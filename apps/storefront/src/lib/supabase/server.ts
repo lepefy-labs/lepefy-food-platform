@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import type { CookieMethodsServer } from '@supabase/ssr';
+import type { CookieMethods } from '@supabase/ssr';
 
 export function createClient() {
   const cookieStore = cookies();
@@ -12,7 +12,7 @@ export function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: Parameters<CookieMethodsServer['setAll']>[0]) {
+        setAll(cookiesToSet: Parameters<CookieMethods['setAll']>[0]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);
