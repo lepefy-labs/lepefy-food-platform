@@ -1,0 +1,14 @@
+{
+  "name": "lepefy-food",
+  "private": true,
+  "version": "0.0.1",
+  "engines": { "node": ">=18" },
+  "packageManager": "pnpm@8.15.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "pnpm --filter @lepefy/storefront dev",
+    "build": "pnpm --filter @lepefy/storefront build",
+    "lint": "pnpm --filter @lepefy/storefront lint",
+    "typecheck": "pnpm --filter @lepefy/storefront typecheck"
+  }
+}

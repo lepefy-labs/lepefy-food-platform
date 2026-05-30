@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #1d9e75;
+  --color-primary-light: #e1f5ee;
+  --color-secondary: #f2c811;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  body { @apply bg-white text-gray-900 antialiased; }
+}
