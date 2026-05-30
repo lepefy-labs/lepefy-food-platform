@@ -15,7 +15,7 @@ insert into tenants (
   'EUR',
   'fr-FR',
   true,
-  'Via Guasco 5, 42121 Reggio Emilia, Italia'
+  'Via Angelo Zanti 1, 42122 Reggio Emilia, Italia'
 );
 
 -- ─── CATEGORIES ───────────────────────────────────────────────────────────────
