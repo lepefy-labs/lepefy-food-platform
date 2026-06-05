@@ -104,3 +104,10 @@ begin
     set vat_rate = excluded.vat_rate,
         note     = excluded.note;
 end $$;
+
+-- ─── 6. DROP TABELLE OBSOLETE ─────────────────────────────────────────────────
+-- shipping_zones e shipping_rates (create in 001_initial_schema.sql) non servono
+-- più: la selezione del corriere e il calcolo tariffe sono delegati a Packlink PRO.
+
+drop table if exists shipping_rates cascade;
+drop table if exists shipping_zones cascade;
