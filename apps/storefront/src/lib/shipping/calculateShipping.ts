@@ -9,8 +9,13 @@
  *   shippingTotal = packlink_price + vat + packaging
  *
  * Filtri applicati sui servizi Packlink:
- *   - dropoff: false     → solo consegna a domicilio (no locker, no punto ritiro)
+ *   - dropoff: false        → solo consegna a domicilio (no locker, no punto ritiro)
  *   - no company-collection → esclude servizi B2B non applicabili a privati
+ *
+ * Dimensioni pacco configurabili in DB (packaging_surcharges):
+ *   box_length_cm, box_width_cm, box_height_cm
+ *   → usate per il calcolo peso volumetrico da parte di Packlink
+ *   → peso_vol = (L × W × H) / 5000
  *
  * Tutto configurabile in DB — zero modifiche al codice per cambiare importi o logica.
  */
@@ -23,6 +28,9 @@ export interface PackagingSurcharge {
   surcharge_amount: number;
   surcharge_mode:   SurchargeMode;
   max_pack_kg:      number;
+  box_length_cm:    number;
+  box_width_cm:     number;
+  box_height_cm:    number;
 }
 
 export interface VatRate {
@@ -55,6 +63,7 @@ export type ShippingResult =
         vatAmount:               number;
         surchargeMode:           SurchargeMode;
         packagingSurchargeTotal: number;
+        boxDimensions:           { length: number; width: number; height: number };
       };
     }
   | {
@@ -76,8 +85,8 @@ interface PacklinkServiceInfo {
 }
 
 interface PacklinkService {
-  id:       number;
-  dropoff:  boolean;
+  id:           number;
+  dropoff:      boolean;
   service_info: PacklinkServiceInfo[];
   price: {
     base_price: number; // prezzo netto B2B — IVA cliente finale gestita da vat_rate in DB
@@ -91,8 +100,8 @@ interface PacklinkService {
  */
 function isEligibleService(s: PacklinkService): boolean {
   if (s.dropoff) return false;
-  const isB2B = s.service_info.some((info) =>
-    info.icon === 'b2b' || info.text.includes('company-collection'),
+  const isB2B = s.service_info.some(
+    (info) => info.icon === 'b2b' || info.text.includes('company-collection'),
   );
   return !isB2B;
 }
@@ -104,7 +113,6 @@ async function fetchPacklinkCost(
   parcels: Array<{ weight: number; width: number; height: number; length: number }>,
 ): Promise<{ cost: number; serviceId: number } | null> {
 
-  // Sintassi array Packlink: from[country], from[zip], packages[0][weight], ...
   const params = new URLSearchParams();
   params.set('from[country]', from.country);
   params.set('from[zip]',     from.zip_code);
@@ -127,11 +135,9 @@ async function fetchPacklinkCost(
   const services: PacklinkService[] = await res.json();
   if (!services?.length) return null;
 
-  // Applica filtri: solo consegna a domicilio, no B2B
   const eligible = services.filter(isEligibleService);
   if (!eligible.length) return null;
 
-  // Seleziona il servizio più economico tra quelli idonei
   const cheapest = eligible.reduce((min, s) =>
     s.price.base_price < min.price.base_price ? s : min,
   );
@@ -151,7 +157,6 @@ export function splitIntoParcels(totalG: number, maxPackKg: number): number[] {
   return result;
 }
 
-/** Trova l'aliquota IVA per paese. Fallback su '{*}', poi 0. */
 export function resolveVatRate(country: string, vatRates: VatRate[]): number {
   const exact = vatRates.find(
     (v) => !v.countries.includes('*') && v.countries.includes(country),
@@ -160,11 +165,6 @@ export function resolveVatRate(country: string, vatRates: VatRate[]): number {
   return vatRates.find((v) => v.countries.includes('*'))?.vat_rate ?? 0;
 }
 
-/**
- * Calcola il surplus imballaggio in base alla modalità configurata.
- *   per_parcel → surcharge_amount × num_pacchi
- *   per_order  → surcharge_amount fisso
- */
 export function calcPackagingSurcharge(
   surcharge: PackagingSurcharge,
   numParcels: number,
@@ -195,16 +195,23 @@ export async function calculateShipping(
   // 2. Surplus imballaggio (invisibile al cliente)
   const packagingSurchargeTotal = calcPackagingSurcharge(packagingSurcharge, numParcels);
 
-  // 3. Chiama Packlink PRO — prezzo corriere in tempo reale
+  // 3. Dimensioni pacco da DB — usate da Packlink per peso volumetrico
+  const boxDimensions = {
+    length: packagingSurcharge.box_length_cm,
+    width:  packagingSurcharge.box_width_cm,
+    height: packagingSurcharge.box_height_cm,
+  };
+
+  // 4. Chiama Packlink PRO — prezzo corriere in tempo reale
   let packlinkResult: { cost: number; serviceId: number } | null = null;
   try {
     packlinkResult = await fetchPacklinkCost(
       packlinkApiKey, from, to,
       parcelWeightsG.map((g) => ({
         weight: parseFloat((g / 1000).toFixed(3)),
-        width:  30, // cm — scatola standard
-        height: 20,
-        length: 40,
+        width:  boxDimensions.width,
+        height: boxDimensions.height,
+        length: boxDimensions.length,
       })),
     );
   } catch {
@@ -223,11 +230,11 @@ export async function calculateShipping(
     };
   }
 
-  // 4. IVA sul prezzo Packlink (da confermare con commercialista ChloeFood)
+  // 5. IVA sul prezzo Packlink (da confermare con commercialista ChloeFood)
   const vatRate   = resolveVatRate(to.country, vatRates);
   const vatAmount = parseFloat((packlinkResult.cost * vatRate).toFixed(2));
 
-  // 5. Totale finale mostrato al cliente
+  // 6. Totale finale mostrato al cliente
   const shippingTotal = parseFloat(
     (packlinkResult.cost + vatAmount + packagingSurchargeTotal).toFixed(2),
   );
@@ -243,6 +250,7 @@ export async function calculateShipping(
       vatAmount,
       surchargeMode:           packagingSurcharge.surcharge_mode,
       packagingSurchargeTotal,
+      boxDimensions,
     },
   };
 }
