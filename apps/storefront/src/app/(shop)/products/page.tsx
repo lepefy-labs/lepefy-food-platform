@@ -6,7 +6,7 @@ import { ProductGrid } from '@/components/catalog/ProductGrid';
 import type { Category, ProductWithCategory } from '@lepefy/types';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const slug = process.env.TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   return { title: 'Catalogue', description: `Découvrez les produits de ${tenant.name}` };
 }
@@ -16,7 +16,7 @@ interface ProductsPageProps {
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const tenantSlug = process.env.TENANT_SLUG ?? 'chloefood';
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const supabase = createClient();
 

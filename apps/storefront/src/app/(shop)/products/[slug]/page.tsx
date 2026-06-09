@@ -8,7 +8,7 @@ import type { ProductWithCategory } from '@lepefy/types';
 interface ProductPageProps { params: { slug: string } }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const tenantSlug = process.env.TENANT_SLUG ?? 'chloefood';
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const supabase = createClient();
   const { data } = await supabase.from('products').select('name, description')
@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const tenantSlug = process.env.TENANT_SLUG ?? 'chloefood';
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const supabase = createClient();
 
