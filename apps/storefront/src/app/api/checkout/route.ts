@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
     }
 
-    const tenant = await getTenant();
+    const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+    const tenant = await getTenant(tenantSlug);
     const supabase = createServiceClient();
 
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);

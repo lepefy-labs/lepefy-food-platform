@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const tenantSlug = process.env.TENANT_SLUG ?? 'chloefood';
+    const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(tenantSlug);
     const supabase = createClient();
 
