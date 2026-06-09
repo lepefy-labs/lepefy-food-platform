@@ -68,6 +68,7 @@ export type ShippingResult =
         surchargeMode:           SurchargeMode;
         packagingSurchargeTotal: number;
         boxDimensions:           { length: number; width: number; height: number };
+        serviceId:               number;
       };
     }
   | {
@@ -130,22 +131,48 @@ async function fetchPacklinkCost(
     params.set(`packages[${i}][length]`, p.length.toString());
   });
 
-  const res = await fetch(`${PACKLINK_API_BASE}/services?${params}`, {
+  const url = `${PACKLINK_API_BASE}/services?${params}`;
+  console.info('[calculateShipping] Packlink request — url:', url.replace(apiKey, '***'));
+
+  const res = await fetch(url, {
     headers: { Authorization: apiKey },
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    let body = '';
+    try { body = await res.text(); } catch { /* ignore */ }
+    console.error('[calculateShipping] Packlink API error — status:', res.status, '— body:', body.slice(0, 500));
+    return null;
+  }
 
-  const services: PacklinkService[] = await res.json();
-  if (!services?.length) return null;
+  let services: PacklinkService[];
+  try {
+    services = await res.json();
+  } catch (parseErr) {
+    console.error('[calculateShipping] Packlink response JSON parse error:', parseErr);
+    return null;
+  }
+
+  console.info('[calculateShipping] Packlink services returned:', services?.length ?? 0, 'total');
+
+  if (!services?.length) {
+    console.info('[calculateShipping] Packlink returned 0 services for this destination');
+    return null;
+  }
 
   const eligible = services.filter(isEligibleService);
-  if (!eligible.length) return null;
+  console.info('[calculateShipping] eligible services (home delivery, no B2B):', eligible.length);
+
+  if (!eligible.length) {
+    console.info('[calculateShipping] no eligible services — all filtered out');
+    return null;
+  }
 
   const cheapest = eligible.reduce((min, s) =>
     s.price.base_price < min.price.base_price ? s : min,
   );
 
+  console.info('[calculateShipping] cheapest service — id:', cheapest.id, '— base_price:', cheapest.price.base_price);
   return { cost: cheapest.price.base_price, serviceId: cheapest.id };
 }
 
@@ -196,6 +223,8 @@ export async function calculateShipping(
   const parcelWeightsG = splitIntoParcels(totalWeightG, packagingSurcharge.max_pack_kg);
   const numParcels = parcelWeightsG.length;
 
+  console.info('[calculateShipping] totalWeightG:', totalWeightG, '— numParcels:', numParcels, '— to:', to.country, to.zip_code);
+
   // 2. Surplus imballaggio (invisibile al cliente)
   const packagingSurchargeTotal = calcPackagingSurcharge(packagingSurcharge, numParcels);
 
@@ -218,7 +247,8 @@ export async function calculateShipping(
         length: boxDimensions.length,
       })),
     );
-  } catch {
+  } catch (err) {
+    console.error('[calculateShipping] fetchPacklinkCost threw unexpectedly:', err);
     return {
       available: false,
       reason: 'packlink_error',
@@ -243,6 +273,8 @@ export async function calculateShipping(
     (packlinkResult.cost + vatAmount + packagingSurchargeTotal).toFixed(2),
   );
 
+  console.info('[calculateShipping] result — shippingTotal:', shippingTotal, '— packlinkCost:', packlinkResult.cost, '— vat:', vatAmount, '— surcharge:', packagingSurchargeTotal);
+
   return {
     available: true,
     shippingTotal,
@@ -255,6 +287,7 @@ export async function calculateShipping(
       surchargeMode:           packagingSurcharge.surcharge_mode,
       packagingSurchargeTotal,
       boxDimensions,
+      serviceId:               packlinkResult.serviceId,
     },
   };
 }
