@@ -8,13 +8,11 @@
  *   vat           = packlink_price × vat_rate        (per paese, da DB)
  *   shippingTotal = packlink_price + vat + packaging
  *
- * Note:
- *  - vat_rate configurabile per paese in DB (shipping_vat_rates)
- *    → da confermare con commercialista ChloeFood prima del go-live
- *  - Il corriere scelto da Packlink non viene mai esposto al cliente
- *  - Nessuna differenziazione per tipo conservazione (dry/fresh/frozen)
- *  - Packlink restituisce prezzi B2B (reverse charge, tax_price = 0)
- *    → il vat_rate in DB riguarda l'IVA applicata al cliente finale
+ * Filtri applicati sui servizi Packlink:
+ *   - dropoff: false     → solo consegna a domicilio (no locker, no punto ritiro)
+ *   - no company-collection → esclude servizi B2B non applicabili a privati
+ *
+ * Tutto configurabile in DB — zero modifiche al codice per cambiare importi o logica.
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,11 +70,31 @@ const WEIGHT_FALLBACK_G = 400;
 
 // ─── Packlink API ─────────────────────────────────────────────────────────────
 
+interface PacklinkServiceInfo {
+  text: string;
+  icon: string;
+}
+
 interface PacklinkService {
-  id: number;
+  id:       number;
+  dropoff:  boolean;
+  service_info: PacklinkServiceInfo[];
   price: {
     base_price: number; // prezzo netto B2B — IVA cliente finale gestita da vat_rate in DB
   };
+}
+
+/**
+ * Filtra i servizi Packlink per garantire:
+ *   1. Solo consegna a domicilio (dropoff: false)
+ *   2. Nessun servizio B2B aziendale (esclude company-collection)
+ */
+function isEligibleService(s: PacklinkService): boolean {
+  if (s.dropoff) return false;
+  const isB2B = s.service_info.some((info) =>
+    info.icon === 'b2b' || info.text.includes('company-collection'),
+  );
+  return !isB2B;
 }
 
 async function fetchPacklinkCost(
@@ -109,8 +127,12 @@ async function fetchPacklinkCost(
   const services: PacklinkService[] = await res.json();
   if (!services?.length) return null;
 
-  // Seleziona il servizio più economico
-  const cheapest = services.reduce((min, s) =>
+  // Applica filtri: solo consegna a domicilio, no B2B
+  const eligible = services.filter(isEligibleService);
+  if (!eligible.length) return null;
+
+  // Seleziona il servizio più economico tra quelli idonei
+  const cheapest = eligible.reduce((min, s) =>
     s.price.base_price < min.price.base_price ? s : min,
   );
 
