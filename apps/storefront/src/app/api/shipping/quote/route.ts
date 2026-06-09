@@ -5,15 +5,6 @@
  * Body: { items: [{weight_grams, quantity}], to: {country, zip_code} }
  * Response: { available: true, shippingTotal: number }
  *        or { available: false, message: string }
- *
- * Formula:
- *   num_pacchi      = ceil(peso_totale_g / (max_pack_kg × 1000))
- *   packaging       = surcharge_amount × num_pacchi  (se per_parcel)
- *                   = surcharge_amount               (se per_order)
- *   vat             = packlink_price × vat_rate (per paese, da DB)
- *   shippingTotal   = packlink_price + vat + packaging
- *
- * Il breakdown interno (corriere, IVA, imballo) non viene mai esposto al client.
  */
 
 import { NextResponse } from 'next/server';
@@ -53,11 +44,10 @@ export async function POST(request: Request) {
     const tenant = await getTenant(tenantSlug);
     const supabase = createClient();
 
-    // Carica packaging_surcharge e vat_rates in parallelo
     const [{ data: surcharge }, { data: vatRates }] = await Promise.all([
       supabase
         .from('packaging_surcharges')
-        .select('surcharge_amount, surcharge_mode, max_pack_kg') // ← nomi colonne aggiornati
+        .select('surcharge_amount, surcharge_mode, max_pack_kg, box_length_cm, box_width_cm, box_height_cm')
         .eq('tenant_id', tenant.id)
         .eq('active', true)
         .single(),
@@ -80,13 +70,12 @@ export async function POST(request: Request) {
         cartItems: items,
         from: FROM_ADDRESS,
         to,
-        packagingSurcharge: surcharge, // { surcharge_amount, surcharge_mode, max_pack_kg }
+        packagingSurcharge: surcharge,
         vatRates: vatRates ?? [],
       },
       packlinkApiKey,
     );
 
-    // Esporre al client solo available + shippingTotal — mai _internal
     if (!result.available) {
       return NextResponse.json({ available: false, message: result.message });
     }
