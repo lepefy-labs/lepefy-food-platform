@@ -13,7 +13,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { calculateShipping } from '@/lib/shipping/calculateShipping';
 
@@ -37,11 +37,24 @@ export async function POST(request: Request) {
       );
     }
 
+    // ── Tenant ───────────────────────────────────────────────────────────────────
     const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant = await getTenant(tenantSlug);
-    const supabase = createClient();
+    let tenant;
+    try {
+      tenant = await getTenant(tenantSlug);
+    } catch (err) {
+      console.error('[shipping/quote] getTenant failed — slug:', tenantSlug, err);
+      return NextResponse.json(
+        { available: false, message: 'Tenant non trovato.' },
+        { status: 500 },
+      );
+    }
+    console.info('[shipping/quote] tenant loaded — id:', tenant.id, 'slug:', tenant.slug, 'provider:', tenant.shipping_provider);
 
-    // ── Router per provider ───────────────────────────────────────────────────
+    // Use service client to bypass RLS on internal config tables
+    const supabase = createServiceClient();
+
+    // ── Router per provider ───────────────────────────────────────────────────────
 
     switch (tenant.shipping_provider) {
 
@@ -55,6 +68,7 @@ export async function POST(request: Request) {
       // ── Flat rate ────────────────────────────────────────────────────────────
       case 'flat_rate': {
         if (!tenant.flat_rate_amount) {
+          console.error('[shipping/quote] flat_rate provider but flat_rate_amount is null — tenant:', tenant.id);
           return NextResponse.json(
             { available: false, message: 'Tarif de livraison non configuré.' },
             { status: 500 },
@@ -70,16 +84,19 @@ export async function POST(request: Request) {
       // ── Packlink PRO ─────────────────────────────────────────────────────────
       case 'packlink':
       default: {
-        // Chiave API: per-tenant se disponibile, altrimenti fallback env
+        // ── API key ────────────────────────────────────────────────────────────
         const packlinkApiKey = tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY;
         if (!packlinkApiKey) {
+          console.error('[shipping/quote] PACKLINK_API_KEY missing — tenant.packlink_api_key:', tenant.packlink_api_key, '— env PACKLINK_API_KEY:', process.env.PACKLINK_API_KEY ?? '(undefined)');
           return NextResponse.json(
             { available: false, message: 'Service de livraison non configuré.' },
             { status: 500 },
           );
         }
+        console.info('[shipping/quote] packlink api key present — source:', tenant.packlink_api_key ? 'tenant DB' : 'env');
 
-        const [{ data: surcharge }, { data: vatRates }] = await Promise.all([
+        // ── DB config queries ─────────────────────────────────────────────────
+        const [surchargeResult, vatRatesResult] = await Promise.all([
           supabase
             .from('packaging_surcharges')
             .select('surcharge_amount, surcharge_mode, max_pack_kg, box_length_cm, box_width_cm, box_height_cm')
@@ -93,6 +110,17 @@ export async function POST(request: Request) {
             .eq('active', true),
         ]);
 
+        const { data: surcharge, error: surchargeError } = surchargeResult;
+        const { data: vatRates,  error: vatRatesError  } = vatRatesResult;
+
+        if (surchargeError) {
+          console.error('[shipping/quote] packaging_surcharges query error — tenant_id:', tenant.id, '— error:', surchargeError);
+        }
+        if (vatRatesError) {
+          console.error('[shipping/quote] shipping_vat_rates query error — tenant_id:', tenant.id, '— error:', vatRatesError);
+        }
+        console.info('[shipping/quote] surcharge row:', surcharge, '— vatRates count:', vatRates?.length ?? 0);
+
         if (!surcharge) {
           return NextResponse.json(
             { available: false, message: 'Configuration de livraison manquante.' },
@@ -100,6 +128,7 @@ export async function POST(request: Request) {
           );
         }
 
+        // ── Calculate ─────────────────────────────────────────────────────────
         const result = await calculateShipping(
           {
             cartItems: items,
@@ -111,6 +140,8 @@ export async function POST(request: Request) {
           packlinkApiKey,
         );
 
+        console.info('[shipping/quote] calculateShipping result:', JSON.stringify(result));
+
         if (!result.available) {
           return NextResponse.json({ available: false, message: result.message });
         }
@@ -118,12 +149,13 @@ export async function POST(request: Request) {
         return NextResponse.json({
           available: true,
           shippingTotal: result.shippingTotal,
-          shippingDetails: result._internal ?? null, // salvato in DB, mai mostrato al cliente
+          shippingDetails: result._internal ?? null,
         });
       }
     }
 
-  } catch {
+  } catch (err) {
+    console.error('[shipping/quote] unhandled error:', err);
     return NextResponse.json(
       { available: false, message: 'Erreur serveur. Veuillez réessayer.' },
       { status: 500 },
