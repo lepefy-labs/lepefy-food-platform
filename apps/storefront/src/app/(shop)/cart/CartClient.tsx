@@ -144,7 +144,12 @@ export default function CartClient({ tenant }: Props) {
                   aria-label="Supprimer"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -159,7 +164,10 @@ export default function CartClient({ tenant }: Props) {
                   <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
                   <button
                     onClick={() =>
-                      updateQuantity(item.product.id, Math.min(item.quantity + 1, item.product.stock))
+                      updateQuantity(
+                        item.product.id,
+                        Math.min(item.quantity + 1, item.product.stock),
+                      )
                     }
                     disabled={item.quantity >= item.product.stock}
                     className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-30"

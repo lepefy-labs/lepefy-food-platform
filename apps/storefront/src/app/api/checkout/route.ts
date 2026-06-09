@@ -49,8 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
     }
 
-    const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant = await getTenant(tenantSlug);
+    const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
     const supabase = createServiceClient();
 
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Insert order items (table not yet in generated types; use explicit cast)
+    // Insert order items (order_items not yet in generated DB types)
     const orderItemsPayload = items.map((i) => ({
       order_id: order.id,
       tenant_id: tenant.id,
@@ -103,7 +102,9 @@ export async function POST(req: NextRequest) {
 
     const { error: itemsError } = await (supabase as unknown as {
       from: (t: string) => { insert: (rows: unknown[]) => Promise<{ error: unknown }> };
-    }).from('order_items').insert(orderItemsPayload);
+    })
+      .from('order_items')
+      .insert(orderItemsPayload);
 
     if (itemsError) {
       console.error('Order items insert error:', itemsError);
@@ -117,7 +118,7 @@ export async function POST(req: NextRequest) {
       automatic_payment_methods: { enabled: true },
     });
 
-    // Attach PaymentIntent to order
+    // Attach PaymentIntent id to order
     await supabase
       .from('orders')
       .update({ stripe_payment_intent_id: paymentIntent.id })
