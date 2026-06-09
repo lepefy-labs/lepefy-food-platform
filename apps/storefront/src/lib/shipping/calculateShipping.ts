@@ -7,7 +7,11 @@
  *                 = surcharge_amount                 (se per_order)
  *   vat           = packlink_price × vat_rate        (per paese, da DB)
  *   shippingTotal = packlink_price + vat + packaging
- *
+ * max_pack_kg = limite fisico dichiarato dalla cliente (carico manuale nel furgone)
+ *               NON è un limite Packlink — Packlink accetta pesi arbitrari.
+ *   Determina: 1) quanti pacchi fisici prepara ChloeFood
+ *              2) il numero di surcharge imballaggio (3€ × n_pacchi)
+ *              3) i pacchi passati all'API Packlink per il calcolo tariffe
  * Filtri applicati sui servizi Packlink:
  *   - dropoff: false        → solo consegna a domicilio (no locker, no punto ritiro)
  *   - no company-collection → esclude servizi B2B non applicabili a privati
