@@ -3,7 +3,7 @@
  *
  * POST /api/shipping/quote
  * Body: { items: [{weight_grams, quantity}], to: {country, zip_code} }
- * Response: { available: true, shippingTotal: number }
+ * Response: { available: true, shippingTotal: number, shippingDetails: object }
  *        or { available: false, message: string }
  *
  * Multi-tenant: ogni tenant può avere un provider di spedizione diverso.
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           available: true,
           shippingTotal: tenant.flat_rate_amount,
+          shippingDetails: null,
         });
       }
 
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           available: true,
           shippingTotal: result.shippingTotal,
+          shippingDetails: result._internal ?? null, // salvato in DB, mai mostrato al cliente
         });
       }
     }

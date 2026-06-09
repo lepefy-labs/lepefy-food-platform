@@ -28,12 +28,22 @@ interface CheckoutBody {
   phone?: string | null;
   fullName?: string | null;
   shippingTotal: number;
+  shippingDetails?: Record<string, unknown> | null;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body: CheckoutBody = await req.json();
-    const { items, shippingAddress, fulfillmentType, email, phone, fullName, shippingTotal } = body;
+    const {
+      items,
+      shippingAddress,
+      fulfillmentType,
+      email,
+      phone,
+      fullName,
+      shippingTotal,
+      shippingDetails,
+    } = body;
 
     if (!items?.length || !email) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
@@ -55,6 +65,7 @@ export async function POST(req: NextRequest) {
         full_name: fullName ?? null,
         fulfillment_type: fulfillmentType,
         shipping_address: shippingAddress ?? null,
+        shipping_details: shippingDetails ?? null,
         subtotal,
         shipping_cost: shippingTotal ?? 0,
         total,
