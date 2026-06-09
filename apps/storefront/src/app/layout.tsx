@@ -4,7 +4,7 @@ import { TenantProvider } from '@/providers/TenantProvider';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const slug = process.env.TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   return {
     title: { default: tenant.name, template: `%s | ${tenant.name}` },
@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const slug = process.env.TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
   return (
