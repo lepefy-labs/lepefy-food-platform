@@ -13,10 +13,21 @@ interface PageProps {
   params: { id: string };
 }
 
+// Matches ShippingDetails in OrderDetail.tsx — all fields optional here
+// because we only cast from a jsonb column and can't guarantee presence
 interface ShippingDetails {
-  carrierName?: string;
-  serviceName?: string;
-  vatSource?:   string;
+  totalWeightG?:            number;
+  numParcels?:              number;
+  packlinkCost?:            number;
+  serviceId?:               number;
+  serviceName?:             string;
+  carrierName?:             string;
+  vatSource?:               'packlink' | 'db';
+  vatRate?:                 number;
+  vatAmount?:               number;
+  surchargeMode?:           string;
+  packagingSurchargeTotal?: number;
+  boxDimensions?:           { length: number; width: number; height: number };
 }
 
 export default async function AdminOrderPage({ params }: PageProps) {
@@ -44,11 +55,9 @@ export default async function AdminOrderPage({ params }: PageProps) {
     .eq('active', true)
     .order('position', { ascending: true });
 
-  const carriers = (carriersRaw ?? []) as { name: string }[];
-
+  const carriers        = (carriersRaw ?? []) as { name: string }[];
   const shippingDetails = (order.shipping_details ?? null) as ShippingDetails | null;
-
-  const isPickup = order.fulfillment_type === 'pickup';
+  const isPickup        = order.fulfillment_type === 'pickup';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,7 +94,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
             <p className="text-xs text-gray-500">{order.email}</p>
             {order.shipping_address && !isPickup && (
               <div className="text-xs text-gray-500 mt-1">
-                {(order.shipping_address as { line1?: string; postal_code?: string; city?: string; country?: string }).line1 && (
+                {(order.shipping_address as { line1?: string }).line1 && (
                   <p>{(order.shipping_address as { line1?: string }).line1}</p>
                 )}
                 <p>
@@ -98,8 +107,10 @@ export default async function AdminOrderPage({ params }: PageProps) {
               </div>
             )}
             {isPickup && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold mt-1"
-                style={{ background: '#EFF6FF', color: '#1E40AF', border: '0.5px solid #BFDBFE' }}>
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold mt-1"
+                style={{ background: '#EFF6FF', color: '#1E40AF', border: '0.5px solid #BFDBFE' }}
+              >
                 🏪 Click &amp; Collect
               </span>
             )}
@@ -115,19 +126,25 @@ export default async function AdminOrderPage({ params }: PageProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-gray-700">{item.name} × {item.quantity}</span>
                   {item.storage_type === 'frozen' && (
-                    <span className="text-xs px-1.5 py-0.5 rounded"
-                      style={{ background: '#EFF6FF', color: '#1D4ED8', border: '0.5px solid #BFDBFE' }}>
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded"
+                      style={{ background: '#EFF6FF', color: '#1D4ED8', border: '0.5px solid #BFDBFE' }}
+                    >
                       ❄ surgelé
                     </span>
                   )}
                   {item.storage_type === 'fresh' && (
-                    <span className="text-xs px-1.5 py-0.5 rounded"
-                      style={{ background: '#F0FDF4', color: '#15803D', border: '0.5px solid #BBF7D0' }}>
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded"
+                      style={{ background: '#F0FDF4', color: '#15803D', border: '0.5px solid #BBF7D0' }}
+                    >
                       🌿 frais
                     </span>
                   )}
                 </div>
-                <span className="font-medium text-gray-900">{formatPrice(item.subtotal, tenant.currency)}</span>
+                <span className="font-medium text-gray-900">
+                  {formatPrice(item.subtotal, tenant.currency)}
+                </span>
               </div>
             ))}
           </div>
@@ -153,40 +170,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Section 3 — Shipping details (delivery only) */}
-        {!isPickup && shippingDetails && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Détails expédition</h2>
-            <div className="space-y-1.5 text-sm text-gray-600">
-              {shippingDetails.serviceName && (
-                <div className="flex gap-2">
-                  <span className="text-gray-400 text-xs w-28 shrink-0">Service :</span>
-                  <span>{shippingDetails.serviceName}</span>
-                </div>
-              )}
-              {order.tracking_carrier && (
-                <div className="flex gap-2">
-                  <span className="text-gray-400 text-xs w-28 shrink-0">Transporteur :</span>
-                  <span className="font-medium">{order.tracking_carrier}</span>
-                </div>
-              )}
-              {order.tracking_code && (
-                <div className="flex gap-2">
-                  <span className="text-gray-400 text-xs w-28 shrink-0">Tracking :</span>
-                  <span className="font-mono">{order.tracking_code}</span>
-                </div>
-              )}
-              {shippingDetails.vatSource && (
-                <div className="flex gap-2">
-                  <span className="text-gray-400 text-xs w-28 shrink-0">Source TVA :</span>
-                  <span className="text-xs">{shippingDetails.vatSource}</span>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* Section 4 + 5 — OrderDetail (interactive) */}
+        {/* Sections 3-5 — interactive (shipping details + update form + print) */}
         <OrderDetail
           order={order}
           currency={tenant.currency}

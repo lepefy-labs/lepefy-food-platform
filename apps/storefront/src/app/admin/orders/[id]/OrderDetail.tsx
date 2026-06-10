@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatPrice } from '@/lib/utils/format';
 import type { Order, OrderStatus } from '@lepefy/types';
 
 // ─── Translations ─────────────────────────────────────────────────────────────
@@ -37,6 +38,15 @@ const translations = {
     changeCarrier:        'Changer de transporteur ?',
     cancel:               'Annuler',
     confirm:              'Confirmer',
+    // Shipping details section
+    shippingDetails:      'Détails expédition',
+    sdCarrier:            'Transporteur',
+    sdService:            'Service',
+    sdParcels:            'Nb colis',
+    sdWeight:             'Poids total',
+    sdCarrierCost:        'Coût transporteur',
+    sdPackaging:          'Surplus emballage',
+    sdTotal:              'Total livraison facturé',
   },
   it: {
     updateOrder:          'Aggiorna ordine',
@@ -68,6 +78,15 @@ const translations = {
     changeCarrier:        'Cambiare corriere?',
     cancel:               'Annulla',
     confirm:              'Conferma',
+    // Shipping details section
+    shippingDetails:      'Dettagli spedizione',
+    sdCarrier:            'Corriere',
+    sdService:            'Servizio',
+    sdParcels:            'N° colli',
+    sdWeight:             'Peso totale',
+    sdCarrierCost:        'Costo corriere',
+    sdPackaging:          'Surplus imballaggio',
+    sdTotal:              'Totale spedizione fatturato',
   },
 } as const;
 
@@ -92,15 +111,86 @@ const STATUS_OPTIONS_PICKUP = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ShippingDetails {
-  carrierName?: string;
+  totalWeightG?:            number;
+  numParcels?:              number;
+  packlinkCost?:            number;
+  serviceId?:               number;
+  serviceName?:             string;
+  carrierName?:             string;
+  vatSource?:               'packlink' | 'db';
+  vatRate?:                 number;
+  vatAmount?:               number;
+  surchargeMode?:           string;
+  packagingSurchargeTotal?: number;
+  boxDimensions?:           { length: number; width: number; height: number };
 }
 
 interface Props {
-  order:           Order;
-  currency:        string;
-  carriers:        { name: string }[];
-  shippingDetails: ShippingDetails | null;
+  order:            Order;
+  currency:         string;
+  carriers:         { name: string }[];
+  shippingDetails:  ShippingDetails | null;
   shippingProvider: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const CARRIER_MAP: Record<string, string> = {
+  brt:         'BRT',
+  bartolini:   'BRT',
+  dhl:         'DHL',
+  fedex:       'FedEx',
+  tnt:         'TNT',
+  gls:         'GLS',
+  ups:         'UPS',
+  sda:         'SDA',
+  poste:       'Poste Italiane',
+  'poste italiane': 'Poste Italiane',
+  dpd:         'DPD',
+  nexive:      'Nexive',
+};
+
+function formatCarrierName(raw: string | undefined): string {
+  if (!raw) return '—';
+  const key = raw.toLowerCase().trim();
+  return CARRIER_MAP[key] ?? raw.trim();
+}
+
+function vatLabel(sd: ShippingDetails, lang: Lang): string {
+  const pct = Math.round((sd.vatRate ?? 0) * 100);
+  if ((sd.vatSource ?? '') === 'packlink') {
+    return lang === 'fr' ? 'TVA (incluse Packlink)' : 'IVA (inclusa Packlink)';
+  }
+  return lang === 'fr'
+    ? `TVA livraison (${pct}% — appliquée par le système)`
+    : `IVA spedizione (${pct}% — applicata dal sistema)`;
+}
+
+// ─── Field row ────────────────────────────────────────────────────────────────
+
+function Field({
+  label,
+  value,
+  bold,
+  accent,
+}: {
+  label:   string;
+  value:   string;
+  bold?:   boolean;
+  accent?: boolean;
+}) {
+  return (
+    <div className={`flex justify-between items-baseline gap-2 text-sm ${bold ? 'font-semibold' : ''}`}>
+      <span className="text-gray-400 text-xs shrink-0">{label}</span>
+      <span className={`text-right ${accent ? 'text-[var(--color-primary)] font-semibold' : bold ? 'text-gray-900' : 'text-gray-700'}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="border-t border-gray-100 my-2" />;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -130,19 +220,19 @@ export default function OrderDetail({
   const originalCarrier =
     order.tracking_carrier ?? packlinkCarrier ?? carriers[0]?.name ?? '';
 
-  const [status, setStatus]               = useState<OrderStatus>(order.status);
-  const [carrier, setCarrier]             = useState(originalCarrier);
+  const [status,         setStatus]         = useState<OrderStatus>(order.status);
+  const [carrier,        setCarrier]        = useState(originalCarrier);
   const [pendingCarrier, setPendingCarrier] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm]     = useState(false);
-  const [trackingCode, setTrackingCode]   = useState(order.tracking_code ?? '');
-  const [notes, setNotes]                 = useState(order.notes ?? '');
-  const [saving, setSaving]               = useState(false);
-  const [saveMsg, setSaveMsg]             = useState<string | null>(null);
-  const [saveError, setSaveError]         = useState(false);
-  const [markingPaid, setMarkingPaid]     = useState(false);
-  const [paidMsg, setPaidMsg]             = useState<string | null>(null);
-  const [paidError, setPaidError]         = useState(false);
-  const [isPaid, setIsPaid]               = useState(!isInStorePending);
+  const [showConfirm,    setShowConfirm]    = useState(false);
+  const [trackingCode,   setTrackingCode]   = useState(order.tracking_code ?? '');
+  const [notes,          setNotes]          = useState(order.notes ?? '');
+  const [saving,         setSaving]         = useState(false);
+  const [saveMsg,        setSaveMsg]        = useState<string | null>(null);
+  const [saveError,      setSaveError]      = useState(false);
+  const [markingPaid,    setMarkingPaid]    = useState(false);
+  const [paidMsg,        setPaidMsg]        = useState<string | null>(null);
+  const [paidError,      setPaidError]      = useState(false);
+  const [isPaid,         setIsPaid]         = useState(!isInStorePending);
 
   const t = translations[lang];
 
@@ -238,6 +328,9 @@ export default function OrderDetail({
   const inputClass =
     'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
 
+  // Fully-typed shipping details (safe — all fields accessed via optional chaining below)
+  const sd = shippingDetails;
+
   return (
     <>
       {/* Lang toggle */}
@@ -276,6 +369,56 @@ export default function OrderDetail({
               {paidMsg}
             </p>
           )}
+        </section>
+      )}
+
+      {/* Section 3 — Shipping details (delivery + Packlink only) */}
+      {!isPickup && sd && (
+        <section className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">{t.shippingDetails}</h2>
+          <div className="space-y-2">
+            <Field
+              label={t.sdCarrier}
+              value={formatCarrierName(sd.carrierName)}
+            />
+            {sd.serviceName && (
+              <Field label={t.sdService} value={sd.serviceName} />
+            )}
+            {sd.numParcels != null && (
+              <Field label={t.sdParcels} value={String(sd.numParcels)} />
+            )}
+            {sd.totalWeightG != null && (
+              <Field
+                label={t.sdWeight}
+                value={(sd.totalWeightG / 1000).toFixed(2) + ' kg'}
+              />
+            )}
+            <Divider />
+            {sd.packlinkCost != null && (
+              <Field
+                label={t.sdCarrierCost}
+                value={formatPrice(sd.packlinkCost, currency)}
+              />
+            )}
+            {sd.vatAmount != null && (
+              <Field
+                label={vatLabel(sd, lang)}
+                value={formatPrice(sd.vatAmount, currency)}
+              />
+            )}
+            {sd.packagingSurchargeTotal != null && sd.packagingSurchargeTotal > 0 && (
+              <Field
+                label={t.sdPackaging}
+                value={formatPrice(sd.packagingSurchargeTotal, currency)}
+              />
+            )}
+            <Divider />
+            <Field
+              label={t.sdTotal}
+              value={formatPrice(order.shipping_cost, currency)}
+              bold
+            />
+          </div>
         </section>
       )}
 
