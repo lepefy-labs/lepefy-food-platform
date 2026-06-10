@@ -135,7 +135,8 @@ const translations = {
   },
 } as const;
 
-type Lang = keyof typeof translations;
+type Lang         = keyof typeof translations;
+type Translations = typeof translations.fr | typeof translations.it;
 
 // ─── SVG Flags ───────────────────────────────────────────────────────────────
 
@@ -258,7 +259,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }
   cancelled:        { bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA' },
 };
 
-function statusLabel(status: OrderStatus, t: typeof translations.fr): string {
+function statusLabel(status: OrderStatus, t: Translations): string {
   const map: Record<string, string> = {
     new:              t.new,
     preparing:        t.preparing,
@@ -270,7 +271,7 @@ function statusLabel(status: OrderStatus, t: typeof translations.fr): string {
   return map[status] ?? status;
 }
 
-function StatusBadge({ status, t }: { status: OrderStatus; t: typeof translations.fr }) {
+function StatusBadge({ status, t }: { status: OrderStatus; t: Translations }) {
   const s = STATUS_STYLE[status] ?? { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB' };
   return (
     <span
