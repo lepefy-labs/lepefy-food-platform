@@ -11,6 +11,7 @@ export interface Order {
   full_name: string | null;
   fulfillment_type: FulfillmentType;
   shipping_address: ShippingAddress | null;
+  shipping_details: Record<string, unknown> | null;
   subtotal: number;
   shipping_cost: number;
   total: number;
