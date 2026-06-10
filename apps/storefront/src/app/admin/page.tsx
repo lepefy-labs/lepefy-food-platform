@@ -6,6 +6,77 @@ import type { Order, OrderStatus, OrderItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 
+// ─── Flag SVGs ────────────────────────────────────────────────────────────────
+
+const FLAGS: Record<string, React.ReactElement> = {
+  FR: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="7"  height="14" fill="#002395" />
+      <rect x="7"  width="6"  height="14" fill="#fff" />
+      <rect x="13" width="7"  height="14" fill="#ED2939" />
+    </svg>
+  ),
+  BE: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="7"  height="14" fill="#1E1E1E" />
+      <rect x="7"  width="6"  height="14" fill="#FAE042" />
+      <rect x="13" width="7"  height="14" fill="#CC0001" />
+    </svg>
+  ),
+  DE: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="20" height="5"  fill="#1E1E1E" />
+      <rect y="5"  width="20" height="4"  fill="#DD0000" />
+      <rect y="9"  width="20" height="5"  fill="#FFCE00" />
+    </svg>
+  ),
+  CH: (
+    <svg width="14" height="14" viewBox="0 0 14 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="14" height="14" fill="#FF0000" />
+      <rect x="6" y="2" width="2"  height="10" fill="#fff" />
+      <rect x="2" y="6" width="10" height="2"  fill="#fff" />
+    </svg>
+  ),
+  LU: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="20" height="5"  fill="#EF3340" />
+      <rect y="5"  width="20" height="4"  fill="#fff" />
+      <rect y="9"  width="20" height="5"  fill="#00A3E0" />
+    </svg>
+  ),
+  NL: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="20" height="5"  fill="#AE1C28" />
+      <rect y="5"  width="20" height="4"  fill="#fff" />
+      <rect y="9"  width="20" height="5"  fill="#21468B" />
+    </svg>
+  ),
+  ES: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="20" height="3"  fill="#AA151B" />
+      <rect y="3"  width="20" height="8"  fill="#F1BF00" />
+      <rect y="11" width="20" height="3"  fill="#AA151B" />
+    </svg>
+  ),
+  PT: (
+    <svg width="20" height="14" viewBox="0 0 20 14" style={{ borderRadius: 2, flexShrink: 0 }}>
+      <rect width="8"  height="14" fill="#006600" />
+      <rect x="8" width="12" height="14" fill="#FF0000" />
+    </svg>
+  ),
+};
+
+const FLAG_STYLES: Record<string, { bg: string; color: string; border: string }> = {
+  FR: { bg: '#EEF2FF', color: '#1E3A8A', border: '#BFDBFE' },
+  BE: { bg: '#FEFCE8', color: '#854D0E', border: '#FDE68A' },
+  DE: { bg: '#FEF2F2', color: '#991B1B', border: '#FECACA' },
+  CH: { bg: '#FEF2F2', color: '#991B1B', border: '#FECACA' },
+  LU: { bg: '#EEF2FF', color: '#1E3A8A', border: '#BFDBFE' },
+  NL: { bg: '#EEF2FF', color: '#1E3A8A', border: '#BFDBFE' },
+  ES: { bg: '#FEFCE8', color: '#854D0E', border: '#FDE68A' },
+  PT: { bg: '#F0FDF4', color: '#166534', border: '#BBF7D0' },
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -35,41 +106,85 @@ const CARRIER_MAP: Record<string, string> = {
   'inpost it':      'InPost',
 };
 
-const FLAG_MAP: Record<string, string> = {
-  FR: '🇫🇷', BE: '🇧🇪', DE: '🇩🇪', CH: '🇨🇭',
-  LU: '🇱🇺', NL: '🇳🇱', ES: '🇪🇸', PT: '🇵🇹',
-  AT: '🇦🇹', GB: '🇬🇧',
-};
-
 function formatCarrierName(name: string | null | undefined): string {
   if (!name) return '—';
   return CARRIER_MAP[name.toLowerCase()] ?? name;
 }
 
-function formatProductsList(items: Pick<OrderItem, 'name' | 'quantity'>[]): string {
-  if (!items?.length) return '—';
-  if (items.length === 1) {
-    const item = items[0];
-    if (!item) return '—';
-    return `${item.name} × ${item.quantity}`;
+function StorageTag({ type }: { type: 'frozen' | 'fresh' }) {
+  const styles = {
+    frozen: { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE', label: '❄ surgelé' },
+    fresh:  { bg: '#F0FDF4', color: '#166534', border: '#BBF7D0', label: '🌿 frais'  },
+  };
+  const s = styles[type];
+  return (
+    <span style={{
+      display: 'inline-block', fontSize: 10, fontWeight: 600,
+      padding: '1px 5px', borderRadius: 3, marginRight: 3,
+      background: s.bg, color: s.color, border: `0.5px solid ${s.border}`,
+    }}>
+      {s.label}
+    </span>
+  );
+}
+
+function ProductsCell({ items }: { items: Pick<OrderItem, 'name' | 'storage_type'>[] }) {
+  const MAX   = 3;
+  const names = items.slice(0, MAX).map((i) => i.name).join(', ');
+  const extra = items.length > MAX ? ` + ${items.length - MAX} autres` : '';
+  const hasFrozen = items.some((i) => i.storage_type === 'frozen');
+  const hasFresh  = items.some((i) => i.storage_type === 'fresh');
+
+  return (
+    <div>
+      <span style={{ fontSize: 12, color: '#6B7280' }}>
+        {names}
+        {extra && <span style={{ color: '#9CA3AF' }}>{extra}</span>}
+      </span>
+      {(hasFrozen || hasFresh) && (
+        <div style={{ marginTop: 3 }}>
+          {hasFrozen && <StorageTag type="frozen" />}
+          {hasFresh  && <StorageTag type="fresh"  />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DestinationCell({
+  fulfillmentType,
+  shippingAddress,
+}: {
+  fulfillmentType: string;
+  shippingAddress: { country?: string; city?: string; postal_code?: string } | null;
+}) {
+  if (fulfillmentType === 'pickup') {
+    return <span className="text-xs text-blue-600 font-medium">🏪 Click & Collect</span>;
   }
-  if (items.length <= 3) return items.map((i) => i.name).join(', ');
-  return `${items.length} produits`;
-}
 
-function getDominantStorageType(
-  items: Pick<OrderItem, 'storage_type'>[],
-): 'dry' | 'fresh' | 'frozen' {
-  if (items.some((i) => i.storage_type === 'frozen')) return 'frozen';
-  if (items.some((i) => i.storage_type === 'fresh'))  return 'fresh';
-  return 'dry';
-}
+  const country = shippingAddress?.country?.toUpperCase() ?? null;
 
-const STORAGE_ICON: Record<string, string> = {
-  frozen: '❄️',
-  fresh:  '🌿',
-  dry:    '',
-};
+  if (!country || country === 'IT') {
+    const city    = shippingAddress?.city ?? '';
+    const postal  = shippingAddress?.postal_code ?? '';
+    const label   = [city, postal].filter(Boolean).join(' ');
+    return <span className="text-xs text-gray-400">{label || 'IT'}</span>;
+  }
+
+  const flag  = FLAGS[country];
+  const style = FLAG_STYLES[country] ?? { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB' };
+
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize: 11, fontWeight: 600, padding: '2px 7px 2px 3px',
+      borderRadius: 4, border: `0.5px solid ${style.border}`,
+      background: style.bg, color: style.color,
+    }}>
+      {flag ?? '🌍'} {country}
+    </span>
+  );
+}
 
 function StatusBadge({ status }: { status: OrderStatus }) {
   return (
@@ -96,11 +211,14 @@ interface ShippingDetails {
 }
 
 interface ShippingAddress {
-  country?: string;
+  country?:     string;
+  city?:        string;
+  postal_code?: string;
 }
 
-type ListOrder = Pick<Order, 'id' | 'created_at' | 'email' | 'full_name' | 'status' | 'total' | 'fulfillment_type' | 'shipping_address'> & {
+type ListOrder = Pick<Order, 'id' | 'created_at' | 'email' | 'full_name' | 'status' | 'total' | 'fulfillment_type'> & {
   shipping_details: ShippingDetails | null;
+  shipping_address: ShippingAddress | null;
   order_items:      Pick<OrderItem, 'name' | 'quantity' | 'storage_type'>[];
 };
 
@@ -242,7 +360,6 @@ export default async function AdminPage({
                   <th className="px-4 py-3 text-left font-medium">Date</th>
                   <th className="px-4 py-3 text-left font-medium">Client</th>
                   <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Produits</th>
-                  <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">Dest.</th>
                   <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">Transporteur</th>
                   <th className="px-4 py-3 text-left font-medium hidden xl:table-cell">Colis</th>
                   <th className="px-4 py-3 text-right font-medium">Total</th>
@@ -252,13 +369,8 @@ export default async function AdminPage({
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {list.map((order) => {
-                  const details  = order.shipping_details;
-                  const items    = order.order_items ?? [];
-                  const address  = order.shipping_address as ShippingAddress | null;
-                  const country  = address?.country?.toUpperCase() ?? null;
-                  const isPickup = order.fulfillment_type === 'pickup';
-                  const storageType = getDominantStorageType(items);
-                  const storageIcon = STORAGE_ICON[storageType];
+                  const details = order.shipping_details;
+                  const items   = order.order_items ?? [];
 
                   const date = new Intl.DateTimeFormat('fr-FR', {
                     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -267,56 +379,39 @@ export default async function AdminPage({
 
                   return (
                     <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                      {/* N° ordre + storage icon */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs text-gray-500">
-                            {order.id.slice(0, 8).toUpperCase()}
-                          </span>
-                          {storageIcon && (
-                            <span title={storageType} className="text-sm leading-none">
-                              {storageIcon}
-                            </span>
-                          )}
-                        </div>
+                      {/* N° ordre */}
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">
+                        {order.id.slice(0, 8).toUpperCase()}
                       </td>
 
                       {/* Date */}
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{date}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{date}</td>
 
-                      {/* Client */}
+                      {/* Client + destination */}
                       <td className="px-4 py-3">
                         {order.full_name && (
-                          <p className="font-medium text-gray-900">{order.full_name}</p>
+                          <p className="font-medium text-gray-900 text-sm leading-tight">{order.full_name}</p>
                         )}
                         <p className="text-gray-500 text-xs">{order.email}</p>
+                        <div className="mt-1">
+                          <DestinationCell
+                            fulfillmentType={order.fulfillment_type}
+                            shippingAddress={order.shipping_address}
+                          />
+                        </div>
                       </td>
 
                       {/* Products */}
-                      <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] hidden md:table-cell">
-                        <span className="line-clamp-2">{formatProductsList(items)}</span>
-                      </td>
-
-                      {/* Destination */}
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {isPickup ? (
-                          <span className="text-blue-600 text-xs font-medium">C&amp;C</span>
-                        ) : country && country !== 'IT' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                            {FLAG_MAP[country] ?? '🌍'} {country}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">IT</span>
-                        )}
+                      <td className="px-4 py-3 hidden md:table-cell max-w-[220px]">
+                        <ProductsCell items={items} />
                       </td>
 
                       {/* Carrier */}
-                      <td className="px-4 py-3 text-gray-600 text-xs hidden lg:table-cell">
-                        {isPickup ? (
-                          <span className="text-gray-300">—</span>
-                        ) : (
-                          formatCarrierName(details?.carrierName)
-                        )}
+                      <td className="px-4 py-3 text-gray-600 text-xs hidden lg:table-cell whitespace-nowrap">
+                        {order.fulfillment_type === 'pickup'
+                          ? <span className="text-gray-300">—</span>
+                          : formatCarrierName(details?.carrierName)
+                        }
                       </td>
 
                       {/* Parcels */}
@@ -325,7 +420,7 @@ export default async function AdminPage({
                       </td>
 
                       {/* Total */}
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
                         {formatPrice(order.total, tenant.currency)}
                       </td>
 
@@ -338,7 +433,7 @@ export default async function AdminPage({
                       <td className="px-4 py-3 text-right">
                         <Link
                           href={`/admin/orders/${order.id}`}
-                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors whitespace-nowrap"
                         >
                           Voir →
                         </Link>
