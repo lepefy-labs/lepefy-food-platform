@@ -45,12 +45,11 @@ export async function POST(req: NextRequest) {
     const { session_id, tenant_id } = intent.metadata ?? {};
 
     if (!session_id || !tenant_id) {
-      // PaymentIntent not from this platform — ignore silently
       console.info('[webhook] payment_intent.succeeded — no session_id/tenant_id in metadata, skipping');
       return NextResponse.json({ received: true });
     }
 
-    // Idempotency guard: check if order was already created for this payment intent
+    // Idempotency guard
     const { data: existing } = await supabase
       .from('orders')
       .select('id')
@@ -72,12 +71,11 @@ export async function POST(req: NextRequest) {
 
     if (sessionError || !session) {
       console.error('[webhook] checkout_session not found — session_id:', session_id, '— error:', sessionError);
-      // Return 200 so Stripe doesn't retry — session may have been cleaned up already
       return NextResponse.json({ received: true });
     }
 
     const subtotal = session.items.reduce(
-      (sum: number, i: { price: number; quantity: number }) => sum + i.price * i.quantity, 0,
+      (sum, i) => sum + i.price * i.quantity, 0,
     );
     const total = subtotal + session.shipping_total;
 
@@ -106,16 +104,16 @@ export async function POST(req: NextRequest) {
 
     if (orderError || !order) {
       console.error('[webhook] orders insert error:', orderError);
-      // Return 500 so Stripe retries — this is a real failure we want to recover
       return NextResponse.json({ error: 'Order creation failed.' }, { status: 500 });
     }
 
     console.info('[webhook] order created — id:', order.id, '— tenant:', tenant_id, '— payment_intent:', intent.id);
 
-    // Create order_items
+    // Insert order_items with explicit fields — no spread to avoid null overwrites
     const orderItemsPayload = session.items.map((i) => ({
       order_id:   order.id,
-      product_id: i.productId,
+      tenant_id:  tenant_id,
+      product_id: i.productId ?? null,
       name:       i.name,
       price:      i.price,
       quantity:   i.quantity,
@@ -129,13 +127,12 @@ export async function POST(req: NextRequest) {
     }).from('order_items').insert(orderItemsPayload);
 
     if (itemsError) {
-      console.error('[webhook] order_items insert error:', itemsError, '— order_id:', order.id);
-      // Order exists; items failure is bad but don't block Stripe retry
+      console.error('[webhook] order_items insert error:', itemsError, '— order_id:', order.id, '— tenant_id:', tenant_id);
     } else {
-      console.info('[webhook] order_items inserted — count:', orderItemsPayload.length, '— order_id:', order.id);
+      console.info('[webhook] order_items inserted successfully — count:', orderItemsPayload.length, '— order_id:', order.id);
     }
 
-    // Delete checkout session — payment confirmed, session no longer needed
+    // Delete checkout session
     const { error: deleteError } = await supabase
       .from('checkout_sessions')
       .delete()
@@ -148,8 +145,8 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'payment_intent.payment_failed') {
     const intent = event.data.object as Stripe.PaymentIntent;
-    console.info('[webhook] payment_intent.payment_failed — id:', intent.id, '— last_payment_error:', (intent as Stripe.PaymentIntent & { last_payment_error?: { message?: string } }).last_payment_error?.message);
-    // No order to update in new architecture — session stays until payment succeeds or expires
+    console.info('[webhook] payment_intent.payment_failed — id:', intent.id);
+    // Nessun ordine da aggiornare nella nuova architettura
   }
 
   return NextResponse.json({ received: true });
