@@ -5,7 +5,7 @@
  *   num_pacchi    = ceil(peso_totale_g / (max_pack_kg × 1000))
  *   packaging     = surcharge_amount × num_pacchi   (se per_parcel)
  *                 = surcharge_amount                 (se per_order)
- *   vat           = packlink_price × vat_rate        (per paese, da DB)
+ *   vat           = tax_price (Packlink) se > 0, altrimenti packlink_price × vat_rate (DB)
  *   shippingTotal = packlink_price + vat + packaging
  * max_pack_kg = limite fisico dichiarato dalla cliente (carico manuale nel furgone)
  *               NON è un limite Packlink — Packlink accetta pesi arbitrari.
@@ -27,6 +27,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SurchargeMode = 'per_parcel' | 'per_order';
+export type VatSource = 'packlink' | 'db';
 
 export interface PackagingSurcharge {
   surcharge_amount: number;
@@ -65,10 +66,13 @@ export type ShippingResult =
         packlinkCost:            number;
         vatRate:                 number;
         vatAmount:               number;
+        vatSource:               VatSource;
         surchargeMode:           SurchargeMode;
         packagingSurchargeTotal: number;
         boxDimensions:           { length: number; width: number; height: number };
         serviceId:               number;
+        serviceName:             string;
+        carrierName:             string;
       };
     }
   | {
@@ -91,18 +95,16 @@ interface PacklinkServiceInfo {
 
 interface PacklinkService {
   id:           number;
+  name:         string;
+  carrier_name: string;
   dropoff:      boolean;
   service_info: PacklinkServiceInfo[];
   price: {
-    base_price: number; // prezzo netto B2B — IVA cliente finale gestita da vat_rate in DB
+    base_price: number;
+    tax_price:  number;
   };
 }
 
-/**
- * Filtra i servizi Packlink per garantire:
- *   1. Solo consegna a domicilio (dropoff: false)
- *   2. Nessun servizio B2B aziendale (esclude company-collection)
- */
 function isEligibleService(s: PacklinkService): boolean {
   if (s.dropoff) return false;
   const isB2B = s.service_info.some(
@@ -116,7 +118,7 @@ async function fetchPacklinkCost(
   from: ShippingAddress,
   to: ShippingAddress,
   parcels: Array<{ weight: number; width: number; height: number; length: number }>,
-): Promise<{ cost: number; serviceId: number } | null> {
+): Promise<{ cost: number; taxPrice: number; serviceId: number; serviceName: string; carrierName: string } | null> {
 
   const params = new URLSearchParams();
   params.set('from[country]', from.country);
@@ -172,8 +174,15 @@ async function fetchPacklinkCost(
     s.price.base_price < min.price.base_price ? s : min,
   );
 
-  console.info('[calculateShipping] cheapest service — id:', cheapest.id, '— base_price:', cheapest.price.base_price);
-  return { cost: cheapest.price.base_price, serviceId: cheapest.id };
+  console.info('[calculateShipping] cheapest service — id:', cheapest.id, '— name:', cheapest.name, '— base_price:', cheapest.price.base_price, '— tax_price:', cheapest.price.tax_price);
+
+  return {
+    cost:        cheapest.price.base_price,
+    taxPrice:    cheapest.price.tax_price ?? 0,
+    serviceId:   cheapest.id,
+    serviceName: cheapest.name ?? '',
+    carrierName: cheapest.carrier_name ?? '',
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -225,18 +234,18 @@ export async function calculateShipping(
 
   console.info('[calculateShipping] totalWeightG:', totalWeightG, '— numParcels:', numParcels, '— to:', to.country, to.zip_code);
 
-  // 2. Surplus imballaggio (invisibile al cliente)
+  // 2. Surplus imballaggio
   const packagingSurchargeTotal = calcPackagingSurcharge(packagingSurcharge, numParcels);
 
-  // 3. Dimensioni pacco da DB — usate da Packlink per peso volumetrico
+  // 3. Dimensioni pacco da DB
   const boxDimensions = {
     length: packagingSurcharge.box_length_cm,
     width:  packagingSurcharge.box_width_cm,
     height: packagingSurcharge.box_height_cm,
   };
 
-  // 4. Chiama Packlink PRO — prezzo corriere in tempo reale
-  let packlinkResult: { cost: number; serviceId: number } | null = null;
+  // 4. Chiama Packlink PRO
+  let packlinkResult: { cost: number; taxPrice: number; serviceId: number; serviceName: string; carrierName: string } | null = null;
   try {
     packlinkResult = await fetchPacklinkCost(
       packlinkApiKey, from, to,
@@ -264,16 +273,27 @@ export async function calculateShipping(
     };
   }
 
-  // 5. IVA sul prezzo Packlink (da confermare con commercialista ChloeFood)
-  const vatRate   = resolveVatRate(to.country, vatRates);
-  const vatAmount = parseFloat((packlinkResult.cost * vatRate).toFixed(2));
+  // 5. IVA: usa tax_price Packlink se > 0, altrimenti tasso DB per paese
+  let vatAmount: number;
+  let vatRate: number;
+  let vatSource: VatSource;
+
+  if (packlinkResult.taxPrice > 0) {
+    vatAmount = parseFloat(packlinkResult.taxPrice.toFixed(2));
+    vatRate   = parseFloat((vatAmount / packlinkResult.cost).toFixed(4));
+    vatSource = 'packlink';
+  } else {
+    vatRate   = resolveVatRate(to.country, vatRates);
+    vatAmount = parseFloat((packlinkResult.cost * vatRate).toFixed(2));
+    vatSource = 'db';
+  }
 
   // 6. Totale finale mostrato al cliente
   const shippingTotal = parseFloat(
     (packlinkResult.cost + vatAmount + packagingSurchargeTotal).toFixed(2),
   );
 
-  console.info('[calculateShipping] result — shippingTotal:', shippingTotal, '— packlinkCost:', packlinkResult.cost, '— vat:', vatAmount, '— surcharge:', packagingSurchargeTotal);
+  console.info('[calculateShipping] result — shippingTotal:', shippingTotal, '— packlinkCost:', packlinkResult.cost, '— vat:', vatAmount, '(source:', vatSource + ')', '— surcharge:', packagingSurchargeTotal);
 
   return {
     available: true,
@@ -284,10 +304,13 @@ export async function calculateShipping(
       packlinkCost:            packlinkResult.cost,
       vatRate,
       vatAmount,
+      vatSource,
       surchargeMode:           packagingSurcharge.surcharge_mode,
       packagingSurchargeTotal,
       boxDimensions,
       serviceId:               packlinkResult.serviceId,
+      serviceName:             packlinkResult.serviceName,
+      carrierName:             packlinkResult.carrierName,
     },
   };
 }

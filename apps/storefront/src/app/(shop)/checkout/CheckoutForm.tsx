@@ -19,59 +19,62 @@ import type { Tenant } from '@lepefy/types';
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const formSchema = z.object({
-  firstName: z.string().min(1, 'Prénom requis'),
-  lastName: z.string().min(1, 'Nom requis'),
-  email: z.string().email('Email invalide'),
-  phone: z.string().optional(),
-  line1: z.string().optional(),
-  city: z.string().optional(),
+  firstName:   z.string().min(1, 'Prénom requis'),
+  lastName:    z.string().min(1, 'Nom requis'),
+  email:       z.string().email('Email invalide'),
+  phone:       z.string().optional(),
+  line1:       z.string().optional(),
+  city:        z.string().optional(),
   postal_code: z.string().optional(),
-  country: z.string().optional(),
+  country:     z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface CheckoutShipping {
-  shippingTotal: number;
+  shippingTotal:   number;
   shippingDetails: Record<string, unknown> | null;
   fulfillmentType: 'delivery' | 'pickup';
-  country: string | null;
-  postalCode: string | null;
+  country:         string | null;
+  postalCode:      string | null;
 }
 
 function PaymentStep({
-  orderId,
+  clientSecret,
   total,
   tenant,
   onError,
 }: {
-  orderId: string;
-  total: number;
-  tenant: Tenant;
-  onError: (msg: string) => void;
+  clientSecret: string;
+  total:        number;
+  tenant:       Tenant;
+  onError:      (msg: string) => void;
 }) {
-  const stripe = useStripe();
+  const stripe   = useStripe();
   const elements = useElements();
-  const router = useRouter();
+  const router   = useRouter();
   const { clearCart } = useCartStore();
   const [isConfirming, setIsConfirming] = useState(false);
 
   const handleConfirm = async () => {
     if (!stripe || !elements) return;
     setIsConfirming(true);
-    const { error } = await stripe.confirmPayment({
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/order-confirmation/${orderId}`,
+        return_url: `${window.location.origin}/order-confirmation`,
       },
       redirect: 'if_required',
     });
+
     if (error) {
       onError(error.message ?? 'Erreur lors du paiement.');
       setIsConfirming(false);
     } else {
       clearCart();
-      router.push(`/order-confirmation/${orderId}`);
+      const intentId = paymentIntent?.id ?? '';
+      router.push(`/order-confirmation?payment_intent=${intentId}`);
     }
   };
 
@@ -97,19 +100,13 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const { items, totalPrice } = useCartStore();
   const router = useRouter();
 
-  const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(null);
-  const [step, setStep] = useState<'form' | 'payment'>('form');
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [shippingInfo, setShippingInfo]   = useState<CheckoutShipping | null>(null);
+  const [step, setStep]                   = useState<'form' | 'payment'>('form');
+  const [clientSecret, setClientSecret]   = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting]   = useState(false);
+  const [submitError, setSubmitError]     = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
   });
 
@@ -119,7 +116,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
       try {
         const info: CheckoutShipping = JSON.parse(stored);
         setShippingInfo(info);
-        if (info.country) setValue('country', info.country);
+        if (info.country)    setValue('country',     info.country);
         if (info.postalCode) setValue('postal_code', info.postalCode);
       } catch {
         router.push('/cart');
@@ -130,10 +127,9 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     if (items.length === 0) router.push('/cart');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subtotal = totalPrice();
-  const shippingTotal =
-    shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
-  const total = subtotal + shippingTotal;
+  const subtotal       = totalPrice();
+  const shippingTotal  = shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
+  const total          = subtotal + shippingTotal;
   const fulfillmentType = shippingInfo?.fulfillmentType ?? 'delivery';
 
   const onSubmit = async (data: FormValues) => {
@@ -145,29 +141,29 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     setSubmitError(null);
     try {
       const res = await fetch('/api/checkout', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map((i) => ({
             productId: i.product.id,
-            name: i.product.name,
-            price: i.product.price,
-            quantity: i.quantity,
+            name:      i.product.name,
+            price:     i.product.price,
+            quantity:  i.quantity,
           })),
           shippingAddress:
             fulfillmentType === 'delivery'
               ? {
-                  full_name: `${data.firstName} ${data.lastName}`,
-                  line1: data.line1,
-                  city: data.city,
+                  full_name:   `${data.firstName} ${data.lastName}`,
+                  line1:       data.line1,
+                  city:        data.city,
                   postal_code: data.postal_code,
-                  country: data.country ?? shippingInfo?.country ?? 'IT',
+                  country:     data.country ?? shippingInfo?.country ?? 'IT',
                 }
               : null,
           fulfillmentType,
-          email: data.email,
-          phone: data.phone ?? null,
-          fullName: `${data.firstName} ${data.lastName}`,
+          email:           data.email,
+          phone:           data.phone ?? null,
+          fullName:        `${data.firstName} ${data.lastName}`,
           shippingTotal,
           shippingDetails: shippingInfo?.shippingDetails ?? null,
         }),
@@ -177,7 +173,6 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
         setSubmitError(result.error ?? 'Une erreur est survenue.');
         return;
       }
-      setOrderId(result.orderId);
       setClientSecret(result.clientSecret);
       setStep('payment');
     } catch {
@@ -320,7 +315,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
       )}
 
       {/* Step 2: Stripe Payment */}
-      {step === 'payment' && clientSecret && orderId && (
+      {step === 'payment' && clientSecret && (
         <div>
           {submitError && (
             <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">
@@ -329,7 +324,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           )}
           <Elements stripe={stripePromise} options={{ clientSecret, locale: 'fr' }}>
             <PaymentStep
-              orderId={orderId}
+              clientSecret={clientSecret}
               total={total}
               tenant={tenant}
               onError={(msg) => setSubmitError(msg)}
