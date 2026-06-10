@@ -11,7 +11,6 @@ const translations = {
     updateOrder:      'Mettre à jour la commande',
     status:           'Statut',
     carrier:          'Transporteur effectif',
-    carrierHint:      'Nom du transporteur utilisé pour l\'envoi',
     tracking:         'Code de suivi',
     trackingHint:     'Numéro de tracking du colis',
     notes:            'Notes internes',
@@ -25,12 +24,17 @@ const translations = {
     shipped:          'Expédié',
     delivered:        'Livré',
     cancelled:        'Annulé',
+    // Modal
+    changeCarrier:   'Changer de transporteur ?',
+    packlinkCarrier: 'Transporteur Packlink :',
+    newCarrier:      'Nouveau transporteur :',
+    cancel:          'Annuler',
+    confirm:         'Confirmer',
   },
   it: {
     updateOrder:      'Aggiorna ordine',
     status:           'Stato',
     carrier:          'Corriere effettivo',
-    carrierHint:      'Nome del corriere usato per la spedizione',
     tracking:         'Codice tracking',
     trackingHint:     'Numero di tracking del pacco',
     notes:            'Note interne',
@@ -44,48 +48,85 @@ const translations = {
     shipped:          'Spedito',
     delivered:        'Consegnato',
     cancelled:        'Annullato',
+    // Modal
+    changeCarrier:   'Cambiare corriere?',
+    packlinkCarrier: 'Corriere Packlink:',
+    newCarrier:      'Nuovo corriere:',
+    cancel:          'Annulla',
+    confirm:         'Conferma',
   },
 } as const;
 
 type Lang = keyof typeof translations;
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ShippingDetails {
   carrierName?: string;
 }
 
-export default function OrderDetail({
-  order,
-  currency,
-}: {
-  order: Order;
-  currency: string;
-}) {
+interface Props {
+  order:           Order;
+  currency:        string;
+  carriers:        { name: string }[];
+  shippingDetails: ShippingDetails | null;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function OrderDetail({ order, currency, carriers, shippingDetails }: Props) {
   const router = useRouter();
 
-  const [lang, setLang]                   = useState<Lang>(() => {
+  const [lang, setLang] = useState<Lang>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('lepefy-admin-lang') as Lang) ?? 'fr';
     }
     return 'fr';
   });
-  const [status, setStatus]               = useState<OrderStatus>(order.status);
-  const [carrier, setCarrier]             = useState(
+
+  // Carrier — priority: tracking_carrier set manually > Packlink suggestion > first in list
+  const packlinkCarrier = shippingDetails?.carrierName ?? '';
+  const originalCarrier =
     order.tracking_carrier ??
-    ((order.shipping_details as ShippingDetails | null)?.carrierName ?? ''),
-  );
-  const [trackingCode, setTrackingCode]   = useState(order.tracking_code ?? '');
-  const [notes, setNotes]                 = useState(order.notes ?? '');
-  const [saving, setSaving]               = useState(false);
-  const [saveMsg, setSaveMsg]             = useState<string | null>(null);
-  const [saveError, setSaveError]         = useState(false);
+    packlinkCarrier ??
+    carriers[0]?.name ??
+    '';
+
+  const [status, setStatus]                     = useState<OrderStatus>(order.status);
+  const [carrier, setCarrier]                   = useState(originalCarrier);
+  const [pendingCarrier, setPendingCarrier]      = useState<string | null>(null);
+  const [showConfirm, setShowConfirm]           = useState(false);
+  const [trackingCode, setTrackingCode]         = useState(order.tracking_code ?? '');
+  const [notes, setNotes]                       = useState(order.notes ?? '');
+  const [saving, setSaving]                     = useState(false);
+  const [saveMsg, setSaveMsg]                   = useState<string | null>(null);
+  const [saveError, setSaveError]               = useState(false);
 
   const t = translations[lang];
 
   function switchLang(l: Lang) {
     setLang(l);
     localStorage.setItem('lepefy-admin-lang', l);
+  }
+
+  function handleCarrierChange(newValue: string) {
+    if (newValue !== originalCarrier && packlinkCarrier && newValue !== packlinkCarrier) {
+      setPendingCarrier(newValue);
+      setShowConfirm(true);
+    } else {
+      setCarrier(newValue);
+    }
+  }
+
+  function confirmCarrierChange() {
+    if (pendingCarrier) setCarrier(pendingCarrier);
+    setPendingCarrier(null);
+    setShowConfirm(false);
+  }
+
+  function cancelCarrierChange() {
+    setPendingCarrier(null);
+    setShowConfirm(false);
   }
 
   async function handleSave() {
@@ -119,7 +160,7 @@ export default function OrderDetail({
 
   return (
     <>
-      {/* Lang toggle — top right of section */}
+      {/* Lang toggle */}
       <div className="flex justify-end gap-1 -mb-2">
         {(['fr', 'it'] as Lang[]).map((l) => (
           <button
@@ -156,16 +197,66 @@ export default function OrderDetail({
             </select>
           </div>
 
-          {/* Carrier */}
-          <div>
+          {/* Carrier select */}
+          <div style={{ position: 'relative' }}>
             <label className="block text-xs text-gray-500 mb-1.5 font-medium">{t.carrier}</label>
-            <input
-              type="text"
+
+            {/* Confirmation modal — inline, no fixed positioning */}
+            {showConfirm && (
+              <div
+                style={{
+                  border: '1px solid #E5E7EB',
+                  borderRadius: 10,
+                  background: '#fff',
+                  padding: '16px',
+                  marginBottom: 8,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                }}
+              >
+                <p className="text-sm font-semibold text-gray-800 mb-3">{t.changeCarrier}</p>
+                <div className="space-y-1.5 text-sm mb-4">
+                  {packlinkCarrier && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-xs w-36 shrink-0">{t.packlinkCarrier}</span>
+                      <span className="font-medium text-gray-700">{packlinkCarrier}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-xs w-36 shrink-0">{t.newCarrier}</span>
+                    <span className="font-semibold text-gray-900">{pendingCarrier}</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={cancelCarrierChange}
+                    className="px-4 py-1.5 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    onClick={confirmCarrierChange}
+                    className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    {t.confirm}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <select
               value={carrier}
-              onChange={(e) => setCarrier(e.target.value)}
-              placeholder={t.carrierHint}
+              onChange={(e) => handleCarrierChange(e.target.value)}
               className={inputClass}
-            />
+            >
+              {/* If current carrier isn't in list (manual entry from before), show it first */}
+              {carrier && !carriers.some((c) => c.name === carrier) && (
+                <option value={carrier}>{carrier}</option>
+              )}
+              {carriers.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Tracking code */}

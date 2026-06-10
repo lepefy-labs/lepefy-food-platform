@@ -15,12 +15,28 @@ interface ShippingDetails {
   totalWeightG?:            number;
   packlinkCost?:            number;
   vatAmount?:               number;
+  vatRate?:                 number;
   vatSource?:               'packlink' | 'db';
   packagingSurchargeTotal?: number;
 }
 
 interface Props {
   params: { id: string };
+}
+
+function formatCarrierName(name: string | null | undefined): string {
+  if (!name) return '—';
+  const map: Record<string, string> = {
+    'brt':            'BRT',
+    'tnt':            'TNT',
+    'ups':            'UPS',
+    'dhl':            'DHL',
+    'fedex':          'FedEx',
+    'poste italiane': 'Poste Italiane',
+    'sda':            'SDA',
+    'inpost it':      'InPost',
+  };
+  return map[name.toLowerCase()] ?? name;
 }
 
 export default async function AdminOrderPage({ params }: Props) {
@@ -41,8 +57,18 @@ export default async function AdminOrderPage({ params }: Props) {
     from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>;
   }).from('order_items').select('*').eq('order_id', order.id) as { data: OrderItem[] | null };
 
-  const details = order.shipping_details as ShippingDetails | null;
-  const address = order.shipping_address;
+  // Load carriers for the select in OrderDetail
+  const { data: carriersData } = await supabase
+    .from('carriers')
+    .select('name')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('position');
+
+  const carriers = (carriersData ?? []) as { name: string }[];
+
+  const details  = order.shipping_details as ShippingDetails | null;
+  const address  = order.shipping_address;
   const isPickup = order.fulfillment_type === 'pickup';
 
   return (
@@ -139,6 +165,12 @@ export default async function AdminOrderPage({ params }: Props) {
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="text-sm font-semibold text-gray-700 mb-4">Détails expédition</h2>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {details.carrierName && (
+                <div>
+                  <dt className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Transporteur Packlink</dt>
+                  <dd className="text-gray-800">{formatCarrierName(details.carrierName)}</dd>
+                </div>
+              )}
               {details.serviceName && (
                 <div>
                   <dt className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Service</dt>
@@ -164,7 +196,10 @@ export default async function AdminOrderPage({ params }: Props) {
               {details.vatAmount != null && (
                 <div>
                   <dt className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
-                    TVA livraison {details.vatSource === 'packlink' ? '(Packlink)' : '(DB)'}
+                    {details.vatSource === 'packlink'
+                      ? 'TVA (incluse Packlink)'
+                      : `TVA livraison (${Math.round((details.vatRate ?? 0) * 100)}% — appliquée par le système)`
+                    }
                   </dt>
                   <dd className="text-gray-800">{formatPrice(details.vatAmount, tenant.currency)}</dd>
                 </div>
@@ -184,7 +219,12 @@ export default async function AdminOrderPage({ params }: Props) {
         )}
 
         {/* Section 4+5 — Update form + Print (client component) */}
-        <OrderDetail order={order} currency={tenant.currency} />
+        <OrderDetail
+          order={order}
+          currency={tenant.currency}
+          carriers={carriers}
+          shippingDetails={details}
+        />
       </div>
     </div>
   );
