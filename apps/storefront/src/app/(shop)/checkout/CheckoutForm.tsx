@@ -39,7 +39,11 @@ interface CheckoutShipping {
   postalCode:      string | null;
 }
 
-function PaymentStep({
+type PaymentMode = 'stripe' | 'in_store';
+
+// ─── Stripe payment step ──────────────────────────────────────────────────────
+
+function StripePaymentStep({
   total,
   tenant,
   onError,
@@ -71,8 +75,7 @@ function PaymentStep({
       setIsConfirming(false);
     } else {
       clearCart();
-      const intentId = paymentIntent?.id ?? '';
-      router.push(`/order-confirmation?payment_intent=${intentId}`);
+      router.push(`/order-confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
     }
   };
 
@@ -94,6 +97,8 @@ function PaymentStep({
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const { items, totalPrice } = useCartStore();
   const router = useRouter();
@@ -101,6 +106,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(null);
   const [step, setStep]                 = useState<'form' | 'payment'>('form');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode]   = useState<PaymentMode>('stripe');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError]   = useState<string | null>(null);
 
@@ -125,10 +131,11 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     if (items.length === 0) router.push('/cart');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subtotal      = totalPrice();
-  const shippingTotal = shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
-  const total         = subtotal + shippingTotal;
+  const subtotal        = totalPrice();
+  const shippingTotal   = shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
+  const total           = subtotal + shippingTotal;
   const fulfillmentType = shippingInfo?.fulfillmentType ?? 'delivery';
+  const isPickup        = fulfillmentType === 'pickup';
 
   const onSubmit = async (data: FormValues) => {
     if (fulfillmentType === 'delivery' && (!data.line1 || !data.city || !data.postal_code)) {
@@ -138,40 +145,54 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      const payload = {
+        items: items.map((i) => ({
+          productId:    i.product.id,
+          name:         i.product.name,
+          price:        i.product.price,
+          quantity:     i.quantity,
+          storage_type: i.product.storage_type ?? 'dry',
+        })),
+        shippingAddress:
+          fulfillmentType === 'delivery'
+            ? {
+                full_name:   `${data.firstName} ${data.lastName}`,
+                line1:       data.line1,
+                city:        data.city,
+                postal_code: data.postal_code,
+                country:     data.country ?? shippingInfo?.country ?? 'IT',
+              }
+            : null,
+        fulfillmentType,
+        email:           data.email,
+        phone:           data.phone ?? null,
+        fullName:        `${data.firstName} ${data.lastName}`,
+        shippingTotal,
+        shippingDetails: shippingInfo?.shippingDetails ?? null,
+        paymentMethod:   isPickup ? paymentMode : 'stripe',
+      };
+
       const res = await fetch('/api/checkout', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map((i) => ({
-            productId:    i.product.id,
-            name:         i.product.name,
-            price:        i.product.price,
-            quantity:     i.quantity,
-            storage_type: i.product.storage_type ?? 'dry',
-          })),
-          shippingAddress:
-            fulfillmentType === 'delivery'
-              ? {
-                  full_name:   `${data.firstName} ${data.lastName}`,
-                  line1:       data.line1,
-                  city:        data.city,
-                  postal_code: data.postal_code,
-                  country:     data.country ?? shippingInfo?.country ?? 'IT',
-                }
-              : null,
-          fulfillmentType,
-          email:           data.email,
-          phone:           data.phone ?? null,
-          fullName:        `${data.firstName} ${data.lastName}`,
-          shippingTotal,
-          shippingDetails: shippingInfo?.shippingDetails ?? null,
-        }),
+        body:    JSON.stringify(payload),
       });
+
       const result = await res.json();
       if (!res.ok) {
         setSubmitError(result.error ?? 'Une erreur est survenue.');
         return;
       }
+
+      // In-store flow: order created directly, redirect immediately
+      if (paymentMode === 'in_store') {
+        const { clearCart } = useCartStore.getState();
+        clearCart();
+        router.push(`/order-confirmation?order_id=${result.orderId}`);
+        return;
+      }
+
+      // Stripe flow: proceed to payment step
       setClientSecret(result.clientSecret);
       setStep('payment');
     } catch {
@@ -230,6 +251,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
       {/* Step 1: Contact + address form */}
       {step === 'form' && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+          {/* Customer info */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">Vos informations</p>
             <div className="space-y-3">
@@ -269,6 +291,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             </div>
           </div>
 
+          {/* Delivery address */}
           {fulfillmentType === 'delivery' && (
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
@@ -288,10 +311,50 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             </div>
           )}
 
-          {fulfillmentType === 'pickup' && tenant.click_collect_address && (
-            <div className="bg-blue-50 rounded-2xl p-4 text-sm">
-              <p className="font-semibold text-blue-800 mb-1">📍 Adresse de retrait</p>
+          {/* Click & Collect info */}
+          {isPickup && tenant.click_collect_address && (
+            <div className="bg-blue-50 rounded-2xl p-4 text-sm space-y-1">
+              <p className="font-semibold text-blue-800 mb-2">📍 Adresse de retrait</p>
               <p className="text-blue-700">{tenant.click_collect_address}</p>
+              {tenant.click_collect_hours && (
+                <p className="text-blue-600">🕐 {tenant.click_collect_hours}</p>
+              )}
+              <p style={{ fontSize: 12, color: '#3B82F6' }} className="pt-1">
+                Votre commande sera prête dans quelques heures. Vous recevrez un email dès qu&apos;elle est disponible.
+              </p>
+            </div>
+          )}
+
+          {/* Payment method selector — pickup only */}
+          {isPickup && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('stripe')}
+                  className={`flex-1 py-3 px-3 rounded-xl border text-xs font-medium text-center transition-all ${
+                    paymentMode === 'stripe'
+                      ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="block text-base mb-0.5">💳</span>
+                  Carte / Satispay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode('in_store')}
+                  className={`flex-1 py-3 px-3 rounded-xl border text-xs font-medium text-center transition-all ${
+                    paymentMode === 'in_store'
+                      ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="block text-base mb-0.5">🏪</span>
+                  Payer en boutique
+                </button>
+              </div>
             </div>
           )}
 
@@ -305,7 +368,12 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
-            {isSubmitting ? 'Traitement…' : 'Continuer vers le paiement'}
+            {isSubmitting
+              ? 'Traitement…'
+              : paymentMode === 'in_store'
+                ? `Confirmer la commande — ${formatPrice(total, tenant.currency)}`
+                : 'Continuer vers le paiement'
+            }
           </button>
         </form>
       )}
@@ -319,7 +387,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             </p>
           )}
           <Elements stripe={stripePromise} options={{ clientSecret, locale: 'fr' }}>
-            <PaymentStep
+            <StripePaymentStep
               total={total}
               tenant={tenant}
               onError={(msg) => setSubmitError(msg)}

@@ -16,11 +16,12 @@ export interface Tenant {
   stripe_account_id: string | null;
   click_collect_enabled: boolean;
   click_collect_address: string | null;
+  click_collect_hours: string | null;
   active: boolean;
   // Spedizione
   shipping_provider: ShippingProvider;
-  packlink_api_key: string | null;   // null = usa env PACKLINK_API_KEY
-  flat_rate_amount: number | null;   // usato solo se shipping_provider = 'flat_rate'
+  packlink_api_key: string | null;
+  flat_rate_amount: number | null;
   created_at: string;
   updated_at: string;
 }

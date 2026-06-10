@@ -1,6 +1,13 @@
-export type OrderStatus = 'new' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderStatus =
+  | 'new'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
-export type PaymentMethod = 'stripe' | 'satispay' | 'cash';
+export type PaymentMethod = 'stripe' | 'satispay' | 'cash' | 'in_store';
 export type FulfillmentType = 'delivery' | 'pickup';
 
 export interface Order {

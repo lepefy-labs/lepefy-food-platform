@@ -30,12 +30,17 @@ interface CheckoutBody {
   fullName?:       string | null;
   shippingTotal:   number;
   shippingDetails: Record<string, unknown> | null;
+  paymentMethod?:  'stripe' | 'in_store';
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body: CheckoutBody = await req.json();
-    const { items, shippingAddress, fulfillmentType, email, phone, fullName, shippingTotal, shippingDetails } = body;
+    const {
+      items, shippingAddress, fulfillmentType, email,
+      phone, fullName, shippingTotal, shippingDetails,
+      paymentMethod = 'stripe',
+    } = body;
 
     if (!items?.length || !email) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
@@ -48,7 +53,65 @@ export async function POST(req: NextRequest) {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const total    = subtotal + (shippingTotal ?? 0);
 
-    // Save to checkout_sessions — order created by webhook on payment confirmation
+    // ── In-store payment: create order directly, no Stripe ──────────────────
+    if (paymentMethod === 'in_store') {
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          tenant_id:        tenant.id,
+          customer_id:      null,
+          email,
+          full_name:        fullName ?? null,
+          fulfillment_type: fulfillmentType,
+          shipping_address: shippingAddress ?? null,
+          shipping_details: shippingDetails ?? null,
+          subtotal,
+          shipping_cost:    shippingTotal ?? 0,
+          total,
+          payment_method:   'in_store',
+          payment_status:   'pending',
+          status:           'preparing',
+          notes:            phone ? `Téléphone: ${phone}` : null,
+        })
+        .select('id')
+        .single();
+
+      if (orderError || !order) {
+        console.error('[checkout] in_store order insert error:', orderError);
+        return NextResponse.json(
+          { error: 'Erreur lors de la création de la commande.' },
+          { status: 500 },
+        );
+      }
+
+      // Insert order_items
+      const orderItemsPayload = items.map((i) => ({
+        order_id:     order.id,
+        tenant_id:    tenant.id,
+        product_id:   i.productId ?? null,
+        name:         i.name,
+        price:        i.price,
+        quantity:     i.quantity,
+        subtotal:     i.price * i.quantity,
+        storage_type: i.storage_type ?? 'dry',
+      }));
+
+      const { error: itemsError } = await (supabase as unknown as {
+        from(table: 'order_items'): {
+          insert(data: unknown[]): Promise<{ error: unknown }>;
+        };
+      }).from('order_items').insert(orderItemsPayload);
+
+      if (itemsError) {
+        console.error('[checkout] in_store order_items insert error:', itemsError, '— order_id:', order.id);
+      } else {
+        console.info('[checkout] in_store order created — id:', order.id, '— items:', orderItemsPayload.length);
+      }
+
+      return NextResponse.json({ orderId: order.id });
+    }
+
+    // ── Stripe payment: save checkout_session, create PaymentIntent ──────────
     const { data: session, error: sessionError } = await supabase
       .from('checkout_sessions')
       .insert({
@@ -84,7 +147,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.info('[checkout] PaymentIntent created — id:', paymentIntent.id, '— amount:', paymentIntent.amount, '— session_id:', session.id);
+    console.info('[checkout] PaymentIntent created — id:', paymentIntent.id, '— amount:', paymentIntent.amount);
 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
