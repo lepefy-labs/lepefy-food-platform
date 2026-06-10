@@ -48,7 +48,11 @@ function formatCarrierName(name: string | null | undefined): string {
 
 function formatProductsList(items: Pick<OrderItem, 'name' | 'quantity'>[]): string {
   if (!items?.length) return '—';
-  if (items.length === 1) return `${items[0].name} × ${items[0].quantity}`;
+  if (items.length === 1) {
+    const item = items[0];
+    if (!item) return '—';
+    return `${item.name} × ${item.quantity}`;
+  }
   if (items.length <= 3) return items.map((i) => i.name).join(', ');
   return `${items.length} produits`;
 }
