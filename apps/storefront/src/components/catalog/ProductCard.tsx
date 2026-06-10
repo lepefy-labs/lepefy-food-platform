@@ -13,7 +13,16 @@ export function ProductCard({ product }: { product: ProductWithCategory }) {
 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
-    if (!outOfStock) addItem({ id: product.id, name: product.name, slug: product.slug, price: product.price, image_url: product.image_url, weight_grams: product.weight_grams, stock: product.stock });
+    if (!outOfStock) addItem({
+      id:           product.id,
+      name:         product.name,
+      slug:         product.slug,
+      price:        product.price,
+      image_url:    product.image_url,
+      weight_grams: product.weight_grams,
+      stock:        product.stock,
+      storage_type: product.storage_type ?? null,
+    });
   }
 
   return (

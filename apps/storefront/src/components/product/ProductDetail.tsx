@@ -15,7 +15,16 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const outOfStock = product.stock === 0;
 
   function handleAddToCart() {
-    addItem({ id: product.id, name: product.name, slug: product.slug, price: product.price, image_url: product.image_url, weight_grams: product.weight_grams, stock: product.stock }, quantity);
+    addItem({
+      id:           product.id,
+      name:         product.name,
+      slug:         product.slug,
+      price:        product.price,
+      image_url:    product.image_url,
+      weight_grams: product.weight_grams,
+      stock:        product.stock,
+      storage_type: product.storage_type ?? null,
+    }, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   }
