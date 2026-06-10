@@ -24,6 +24,7 @@ export interface Product {
   active: boolean;
   featured: boolean;
   position: number;
+  storage_type: 'dry' | 'fresh' | 'frozen' | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +39,6 @@ export interface ProductWithCategory extends Product {
 }
 
 export interface CartItem {
-  product: Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'image_url' | 'weight_grams' | 'stock'>;
+  product: Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'image_url' | 'weight_grams' | 'stock' | 'storage_type'>;
   quantity: number;
 }

@@ -15,10 +15,11 @@ interface CheckoutSessionRow {
   shipping_details: Record<string, unknown> | null;
   shipping_total:   number;
   items: Array<{
-    productId: string;
-    name:      string;
-    price:     number;
-    quantity:  number;
+    productId:    string;
+    name:         string;
+    price:        number;
+    quantity:     number;
+    storage_type: 'dry' | 'fresh' | 'frozen' | null;
   }>;
 }
 
@@ -74,10 +75,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const subtotal = session.items.reduce(
-      (sum, i) => sum + i.price * i.quantity, 0,
-    );
-    const total = subtotal + session.shipping_total;
+    const subtotal = session.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const total    = subtotal + session.shipping_total;
 
     // Create order
     const { data: order, error: orderError } = await supabase
@@ -111,13 +110,14 @@ export async function POST(req: NextRequest) {
 
     // Insert order_items with explicit fields — no spread to avoid null overwrites
     const orderItemsPayload = session.items.map((i) => ({
-      order_id:   order.id,
-      tenant_id:  tenant_id,
-      product_id: i.productId ?? null,
-      name:       i.name,
-      price:      i.price,
-      quantity:   i.quantity,
-      subtotal:   i.price * i.quantity,
+      order_id:     order.id,
+      tenant_id:    tenant_id,
+      product_id:   i.productId ?? null,
+      name:         i.name,
+      price:        i.price,
+      quantity:     i.quantity,
+      subtotal:     i.price * i.quantity,
+      storage_type: i.storage_type ?? 'dry',
     }));
 
     const { error: itemsError } = await (supabase as unknown as {
@@ -146,7 +146,6 @@ export async function POST(req: NextRequest) {
   if (event.type === 'payment_intent.payment_failed') {
     const intent = event.data.object as Stripe.PaymentIntent;
     console.info('[webhook] payment_intent.payment_failed — id:', intent.id);
-    // Nessun ordine da aggiornare nella nuova architettura
   }
 
   return NextResponse.json({ received: true });

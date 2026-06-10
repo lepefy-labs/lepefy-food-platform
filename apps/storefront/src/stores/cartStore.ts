@@ -69,7 +69,7 @@ export const useCartStore = create<CartState>()(
       shippingPayload() {
         return get().items.map((i) => ({
           weight_grams: i.product.weight_grams,
-          quantity: i.quantity,
+          quantity:     i.quantity,
         }));
       },
     }),

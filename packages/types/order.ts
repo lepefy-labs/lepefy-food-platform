@@ -45,6 +45,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   subtotal: number;
+  storage_type: 'dry' | 'fresh' | 'frozen' | null;
 }
 
 export interface OrderWithItems extends Order {

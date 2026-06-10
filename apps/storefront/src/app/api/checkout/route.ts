@@ -6,10 +6,11 @@ import { getTenant } from '@/lib/tenant/getTenant';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 interface CartItemPayload {
-  productId: string;
-  name:      string;
-  price:     number;
-  quantity:  number;
+  productId:    string;
+  name:         string;
+  price:        number;
+  quantity:     number;
+  storage_type: 'dry' | 'fresh' | 'frozen' | null;
 }
 
 interface ShippingAddress {
@@ -41,13 +42,13 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant = await getTenant(tenantSlug);
-    const supabase = createServiceClient();
+    const tenant     = await getTenant(tenantSlug);
+    const supabase   = createServiceClient();
 
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const total    = subtotal + (shippingTotal ?? 0);
 
-    // Save to checkout_sessions — order is created by the webhook on payment confirmation
+    // Save to checkout_sessions — order created by webhook on payment confirmation
     const { data: session, error: sessionError } = await supabase
       .from('checkout_sessions')
       .insert({
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
         shipping_address: shippingAddress ?? null,
         shipping_details: shippingDetails ?? null,
         shipping_total:   shippingTotal ?? 0,
-        items:            items,
+        items,
       })
       .select('id')
       .single();
@@ -74,7 +75,6 @@ export async function POST(req: NextRequest) {
 
     console.info('[checkout] checkout_session created — id:', session.id, '— tenant:', tenant.id);
 
-    // PaymentIntent: metadata only carries session_id + tenant_id (no items — avoids 500-char Stripe limit)
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(total * 100),
       currency: tenant.currency ?? 'eur',

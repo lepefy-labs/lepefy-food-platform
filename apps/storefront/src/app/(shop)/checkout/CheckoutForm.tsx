@@ -40,15 +40,13 @@ interface CheckoutShipping {
 }
 
 function PaymentStep({
-  clientSecret,
   total,
   tenant,
   onError,
 }: {
-  clientSecret: string;
-  total:        number;
-  tenant:       Tenant;
-  onError:      (msg: string) => void;
+  total:   number;
+  tenant:  Tenant;
+  onError: (msg: string) => void;
 }) {
   const stripe   = useStripe();
   const elements = useElements();
@@ -100,11 +98,11 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const { items, totalPrice } = useCartStore();
   const router = useRouter();
 
-  const [shippingInfo, setShippingInfo]   = useState<CheckoutShipping | null>(null);
-  const [step, setStep]                   = useState<'form' | 'payment'>('form');
-  const [clientSecret, setClientSecret]   = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting]   = useState(false);
-  const [submitError, setSubmitError]     = useState<string | null>(null);
+  const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(null);
+  const [step, setStep]                 = useState<'form' | 'payment'>('form');
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError]   = useState<string | null>(null);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -127,9 +125,9 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     if (items.length === 0) router.push('/cart');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subtotal       = totalPrice();
-  const shippingTotal  = shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
-  const total          = subtotal + shippingTotal;
+  const subtotal      = totalPrice();
+  const shippingTotal = shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
+  const total         = subtotal + shippingTotal;
   const fulfillmentType = shippingInfo?.fulfillmentType ?? 'delivery';
 
   const onSubmit = async (data: FormValues) => {
@@ -145,10 +143,11 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map((i) => ({
-            productId: i.product.id,
-            name:      i.product.name,
-            price:     i.product.price,
-            quantity:  i.quantity,
+            productId:    i.product.id,
+            name:         i.product.name,
+            price:        i.product.price,
+            quantity:     i.quantity,
+            storage_type: i.product.storage_type ?? 'dry',
           })),
           shippingAddress:
             fulfillmentType === 'delivery'
@@ -231,7 +230,6 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
       {/* Step 1: Contact + address form */}
       {step === 'form' && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-          {/* Customer info */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">Vos informations</p>
             <div className="space-y-3">
@@ -271,7 +269,6 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             </div>
           </div>
 
-          {/* Shipping address */}
           {fulfillmentType === 'delivery' && (
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
@@ -291,7 +288,6 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             </div>
           )}
 
-          {/* Click & Collect address */}
           {fulfillmentType === 'pickup' && tenant.click_collect_address && (
             <div className="bg-blue-50 rounded-2xl p-4 text-sm">
               <p className="font-semibold text-blue-800 mb-1">📍 Adresse de retrait</p>
@@ -324,7 +320,6 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           )}
           <Elements stripe={stripePromise} options={{ clientSecret, locale: 'fr' }}>
             <PaymentStep
-              clientSecret={clientSecret}
               total={total}
               tenant={tenant}
               onError={(msg) => setSubmitError(msg)}
