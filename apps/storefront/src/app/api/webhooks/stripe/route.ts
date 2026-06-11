@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-interface CheckoutSessionRow {
-  id:               string;
-  tenant_id:        string;
-  email:            string;
-  full_name:        string | null;
-  phone:            string | null;
-  fulfillment_type: 'delivery' | 'pickup';
-  shipping_address: Record<string, unknown> | null;
-  shipping_details: Record<string, unknown> | null;
-  shipping_total:   number;
-  items: Array<{
-    productId:    string;
-    name:         string;
-    price:        number;
-    quantity:     number;
-    storage_type: 'dry' | 'fresh' | 'frozen' | null;
-  }>;
+function generateTrackingToken(orderId: string, email: string): string {
+  return crypto
+    .createHmac('sha256', process.env.TRACKING_SECRET!)
+    .update(orderId + email)
+    .digest('hex');
 }
 
 export async function POST(req: NextRequest) {
@@ -35,7 +24,7 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch (err) {
-    console.error('[webhook] signature verification failed:', err);
+    console.error('Webhook signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 });
   }
 
@@ -43,109 +32,67 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'payment_intent.succeeded') {
     const intent = event.data.object as Stripe.PaymentIntent;
-    const { session_id, tenant_id } = intent.metadata ?? {};
 
-    if (!session_id || !tenant_id) {
-      console.info('[webhook] payment_intent.succeeded — no session_id/tenant_id in metadata, skipping');
-      return NextResponse.json({ received: true });
-    }
-
-    // Idempotency guard
-    const { data: existing } = await supabase
+    const { error: updateError } = await supabase
       .from('orders')
-      .select('id')
-      .eq('stripe_payment_intent_id', intent.id)
-      .maybeSingle();
+      .update({ payment_status: 'paid', status: 'preparing' })
+      .eq('stripe_payment_intent_id', intent.id);
 
-    if (existing) {
-      console.info('[webhook] order already exists for payment_intent:', intent.id, '— skipping duplicate webhook');
-      return NextResponse.json({ received: true });
-    }
-
-    // Fetch checkout session
-    const { data: session, error: sessionError } = await supabase
-      .from('checkout_sessions')
-      .select('*')
-      .eq('id', session_id)
-      .eq('tenant_id', tenant_id)
-      .single() as { data: CheckoutSessionRow | null; error: unknown };
-
-    if (sessionError || !session) {
-      console.error('[webhook] checkout_session not found — session_id:', session_id, '— error:', sessionError);
-      return NextResponse.json({ received: true });
-    }
-
-    const subtotal = session.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const total    = subtotal + session.shipping_total;
-
-    // Create order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        tenant_id:                tenant_id,
-        customer_id:              null,
-        email:                    session.email,
-        full_name:                session.full_name,
-        fulfillment_type:         session.fulfillment_type,
-        shipping_address:         session.shipping_address,
-        shipping_details:         session.shipping_details,
-        subtotal,
-        shipping_cost:            session.shipping_total,
-        total,
-        payment_method:           'stripe',
-        payment_status:           'paid',
-        stripe_payment_intent_id: intent.id,
-        status:                   'preparing',
-        notes:                    session.phone ? `Téléphone: ${session.phone}` : null,
-      })
-      .select('id')
-      .single();
-
-    if (orderError || !order) {
-      console.error('[webhook] orders insert error:', orderError);
-      return NextResponse.json({ error: 'Order creation failed.' }, { status: 500 });
-    }
-
-    console.info('[webhook] order created — id:', order.id, '— tenant:', tenant_id, '— payment_intent:', intent.id);
-
-    // Insert order_items with explicit fields — no spread to avoid null overwrites
-    const orderItemsPayload = session.items.map((i) => ({
-      order_id:     order.id,
-      tenant_id:    tenant_id,
-      product_id:   i.productId ?? null,
-      name:         i.name,
-      price:        i.price,
-      quantity:     i.quantity,
-      subtotal:     i.price * i.quantity,
-      storage_type: i.storage_type ?? 'dry',
-    }));
-
-    const { error: itemsError } = await (supabase as unknown as {
-      from(table: 'order_items'): {
-        insert(data: unknown[]): Promise<{ error: unknown }>;
-      };
-    }).from('order_items').insert(orderItemsPayload);
-
-    if (itemsError) {
-      console.error('[webhook] order_items insert error:', itemsError, '— order_id:', order.id, '— tenant_id:', tenant_id);
+    if (updateError) {
+      console.error('Failed to update order on payment_intent.succeeded:', updateError);
     } else {
-      console.info('[webhook] order_items inserted successfully — count:', orderItemsPayload.length, '— order_id:', order.id);
-    }
+      // Fetch order to build n8n payload
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id, email, full_name, total, shipping_cost, shipping_address')
+        .eq('stripe_payment_intent_id', intent.id)
+        .maybeSingle() as {
+          data: {
+            id:               string;
+            email:            string;
+            full_name:        string | null;
+            total:            number;
+            shipping_cost:    number;
+            shipping_address: Record<string, unknown> | null;
+          } | null;
+        };
 
-    // Delete checkout session
-    const { error: deleteError } = await supabase
-      .from('checkout_sessions')
-      .delete()
-      .eq('id', session_id);
+      if (order && process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
+        try {
+          const trackingToken    = generateTrackingToken(order.id, order.email);
+          const storefrontUrl    = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+          const orderTrackingLink = `${storefrontUrl}/orders/${order.id}?token=${trackingToken}`;
 
-    if (deleteError) {
-      console.error('[webhook] checkout_session delete error (non-critical):', deleteError);
+          await fetch(`${process.env.N8N_WEBHOOK_URL}/webhook/order-confirmed`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId:         order.id,
+              email:           order.email,
+              fullName:        order.full_name ?? '',
+              total:           order.total,
+              shippingTotal:   order.shipping_cost,
+              shippingAddress: order.shipping_address ?? null,
+              orderTrackingLink,
+            }),
+          });
+
+          console.info('[webhook] n8n notified — order:', order.id);
+        } catch (n8nErr) {
+          // Non-fatal: log and continue
+          console.error('[webhook] n8n notification failed:', n8nErr);
+        }
+      }
     }
   }
 
   if (event.type === 'payment_intent.payment_failed') {
     const intent = event.data.object as Stripe.PaymentIntent;
-    console.info('[webhook] payment_intent.payment_failed — id:', intent.id);
+    const { error } = await supabase
+      .from('orders')
+      .update({ payment_status: 'failed' })
+      .eq('stripe_payment_intent_id', intent.id);
+    if (error) console.error('Failed to update order on payment_intent.payment_failed:', error);
   }
 
   return NextResponse.json({ received: true });
