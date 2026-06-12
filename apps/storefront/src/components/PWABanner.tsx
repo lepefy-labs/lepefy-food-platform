@@ -20,11 +20,14 @@ export function PWABanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
+    // Already installed as standalone app — hide
     if (window.matchMedia('(display-mode: standalone)').matches) return;
 
+    // Dismissed within the last 7 days — hide
     const dismissed = localStorage.getItem(DISMISS_KEY);
     if (dismissed && Date.now() - parseInt(dismissed, 10) < SEVEN_DAYS) return;
 
+    // beforeinstallprompt only fires on Android Chrome — never on iOS or desktop
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -80,16 +83,16 @@ export function PWABanner() {
         <div
           aria-hidden
           style={{
-            width:        36,
-            height:       36,
-            borderRadius: 8,
-            background:   'white',
-            display:      'flex',
-            alignItems:   'center',
+            width:          36,
+            height:         36,
+            borderRadius:   8,
+            background:     'white',
+            display:        'flex',
+            alignItems:     'center',
             justifyContent: 'center',
-            fontSize:     20,
-            flexShrink:   0,
-            animation:    'pwa-pulse 2s ease-in-out infinite',
+            fontSize:       20,
+            flexShrink:     0,
+            animation:      'pwa-pulse 2s ease-in-out infinite',
           }}
         >
           🌿
@@ -97,30 +100,16 @@ export function PWABanner() {
 
         {/* Text */}
         <div style={{ flex: 1 }}>
-          <div style={{
-            color:      '#1a1a1a',
-            fontWeight: 700,
-            fontSize:   13,
-            lineHeight: '1.3',
-          }}>
+          <div style={{ color: '#1a1a1a', fontWeight: 700, fontSize: 13, lineHeight: '1.3' }}>
             Chloé Food
           </div>
-          <div style={{
-            color:      'rgba(0,0,0,0.6)',
-            fontSize:   11,
-            lineHeight: '1.3',
-          }}>
+          <div style={{ color: 'rgba(0,0,0,0.6)', fontSize: 11, lineHeight: '1.3' }}>
             Installer l&apos;application
           </div>
         </div>
 
         {/* Actions */}
-        <div style={{
-          display:       'flex',
-          flexDirection: 'column',
-          gap:           4,
-          alignItems:    'flex-end',
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
           <button
             onClick={handleInstall}
             style={{
