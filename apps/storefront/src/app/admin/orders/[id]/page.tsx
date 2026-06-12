@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { formatPrice } from '@/lib/utils/format';
 import { formatDate } from '@/lib/utils/format';
 import OrderDetail from './OrderDetail';
+import PickingList from './PickingList';
 import type { Order, OrderItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -44,9 +45,14 @@ export default async function AdminOrderPage({ params }: PageProps) {
 
   if (!order) notFound();
 
+  // Sort by warehouse_location so the picker follows a logical shelf path.
+  // Rows without a location (null) go last.
   const { data: items } = await (supabase as unknown as {
     from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>;
-  }).from('order_items').select('*').eq('order_id', order.id) as { data: OrderItem[] | null };
+  }).from('order_items')
+    .select('*')
+    .eq('order_id', order.id)
+    .order('warehouse_location', { ascending: true, nullsFirst: false }) as { data: OrderItem[] | null };
 
   const { data: carriersRaw } = await supabase
     .from('carriers')
@@ -60,7 +66,9 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const isPickup        = order.fulfillment_type === 'pickup';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+    {/* no-print: hidden when @media print kicks in — only PickingList shows */}
+    <div className="no-print min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-8">
 
         {/* Back */}
@@ -180,5 +188,13 @@ export default async function AdminOrderPage({ params }: PageProps) {
         />
       </div>
     </div>
+
+    {/* Picking List — screen button visible, print content hidden until print */}
+    <PickingList
+      order={order}
+      items={items ?? []}
+      currency={tenant.currency}
+    />
+    </>
   );
 }

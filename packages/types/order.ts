@@ -49,10 +49,14 @@ export interface OrderItem {
   tenant_id: string;
   product_id: string | null;
   name: string;
+  /** Secondary name / transliteration shown on picking lists */
+  name_alt: string | null;
   price: number;
   quantity: number;
   subtotal: number;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  /** Shelf / aisle code used to sort picking lists (e.g. "A-03", "FRIGO-2") */
+  warehouse_location: string | null;
 }
 
 export interface OrderWithItems extends Order {

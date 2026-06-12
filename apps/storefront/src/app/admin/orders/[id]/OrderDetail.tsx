@@ -545,7 +545,7 @@ export default function OrderDetail({
         </div>
       </section>
 
-      {/* Section 5 — Print */}
+      {/* Section 5 — Print summary (full admin recap, not the picking list) */}
       <section className="bg-white rounded-xl border border-gray-200 p-5">
         <button
           onClick={() => window.print()}
@@ -553,6 +553,11 @@ export default function OrderDetail({
         >
           <span>🖨</span> {t.print}
         </button>
+        <p className="text-xs text-gray-400 mt-1.5">
+          {lang === 'fr'
+            ? 'Récapitulatif complet de la commande'
+            : 'Riepilogo completo dell\'ordine'}
+        </p>
       </section>
     </>
   );
