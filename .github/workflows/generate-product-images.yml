@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Numero massimo di prodotti da processare (0 = tutti)'
+        description: 'Numero massimo di prodotti (0 = tutti)'
         required: false
         default: '0'
       skip_existing:
@@ -25,14 +25,13 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
-        run: |
-          npm install @google/genai @supabase/supabase-js
+        run: npm install @google/genai @supabase/supabase-js ws
 
       - name: Generate and upload images
         env:
@@ -43,7 +42,7 @@ jobs:
           SKIP_EXISTING: ${{ github.event.inputs.skip_existing }}
         run: node scripts/generate-product-images.mjs
 
-      - name: Upload log CSV as artifact
+      - name: Upload log CSV
         if: always()
         uses: actions/upload-artifact@v4
         with:
