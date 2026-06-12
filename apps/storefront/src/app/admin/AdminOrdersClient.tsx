@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { formatPrice } from '@/lib/utils/format';
 import { formatDate } from '@/lib/utils/format';
 import type { OrderStatus } from '@lepefy/types';
+import CopyTrackingButton from './CopyTrackingButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -748,7 +749,16 @@ export default function AdminOrdersClient({ orders, currency }: Props) {
                       {/* Status */}
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1 items-start">
-                          <StatusBadge status={order.status} t={t} />
+                          <div className="flex items-center gap-1">
+                            <StatusBadge status={order.status} t={t} />
+                            {order.status === 'shipped' && (
+                              <CopyTrackingButton
+                                orderId={order.id}
+                                email={order.email}
+                                lang={lang}
+                              />
+                            )}
+                          </div>
                           {isInStorePending && (
                             <InStoreBadge label={t.paidInStore} />
                           )}
