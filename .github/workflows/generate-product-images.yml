@@ -1,0 +1,52 @@
+name: Generate Product Images (Gemini AI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Numero massimo di prodotti da processare (0 = tutti)'
+        required: false
+        default: '0'
+      skip_existing:
+        description: 'Salta prodotti che hanno già image_url'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  generate-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm install @google/genai @supabase/supabase-js
+
+      - name: Generate and upload images
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          SKIP_EXISTING: ${{ github.event.inputs.skip_existing }}
+        run: node scripts/generate-product-images.mjs
+
+      - name: Upload log CSV as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-generation-log
+          path: scripts/image-generation-log.csv
+          retention-days: 30
