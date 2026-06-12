@@ -280,7 +280,7 @@ export default function CartClient({ tenant }: Props) {
       </div>
 
       {/* CTA — fixed on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 sm:static sm:border-0 sm:p-0 sm:bg-transparent">
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-[calc(1rem+64px)] bg-white border-t border-gray-100 sm:static sm:border-0 sm:p-0 sm:pb-0 sm:bg-transparent">
         <button
           onClick={handleProceed}
           disabled={!canProceed}

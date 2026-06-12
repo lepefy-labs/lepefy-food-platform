@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
+import { formatPrice } from '@/lib/utils/format';
 
 export const metadata: Metadata = {
   title: 'Chloé Food ETS — Boutique africaine à Reggio Emilia',
@@ -10,26 +11,64 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const slug = process.env.TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const supabase = createClient();
 
-  const { data: featuredData } = await supabase
+  const { data: featuredRaw } = await supabase
     .from('products')
-    .select('id, name, price, image_url, slug')
+    .select('id, name, price, image_url, slug, category_id')
     .eq('tenant_id', tenant.id)
     .eq('active', true)
     .eq('featured', true)
-    .order('position')
-    .limit(4);
+    .order('position', { ascending: true })
+    .limit(8);
 
-  const featured = featuredData ?? [];
+  const featuredList = featuredRaw ?? [];
+  let displayProducts = featuredList.slice(0, 4);
+
+  if (displayProducts.length < 4) {
+    const needed = 4 - displayProducts.length;
+    const usedIds = featuredList.map((p) => p.id);
+
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('id, name, slug')
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true });
+
+    const fallback: typeof featuredList = [];
+
+    for (const cat of categories ?? []) {
+      if (fallback.length >= needed) break;
+
+      const excludeIds = [...usedIds, ...fallback.map((p) => p.id)];
+      const notInList =
+        excludeIds.length > 0
+          ? excludeIds
+          : ['00000000-0000-0000-0000-000000000000'];
+
+      const { data: pick } = await supabase
+        .from('products')
+        .select('id, name, price, image_url, slug, category_id')
+        .eq('tenant_id', tenant.id)
+        .eq('active', true)
+        .eq('category_id', cat.id)
+        .not('id', 'in', `(${notInList.join(',')})`)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pick && pick.length > 0) fallback.push(pick[0]);
+    }
+
+    displayProducts = [...featuredList, ...fallback].slice(0, 4);
+  }
 
   const { data: categoryData } = await supabase
     .from('categories')
-    .select('id, name, slug')
+    .select('id, name, slug, image_url')
     .eq('tenant_id', tenant.id)
-    .order('position');
+    .order('position', { ascending: true });
 
   const categories = categoryData ?? [];
 
@@ -57,7 +96,10 @@ export default async function HomePage() {
           <h1 className="font-bold text-2xl text-[#1D9E75]">{tenant.name}</h1>
           <p className="italic text-gray-400 text-sm mt-1">Les saveurs de chez nous</p>
           {tenant.city && (
-            <p className="text-xs text-gray-300 mt-0.5">{tenant.city}{tenant.country ? `, ${tenant.country}` : ''}</p>
+            <p className="text-xs text-gray-300 mt-0.5">
+              {tenant.city}
+              {tenant.country ? `, ${tenant.country}` : ''}
+            </p>
           )}
         </div>
       </section>
@@ -71,11 +113,11 @@ export default async function HomePage() {
       </div>
 
       {/* Featured products */}
-      {featured.length > 0 && (
+      {displayProducts.length > 0 && (
         <section className="mt-2">
           <h2 className="font-bold text-base mb-3 px-4">Nos produits vedettes</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4">
-            {featured.map((product) => (
+            {displayProducts.map((product) => (
               <Link key={product.id} href={`/products/${product.slug}`} className="block">
                 <div className="aspect-square rounded-xl overflow-hidden bg-[#E1F5EE]">
                   {product.image_url ? (
@@ -90,9 +132,11 @@ export default async function HomePage() {
                     <div className="w-full h-full bg-[#E1F5EE]" />
                   )}
                 </div>
-                <p className="text-xs font-medium line-clamp-2 mt-2 text-gray-800">{product.name}</p>
+                <p className="text-xs font-medium line-clamp-2 mt-2 text-gray-800">
+                  {product.name}
+                </p>
                 <p className="text-sm font-bold text-[#1D9E75] mt-0.5">
-                  {(product.price / 100).toFixed(2)} €
+                  {formatPrice(product.price, tenant.currency)}
                 </p>
               </Link>
             ))}
@@ -104,12 +148,12 @@ export default async function HomePage() {
       {categories.length > 0 && (
         <section className="mt-6">
           <h2 className="font-bold text-base mb-3 px-4">Nos catégories</h2>
-          <div className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto px-4 pb-2 [&::-webkit-scrollbar]:hidden">
             {categories.map((cat) => (
               <Link
                 key={cat.id}
-                href={`/products?category=${encodeURIComponent(cat.slug)}`}
-                className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-[#E1F5EE] text-[#0F6E56] border border-[#1D9E75]/20 whitespace-nowrap"
+                href={`/products?category=${cat.slug}`}
+                className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-[#E1F5EE] text-[#0F6E56] border border-[#1D9E75]/20"
               >
                 {cat.name}
               </Link>
