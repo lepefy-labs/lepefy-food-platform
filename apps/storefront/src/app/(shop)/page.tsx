@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { formatPrice } from '@/lib/utils/format';
+import { AddToCartButton } from '@/components/home/AddToCartButton';
 
 export const metadata: Metadata = {
   title: 'Chloé Food ETS — Boutique africaine à Reggio Emilia',
@@ -17,7 +18,7 @@ export default async function HomePage() {
 
   const { data: featuredRaw } = await supabase
     .from('products')
-    .select('id, name, price, image_url, slug, category_id')
+    .select('id, name, price, image_url, slug, category_id, weight_grams, stock')
     .eq('tenant_id', tenant.id)
     .eq('active', true)
     .eq('featured', true)
@@ -50,7 +51,7 @@ export default async function HomePage() {
 
       const { data: pick } = await supabase
         .from('products')
-        .select('id, name, price, image_url, slug, category_id')
+        .select('id, name, price, image_url, slug, category_id, weight_grams, stock')
         .eq('tenant_id', tenant.id)
         .eq('active', true)
         .eq('category_id', cat.id)
@@ -58,7 +59,8 @@ export default async function HomePage() {
         .order('created_at', { ascending: false })
         .limit(1);
 
-      if (pick && pick.length > 0) fallback.push(pick[0]);
+      const first = pick?.[0];
+      if (first) fallback.push(first);
     }
 
     displayProducts = [...featuredList, ...fallback].slice(0, 4);
@@ -118,26 +120,33 @@ export default async function HomePage() {
           <h2 className="font-bold text-base mb-3 px-4">Nos produits vedettes</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4">
             {displayProducts.map((product) => (
-              <Link key={product.id} href={`/products/${product.slug}`} className="block">
-                <div className="aspect-square rounded-xl overflow-hidden bg-[#E1F5EE]">
+              <Link
+                key={product.id}
+                href={`/products/${product.slug}`}
+                className="block rounded-xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-all relative group"
+              >
+                <div className="aspect-square bg-[#E1F5EE] relative overflow-hidden">
                   {product.image_url ? (
-                    <Image
+                    <img
                       src={product.image_url}
                       alt={product.name}
-                      width={300}
-                      height={300}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-[#E1F5EE]" />
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-3xl">🛒</span>
+                    </div>
                   )}
                 </div>
-                <p className="text-xs font-medium line-clamp-2 mt-2 text-gray-800">
-                  {product.name}
-                </p>
-                <p className="text-sm font-bold text-[#1D9E75] mt-0.5">
-                  {formatPrice(product.price, tenant.currency)}
-                </p>
+                <div className="p-2 pb-8 relative">
+                  <p className="text-xs font-medium line-clamp-2 text-gray-900">
+                    {product.name}
+                  </p>
+                  <p className="text-sm font-bold text-[#1D9E75] mt-1">
+                    {formatPrice(product.price, 'EUR')}
+                  </p>
+                </div>
+                <AddToCartButton product={product} />
               </Link>
             ))}
           </div>
