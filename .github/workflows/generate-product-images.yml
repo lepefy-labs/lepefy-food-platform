@@ -25,13 +25,13 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Install dependencies
-        run: npm install @google/genai @supabase/supabase-js ws
+        run: npm install @google/genai
 
       - name: Generate and upload images
         env:
