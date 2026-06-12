@@ -16,6 +16,7 @@
     "@stripe/stripe-js": "^4.0.0",
     "@supabase/ssr": "^0.3.0",
     "@supabase/supabase-js": "^2.43.0",
+    "@tabler/icons-react": "^3.x.x"    
     "next": "14.2.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
