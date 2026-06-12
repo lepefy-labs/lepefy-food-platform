@@ -133,7 +133,7 @@ function buildPrompt(name, categorySlug) {
 
 async function generateImage(name, categorySlug) {
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash-preview-image-generation',
+    model: 'gemini-2.5-flash-image',
     contents: buildPrompt(name, categorySlug),
     config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
   });
