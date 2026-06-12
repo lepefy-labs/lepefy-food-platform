@@ -1,11 +1,13 @@
 /**
  * scripts/generate-product-images.mjs
- * Eseguito dalla GitHub Action — NON richede ambiente locale
+ * ChloeFood — Generazione immagini via Gemini AI
+ * Eseguito dalla GitHub Action — nessun ambiente locale necessario
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import { writeFileSync } from 'fs';
+import ws from 'ws';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -27,8 +29,11 @@ if (missing.length) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const ai       = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// Fix Node.js 20: passa ws come transport a Supabase Realtime
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  realtime: { transport: ws },
+});
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // ─── Prompt per categoria ─────────────────────────────────────────────────────
 
@@ -123,10 +128,7 @@ async function uploadAndUpdate(product, imageBuffer) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-function pad(n, total) {
-  return String(n).padStart(String(total).length, ' ');
-}
+const pad   = (n, total) => String(n).padStart(String(total).length, ' ');
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -134,13 +136,14 @@ async function main() {
   console.log('╔══════════════════════════════════════════════════╗');
   console.log('║   ChloeFood — Generazione immagini Gemini AI    ║');
   console.log('╚══════════════════════════════════════════════════╝');
-  console.log(`Skip prodotti con immagine già presente: ${SKIP_EXISTING}`);
-  console.log(`Limite: ${LIMIT === 0 ? 'nessuno (tutti)' : LIMIT}`);
+  console.log(`Skip esistenti : ${SKIP_EXISTING}`);
+  console.log(`Limite         : ${LIMIT === 0 ? 'nessuno (tutti)' : LIMIT}`);
   console.log('');
 
   const products = await getProducts();
   if (products.length === 0) {
     console.log('✅ Nessun prodotto da processare (tutti hanno già image_url).');
+    writeFileSync('scripts/image-generation-log.csv', 'slug,name,category,status,image_url,error\n');
     return;
   }
   console.log(`📦 ${products.length} prodotti da processare\n`);
@@ -152,16 +155,16 @@ async function main() {
     const p = products[i];
     const prefix = `[${pad(i+1, products.length)}/${products.length}]`;
     console.log(`${prefix} ${p.slug}`);
-    console.log(`         ${p.name} (${p.categorySlug})`);
+    console.log(`${''.padStart(prefix.length + 1)}${p.name} (${p.categorySlug})`);
 
     let status = 'failed', imageUrl = '', errorMsg = '';
+    let imageBuffer = null;
 
     // Genera con retry
-    let imageBuffer = null;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const attemptLabel = attempt > 1 ? ` — retry ${attempt}/${MAX_RETRIES}` : '';
-        process.stdout.write(`         → Gemini${attemptLabel}... `);
+        const label = attempt > 1 ? ` — retry ${attempt}/${MAX_RETRIES}` : '';
+        process.stdout.write(`         → Gemini${label}... `);
         imageBuffer = await generateImage(p.name, p.categorySlug);
         console.log('✓');
         break;
@@ -177,7 +180,7 @@ async function main() {
       }
     }
 
-    // Upload + DB
+    // Upload + DB update
     if (imageBuffer) {
       try {
         process.stdout.write('         → Upload + DB... ');
@@ -201,18 +204,18 @@ async function main() {
     if (i < products.length - 1) await sleep(DELAY_MS);
   }
 
-  // ─── Report ───────────────────────────────────────────────────────────────
+  // ─── Report finale ────────────────────────────────────────────────────────
   console.log('══════════════════════════════════════════════════');
   console.log(`✅ Successo : ${ok}/${products.length}`);
-  if (fail > 0) console.log(`❌ Falliti  : ${fail} (scarica l'artefatto CSV dal run)`);
+  if (fail > 0) console.log(`❌ Falliti  : ${fail} — scarica il CSV dagli artefatti del run`);
 
-  // ─── CSV ──────────────────────────────────────────────────────────────────
+  // ─── Salva CSV ────────────────────────────────────────────────────────────
   const csv = 'slug,name,category,status,image_url,error\n' +
     log.map(r =>
       [r.slug, `"${r.name}"`, r.category, r.status, r.image_url, `"${r.error}"`].join(',')
     ).join('\n');
   writeFileSync('scripts/image-generation-log.csv', csv, 'utf8');
-  console.log('📄 Log CSV salvato → scaricabile come artefatto del workflow');
+  console.log('📄 Log CSV salvato → disponibile negli artefatti del workflow');
 }
 
 main().catch(err => {
