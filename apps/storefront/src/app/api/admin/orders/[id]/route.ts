@@ -23,13 +23,21 @@ export async function PATCH(
     const tenant     = await getTenant(tenantSlug);
     const supabase   = createServiceClient();
 
-    // Verify the order belongs to this tenant
+    // Verify the order belongs to this tenant — fetch fields needed for n8n too
     const { data: existing } = await supabase
       .from('orders')
-      .select('id, status')
+      .select('id, status, email, full_name, tracking_token')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
-      .single();
+      .single() as {
+        data: {
+          id:             string;
+          status:         string;
+          email:          string;
+          full_name:      string | null;
+          tracking_token: string | null;
+        } | null;
+      };
 
     if (!existing) {
       return NextResponse.json({ error: 'Commande introuvable.' }, { status: 404 });
@@ -82,7 +90,49 @@ export async function PATCH(
       return NextResponse.json({ error: 'Erreur lors de la mise à jour.' }, { status: 500 });
     }
 
-    console.info('[admin/orders PATCH] updated — order_id:', params.id, '— fields:', Object.keys(update).join(', '));
+    console.info('[admin/orders PATCH] updated — order_id:', params.id,
+      '— fields:', Object.keys(update).join(', '));
+
+    // ── Notify n8n when transitioning to shipped ──────────────────────────
+    const transitioningToShipped =
+      status === 'shipped' && existing.status !== 'shipped';
+
+    if (transitioningToShipped && process.env.N8N_WEBHOOK_URL) {
+      try {
+        const storefrontUrl     = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+        const trackingToken     = existing.tracking_token ?? '';
+        const orderTrackingLink =
+          `${storefrontUrl}/orders/${params.id}?token=${trackingToken}`;
+
+        const n8nPayload = {
+          orderId:          params.id,
+          email:            existing.email,
+          fullName:         existing.full_name ?? '',
+          trackingCode:     body.tracking_code    ?? null,
+          trackingCarrier:  body.tracking_carrier ?? null,
+          orderTrackingLink,
+        };
+
+        console.info('[admin/orders PATCH] notifying n8n order-shipped — order_id:', params.id);
+
+        const n8nRes = await fetch(
+          `${process.env.N8N_WEBHOOK_URL}/webhook/order-shipped`,
+          {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(n8nPayload),
+          },
+        );
+
+        console.info('[admin/orders PATCH] n8n response status:', n8nRes.status,
+          '— order_id:', params.id);
+      } catch (n8nErr) {
+        // Non-fatal: log and continue — the DB update already succeeded
+        console.error('[admin/orders PATCH] n8n notification failed:', n8nErr,
+          '— order_id:', params.id);
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[admin/orders PATCH] unhandled error:', err);
