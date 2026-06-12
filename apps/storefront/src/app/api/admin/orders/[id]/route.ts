@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import type { OrderStatus, PaymentStatus } from '@lepefy/types';
@@ -9,6 +10,20 @@ interface PatchBody {
   tracking_code?:    string | null;
   notes?:            string | null;
   payment_status?:   PaymentStatus;
+}
+
+interface ExistingOrder {
+  id:        string;
+  status:    string;
+  email:     string;
+  full_name: string | null;
+}
+
+function generateTrackingToken(orderId: string, email: string): string {
+  return crypto
+    .createHmac('sha256', process.env.TRACKING_SECRET!)
+    .update(orderId + email)
+    .digest('hex');
 }
 
 export async function PATCH(
@@ -23,26 +38,20 @@ export async function PATCH(
     const tenant     = await getTenant(tenantSlug);
     const supabase   = createServiceClient();
 
-    // Verify the order belongs to this tenant — fetch fields needed for n8n too
-    const { data: existing } = await supabase
+    const { data: existingRaw, error: fetchError } = await supabase
       .from('orders')
-      .select('id, status, email, full_name, tracking_token')
+      .select('id, status, email, full_name')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
-      .single() as {
-        data: {
-          id:             string;
-          status:         string;
-          email:          string;
-          full_name:      string | null;
-          tracking_token: string | null;
-        } | null;
-      };
+      .single();
 
-    if (!existing) {
+    if (fetchError || !existingRaw) {
       return NextResponse.json({ error: 'Commande introuvable.' }, { status: 404 });
     }
 
+    const existing = existingRaw as unknown as ExistingOrder;
+
+    // ── Build update payload ──────────────────────────────────────────────
     const update: Record<string, unknown> = {};
 
     if (status !== undefined) {
@@ -54,7 +63,6 @@ export async function PATCH(
       }
       update.status = status;
 
-      // shipped_at: set when transitioning to shipped, clear when leaving shipped
       if (status === 'shipped' && existing.status !== 'shipped') {
         update.shipped_at = new Date().toISOString();
       }
@@ -79,14 +87,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Aucun champ à mettre à jour.' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    // ── Persist ───────────────────────────────────────────────────────────
+    const { error: updateError } = await supabase
       .from('orders')
       .update(update)
       .eq('id', params.id)
       .eq('tenant_id', tenant.id);
 
-    if (error) {
-      console.error('[admin/orders PATCH] update error:', error, '— order_id:', params.id);
+    if (updateError) {
+      console.error('[admin/orders PATCH] update error:', updateError,
+        '— order_id:', params.id);
       return NextResponse.json({ error: 'Erreur lors de la mise à jour.' }, { status: 500 });
     }
 
@@ -97,19 +107,19 @@ export async function PATCH(
     const transitioningToShipped =
       status === 'shipped' && existing.status !== 'shipped';
 
-    if (transitioningToShipped && process.env.N8N_WEBHOOK_URL) {
+    if (transitioningToShipped && process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
       try {
+        // Token is deterministic — recompute from orderId + email, no DB column needed
+        const trackingToken     = generateTrackingToken(params.id, existing.email);
         const storefrontUrl     = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-        const trackingToken     = existing.tracking_token ?? '';
-        const orderTrackingLink =
-          `${storefrontUrl}/orders/${params.id}?token=${trackingToken}`;
+        const orderTrackingLink = `${storefrontUrl}/orders/${params.id}?token=${trackingToken}`;
 
         const n8nPayload = {
           orderId:          params.id,
           email:            existing.email,
           fullName:         existing.full_name ?? '',
-          trackingCode:     body.tracking_code    ?? null,
-          trackingCarrier:  body.tracking_carrier ?? null,
+          trackingCode:     tracking_code    ?? null,
+          trackingCarrier:  tracking_carrier ?? null,
           orderTrackingLink,
         };
 
@@ -124,10 +134,9 @@ export async function PATCH(
           },
         );
 
-        console.info('[admin/orders PATCH] n8n response status:', n8nRes.status,
+        console.info('[admin/orders PATCH] n8n response:', n8nRes.status,
           '— order_id:', params.id);
       } catch (n8nErr) {
-        // Non-fatal: log and continue — the DB update already succeeded
         console.error('[admin/orders PATCH] n8n notification failed:', n8nErr,
           '— order_id:', params.id);
       }
