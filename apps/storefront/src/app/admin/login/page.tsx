@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -18,19 +17,18 @@ export default function AdminLoginPage() {
     }
   }, [searchParams]);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorMsg('');
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-    if (error) {
+    if (!res.ok) {
       setErrorMsg('Identifiants incorrects. Veuillez réessayer.');
       setLoading(false);
       return;
