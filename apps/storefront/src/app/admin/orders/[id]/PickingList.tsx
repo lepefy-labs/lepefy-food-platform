@@ -120,7 +120,6 @@ export default function PickingList({ order, items, currency }: Props) {
           <span>Controllato da: ___________________</span>
           <span>Ora: ___________</span>
         </div>
-      </div>
     </div>
   );
 }
