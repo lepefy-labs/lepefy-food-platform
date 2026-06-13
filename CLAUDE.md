@@ -84,12 +84,14 @@ Two separate clients exist — use the right one:
 - `(protected)/layout.tsx` — auth check via `createServerClient` + `cookies()`; also checks `ADMIN_EMAILS` env var whitelist; wraps dashboard and orders only
 - `(protected)/page.tsx` — order management dashboard (`/admin`)
 - `(protected)/orders/[id]/page.tsx` — per-order detail/picking list (`/admin/orders/:id`)
-- `login/page.tsx` — login form, Client Component (`@supabase/ssr` `createBrowserClient`); reads `?error=unauthorized` to show access-denied message
+- `login/page.tsx` — login form, Client Component; calls `POST /api/admin/login` (server-side) then `router.refresh()` + `router.push('/admin')`; reads `?error=unauthorized` to show access-denied message
 - `LogoutButton.tsx` — logout button (Client Component) rendered in `(protected)/layout.tsx`
 
 **Auth flow**: unauthenticated → `redirect('/admin/login')`; authenticated but not in whitelist → `redirect('/admin/login?error=unauthorized')`.
 
-`middleware.ts` is intentionally empty (`export {}`). The service worker (`public/sw.js`) explicitly skips `/admin` routes to avoid caching interference.
+**Cookie API**: `@supabase/ssr@0.3.x` uses `get(name)`/`set(name,value,options)` internally (old API). Both `createServerClient` instances (API route + protected layout) must provide `get + set + remove + getAll + setAll` — providing only `getAll/setAll` causes session read/write to silently fail.
+
+**Login flow**: `POST /api/admin/login/route.ts` calls `signInWithPassword` server-side and sets session cookies explicitly on the `NextResponse`. This ensures cookies are available to Server Components on the next request.
 
 Admin accounts are created manually via **Supabase Dashboard → Authentication → Users**. No registration flow exists in the app.
 
