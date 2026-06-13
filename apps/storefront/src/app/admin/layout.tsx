@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
+import LogoutButton from './LogoutButton';
 
 export const metadata: Metadata = {
   title: 'Administration',
@@ -33,6 +34,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <span className="ml-2 text-xs text-gray-400 font-medium uppercase tracking-wide">
               Administration
             </span>
+          </div>
+          <div className="ml-auto">
+            <LogoutButton />
           </div>
         </header>
 

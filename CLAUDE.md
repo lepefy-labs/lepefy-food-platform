@@ -77,7 +77,13 @@ Two separate clients exist — use the right one:
 
 ### Admin
 
-`/admin` routes are protected only at the UI level (no auth yet). `src/app/admin/` contains an order management dashboard and per-order picking lists. API mutations go through `src/app/api/admin/`.
+`/admin` routes are protected via **Supabase Auth** (email/password). The middleware at `apps/storefront/middleware.ts` intercepts all `/admin/*` requests, verifies the session using `@supabase/ssr`, and redirects unauthenticated users to `/admin/login`. The login page is the only `/admin/*` route accessible without a session.
+
+- `src/app/admin/login/page.tsx` — login form (Client Component, `@supabase/ssr` `createBrowserClient`)
+- `src/app/admin/LogoutButton.tsx` — logout button rendered in the admin header
+- Admin accounts are created manually via Supabase Dashboard → Authentication → Users; no registration flow exists in the app
+
+`src/app/admin/` contains an order management dashboard and per-order picking lists. API mutations go through `src/app/api/admin/`.
 
 ## Key Environment Variables
 
