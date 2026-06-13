@@ -4,6 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  console.log('[middleware] executing for path:', pathname)
+
   // Lascia passare la pagina di login
   if (pathname === '/admin/login') return NextResponse.next()
 
@@ -35,6 +37,8 @@ export async function middleware(request: NextRequest) {
 
       const { data: { user } } = await supabase.auth.getUser()
 
+      console.log('[middleware] user:', user?.email ?? 'null (unauthenticated)')
+
       if (!user) {
         const url = request.nextUrl.clone()
         url.pathname = '/admin/login'
@@ -42,8 +46,8 @@ export async function middleware(request: NextRequest) {
       }
 
       return supabaseResponse
-    } catch {
-      // Se il client Supabase fallisce, blocca l'accesso per sicurezza
+    } catch (err) {
+      console.error('[middleware] error:', err)
       const url = request.nextUrl.clone()
       url.pathname = '/admin/login'
       return NextResponse.redirect(url)
@@ -53,7 +57,8 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
+// Nessun matcher: il middleware gira su tutte le route
+// e il path-check è fatto internamente (più affidabile in monorepo)
 export const config = {
-  // Matcher esplicito: cattura /admin e tutti i sottopercorsi
-  matcher: ['/admin', '/admin/:path+'],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico).*)'],
 }
