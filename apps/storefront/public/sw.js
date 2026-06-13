@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chloefood-v1';
+const CACHE_NAME = 'chloefood-v2';
 const STATIC_ASSETS = ['/', '/products'];
 
 self.addEventListener('install', (event) => {
@@ -28,7 +28,8 @@ self.addEventListener('fetch', (event) => {
   if (
     event.request.method !== 'GET' ||
     url.origin !== self.location.origin ||
-    url.pathname.startsWith('/api/')
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/admin')
   ) {
     return;
   }
