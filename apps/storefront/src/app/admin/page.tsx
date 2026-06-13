@@ -22,9 +22,11 @@ export default async function AdminPage() {
   const tenant     = await getTenant(tenantSlug);
   const supabase   = createServiceClient();
 
+  // Explicit column list on order_items avoids PostgREST schema-cache failures
+  // after an ALTER TABLE (e.g. migration 010). Using '*' on the parent is fine.
   const { data: orders } = await supabase
     .from('orders')
-    .select('*, order_items(*)')
+    .select('*, order_items(id, name, quantity, subtotal, storage_type)')
     .eq('tenant_id', tenant.id)
     .order('created_at', { ascending: false })
     .limit(500) as { data: OrderRow[] | null };

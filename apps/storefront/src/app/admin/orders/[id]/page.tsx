@@ -45,14 +45,23 @@ export default async function AdminOrderPage({ params }: PageProps) {
 
   if (!order) notFound();
 
-  // Sort by warehouse_location so the picker follows a logical shelf path.
-  // Rows without a location (null) go last.
-  const { data: items } = await (supabase as unknown as {
+  // Fetch all items for this order. We sort by warehouse_location in JS so
+  // the query works even before migration 010 is applied in production.
+  const { data: rawItems } = await (supabase as unknown as {
     from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>;
   }).from('order_items')
     .select('*')
-    .eq('order_id', order.id)
-    .order('warehouse_location', { ascending: true, nullsFirst: false }) as { data: OrderItem[] | null };
+    .eq('order_id', order.id) as { data: OrderItem[] | null };
+
+  // Sort by warehouse_location (nulls last) — safe whether column exists or not.
+  const items = (rawItems ?? []).sort((a, b) => {
+    const la = a.warehouse_location ?? '';
+    const lb = b.warehouse_location ?? '';
+    if (!la && !lb) return 0;
+    if (!la) return 1;
+    if (!lb) return -1;
+    return la.localeCompare(lb);
+  });
 
   const { data: carriersRaw } = await supabase
     .from('carriers')
