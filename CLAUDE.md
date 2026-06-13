@@ -77,13 +77,21 @@ Two separate clients exist — use the right one:
 
 ### Admin
 
-`/admin` routes are protected via **Supabase Auth** (email/password). The middleware at `apps/storefront/middleware.ts` intercepts all `/admin/*` requests, verifies the session using `@supabase/ssr`, and redirects unauthenticated users to `/admin/login`. The login page is the only `/admin/*` route accessible without a session.
+`/admin` routes are protected via **Supabase Auth** (email/password) implemented at the Server Component layout level (Edge middleware is not used due to Vercel monorepo limitations).
 
-- `src/app/admin/login/page.tsx` — login form (Client Component, `@supabase/ssr` `createBrowserClient`)
-- `src/app/admin/LogoutButton.tsx` — logout button rendered in the admin header
-- Admin accounts are created manually via Supabase Dashboard → Authentication → Users; no registration flow exists in the app
+**Route structure** (`src/app/admin/`):
+- `layout.tsx` — HTML shell only (CSS vars from tenant, no auth check); wraps all admin routes including login
+- `(protected)/layout.tsx` — auth check via `createServerClient` + `cookies()`; also checks `ADMIN_EMAILS` env var whitelist; wraps dashboard and orders only
+- `(protected)/page.tsx` — order management dashboard (`/admin`)
+- `(protected)/orders/[id]/page.tsx` — per-order detail/picking list (`/admin/orders/:id`)
+- `login/page.tsx` — login form, Client Component (`@supabase/ssr` `createBrowserClient`); reads `?error=unauthorized` to show access-denied message
+- `LogoutButton.tsx` — logout button (Client Component) rendered in `(protected)/layout.tsx`
 
-`src/app/admin/` contains an order management dashboard and per-order picking lists. API mutations go through `src/app/api/admin/`.
+**Auth flow**: unauthenticated → `redirect('/admin/login')`; authenticated but not in whitelist → `redirect('/admin/login?error=unauthorized')`.
+
+`middleware.ts` is intentionally empty (`export {}`). The service worker (`public/sw.js`) explicitly skips `/admin` routes to avoid caching interference.
+
+Admin accounts are created manually via **Supabase Dashboard → Authentication → Users**. No registration flow exists in the app.
 
 ## Key Environment Variables
 
@@ -99,6 +107,7 @@ NEXT_PUBLIC_APP_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 STRIPE_SECRET_KEY=
 PACKLINK_API_KEY=
+ADMIN_EMAILS=email1@example.com,email2@example.com  # comma-separated, no spaces
 ```
 
 ## Conventions
