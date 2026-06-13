@@ -7,27 +7,27 @@ import LogoutButton from '../LogoutButton';
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
 
+  // Provide both old (get/set/remove) and new (getAll/setAll) cookie APIs.
+  // @supabase/ssr@0.3.x reads cookies via get(name) internally, not getAll().
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
+        getAll() { return cookieStore.getAll() },
         setAll() {},
-      },
+        get(name: string) { return cookieStore.get(name)?.value },
+        set() {},
+        remove() {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
     }
   );
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  console.log('[protected layout] user:', user?.email ?? 'null')
-  console.log('[protected layout] ADMIN_EMAILS:', process.env.ADMIN_EMAILS ?? '(not set)')
-  console.log('[protected layout] cookies present:', cookieStore.getAll().map(c => c.name))
-
   if (!user) {
-    console.log('[protected layout] → redirect: no user')
     redirect('/admin/login');
   }
 
@@ -36,7 +36,6 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .map((e) => e.trim().toLowerCase());
 
   if (!adminEmails.includes(user.email?.toLowerCase() ?? '')) {
-    console.log('[protected layout] → redirect: unauthorized', user.email, 'not in', adminEmails)
     redirect('/admin/login?error=unauthorized');
   }
 
