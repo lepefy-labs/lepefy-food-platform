@@ -22,19 +22,21 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  console.log('[admin auth] user:', user?.email ?? 'null')
-  console.log('[admin auth] ADMIN_EMAILS env:', process.env.ADMIN_EMAILS)
-  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase());
-  console.log('[admin auth] parsed emails:', adminEmails)
-  console.log('[admin auth] match:', adminEmails.includes(user?.email?.toLowerCase() ?? ''))
+  console.log('[protected layout] user:', user?.email ?? 'null')
+  console.log('[protected layout] ADMIN_EMAILS:', process.env.ADMIN_EMAILS ?? '(not set)')
+  console.log('[protected layout] cookies present:', cookieStore.getAll().map(c => c.name))
 
   if (!user) {
+    console.log('[protected layout] → redirect: no user')
     redirect('/admin/login');
   }
 
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase());
+
   if (!adminEmails.includes(user.email?.toLowerCase() ?? '')) {
+    console.log('[protected layout] → redirect: unauthorized', user.email, 'not in', adminEmails)
     redirect('/admin/login?error=unauthorized');
   }
 
