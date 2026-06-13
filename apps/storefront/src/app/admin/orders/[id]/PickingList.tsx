@@ -28,26 +28,8 @@ export default function PickingList({ order, items, currency }: Props) {
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <>
-      {/* ── Screen trigger button ─────────────────────────────────────────── */}
-      {/* Visible on screen, hidden on print via @media print .pl-trigger */}
-      <div className="pl-trigger bg-white rounded-xl border border-gray-200 p-5 mt-4">
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 text-sm font-semibold text-white px-4 py-2.5 rounded-lg transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#1d9e75' }}
-        >
-          <span>📦</span>
-          Stampa Picking List
-        </button>
-        <p className="text-xs text-gray-400 mt-2">
-          Foglio di prelievo magazzino — ordinato per ubicazione
-        </p>
-      </div>
-
-      {/* ── Print-only picking list ───────────────────────────────────────── */}
-      {/* Hidden on screen (display:none), shown by @media print .pl-content */}
-      <div className="pl-content" style={{ display: 'none' }}>
+    /* Hidden on screen (display:none), shown by @media print .pl-content */
+    <div className="pl-content" style={{ display: 'none' }}>
 
         {/* Header */}
         <div className="pl-header">
@@ -140,6 +122,6 @@ export default function PickingList({ order, items, currency }: Props) {
           <span>Ora: ___________</span>
         </div>
       </div>
-    </>
+    </div>
   );
 }

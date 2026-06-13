@@ -21,6 +21,7 @@ const translations = {
     saveOk:               '✓ Modifications enregistrées',
     saveError:            'Erreur lors de l\'enregistrement',
     print:                'Imprimer le récapitulatif',
+    pickingList:          '📦 Liste de prélèvement',
     markAsPaid:           'Marquer comme payé',
     markingAsPaid:        'Mise à jour…',
     markAsPaidOk:         '✓ Commande marquée comme payée',
@@ -61,6 +62,7 @@ const translations = {
     saveOk:               '✓ Modifiche salvate',
     saveError:            'Errore durante il salvataggio',
     print:                'Stampa riepilogo',
+    pickingList:          '📦 Lista prelievo',
     markAsPaid:           'Segna come pagato',
     markingAsPaid:        'Aggiornamento…',
     markAsPaidOk:         '✓ Ordine segnato come pagato',
@@ -545,19 +547,35 @@ export default function OrderDetail({
         </div>
       </section>
 
-      {/* Section 5 — Print summary (full admin recap, not the picking list) */}
+      {/* Section 5 — Print controls */}
       <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-        >
-          <span>🖨</span> {t.print}
-        </button>
-        <p className="text-xs text-gray-400 mt-1.5">
-          {lang === 'fr'
-            ? 'Récapitulatif complet de la commande'
-            : 'Riepilogo completo dell\'ordine'}
-        </p>
+        <div className="flex flex-col gap-3">
+          {/* Picking list — primary print action */}
+          <div>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-white text-sm transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              {t.pickingList}
+            </button>
+            <p className="text-xs text-gray-400 mt-1.5">
+              {lang === 'fr'
+                ? 'Feuille de prélèvement magazzin — triée par emplacement'
+                : 'Foglio prelievo magazzino — ordinato per ubicazione'}
+            </p>
+          </div>
+
+          {/* Summary print — secondary */}
+          <div className="border-t border-gray-100 pt-3">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              <span>🖨</span> {t.print}
+            </button>
+          </div>
+        </div>
       </section>
     </>
   );
