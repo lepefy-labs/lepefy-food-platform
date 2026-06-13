@@ -22,13 +22,17 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect('/admin/login');
-  }
-
+  console.log('[admin auth] user:', user?.email ?? 'null')
+  console.log('[admin auth] ADMIN_EMAILS env:', process.env.ADMIN_EMAILS)
   const adminEmails = (process.env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase());
+  console.log('[admin auth] parsed emails:', adminEmails)
+  console.log('[admin auth] match:', adminEmails.includes(user?.email?.toLowerCase() ?? ''))
+
+  if (!user) {
+    redirect('/admin/login');
+  }
 
   if (!adminEmails.includes(user.email?.toLowerCase() ?? '')) {
     redirect('/admin/login?error=unauthorized');
