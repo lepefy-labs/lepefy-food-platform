@@ -1,3 +1,6 @@
 {
-  "rootDirectory": "apps/storefront"
+  "framework": "nextjs",
+  "buildCommand": "pnpm --filter @lepefy/storefront build",
+  "outputDirectory": "apps/storefront/.next",
+  "installCommand": "pnpm install"
 }
