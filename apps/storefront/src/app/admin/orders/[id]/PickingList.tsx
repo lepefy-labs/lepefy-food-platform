@@ -28,7 +28,6 @@ export default function PickingList({ order, items, currency }: Props) {
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    /* Hidden on screen (display:none), shown by @media print .pl-content */
     <div className="pl-content" style={{ display: 'none' }}>
 
         {/* Header */}
