@@ -24,7 +24,7 @@ function ProductCard({ product, currency }: { product: Product; currency: string
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="relative block flex-shrink-0 w-36 rounded-xl overflow-hidden border border-gray-100 bg-white"
+      className="relative block flex-shrink-0 w-36 md:w-auto md:flex-shrink rounded-xl overflow-hidden border border-gray-100 bg-white"
     >
       <div className="aspect-square bg-[#E1F5EE] overflow-hidden">
         {product.image_url ? (
@@ -153,7 +153,7 @@ export default async function HomePage() {
                 Voir tout →
               </Link>
             </div>
-            <div className="flex gap-3 overflow-x-auto px-4 pb-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex gap-3 overflow-x-auto px-4 pb-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-4 md:overflow-x-visible">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} currency={tenant.currency} />
               ))}
