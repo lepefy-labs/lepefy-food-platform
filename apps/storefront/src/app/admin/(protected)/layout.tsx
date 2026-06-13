@@ -31,7 +31,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .map((e) => e.trim().toLowerCase());
 
   if (!adminEmails.includes(user.email?.toLowerCase() ?? '')) {
-    redirect('/admin/login');
+    redirect('/admin/login?error=unauthorized');
   }
 
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
