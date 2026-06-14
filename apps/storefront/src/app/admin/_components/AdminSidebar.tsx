@@ -151,15 +151,15 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
       </p>
 
       <Link
-        href="/admin/abonnement"
+        href="/admin/billing"
         className={`flex items-center gap-2 px-3 py-2 rounded-lg
                     text-sm transition-colors mx-1 ${
-          pathname === '/admin/abonnement' ? navClass(true) : navClass(false)
+          pathname === '/admin/billing' ? navClass(true) : navClass(false)
         }`}
       >
         <IconCreditCard
           size={16}
-          stroke={pathname === '/admin/abonnement' ? 2 : 1.5}
+          stroke={pathname === '/admin/billing' ? 2 : 1.5}
         />
         Abonnement
       </Link>

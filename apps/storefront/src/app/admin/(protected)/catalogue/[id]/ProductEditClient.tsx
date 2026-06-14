@@ -30,6 +30,7 @@ interface ProductEditProps {
   tenantId: string;
   tenantCurrency: string;
   aiEnabled: boolean;
+  isNew?: boolean;
 }
 
 const INPUT_CLS =
@@ -40,6 +41,7 @@ export default function ProductEditClient({
   product,
   categories,
   aiEnabled,
+  isNew = false,
 }: ProductEditProps) {
   const [imageUrl, setImageUrl]         = useState(product.image_url);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -88,14 +90,25 @@ export default function ProductEditClient({
         warehouse_location: warehouseRef.current?.value ?? '',
       };
 
-      const res = await fetch(`/api/admin/catalogue/${product.id}`, {
-        method: 'PATCH',
+      const method   = isNew ? 'POST' : 'PATCH';
+      const endpoint = isNew
+        ? '/api/admin/catalogue'
+        : `/api/admin/catalogue/${product.id}`;
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
       if (!res.ok) throw new Error('Erreur lors de l\'enregistrement');
-      showToast('Produit enregistré', 'success');
+
+      if (isNew) {
+        const { id } = await res.json() as { id: string };
+        window.location.href = `/admin/catalogue/${id}`;
+      } else {
+        showToast('Produit enregistré', 'success');
+      }
     } catch {
       showToast('Erreur lors de l\'enregistrement', 'error');
     } finally {
@@ -184,7 +197,9 @@ export default function ProductEditClient({
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
+          <h1 className="text-xl font-bold text-gray-900">
+            {isNew ? 'Nouveau produit' : product.name}
+          </h1>
           <p className="text-sm text-gray-400 mt-0.5">
             slug: <span className="font-mono">{product.slug}</span>
           </p>
