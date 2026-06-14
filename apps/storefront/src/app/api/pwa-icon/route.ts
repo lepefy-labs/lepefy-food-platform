@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import sharp from 'sharp';
 
 export async function GET(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const sizeParam = req.nextUrl.searchParams.get('size');
-  const size = sizeParam === '512' ? 512 : 192;
+  // size param accepted for manifest compatibility but scaling is left to the OS
+  req.nextUrl.searchParams.get('size');
 
   try {
     const tenant = await getTenant(slug);
@@ -19,20 +18,13 @@ export async function GET(req: NextRequest) {
       return new NextResponse(null, { status: 502 });
     }
 
+    const contentType = response.headers.get('content-type') ?? 'image/png';
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    const png = await sharp(buffer)
-      .resize(size, size, {
-        fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      })
-      .png()
-      .toBuffer();
-
-    return new NextResponse(png, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
       },
     });
