@@ -70,6 +70,11 @@ export default async function AdminCataloguePage({ searchParams }: PageProps) {
   const { data: products } = await query;
   const list = (products ?? []) as unknown as ProductRow[];
 
+  const searchMode: 'client' | 'server' =
+    list.length <= (tenant.catalogue_search_threshold ?? 500)
+      ? 'client'
+      : 'server';
+
   return (
     <Suspense fallback={<div className="h-96 animate-pulse bg-gray-50 rounded-xl" />}>
       <CatalogueTable
@@ -77,6 +82,7 @@ export default async function AdminCataloguePage({ searchParams }: PageProps) {
         currentSort={searchParams.sort}
         currentCategory={searchParams.category}
         tenantCurrency={tenant.currency}
+        searchMode={searchMode}
       />
     </Suspense>
   );

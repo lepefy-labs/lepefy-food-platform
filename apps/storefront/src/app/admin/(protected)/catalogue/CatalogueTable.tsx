@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { formatPrice } from '@/lib/utils/format';
 import {
   IconSelector,
@@ -10,6 +10,8 @@ import {
   IconSortDescending,
   IconPhoto,
   IconPlus,
+  IconSearch,
+  IconX,
 } from '@tabler/icons-react';
 
 interface Product {
@@ -29,20 +31,82 @@ interface CatalogueTableProps {
   currentSort?:     string;
   currentCategory?: string;
   tenantCurrency:   string;
+  searchMode:       'client' | 'server';
 }
 
 export default function CatalogueTable({
   products,
   currentSort,
+  currentCategory,
   tenantCurrency,
+  searchMode,
 }: CatalogueTableProps) {
   const pathname     = usePathname();
   const searchParams = useSearchParams();
 
+  // ── Search ──────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredProducts = searchMode === 'client' && searchQuery.trim()
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.categories?.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : products;
+
+  // ── Active toggle ────────────────────────────────────────────────────
+  const [activeStates, setActiveStates] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(products.map(p => [p.id, p.active]))
+  );
+
+  async function handleToggleActive(productId: string) {
+    const current = activeStates[productId] ?? false;
+    const next    = !current;
+    setActiveStates(prev => ({ ...prev, [productId]: next }));
+    try {
+      const res = await fetch(`/api/admin/catalogue/${productId}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ active: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setActiveStates(prev => ({ ...prev, [productId]: current }));
+    }
+  }
+
+  // ── Inline stock editing ─────────────────────────────────────────────
+  const [editingStock, setEditingStock] = useState<string | null>(null);
+  const [stockValues, setStockValues]   = useState<Record<string, number>>(
+    () => Object.fromEntries(products.map(p => [p.id, p.stock]))
+  );
+  const stockInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleStockSave(productId: string) {
+    const newStock = stockValues[productId] ?? 0;
+    setEditingStock(null);
+    try {
+      await fetch(`/api/admin/catalogue/${productId}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ stock: newStock }),
+      });
+    } catch {
+      // no rollback — user can reload if needed
+    }
+  }
+
+  function handleStockKeyDown(e: React.KeyboardEvent, productId: string) {
+    if (e.key === 'Enter')  handleStockSave(productId);
+    if (e.key === 'Escape') setEditingStock(null);
+  }
+
+  // ── Sort URL ─────────────────────────────────────────────────────────
   const buildSortUrl = useCallback((col: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params  = new URLSearchParams(searchParams.toString());
     const current = params.get('sort') ?? '';
-    const next = current === `${col}_asc` ? `${col}_desc` : `${col}_asc`;
+    const next    = current === `${col}_asc` ? `${col}_desc` : `${col}_asc`;
     params.set('sort', next);
     return `${pathname}?${params.toString()}`;
   }, [pathname, searchParams]);
@@ -66,16 +130,62 @@ export default function CatalogueTable({
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-baseline gap-2">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6 gap-4">
+        <div className="flex items-baseline gap-2 flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-900">Catalogue</h1>
           <span className="text-sm text-gray-400">
-            ({products.length} produit{products.length !== 1 ? 's' : ''})
+            ({filteredProducts.length} produit{filteredProducts.length !== 1 ? 's' : ''})
           </span>
         </div>
+
+        {/* Search input */}
+        {searchMode === 'client' ? (
+          <div className="relative flex-1 max-w-xs">
+            <IconSearch
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Rechercher un produit..."
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200
+                         rounded-lg focus:outline-none
+                         focus:ring-2 focus:ring-[var(--color-primary)]
+                         focus:border-transparent bg-white"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2
+                           text-gray-400 hover:text-gray-600"
+                aria-label="Effacer la recherche"
+              >
+                <IconX size={14} />
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="relative flex-1 max-w-xs">
+            <IconSearch
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"
+            />
+            <input
+              type="text"
+              disabled
+              placeholder="Rechercher..."
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-100
+                         rounded-lg bg-gray-50 text-gray-300 cursor-not-allowed"
+            />
+          </div>
+        )}
+
         <Link
           href="/admin/catalogue/nouveau"
-          className="flex items-center gap-2 bg-[var(--color-primary)]
+          className="flex-shrink-0 flex items-center gap-2 bg-[var(--color-primary)]
                      text-white px-4 py-2 rounded-lg text-sm font-medium
                      hover:opacity-90 transition-opacity"
         >
@@ -84,12 +194,19 @@ export default function CatalogueTable({
         </Link>
       </div>
 
+      {/* No search results */}
+      {filteredProducts.length === 0 && searchQuery && (
+        <p className="text-center text-gray-400 py-8 text-sm">
+          Aucun produit trouvé pour « {searchQuery} »
+        </p>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {products.length === 0 ? (
+        {filteredProducts.length === 0 && !searchQuery ? (
           <p className="text-center text-gray-400 py-12 text-sm">
             Aucun produit trouvé.
           </p>
-        ) : (
+        ) : filteredProducts.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -127,14 +244,20 @@ export default function CatalogueTable({
               </thead>
 
               <tbody className="divide-y divide-gray-50">
-                {products.map((product) => {
-                  const stockColor =
-                    product.stock === 0 ? 'text-red-500 font-medium'
-                    : product.stock < 10 ? 'text-amber-600 font-medium'
-                    : 'text-gray-600';
+                {filteredProducts.map((product) => {
+                  const stockVal = stockValues[product.id] ?? product.stock;
+                  const stockColorClass =
+                    stockVal === 0 ? 'text-red-500'
+                    : stockVal < 10 ? 'text-amber-600'
+                    : 'text-gray-700';
+
+                  const modifierHref = `/admin/catalogue/${product.id}${
+                    currentCategory ? `?from_category=${currentCategory}` : ''
+                  }`;
 
                   return (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                      {/* Image */}
                       <td className="px-4 py-3">
                         <div className="w-9 h-9 rounded-lg bg-gray-100 overflow-hidden
                                         flex items-center justify-center flex-shrink-0">
@@ -151,43 +274,83 @@ export default function CatalogueTable({
                         </div>
                       </td>
 
+                      {/* Nom */}
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900 leading-snug">{product.name}</p>
                         <p className="text-xs text-gray-400 font-mono mt-0.5">{product.slug}</p>
                       </td>
 
+                      {/* Catégorie */}
                       <td className="px-4 py-3">
                         <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
                           {product.categories?.name ?? '—'}
                         </span>
                       </td>
 
+                      {/* Prix */}
                       <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                         {formatPrice(product.price, tenantCurrency)}
                       </td>
 
-                      <td className={`px-4 py-3 ${stockColor}`}>
-                        {product.stock}
-                      </td>
-
+                      {/* Stock — inline editable */}
                       <td className="px-4 py-3">
-                        {product.active ? (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1
-                                           rounded-full bg-[var(--color-primary-light)]
-                                           text-[var(--color-primary)] font-medium">
-                            Actif
-                          </span>
+                        {editingStock === product.id ? (
+                          <input
+                            ref={stockInputRef}
+                            type="number"
+                            min={0}
+                            value={stockValues[product.id] ?? product.stock}
+                            onChange={e => setStockValues(prev => ({
+                              ...prev,
+                              [product.id]: parseInt(e.target.value, 10) || 0,
+                            }))}
+                            onBlur={() => handleStockSave(product.id)}
+                            onKeyDown={e => handleStockKeyDown(e, product.id)}
+                            className="w-16 px-2 py-1 text-sm border
+                                       border-[var(--color-primary)] rounded-lg
+                                       focus:outline-none focus:ring-1
+                                       focus:ring-[var(--color-primary)] text-center"
+                            autoFocus
+                          />
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-1
-                                           rounded-full bg-gray-100 text-gray-500">
-                            Inactif
-                          </span>
+                          <button
+                            onClick={() => setEditingStock(product.id)}
+                            title="Cliquer pour modifier"
+                            className={`text-sm font-medium cursor-pointer
+                                        hover:underline decoration-dashed
+                                        underline-offset-2 bg-transparent border-0
+                                        p-0 ${stockColorClass}`}
+                          >
+                            {stockVal}
+                          </button>
                         )}
                       </td>
 
+                      {/* Statut — toggle inline */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggleActive(product.id)}
+                          title={
+                            activeStates[product.id]
+                              ? 'Cliquer pour désactiver'
+                              : 'Cliquer pour activer'
+                          }
+                          className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1
+                                      rounded-full font-medium transition-colors cursor-pointer
+                                      border-0 ${
+                            activeStates[product.id]
+                              ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)]'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {activeStates[product.id] ? 'Actif' : 'Inactif'}
+                        </button>
+                      </td>
+
+                      {/* Action */}
                       <td className="px-4 py-3 text-right">
                         <Link
-                          href={`/admin/catalogue/${product.id}`}
+                          href={modifierHref}
                           className="text-xs font-medium px-3 py-1.5 rounded-lg border
                                      border-gray-200 hover:bg-gray-50 transition-colors
                                      whitespace-nowrap"
@@ -201,7 +364,7 @@ export default function CatalogueTable({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

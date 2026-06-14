@@ -31,6 +31,7 @@ interface ProductEditProps {
   tenantCurrency: string;
   aiEnabled: boolean;
   isNew?: boolean;
+  fromCategory?: string;
 }
 
 const INPUT_CLS =
@@ -42,6 +43,8 @@ export default function ProductEditClient({
   categories,
   aiEnabled,
   isNew = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  fromCategory,
 }: ProductEditProps) {
   const [imageUrl, setImageUrl]         = useState(product.image_url);
   const [isGenerating, setIsGenerating] = useState(false);
