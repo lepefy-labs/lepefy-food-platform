@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   };
 
   const keyword = categoryKeywords[categorySlug ?? ''] ?? 'food,african';
-  const simulatedUrl = `https://source.unsplash.com/800x800/?${keyword}&sig=${Date.now()}`;
+  const simulatedUrl = `https://picsum.photos/seed/${productId}/800/800`;
 
   return NextResponse.json({
     imageUrl:  simulatedUrl,
