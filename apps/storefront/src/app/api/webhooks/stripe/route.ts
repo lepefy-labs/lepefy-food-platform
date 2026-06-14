@@ -36,6 +36,47 @@ export async function POST(req: NextRequest) {
 
   console.info('[webhook] Received event:', event.type, '— id:', event.id);
 
+  // ─── ABBONAMENTO SAAS ──────────────────────────────────────────────────────
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    // Gestisce solo i pagamenti SaaS (non confondere con gli ordini storefront)
+    if (session.metadata?.type !== 'saas_subscription') {
+      return NextResponse.json({ received: true });
+    }
+
+    const tenantSlug = session.metadata?.tenant_slug;
+    if (!tenantSlug) {
+      console.error('[webhook/billing] checkout.session.completed — tenant_slug mancante nei metadata');
+      return NextResponse.json({ received: true });
+    }
+
+    // Calcola il nuovo periodo: +30 giorni dalla data di pagamento
+    const paidAt = new Date(session.created * 1000);
+    const paidUntil = new Date(paidAt);
+    paidUntil.setDate(paidUntil.getDate() + 30);
+
+    const supabase = createServiceClient();
+
+    const { error } = await supabase
+      .from('tenants')
+      .update({
+        subscription_status:     'active',
+        subscription_paid_until: paidUntil.toISOString(),
+        updated_at:              new Date().toISOString(),
+      })
+      .eq('slug', tenantSlug);
+
+    if (error) {
+      console.error('[webhook/billing] errore aggiornamento tenant:', error);
+      return NextResponse.json({ error: 'DB update failed' }, { status: 500 });
+    }
+
+    console.info(`[webhook/billing] abbonamento rinnovato per tenant: ${tenantSlug} fino al ${paidUntil.toISOString()}`);
+
+    return NextResponse.json({ received: true });
+  }
+
   // ── payment_intent.succeeded — create order from checkout_session ──────────
   if (event.type === 'payment_intent.succeeded') {
     const intent    = event.data.object as Stripe.PaymentIntent;
@@ -66,7 +107,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Fetch checkout_session ───────────────────────────────────────────────
-    const { data: session, error: sessionError } = await supabase
+    const { data: checkoutSession, error: sessionError } = await supabase
       .from('checkout_sessions')
       .select('*')
       .eq('id', sessionId)
@@ -97,25 +138,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    if (!session) {
+    if (!checkoutSession) {
       console.error('[webhook] checkout_session not found — id:', sessionId);
       return NextResponse.json({ received: true });
     }
 
-    console.info('[webhook] checkout_session found — id:', session.id,
-      '— email:', session.email, '— items:', session.items?.length ?? 0);
+    console.info('[webhook] checkout_session found — id:', checkoutSession.id,
+      '— email:', checkoutSession.email, '— items:', checkoutSession.items?.length ?? 0);
 
     // ── Resolve tenant ───────────────────────────────────────────────────────
-    const resolvedTenantId = session.tenant_id ?? tenantId;
+    const resolvedTenantId = checkoutSession.tenant_id ?? tenantId;
     if (!resolvedTenantId) {
-      console.error('[webhook] Cannot resolve tenant_id — session:', session.id);
+      console.error('[webhook] Cannot resolve tenant_id — session:', checkoutSession.id);
       return NextResponse.json({ received: true });
     }
 
     // ── Compute totals ───────────────────────────────────────────────────────
-    const items    = session.items ?? [];
+    const items    = checkoutSession.items ?? [];
     const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const total    = subtotal + (session.shipping_total ?? 0);
+    const total    = subtotal + (checkoutSession.shipping_total ?? 0);
 
     console.info('[webhook] Creating order — tenant:', resolvedTenantId,
       '— subtotal:', subtotal, '— total:', total);
@@ -126,19 +167,19 @@ export async function POST(req: NextRequest) {
       .insert({
         tenant_id:                 resolvedTenantId,
         customer_id:               null,
-        email:                     session.email,
-        full_name:                 session.full_name ?? null,
-        fulfillment_type:          session.fulfillment_type,
-        shipping_address:          session.shipping_address ?? null,
-        shipping_details:          session.shipping_details ?? null,
+        email:                     checkoutSession.email,
+        full_name:                 checkoutSession.full_name ?? null,
+        fulfillment_type:          checkoutSession.fulfillment_type,
+        shipping_address:          checkoutSession.shipping_address ?? null,
+        shipping_details:          checkoutSession.shipping_details ?? null,
         subtotal,
-        shipping_cost:             session.shipping_total ?? 0,
+        shipping_cost:             checkoutSession.shipping_total ?? 0,
         total,
         payment_method:            'stripe',
         payment_status:            'paid',
         stripe_payment_intent_id:  intent.id,
         status:                    'preparing',
-        notes:                     session.phone ? `Téléphone: ${session.phone}` : null,
+        notes:                     checkoutSession.phone ? `Téléphone: ${checkoutSession.phone}` : null,
       })
       .select('id')
       .single();
@@ -191,17 +232,17 @@ export async function POST(req: NextRequest) {
     // ── Notify n8n ───────────────────────────────────────────────────────────
     if (process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
       try {
-        const trackingToken     = generateTrackingToken(order.id, session.email);
+        const trackingToken     = generateTrackingToken(order.id, checkoutSession.email);
         const storefrontUrl     = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
         const orderTrackingLink = `${storefrontUrl}/orders/${order.id}?token=${trackingToken}`;
 
         const n8nPayload = {
           orderId:          order.id,
-          email:            session.email,
-          fullName:         session.full_name ?? '',
+          email:            checkoutSession.email,
+          fullName:         checkoutSession.full_name ?? '',
           total,
-          shippingTotal:    session.shipping_total ?? 0,
-          shippingAddress:  session.shipping_address ?? null,
+          shippingTotal:    checkoutSession.shipping_total ?? 0,
+          shippingAddress:  checkoutSession.shipping_address ?? null,
           orderTrackingLink,
         };
 

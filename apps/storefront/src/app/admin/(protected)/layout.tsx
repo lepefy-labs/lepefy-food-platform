@@ -68,6 +68,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           >
             <span>📦</span> Commandes
           </a>
+          <a
+            href="/admin/billing"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors mt-1"
+          >
+            <span>💳</span> Abbonamento
+          </a>
         </nav>
         <main className="flex-1 p-6 min-w-0">{children}</main>
       </div>

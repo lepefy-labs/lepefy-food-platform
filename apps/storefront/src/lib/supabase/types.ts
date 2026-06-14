@@ -10,6 +10,9 @@ export interface Database {
           accent_light: string; city: string | null; country: string; currency: string;
           locale: string; stripe_account_id: string | null; click_collect_enabled: boolean;
           click_collect_address: string | null; active: boolean; created_at: string; updated_at: string;
+          subscription_status: 'active' | 'expired';
+          subscription_paid_until: string | null;
+          stripe_payment_link: string | null;
         };
         Insert: Partial<Database['public']['Tables']['tenants']['Row']> & { slug: string; name: string };
         Update: Partial<Database['public']['Tables']['tenants']['Row']>;
