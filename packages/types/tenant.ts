@@ -18,6 +18,7 @@ export interface Tenant {
   click_collect_address: string | null;
   click_collect_hours: string | null;
   active: boolean;
+  ai_image_generation: boolean;
   // Spedizione
   shipping_provider: ShippingProvider;
   packlink_api_key: string | null;

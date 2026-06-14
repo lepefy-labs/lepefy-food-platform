@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import LogoutButton from '../LogoutButton';
+import AdminNav from './AdminNav';
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
@@ -61,20 +62,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
       </header>
 
       <div className="flex min-h-[calc(100vh-57px)]">
-        <nav className="w-56 bg-white border-r border-gray-200 px-3 py-4 shrink-0 hidden md:block">
-          <a
-            href="/admin"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <span>📦</span> Commandes
-          </a>
-          <a
-            href="/admin/billing"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors mt-1"
-          >
-            <span>💳</span> Abonnement
-          </a>
-        </nav>
+        <AdminNav />
         <main className="flex-1 p-6 min-w-0">{children}</main>
       </div>
     </>
