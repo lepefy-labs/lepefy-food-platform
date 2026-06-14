@@ -88,7 +88,6 @@ export async function POST(req: NextRequest) {
 
     if (!sessionId) {
       console.error('[webhook] No session_id in PaymentIntent metadata — intent:', intent.id);
-      // Return 200 so Stripe does not retry; this is a data integrity issue, not a transient error
       return NextResponse.json({ received: true });
     }
 
@@ -272,7 +271,6 @@ export async function POST(req: NextRequest) {
     const intent = event.data.object as Stripe.PaymentIntent;
     console.info('[webhook] payment_intent.payment_failed — intent:', intent.id);
 
-    // Try to mark order failed if it somehow exists (e.g. partial retry)
     const { error } = await createServiceClient()
       .from('orders')
       .update({ payment_status: 'failed' })

@@ -13,6 +13,9 @@ export interface Database {
           subscription_status: 'active' | 'expired';
           subscription_paid_until: string | null;
           stripe_payment_link: string | null;
+          bank_iban: string | null;
+          bank_beneficiary: string | null;
+          bank_bic: string | null;
         };
         Insert: Partial<Database['public']['Tables']['tenants']['Row']> & { slug: string; name: string };
         Update: Partial<Database['public']['Tables']['tenants']['Row']>;

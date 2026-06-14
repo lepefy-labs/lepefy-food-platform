@@ -1,5 +1,4 @@
 import { createServiceClient } from '@/lib/supabase/server';
-import { getTenant } from '@/lib/tenant/getTenant';
 import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +24,12 @@ export default async function BillingPage() {
 
   const { data: tenant, error } = await supabase
     .from('tenants')
-    .select('id, name, subscription_status, subscription_paid_until, stripe_payment_link')
+    .select(`
+      id, name,
+      subscription_status, subscription_paid_until,
+      stripe_payment_link,
+      bank_iban, bank_beneficiary, bank_bic
+    `)
     .eq('slug', slug)
     .single();
 
@@ -35,6 +39,9 @@ export default async function BillingPage() {
   const days      = daysRemaining(tenant.subscription_paid_until);
   const isWarning = days !== null && days <= 7 && isActive;
   const isExpired = !isActive || (days !== null && days < 0);
+
+  // Causale bonifico standard
+  const bonificoRef = `Abbonamento Lepefy Food Platform - ${new Date().toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}`;
 
   return (
     <div className="max-w-2xl">
@@ -64,7 +71,7 @@ export default async function BillingPage() {
       )}
 
       {/* Card stato abbonamento */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
           <div>
             <p className="font-semibold text-gray-900 text-sm">{tenant.name}</p>
@@ -79,11 +86,9 @@ export default async function BillingPage() {
                 : 'bg-green-100 text-green-700'
             }`}
           >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isExpired ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-green-500'
-              }`}
-            />
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              isExpired ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-green-500'
+            }`} />
             {isExpired ? 'Scaduto' : isWarning ? `Scade tra ${days} giorni` : 'Attivo'}
           </span>
         </div>
@@ -99,33 +104,87 @@ export default async function BillingPage() {
               {formatDate(tenant.subscription_paid_until)}
             </dd>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-gray-500">Metodo di rinnovo</dt>
-            <dd className="text-gray-900">Link pagamento mensile</dd>
-          </div>
         </dl>
       </div>
 
-      {/* Pulsante pagamento */}
-      {tenant.stripe_payment_link ? (
-        <a
-          href={tenant.stripe_payment_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          💳 Rinnova abbonamento — 89,00 €
-        </a>
-      ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-500">
-          Link di pagamento non ancora configurato.{' '}
-          <a href="mailto:support@lepefy.com" className="underline">
-            Contatta Lepefy Labs
-          </a>{' '}
-          per ricevere il link mensile.
+      {/* Sezione metodi di pagamento */}
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">Metodi di pagamento</h2>
+      <div className="space-y-3">
+
+        {/* Opzione 1 — Stripe */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">💳 Carta di credito / debito</p>
+              <p className="text-xs text-gray-400 mt-0.5">Pagamento immediato via Stripe · Sicuro e tracciato</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            Il pagamento viene confermato automaticamente. Il tuo abbonamento si rinnova istantaneamente.
+          </p>
+          {tenant.stripe_payment_link ? (
+            <a
+              href={tenant.stripe_payment_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              Paga con carta — 89,00 €
+            </a>
+          ) : (
+            <p className="text-xs text-gray-400 italic">Link non ancora configurato. Contatta Lepefy Labs.</p>
+          )}
         </div>
-      )}
+
+        {/* Opzione 2 — Bonifico */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">🏦 Bonifico bancario</p>
+              <p className="text-xs text-gray-400 mt-0.5">Zero commissioni · 1–2 giorni lavorativi</p>
+            </div>
+            <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
+              Consigliato
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mb-4">
+            Effettua il bonifico con i dati qui sotto. Lepefy Labs aggiornerà il tuo abbonamento
+            entro 1–2 giorni lavorativi dalla ricezione del pagamento.
+          </p>
+          {tenant.bank_iban ? (
+            <dl className="space-y-2 text-sm bg-gray-50 rounded-xl p-4">
+              <div className="flex justify-between gap-4">
+                <dt className="text-gray-500 shrink-0">Beneficiario</dt>
+                <dd className="font-medium text-gray-900 text-right">{tenant.bank_beneficiary ?? '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-gray-500 shrink-0">IBAN</dt>
+                <dd className="font-mono font-medium text-gray-900 text-right">{tenant.bank_iban}</dd>
+              </div>
+              {tenant.bank_bic && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-gray-500 shrink-0">BIC / SWIFT</dt>
+                  <dd className="font-mono font-medium text-gray-900 text-right">{tenant.bank_bic}</dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-4 pt-2 border-t border-gray-200">
+                <dt className="text-gray-500 shrink-0">Importo</dt>
+                <dd className="font-semibold text-gray-900">89,00 €</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-gray-500 shrink-0">Causale</dt>
+                <dd className="text-gray-700 text-right text-xs">{bonificoRef}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-xs text-gray-400 italic">
+              Dati bancari non ancora configurati.{' '}
+              <a href="mailto:support@lepefy.com" className="underline">Contatta Lepefy Labs</a>.
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* Info conservazione dati */}
       {isExpired && (
@@ -139,9 +198,7 @@ export default async function BillingPage() {
       <div className="mt-8 pt-6 border-t border-gray-100">
         <p className="text-xs text-gray-400">
           Per domande sulla fatturazione contatta{' '}
-          <a href="mailto:support@lepefy.com" className="underline">
-            support@lepefy.com
-          </a>{' '}
+          <a href="mailto:support@lepefy.com" className="underline">support@lepefy.com</a>{' '}
           oppure scrivi su WhatsApp al numero Lepefy Labs.
         </p>
       </div>
