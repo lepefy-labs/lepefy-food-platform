@@ -1,9 +1,11 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { createServiceClient } from '@/lib/supabase/server';
 import LogoutButton from '../LogoutButton';
-import AdminNav from './AdminNav';
+import AdminSidebar from '../_components/AdminSidebar';
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
@@ -40,8 +42,15 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     redirect('/admin/login?error=unauthorized');
   }
 
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
+  const slug      = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant    = await getTenant(slug);
+  const supabase  = createServiceClient();
+
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name, slug')
+    .eq('tenant_id', tenant.id)
+    .order('position');
 
   return (
     <>
@@ -62,7 +71,11 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
       </header>
 
       <div className="flex min-h-[calc(100vh-57px)]">
-        <AdminNav />
+        <aside className="w-56 bg-white border-r border-gray-200 px-3 py-2 shrink-0 hidden md:block">
+          <Suspense fallback={<div className="w-56 h-full" />}>
+            <AdminSidebar categories={categories ?? []} />
+          </Suspense>
+        </aside>
         <main className="flex-1 p-6 min-w-0">{children}</main>
       </div>
     </>
