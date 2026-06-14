@@ -17,16 +17,16 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     lang:             tenant.locale?.split('-')[0] ?? 'fr',
     icons: [
       {
-        src:     '/icons/icon-192.png',
+        src:     '/api/pwa-icon?size=192',
         sizes:   '192x192',
         type:    'image/png',
-        purpose: 'maskable',
+        purpose: 'any maskable',
       },
       {
-        src:     '/icons/icon-512.png',
+        src:     '/api/pwa-icon?size=512',
         sizes:   '512x512',
         type:    'image/png',
-        purpose: 'maskable',
+        purpose: 'any maskable',
       },
     ],
   };
