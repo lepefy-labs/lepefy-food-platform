@@ -12,22 +12,28 @@ export async function PATCH(
 
   const supabase = createServiceClient();
 
+  const updatePayload: Record<string, unknown> = {
+    name:               String(body.name ?? '').trim(),
+    description:        body.description ? String(body.description).trim() : null,
+    price:              parseFloat(String(body.price)) || 0,
+    weight_grams:       body.weight_grams ? parseInt(String(body.weight_grams), 10) : null,
+    stock:              parseInt(String(body.stock ?? 0), 10) || 0,
+    active:             Boolean(body.active),
+    featured:           Boolean(body.featured),
+    storage_type:       body.storage_type ?? 'dry',
+    category_id:        body.category_id,
+    warehouse_location: body.warehouse_location
+                          ? String(body.warehouse_location).trim()
+                          : null,
+  };
+
+  if ('image_url' in body) {
+    updatePayload.image_url = body.image_url ?? null;
+  }
+
   const { error } = await supabase
     .from('products')
-    .update({
-      name:               String(body.name ?? '').trim(),
-      description:        body.description ? String(body.description).trim() : null,
-      price:              parseFloat(String(body.price)) || 0,
-      weight_grams:       body.weight_grams ? parseInt(String(body.weight_grams), 10) : null,
-      stock:              parseInt(String(body.stock ?? 0), 10) || 0,
-      active:             Boolean(body.active),
-      featured:           Boolean(body.featured),
-      storage_type:       body.storage_type ?? 'dry',
-      category_id:        body.category_id,
-      warehouse_location: body.warehouse_location
-                            ? String(body.warehouse_location).trim()
-                            : null,
-    })
+    .update(updatePayload)
     .eq('id', params.id)
     .eq('tenant_id', tenant.id);
 

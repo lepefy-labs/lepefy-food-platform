@@ -7,6 +7,7 @@ import {
   IconSparkles,
   IconCheck,
   IconX,
+  IconTrash,
 } from '@tabler/icons-react';
 
 interface ProductEditProps {
@@ -153,6 +154,21 @@ export default function ProductEditClient({
       showToast('Image mise à jour', 'success');
     } catch {
       showToast('Erreur lors de l\'upload', 'error');
+    }
+  }
+
+  async function handleDeleteImage() {
+    setImageUrl(null);
+    try {
+      const res = await fetch(`/api/admin/catalogue/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: null }),
+      });
+      if (!res.ok) throw new Error('Erreur');
+      showToast('Image supprimée', 'success');
+    } catch {
+      showToast('Erreur lors de la suppression', 'error');
     }
   }
 
@@ -317,6 +333,17 @@ export default function ProductEditClient({
                 </div>
               )}
             </div>
+
+            {/* Delete button — only when image exists */}
+            {imageUrl && (
+              <button
+                onClick={handleDeleteImage}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mt-2 mb-3"
+              >
+                <IconTrash size={14} />
+                Supprimer l&apos;image
+              </button>
+            )}
 
             {/* Drag & Drop area */}
             <div
