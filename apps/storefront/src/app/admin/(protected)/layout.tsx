@@ -44,9 +44,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   const slug      = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant    = await getTenant(slug);
-  const supabase  = createServiceClient();
+  const adminClient  = createServiceClient();
 
-  const { data: categories } = await supabase
+  const { data: categories } = await adminClient
     .from('categories')
     .select('id, name, slug')
     .eq('tenant_id', tenant.id)
