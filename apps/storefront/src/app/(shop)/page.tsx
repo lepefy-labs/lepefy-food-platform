@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatPrice } from '@/lib/utils/format';
 import { AddToCartButton } from '@/components/home/AddToCartButton';
-import { FeaturedProducts } from '@/components/home/FeaturedProducts';
 
 export const metadata: Metadata = {
   title: 'Accueil',
@@ -22,10 +21,11 @@ export type HomeProduct = {
 };
 
 export default async function HomePage() {
-  const slug    = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant  = await getTenant(slug);
+  const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant   = await getTenant(slug);
   const supabase = createClient();
 
+  // 1. Categorie
   const { data: categoriesRaw } = await supabase
     .from('categories')
     .select('id, name, slug')
@@ -33,6 +33,7 @@ export default async function HomePage() {
     .order('position', { ascending: true });
   const categories = categoriesRaw ?? [];
 
+  // 2. Prodotti featured
   const { data: featuredRaw } = await supabase
     .from('products')
     .select('id, name, price, image_url, slug, weight_grams, stock')
@@ -43,6 +44,7 @@ export default async function HomePage() {
     .limit(8);
   const featuredProducts: HomeProduct[] = featuredRaw ?? [];
 
+  // 3. Prodotti per categoria (escludi featured)
   const featuredIds = featuredProducts.map(p => p.id);
   const excludeIds  = featuredIds.length > 0
     ? featuredIds
@@ -67,45 +69,42 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-[#f7f9f8]">
 
-      {/* ── HERO COMPATTO ── */}
-      <section className="bg-gradient-to-br from-[#f0faf6] to-[#eaf4fd] px-4 pt-4 pb-0">
-        <div className="flex items-center gap-3">
-          {tenant.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={tenant.logo_url}
-              alt={tenant.name}
-              className="w-11 h-11 rounded-full object-cover shrink-0
-                         border-2 border-white shadow-sm"
-            />
-          ) : (
-            <div
-              className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center
-                         bg-white border-2 border-white shadow-sm text-lg font-bold"
+      {/* ── BANNER EMOZIONALE ── */}
+      <HeroBanner
+        heroImageUrl={tenant.hero_image_url ?? null}
+        tagline={tenant.tagline ?? 'Épicerie africaine'}
+        primaryColor={tenant.primary_color}
+      />
+
+      {/* ── PRODUITS VEDETTES ── */}
+      {featuredProducts.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between px-4 mb-2 mt-5">
+            <h2 className="text-[13px] font-bold text-gray-900">
+              Nos produits vedettes
+            </h2>
+            <Link
+              href="/products"
+              className="text-[11px] font-medium"
               style={{ color: 'var(--color-primary)' }}
             >
-              {tenant.name.charAt(0)}
-            </div>
-          )}
-          <div>
-            <h1 className="text-[15px] font-semibold leading-tight"
-                style={{ color: 'var(--color-primary)' }}>
-              Les saveurs de chez nous
-            </h1>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              {tenant.name}
-              {tenant.city ? ` · ${tenant.city}` : ''}
-            </p>
+              Voir tout →
+            </Link>
           </div>
-        </div>
-
-        <div className="mt-3 pb-4">
-          <FeaturedProducts
-            products={featuredProducts}
-            currency={tenant.currency}
-          />
-        </div>
-      </section>
+          <div className="flex gap-2.5 overflow-x-auto px-4 pb-3
+                          [&::-webkit-scrollbar]:hidden
+                          [-ms-overflow-style:none]
+                          [scrollbar-width:none]">
+            {featuredProducts.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                currency={tenant.currency}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── SEZIONI PER CATEGORIA ── */}
       {categories.map(cat => {
@@ -144,6 +143,95 @@ export default async function HomePage() {
   );
 }
 
+// ── HeroBanner (Server Component interno, non esportato) ──
+function HeroBanner({
+  heroImageUrl,
+  tagline,
+  primaryColor: _primaryColor,
+}: {
+  heroImageUrl: string | null;
+  tagline: string;
+  primaryColor: string;
+}) {
+  const darkBg   = '#085041';
+  const midBg    = '#0F6E56';
+  const accentBg = '#1D9E75';
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={{ height: '160px', backgroundColor: darkBg }}
+    >
+      {/* Immagine di sfondo opzionale */}
+      {heroImageUrl && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={heroImageUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: 'rgba(4, 52, 44, 0.72)' }}
+          />
+        </>
+      )}
+
+      {/* Pattern geometrico — visibile solo senza hero_image_url */}
+      {!heroImageUrl && (
+        <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+          <div
+            className="absolute rounded-full"
+            style={{ width: '220px', height: '220px', top: '-70px', right: '-50px', backgroundColor: midBg, opacity: 0.6 }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{ width: '130px', height: '130px', top: '15px', right: '65px', backgroundColor: accentBg, opacity: 0.35 }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{ width: '90px', height: '90px', bottom: '-25px', right: '18px', backgroundColor: 'var(--color-secondary)', opacity: 0.22 }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{ width: '60px', height: '60px', top: '8px', left: '55px', backgroundColor: 'var(--color-secondary)', opacity: 0.14 }}
+          />
+        </div>
+      )}
+
+      {/* Testo */}
+      <div className="absolute inset-0 flex flex-col justify-end px-5 pb-5">
+        <div
+          className="inline-flex items-center self-start mb-2 px-2 py-0.5 rounded
+                     text-[9px] font-semibold tracking-widest uppercase"
+          style={{
+            backgroundColor: 'rgba(242, 200, 17, 0.18)',
+            border: '1px solid rgba(242, 200, 17, 0.38)',
+            color: '#F2C811',
+          }}
+        >
+          {tagline}
+        </div>
+        <h1
+          className="text-white font-bold leading-tight"
+          style={{ fontSize: '22px' }}
+        >
+          Les saveurs<br />de chez nous
+        </h1>
+        <p
+          className="mt-1 text-white/60 leading-snug"
+          style={{ fontSize: '11px' }}
+        >
+          Frais · Surgelés · Épices · Livraison Europe
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── ProductCard (Server Component interno, non esportato) ──
 function ProductCard({
   product,
   currency,
