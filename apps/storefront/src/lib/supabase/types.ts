@@ -9,7 +9,7 @@ export interface Database {
           logo_url: string | null; primary_color: string; secondary_color: string;
           accent_light: string; city: string | null; country: string; currency: string;
           locale: string; stripe_account_id: string | null; click_collect_enabled: boolean;
-          click_collect_address: string | null; active: boolean; created_at: string; updated_at: string;
+          click_collect_address: string | null; active: boolean; show_powered_by: boolean; created_at: string; updated_at: string;
           subscription_status: 'active' | 'expired';
           subscription_paid_until: string | null;
           stripe_payment_link: string | null;

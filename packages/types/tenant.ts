@@ -25,6 +25,7 @@ export interface Tenant {
   shipping_provider: ShippingProvider;
   packlink_api_key: string | null;
   flat_rate_amount: number | null;
+  show_powered_by: boolean;
   created_at: string;
   updated_at: string;
 }
