@@ -126,25 +126,30 @@ export default function ProductEditClient({
       const currentCategory   = categories.find(c => c.id === currentCategoryId);
 
       const res = await fetch('/api/admin/generate-product-image', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId:    product.id,
           productName:  product.name,
+          productSlug:  product.slug,
           categorySlug: currentCategory?.slug ?? '',
-          prompt:
-            `Professional food photography of "${product.name}" from Cameroon, ` +
-            `African specialty food, commercial e-commerce style, ` +
-            `white background, studio lighting, sharp focus`,
+          categoryName: currentCategory?.name ?? '',
         }),
       });
 
-      if (!res.ok) throw new Error('Génération échouée');
+      if (!res.ok) {
+        const { error } = await res.json() as { error?: string };
+        throw new Error(error ?? 'Génération échouée');
+      }
+
       const { imageUrl: newUrl } = await res.json() as { imageUrl: string };
       setImageUrl(newUrl);
       showToast('Image générée avec succès', 'success');
-    } catch {
-      showToast('Erreur lors de la génération', 'error');
+    } catch (err) {
+      const message = err instanceof Error
+        ? err.message
+        : 'Erreur lors de la génération';
+      showToast(message, 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -343,11 +348,23 @@ export default function ProductEditClient({
               )}
 
               {isGenerating && (
-                <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-3">
-                  <div className="w-7 h-7 border-2 border-[var(--color-primary-light)] border-t-[var(--color-primary)] rounded-full animate-spin" />
-                  <p className="text-xs text-[var(--color-primary)] font-medium">
-                    Génération en cours...
-                  </p>
+                <div className="absolute inset-0 bg-white/90 flex flex-col
+                                items-center justify-center gap-3 rounded-lg">
+                  <div className="w-8 h-8 border-2
+                                  border-[var(--color-primary-light)]
+                                  border-t-[var(--color-primary)]
+                                  rounded-full animate-spin" />
+                  <div className="text-center px-4">
+                    <p className="text-xs font-medium text-[var(--color-primary)]">
+                      Génération en cours...
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Analyse du produit puis création de l&apos;image
+                    </p>
+                    <p className="text-[10px] text-gray-300 mt-0.5">
+                      (5 à 15 secondes)
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
