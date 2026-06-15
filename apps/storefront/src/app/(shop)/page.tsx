@@ -76,6 +76,8 @@ export default async function HomePage() {
         primaryColor={tenant.primary_color}
       />
 
+      {/* Contenuto centrato */}
+      <div className="max-w-6xl mx-auto w-full">
       {/* ── PRODUITS VEDETTES ── */}
       {featuredProducts.length > 0 && (
         <section>
@@ -143,6 +145,7 @@ export default async function HomePage() {
       })}
 
       <div className="h-6" />
+      </div>{/* /max-w-6xl */}
     </div>
   );
 }
