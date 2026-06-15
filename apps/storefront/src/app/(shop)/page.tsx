@@ -91,10 +91,12 @@ export default async function HomePage() {
               Voir tout →
             </Link>
           </div>
-          <div className="flex gap-2.5 overflow-x-auto px-4 pb-3
-                          [&::-webkit-scrollbar]:hidden
-                          [-ms-overflow-style:none]
-                          [scrollbar-width:none]">
+          <div className="
+            flex gap-2.5 overflow-x-auto px-4 pb-3
+            [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+            md:grid md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]
+            md:overflow-x-visible md:pb-4
+          ">
             {featuredProducts.map(product => (
               <ProductCard
                 key={product.id}
@@ -122,10 +124,12 @@ export default async function HomePage() {
                 Voir tout →
               </Link>
             </div>
-            <div className="flex gap-2.5 overflow-x-auto px-4 pb-3
-                            [&::-webkit-scrollbar]:hidden
-                            [-ms-overflow-style:none]
-                            [scrollbar-width:none]">
+            <div className="
+              flex gap-2.5 overflow-x-auto px-4 pb-3
+              [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+              md:grid md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]
+              md:overflow-x-visible md:pb-4
+            ">
               {products.map(product => (
                 <ProductCard
                   key={product.id}
@@ -243,7 +247,8 @@ function ProductCard({
     <Link
       href={`/products/${product.slug}`}
       className="relative block flex-shrink-0 w-36 rounded-xl overflow-hidden
-                 border border-gray-100 bg-white"
+                 border border-gray-100 bg-white
+                 md:w-full md:flex-shrink"
     >
       <div className="aspect-square bg-[#E1F5EE] overflow-hidden">
         {product.image_url ? (
