@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { requireAdmin } from '@/lib/auth/requireAdmin';
 import type { OrderStatus, PaymentStatus } from '@lepefy/types';
 
 interface PatchBody {
@@ -30,6 +31,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     const body: PatchBody = await req.json();
     const { status, tracking_carrier, tracking_code, notes, payment_status } = body;

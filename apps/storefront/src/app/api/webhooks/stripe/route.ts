@@ -184,6 +184,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (orderError || !order) {
+      // 23505 = unique_violation su stripe_payment_intent_id: un retry
+      // concorrente ha già creato l'ordine — non è un errore.
+      if ((orderError as { code?: string } | null)?.code === '23505') {
+        console.info('[webhook] Order already created by concurrent retry — intent:', intent.id);
+        return NextResponse.json({ received: true });
+      }
       console.error('[webhook] Failed to create order:', orderError);
       return NextResponse.json({ received: true });
     }

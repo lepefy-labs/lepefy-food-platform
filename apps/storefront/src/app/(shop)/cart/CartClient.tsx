@@ -28,6 +28,7 @@ export default function CartClient({ tenant }: Props) {
   const [postalCode, setPostalCode] = useState('');
   const [shippingTotal, setShippingTotal] = useState<number | null>(null);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(null);
+  const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,15 +55,18 @@ export default function CartClient({ tenant }: Props) {
         if (data.available) {
           setShippingTotal(data.shippingTotal);
           setShippingDetails(data.shippingDetails ?? null);
+          setQuoteToken(data.quoteToken ?? null);
         } else {
           setShippingError(data.message ?? 'Livraison non disponible pour cette adresse.');
           setShippingTotal(null);
           setShippingDetails(null);
+          setQuoteToken(null);
         }
       } catch {
         setShippingError('Erreur lors du calcul des frais de livraison.');
         setShippingTotal(null);
         setShippingDetails(null);
+        setQuoteToken(null);
       } finally {
         setShippingLoading(false);
       }
@@ -88,6 +92,7 @@ export default function CartClient({ tenant }: Props) {
       JSON.stringify({
         shippingTotal: fulfillmentType === 'pickup' ? 0 : shippingTotal,
         shippingDetails: fulfillmentType === 'pickup' ? null : shippingDetails,
+        quoteToken: fulfillmentType === 'pickup' ? null : quoteToken,
         fulfillmentType,
         country: fulfillmentType === 'delivery' ? country : null,
         postalCode: fulfillmentType === 'delivery' ? postalCode : null,

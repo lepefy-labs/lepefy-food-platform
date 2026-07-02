@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { calculateShipping } from '@/lib/shipping/calculateShipping';
+import { signQuote } from '@/lib/shipping/quoteToken';
 
 const FROM_ADDRESS = {
   country:  'IT',
@@ -34,6 +35,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { available: false, message: 'Paramètres manquants.' },
         { status: 400 },
+      );
+    }
+
+    // Il segreto serve a firmare il quote: senza, il checkout non può
+    // verificare lo shippingTotal e la quotazione non deve essere emessa.
+    const quoteSecret = process.env.TRACKING_SECRET;
+    if (!quoteSecret) {
+      console.error('[shipping/quote] TRACKING_SECRET manquant — impossible de signer le devis');
+      return NextResponse.json(
+        { available: false, message: 'Service de livraison non configuré.' },
+        { status: 500 },
       );
     }
 
@@ -78,6 +90,7 @@ export async function POST(request: Request) {
           available: true,
           shippingTotal: tenant.flat_rate_amount,
           shippingDetails: null,
+          quoteToken: signQuote(tenant.flat_rate_amount, to.country, to.zip_code, quoteSecret),
         });
       }
 
@@ -150,6 +163,7 @@ export async function POST(request: Request) {
           available: true,
           shippingTotal: result.shippingTotal,
           shippingDetails: result._internal ?? null,
+          quoteToken: signQuote(result.shippingTotal, to.country, to.zip_code, quoteSecret),
         });
       }
     }

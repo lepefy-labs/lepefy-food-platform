@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth/requireAdmin';
 
 // ⚠️  NOTA VERCEL: la generazione AI richiede 5-15s.
 // Con piano Free (timeout 10s) può andare in timeout.
@@ -144,6 +145,9 @@ async function uploadToStorage(
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json(
       { error: 'GEMINI_API_KEY non configurata' },

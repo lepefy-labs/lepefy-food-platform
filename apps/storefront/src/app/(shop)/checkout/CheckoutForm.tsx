@@ -34,6 +34,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface CheckoutShipping {
   shippingTotal:   number;
   shippingDetails: Record<string, unknown> | null;
+  quoteToken:      string | null;
   fulfillmentType: 'delivery' | 'pickup';
   country:         string | null;
   postalCode:      string | null;
@@ -169,6 +170,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
         fullName:        `${data.firstName} ${data.lastName}`,
         shippingTotal,
         shippingDetails: shippingInfo?.shippingDetails ?? null,
+        quoteToken:      shippingInfo?.quoteToken ?? null,
         paymentMethod:   isPickup ? paymentMode : 'stripe',
       };
 
