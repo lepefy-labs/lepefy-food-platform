@@ -2,6 +2,9 @@
 
 > Analisi di stack, struttura, sicurezza e strategia del progetto, con migliorie
 > ordinate per priorità. Data revisione: luglio 2026.
+> **Aggiornamento 2026-07-02**: le 4 criticità di sicurezza del §2.1–2.4 sono
+> state corrette, deployate e verificate in produzione (branch
+> `claude/project-review-improvements-mih2d8`).
 
 ---
 
@@ -9,11 +12,13 @@
 
 Il progetto è ben strutturato per essere un MVP: monorepo pulito, logica di
 spedizione ben isolata e documentata, flusso checkout → webhook solido come
-design. Ci sono però **3 falle di sicurezza serie da sistemare prima di
-scalare** (API admin senza autenticazione, prezzi fidati dal client, policy RLS
-troppo aperte), e il modello "un deploy per tenant" è il vero tetto alla
-crescita del business: finché onboarding e billing restano manuali, ogni nuovo
-cliente costa ore di lavoro invece di minuti.
+design. Le **4 falle di sicurezza critiche/alte identificate in questa
+revisione sono state risolte e deployate** (API admin senza autenticazione,
+prezzi fidati dal client, policy RLS troppo aperte, idempotenza webhook). Resta
+da affrontare il debito minore (§2.5–2.7) e, soprattutto, il modello "un
+deploy per tenant", che è il vero tetto alla crescita del business: finché
+onboarding e billing restano manuali, ogni nuovo cliente costa ore di lavoro
+invece di minuti.
 
 ---
 
@@ -38,12 +43,14 @@ Punti di forza di `calculateShipping.ts`:
 
 ---
 
-## 2. Criticità tecniche — da sistemare subito
+## 2. Criticità tecniche
 
-### 2.1 Le API admin non hanno alcun controllo di autenticazione — **CRITICO**
+### ✅ Risolte (deployate il 2026-07-02)
 
-L'autenticazione esiste solo nel layout `(protected)` che protegge le
-**pagine**. Le route API amministrative usano `createServiceClient()` (che
+#### 2.1 Le API admin non avevano alcun controllo di autenticazione — **CRITICO**
+
+L'autenticazione esisteva solo nel layout `(protected)` che protegge le
+**pagine**. Le route API amministrative usavano `createServiceClient()` (che
 bypassa RLS) **senza mai verificare la sessione né la whitelist
 `ADMIN_EMAILS`**:
 
@@ -53,49 +60,64 @@ bypassa RLS) **senza mai verificare la sessione né la whitelist
 - `src/app/api/admin/generate-product-image/route.ts` — consumo quota Gemini
 - `src/app/api/admin/upload-product-image/route.ts` — upload su storage
 
-Chiunque conosca l'URL può creare/modificare prodotti, cambiare stato ordini e
-consumare la quota API Gemini con una semplice POST.
+Chiunque conosca l'URL poteva creare/modificare prodotti, cambiare stato
+ordini e consumare la quota API Gemini con una semplice POST.
 
-**Fix:** helper condiviso `requireAdmin()` (verifica sessione Supabase +
-`ADMIN_EMAILS`) chiamato in testa a ogni route admin.
+**Fix applicata:** nuovo helper `src/lib/auth/requireAdmin.ts` (verifica
+sessione Supabase + whitelist `ADMIN_EMAILS`) chiamato in testa a tutte e
+cinque le route admin — rispondono 401/403 senza sessione valida.
 
-### 2.2 Il checkout si fida dei prezzi inviati dal client — **CRITICO**
+#### 2.2 Il checkout si fidava dei prezzi inviati dal client — **CRITICO**
 
-In `src/app/api/checkout/route.ts` il subtotale è calcolato da `items[].price`
-che arriva dal browser, e anche `shippingTotal` è passato dal client. Un utente
-può modificare il payload e pagare 0,01 € per l'intero carrello.
+In `src/app/api/checkout/route.ts` il subtotale era calcolato da
+`items[].price` proveniente dal browser, e anche `shippingTotal` era passato
+dal client. Un utente poteva modificare il payload e pagare 0,01 € per
+l'intero carrello.
 
-**Fix:**
-- Ricaricare i prezzi da DB tramite `productId` e ricalcolare il subtotale
-  lato server.
-- Salvare il quote di spedizione in `checkout_sessions` al momento della
-  quotazione e riusarlo, invece di riaccettare `shippingTotal` dal client.
+**Fix applicata:**
+- Prezzo, nome e `storage_type` vengono riletti dal DB per `productId`
+  (filtrati per tenant e prodotti attivi); quantità validate come intero
+  1–999.
+- Il costo di spedizione è certificato da un token HMAC-SHA256
+  (`src/lib/shipping/quoteToken.ts`) emesso da `/api/shipping/quote` — lega
+  importo, paese, CAP e scadenza (1h); il checkout lo verifica e lo confronta
+  con l'indirizzo di consegna. Il pickup è forzato a spedizione 0 lato server.
 
-### 2.3 Policy RLS troppo permissive — **ALTO**
+#### 2.3 Policy RLS troppo permissive — **ALTO**
 
 `orders_insert_any` e `order_items_insert_any` con `with check (true)`
-(`supabase/migrations/002_rls_policies.sql`) permettono a chiunque con la anon
-key (pubblica per definizione) di inserire ordini arbitrari nel DB.
+(`supabase/migrations/002_rls_policies.sql`) permettevano a chiunque con la
+anon key (pubblica per definizione) di inserire ordini arbitrari nel DB.
 
-**Fix:** eliminare le due policy — gli insert reali passano tutti dal service
-role, che bypassa RLS.
+**Fix applicata:** migration `016_security_hardening.sql` elimina le due
+policy — gli insert reali passano tutti dal service role, che bypassa RLS.
 
-### 2.4 Idempotenza webhook fragile — **ALTO**
+#### 2.4 Idempotenza webhook fragile — **ALTO**
 
-Il check "esiste già un ordine per questo intent?" nel webhook Stripe è
-check-then-insert: due retry Stripe concorrenti possono creare ordini
+Il check "esiste già un ordine per questo intent?" nel webhook Stripe era
+check-then-insert: due retry Stripe concorrenti potevano creare ordini
 duplicati.
 
-**Fix:** indice unico su `orders.stripe_payment_intent_id` + gestione
-dell'errore di conflitto nel webhook.
+**Fix applicata:** stessa migration 016 — indice unico parziale su
+`orders.stripe_payment_intent_id` (`WHERE stripe_payment_intent_id IS NOT
+NULL`); il webhook tratta la unique violation (23505) come ordine già creato
+da un retry concorrente, non come errore.
 
-### 2.5 Nessuna gestione stock reale — **MEDIO**
+> Prerequisiti runtime introdotti da queste fix: env var `TRACKING_SECRET`
+> obbligatoria (già richiesta per i link di tracking) e migration 016 applicata
+> con `supabase db push`.
+
+---
+
+### Da sistemare — debito residuo
+
+#### 2.5 Nessuna gestione stock reale — **MEDIO**
 
 Stock default 999, nessun controllo né decremento al checkout: si può vendere
 merce esaurita — problema concreto per fresco/surgelato. Il campo
 `product.stock` è usato solo come cap nel carrello lato client.
 
-### 2.6 Incoerenze minori da pulire — **MEDIO/BASSO**
+#### 2.6 Incoerenze minori da pulire — **MEDIO/BASSO**
 
 - `FROM_ADDRESS` hardcoded a `IT 42122` in `api/shipping/quote/route.ts`
   nonostante esista la migration `010_warehouse_location.sql` — il secondo
@@ -110,7 +132,7 @@ merce esaurita — problema concreto per fresco/surgelato. Il campo
   `exceljs`); `@supabase/ssr@0.3` è vecchio e già oggi impone i workaround sui
   cookie documentati in `CLAUDE.md`; Next 14.2 → valutare upgrade a 15.
 
-### 2.7 Zero test — **MEDIO**
+#### 2.7 Zero test — **MEDIO**
 
 Le funzioni pure di `calculateShipping` sono il candidato perfetto per partire
 con Vitest a costo quasi nullo: split pacchi, fallback IVA, surcharge
@@ -216,6 +238,6 @@ sorgente è molto più economico ora che dopo.
 
 | Orizzonte | Interventi |
 |---|---|
-| **Subito** (giorni) | Auth sulle API admin · ricalcolo prezzi server-side nel checkout · unique index su `stripe_payment_intent_id` · chiusura policy RLS |
+| ~~**Subito** (giorni)~~ | ~~Auth sulle API admin · ricalcolo prezzi server-side nel checkout · unique index su `stripe_payment_intent_id` · chiusura policy RLS~~ ✅ **Fatto (2026-07-02)** |
 | **Breve** (settimane) | Enforcement abbonamento · test Vitest su `calculateShipping` · controllo stock al checkout · pulizia file morti · `FROM_ADDRESS` da DB |
 | **Medio** (mesi, guidato dal commerciale) | Stripe Connect + billing automatico · risoluzione tenant per dominio · recupero carrelli abbandonati · creazione spedizioni Packlink automatica · i18n |
