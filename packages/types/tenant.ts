@@ -18,6 +18,7 @@ export interface Tenant {
   click_collect_enabled: boolean;
   click_collect_address: string | null;
   click_collect_hours: string | null;
+  whatsapp_number: string | null;
   active: boolean;
   ai_image_generation: boolean;
   catalogue_search_threshold: number;
