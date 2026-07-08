@@ -4,3 +4,4 @@ export * from './order';
 export * from './shipping';
 export * from './customer';
 export * from './socialLinks';
+export * from './labels';

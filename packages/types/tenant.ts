@@ -19,6 +19,11 @@ export interface Tenant {
   click_collect_address: string | null;
   click_collect_hours: string | null;
   whatsapp_number: string | null;
+  label_logo_url: string | null;
+  legal_name: string | null;
+  legal_address: string | null;
+  legal_email: string | null;
+  legal_website: string | null;
   active: boolean;
   ai_image_generation: boolean;
   catalogue_search_threshold: number;
