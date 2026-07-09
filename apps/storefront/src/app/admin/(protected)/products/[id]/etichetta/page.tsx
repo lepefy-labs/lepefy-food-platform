@@ -1,40 +1,37 @@
 import { notFound } from 'next/navigation';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
-import LabelGeneratorClient from './LabelGeneratorClient';
+import type { LabelPrintJob } from '@lepefy/types';
+import LabelJobsListClient from './LabelJobsListClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function LabelGeneratorPage({ params }: { params: { id: string } }) {
+export default async function LabelJobsPage({ params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const supabase = createServiceClient();
 
   const { data: product } = await supabase
     .from('products')
-    .select(`*, producer:producers(*), importer:importers(*), category:categories(id, name, label_background_image_url, label_background_color)`)
+    .select('id, name, slug')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .single();
 
   if (!product) notFound();
 
-  const { data: settings } = await supabase
-    .from('label_settings')
+  const { data: jobs } = await supabase
+    .from('label_print_jobs')
     .select('*')
     .eq('tenant_id', tenant.id)
-    .single();
+    .eq('product_id', product.id)
+    .order('updated_at', { ascending: false });
 
   return (
-    <LabelGeneratorClient
-      product={product}
-      tenantId={tenant.id}
-      tenantHasLogo={!!tenant.label_logo_url}
-      settings={settings ?? {
-        sheet_width_mm: 210, sheet_height_mm: 297,
-        label_width_mm: 100, label_height_mm: 75,
-        margin_mm: 5, gutter_mm: 2, crop_marks: true,
-      }}
+    <LabelJobsListClient
+      productId={product.id}
+      productName={product.name}
+      jobs={(jobs ?? []) as LabelPrintJob[]}
     />
   );
 }

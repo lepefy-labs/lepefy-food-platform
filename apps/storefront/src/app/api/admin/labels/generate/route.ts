@@ -4,7 +4,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { buildSheetHtml } from '@/lib/labels/buildSheetHtml';
 import { htmlToPdf } from '@/lib/labels/gotenberg';
-import type { LabelJobInput } from '@lepefy/types';
+import type { LabelPrintJob } from '@lepefy/types';
 
 export const runtime = 'nodejs';
 
@@ -12,22 +12,34 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const body = await req.json() as LabelJobInput;
+  const body = await req.json() as { jobId: string };
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
 
   if (!tenant.label_logo_url) {
     return NextResponse.json({ error: 'Logo etichetta non caricato per questo tenant.' }, { status: 400 });
   }
-  if (!body.lotNumber || !body.durabilityDate || !body.quantity || body.quantity < 1) {
-    return NextResponse.json({ error: 'Lotto, data e quantità sono obbligatori.' }, { status: 400 });
-  }
 
   const supabase = createServiceClient();
+  const { data: job } = await supabase
+    .from('label_print_jobs')
+    .select('*')
+    .eq('id', body.jobId)
+    .eq('tenant_id', tenant.id)
+    .eq('status', 'draft')
+    .single() as { data: LabelPrintJob | null };
+
+  if (!job) {
+    return NextResponse.json({ error: 'Bozza non trovata o già generata.' }, { status: 404 });
+  }
+  if (!job.lot_number || !job.durability_date || !job.quantity || job.quantity < 1) {
+    return NextResponse.json({ error: 'Lotto, data e quantità sono obbligatori prima di generare.' }, { status: 400 });
+  }
+
   const { data: product, error } = await supabase
     .from('products')
     .select(`*, producer:producers(*), importer:importers(*), category:categories(id, name, label_background_image_url, label_background_color)`)
-    .eq('id', body.productId)
+    .eq('id', job.product_id)
     .eq('tenant_id', tenant.id)
     .single();
 
@@ -47,18 +59,18 @@ export async function POST(req: NextRequest) {
         label_logo_url: tenant.label_logo_url, legal_name: tenant.legal_name,
         legal_address: tenant.legal_address, legal_email: tenant.legal_email, legal_website: tenant.legal_website,
       },
-      sections: body.sections,
+      sections: job.included_sections,
       settings: {
-        sheet_width_mm: body.sheetWidthMm, sheet_height_mm: body.sheetHeightMm,
-        label_width_mm: body.labelWidthMm, label_height_mm: body.labelHeightMm,
+        sheet_width_mm: job.sheet_width_mm, sheet_height_mm: job.sheet_height_mm,
+        label_width_mm: job.label_width_mm, label_height_mm: job.label_height_mm,
         margin_mm: 5, gutter_mm: 2, crop_marks: true,
       },
-      lotNumber: body.lotNumber, productionDate: body.productionDate,
-      durabilityDate: body.durabilityDate, durabilityLabel, quantity: body.quantity,
+      lotNumber: job.lot_number, productionDate: job.production_date,
+      durabilityDate: job.durability_date, durabilityLabel, quantity: job.quantity,
     });
 
     const pdfBuffer = await htmlToPdf(html);
-    const fileName = `${product.slug}-${body.lotNumber}-${Date.now()}.pdf`;
+    const fileName = `${product.slug}-${job.lot_number}-${Date.now()}.pdf`;
     const path = `labels/${fileName}`;
 
     const { error: upErr } = await supabase.storage
@@ -69,14 +81,14 @@ export async function POST(req: NextRequest) {
 
     const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}`;
 
-    await supabase.from('label_print_jobs').insert({
-      tenant_id: tenant.id, product_id: product.id, template_key: body.templateKey ?? 'default',
-      included_sections: body.sections, lot_number: body.lotNumber,
-      production_date: body.productionDate, durability_date: body.durabilityDate,
-      quantity: body.quantity, sheet_width_mm: body.sheetWidthMm, sheet_height_mm: body.sheetHeightMm,
-      label_width_mm: body.labelWidthMm, label_height_mm: body.labelHeightMm,
-      labels_per_sheet: layout.perSheet, sheets_generated: layout.sheets, pdf_url: pdfUrl,
-    });
+    // Le job est immuable une fois généré : UPDATE du brouillon existant, jamais un nouvel INSERT.
+    await supabase
+      .from('label_print_jobs')
+      .update({
+        status: 'generated', pdf_url: pdfUrl,
+        labels_per_sheet: layout.perSheet, sheets_generated: layout.sheets,
+      })
+      .eq('id', job.id);
 
     return NextResponse.json({ pdfUrl, layout });
   } catch (err) {

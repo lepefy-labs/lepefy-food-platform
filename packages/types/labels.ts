@@ -109,3 +109,29 @@ export interface LabelLayout {
   perSheet: number;
   sheets: number;
 }
+
+export type LabelJobStatus = 'draft' | 'generated';
+
+export interface LabelPrintJob {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  status: LabelJobStatus;
+  duplicated_from_id: string | null;
+  template_key: string;
+  included_sections: LabelSections;
+  lot_number: string | null;
+  production_date: string | null;
+  durability_date: string | null;
+  quantity: number | null;
+  sheet_width_mm: number;
+  sheet_height_mm: number;
+  label_width_mm: number;
+  label_height_mm: number;
+  labels_per_sheet: number | null;
+  sheets_generated: number | null;
+  pdf_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
