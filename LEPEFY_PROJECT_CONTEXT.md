@@ -152,6 +152,7 @@ lepefy-food-platform/
 | 018 | `018_fix_grants.sql` | ✅ Fix `permission denied` — GRANT UPDATE su tenants/categories/products a `service_role` |
 | 019 | `019_link_default_producer.sql` | Collega producer_id di default ai prodotti già esistenti |
 | 020 | `020_reseed_products_catalogue_v2.sql` | Ripopola/aggiorna i 121 prodotti da `ChloeFood_Template_Catalogue_v2` (categoria Boissons + upsert idempotente) — da eseguire su Supabase |
+| 021 | `021_update_label_data_batch1.sql` | Popola i campi etichetta (ingredienti, allergeni, nutrizione, ecc.) per 22 prodotti esistenti da `20260708 - Data base etiquettes Chloé Food.xlsx` — da eseguire su Supabase, verificare i commenti ⚠️ prima di stampare etichette reali |
 
 ⚠️ Numeri 012 e 016 non risultano documentati in nessuna chat — verificare se esistono o se sono stati saltati.
 
