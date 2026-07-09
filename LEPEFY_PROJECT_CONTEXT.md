@@ -153,6 +153,7 @@ lepefy-food-platform/
 | 019 | `019_link_default_producer.sql` | Collega producer_id di default ai prodotti già esistenti |
 | 020 | `020_reseed_products_catalogue_v2.sql` | Ripopola/aggiorna i 121 prodotti da `ChloeFood_Template_Catalogue_v2` (categoria Boissons + upsert idempotente) — da eseguire su Supabase |
 | 021 | `021_update_label_data_batch1.sql` | Popola i campi etichetta (ingredienti, allergeni, nutrizione, ecc.) per 22 prodotti esistenti da `20260708 - Data base etiquettes Chloé Food.xlsx` — da eseguire su Supabase, verificare i commenti ⚠️ prima di stampare etichette reali |
+| 022 | `022_new_products_from_labels.sql` | Inserisce 2 nuovi prodotti emersi dalle schede etichetta ma assenti dal catalogo v2 (Garri/Tapioca, Pâte d'arachide 1kg) — `price = 0.00, active = false, stock = 0`: da attivare manualmente da `/admin/catalogue` dopo aver impostato prezzo/stock reali |
 
 ⚠️ Numeri 012 e 016 non risultano documentati in nessuna chat — verificare se esistono o se sono stati saltati.
 
