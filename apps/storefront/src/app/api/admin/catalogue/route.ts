@@ -3,6 +3,14 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 
+function cleanNutrition(raw: unknown): Record<string, number> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '' && !Number.isNaN(Number(v)))
+    .map(([k, v]) => [k, Number(v)] as const);
+  return entries.length ? Object.fromEntries(entries) : null;
+}
+
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
@@ -36,6 +44,27 @@ export async function POST(req: NextRequest) {
       category_id:        body.category_id,
       warehouse_location: body.warehouse_location || null,
       position:           9999,
+
+      producer_id:                 body.producer_id || null,
+      importer_id:                 body.importer_id || null,
+      ingredients_text:            body.ingredients_text ? String(body.ingredients_text).trim() : null,
+      allergens_text:              body.allergens_text ? String(body.allergens_text).trim() : null,
+      gluten_free_certified:       Boolean(body.gluten_free_certified),
+      usage_instructions:          body.usage_instructions ? String(body.usage_instructions).trim() : null,
+      conservation_instructions:   body.conservation_instructions ? String(body.conservation_instructions).trim() : null,
+      conservation_after_opening:  body.conservation_after_opening ? String(body.conservation_after_opening).trim() : null,
+      country_of_origin:           body.country_of_origin ? String(body.country_of_origin).trim() : null,
+      durability_type:             body.durability_type || null,
+      quid_ingredient:              body.quid_ingredient ? String(body.quid_ingredient).trim() : null,
+      quid_percentage:              body.quid_percentage !== '' && body.quid_percentage != null ? parseFloat(body.quid_percentage) : null,
+      alcohol_pct:                  body.alcohol_pct !== '' && body.alcohol_pct != null ? parseFloat(body.alcohol_pct) : null,
+      net_quantity_display:         body.net_quantity_display ? String(body.net_quantity_display).trim() : null,
+      packaging_material:           body.packaging_material ? String(body.packaging_material).trim() : null,
+      recycling_note:               body.recycling_note ? String(body.recycling_note).trim() : null,
+      nutrition_basis:              body.nutrition_basis === '100ml' ? '100ml' : '100g',
+      nutrition:                    cleanNutrition(body.nutrition),
+      label_background_image_url:   body.label_background_image_url ?? null,
+      label_background_color:       body.label_background_color ? String(body.label_background_color).trim() : null,
     })
     .select('id')
     .single();

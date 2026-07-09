@@ -22,7 +22,13 @@ export default async function AdminProductEditPage({
     .select(`
       id, name, slug, description, price, weight_grams, stock,
       active, featured, storage_type, image_url,
-      warehouse_location, category_id
+      warehouse_location, category_id,
+      producer_id, importer_id, ingredients_text, allergens_text,
+      gluten_free_certified, usage_instructions, conservation_instructions,
+      conservation_after_opening, country_of_origin, durability_type,
+      quid_ingredient, quid_percentage, alcohol_pct, net_quantity_display,
+      packaging_material, recycling_note, nutrition_basis, nutrition,
+      label_background_image_url, label_background_color
     `)
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
@@ -34,6 +40,20 @@ export default async function AdminProductEditPage({
     .from('categories')
     .select('id, name, slug')
     .eq('tenant_id', tenant.id)
+    .order('name');
+
+  const { data: producers } = await supabase
+    .from('producers')
+    .select('id, tenant_id, name, legal_address, vat_number, health_stamp, country, active')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('name');
+
+  const { data: importers } = await supabase
+    .from('importers')
+    .select('id, tenant_id, name, legal_address, vat_number, email, active')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
     .order('name');
 
   const backHref = searchParams.from_category
@@ -51,6 +71,8 @@ export default async function AdminProductEditPage({
       <ProductEditClient
         product={product}
         categories={categories ?? []}
+        producers={producers ?? []}
+        importers={importers ?? []}
         tenantId={tenant.id}
         tenantCurrency={tenant.currency}
         aiEnabled={tenant.ai_image_generation ?? false}

@@ -14,20 +14,54 @@ export default async function AdminNouveauProduitPage() {
     .eq('tenant_id', tenant.id)
     .order('position');
 
+  const { data: producers } = await supabase
+    .from('producers')
+    .select('id, tenant_id, name, legal_address, vat_number, health_stamp, country, active')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('name');
+
+  const { data: importers } = await supabase
+    .from('importers')
+    .select('id, tenant_id, name, legal_address, vat_number, email, active')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('name');
+
   const emptyProduct = {
-    id:                 '',
-    name:               '',
-    slug:               '',
-    description:        null,
-    price:              0,
-    weight_grams:       null,
-    stock:              0,
-    active:             false,
-    featured:           false,
-    storage_type:       'dry',
-    image_url:          null,
-    warehouse_location: null,
-    category_id:        categories?.[0]?.id ?? '',
+    id:                          '',
+    name:                        '',
+    slug:                        '',
+    description:                 null,
+    price:                       0,
+    weight_grams:                null,
+    stock:                       0,
+    active:                      false,
+    featured:                    false,
+    storage_type:                'dry',
+    image_url:                   null,
+    warehouse_location:          null,
+    category_id:                 categories?.[0]?.id ?? '',
+    producer_id:                 null,
+    importer_id:                 null,
+    ingredients_text:            null,
+    allergens_text:              null,
+    gluten_free_certified:       false,
+    usage_instructions:          null,
+    conservation_instructions:   null,
+    conservation_after_opening:  null,
+    country_of_origin:           null,
+    durability_type:             null,
+    quid_ingredient:              null,
+    quid_percentage:              null,
+    alcohol_pct:                  null,
+    net_quantity_display:         null,
+    packaging_material:           null,
+    recycling_note:               null,
+    nutrition_basis:              '100g' as const,
+    nutrition:                    null,
+    label_background_image_url:   null,
+    label_background_color:       null,
   };
 
   return (
@@ -42,6 +76,8 @@ export default async function AdminNouveauProduitPage() {
       <ProductEditClient
         product={emptyProduct}
         categories={categories ?? []}
+        producers={producers ?? []}
+        importers={importers ?? []}
         tenantId={tenant.id}
         tenantCurrency={tenant.currency}
         aiEnabled={tenant.ai_image_generation}
