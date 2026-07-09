@@ -150,6 +150,8 @@ lepefy-food-platform/
 | 015 | `015_catalogue_ux.sql` | `catalogue_search_threshold` su tenants |
 | 017 | `017_label_system.sql` | Tabelle `producers`, `importers`, `label_settings`, `label_print_jobs` + estensioni a products/categories/tenants |
 | 018 | `018_fix_grants.sql` | ✅ Fix `permission denied` — GRANT UPDATE su tenants/categories/products a `service_role` |
+| 019 | `019_link_default_producer.sql` | Collega producer_id di default ai prodotti già esistenti |
+| 020 | `020_reseed_products_catalogue_v2.sql` | Ripopola/aggiorna i 121 prodotti da `ChloeFood_Template_Catalogue_v2` (categoria Boissons + upsert idempotente) — da eseguire su Supabase |
 
 ⚠️ Numeri 012 e 016 non risultano documentati in nessuna chat — verificare se esistono o se sono stati saltati.
 
