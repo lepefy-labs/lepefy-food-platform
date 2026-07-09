@@ -33,6 +33,8 @@ export interface NutritionInfo {
 
 export type DurabilityType = 'best_before' | 'use_by';
 
+export type LabelTemplateKey = 'default' | 'fullbleed';
+
 export interface ProductLabelData {
   id: string;
   name: string;
@@ -70,7 +72,7 @@ export interface ProductLabelData {
 export interface LabelSettings {
   id: string;
   tenant_id: string;
-  default_template_key: string;
+  default_template_key: LabelTemplateKey;
   sheet_width_mm: number;
   sheet_height_mm: number;
   label_width_mm: number;
@@ -91,7 +93,7 @@ export interface LabelSections {
 
 export interface LabelJobInput {
   productId: string;
-  templateKey: string;
+  templateKey: LabelTemplateKey;
   sections: LabelSections;
   lotNumber: string;
   productionDate: string | null;
@@ -118,7 +120,7 @@ export interface LabelPrintJob {
   product_id: string;
   status: LabelJobStatus;
   duplicated_from_id: string | null;
-  template_key: string;
+  template_key: LabelTemplateKey;
   included_sections: LabelSections;
   lot_number: string | null;
   production_date: string | null;

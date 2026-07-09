@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server.node';
 import { DefaultLabelTemplate } from './templates/default';
+import { FullBleedLabelTemplate } from './templates/fullbleed';
 import { calculateLayout } from './calculateLayout';
-import type { ProductLabelData, LabelSections, LabelSettings } from '@lepefy/types';
+import type { ProductLabelData, LabelSections, LabelSettings, LabelTemplateKey } from '@lepefy/types';
 
 interface BuildSheetParams {
   product: ProductLabelData;
@@ -9,6 +10,7 @@ interface BuildSheetParams {
     primary_color: string; secondary_color: string; label_logo_url: string | null;
     legal_name: string | null; legal_address: string | null; legal_email: string | null; legal_website: string | null;
   };
+  templateKey: LabelTemplateKey;
   sections: LabelSections;
   settings: Pick<LabelSettings, 'sheet_width_mm' | 'sheet_height_mm' | 'label_width_mm' | 'label_height_mm' | 'margin_mm' | 'gutter_mm' | 'crop_marks'>;
   lotNumber: string;
@@ -19,7 +21,9 @@ interface BuildSheetParams {
 }
 
 export function buildSheetHtml(params: BuildSheetParams): { html: string; layout: ReturnType<typeof calculateLayout> } {
-  const { product, tenant, sections, settings, lotNumber, productionDate, durabilityDate, durabilityLabel, quantity } = params;
+  const { product, tenant, templateKey, sections, settings, lotNumber, productionDate, durabilityDate, durabilityLabel, quantity } = params;
+
+  const Template = templateKey === 'fullbleed' ? FullBleedLabelTemplate : DefaultLabelTemplate;
 
   const layout = calculateLayout({
     sheetWidthMm: settings.sheet_width_mm,
@@ -32,7 +36,7 @@ export function buildSheetHtml(params: BuildSheetParams): { html: string; layout
   });
 
   const labelMarkup = renderToStaticMarkup(
-    <DefaultLabelTemplate
+    <Template
       product={product} tenant={tenant} sections={sections}
       labelWidthMm={settings.label_width_mm} labelHeightMm={settings.label_height_mm}
       lotNumber={lotNumber} productionDate={productionDate}

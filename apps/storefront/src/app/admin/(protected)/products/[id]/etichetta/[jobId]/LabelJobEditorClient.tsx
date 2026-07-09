@@ -4,14 +4,20 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconCheck, IconX, IconUpload, IconPrinter, IconAlertTriangle } from '@tabler/icons-react';
 import { calculateLayout } from '@/lib/labels/calculateLayout';
-import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout } from '@lepefy/types';
+import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout, LabelTemplateKey } from '@lepefy/types';
 
 interface LabelJobEditorProps {
   job: LabelPrintJob;
   product: ProductLabelData;
   tenantId: string;
   tenantHasLogo: boolean;
+  tenantLabelLogoUrl: string | null;
 }
+
+const TEMPLATE_OPTIONS: { key: LabelTemplateKey; label: string; description: string }[] = [
+  { key: 'default', label: 'Classico (due colonne)', description: 'Logo e testo su colonne separate, secondo la maquette approvata.' },
+  { key: 'fullbleed', label: 'Full-bleed (sfondo intero)', description: "Lo sfondo copre l'intera etichetta, i testi poggiano su pannelli traslucidi." },
+];
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -28,6 +34,7 @@ const SECTION_LABELS: { key: keyof LabelSections; label: string }[] = [
 
 // Champs autosauvegardés — miroir de PATCHABLE_FIELDS côté API
 interface DraftFields {
+  template_key: LabelTemplateKey;
   included_sections: LabelSections;
   lot_number: string | null;
   production_date: string | null;
@@ -40,10 +47,11 @@ interface DraftFields {
 }
 
 function toDraftFields(state: {
-  sections: LabelSections; lotNumber: string; productionDate: string; durabilityDate: string; quantity: number;
+  templateKey: LabelTemplateKey; sections: LabelSections; lotNumber: string; productionDate: string; durabilityDate: string; quantity: number;
   sheetWidthMm: number; sheetHeightMm: number; labelWidthMm: number; labelHeightMm: number;
 }): DraftFields {
   return {
+    template_key: state.templateKey,
     included_sections: state.sections,
     lot_number: state.lotNumber || null,
     production_date: state.productionDate || null,
@@ -54,7 +62,7 @@ function toDraftFields(state: {
   };
 }
 
-export default function LabelJobEditorClient({ job, product, tenantId, tenantHasLogo }: LabelJobEditorProps) {
+export default function LabelJobEditorClient({ job, product, tenantId, tenantHasLogo, tenantLabelLogoUrl }: LabelJobEditorProps) {
   const router = useRouter();
   const [hasLogo, setHasLogo] = useState(tenantHasLogo);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -67,6 +75,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const lastSavedRef = useRef<DraftFields>(toDraftFields({
+    templateKey: job.template_key,
     sections: job.included_sections,
     lotNumber: job.lot_number ?? '', productionDate: job.production_date ?? '',
     durabilityDate: job.durability_date ?? '', quantity: job.quantity ?? 1,
@@ -74,6 +83,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
     labelWidthMm: job.label_width_mm, labelHeightMm: job.label_height_mm,
   }));
 
+  const [templateKey, setTemplateKey] = useState<LabelTemplateKey>(job.template_key);
   const [sections, setSections] = useState<LabelSections>(job.included_sections);
   const [lotNumber, setLotNumber] = useState(job.lot_number ?? '');
   const [productionDate, setProductionDate] = useState(job.production_date ?? '');
@@ -126,7 +136,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             productId: product.id,
-            templateKey: 'default',
+            templateKey,
             sections,
             lotNumber: lotNumber || '—',
             productionDate: productionDate || null,
@@ -146,13 +156,13 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasLogo, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
+  }, [hasLogo, templateKey, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
 
   // Autosave — n'envoie que les champs modifiés depuis le dernier enregistrement
   useEffect(() => {
     const t = setTimeout(async () => {
       const current = toDraftFields({
-        sections, lotNumber, productionDate, durabilityDate, quantity,
+        templateKey, sections, lotNumber, productionDate, durabilityDate, quantity,
         sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm,
       });
 
@@ -184,7 +194,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
+  }, [templateKey, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
 
   async function handleLogoUpload(file: File) {
     setIsUploadingLogo(true);
@@ -280,11 +290,56 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
         </div>
       )}
 
+      {hasLogo && tenantLabelLogoUrl?.toLowerCase().endsWith('.jpg') && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <IconAlertTriangle size={20} className="text-amber-500 shrink-0" />
+          <p className="text-sm text-amber-800">
+            Il logo è un JPG: se ha uno sfondo bianco, apparirà come un riquadro sull&apos;etichetta.
+            Consigliato PNG con trasparenza o SVG.
+          </p>
+        </div>
+      )}
+
       <fieldset disabled={!hasLogo} className={!hasLogo ? 'opacity-50 pointer-events-none' : ''}>
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-5">
 
           {/* ── Formulaire ─────────────────────────────────────────────── */}
           <div className="space-y-5">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-700 mb-4">Template</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {TEMPLATE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.key}
+                    className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
+                      templateKey === opt.key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="templateKey"
+                      value={opt.key}
+                      checked={templateKey === opt.key}
+                      onChange={() => setTemplateKey(opt.key)}
+                      className="sr-only"
+                    />
+                    {opt.key === 'default' ? (
+                      <div className="mb-2 flex h-10 w-full overflow-hidden rounded border border-gray-200">
+                        <div className="w-[32%] bg-gray-300" />
+                        <div className="flex-1 bg-gray-100" />
+                      </div>
+                    ) : (
+                      <div className="relative mb-2 h-10 w-full overflow-hidden rounded border border-gray-200 bg-gray-300">
+                        <div className="absolute right-1 top-1 h-6 w-[55%] rounded-sm bg-white/80" />
+                      </div>
+                    )}
+                    <div className="font-medium text-gray-800">{opt.label}</div>
+                    <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
+                  </label>
+                ))}
+              </div>
+            </section>
+
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="text-sm font-semibold text-gray-700 mb-4">Sections incluses</h2>
               <div className="grid grid-cols-2 gap-3">

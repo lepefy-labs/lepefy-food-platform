@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         label_logo_url: tenant.label_logo_url, legal_name: tenant.legal_name,
         legal_address: tenant.legal_address, legal_email: tenant.legal_email, legal_website: tenant.legal_website,
       },
+      templateKey: job.template_key,
       sections: job.included_sections,
       settings: {
         sheet_width_mm: job.sheet_width_mm, sheet_height_mm: job.sheet_height_mm,

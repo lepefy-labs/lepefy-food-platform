@@ -40,6 +40,7 @@ export default async function LabelJobEditorPage({ params }: { params: { id: str
       product={product}
       tenantId={tenant.id}
       tenantHasLogo={!!tenant.label_logo_url}
+      tenantLabelLogoUrl={tenant.label_logo_url}
     />
   );
 }
