@@ -31,6 +31,8 @@ comment on column label_print_jobs.duplicated_from_id is
 
 grant update on public.label_print_jobs to service_role;
 
+-- drop+create invece di CREATE OR REPLACE TRIGGER per compatibilità con Postgres < 14
+drop trigger if exists label_print_jobs_updated_at on label_print_jobs;
 create trigger label_print_jobs_updated_at before update on label_print_jobs
   for each row execute function update_updated_at();
 
