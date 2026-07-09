@@ -1,26 +1,29 @@
--- ─── MIGRATION: RESEED PRODUCTS — ChloeFood_Template_Catalogue_v2 ───────────
+-- ─── MIGRATION: RESEED PRODUCTS — ChloeFood_Template_Catalogue_v2 (v2 slug) ─
 -- Ripopola/aggiorna la tabella `products` del tenant 'chloefood' a partire
 -- dal file sorgente Google Sheets "ChloeFood_Template_Catalogue_v2"
--- (121 prodotti, 8 categorie: Épices, Légumes, Snacks, Sauces & Huiles,
---  Farines, Poissons, Viandes séchées, Boissons).
+-- (121 prodotti, 8 categorie).
+--
+-- ⚠️ v2: slug corretti per allinearsi alla convenzione già in uso nel DB —
+-- apostrofi, virgole e "+" vengono ELIMINATI senza inserire un trattino
+-- (es. "Feuilles d'Okok" → feuilles-dokok, non feuilles-d-okok), a differenza
+-- di spazi/slash che diventano "-". Verificato contro 10 prodotti reali già
+-- presenti in tabella (query Check_ProdottiOrfani.sql) — la v1 di questo
+-- script li avrebbe duplicati anziché aggiornarli.
 --
 -- Numerazione: 020 — primo numero libero dopo 019_link_default_producer.sql
 -- (numerazione locale 001...019 presenta doppioni/gap noti, vedi LEPEFY_PROJECT_CONTEXT.md §4).
 --
 -- Idempotente: ON CONFLICT (tenant_id, slug) DO UPDATE — sicuro da rieseguire.
--- Non tocca producer_id / importer_id / campi etichetta: se già valorizzati
--- da 017_label_system.sql + 019_link_default_producer.sql restano invariati
--- (non sono referenziati in questo INSERT).
+-- Non tocca producer_id / importer_id / campi etichetta / image_url / images /
+-- description / position: se già valorizzati restano invariati.
 --
 -- Regole applicate:
 --   • prezzo con virgola francese convertito in punto decimale
 --   • 8 prodotti senza prezzo nel foglio → price = 0.00, active = false
---     (Thon, Plantains mûrs découpés, Huile rouge 5L, Croquettes, Caramel,
---      Arachides grillées, Acqua Fonte dei Marchesi 0,5L, Acqua Saguaro 0,5L)
---   • riga "Doppel" nel foglio sorgente è malformata (categoria/sottocategoria
---     mancanti) → categoria dedotta dalla sezione "── BIÈRES ──" in cui si trova
---   • storage_type: Produits frais→fresh · Surgelés→frozen · tutto il resto→dry
---   • stock vuoto nel foglio → 0 · peso vuoto nel foglio → NULL
+--   • riga "Doppel" malformata nel foglio → categoria dedotta dalla sezione
+--     "── BIÈRES ──" in cui si trova
+--   • storage_type: Produits frais→fresh · Surgelés→frozen · resto→dry
+--   • stock vuoto → 0 · peso vuoto → NULL
 
 -- ─── 0. CATEGORIA "Boissons" — garantita presente (8ª categoria) ─────────────
 insert into categories (tenant_id, name, slug, position)
@@ -99,7 +102,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'legumes' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Feuilles d''Okok', 'feuilles-d-okok', 5.00, 100, 40, true, false, 'frozen'
+    'Feuilles d''Okok', 'feuilles-dokok', 5.00, 100, 40, true, false, 'frozen'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -174,7 +177,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'poissons' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Maquereau Oya Oya 500+', 'maquereau-oya-oya-500-plus', 10.00, 1000, 80, true, false, 'frozen'
+    'Maquereau Oya Oya 500+', 'maquereau-oya-oya-500', 10.00, 1000, 80, true, false, 'frozen'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -344,7 +347,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'snacks' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Maïs grillé avec l''arachide', 'mais-grille-avec-l-arachide', 5.00, 250, 40, true, false, 'dry'
+    'Maïs grillé avec l''arachide', 'mais-grille-avec-larachide', 5.00, 250, 40, true, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -394,7 +397,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'sauces-huiles' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Pâte d''arachide', 'pate-d-arachide', 4.00, 500, 40, true, false, 'dry'
+    'Pâte d''arachide', 'pate-darachide', 4.00, 500, 40, true, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -504,7 +507,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'epices' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Épice The Chef Ail+Gingembre 7g', 'epice-the-chef-ail-plus-gingembre-7g', 1.00, 7, 40, true, false, 'dry'
+    'Épice The Chef Ail+Gingembre 7g', 'epice-the-chef-ailgingembre-7g', 1.00, 7, 40, true, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -529,7 +532,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'epices' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Épice The Chef Pépé+Piment 7g', 'epice-the-chef-pepe-plus-piment-7g', 1.00, 7, 40, true, false, 'dry'
+    'Épice The Chef Pépé+Piment 7g', 'epice-the-chef-pepepiment-7g', 1.00, 7, 40, true, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -614,7 +617,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'boissons' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'D''jino Cocktail de fruits (verre)', 'd-jino-cocktail-de-fruits-verre', 5.00, 1200, 0, true, false, 'dry'
+    'D''jino Cocktail de fruits (verre)', 'djino-cocktail-de-fruits-verre', 5.00, 1200, 0, true, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -624,7 +627,7 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'boissons' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'D''jino Cocktail de fruits (plastique)', 'd-jino-cocktail-de-fruits-plastique', 5.00, 1200, 0, true, false, 'dry'
+    'D''jino Cocktail de fruits (plastique)', 'djino-cocktail-de-fruits-plastique', 5.00, 1200, 0, true, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
@@ -634,12 +637,12 @@ values
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'boissons' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Acqua Fonte dei Marchesi 0,5L', 'acqua-fonte-dei-marchesi-0-5l', 0.00, NULL, 0, false, false, 'dry'
+    'Acqua Fonte dei Marchesi 0,5L', 'acqua-fonte-dei-marchesi-05l', 0.00, NULL, 0, false, false, 'dry'
   ),
   (
     (select id from tenants where slug = 'chloefood'),
     (select id from categories where slug = 'boissons' and tenant_id = (select id from tenants where slug = 'chloefood')),
-    'Acqua Saguaro 0,5L', 'acqua-saguaro-0-5l', 0.00, NULL, 0, false, false, 'dry'
+    'Acqua Saguaro 0,5L', 'acqua-saguaro-05l', 0.00, NULL, 0, false, false, 'dry'
   )
 on conflict (tenant_id, slug) do update
   set category_id  = excluded.category_id,
@@ -651,10 +654,10 @@ on conflict (tenant_id, slug) do update
       storage_type = excluded.storage_type,
       updated_at   = now();
 
--- ─── 2. VERIFICA POST-IMPORT (eseguire manualmente per controllo) ───────────
+-- ─── 2. VERIFICA POST-IMPORT ─────────────────────────────────────────────────
 -- select count(*) from products where tenant_id = (select id from tenants where slug = 'chloefood');
--- -- atteso: 121
+-- -- atteso: 121 + eventuali orfani non sovrapposti (es. "Bobolo surgelé") non toccati da questo script
 -- select count(*) from products where tenant_id = (select id from tenants where slug = 'chloefood') and active = false;
--- -- atteso: 8
+-- -- atteso: 8 nuovi + quelli già presenti invariati
 -- select count(*) from products where tenant_id = (select id from tenants where slug = 'chloefood') and featured = true;
 -- -- atteso: 12
