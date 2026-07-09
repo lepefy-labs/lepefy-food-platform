@@ -6,6 +6,8 @@ import { buildSheetHtml } from '@/lib/labels/buildSheetHtml';
 import { htmlToPdf } from '@/lib/labels/gotenberg';
 import type { LabelJobInput } from '@lepefy/types';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;

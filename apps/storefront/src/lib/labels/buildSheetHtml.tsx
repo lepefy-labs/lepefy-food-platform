@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from 'react-dom/server.edge';
+import { renderToStaticMarkup } from 'react-dom/server.node';
 import { DefaultLabelTemplate } from './templates/default';
 import { calculateLayout } from './calculateLayout';
 import type { ProductLabelData, LabelSections, LabelSettings } from '@lepefy/types';

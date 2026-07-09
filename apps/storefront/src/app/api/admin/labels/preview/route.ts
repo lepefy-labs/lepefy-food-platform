@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { buildSheetHtml } from '@/lib/labels/buildSheetHtml';
 import type { LabelJobInput } from '@lepefy/types';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
