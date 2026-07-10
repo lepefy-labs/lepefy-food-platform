@@ -57,16 +57,23 @@ export function DefaultLabelTemplate({
     }}>
       {/* Riga superiore: pannello foto + colonna dati */}
       <div style={{ display: 'grid', gridTemplateColumns: '32% 68%', minHeight: 0, overflow: 'hidden' }}>
-        {/* Pannello sinistro — hero: foto prodotto o colore di fallback */}
+        {/* Pannello sinistro — hero: foto prodotto o colore di fallback, logo come badge d'angolo */}
         <div style={{
           background: bg.type === 'color' ? bg.value : undefined,
           backgroundImage: bg.type === 'image' ? `url(${bg.url})` : undefined,
           backgroundSize: 'cover', backgroundPosition: 'center',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3mm',
+          position: 'relative', overflow: 'hidden',
         }}>
           {tenant.label_logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={tenant.label_logo_url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            <div style={{
+              position: 'absolute', top: '2mm', left: '2mm',
+              background: 'rgba(255,255,255,0.85)', borderRadius: '1.5mm',
+              padding: '1mm', maxWidth: '20mm', maxHeight: '14mm',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={tenant.label_logo_url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            </div>
           )}
         </div>
 
