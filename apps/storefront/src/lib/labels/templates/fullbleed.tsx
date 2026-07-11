@@ -1,5 +1,6 @@
 import type { ProductLabelData, LabelSections } from '@lepefy/types';
 import { resolveBackground } from '../resolveBackground';
+import { formatDateIT } from '../formatDate';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -143,8 +144,8 @@ export function FullBleedLabelTemplate({
             <div style={{ textAlign: 'right' }}>
               {netQty && <div style={{ fontWeight: 700, fontSize: '2.4mm' }}>Peso Netto: {netQty} {'℮'}</div>}
               <div>Lotto: {lotNumber}</div>
-              {productionDate && <div>Data di produzione: {productionDate}</div>}
-              <div>{durabilityLabel}: {durabilityDate}</div>
+              {productionDate && <div>Data di produzione: {formatDateIT(productionDate)}</div>}
+              <div>{durabilityLabel}: {formatDateIT(durabilityDate)}</div>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import type { ProductLabelData, LabelSections } from '@lepefy/types';
 import { resolveBackground, resolveAmbientColor } from '../resolveBackground';
+import { formatDateIT } from '../formatDate';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -26,6 +27,12 @@ interface DefaultLabelTemplateProps {
 function formatWeight(grams: number | null): string {
   if (!grams) return '';
   return grams >= 1000 ? `${(grams / 1000).toLocaleString('it-IT')} kg` : `${grams} g`;
+}
+
+function nameFontSizeMm(name: string): number {
+  if (name.length <= 10) return 5.5;
+  if (name.length <= 18) return 4.6;
+  return 3.8;
 }
 
 const NUTRITION_ROWS: Array<{ key: keyof NonNullable<ProductLabelData['nutrition']>; label: string }> = [
@@ -83,8 +90,8 @@ export function DefaultLabelTemplate({
           }}>
             {netQty && <div style={{ fontWeight: 700 }}>Peso Netto: {netQty} {'℮'}</div>}
             <div>Lotto: {lotNumber}</div>
-            {productionDate && <div>Produzione: {productionDate}</div>}
-            <div>{durabilityLabel}: {durabilityDate}</div>
+            {productionDate && <div>Produzione: {formatDateIT(productionDate)}</div>}
+            <div>{durabilityLabel}: {formatDateIT(durabilityDate)}</div>
           </div>
         </div>
 
@@ -92,14 +99,18 @@ export function DefaultLabelTemplate({
         <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', padding: '2mm 3mm' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '2mm' }}>
             <div>
-              <div style={{ fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: '5mm', color: tenant.primary_color }}>
+              <div style={{
+                fontFamily: 'Georgia, serif', fontWeight: 700,
+                fontSize: `${nameFontSizeMm(product.name)}mm`, lineHeight: 1.05,
+                color: tenant.primary_color,
+              }}>
                 {product.name}
               </div>
               {sections.origin && product.country_of_origin && (
                 <div style={{
                   display: 'inline-block', marginTop: '1.2mm',
-                  border: `0.25mm solid ${tenant.secondary_color}`, borderRadius: '3mm',
-                  padding: '0.5mm 2mm', fontSize: '2mm', fontWeight: 700, color: tenant.secondary_color,
+                  border: `0.25mm solid ${tenant.primary_color}`, borderRadius: '3mm',
+                  padding: '0.5mm 2mm', fontSize: '2mm', fontWeight: 700, color: tenant.primary_color,
                 }}>
                   {product.country_of_origin}
                 </div>
@@ -124,14 +135,28 @@ export function DefaultLabelTemplate({
                   </tr>
                 </thead>
                 <tbody>
-                  {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => (
-                    <tr key={r.key}>
-                      <td style={{ padding: '0.4mm 1.5mm', borderTop: '0.1mm solid #ddd' }}>{r.label}</td>
-                      <td style={{ padding: '0.4mm 1.5mm', borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700 }}>
-                        {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
-                      </td>
-                    </tr>
-                  ))}
+                  {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => {
+                    const isSubRow = r.key === 'saturated_fat_g' || r.key === 'sugars_g';
+                    return (
+                      <tr key={r.key}>
+                        <td style={{
+                          padding: '0.4mm 1.5mm',
+                          paddingLeft: isSubRow ? '4mm' : '1.5mm',
+                          fontStyle: isSubRow ? 'italic' : 'normal',
+                          color: isSubRow ? '#555' : undefined,
+                          borderTop: '0.1mm solid #ddd',
+                        }}>{r.label}</td>
+                        <td style={{
+                          padding: '0.4mm 1.5mm',
+                          fontStyle: isSubRow ? 'italic' : 'normal',
+                          color: isSubRow ? '#555' : undefined,
+                          borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700,
+                        }}>
+                          {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -157,17 +182,33 @@ export function DefaultLabelTemplate({
         </div>
       </div>
 
-      {/* Footer legale — stessa tinta ambientale, separato da un filo colore secondario, ora nel flusso normale */}
+      {/* Footer legale — stessa tinta ambientale, separato da un filo colore primario, ora nel flusso normale */}
       <div style={{
-        background: ambient, borderTop: `0.3mm solid ${tenant.secondary_color}`,
-        fontSize: '1.8mm', padding: '1.5mm 3mm', lineHeight: 1.5,
+        gridColumn: '1 / -1', background: ambient,
+        borderTop: `0.3mm solid ${tenant.primary_color}`,
+        padding: '1.5mm 3mm', display: 'flex', alignItems: 'flex-end',
+        justifyContent: 'space-between', gap: '3mm',
       }}>
-        {product.producer && <div><b>Prodotto da:</b> {product.producer.name}, {product.producer.legal_address}</div>}
-        {product.importer && <div><b>Importato da:</b> {product.importer.name}, {product.importer.legal_address}</div>}
-        <div><b>Per:</b> {tenant.legal_name}, {tenant.legal_address} {tenant.legal_email ? `— ${tenant.legal_email}` : ''}</div>
-        {product.packaging_material && (
-          <div><b>Imballaggio:</b> {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}</div>
-        )}
+        <div style={{ fontSize: '1.8mm', lineHeight: 1.5 }}>
+          {product.producer && (
+            <div style={{ color: '#555' }}>Prodotto da: {product.producer.name}, {product.producer.legal_address}</div>
+          )}
+          {product.importer && (
+            <div style={{ color: '#555' }}>Importato da: {product.importer.name}, {product.importer.legal_address}</div>
+          )}
+          <div style={{ fontWeight: 700, color: '#2A2118', marginTop: '0.5mm' }}>
+            Per: {tenant.legal_name}, {tenant.legal_address} {tenant.legal_email ? `— ${tenant.legal_email}` : ''}
+          </div>
+          {product.packaging_material && (
+            <div style={{ color: '#555' }}>Imballaggio: {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}</div>
+          )}
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${process.env.NEXT_PUBLIC_STOREFRONT_URL}/api/card/qr-code?format=png&size=200`}
+          alt=""
+          style={{ width: '12mm', height: '12mm', flexShrink: 0 }}
+        />
       </div>
     </div>
   );
