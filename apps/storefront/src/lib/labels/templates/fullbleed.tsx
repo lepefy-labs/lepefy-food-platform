@@ -141,7 +141,8 @@ export function FullBleedLabelTemplate({
                 </div>
               )}
             </div>
-            <div style={{ textAlign: 'right' }}>
+            {/* DejaVu Sans first: Liberation Sans's ℮ (U+212E) glyph renders as a bare "e" with no ring on Gotenberg's Linux Chromium */}
+            <div style={{ textAlign: 'right', fontFamily: '"DejaVu Sans", Arial, "Liberation Sans", sans-serif' }}>
               {netQty && <div style={{ fontWeight: 700, fontSize: '2.4mm' }}>Peso Netto: {netQty} {'℮'}</div>}
               <div>Lotto: {lotNumber}</div>
               {productionDate && <div>Data di produzione: {formatDateIT(productionDate)}</div>}
@@ -156,7 +157,6 @@ export function FullBleedLabelTemplate({
         margin: '0 3mm 3mm', background: PANEL_BG, borderRadius: '1.5mm',
         fontSize: '1.8mm', padding: '1.5mm 3mm', lineHeight: 1.5, color: TEXT_COLOR,
       }}>
-        {product.producer && <div>Prodotto da: {product.producer.name}, {product.producer.legal_address}</div>}
         {product.importer && <div>Importato da: {product.importer.name}, {product.importer.legal_address}</div>}
         <div>Per: {tenant.legal_name}, {tenant.legal_address} {tenant.legal_email ? `— ${tenant.legal_email}` : ''}</div>
         {product.packaging_material && (

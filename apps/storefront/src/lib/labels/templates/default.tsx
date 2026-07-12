@@ -83,10 +83,12 @@ export function DefaultLabelTemplate({
             </div>
           )}
 
+          {/* DejaVu Sans first: Liberation Sans's ℮ (U+212E) glyph renders as a bare "e" with no ring on Gotenberg's Linux Chromium */}
           <div style={{
             position: 'absolute', bottom: '2mm', left: '2mm', right: '2mm',
             background: 'rgba(255,255,255,0.88)', borderRadius: '1.5mm',
             padding: '1.2mm 2mm', fontSize: '1.9mm', lineHeight: 1.3, color: '#2A2118',
+            fontFamily: '"DejaVu Sans", Arial, "Liberation Sans", sans-serif',
           }}>
             {netQty && <div style={{ fontWeight: 700 }}>Peso Netto: {netQty} {'℮'}</div>}
             <div>Lotto: {lotNumber}</div>
@@ -190,9 +192,6 @@ export function DefaultLabelTemplate({
         justifyContent: 'space-between', gap: '3mm',
       }}>
         <div style={{ fontSize: '1.8mm', lineHeight: 1.5 }}>
-          {product.producer && (
-            <div style={{ color: '#555' }}>Prodotto da: {product.producer.name}, {product.producer.legal_address}</div>
-          )}
           {product.importer && (
             <div style={{ color: '#555' }}>Importato da: {product.importer.name}, {product.importer.legal_address}</div>
           )}
