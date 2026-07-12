@@ -29,12 +29,6 @@ function formatWeight(grams: number | null): string {
   return grams >= 1000 ? `${(grams / 1000).toLocaleString('it-IT')} kg` : `${grams} g`;
 }
 
-function nameFontSizeMm(name: string): number {
-  if (name.length <= 10) return 5.5;
-  if (name.length <= 18) return 4.6;
-  return 3.8;
-}
-
 const NUTRITION_ROWS: Array<{ key: keyof NonNullable<ProductLabelData['nutrition']>; label: string }> = [
   { key: 'kcal', label: 'Energia (Energy)' },
   { key: 'kj', label: 'Valore energetico (kJ)' },
@@ -98,12 +92,12 @@ export function DefaultLabelTemplate({
         </div>
 
         {/* Colonna destra — sfondo trasparente: lascia vedere la tinta ambientale del contenitore */}
-        <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', padding: '2mm 3mm' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '2mm' }}>
+        <div style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr', padding: '2mm 3mm' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2mm' }}>
             <div>
               <div style={{
                 fontFamily: 'Georgia, serif', fontWeight: 700,
-                fontSize: `${nameFontSizeMm(product.name)}mm`, lineHeight: 1.05,
+                fontSize: `clamp(3mm, ${65 / product.name.length}mm, 5.5mm)`, lineHeight: 1.05,
                 color: tenant.primary_color,
               }}>
                 {product.name}
@@ -127,42 +121,43 @@ export function DefaultLabelTemplate({
                 GLUTEN FREE
               </div>
             )}
-            {sections.nutrition && product.nutrition && (
-              <table style={{ borderCollapse: 'collapse', fontSize: '2mm', border: `0.2mm solid ${tenant.primary_color}` }}>
-                <thead>
-                  <tr>
-                    <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '1mm', fontSize: '2.1mm' }}>
-                      Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => {
-                    const isSubRow = r.key === 'saturated_fat_g' || r.key === 'sugars_g';
-                    return (
-                      <tr key={r.key}>
-                        <td style={{
-                          padding: '0.4mm 1.5mm',
-                          paddingLeft: isSubRow ? '4mm' : '1.5mm',
-                          fontStyle: isSubRow ? 'italic' : 'normal',
-                          color: isSubRow ? '#555' : undefined,
-                          borderTop: '0.1mm solid #ddd',
-                        }}>{r.label}</td>
-                        <td style={{
-                          padding: '0.4mm 1.5mm',
-                          fontStyle: isSubRow ? 'italic' : 'normal',
-                          color: isSubRow ? '#555' : undefined,
-                          borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700,
-                        }}>
-                          {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
           </div>
+
+          {sections.nutrition && product.nutrition && (
+            <table style={{ borderCollapse: 'collapse', fontSize: '2mm', border: `0.2mm solid ${tenant.primary_color}`, width: '100%', marginTop: '1.5mm' }}>
+              <thead>
+                <tr>
+                  <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '1mm', fontSize: '2.1mm' }}>
+                    Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => {
+                  const isSubRow = r.key === 'saturated_fat_g' || r.key === 'sugars_g';
+                  return (
+                    <tr key={r.key}>
+                      <td style={{
+                        padding: '0.4mm 1.5mm',
+                        paddingLeft: isSubRow ? '4mm' : '1.5mm',
+                        fontStyle: isSubRow ? 'italic' : 'normal',
+                        color: isSubRow ? '#555' : undefined,
+                        borderTop: '0.1mm solid #ddd',
+                      }}>{r.label}</td>
+                      <td style={{
+                        padding: '0.4mm 1.5mm',
+                        fontStyle: isSubRow ? 'italic' : 'normal',
+                        color: isSubRow ? '#555' : undefined,
+                        borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700,
+                      }}>
+                        {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
 
           <div style={{ fontSize: '2.2mm', lineHeight: 1.25, marginTop: '2mm' }}>
             {product.ingredients_text && (
