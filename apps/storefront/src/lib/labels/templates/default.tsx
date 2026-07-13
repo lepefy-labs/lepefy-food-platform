@@ -1,7 +1,8 @@
+import { IconPackage } from '@tabler/icons-react';
 import type { ProductLabelData, LabelSections, LabelPaletteKey } from '@lepefy/types';
 import { resolveBackground, resolveAmbientColor } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
-import { LABEL_PALETTES, NATURAL_BADGE_COLOR, ambientWashBackground, footerWashBackground } from '../palettes';
+import { LABEL_PALETTES, NATURAL_BADGE_COLOR, ambientWashBackground, footerWashBackground, kenteStripBackground } from '../palettes';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -56,7 +57,7 @@ export function DefaultLabelTemplate({
   return (
     <div style={{
       width: `${labelWidthMm}mm`, height: `${labelHeightMm}mm`,
-      display: 'grid', gridTemplateRows: '1fr auto',
+      display: 'grid', gridTemplateRows: '1fr auto auto',
       fontFamily: 'Arial, sans-serif', overflow: 'hidden', position: 'relative',
       border: '0.2mm solid #ddd', background: ambientWashBackground(ambient),
     }}>
@@ -210,10 +211,12 @@ export function DefaultLabelTemplate({
         </div>
       </div>
 
-      {/* Footer legale — stessa tinta ambientale, separato da un filo colore primario, ora nel flusso normale */}
+      {/* Fascia decorativa a kente — divisore tra corpo e footer legale */}
+      <div style={{ gridColumn: '1 / -1', height: '2mm', background: kenteStripBackground(colors) }} />
+
+      {/* Footer legale — stessa tinta ambientale */}
       <div style={{
         gridColumn: '1 / -1', background: footerWashBackground(ambient),
-        borderTop: `0.3mm solid ${colors.primary}`,
         padding: '1.5mm 3mm', display: 'flex', alignItems: 'flex-end',
         justifyContent: 'space-between', gap: '3mm',
       }}>
@@ -227,7 +230,10 @@ export function DefaultLabelTemplate({
             {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
           </div>
           {product.packaging_material && (
-            <div style={{ color: '#555' }}>Imballaggio: {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}</div>
+            <div style={{ color: '#555', display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
+              <IconPackage size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />
+              {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
+            </div>
           )}
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}

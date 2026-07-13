@@ -54,3 +54,8 @@ export function ambientWashBackground(ambientColor: string): string {
 export function footerWashBackground(ambientColor: string): string {
   return `radial-gradient(120% 220% at 0% 0%, ${NATURAL_BADGE_COLOR}1a, transparent 75%), ${ambientColor}`;
 }
+
+/** Fascia decorativa a triangoli (richiamo kente) usata come divisore tra il corpo dell'etichetta e il footer legale. */
+export function kenteStripBackground(colors: LabelPalette): string {
+  return `repeating-linear-gradient(115deg, ${colors.secondary} 0 1.4mm, transparent 1.4mm 2.8mm), repeating-linear-gradient(65deg, ${colors.accent} 0 1.4mm, transparent 1.4mm 2.8mm), ${colors.primary}`;
+}
