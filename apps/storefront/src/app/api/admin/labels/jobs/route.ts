@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { DEFAULT_LABEL_PALETTE } from '@/lib/labels/palettes';
 import type { LabelPrintJob } from '@lepefy/types';
 
 export const runtime = 'nodejs';
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest) {
 
   let seed: Record<string, unknown> = {
     template_key: 'default',
+    palette: DEFAULT_LABEL_PALETTE,
+    natural_badge: false,
     included_sections: DEFAULT_SECTIONS,
     sheet_width_mm: 210, sheet_height_mm: 297, label_width_mm: 100, label_height_mm: 75,
   };
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
   if (body.duplicateFromId) {
     const { data: source } = await supabase
       .from('label_print_jobs')
-      .select('template_key, included_sections, sheet_width_mm, sheet_height_mm, label_width_mm, label_height_mm, lot_number, production_date, durability_date, quantity')
+      .select('template_key, palette, natural_badge, included_sections, sheet_width_mm, sheet_height_mm, label_width_mm, label_height_mm, lot_number, production_date, durability_date, quantity')
       .eq('id', body.duplicateFromId)
       .eq('tenant_id', tenant.id)
       .single();

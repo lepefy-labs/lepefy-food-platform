@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
         legal_address: tenant.legal_address, legal_email: tenant.legal_email, legal_website: tenant.legal_website,
       },
       templateKey: body.templateKey,
+      palette: body.palette,
+      naturalBadge: body.naturalBadge,
       sections: body.sections,
       settings: {
         sheet_width_mm: body.sheetWidthMm, sheet_height_mm: body.sheetHeightMm,

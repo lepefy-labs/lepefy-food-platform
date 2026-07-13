@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
         legal_address: tenant.legal_address, legal_email: tenant.legal_email, legal_website: tenant.legal_website,
       },
       templateKey: job.template_key,
+      palette: job.palette,
+      naturalBadge: job.natural_badge,
       sections: job.included_sections,
       settings: {
         sheet_width_mm: job.sheet_width_mm, sheet_height_mm: job.sheet_height_mm,

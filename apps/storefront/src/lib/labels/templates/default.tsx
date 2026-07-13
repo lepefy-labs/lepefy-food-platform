@@ -1,6 +1,7 @@
-import type { ProductLabelData, LabelSections } from '@lepefy/types';
+import type { ProductLabelData, LabelSections, LabelPaletteKey } from '@lepefy/types';
 import { resolveBackground, resolveAmbientColor } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
+import { LABEL_PALETTES, NATURAL_BADGE_COLOR } from '../palettes';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -15,6 +16,8 @@ interface TenantLabelProps {
 interface DefaultLabelTemplateProps {
   product: ProductLabelData;
   tenant: TenantLabelProps;
+  palette: LabelPaletteKey;
+  naturalBadge: boolean;
   sections: LabelSections;
   labelWidthMm: number;
   labelHeightMm: number;
@@ -42,11 +45,12 @@ const NUTRITION_ROWS: Array<{ key: NutritionKey; label: string; unit: 'kcal' | '
 ];
 
 export function DefaultLabelTemplate({
-  product, tenant, sections, labelWidthMm, labelHeightMm,
+  product, tenant, palette, naturalBadge, sections, labelWidthMm, labelHeightMm,
   lotNumber, productionDate, durabilityDate, durabilityLabel,
 }: DefaultLabelTemplateProps) {
-  const bg = resolveBackground(product);
-  const ambient = resolveAmbientColor(product);
+  const colors = LABEL_PALETTES[palette];
+  const bg = resolveBackground(product, colors.ambient);
+  const ambient = resolveAmbientColor(product, colors.ambient);
   const netQty = product.net_quantity_display ?? formatWeight(product.weight_grams);
 
   return (
@@ -77,11 +81,25 @@ export function DefaultLabelTemplate({
             </div>
           )}
 
+          {naturalBadge && (
+            <div style={{
+              position: 'absolute', top: '2mm', right: '2mm',
+              width: '9mm', height: '9mm', borderRadius: '50%',
+              background: NATURAL_BADGE_COLOR, border: '0.3mm solid rgba(255,255,255,0.9)',
+              boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.25)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', textAlign: 'center', lineHeight: 1.05,
+            }}>
+              <span style={{ fontSize: '2.1mm', fontWeight: 800 }}>100%</span>
+              <span style={{ fontSize: '1.3mm', fontWeight: 700, letterSpacing: '0.02em' }}>NATURALE</span>
+            </div>
+          )}
+
           {/* DejaVu Sans first: Liberation Sans's ℮ (U+212E) glyph renders as a bare "e" with no ring on Gotenberg's Linux Chromium */}
           <div style={{
             position: 'absolute', bottom: '2mm', left: '2mm', right: '2mm',
             background: 'rgba(255,255,255,0.9)', borderRadius: '1.5mm',
-            border: `0.15mm solid ${tenant.primary_color}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.1)',
+            border: `0.15mm solid ${colors.primary}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.1)',
             padding: '1.2mm 2mm', fontSize: '1.9mm', lineHeight: 1.3, color: '#2A2118',
             fontFamily: '"DejaVu Sans", Arial, "Liberation Sans", sans-serif',
           }}>
@@ -99,7 +117,7 @@ export function DefaultLabelTemplate({
               <div style={{
                 fontFamily: 'Georgia, serif', fontWeight: 700,
                 fontSize: `clamp(3.5mm, ${78 / product.name.length}mm, ${product.name_alt ? 5.8 : 6.5}mm)`, lineHeight: 1.05,
-                color: tenant.primary_color,
+                color: colors.primary,
               }}>
                 {product.name}
               </div>
@@ -111,12 +129,12 @@ export function DefaultLabelTemplate({
                   {product.name_alt}
                 </div>
               )}
-              <div style={{ width: '10mm', height: '0.5mm', background: tenant.primary_color, borderRadius: '0.25mm', marginTop: '0.6mm' }} />
+              <div style={{ width: '10mm', height: '0.5mm', background: colors.secondary, borderRadius: '0.25mm', marginTop: '0.6mm' }} />
               {sections.origin && product.country_of_origin && (
                 <div style={{
                   display: 'inline-block', marginTop: '0.8mm',
-                  border: `0.25mm solid ${tenant.primary_color}`, borderRadius: '3mm',
-                  padding: '0.3mm 2mm', fontSize: '2mm', fontWeight: 700, color: tenant.primary_color,
+                  border: `0.25mm solid ${colors.primary}`, borderRadius: '3mm',
+                  padding: '0.3mm 2mm', fontSize: '2mm', fontWeight: 700, color: colors.primary,
                 }}>
                   {product.country_of_origin}
                 </div>
@@ -136,12 +154,12 @@ export function DefaultLabelTemplate({
           {sections.nutrition && product.nutrition && (
             <div style={{
               marginTop: '0.8mm', borderRadius: '1.5mm', overflow: 'hidden',
-              border: `0.15mm solid ${tenant.primary_color}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.06)',
+              border: `0.15mm solid ${colors.primary}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.06)',
             }}>
               <table style={{ borderCollapse: 'collapse', fontSize: '1.8mm', width: '100%' }}>
                 <thead>
                   <tr>
-                    <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '0.7mm 2mm', fontSize: '1.9mm', textAlign: 'left' }}>
+                    <th colSpan={2} style={{ background: colors.primary, color: '#fff', padding: '0.7mm 2mm', fontSize: '1.9mm', textAlign: 'left' }}>
                       Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
                     </th>
                   </tr>
@@ -151,7 +169,7 @@ export function DefaultLabelTemplate({
                     const subValue = r.subKey ? product.nutrition?.[r.subKey] : null;
                     const zebra = i % 2 === 1;
                     return (
-                      <tr key={r.key} style={{ background: zebra ? `${tenant.primary_color}0d` : 'transparent' }}>
+                      <tr key={r.key} style={{ background: zebra ? `${colors.secondary}22` : 'transparent' }}>
                         <td style={{ padding: '0.3mm 2mm' }}>
                           {r.label}
                           {subValue != null && (
@@ -195,7 +213,7 @@ export function DefaultLabelTemplate({
       {/* Footer legale — stessa tinta ambientale, separato da un filo colore primario, ora nel flusso normale */}
       <div style={{
         gridColumn: '1 / -1', background: ambient,
-        borderTop: `0.3mm solid ${tenant.primary_color}`,
+        borderTop: `0.3mm solid ${colors.primary}`,
         padding: '1.5mm 3mm', display: 'flex', alignItems: 'flex-end',
         justifyContent: 'space-between', gap: '3mm',
       }}>

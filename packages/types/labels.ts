@@ -35,6 +35,8 @@ export type DurabilityType = 'best_before' | 'use_by';
 
 export type LabelTemplateKey = 'default' | 'fullbleed';
 
+export type LabelPaletteKey = 'verde_palma' | 'blu_epices' | 'terra_piccante';
+
 export interface ProductLabelData {
   id: string;
   name: string;
@@ -95,6 +97,8 @@ export interface LabelSections {
 export interface LabelJobInput {
   productId: string;
   templateKey: LabelTemplateKey;
+  palette: LabelPaletteKey;
+  naturalBadge: boolean;
   sections: LabelSections;
   lotNumber: string;
   productionDate: string | null;
@@ -122,6 +126,8 @@ export interface LabelPrintJob {
   status: LabelJobStatus;
   duplicated_from_id: string | null;
   template_key: LabelTemplateKey;
+  palette: LabelPaletteKey;
+  natural_badge: boolean;
   included_sections: LabelSections;
   lot_number: string | null;
   production_date: string | null;

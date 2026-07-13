@@ -8,16 +8,16 @@ export type ResolvedBackground =
 
 /**
  * Sfondo del pannello hero (sinistra): foto prodotto se presente,
- * altrimenti colore di fallback (prodotto → categoria → default).
+ * altrimenti colore di fallback (prodotto → categoria → palette scelta → default).
  */
-export function resolveBackground(product: ProductLabelData): ResolvedBackground {
+export function resolveBackground(product: ProductLabelData, fallbackColor: string = DEFAULT_TEMPLATE_BACKGROUND): ResolvedBackground {
   const image = product.label_background_image_url ?? product.category?.label_background_image_url ?? null;
   if (image) return { type: 'image', url: image };
 
   const color =
     product.label_background_color ??
     product.category?.label_background_color ??
-    DEFAULT_TEMPLATE_BACKGROUND;
+    fallbackColor;
 
   return { type: 'color', value: color };
 }
@@ -31,10 +31,10 @@ export function resolveBackground(product: ProductLabelData): ResolvedBackground
  * nutrizionale e blocco legale (poco leggibile, sconsigliato) e senza
  * richiedere alcuna nuova colonna o migrazione.
  */
-export function resolveAmbientColor(product: ProductLabelData): string {
+export function resolveAmbientColor(product: ProductLabelData, fallbackColor: string = DEFAULT_TEMPLATE_BACKGROUND): string {
   return (
     product.label_background_color ??
     product.category?.label_background_color ??
-    DEFAULT_TEMPLATE_BACKGROUND
+    fallbackColor
   );
 }

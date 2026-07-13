@@ -1,6 +1,7 @@
-import type { ProductLabelData, LabelSections } from '@lepefy/types';
+import type { ProductLabelData, LabelSections, LabelPaletteKey } from '@lepefy/types';
 import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
+import { LABEL_PALETTES, NATURAL_BADGE_COLOR } from '../palettes';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -15,6 +16,8 @@ interface TenantLabelProps {
 interface FullBleedLabelTemplateProps {
   product: ProductLabelData;
   tenant: TenantLabelProps;
+  palette: LabelPaletteKey;
+  naturalBadge: boolean;
   sections: LabelSections;
   labelWidthMm: number;
   labelHeightMm: number;
@@ -45,10 +48,11 @@ const PANEL_BG = 'rgba(255,255,255,0.92)';
 const TEXT_COLOR = '#2A2118';
 
 export function FullBleedLabelTemplate({
-  product, tenant, sections, labelWidthMm, labelHeightMm,
+  product, tenant, palette, naturalBadge, sections, labelWidthMm, labelHeightMm,
   lotNumber, productionDate, durabilityDate, durabilityLabel,
 }: FullBleedLabelTemplateProps) {
-  const bg = resolveBackground(product);
+  const colors = LABEL_PALETTES[palette];
+  const bg = resolveBackground(product, colors.ambient);
   const netQty = product.net_quantity_display ?? formatWeight(product.weight_grams);
 
   return (
@@ -74,6 +78,20 @@ export function FullBleedLabelTemplate({
               filter: bg.type === 'image' ? 'drop-shadow(0 0 2mm rgba(255,255,255,0.85))' : undefined,
             }}
           />
+        )}
+
+        {naturalBadge && (
+          <div style={{
+            position: 'absolute', bottom: '3mm', left: '3mm',
+            width: '11mm', height: '11mm', borderRadius: '50%',
+            background: NATURAL_BADGE_COLOR, border: '0.4mm solid rgba(255,255,255,0.9)',
+            boxShadow: '0 0.4mm 1mm rgba(0,0,0,0.3)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', textAlign: 'center', lineHeight: 1.05,
+          }}>
+            <span style={{ fontSize: '2.6mm', fontWeight: 800 }}>100%</span>
+            <span style={{ fontSize: '1.6mm', fontWeight: 700, letterSpacing: '0.02em' }}>NATURALE</span>
+          </div>
         )}
 
         <div style={{
@@ -102,7 +120,7 @@ export function FullBleedLabelTemplate({
             <table style={{ borderCollapse: 'collapse', fontSize: '2mm', width: '100%', marginTop: '1.5mm' }}>
               <thead>
                 <tr>
-                  <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '1mm', fontSize: '2.1mm', textAlign: 'left' }}>
+                  <th colSpan={2} style={{ background: colors.primary, color: '#fff', padding: '1mm', fontSize: '2.1mm', textAlign: 'left' }}>
                     Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
                   </th>
                 </tr>

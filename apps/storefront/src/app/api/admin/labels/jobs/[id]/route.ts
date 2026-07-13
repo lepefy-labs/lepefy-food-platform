@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 export const runtime = 'nodejs';
 
 const PATCHABLE_FIELDS = [
-  'template_key', 'included_sections', 'lot_number', 'production_date', 'durability_date',
+  'template_key', 'palette', 'natural_badge', 'included_sections', 'lot_number', 'production_date', 'durability_date',
   'quantity', 'sheet_width_mm', 'sheet_height_mm', 'label_width_mm', 'label_height_mm',
 ];
 

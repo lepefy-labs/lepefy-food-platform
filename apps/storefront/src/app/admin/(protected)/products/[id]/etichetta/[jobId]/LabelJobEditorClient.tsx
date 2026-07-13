@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconCheck, IconX, IconUpload, IconPrinter, IconAlertTriangle, IconArrowLeft } from '@tabler/icons-react';
 import { calculateLayout } from '@/lib/labels/calculateLayout';
-import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout, LabelTemplateKey } from '@lepefy/types';
+import { LABEL_PALETTES } from '@/lib/labels/palettes';
+import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout, LabelTemplateKey, LabelPaletteKey } from '@lepefy/types';
 
 interface LabelJobEditorProps {
   job: LabelPrintJob;
@@ -18,6 +19,12 @@ interface LabelJobEditorProps {
 const TEMPLATE_OPTIONS: { key: LabelTemplateKey; label: string; description: string }[] = [
   { key: 'default', label: 'Classico (due colonne)', description: 'Logo e testo su colonne separate, secondo la maquette approvata.' },
   { key: 'fullbleed', label: 'Full-bleed (sfondo intero)', description: "Lo sfondo copre l'intera etichetta, i testi poggiano su pannelli traslucidi." },
+];
+
+const PALETTE_OPTIONS: { key: LabelPaletteKey }[] = [
+  { key: 'blu_epices' },
+  { key: 'verde_palma' },
+  { key: 'terra_piccante' },
 ];
 
 const INPUT_CLS =
@@ -36,6 +43,8 @@ const SECTION_LABELS: { key: keyof LabelSections; label: string }[] = [
 // Champs autosauvegardés — miroir de PATCHABLE_FIELDS côté API
 interface DraftFields {
   template_key: LabelTemplateKey;
+  palette: LabelPaletteKey;
+  natural_badge: boolean;
   included_sections: LabelSections;
   lot_number: string | null;
   production_date: string | null;
@@ -48,11 +57,13 @@ interface DraftFields {
 }
 
 function toDraftFields(state: {
-  templateKey: LabelTemplateKey; sections: LabelSections; lotNumber: string; productionDate: string; durabilityDate: string; quantity: number;
+  templateKey: LabelTemplateKey; palette: LabelPaletteKey; naturalBadge: boolean; sections: LabelSections; lotNumber: string; productionDate: string; durabilityDate: string; quantity: number;
   sheetWidthMm: number; sheetHeightMm: number; labelWidthMm: number; labelHeightMm: number;
 }): DraftFields {
   return {
     template_key: state.templateKey,
+    palette: state.palette,
+    natural_badge: state.naturalBadge,
     included_sections: state.sections,
     lot_number: state.lotNumber || null,
     production_date: state.productionDate || null,
@@ -76,7 +87,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const lastSavedRef = useRef<DraftFields>(toDraftFields({
-    templateKey: job.template_key,
+    templateKey: job.template_key, palette: job.palette, naturalBadge: job.natural_badge,
     sections: job.included_sections,
     lotNumber: job.lot_number ?? '', productionDate: job.production_date ?? '',
     durabilityDate: job.durability_date ?? '', quantity: job.quantity ?? 1,
@@ -85,6 +96,8 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
   }));
 
   const [templateKey, setTemplateKey] = useState<LabelTemplateKey>(job.template_key);
+  const [palette, setPalette] = useState<LabelPaletteKey>(job.palette);
+  const [naturalBadge, setNaturalBadge] = useState(job.natural_badge);
   const [sections, setSections] = useState<LabelSections>(job.included_sections);
   const [lotNumber, setLotNumber] = useState(job.lot_number ?? '');
   const [productionDate, setProductionDate] = useState(job.production_date ?? '');
@@ -138,6 +151,8 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
           body: JSON.stringify({
             productId: product.id,
             templateKey,
+            palette,
+            naturalBadge,
             sections,
             lotNumber: lotNumber || '—',
             productionDate: productionDate || null,
@@ -157,13 +172,13 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasLogo, templateKey, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
+  }, [hasLogo, templateKey, palette, naturalBadge, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
 
   // Autosave — n'envoie que les champs modifiés depuis le dernier enregistrement
   useEffect(() => {
     const t = setTimeout(async () => {
       const current = toDraftFields({
-        templateKey, sections, lotNumber, productionDate, durabilityDate, quantity,
+        templateKey, palette, naturalBadge, sections, lotNumber, productionDate, durabilityDate, quantity,
         sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm,
       });
 
@@ -195,7 +210,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateKey, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
+  }, [templateKey, palette, naturalBadge, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
 
   async function handleLogoUpload(file: File) {
     setIsUploadingLogo(true);
@@ -346,6 +361,51 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                   </label>
                 ))}
               </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-700 mb-4">Palette colori</h2>
+              <div className="grid grid-cols-1 gap-2">
+                {PALETTE_OPTIONS.map(({ key }) => {
+                  const p = LABEL_PALETTES[key];
+                  return (
+                    <label
+                      key={key}
+                      className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors flex items-center gap-3 ${
+                        palette === key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="palette"
+                        value={key}
+                        checked={palette === key}
+                        onChange={() => setPalette(key)}
+                        className="sr-only"
+                      />
+                      <span className="flex shrink-0 overflow-hidden rounded-md border border-gray-200" style={{ width: 32, height: 32 }}>
+                        <span style={{ background: p.primary, width: '50%' }} />
+                        <span style={{ background: p.secondary, width: '25%' }} />
+                        <span style={{ background: p.accent, width: '25%' }} />
+                      </span>
+                      <span>
+                        <div className="font-medium text-gray-800">{p.label}</div>
+                        <div className="mt-0.5 text-xs text-gray-400">{p.description}</div>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <label className="mt-4 flex items-center gap-2 text-sm text-gray-700 border-t border-gray-100 pt-4">
+                <input
+                  type="checkbox"
+                  checked={naturalBadge}
+                  onChange={(e) => setNaturalBadge(e.target.checked)}
+                  className="accent-[var(--color-primary)]"
+                />
+                Bollino « 100% Naturale »
+              </label>
             </section>
 
             <section className="bg-white rounded-xl border border-gray-200 p-5">
