@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconCheck, IconX, IconUpload, IconPrinter, IconAlertTriangle } from '@tabler/icons-react';
+import { IconCheck, IconX, IconUpload, IconPrinter, IconAlertTriangle, IconArrowLeft } from '@tabler/icons-react';
 import { calculateLayout } from '@/lib/labels/calculateLayout';
 import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout, LabelTemplateKey } from '@lepefy/types';
 
@@ -252,6 +253,13 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
     <div>
       <div className="mb-6 flex items-baseline gap-3">
         <div>
+          <Link
+            href={`/admin/products/${product.id}/etichetta`}
+            className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-1"
+          >
+            <IconArrowLeft size={14} />
+            Retour aux étiquettes
+          </Link>
           <h1 className="text-xl font-bold text-gray-900">Étiquette — {product.name}</h1>
           <p className="text-sm text-gray-400 mt-0.5">Génération PDF prêt pour l&apos;impression</p>
         </div>
