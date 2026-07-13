@@ -57,7 +57,7 @@ export function DefaultLabelTemplate({
       border: '0.2mm solid #ddd', background: ambient,
     }}>
       {/* Riga superiore: pannello foto + colonna dati */}
-      <div style={{ display: 'grid', gridTemplateColumns: '32% 68%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', minHeight: 0, overflow: 'hidden' }}>
         {/* Pannello sinistro — hero: foto prodotto o colore di fallback, logo come badge d'angolo */}
         <div style={{
           background: bg.type === 'color' ? bg.value : undefined,
@@ -80,7 +80,8 @@ export function DefaultLabelTemplate({
           {/* DejaVu Sans first: Liberation Sans's ℮ (U+212E) glyph renders as a bare "e" with no ring on Gotenberg's Linux Chromium */}
           <div style={{
             position: 'absolute', bottom: '2mm', left: '2mm', right: '2mm',
-            background: 'rgba(255,255,255,0.88)', borderRadius: '1.5mm',
+            background: 'rgba(255,255,255,0.9)', borderRadius: '1.5mm',
+            border: `0.15mm solid ${tenant.primary_color}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.1)',
             padding: '1.2mm 2mm', fontSize: '1.9mm', lineHeight: 1.3, color: '#2A2118',
             fontFamily: '"DejaVu Sans", Arial, "Liberation Sans", sans-serif',
           }}>
@@ -97,11 +98,12 @@ export function DefaultLabelTemplate({
             <div>
               <div style={{
                 fontFamily: 'Georgia, serif', fontWeight: 700,
-                fontSize: `clamp(3mm, ${65 / product.name.length}mm, 5.5mm)`, lineHeight: 1.05,
+                fontSize: `clamp(3.5mm, ${78 / product.name.length}mm, 6.5mm)`, lineHeight: 1.05,
                 color: tenant.primary_color,
               }}>
                 {product.name}
               </div>
+              <div style={{ width: '10mm', height: '0.5mm', background: tenant.primary_color, borderRadius: '0.25mm', marginTop: '0.8mm' }} />
               {sections.origin && product.country_of_origin && (
                 <div style={{
                   display: 'inline-block', marginTop: '1.2mm',
@@ -124,36 +126,42 @@ export function DefaultLabelTemplate({
           </div>
 
           {sections.nutrition && product.nutrition && (
-            <table style={{ borderCollapse: 'collapse', fontSize: '1.8mm', border: `0.2mm solid ${tenant.primary_color}`, width: '100%', marginTop: '1.2mm' }}>
-              <thead>
-                <tr>
-                  <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '0.6mm 1mm', fontSize: '1.9mm' }}>
-                    Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => {
-                  const subValue = r.subKey ? product.nutrition?.[r.subKey] : null;
-                  return (
-                    <tr key={r.key}>
-                      <td style={{ padding: '0.25mm 1.5mm', borderTop: '0.1mm solid #ddd' }}>
-                        {r.label}
-                        {subValue != null && (
-                          <div style={{ fontSize: '1.5mm', fontStyle: 'italic', color: '#555' }}>{r.subLabel}</div>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.25mm 1.5mm', borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700 }}>
-                        {product.nutrition?.[r.key]} {r.unit}
-                        {subValue != null && (
-                          <div style={{ fontSize: '1.5mm', fontStyle: 'italic', color: '#555', fontWeight: 400 }}>{subValue} g</div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div style={{
+              marginTop: '1.2mm', borderRadius: '1.5mm', overflow: 'hidden',
+              border: `0.15mm solid ${tenant.primary_color}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.06)',
+            }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: '1.8mm', width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '0.7mm 2mm', fontSize: '1.9mm', textAlign: 'left' }}>
+                      Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r, i) => {
+                    const subValue = r.subKey ? product.nutrition?.[r.subKey] : null;
+                    const zebra = i % 2 === 1;
+                    return (
+                      <tr key={r.key} style={{ background: zebra ? `${tenant.primary_color}0d` : 'transparent' }}>
+                        <td style={{ padding: '0.3mm 2mm' }}>
+                          {r.label}
+                          {subValue != null && (
+                            <div style={{ fontSize: '1.5mm', fontStyle: 'italic', color: '#555' }}>{r.subLabel}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.3mm 2mm', textAlign: 'right', fontWeight: 700 }}>
+                          {product.nutrition?.[r.key]} {r.unit}
+                          {subValue != null && (
+                            <div style={{ fontSize: '1.5mm', fontStyle: 'italic', color: '#555', fontWeight: 400 }}>{subValue} g</div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
           <div style={{ fontSize: '2mm', lineHeight: 1.15, marginTop: '1mm' }}>
