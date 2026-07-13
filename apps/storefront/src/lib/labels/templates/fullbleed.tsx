@@ -1,4 +1,4 @@
-import type { ProductLabelData, LabelSections, LabelPaletteKey } from '@lepefy/types';
+import type { ProductLabelData, LabelSections, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
 import { LABEL_PALETTES, NATURAL_BADGE_COLOR } from '../palettes';
@@ -18,6 +18,8 @@ interface FullBleedLabelTemplateProps {
   tenant: TenantLabelProps;
   palette: LabelPaletteKey;
   naturalBadge: boolean;
+  /** Non ancora usato in questo template — la scelta di stile bandiera è implementata solo su default.tsx. */
+  originStyle: LabelOriginStyleKey;
   sections: LabelSections;
   labelWidthMm: number;
   labelHeightMm: number;

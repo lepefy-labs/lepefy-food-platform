@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
     template_key: 'default',
     palette: DEFAULT_LABEL_PALETTE,
     natural_badge: false,
+    origin_style: 'pill',
     included_sections: DEFAULT_SECTIONS,
     sheet_width_mm: 210, sheet_height_mm: 297, label_width_mm: 100, label_height_mm: 75,
   };
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
   if (body.duplicateFromId) {
     const { data: source } = await supabase
       .from('label_print_jobs')
-      .select('template_key, palette, natural_badge, included_sections, sheet_width_mm, sheet_height_mm, label_width_mm, label_height_mm, lot_number, production_date, durability_date, quantity')
+      .select('template_key, palette, natural_badge, origin_style, included_sections, sheet_width_mm, sheet_height_mm, label_width_mm, label_height_mm, lot_number, production_date, durability_date, quantity')
       .eq('id', body.duplicateFromId)
       .eq('tenant_id', tenant.id)
       .single();

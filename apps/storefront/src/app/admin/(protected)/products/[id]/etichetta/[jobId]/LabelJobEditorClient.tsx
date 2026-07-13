@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { IconCheck, IconX, IconUpload, IconPrinter, IconAlertTriangle, IconArrowLeft } from '@tabler/icons-react';
 import { calculateLayout } from '@/lib/labels/calculateLayout';
 import { LABEL_PALETTES } from '@/lib/labels/palettes';
-import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout, LabelTemplateKey, LabelPaletteKey } from '@lepefy/types';
+import type { ProductLabelData, LabelSections, LabelPrintJob, LabelLayout, LabelTemplateKey, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 
 interface LabelJobEditorProps {
   job: LabelPrintJob;
@@ -27,6 +27,12 @@ const PALETTE_OPTIONS: { key: LabelPaletteKey }[] = [
   { key: 'terra_piccante' },
 ];
 
+const ORIGIN_STYLE_OPTIONS: { key: LabelOriginStyleKey; label: string; description: string }[] = [
+  { key: 'pill', label: 'Nell’asola', description: 'Bandierina piccola davanti al nome del paese, nell’asola già esistente.' },
+  { key: 'block', label: 'Blocco grafico', description: 'Bandiera più grande, con "Origine: ..." in corsivo a fianco.' },
+  { key: 'medallion', label: 'Bollino speculare', description: 'Cerchio nel pannello foto con testo curvo "Prodotto in ...". Solo template Classico.' },
+];
+
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
 const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
@@ -45,6 +51,7 @@ interface DraftFields {
   template_key: LabelTemplateKey;
   palette: LabelPaletteKey;
   natural_badge: boolean;
+  origin_style: LabelOriginStyleKey;
   included_sections: LabelSections;
   lot_number: string | null;
   production_date: string | null;
@@ -57,13 +64,14 @@ interface DraftFields {
 }
 
 function toDraftFields(state: {
-  templateKey: LabelTemplateKey; palette: LabelPaletteKey; naturalBadge: boolean; sections: LabelSections; lotNumber: string; productionDate: string; durabilityDate: string; quantity: number;
+  templateKey: LabelTemplateKey; palette: LabelPaletteKey; naturalBadge: boolean; originStyle: LabelOriginStyleKey; sections: LabelSections; lotNumber: string; productionDate: string; durabilityDate: string; quantity: number;
   sheetWidthMm: number; sheetHeightMm: number; labelWidthMm: number; labelHeightMm: number;
 }): DraftFields {
   return {
     template_key: state.templateKey,
     palette: state.palette,
     natural_badge: state.naturalBadge,
+    origin_style: state.originStyle,
     included_sections: state.sections,
     lot_number: state.lotNumber || null,
     production_date: state.productionDate || null,
@@ -87,7 +95,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const lastSavedRef = useRef<DraftFields>(toDraftFields({
-    templateKey: job.template_key, palette: job.palette, naturalBadge: job.natural_badge,
+    templateKey: job.template_key, palette: job.palette, naturalBadge: job.natural_badge, originStyle: job.origin_style,
     sections: job.included_sections,
     lotNumber: job.lot_number ?? '', productionDate: job.production_date ?? '',
     durabilityDate: job.durability_date ?? '', quantity: job.quantity ?? 1,
@@ -98,6 +106,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
   const [templateKey, setTemplateKey] = useState<LabelTemplateKey>(job.template_key);
   const [palette, setPalette] = useState<LabelPaletteKey>(job.palette);
   const [naturalBadge, setNaturalBadge] = useState(job.natural_badge);
+  const [originStyle, setOriginStyle] = useState<LabelOriginStyleKey>(job.origin_style);
   const [sections, setSections] = useState<LabelSections>(job.included_sections);
   const [lotNumber, setLotNumber] = useState(job.lot_number ?? '');
   const [productionDate, setProductionDate] = useState(job.production_date ?? '');
@@ -153,6 +162,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
             templateKey,
             palette,
             naturalBadge,
+            originStyle,
             sections,
             lotNumber: lotNumber || '—',
             productionDate: productionDate || null,
@@ -172,13 +182,13 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasLogo, templateKey, palette, naturalBadge, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
+  }, [hasLogo, templateKey, palette, naturalBadge, originStyle, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
 
   // Autosave — n'envoie que les champs modifiés depuis le dernier enregistrement
   useEffect(() => {
     const t = setTimeout(async () => {
       const current = toDraftFields({
-        templateKey, palette, naturalBadge, sections, lotNumber, productionDate, durabilityDate, quantity,
+        templateKey, palette, naturalBadge, originStyle, sections, lotNumber, productionDate, durabilityDate, quantity,
         sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm,
       });
 
@@ -210,7 +220,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateKey, palette, naturalBadge, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
+  }, [templateKey, palette, naturalBadge, originStyle, sections, lotNumber, productionDate, durabilityDate, quantity, sheetWidthMm, sheetHeightMm, labelWidthMm, labelHeightMm]);
 
   async function handleLogoUpload(file: File) {
     setIsUploadingLogo(true);
@@ -423,6 +433,40 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                   </label>
                 ))}
               </div>
+            </section>
+
+            <section className={`bg-white rounded-xl border border-gray-200 p-5 ${!sections.origin ? 'opacity-50 pointer-events-none' : ''}`}>
+              <h2 className="text-sm font-semibold text-gray-700 mb-1">Bandiera origine</h2>
+              <p className="text-xs text-gray-400 mb-4">
+                {sections.origin ? 'Come mostrare il paese d’origine sull’etichetta.' : 'Attiva "Origine" tra le sections incluse per usarla.'}
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                {ORIGIN_STYLE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.key}
+                    className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
+                      originStyle === opt.key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="originStyle"
+                      value={opt.key}
+                      checked={originStyle === opt.key}
+                      onChange={() => setOriginStyle(opt.key)}
+                      className="sr-only"
+                    />
+                    <div className="font-medium text-gray-800">{opt.label}</div>
+                    <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
+                  </label>
+                ))}
+              </div>
+              {originStyle === 'medallion' && naturalBadge && templateKey === 'default' && (
+                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Con il bollino « 100% Naturale » attivo, il pannello foto avrà due bollini circolari
+                  (in alto e in basso a destra) — verifica che il risultato ti piaccia nell&apos;anteprima.
+                </p>
+              )}
             </section>
 
             <section className="bg-white rounded-xl border border-gray-200 p-5">

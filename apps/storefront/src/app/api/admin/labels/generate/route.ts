@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       templateKey: job.template_key,
       palette: job.palette,
       naturalBadge: job.natural_badge,
+      originStyle: job.origin_style,
       sections: job.included_sections,
       settings: {
         sheet_width_mm: job.sheet_width_mm, sheet_height_mm: job.sheet_height_mm,

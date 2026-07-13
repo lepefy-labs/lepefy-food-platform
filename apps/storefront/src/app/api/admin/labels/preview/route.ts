@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       templateKey: body.templateKey,
       palette: body.palette,
       naturalBadge: body.naturalBadge,
+      originStyle: body.originStyle,
       sections: body.sections,
       settings: {
         sheet_width_mm: body.sheetWidthMm, sheet_height_mm: body.sheetHeightMm,

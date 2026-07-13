@@ -37,6 +37,9 @@ export type LabelTemplateKey = 'default' | 'fullbleed';
 
 export type LabelPaletteKey = 'verde_palma' | 'blu_epices' | 'terra_piccante';
 
+/** pill = bandierina nell'asola esistente. block = blocco grafico più grande. medallion = bollino circolare con testo curvo. */
+export type LabelOriginStyleKey = 'pill' | 'block' | 'medallion';
+
 export interface ProductLabelData {
   id: string;
   name: string;
@@ -99,6 +102,7 @@ export interface LabelJobInput {
   templateKey: LabelTemplateKey;
   palette: LabelPaletteKey;
   naturalBadge: boolean;
+  originStyle: LabelOriginStyleKey;
   sections: LabelSections;
   lotNumber: string;
   productionDate: string | null;
@@ -128,6 +132,7 @@ export interface LabelPrintJob {
   template_key: LabelTemplateKey;
   palette: LabelPaletteKey;
   natural_badge: boolean;
+  origin_style: LabelOriginStyleKey;
   included_sections: LabelSections;
   lot_number: string | null;
   production_date: string | null;
