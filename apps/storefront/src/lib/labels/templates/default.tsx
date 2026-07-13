@@ -98,17 +98,25 @@ export function DefaultLabelTemplate({
             <div>
               <div style={{
                 fontFamily: 'Georgia, serif', fontWeight: 700,
-                fontSize: `clamp(3.5mm, ${78 / product.name.length}mm, 6.5mm)`, lineHeight: 1.05,
+                fontSize: `clamp(3.5mm, ${78 / product.name.length}mm, ${product.name_alt ? 5.8 : 6.5}mm)`, lineHeight: 1.05,
                 color: tenant.primary_color,
               }}>
                 {product.name}
               </div>
-              <div style={{ width: '10mm', height: '0.5mm', background: tenant.primary_color, borderRadius: '0.25mm', marginTop: '0.8mm' }} />
+              {product.name_alt && (
+                <div style={{
+                  fontFamily: 'Georgia, serif', fontStyle: 'italic', fontWeight: 400,
+                  color: '#6b7280', fontSize: '2.4mm', lineHeight: 1.15, marginTop: '0.2mm',
+                }}>
+                  {product.name_alt}
+                </div>
+              )}
+              <div style={{ width: '10mm', height: '0.5mm', background: tenant.primary_color, borderRadius: '0.25mm', marginTop: '0.6mm' }} />
               {sections.origin && product.country_of_origin && (
                 <div style={{
-                  display: 'inline-block', marginTop: '1.2mm',
+                  display: 'inline-block', marginTop: '0.8mm',
                   border: `0.25mm solid ${tenant.primary_color}`, borderRadius: '3mm',
-                  padding: '0.5mm 2mm', fontSize: '2mm', fontWeight: 700, color: tenant.primary_color,
+                  padding: '0.3mm 2mm', fontSize: '2mm', fontWeight: 700, color: tenant.primary_color,
                 }}>
                   {product.country_of_origin}
                 </div>
@@ -127,7 +135,7 @@ export function DefaultLabelTemplate({
 
           {sections.nutrition && product.nutrition && (
             <div style={{
-              marginTop: '1.2mm', borderRadius: '1.5mm', overflow: 'hidden',
+              marginTop: '0.8mm', borderRadius: '1.5mm', overflow: 'hidden',
               border: `0.15mm solid ${tenant.primary_color}30`, boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.06)',
             }}>
               <table style={{ borderCollapse: 'collapse', fontSize: '1.8mm', width: '100%' }}>

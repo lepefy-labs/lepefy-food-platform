@@ -17,6 +17,7 @@ interface ProductEditProps {
   product: {
     id: string;
     name: string;
+    name_alt: string | null;
     slug: string;
     description: string | null;
     price: number;
@@ -61,6 +62,7 @@ interface ProductEditProps {
 
 interface FormState {
   name: string;
+  name_alt: string;
   description: string;
   price: string;
   weight_grams: string;
@@ -120,6 +122,7 @@ function cleanNutrition(raw: NutritionInfo): NutritionInfo {
 function initFormState(product: ProductEditProps['product']): FormState {
   return {
     name:                        product.name,
+    name_alt:                    product.name_alt ?? '',
     description:                 product.description ?? '',
     price:                       product.price.toFixed(2),
     weight_grams:                product.weight_grams != null ? String(product.weight_grams) : '',
@@ -211,6 +214,7 @@ export default function ProductEditClient({
     try {
       const body = {
         name:               formData.name,
+        name_alt:           formData.name_alt,
         description:        formData.description,
         price:              formData.price,
         weight_grams:       formData.weight_grams,
@@ -719,6 +723,21 @@ export default function ProductEditClient({
 
         {/* ── Left column ─────────────────────────────────────────────────── */}
         <div className="space-y-5">
+
+          {/* Traduction du nom */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className={SECTION_TITLE_CLS}>Traduction du nom</h3>
+            <div>
+              <label className={LABEL_CLS}>Nome in italiano / traduzione</label>
+              <input
+                type="text"
+                value={formData.name_alt}
+                onChange={(e) => setField('name_alt', e.target.value)}
+                className={INPUT_CLS}
+                placeholder="es. Pasta di manioca sotto vuoto"
+              />
+            </div>
+          </section>
 
           {/* Producteur et importateur */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">

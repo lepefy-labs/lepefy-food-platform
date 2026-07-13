@@ -27,6 +27,7 @@ export async function PATCH(
   const updatePayload: Record<string, unknown> = {};
 
   if ('name'               in body) updatePayload.name               = String(body.name).trim();
+  if ('name_alt'           in body) updatePayload.name_alt           = body.name_alt ? String(body.name_alt).trim() : null;
   if ('description'        in body) updatePayload.description        = body.description ? String(body.description).trim() : null;
   if ('price'              in body) updatePayload.price              = parseFloat(String(body.price)) || 0;
   if ('weight_grams'       in body) updatePayload.weight_grams       = body.weight_grams ? parseInt(String(body.weight_grams), 10) : null;

@@ -20,7 +20,7 @@ export default async function AdminProductEditPage({
   const { data: product } = await supabase
     .from('products')
     .select(`
-      id, name, slug, description, price, weight_grams, stock,
+      id, name, name_alt, slug, description, price, weight_grams, stock,
       active, featured, storage_type, image_url,
       warehouse_location, category_id,
       producer_id, importer_id, ingredients_text, allergens_text,

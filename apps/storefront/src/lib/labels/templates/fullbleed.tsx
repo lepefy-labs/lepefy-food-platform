@@ -83,9 +83,14 @@ export function FullBleedLabelTemplate({
           color: TEXT_COLOR,
         }}>
           <div>
-            <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: '4.6mm', color: TEXT_COLOR }}>
+            <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: product.name_alt ? '3.8mm' : '4.6mm', color: TEXT_COLOR }}>
               {product.name}
             </div>
+            {product.name_alt && (
+              <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontStyle: 'italic', fontSize: '2.3mm', color: '#6b7280', marginTop: '0.2mm' }}>
+                {product.name_alt}
+              </div>
+            )}
             {sections.origin && product.country_of_origin && (
               <div style={{ fontSize: '2.2mm', color: '#666', marginTop: '0.5mm' }}>
                 Origine: {product.country_of_origin}

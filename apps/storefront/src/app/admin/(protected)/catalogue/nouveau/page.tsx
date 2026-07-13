@@ -31,6 +31,7 @@ export default async function AdminNouveauProduitPage() {
   const emptyProduct = {
     id:                          '',
     name:                        '',
+    name_alt:                    null,
     slug:                        '',
     description:                 null,
     price:                       0,

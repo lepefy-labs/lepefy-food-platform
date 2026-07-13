@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     .insert({
       tenant_id:          tenant.id,
       name:               String(body.name ?? '').trim(),
+      name_alt:           body.name_alt ? String(body.name_alt).trim() : null,
       slug:               slugProd,
       description:        body.description || null,
       price:              parseFloat(body.price) || 0,

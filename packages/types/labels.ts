@@ -38,6 +38,7 @@ export type LabelTemplateKey = 'default' | 'fullbleed';
 export interface ProductLabelData {
   id: string;
   name: string;
+  name_alt: string | null;
   slug: string;
   image_url: string | null;
   weight_grams: number | null;
