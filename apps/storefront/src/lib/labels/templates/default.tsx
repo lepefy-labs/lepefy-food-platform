@@ -1,7 +1,7 @@
 import type { ProductLabelData, LabelSections, LabelPaletteKey } from '@lepefy/types';
 import { resolveBackground, resolveAmbientColor } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
-import { LABEL_PALETTES, NATURAL_BADGE_COLOR } from '../palettes';
+import { LABEL_PALETTES, NATURAL_BADGE_COLOR, ambientWashBackground, footerWashBackground } from '../palettes';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -58,7 +58,7 @@ export function DefaultLabelTemplate({
       width: `${labelWidthMm}mm`, height: `${labelHeightMm}mm`,
       display: 'grid', gridTemplateRows: '1fr auto',
       fontFamily: 'Arial, sans-serif', overflow: 'hidden', position: 'relative',
-      border: '0.2mm solid #ddd', background: ambient,
+      border: '0.2mm solid #ddd', background: ambientWashBackground(ambient),
     }}>
       {/* Riga superiore: pannello foto + colonna dati */}
       <div style={{ display: 'grid', gridTemplateColumns: '40% 60%', minHeight: 0, overflow: 'hidden' }}>
@@ -212,7 +212,7 @@ export function DefaultLabelTemplate({
 
       {/* Footer legale — stessa tinta ambientale, separato da un filo colore primario, ora nel flusso normale */}
       <div style={{
-        gridColumn: '1 / -1', background: ambient,
+        gridColumn: '1 / -1', background: footerWashBackground(ambient),
         borderTop: `0.3mm solid ${colors.primary}`,
         padding: '1.5mm 3mm', display: 'flex', alignItems: 'flex-end',
         justifyContent: 'space-between', gap: '3mm',
@@ -222,7 +222,9 @@ export function DefaultLabelTemplate({
             <div style={{ color: '#555' }}>Importato da: {product.importer.name}, {product.importer.legal_address}</div>
           )}
           <div style={{ fontWeight: 700, color: '#2A2118', marginTop: '0.5mm' }}>
-            Per: {tenant.legal_name}, {tenant.legal_address} {tenant.legal_email ? `— ${tenant.legal_email}` : ''}
+            Per: {tenant.legal_name}, {tenant.legal_address}
+            {tenant.legal_email ? ` — ${tenant.legal_email}` : ''}
+            {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
           </div>
           {product.packaging_material && (
             <div style={{ color: '#555' }}>Imballaggio: {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}</div>

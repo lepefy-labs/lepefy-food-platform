@@ -181,7 +181,11 @@ export function FullBleedLabelTemplate({
         fontSize: '1.8mm', padding: '1.5mm 3mm', lineHeight: 1.5, color: TEXT_COLOR,
       }}>
         {product.importer && <div>Importato da: {product.importer.name}, {product.importer.legal_address}</div>}
-        <div>Per: {tenant.legal_name}, {tenant.legal_address} {tenant.legal_email ? `— ${tenant.legal_email}` : ''}</div>
+        <div>
+          Per: {tenant.legal_name}, {tenant.legal_address}
+          {tenant.legal_email ? ` — ${tenant.legal_email}` : ''}
+          {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
+        </div>
         {product.packaging_material && (
           <div>Imballaggio: {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}</div>
         )}

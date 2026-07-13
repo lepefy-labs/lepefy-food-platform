@@ -40,3 +40,17 @@ export const DEFAULT_LABEL_PALETTE: LabelPaletteKey = 'blu_epices';
 
 /** Colore fisso del badge "100% Naturale" — indipendente dalla palette scelta, come un bollino di certificazione. */
 export const NATURAL_BADGE_COLOR = '#1B8A44';
+
+/**
+ * Sfondo "verde-bianco dinamico" per la colonna dati (template default) — due aloni verdi morbidi
+ * negli angoli sopra il colore ambientale risolto (prodotto → categoria → palette). Nessun pattern
+ * ripetuto: il centro, dove sta il testo, resta leggibile.
+ */
+export function ambientWashBackground(ambientColor: string): string {
+  return `radial-gradient(60% 55% at 100% 0%, ${NATURAL_BADGE_COLOR}29, transparent 70%), radial-gradient(55% 50% at 0% 100%, ${NATURAL_BADGE_COLOR}1f, transparent 70%), ${ambientColor}`;
+}
+
+/** Stessa idea, versione più discreta per la fascia footer legale (bassa e larga). */
+export function footerWashBackground(ambientColor: string): string {
+  return `radial-gradient(120% 220% at 0% 0%, ${NATURAL_BADGE_COLOR}1a, transparent 75%), ${ambientColor}`;
+}
