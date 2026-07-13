@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 9 Luglio 2026
+> Aggiornato: 13 Luglio 2026
 
 ---
 
@@ -150,10 +150,6 @@ lepefy-food-platform/
 | 015 | `015_catalogue_ux.sql` | `catalogue_search_threshold` su tenants |
 | 017 | `017_label_system.sql` | Tabelle `producers`, `importers`, `label_settings`, `label_print_jobs` + estensioni a products/categories/tenants |
 | 018 | `018_fix_grants.sql` | ✅ Fix `permission denied` — GRANT UPDATE su tenants/categories/products a `service_role` |
-| 019 | `019_link_default_producer.sql` | Collega producer_id di default ai prodotti già esistenti |
-| 020 | `020_reseed_products_catalogue_v2.sql` | Ripopola/aggiorna i 121 prodotti da `ChloeFood_Template_Catalogue_v2` (categoria Boissons + upsert idempotente) — da eseguire su Supabase |
-| 021 | `021_update_label_data_batch1.sql` | Popola i campi etichetta (ingredienti, allergeni, nutrizione, ecc.) per 22 prodotti esistenti da `20260708 - Data base etiquettes Chloé Food.xlsx` — da eseguire su Supabase, verificare i commenti ⚠️ prima di stampare etichette reali |
-| 022 | `022_new_products_from_labels.sql` | Inserisce 2 nuovi prodotti emersi dalle schede etichetta ma assenti dal catalogo v2 (Garri/Tapioca, Pâte d'arachide 1kg) — `price = 0.00, active = false, stock = 0`: da attivare manualmente da `/admin/catalogue` dopo aver impostato prezzo/stock reali |
 
 ⚠️ Numeri 012 e 016 non risultano documentati in nessuna chat — verificare se esistono o se sono stati saltati.
 
@@ -404,7 +400,7 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 - ✅ Migration `017` applicata
 - ✅ Migration `018_fix_grants.sql` applicata — risolto `permission denied` su upload logo (mancavano GRANT UPDATE su `tenants`, `categories`, `products` a `service_role`)
 - ⚠️ **Gotenberg non ancora installato su Hetzner** — richiede reverse proxy Caddy con autenticazione per essere raggiungibile da Vercel (bind solo localhost non sufficiente)
-- ✅ **Errore 400 su `/api/labels/preview`** — risolto (non era correlato a Gotenberg, che la preview non chiama)
+- ✅ **Errore 400 su `/api/labels/preview`** — RISOLTO (13/07). Causa: import "nudo" di `react-dom/server` intercettato dal Next.js App Router. Fix: in `buildSheetHtml.ts` import cambiato in `react-dom/server.node` + aggiunto `export const runtime = 'nodejs'` nelle route `/api/labels/preview` e `/api/labels/generate`.
 - ⚠️ **Data quality flag:** i valori nutrizionali usati nell'etichetta BOBOLO Sous Vide corrispondevano alla scheda prodotto Foufou, non Bobolo — richiede verifica dal produttore prima di ristampare
 - **Dati Excel etichette (~24 prodotti):** confermati dati legali reali — ragione sociale "Chloé Food ETS", indirizzo "Via Angelo Zanti, 1C - 42122 Reggio Emilia", email `chloefood.ets@gmail.com`; importatore ricorrente **AFRICOOP Società Cooperativa** (Modena). Problemi noti: campi lotto/data corrotti (seriali Excel tipo `42026.0`) in ~8 schede, titoli scheda non corrispondenti per errori di copia-incolla, valori nutrizionali espressi in percentuale in 2 schede da chiarire col produttore.
 
@@ -416,7 +412,7 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 
 **Esclusi sempre dall'IA:** valori nutrizionali, allergeni, dati legali produttore/importatore, lotto/date — mai dedotti o generati, sempre campo esplicito con default sicuro. Nessun output IA su questi campi pubblicato senza conferma umana esplicita.
 
-**Priorità attuale:** far funzionare il sistema etichette base (debug preview 400 in corso) prima di procedere con le funzionalità IA.
+**Priorità attuale:** sistema etichette base ora funzionante (preview 400 risolto) — prossimo step è il deploy di Gotenberg su Hetzner per la generazione PDF, prima di procedere con le funzionalità IA.
 
 ---
 
@@ -542,4 +538,4 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v2.0 — 9 Luglio 2026*
+*Lepefy Labs — Lepefy Food Platform — Context document v2.1 — 13 Luglio 2026*
