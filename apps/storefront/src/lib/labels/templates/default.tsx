@@ -29,16 +29,16 @@ function formatWeight(grams: number | null): string {
   return grams >= 1000 ? `${(grams / 1000).toLocaleString('it-IT')} kg` : `${grams} g`;
 }
 
-const NUTRITION_ROWS: Array<{ key: keyof NonNullable<ProductLabelData['nutrition']>; label: string }> = [
-  { key: 'kcal', label: 'Energia (Energy)' },
-  { key: 'kj', label: 'Valore energetico (kJ)' },
-  { key: 'fat_g', label: 'Grassi (Fat)' },
-  { key: 'saturated_fat_g', label: 'di cui saturi' },
-  { key: 'carbs_g', label: 'Carboidrati (Carbohydrate)' },
-  { key: 'sugars_g', label: 'di cui zuccheri' },
-  { key: 'fiber_g', label: 'Fibre (Fiber)' },
-  { key: 'protein_g', label: 'Proteine (Protein)' },
-  { key: 'salt_g', label: 'Sale (Salt)' },
+type NutritionKey = keyof NonNullable<ProductLabelData['nutrition']>;
+
+const NUTRITION_ROWS: Array<{ key: NutritionKey; label: string; unit: 'kcal' | 'kJ' | 'g'; subKey?: NutritionKey; subLabel?: string }> = [
+  { key: 'kcal', label: 'Energia (Energy)', unit: 'kcal' },
+  { key: 'kj', label: 'Valore energetico (kJ)', unit: 'kJ' },
+  { key: 'fat_g', label: 'Grassi (Fat)', unit: 'g', subKey: 'saturated_fat_g', subLabel: 'di cui saturi' },
+  { key: 'carbs_g', label: 'Carboidrati (Carbohydrate)', unit: 'g', subKey: 'sugars_g', subLabel: 'di cui zuccheri' },
+  { key: 'fiber_g', label: 'Fibre (Fiber)', unit: 'g' },
+  { key: 'protein_g', label: 'Proteine (Protein)', unit: 'g' },
+  { key: 'salt_g', label: 'Sale (Salt)', unit: 'g' },
 ];
 
 export function DefaultLabelTemplate({
@@ -124,33 +124,30 @@ export function DefaultLabelTemplate({
           </div>
 
           {sections.nutrition && product.nutrition && (
-            <table style={{ borderCollapse: 'collapse', fontSize: '2mm', border: `0.2mm solid ${tenant.primary_color}`, width: '100%', marginTop: '1.5mm' }}>
+            <table style={{ borderCollapse: 'collapse', fontSize: '1.8mm', border: `0.2mm solid ${tenant.primary_color}`, width: '100%', marginTop: '1.2mm' }}>
               <thead>
                 <tr>
-                  <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '1mm', fontSize: '2.1mm' }}>
+                  <th colSpan={2} style={{ background: tenant.primary_color, color: '#fff', padding: '0.6mm 1mm', fontSize: '1.9mm' }}>
                     Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => {
-                  const isSubRow = r.key === 'saturated_fat_g' || r.key === 'sugars_g';
+                  const subValue = r.subKey ? product.nutrition?.[r.subKey] : null;
                   return (
                     <tr key={r.key}>
-                      <td style={{
-                        padding: '0.4mm 1.5mm',
-                        paddingLeft: isSubRow ? '4mm' : '1.5mm',
-                        fontStyle: isSubRow ? 'italic' : 'normal',
-                        color: isSubRow ? '#555' : undefined,
-                        borderTop: '0.1mm solid #ddd',
-                      }}>{r.label}</td>
-                      <td style={{
-                        padding: '0.4mm 1.5mm',
-                        fontStyle: isSubRow ? 'italic' : 'normal',
-                        color: isSubRow ? '#555' : undefined,
-                        borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700,
-                      }}>
-                        {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
+                      <td style={{ padding: '0.25mm 1.5mm', borderTop: '0.1mm solid #ddd' }}>
+                        {r.label}
+                        {subValue != null && (
+                          <div style={{ fontSize: '1.5mm', fontStyle: 'italic', color: '#555' }}>{r.subLabel}</div>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.25mm 1.5mm', borderTop: '0.1mm solid #ddd', textAlign: 'right', fontWeight: 700 }}>
+                        {product.nutrition?.[r.key]} {r.unit}
+                        {subValue != null && (
+                          <div style={{ fontSize: '1.5mm', fontStyle: 'italic', color: '#555', fontWeight: 400 }}>{subValue} g</div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -159,18 +156,18 @@ export function DefaultLabelTemplate({
             </table>
           )}
 
-          <div style={{ fontSize: '2.2mm', lineHeight: 1.25, marginTop: '2mm' }}>
+          <div style={{ fontSize: '2mm', lineHeight: 1.15, marginTop: '1mm' }}>
             {product.ingredients_text && (
               <div><b>Ingredienti:</b> {product.ingredients_text}</div>
             )}
             {sections.allergens && product.allergens_text && (
-              <div style={{ marginTop: '0.7mm' }}><b>Allergeni:</b> {product.allergens_text}</div>
+              <div style={{ marginTop: '0.4mm' }}><b>Allergeni:</b> {product.allergens_text}</div>
             )}
             {sections.usage && product.usage_instructions && (
-              <div style={{ marginTop: '0.7mm' }}><b>Consigli d&apos;uso:</b> {product.usage_instructions}</div>
+              <div style={{ marginTop: '0.4mm' }}><b>Consigli d&apos;uso:</b> {product.usage_instructions}</div>
             )}
             {sections.conservation && product.conservation_instructions && (
-              <div style={{ marginTop: '0.7mm' }}>
+              <div style={{ marginTop: '0.4mm' }}>
                 <b>Conservazione:</b> {product.conservation_instructions}
                 {product.conservation_after_opening && ` ${product.conservation_after_opening}`}
               </div>
