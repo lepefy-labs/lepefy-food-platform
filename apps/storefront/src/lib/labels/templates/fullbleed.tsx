@@ -1,3 +1,4 @@
+import { IconRecycle } from '@tabler/icons-react';
 import type { ProductLabelData, LabelSections, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
@@ -189,7 +190,11 @@ export function FullBleedLabelTemplate({
           {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
         </div>
         {product.packaging_material && (
-          <div>Imballaggio: {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}</div>
+          <div>
+            Imballaggio: {product.packaging_material}.{' '}
+            <IconRecycle size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, verticalAlign: 'middle' }} />{' '}
+            {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
+          </div>
         )}
       </div>
     </div>

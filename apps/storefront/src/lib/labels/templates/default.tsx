@@ -1,4 +1,4 @@
-import { IconPackage } from '@tabler/icons-react';
+import { IconPackage, IconRecycle } from '@tabler/icons-react';
 import type { ProductLabelData, LabelSections, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 import { resolveBackground, resolveAmbientColor } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
@@ -265,7 +265,9 @@ export function DefaultLabelTemplate({
           {product.packaging_material && (
             <div style={{ color: '#555', display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
               <IconPackage size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />
-              {product.packaging_material}. {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
+              {product.packaging_material}.{' '}
+              <IconRecycle size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />{' '}
+              {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
             </div>
           )}
         </div>
