@@ -173,6 +173,8 @@ export default function ProductEditClient({
   const [isDragging, setIsDragging]     = useState(false);
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
   const [isUploadingLabelBg, setIsUploadingLabelBg] = useState(false);
+  const [removeBgOnUpload, setRemoveBgOnUpload]     = useState(false);
+  const [removeBgOnLabelBg, setRemoveBgOnLabelBg]   = useState(false);
   const [toast, setToast]               = useState<{
     msg: string;
     type: 'success' | 'error';
@@ -318,17 +320,21 @@ export default function ProductEditClient({
       uploadData.append('file', file);
       uploadData.append('productId', product.id);
       uploadData.append('slug', product.slug);
+      if (removeBgOnUpload) uploadData.append('removeBackground', 'true');
 
       const res = await fetch('/api/admin/upload-product-image', {
         method: 'POST',
         body: uploadData,
       });
-      if (!res.ok) throw new Error('Upload échoué');
+      if (!res.ok) {
+        const { error } = await res.json() as { error?: string };
+        throw new Error(error ?? 'Upload échoué');
+      }
       const { imageUrl: uploadedUrl } = await res.json() as { imageUrl: string };
       setField('image_url', uploadedUrl);
       showToast('Image mise à jour', 'success');
-    } catch {
-      showToast('Erreur lors de l\'upload', 'error');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erreur lors de l\'upload', 'error');
     }
   }
 
@@ -364,6 +370,7 @@ export default function ProductEditClient({
       uploadData.append('file', file);
       uploadData.append('target', 'product-background');
       uploadData.append('entityId', product.id);
+      if (removeBgOnLabelBg) uploadData.append('removeBackground', 'true');
 
       const res = await fetch('/api/admin/upload-label-asset', {
         method: 'POST',
@@ -621,6 +628,16 @@ export default function ProductEditClient({
                 Supprimer l&apos;image
               </button>
             )}
+
+            <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={removeBgOnUpload}
+                onChange={(e) => setRemoveBgOnUpload(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Supprimer le fond automatiquement (IA)
+            </label>
 
             {/* Drag & Drop area */}
             <div
@@ -1062,6 +1079,16 @@ export default function ProductEditClient({
                     Supprimer le fond
                   </button>
                 )}
+
+                <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={removeBgOnLabelBg}
+                    onChange={(e) => setRemoveBgOnLabelBg(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Supprimer le fond automatiquement (IA)
+                </label>
 
                 <div
                   onDragOver={(e) => { e.preventDefault(); setIsDraggingLabelBg(true); }}
