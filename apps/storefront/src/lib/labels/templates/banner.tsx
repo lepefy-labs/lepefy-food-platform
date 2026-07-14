@@ -68,7 +68,10 @@ export function BannerLabelTemplate({
   const originFlag = showOrigin ? resolveOriginFlag(product.country_of_origin) : null;
   const hasClaims = (sections.usage && !!product.usage_instructions) || (sections.conservation && !!product.conservation_instructions);
 
-  const bandHeightMm = labelHeightMm * 0.3;
+  const bandHeightMm = labelHeightMm * 0.26;
+  // Il riquadro nutrizionale invade parzialmente la fascia del logo, come nell'esempio allegato
+  // (2.5mm compensa il padding superiore del corpo, il resto è la vera e propria invasione).
+  const nutriOverlapMm = 2.5 + Math.min(bandHeightMm * 0.35, 5);
 
   return (
     <div style={{
@@ -90,26 +93,30 @@ export function BannerLabelTemplate({
         display: 'grid', gridTemplateColumns: '27% 33% 40%', gridTemplateRows: '1fr auto',
         padding: '2.5mm 2.5mm 1.5mm', minHeight: 0,
       }}>
-        {/* Colonna sinistra — riquadro nutrizionale + dati legali */}
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingRight: '2mm', overflow: 'hidden' }}>
+        {/* Colonna sinistra — riquadro nutrizionale (sconfina nella fascia logo) + dati legali */}
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, paddingRight: '2mm' }}>
           {sections.nutrition && product.nutrition && (
-            <div style={{ border: `0.3mm solid ${colors.primary}`, borderRadius: '1mm', overflow: 'hidden', background: '#FFFDF8', flexShrink: 0 }}>
-              <div style={{ padding: '1mm 1.6mm', borderBottom: `0.3mm solid ${colors.primary}` }}>
-                <div style={{ fontWeight: 800, fontSize: '2mm', color: TEXT_DARK }}>Valori Nutrizionali Medi</div>
-                <div style={{ fontSize: '1.4mm', color: TEXT_DARK, marginTop: '0.3mm' }}>
+            <div style={{
+              border: `0.3mm solid ${colors.primary}`, borderRadius: '1mm', overflow: 'hidden', background: '#FFFDF8',
+              flexShrink: 0, position: 'relative', zIndex: 2, marginTop: `-${nutriOverlapMm}mm`,
+              boxShadow: '0 0.4mm 1mm rgba(0,0,0,0.15)',
+            }}>
+              <div style={{ padding: '0.8mm 1.6mm', borderBottom: `0.3mm solid ${colors.primary}` }}>
+                <div style={{ fontWeight: 800, fontSize: '1.9mm', color: TEXT_DARK }}>Valori Nutrizionali Medi</div>
+                <div style={{ fontSize: '1.3mm', color: TEXT_DARK, marginTop: '0.2mm' }}>
                   per {product.nutrition_basis === '100ml' ? '100 ml' : '100 g'} di prodotto
                 </div>
               </div>
               {product.nutrition.kcal != null && (
-                <div style={{ padding: '1mm 1.6mm', borderBottom: `0.3mm solid ${colors.primary}` }}>
-                  <div style={{ fontSize: '1.5mm', fontWeight: 600, color: TEXT_DARK }}>Energia</div>
-                  <span style={{ fontFamily: 'Georgia, serif', fontWeight: 800, fontSize: '4.2mm', color: colors.primary, lineHeight: 1 }}>
+                <div style={{ padding: '0.8mm 1.6mm', borderBottom: `0.3mm solid ${colors.primary}` }}>
+                  <div style={{ fontSize: '1.4mm', fontWeight: 600, color: TEXT_DARK }}>Energia</div>
+                  <span style={{ fontFamily: 'Georgia, serif', fontWeight: 800, fontSize: '3.8mm', color: colors.primary, lineHeight: 1 }}>
                     {product.nutrition.kcal}
                   </span>{' '}
-                  <span style={{ fontSize: '1.5mm', color: TEXT_DARK }}>kcal</span>
+                  <span style={{ fontSize: '1.4mm', color: TEXT_DARK }}>kcal</span>
                 </div>
               )}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1.5mm', color: TEXT_DARK }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1.4mm', color: TEXT_DARK }}>
                 <tbody>
                   {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r, i) => {
                     const subValue = r.subKey ? product.nutrition?.[r.subKey] : null;
@@ -117,13 +124,13 @@ export function BannerLabelTemplate({
                     return (
                       <Fragment key={r.key}>
                         <tr style={{ background: zebra ? `${colors.secondary}22` : 'transparent' }}>
-                          <td style={{ padding: '0.6mm 1.6mm' }}>{r.label}</td>
-                          <td style={{ padding: '0.6mm 1.6mm', textAlign: 'right', fontWeight: 700 }}>{product.nutrition?.[r.key]} {r.unit}</td>
+                          <td style={{ padding: '0.45mm 1.6mm' }}>{r.label}</td>
+                          <td style={{ padding: '0.45mm 1.6mm', textAlign: 'right', fontWeight: 700 }}>{product.nutrition?.[r.key]} {r.unit}</td>
                         </tr>
                         {subValue != null && (
                           <tr style={{ background: zebra ? `${colors.secondary}22` : 'transparent' }}>
-                            <td style={{ padding: '0 1.6mm 0.6mm 3mm', fontStyle: 'italic', opacity: 0.85 }}>{r.subLabel}</td>
-                            <td style={{ padding: '0 1.6mm 0.6mm 1.6mm', textAlign: 'right' }}>{subValue} g</td>
+                            <td style={{ padding: '0 1.6mm 0.45mm 3mm', fontStyle: 'italic', opacity: 0.85 }}>{r.subLabel}</td>
+                            <td style={{ padding: '0 1.6mm 0.45mm 1.6mm', textAlign: 'right' }}>{subValue} g</td>
                           </tr>
                         )}
                       </Fragment>
@@ -131,17 +138,22 @@ export function BannerLabelTemplate({
                   })}
                 </tbody>
               </table>
+              {/* Breve descrizione (ingredienti) — sotto la tabella, dentro lo stesso riquadro, come nell'esempio */}
+              {product.ingredients_text && (
+                <div style={{
+                  borderTop: `0.25mm solid ${colors.primary}40`, background: `${colors.secondary}1a`,
+                  padding: '1.1mm 1.6mm', fontSize: '1.4mm', lineHeight: 1.35, color: TEXT_DARK,
+                }}>
+                  <b>Ingredienti:</b> {product.ingredients_text}
+                </div>
+              )}
             </div>
           )}
 
-          <div style={{ fontSize: '1.6mm', lineHeight: 1.4, marginTop: '1.5mm', color: TEXT_DARK, overflow: 'hidden' }}>
-            {product.ingredients_text && <div><b>Ingredienti:</b> {product.ingredients_text}</div>}
+          <div style={{ marginTop: 'auto', paddingTop: '1.2mm', fontSize: '1.35mm', textAlign: 'center', color: '#555', lineHeight: 1.35 }}>
             {sections.allergens && product.allergens_text && (
-              <div style={{ marginTop: '0.5mm' }}><b>Allergeni:</b> {product.allergens_text}</div>
+              <div style={{ marginBottom: '0.5mm' }}><b>Allergeni:</b> {product.allergens_text}</div>
             )}
-          </div>
-
-          <div style={{ marginTop: 'auto', paddingTop: '1.5mm', fontSize: '1.4mm', textAlign: 'center', color: '#555', lineHeight: 1.4 }}>
             {product.importer && (
               <div>Importato da: {product.importer.name}, {product.importer.legal_address}</div>
             )}
