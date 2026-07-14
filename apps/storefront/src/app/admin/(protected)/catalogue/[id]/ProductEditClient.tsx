@@ -388,6 +388,21 @@ export default function ProductEditClient({
     if (file && file.type.startsWith('image/')) handleLabelBgUpload(file);
   }
 
+  async function handleDeleteLabelBg() {
+    setField('label_background_image_url', null);
+    try {
+      const res = await fetch(`/api/admin/catalogue/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label_background_image_url: null }),
+      });
+      if (!res.ok) throw new Error('Erreur');
+      showToast('Fond étiquette supprimé', 'success');
+    } catch {
+      showToast('Erreur lors de la suppression', 'error');
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -1040,7 +1055,7 @@ export default function ProductEditClient({
 
                 {formData.label_background_image_url && (
                   <button
-                    onClick={() => setField('label_background_image_url', null)}
+                    onClick={handleDeleteLabelBg}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mb-3"
                   >
                     <IconTrash size={14} />

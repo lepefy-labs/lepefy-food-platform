@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
 
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
-  const assetUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}`;
+  // Storage path is deterministic (upsert on the same key), so append a cache-busting
+  // query param — otherwise browsers/CDN keep serving the previous image after a re-upload.
+  const assetUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}?v=${Date.now()}`;
 
   const updateMap: Record<string, { table: string; column: string }> = {
     'tenant-logo':          { table: 'tenants',    column: 'label_logo_url' },
