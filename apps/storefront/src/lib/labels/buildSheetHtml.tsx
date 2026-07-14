@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server.node';
 import { DefaultLabelTemplate } from './templates/default';
 import { FullBleedLabelTemplate } from './templates/fullbleed';
+import { BannerLabelTemplate } from './templates/banner';
 import { calculateLayout } from './calculateLayout';
 import type { ProductLabelData, LabelSections, LabelSettings, LabelTemplateKey, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 
@@ -26,7 +27,9 @@ interface BuildSheetParams {
 export function buildSheetHtml(params: BuildSheetParams): { html: string; layout: ReturnType<typeof calculateLayout> } {
   const { product, tenant, templateKey, palette, naturalBadge, originStyle, sections, settings, lotNumber, productionDate, durabilityDate, durabilityLabel, quantity } = params;
 
-  const Template = templateKey === 'fullbleed' ? FullBleedLabelTemplate : DefaultLabelTemplate;
+  const Template = templateKey === 'fullbleed' ? FullBleedLabelTemplate
+    : templateKey === 'banner' ? BannerLabelTemplate
+    : DefaultLabelTemplate;
 
   const layout = calculateLayout({
     sheetWidthMm: settings.sheet_width_mm,

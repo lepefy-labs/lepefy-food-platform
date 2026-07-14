@@ -33,7 +33,7 @@ export interface NutritionInfo {
 
 export type DurabilityType = 'best_before' | 'use_by';
 
-export type LabelTemplateKey = 'default' | 'fullbleed';
+export type LabelTemplateKey = 'default' | 'fullbleed' | 'banner';
 
 export type LabelPaletteKey = 'verde_palma' | 'blu_epices' | 'terra_piccante';
 

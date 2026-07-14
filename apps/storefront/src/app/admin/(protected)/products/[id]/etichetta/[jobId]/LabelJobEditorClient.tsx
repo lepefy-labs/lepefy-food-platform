@@ -19,6 +19,7 @@ interface LabelJobEditorProps {
 const TEMPLATE_OPTIONS: { key: LabelTemplateKey; label: string; description: string }[] = [
   { key: 'default', label: 'Classico (due colonne)', description: 'Logo e testo su colonne separate, secondo la maquette approvata.' },
   { key: 'fullbleed', label: 'Full-bleed (sfondo intero)', description: "Lo sfondo copre l'intera etichetta, i testi poggiano su pannelli traslucidi." },
+  { key: 'banner', label: 'Fascia Dorata (fascia superiore)', description: 'Fascia logo a tutta larghezza, nutrizione a sinistra, nome al centro, foto a destra.' },
 ];
 
 const PALETTE_OPTIONS: { key: LabelPaletteKey }[] = [
@@ -340,11 +341,11 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
           <div className="space-y-5">
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="text-sm font-semibold text-gray-700 mb-4">Template</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-2">
                 {TEMPLATE_OPTIONS.map((opt) => (
                   <label
                     key={opt.key}
-                    className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
+                    className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors flex items-center gap-3 ${
                       templateKey === opt.key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -356,18 +357,31 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                       onChange={() => setTemplateKey(opt.key)}
                       className="sr-only"
                     />
-                    {opt.key === 'default' ? (
-                      <div className="mb-2 flex h-10 w-full overflow-hidden rounded border border-gray-200">
+                    {opt.key === 'default' && (
+                      <div className="flex h-10 w-14 shrink-0 overflow-hidden rounded border border-gray-200">
                         <div className="w-[32%] bg-gray-300" />
                         <div className="flex-1 bg-gray-100" />
                       </div>
-                    ) : (
-                      <div className="relative mb-2 h-10 w-full overflow-hidden rounded border border-gray-200 bg-gray-300">
+                    )}
+                    {opt.key === 'fullbleed' && (
+                      <div className="relative h-10 w-14 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-300">
                         <div className="absolute right-1 top-1 h-6 w-[55%] rounded-sm bg-white/80" />
                       </div>
                     )}
-                    <div className="font-medium text-gray-800">{opt.label}</div>
-                    <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
+                    {opt.key === 'banner' && (
+                      <div className="flex h-10 w-14 shrink-0 flex-col overflow-hidden rounded border border-gray-200">
+                        <div className="h-3 w-full bg-amber-300" />
+                        <div className="flex flex-1">
+                          <div className="w-[27%] bg-gray-200" />
+                          <div className="w-[33%] bg-gray-100" />
+                          <div className="flex-1 bg-gray-300" />
+                        </div>
+                      </div>
+                    )}
+                    <span>
+                      <div className="font-medium text-gray-800">{opt.label}</div>
+                      <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
+                    </span>
                   </label>
                 ))}
               </div>
@@ -465,6 +479,11 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                 <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   Con il bollino « 100% Naturale » attivo, il pannello foto avrà due bollini circolari
                   (in alto e in basso a destra) — verifica che il risultato ti piaccia nell&apos;anteprima.
+                </p>
+              )}
+              {originStyle === 'medallion' && templateKey !== 'default' && (
+                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Il bollino speculare è disponibile solo sul template Classico — su questo template l&apos;origine verrà mostrata nell&apos;asola.
                 </p>
               )}
             </section>
