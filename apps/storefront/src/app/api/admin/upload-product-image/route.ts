@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient();
-  let buffer     = Buffer.from(await file.arrayBuffer());
+  let buffer: Buffer = Buffer.from(await file.arrayBuffer());
   let ext        =
     file.type === 'image/png'  ? 'png'  :
     file.type === 'image/webp' ? 'webp' :
