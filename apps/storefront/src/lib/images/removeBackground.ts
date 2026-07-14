@@ -3,7 +3,7 @@ export async function removeBackground(buffer: Buffer, filename: string): Promis
   if (!url) throw new Error('REMBG_URL non configurata');
 
   const formData = new FormData();
-  formData.append('file', new Blob([buffer]), filename);
+  formData.append('file', new Blob([new Uint8Array(buffer)]), filename);
 
   const headers: Record<string, string> = {};
   if (process.env.REMBG_AUTH) {
