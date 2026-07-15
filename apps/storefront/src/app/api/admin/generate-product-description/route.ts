@@ -143,6 +143,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Déclarés hors du try pour rester accessibles dans le catch : la réponse
+  // Gemini peut arriver (et donc être facturée) même si le parsing échoue
+  // ensuite — ces valeurs doivent alors atterrir dans le log d'erreur.
+  let inputTokens:  number | undefined;
+  let outputTokens: number | undefined;
+
   try {
     console.log(`[generate-description] Génération pour "${productName}" (${locales.join(', ')})`);
 
@@ -159,14 +165,15 @@ export async function POST(req: NextRequest) {
       contents: prompt,
       config: {
         temperature:      0.6,
-        maxOutputTokens:  1024, // margine ampio pour N langues x 2-4 phrases chacune
+        maxOutputTokens:  4096, // marge large : inclut les tokens de "thinking" du modèle + texte final multilingue
+        thinkingConfig:   { thinkingBudget: 0 }, // 2-4 phrases par langue ne nécessite pas de raisonnement étendu
         responseMimeType: 'application/json',
         responseSchema:   buildResponseSchema(locales),
       },
     });
 
-    const inputTokens  = response.usageMetadata?.promptTokenCount;
-    const outputTokens = response.usageMetadata?.candidatesTokenCount;
+    inputTokens  = response.usageMetadata?.promptTokenCount;
+    outputTokens = response.usageMetadata?.candidatesTokenCount;
 
     const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (!raw.trim()) throw new Error('Gemini n\'a généré aucune description');
@@ -175,8 +182,9 @@ export async function POST(req: NextRequest) {
     try {
       parsed = JSON.parse(extractJsonPayload(raw));
     } catch {
+      const finishReason = response.candidates?.[0]?.finishReason;
       console.error(
-        '[generate-description] JSON non parsable. Réponse brute Gemini:',
+        `[generate-description] JSON non parsable (finishReason: ${finishReason}). Réponse brute Gemini:`,
         raw.slice(0, 2000),
       );
       throw new Error('Réponse IA invalide (JSON non parsable)');
@@ -213,6 +221,8 @@ export async function POST(req: NextRequest) {
       endpoint: ENDPOINT,
       provider: 'gemini',
       model:    MODEL,
+      inputTokens,
+      outputTokens,
       status:   'error',
     });
     return NextResponse.json({ error: message }, { status: 502 });

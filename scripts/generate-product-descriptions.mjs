@@ -151,7 +151,8 @@ async function generateDescriptions(locales, product) {
     contents: prompt,
     config: {
       temperature:      0.6,
-      maxOutputTokens:  1024, // margine ampio per N lingue x 2-4 frasi ciascuna
+      maxOutputTokens:  4096, // margine ampio: include i token di "thinking" del modello + testo finale multilingua
+      thinkingConfig:   { thinkingBudget: 0 }, // 2-4 frasi per lingua non richiede ragionamento esteso
       responseMimeType: 'application/json',
       responseSchema:   buildResponseSchema(locales),
     },
@@ -164,7 +165,8 @@ async function generateDescriptions(locales, product) {
   try {
     parsed = JSON.parse(extractJsonPayload(raw));
   } catch {
-    console.error('[generate-description] JSON non parsable. Risposta grezza Gemini:', raw.slice(0, 2000));
+    const finishReason = response.candidates?.[0]?.finishReason;
+    console.error(`[generate-description] JSON non parsable (finishReason: ${finishReason}). Risposta grezza Gemini:`, raw.slice(0, 2000));
     throw new Error('Réponse IA invalide (JSON non parsable)');
   }
 
