@@ -109,15 +109,24 @@ async function getTenant() {
 }
 
 async function getProducts(tenantId) {
-  let url = `products?tenant_id=eq.${tenantId}&active=eq.true&select=id,name,slug,description,descriptions,ingredients_text,usage_instructions,category_id,categories(name)&order=position`;
-  if (LIMIT > 0) url += `&limit=${LIMIT}`;
+  // LIMIT est appliqué en JS après le filtre skip_existing, jamais au niveau
+  // de la requête REST : sinon il tronque aux N premiers produits par
+  // position AVANT le filtre, qui peut alors tous les écarter si ces N
+  // premiers ont déjà une description (résultat : 0 produit trouvé alors
+  // qu'il y en a des dizaines plus loin dans l'ordre de position).
+  const url = `products?tenant_id=eq.${tenantId}&active=eq.true&select=id,name,slug,description,descriptions,ingredients_text,usage_instructions,category_id,categories(name)&order=position`;
 
-  const products = await sbGet(url);
+  const allProducts = await sbGet(url);
+  console.log(`📦 Prodotti totali attivi tenant: ${allProducts.length}`);
+
   const filtered = SKIP_EXISTING
-    ? products.filter(p => !p.descriptions || Object.keys(p.descriptions).length === 0)
-    : products;
+    ? allProducts.filter(p => !p.descriptions || Object.keys(p.descriptions).length === 0)
+    : allProducts;
+  console.log(`📦 Prodotti dopo filtro skip_existing: ${filtered.length}`);
 
-  return filtered.map(p => ({
+  const limited = LIMIT > 0 ? filtered.slice(0, LIMIT) : filtered;
+
+  return limited.map(p => ({
     id:                 p.id,
     name:               p.name,
     slug:               p.slug,
