@@ -1,0 +1,56 @@
+name: Generate Product Descriptions (Gemini AI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant_slug:
+        description: 'Slug du tenant'
+        required: false
+        default: 'chloefood'
+      limit:
+        description: 'Numero massimo di prodotti (0 = tutti)'
+        required: false
+        default: '0'
+      skip_existing:
+        description: 'Salta prodotti che hanno già descriptions'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  generate-descriptions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install @google/genai
+
+      - name: Generate and update descriptions
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TENANT_SLUG: ${{ github.event.inputs.tenant_slug }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          SKIP_EXISTING: ${{ github.event.inputs.skip_existing }}
+        run: node scripts/generate-product-descriptions.mjs
+
+      - name: Upload log CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: description-generation-log
+          path: scripts/description-generation-log.csv
+          retention-days: 30
