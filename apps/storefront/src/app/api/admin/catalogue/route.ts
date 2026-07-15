@@ -11,6 +11,14 @@ function cleanNutrition(raw: unknown): Record<string, number> | null {
   return entries.length ? Object.fromEntries(entries) : null;
 }
 
+function cleanDescriptions(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {};
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+    .map(([k, v]) => [k, String(v).trim()] as const);
+  return Object.fromEntries(entries);
+}
+
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
@@ -28,6 +36,12 @@ export async function POST(req: NextRequest) {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
+  const descriptions = cleanDescriptions(body.descriptions);
+  const firstLocale   = tenant.locales?.[0];
+  const legacyDescription = firstLocale && descriptions[firstLocale]
+    ? descriptions[firstLocale]
+    : (body.description || null);
+
   const { data, error } = await supabase
     .from('products')
     .insert({
@@ -35,7 +49,9 @@ export async function POST(req: NextRequest) {
       name:               String(body.name ?? '').trim(),
       name_alt:           body.name_alt ? String(body.name_alt).trim() : null,
       slug:               slugProd,
-      description:        body.description || null,
+      description:        legacyDescription,
+      descriptions:        descriptions,
+      description_source:  body.description_source === 'ai' || body.description_source === 'human' ? body.description_source : null,
       price:              parseFloat(body.price) || 0,
       weight_grams:       body.weight_grams ? parseInt(body.weight_grams, 10) : null,
       stock:              parseInt(body.stock, 10) || 0,

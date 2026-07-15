@@ -26,6 +26,8 @@ export interface Tenant {
   legal_website: string | null;
   active: boolean;
   ai_image_generation: boolean;
+  locales: string[];
+  ai_description_generation: boolean;
   catalogue_search_threshold: number;
   // Spedizione
   shipping_provider: ShippingProvider;

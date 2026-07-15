@@ -34,6 +34,8 @@ export default async function AdminNouveauProduitPage() {
     name_alt:                    null,
     slug:                        '',
     description:                 null,
+    descriptions:                null,
+    description_source:          null,
     price:                       0,
     weight_grams:                null,
     stock:                       0,
@@ -82,6 +84,8 @@ export default async function AdminNouveauProduitPage() {
         tenantId={tenant.id}
         tenantCurrency={tenant.currency}
         aiEnabled={tenant.ai_image_generation}
+        tenantLocales={tenant.locales ?? ['fr']}
+        aiDescriptionsEnabled={tenant.ai_description_generation ?? false}
         isNew={true}
       />
     </div>

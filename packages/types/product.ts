@@ -15,6 +15,8 @@ export interface Product {
   name: string;
   slug: string;
   description: string | null;
+  descriptions: Record<string, string>;
+  description_source: 'ai' | 'human' | null;
   price: number;
   compare_at_price: number | null;
   image_url: string | null;

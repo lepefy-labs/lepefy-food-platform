@@ -20,6 +20,8 @@ interface ProductEditProps {
     name_alt: string | null;
     slug: string;
     description: string | null;
+    descriptions: Record<string, string> | null;
+    description_source: 'ai' | 'human' | null;
     price: number;
     weight_grams: number | null;
     stock: number;
@@ -56,6 +58,8 @@ interface ProductEditProps {
   tenantId: string;
   tenantCurrency: string;
   aiEnabled: boolean;
+  tenantLocales: string[];
+  aiDescriptionsEnabled: boolean;
   isNew?: boolean;
   fromCategory?: string;
 }
@@ -64,6 +68,8 @@ interface FormState {
   name: string;
   name_alt: string;
   description: string;
+  descriptions: Record<string, string>;
+  descriptionSource: 'ai' | 'human' | null;
   price: string;
   weight_grams: string;
   stock: string;
@@ -119,11 +125,18 @@ function cleanNutrition(raw: NutritionInfo): NutritionInfo {
   return Object.fromEntries(entries) as NutritionInfo;
 }
 
-function initFormState(product: ProductEditProps['product']): FormState {
+function initFormState(product: ProductEditProps['product'], tenantLocales: string[]): FormState {
+  const descriptions = { ...(product.descriptions ?? {}) };
+  if (Object.keys(descriptions).length === 0 && product.description && tenantLocales[0]) {
+    descriptions[tenantLocales[0]] = product.description;
+  }
+
   return {
     name:                        product.name,
     name_alt:                    product.name_alt ?? '',
     description:                 product.description ?? '',
+    descriptions,
+    descriptionSource:           product.description_source ?? null,
     price:                       product.price.toFixed(2),
     weight_grams:                product.weight_grams != null ? String(product.weight_grams) : '',
     stock:                       String(product.stock),
@@ -162,13 +175,16 @@ export default function ProductEditClient({
   producers,
   importers,
   aiEnabled,
+  tenantLocales,
+  aiDescriptionsEnabled,
   isNew = false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fromCategory,
 }: ProductEditProps) {
   const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta'>('generale');
-  const [formData, setFormData]         = useState<FormState>(() => initFormState(product));
+  const [formData, setFormData]         = useState<FormState>(() => initFormState(product, tenantLocales));
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
   const [isDragging, setIsDragging]     = useState(false);
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
@@ -218,6 +234,8 @@ export default function ProductEditClient({
         name:               formData.name,
         name_alt:           formData.name_alt,
         description:        formData.description,
+        descriptions:       formData.descriptions,
+        description_source: formData.descriptionSource,
         price:              formData.price,
         weight_grams:       formData.weight_grams,
         stock:              formData.stock,
@@ -308,6 +326,53 @@ export default function ProductEditClient({
       showToast(message, 'error');
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  function setDescriptionLocale(locale: string, value: string) {
+    setFormData((prev) => ({
+      ...prev,
+      descriptions:      { ...prev.descriptions, [locale]: value },
+      descriptionSource: 'human',
+    }));
+  }
+
+  async function handleGenerateDescriptions() {
+    setIsGeneratingDescriptions(true);
+    try {
+      const currentCategory = categories.find(c => c.id === formData.category_id);
+
+      const res = await fetch('/api/admin/generate-product-description', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId:          product.id,
+          productName:        formData.name,
+          categoryName:       currentCategory?.name ?? '',
+          ingredientsText:    formData.ingredients_text,
+          usageInstructions:  formData.usage_instructions,
+        }),
+      });
+
+      if (!res.ok) {
+        const { error } = await res.json() as { error?: string };
+        throw new Error(error ?? 'Génération échouée');
+      }
+
+      const { descriptions } = await res.json() as { descriptions: Record<string, string> };
+      setFormData((prev) => ({
+        ...prev,
+        descriptions,
+        descriptionSource: 'ai',
+      }));
+      showToast('Descriptions générées avec succès', 'success');
+    } catch (err) {
+      const message = err instanceof Error
+        ? err.message
+        : 'Erreur lors de la génération';
+      showToast(message, 'error');
+    } finally {
+      setIsGeneratingDescriptions(false);
     }
   }
 
@@ -518,16 +583,44 @@ export default function ProductEditClient({
                 </select>
               </div>
 
-              <div>
-                <label className={LABEL_CLS}>Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setField('description', e.target.value)}
-                  rows={4}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
             </div>
+          </section>
+
+          {/* Card: Descriptions */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={SECTION_TITLE_CLS.replace('mb-4', '')}>Descriptions</h2>
+              {formData.descriptionSource === 'ai' && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                  IA — à revoir
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {tenantLocales.map((locale) => (
+                <div key={locale}>
+                  <label className={LABEL_CLS}>Description ({locale.toUpperCase()})</label>
+                  <textarea
+                    value={formData.descriptions[locale] ?? ''}
+                    onChange={(e) => setDescriptionLocale(locale, e.target.value)}
+                    rows={4}
+                    className={`${INPUT_CLS} resize-none`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {aiDescriptionsEnabled && (
+              <button
+                onClick={handleGenerateDescriptions}
+                disabled={isGeneratingDescriptions}
+                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <IconSparkles size={16} stroke={2} />
+                {isGeneratingDescriptions ? 'Génération...' : 'Générer avec IA'}
+              </button>
+            )}
           </section>
 
           {/* Card: Tarification & Logistique */}

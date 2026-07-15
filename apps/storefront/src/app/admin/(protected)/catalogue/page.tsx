@@ -22,6 +22,7 @@ interface ProductRow {
   image_url: string | null;
   storage_type: string | null;
   warehouse_location: string | null;
+  description_source: 'ai' | 'human' | null;
   categories: { name: string; slug: string } | null;
 }
 
@@ -57,7 +58,7 @@ export default async function AdminCataloguePage({ searchParams }: PageProps) {
     .from('products')
     .select(`
       id, name, slug, price, stock, active,
-      image_url, storage_type, warehouse_location,
+      image_url, storage_type, warehouse_location, description_source,
       categories(name, slug)
     `)
     .eq('tenant_id', tenant.id)

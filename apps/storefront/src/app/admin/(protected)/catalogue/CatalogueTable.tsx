@@ -23,6 +23,7 @@ interface Product {
   active: boolean;
   image_url: string | null;
   storage_type: string | null;
+  description_source: 'ai' | 'human' | null;
   categories: { name: string; slug: string } | null;
 }
 
@@ -47,13 +48,20 @@ export default function CatalogueTable({
   // ── Search ──────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredProducts = searchMode === 'client' && searchQuery.trim()
+  // ── Filtre "descriptions IA à revoir" ─────────────────────────────────
+  const [aiReviewOnly, setAiReviewOnly] = useState(false);
+
+  const searchedProducts = searchMode === 'client' && searchQuery.trim()
     ? products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.categories?.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
       )
     : products;
+
+  const filteredProducts = aiReviewOnly
+    ? searchedProducts.filter(p => p.description_source === 'ai')
+    : searchedProducts;
 
   // ── Active toggle ────────────────────────────────────────────────────
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>(
@@ -183,6 +191,18 @@ export default function CatalogueTable({
           </div>
         )}
 
+        <button
+          onClick={() => setAiReviewOnly(v => !v)}
+          className={`flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-2
+                      rounded-lg font-medium border transition-colors ${
+            aiReviewOnly
+              ? 'bg-amber-100 text-amber-700 border-amber-200'
+              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          Descriptions IA à revoir
+        </button>
+
         <Link
           href="/admin/catalogue/nouveau"
           className="flex-shrink-0 flex items-center gap-2 bg-[var(--color-primary)]
@@ -276,7 +296,17 @@ export default function CatalogueTable({
 
                       {/* Nom */}
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900 leading-snug">{product.name}</p>
+                        <p className="font-medium text-gray-900 leading-snug flex items-center gap-1.5">
+                          {product.name}
+                          {product.description_source === 'ai' && (
+                            <span
+                              title="Description générée par IA — à revoir"
+                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold"
+                            >
+                              IA
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-400 font-mono mt-0.5">{product.slug}</p>
                       </td>
 

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
 import { QuantitySelector } from './QuantitySelector';
+import { ProductDescription } from './ProductDescription';
 import { formatPrice } from '@/lib/utils/format';
 import type { ProductWithCategory } from '@lepefy/types';
 
@@ -49,7 +50,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
             <span className="text-lg text-gray-400 line-through">{formatPrice(product.compare_at_price, currency)}</span>
           )}
         </div>
-        {product.description && <p className="text-gray-600 leading-relaxed">{product.description}</p>}
+        <ProductDescription product={product} />
         {product.weight_grams && (
           <p className="text-sm text-gray-400">Poids : {product.weight_grams >= 1000 ? `${(product.weight_grams / 1000).toFixed(2)} kg` : `${product.weight_grams} g`}</p>
         )}

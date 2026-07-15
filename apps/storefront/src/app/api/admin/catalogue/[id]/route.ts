@@ -11,6 +11,14 @@ function cleanNutrition(raw: unknown): Record<string, number> | null {
   return entries.length ? Object.fromEntries(entries) : null;
 }
 
+function cleanDescriptions(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {};
+  const entries = Object.entries(raw as Record<string, unknown>)
+    .filter(([, v]) => typeof v === 'string' && v.trim() !== '')
+    .map(([k, v]) => [k, String(v).trim()] as const);
+  return Object.fromEntries(entries);
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -29,6 +37,13 @@ export async function PATCH(
   if ('name'               in body) updatePayload.name               = String(body.name).trim();
   if ('name_alt'           in body) updatePayload.name_alt           = body.name_alt ? String(body.name_alt).trim() : null;
   if ('description'        in body) updatePayload.description        = body.description ? String(body.description).trim() : null;
+  if ('descriptions'       in body) {
+    const descriptions = cleanDescriptions(body.descriptions);
+    updatePayload.descriptions = descriptions;
+    const firstLocale = tenant.locales?.[0];
+    if (firstLocale) updatePayload.description = descriptions[firstLocale]?.trim() || null;
+  }
+  if ('description_source' in body) updatePayload.description_source = body.description_source === 'ai' || body.description_source === 'human' ? body.description_source : null;
   if ('price'              in body) updatePayload.price              = parseFloat(String(body.price)) || 0;
   if ('weight_grams'       in body) updatePayload.weight_grams       = body.weight_grams ? parseInt(String(body.weight_grams), 10) : null;
   if ('stock'              in body) updatePayload.stock              = parseInt(String(body.stock ?? 0), 10) || 0;
