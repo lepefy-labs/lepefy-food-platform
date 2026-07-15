@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 
@@ -47,6 +47,29 @@ N'invente aucune information sur la composition ou la provenance du produit.
 
 Réponds UNIQUEMENT avec un objet JSON, sans balises markdown, sans backticks,
 avec exactement ces clés : {${jsonExample}}`;
+}
+
+/** Construit un responseSchema JSON dynamique : un objet avec une propriété
+ * string requise pour chaque locale du tenant. */
+function buildResponseSchema(locales: string[]) {
+  return {
+    type:       Type.OBJECT,
+    properties: Object.fromEntries(locales.map((l) => [l, { type: Type.STRING }])),
+    required:   locales,
+  };
+}
+
+/** Extrait le payload JSON d'une réponse Gemini qui peut contenir des fences
+ * markdown ou du texte de contour autour de l'objet JSON. */
+function extractJsonPayload(raw: string): string {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced?.[1]) return fenced[1].trim();
+  const start = raw.indexOf('{');
+  const end   = raw.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    return raw.slice(start, end + 1).trim();
+  }
+  return raw.trim();
 }
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
@@ -117,23 +140,24 @@ export async function POST(req: NextRequest) {
       model:    'gemini-2.5-flash',
       contents: prompt,
       config: {
-        temperature:     0.6,
-        maxOutputTokens: 800,
+        temperature:      0.6,
+        maxOutputTokens:  1024, // margine ampio pour N langues x 2-4 phrases chacune
+        responseMimeType: 'application/json',
+        responseSchema:   buildResponseSchema(locales),
       },
     });
 
     const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (!raw.trim()) throw new Error('Gemini n\'a généré aucune description');
 
-    const cleaned = raw.trim()
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/```\s*$/, '')
-      .trim();
-
     let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(cleaned);
+      parsed = JSON.parse(extractJsonPayload(raw));
     } catch {
+      console.error(
+        '[generate-description] JSON non parsable. Réponse brute Gemini:',
+        raw.slice(0, 2000),
+      );
       throw new Error('Réponse IA invalide (JSON non parsable)');
     }
 
@@ -141,7 +165,8 @@ export async function POST(req: NextRequest) {
     for (const locale of locales) {
       const value = parsed[locale];
       if (typeof value !== 'string' || !value.trim()) {
-        throw new Error(`Description manquante pour la langue "${locale}"`);
+        console.error(`[generate-description] Langue manquante dans la réponse IA: ${locale}`, parsed);
+        throw new Error(`Langue manquante dans la réponse IA: ${locale}`);
       }
       descriptions[locale] = value.trim();
     }

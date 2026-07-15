@@ -4,7 +4,7 @@
  * Usa fetch nativo per Supabase REST API — nessuna dipendenza da ws/Realtime
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { writeFileSync } from 'fs';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -114,6 +114,29 @@ Réponds UNIQUEMENT avec un objet JSON, sans balises markdown, sans backticks,
 avec exactement ces clés : {${jsonExample}}`;
 }
 
+/** Costruisce un responseSchema JSON dinamico: un oggetto con una proprietà
+ * stringa richiesta per ogni locale del tenant. */
+function buildResponseSchema(locales) {
+  return {
+    type:       Type.OBJECT,
+    properties: Object.fromEntries(locales.map((l) => [l, { type: Type.STRING }])),
+    required:   locales,
+  };
+}
+
+/** Estrae il payload JSON da una risposta Gemini che può contenere fence
+ * markdown o testo di contorno attorno all'oggetto JSON. */
+function extractJsonPayload(raw) {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+  const start = raw.indexOf('{');
+  const end   = raw.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    return raw.slice(start, end + 1).trim();
+  }
+  return raw.trim();
+}
+
 async function generateDescriptions(locales, product) {
   const prompt = buildPrompt(
     locales,
@@ -127,26 +150,30 @@ async function generateDescriptions(locales, product) {
     model:    'gemini-2.5-flash',
     contents: prompt,
     config: {
-      temperature:     0.6,
-      maxOutputTokens: 800,
+      temperature:      0.6,
+      maxOutputTokens:  1024, // margine ampio per N lingue x 2-4 frasi ciascuna
+      responseMimeType: 'application/json',
+      responseSchema:   buildResponseSchema(locales),
     },
   });
 
   const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   if (!raw.trim()) throw new Error('Gemini non ha generato alcuna descrizione');
 
-  const cleaned = raw.trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/, '')
-    .trim();
-
-  const parsed = JSON.parse(cleaned);
+  let parsed;
+  try {
+    parsed = JSON.parse(extractJsonPayload(raw));
+  } catch {
+    console.error('[generate-description] JSON non parsable. Risposta grezza Gemini:', raw.slice(0, 2000));
+    throw new Error('Réponse IA invalide (JSON non parsable)');
+  }
 
   const descriptions = {};
   for (const locale of locales) {
     const value = parsed[locale];
     if (typeof value !== 'string' || !value.trim()) {
-      throw new Error(`Descrizione mancante per la lingua "${locale}"`);
+      console.error(`[generate-description] Langue manquante dans la réponse IA: ${locale}`, parsed);
+      throw new Error(`Langue manquante dans la réponse IA: ${locale}`);
     }
     descriptions[locale] = value.trim();
   }
