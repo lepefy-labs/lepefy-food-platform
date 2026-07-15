@@ -53,6 +53,54 @@ async function sbPatch(path, body) {
   if (!res.ok) throw new Error(`Supabase PATCH ${path}: ${res.status} ${await res.text()}`);
 }
 
+// ─── Tracking costi AI (best-effort, pas de rate limit ici — batch admin) ──────
+
+async function logAiUsage({
+  tenantId,
+  endpoint,
+  provider,
+  model,
+  inputTokens = null,
+  outputTokens = null,
+  imagesGenerated = 0,
+  status,
+}) {
+  try {
+    const pricing = await sbGet(
+      `ai_pricing?provider=eq.${provider}&model=eq.${model}&active=eq.true&select=input_price_per_million,output_price_per_million,image_price_flat`
+    );
+    const price = pricing[0] ?? {};
+
+    const inputCost  = inputTokens  && price.input_price_per_million
+      ? (inputTokens  / 1_000_000) * price.input_price_per_million  : 0;
+    const outputCost = outputTokens && price.output_price_per_million
+      ? (outputTokens / 1_000_000) * price.output_price_per_million : 0;
+    const imageCost  = imagesGenerated && price.image_price_flat
+      ? imagesGenerated * price.image_price_flat : 0;
+
+    const estimatedCostUsd = inputCost + outputCost + imageCost;
+
+    await fetch(`${SUPABASE_URL}/rest/v1/ai_usage_log`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        endpoint,
+        provider,
+        model,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        images_generated: imagesGenerated,
+        estimated_cost_usd: estimatedCostUsd,
+        status,
+      }),
+    });
+  } catch (err) {
+    // Best-effort: il logging non deve mai interrompere il batch
+    console.error('[ai-usage-log] Erreur enregistrement usage (ignorée):', err.message);
+  }
+}
+
 async function sbUpload(storagePath, buffer, contentType) {
   const res = await fetch(
     `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${storagePath}`,
@@ -84,12 +132,15 @@ async function getProducts() {
   if (LIMIT > 0)     url += `&limit=${LIMIT}`;
 
   const products = await sbGet(url);
-  return products.map(p => ({
-    id:           p.id,
-    name:         p.name,
-    slug:         p.slug,
-    categorySlug: p.categories?.slug ?? 'epices',
-  }));
+  return {
+    tenantId,
+    products: products.map(p => ({
+      id:           p.id,
+      name:         p.name,
+      slug:         p.slug,
+      categorySlug: p.categories?.slug ?? 'epices',
+    })),
+  };
 }
 
 // ─── Upload + aggiornamento DB ────────────────────────────────────────────────
@@ -137,10 +188,22 @@ async function generateImage(name, categorySlug) {
     contents: buildPrompt(name, categorySlug),
     config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
   });
+
+  // Lus immédiatement après la réponse : facturés dès que la réponse HTTP
+  // arrive, donc utiles pour le logging même si aucune image n'est trouvée.
+  const inputTokens  = response.usageMetadata?.promptTokenCount ?? null;
+  const outputTokens = response.usageMetadata?.candidatesTokenCount ?? null;
+
   for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData?.data) return Buffer.from(part.inlineData.data, 'base64');
+    if (part.inlineData?.data) {
+      return { imageBuffer: Buffer.from(part.inlineData.data, 'base64'), inputTokens, outputTokens };
+    }
   }
-  throw new Error('Nessuna immagine nella risposta Gemini');
+
+  const err = new Error('Nessuna immagine nella risposta Gemini');
+  err.inputTokens  = inputTokens;
+  err.outputTokens = outputTokens;
+  throw err;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -158,7 +221,7 @@ async function main() {
   console.log(`Limite         : ${LIMIT === 0 ? 'nessuno (tutti)' : LIMIT}`);
   console.log('');
 
-  const products = await getProducts();
+  const { tenantId, products } = await getProducts();
   if (products.length === 0) {
     console.log('✅ Nessun prodotto da processare.');
     writeFileSync('scripts/image-generation-log.csv', 'slug,name,category,status,image_url,error\n');
@@ -175,16 +238,19 @@ async function main() {
     console.log(`         ${p.name} (${p.categorySlug})`);
 
     let status = 'failed', imageUrl = '', errorMsg = '';
-    let imageBuffer = null;
+    let result = null;
+    let lastInputTokens = null, lastOutputTokens = null;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const label = attempt > 1 ? ` — retry ${attempt}/${MAX_RETRIES}` : '';
         process.stdout.write(`         → Gemini${label}... `);
-        imageBuffer = await generateImage(p.name, p.categorySlug);
+        result = await generateImage(p.name, p.categorySlug);
         console.log('✓');
         break;
       } catch (err) {
+        lastInputTokens  = err.inputTokens  ?? null;
+        lastOutputTokens = err.outputTokens ?? null;
         console.log(`✗  ${err.message}`);
         if (attempt < MAX_RETRIES) {
           const wait = Math.pow(2, attempt) * 5000;
@@ -196,10 +262,23 @@ async function main() {
       }
     }
 
-    if (imageBuffer) {
+    // Tracking costi : une ligne par produit reflétant le dernier essai de
+    // génération (succès ou échec), indépendamment du résultat de l'upload/DB.
+    await logAiUsage({
+      tenantId,
+      endpoint:         'generate-product-image-batch',
+      provider:         'gemini',
+      model:            'gemini-2.5-flash-image',
+      inputTokens:      result ? result.inputTokens  : lastInputTokens,
+      outputTokens:     result ? result.outputTokens : lastOutputTokens,
+      imagesGenerated:  result ? 1 : 0,
+      status:           result ? 'success' : 'error',
+    });
+
+    if (result) {
       try {
         process.stdout.write('         → Upload + DB... ');
-        imageUrl = await uploadAndUpdate(p, imageBuffer);
+        imageUrl = await uploadAndUpdate(p, result.imageBuffer);
         console.log('✓');
         status = 'success';
         ok++;

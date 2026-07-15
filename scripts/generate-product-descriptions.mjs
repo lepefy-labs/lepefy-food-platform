@@ -52,6 +52,54 @@ async function sbPatch(path, body) {
   if (!res.ok) throw new Error(`Supabase PATCH ${path}: ${res.status} ${await res.text()}`);
 }
 
+// ─── Tracking costi AI (best-effort, pas de rate limit ici — batch admin) ──────
+
+async function logAiUsage({
+  tenantId,
+  endpoint,
+  provider,
+  model,
+  inputTokens = null,
+  outputTokens = null,
+  imagesGenerated = 0,
+  status,
+}) {
+  try {
+    const pricing = await sbGet(
+      `ai_pricing?provider=eq.${provider}&model=eq.${model}&active=eq.true&select=input_price_per_million,output_price_per_million,image_price_flat`
+    );
+    const price = pricing[0] ?? {};
+
+    const inputCost  = inputTokens  && price.input_price_per_million
+      ? (inputTokens  / 1_000_000) * price.input_price_per_million  : 0;
+    const outputCost = outputTokens && price.output_price_per_million
+      ? (outputTokens / 1_000_000) * price.output_price_per_million : 0;
+    const imageCost  = imagesGenerated && price.image_price_flat
+      ? imagesGenerated * price.image_price_flat : 0;
+
+    const estimatedCostUsd = inputCost + outputCost + imageCost;
+
+    await fetch(`${SUPABASE_URL}/rest/v1/ai_usage_log`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        endpoint,
+        provider,
+        model,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        images_generated: imagesGenerated,
+        estimated_cost_usd: estimatedCostUsd,
+        status,
+      }),
+    });
+  } catch (err) {
+    // Best-effort: il logging non deve mai interrompere il batch
+    console.error('[ai-usage-log] Erreur enregistrement usage (ignorée):', err.message);
+  }
+}
+
 // ─── Lettura tenant + prodotti ─────────────────────────────────────────────────
 
 async function getTenant() {
@@ -158,8 +206,21 @@ async function generateDescriptions(locales, product) {
     },
   });
 
+  // Lus immédiatement après la réponse, avant le parsing : disponibles pour le
+  // logging même si le JSON est tronqué/invalide (les tokens sont facturés
+  // dès que la réponse HTTP arrive, indépendamment du parsing qui suit).
+  const inputTokens  = response.usageMetadata?.promptTokenCount ?? null;
+  const outputTokens = response.usageMetadata?.candidatesTokenCount ?? null;
+
+  function fail(message) {
+    const err = new Error(message);
+    err.inputTokens  = inputTokens;
+    err.outputTokens = outputTokens;
+    throw err;
+  }
+
   const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  if (!raw.trim()) throw new Error('Gemini non ha generato alcuna descrizione');
+  if (!raw.trim()) fail('Gemini non ha generato alcuna descrizione');
 
   let parsed;
   try {
@@ -167,7 +228,7 @@ async function generateDescriptions(locales, product) {
   } catch {
     const finishReason = response.candidates?.[0]?.finishReason;
     console.error(`[generate-description] JSON non parsable (finishReason: ${finishReason}). Risposta grezza Gemini:`, raw.slice(0, 2000));
-    throw new Error('Réponse IA invalide (JSON non parsable)');
+    fail('Réponse IA invalide (JSON non parsable)');
   }
 
   const descriptions = {};
@@ -175,11 +236,11 @@ async function generateDescriptions(locales, product) {
     const value = parsed[locale];
     if (typeof value !== 'string' || !value.trim()) {
       console.error(`[generate-description] Langue manquante dans la réponse IA: ${locale}`, parsed);
-      throw new Error(`Langue manquante dans la réponse IA: ${locale}`);
+      fail(`Langue manquante dans la réponse IA: ${locale}`);
     }
     descriptions[locale] = value.trim();
   }
-  return descriptions;
+  return { descriptions, inputTokens, outputTokens };
 }
 
 // ─── Aggiornamento DB ───────────────────────────────────────────────────────────
@@ -241,16 +302,19 @@ async function main() {
     console.log(`         ${p.name}`);
 
     let status = 'failed', errorMsg = '';
-    let descriptions = null;
+    let result = null;
+    let lastInputTokens = null, lastOutputTokens = null;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const label = attempt > 1 ? ` — retry ${attempt}/${MAX_RETRIES}` : '';
         process.stdout.write(`         → Gemini${label}... `);
-        descriptions = await generateDescriptions(locales, p);
+        result = await generateDescriptions(locales, p);
         console.log('✓');
         break;
       } catch (err) {
+        lastInputTokens  = err.inputTokens  ?? null;
+        lastOutputTokens = err.outputTokens ?? null;
         console.log(`✗  ${err.message}`);
         if (attempt < MAX_RETRIES) {
           const wait = Math.pow(2, attempt) * 5000;
@@ -262,10 +326,22 @@ async function main() {
       }
     }
 
-    if (descriptions) {
+    // Tracking costi : une ligne par produit reflétant le dernier essai de
+    // génération (succès ou échec), indépendamment du résultat de l'écriture DB.
+    await logAiUsage({
+      tenantId:     tenant.id,
+      endpoint:     'generate-product-description-batch',
+      provider:     'gemini',
+      model:        'gemini-2.5-flash',
+      inputTokens:  result ? result.inputTokens  : lastInputTokens,
+      outputTokens: result ? result.outputTokens : lastOutputTokens,
+      status:       result ? 'success' : 'error',
+    });
+
+    if (result) {
       try {
         process.stdout.write('         → Aggiornamento DB... ');
-        await updateProduct(p, descriptions, locales[0]);
+        await updateProduct(p, result.descriptions, locales[0]);
         console.log('✓');
         status = 'success';
         ok++;
