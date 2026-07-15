@@ -3,6 +3,9 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
+
+const ENDPOINT = 'generate-product-image';
 
 // ⚠️  NOTA VERCEL: la generazione AI richiede 5-15s.
 // Con piano Free (timeout 10s) può andare in timeout.
@@ -91,7 +94,14 @@ be used to generate a commercial e-commerce image. The prompt must:
 
 // ─── Step 2: genera immagine dal prompt ───────────────────────────────────────
 
-async function generateImage(photoPrompt: string): Promise<string> {
+interface ImageGenerationResult {
+  base64Data: string;
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+async function generateImage(photoPrompt: string): Promise<ImageGenerationResult> {
   const models = ['gemini-2.5-flash-image', 'gemini-3.1-flash-image'];
 
   for (const model of models) {
@@ -107,7 +117,12 @@ async function generateImage(photoPrompt: string): Promise<string> {
       const parts = response.candidates?.[0]?.content?.parts ?? [];
       for (const part of parts) {
         if (part.inlineData?.data) {
-          return part.inlineData.data;
+          return {
+            base64Data:   part.inlineData.data,
+            model,
+            inputTokens:  response.usageMetadata?.promptTokenCount,
+            outputTokens: response.usageMetadata?.candidatesTokenCount,
+          };
         }
       }
     } catch (err) {
@@ -187,6 +202,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const allowed = await checkRateLimit(tenant.id, ENDPOINT, false);
+  if (!allowed) {
+    await logAiUsage({
+      tenantId: tenant.id,
+      endpoint: ENDPOINT,
+      provider: 'gemini',
+      model:    'gemini-2.5-flash-image',
+      status:   'rate_limited',
+    });
+    return NextResponse.json(
+      { error: 'Limite quotidien de générations IA atteint pour ce tenant. Réessayez demain.' },
+      { status: 429 },
+    );
+  }
+
   try {
     console.log(`[generate-image] Step 1: generazione prompt per "${productName}"`);
     const photoPrompt = await generatePhotoPrompt(
@@ -197,7 +227,7 @@ export async function POST(req: NextRequest) {
     console.log(`[generate-image] Prompt generato: ${photoPrompt.slice(0, 100)}...`);
 
     console.log('[generate-image] Step 2: generazione immagine');
-    const base64Data = await generateImage(photoPrompt);
+    const { base64Data, model, inputTokens, outputTokens } = await generateImage(photoPrompt);
 
     console.log('[generate-image] Step 3: upload su Supabase Storage');
     const imageUrl = await uploadToStorage(base64Data, productSlug);
@@ -211,6 +241,19 @@ export async function POST(req: NextRequest) {
 
     console.log(`[generate-image] Completato: ${imageUrl}`);
 
+    // Coût dominant = l'étape image (step 1 avec gemini-2.5-flash n'est pas
+    // tracké séparément — coût marginal comparé à la génération d'image).
+    await logAiUsage({
+      tenantId:        tenant.id,
+      endpoint:        ENDPOINT,
+      provider:        'gemini',
+      model,
+      inputTokens,
+      outputTokens,
+      imagesGenerated: 1,
+      status:          'success',
+    });
+
     return NextResponse.json({
       imageUrl,
       prompt:    photoPrompt,
@@ -219,6 +262,13 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erreur inconnue';
     console.error('[generate-image] Errore:', message);
+    await logAiUsage({
+      tenantId: tenant.id,
+      endpoint: ENDPOINT,
+      provider: 'gemini',
+      model:    'gemini-2.5-flash-image',
+      status:   'error',
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

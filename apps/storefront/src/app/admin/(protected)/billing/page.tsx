@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import type { AiUsageMonthlyByTenant } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,10 @@ function daysRemaining(iso: string | null): number | null {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+function formatUsd(amount: number): string {
+  return `$${amount.toFixed(4)}`;
+}
+
 export default async function BillingPage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const supabase = createServiceClient();
@@ -34,6 +39,17 @@ export default async function BillingPage() {
     .single();
 
   if (error || !tenant) redirect('/admin');
+
+  const now             = new Date();
+  const monthStart      = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const { data: aiUsageRows } = await supabase
+    .from('ai_usage_monthly_by_tenant')
+    .select('tenant_id, month, provider, endpoint, total_calls, total_cost_usd')
+    .eq('tenant_id', tenant.id)
+    .gte('month', monthStart);
+
+  const aiUsage      = (aiUsageRows ?? []) as AiUsageMonthlyByTenant[];
+  const aiUsageTotal = aiUsage.reduce((sum, row) => sum + Number(row.total_cost_usd), 0);
 
   const isActive  = tenant.subscription_status === 'active';
   const days      = daysRemaining(tenant.subscription_paid_until);
@@ -184,6 +200,45 @@ export default async function BillingPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Utilisation IA */}
+      <h2 className="text-sm font-semibold text-gray-700 mt-8 mb-3">Utilisation IA</h2>
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        {aiUsage.length === 0 ? (
+          <p className="text-xs text-gray-400">
+            Aucune utilisation IA enregistrée ce mois-ci.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                    <th className="pb-2 font-medium">Provider</th>
+                    <th className="pb-2 font-medium">Endpoint</th>
+                    <th className="pb-2 font-medium text-right">Appels</th>
+                    <th className="pb-2 font-medium text-right">Coût (USD)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiUsage.map((row) => (
+                    <tr key={`${row.provider}-${row.endpoint}`} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2 text-gray-700">{row.provider}</td>
+                      <td className="py-2 text-gray-700 font-mono text-xs">{row.endpoint}</td>
+                      <td className="py-2 text-right text-gray-900">{row.total_calls}</td>
+                      <td className="py-2 text-right text-gray-900">{formatUsd(Number(row.total_cost_usd))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+              <span className="text-sm font-medium text-gray-700">Total du mois</span>
+              <span className="text-base font-semibold text-gray-900">{formatUsd(aiUsageTotal)}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Info conservazione dati */}

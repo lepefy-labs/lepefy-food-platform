@@ -28,6 +28,9 @@ export interface Tenant {
   ai_image_generation: boolean;
   locales: string[];
   ai_description_generation: boolean;
+  ai_rate_limit_public_per_minute: number;
+  ai_rate_limit_public_per_day: number;
+  ai_rate_limit_admin_per_day: number;
   catalogue_search_threshold: number;
   // Spedizione
   shipping_provider: ShippingProvider;

@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? '' });
+const ENDPOINT = 'generate-product-description';
+const MODEL    = 'gemini-2.5-flash';
 
 // ─── Prompt builder ────────────────────────────────────────────────────────────
 
@@ -125,6 +128,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const allowed = await checkRateLimit(tenant.id, ENDPOINT, false);
+  if (!allowed) {
+    await logAiUsage({
+      tenantId: tenant.id,
+      endpoint: ENDPOINT,
+      provider: 'gemini',
+      model:    MODEL,
+      status:   'rate_limited',
+    });
+    return NextResponse.json(
+      { error: 'Limite quotidien de générations IA atteint pour ce tenant. Réessayez demain.' },
+      { status: 429 },
+    );
+  }
+
   try {
     console.log(`[generate-description] Génération pour "${productName}" (${locales.join(', ')})`);
 
@@ -137,7 +155,7 @@ export async function POST(req: NextRequest) {
     );
 
     const response = await ai.models.generateContent({
-      model:    'gemini-2.5-flash',
+      model:    MODEL,
       contents: prompt,
       config: {
         temperature:      0.6,
@@ -146,6 +164,9 @@ export async function POST(req: NextRequest) {
         responseSchema:   buildResponseSchema(locales),
       },
     });
+
+    const inputTokens  = response.usageMetadata?.promptTokenCount;
+    const outputTokens = response.usageMetadata?.candidatesTokenCount;
 
     const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (!raw.trim()) throw new Error('Gemini n\'a généré aucune description');
@@ -173,10 +194,27 @@ export async function POST(req: NextRequest) {
 
     console.log(`[generate-description] Terminé pour "${productName}"`);
 
+    await logAiUsage({
+      tenantId: tenant.id,
+      endpoint: ENDPOINT,
+      provider: 'gemini',
+      model:    MODEL,
+      inputTokens,
+      outputTokens,
+      status:   'success',
+    });
+
     return NextResponse.json({ descriptions });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erreur inconnue';
     console.error('[generate-description] Erreur:', message);
+    await logAiUsage({
+      tenantId: tenant.id,
+      endpoint: ENDPOINT,
+      provider: 'gemini',
+      model:    MODEL,
+      status:   'error',
+    });
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }
