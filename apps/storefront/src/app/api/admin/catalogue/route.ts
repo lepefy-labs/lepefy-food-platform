@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { syncProductEmbedding } from '@/lib/ai/embeddings';
+
+export const runtime = 'nodejs';
 
 function cleanNutrition(raw: unknown): Record<string, number> | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -89,6 +92,8 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await syncProductEmbedding(tenant.id, data.id);
 
   return NextResponse.json({ id: data.id }, { status: 201 });
 }

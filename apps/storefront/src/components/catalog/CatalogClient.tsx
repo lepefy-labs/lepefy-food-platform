@@ -3,13 +3,15 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { ProductGrid } from '@/components/catalog/ProductGrid';
-import type { Category, ProductWithCategory } from '@lepefy/types';
+import { SemanticProductCard } from '@/components/catalog/SemanticProductCard';
+import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 
 interface Props {
-  categories:   Category[];
-  products:     ProductWithCategory[];
-  activeSlug?:  string;
-  initialQuery: string;
+  categories:      Category[];
+  products:        ProductWithCategory[];
+  activeSlug?:     string;
+  initialQuery:    string;
+  semanticEnabled: boolean;
 }
 
 export function CatalogClient({
@@ -17,6 +19,7 @@ export function CatalogClient({
   products,
   activeSlug,
   initialQuery,
+  semanticEnabled,
 }: Props) {
   const router        = useRouter();
   const searchParams  = useSearchParams();
@@ -24,9 +27,43 @@ export function CatalogClient({
   const [isPending, startTransition] = useTransition();
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [semanticResults, setSemanticResults]     = useState<SemanticMatch[]>([]);
+  const [isSemanticLoading, setIsSemanticLoading] = useState(false);
+
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
+
+  // Cascade : la recherche sémantique ne se déclenche que si la recherche
+  // textuelle existante donne peu de résultats — elle ne la remplace jamais.
+  useEffect(() => {
+    const trimmed = initialQuery.trim();
+    if (!semanticEnabled || !trimmed || products.length >= 3) {
+      setSemanticResults([]);
+      setIsSemanticLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsSemanticLoading(true);
+
+    fetch(`/api/search/semantic?q=${encodeURIComponent(trimmed)}`, { signal: controller.signal })
+      .then(res => (res.ok ? res.json() : { results: [] }))
+      .then((data: { results?: SemanticMatch[] }) => {
+        setSemanticResults(data.results ?? []);
+      })
+      .catch(() => {
+        // Dégradation silencieuse : rate limit, erreur réseau ou feature
+        // désactivée ne doivent jamais être visibles côté client.
+        setSemanticResults([]);
+      })
+      .finally(() => setIsSemanticLoading(false));
+
+    return () => controller.abort();
+  }, [initialQuery, products.length, semanticEnabled]);
+
+  const textualIds = new Set(products.map(p => p.id));
+  const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
 
   function buildUrl(overrides: { q?: string; category?: string | null }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -180,6 +217,25 @@ export function CatalogClient({
       <div className={isPending ? 'opacity-60 transition-opacity duration-150' : 'opacity-100 transition-opacity duration-150'}>
         <ProductGrid products={products} />
       </div>
+
+      {/* Résultats similaires — recherche sémantique, cascade uniquement si peu de résultats textuels */}
+      {isSemanticLoading && (
+        <div className="mt-8 flex items-center gap-2 text-sm text-gray-400">
+          <svg className="animate-spin shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M12 3a9 9 0 1 0 9 9" />
+          </svg>
+          Recherche de produits similaires...
+        </div>
+      )}
+      {!isSemanticLoading && semanticOnly.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Résultats similaires</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {semanticOnly.map(product => <SemanticProductCard key={product.id} product={product} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

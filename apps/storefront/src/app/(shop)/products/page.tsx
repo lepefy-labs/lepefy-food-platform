@@ -52,6 +52,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       products={products}
       activeSlug={searchQuery ? undefined : searchParams.category}
       initialQuery={searchQuery}
+      semanticEnabled={tenant.ai_semantic_search ?? false}
     />
   );
 }

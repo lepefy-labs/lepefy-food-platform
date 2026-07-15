@@ -32,3 +32,18 @@ export interface AiUsageMonthlyByTenant {
   total_calls: number;
   total_cost_usd: number;
 }
+
+/** Ligne renvoyée par la fonction SQL match_products (ricerca semantica). */
+export interface SemanticMatch {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  image_url: string | null;
+  category_id: string | null;
+  category_name: string | null;
+  stock: number;
+  weight_grams: number | null;
+  storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  similarity: number;
+}
