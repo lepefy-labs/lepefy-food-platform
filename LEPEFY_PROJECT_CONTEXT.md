@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 15 Luglio 2026 (aggiunta sezione IA — descrizioni multilingue, rate limiting/cost tracking, ricerca semantica — basata su chat recenti; numerazione migration IA da riverificare contro filesystem reale, vedi §13bis)
+> Aggiornato: 15 Luglio 2026 — revisione riga-per-riga contro il filesystem reale del repo (`claude/lepefy-context-audit-i2teds`): numerazione migration IA confermata, struttura repo corretta (template etichette, picking list, file mancanti in §3), vedi changelog in fondo al documento.
 
 ---
 
@@ -89,8 +89,10 @@ lepefy-food-platform/
 │       │   │   │   ├── orders/id/     # ⚠️ CODICE MORTO — copia precedente di PickingList.tsx, nessun import nel repo
 │       │   │   │   └── (protected)/   # ✅ Protetto via Supabase Auth + ADMIN_EMAILS whitelist
 │       │   │   │       ├── page.tsx              # Lista ordini + KPI (totale/mese + delta)
-│       │   │   │       ├── orders/[id]/           # Dettaglio ordine — importa componenti da ../../../orders/[id]/
-│       │   │   │       ├── orders/[id]/picking-list/  # Layout dedicato senza navbar (print)
+│       │   │   │       ├── orders/[id]/           # Dettaglio ordine — importa OrderDetail.tsx + PickingList.tsx da ../../../orders/[id]/
+│       │   │   │       │                          #   ⚠️ NON esiste una route/picking-list separata: la stessa pagina
+│       │   │   │       │                          #   renderizza sia il dettaglio (div.no-print) sia la PickingList,
+│       │   │   │       │                          #   e `@media print` nasconde .no-print al momento della stampa
 │       │   │   │       ├── catalogue/             # Lista prodotti (drag&drop img, AI gen, stock inline)
 │       │   │   │       ├── catalogue/[id]/        # Modifica prodotto esistente
 │       │   │   │       ├── catalogue/nouveau/      # Creazione nuovo prodotto (riusa ProductEditClient)
@@ -98,6 +100,8 @@ lepefy-food-platform/
 │       │   │   │       ├── products/[id]/etichetta/[jobId]/ # Editor draft etichetta (template/palette/origin-style/preview live/autosave)
 │       │   │   │       ├── billing/              # Pannello abbonamento (Stripe Payment Link + bonifico)
 │       │   │   │       └── parametres/           # Impostazioni boutique, QR biglietto digitale
+│       │   │   ├── admin/_components/AdminSidebar.tsx   # Sidebar navigazione admin (fuori dal route group, condivisa)
+│       │   │   ├── admin/(protected)/AdminNav.tsx, AdminFilters.tsx, OrdersTable.tsx  # Componenti dashboard ordini
 │       │   │   └── api/
 │       │   │       ├── checkout/                    # Ricalcola prezzi/spedizione server-side, crea PaymentIntent
 │       │   │       ├── shipping/quote/               # Calcolo spedizione + emissione token HMAC
@@ -120,7 +124,12 @@ lepefy-food-platform/
 │       │   │               └── jobs/[id]/             # PATCH autosave draft / DELETE draft
 │       │   ├── lib/
 │       │   │   ├── auth/
-│       │   │   │   └── requireAdmin.ts   # Guard riusato da tutte le API admin (sessione + whitelist)
+│       │   │   │   └── requireAdmin.ts   # Guard riusato da tutte le API admin (sessione + whitelist) — unica eccezione: admin/login/route.ts
+│       │   │   ├── ai/
+│       │   │   │   ├── embeddings.ts     # Genera embedding gemini-embedding-001 (ricerca semantica)
+│       │   │   │   └── usageTracking.ts  # checkRateLimit()/logAiUsage() — vedi §13bis
+│       │   │   ├── images/
+│       │   │   │   └── removeBackground.ts  # Rimozione sfondo immagine prodotto (pipeline AI)
 │       │   │   ├── shipping/
 │       │   │   │   ├── calculateShipping.ts  # Engine spedizione principale
 │       │   │   │   └── quoteToken.ts         # Firma/verifica HMAC del preventivo spedizione
@@ -132,11 +141,21 @@ lepefy-food-platform/
 │       │   │   │   ├── palettes.ts           # 3 palette colore (verde_palma / blu_epices / terra_piccante)
 │       │   │   │   ├── originFlags.tsx       # Bandiere SVG disegnate a mano (9 paesi, no emoji — compat Gotenberg)
 │       │   │   │   ├── formatDate.ts         # Formattazione data IT
-│       │   │   │   └── templates/
-│       │   │   │       ├── default.tsx       # Template "Classico" a due colonne
-│       │   │   │       └── fullbleed.tsx     # Template sfondo a piena pagina (origin-style non implementato qui)
+│       │   │   │   └── templates/            # ⚠️ TRE template, non due
+│       │   │   │       ├── default.tsx       # "Classico" — due colonne, origin-style implementato
+│       │   │   │       ├── fullbleed.tsx     # Sfondo a piena pagina — origin-style NON implementato (solo testo semplice)
+│       │   │   │       └── banner.tsx        # "Fascia Dorata" — fascia logo a tutta larghezza, nutrizione a sx/nome al centro/foto a dx, origin-style implementato
+│       │   │   ├── store/
+│       │   │   │   └── localeStore.ts # Zustand store toggle lingua FR/IT storefront (persist)
+│       │   │   ├── tenant/
+│       │   │   │   ├── getTenant.ts             # Fetch tenant da slug (Next.js cache())
+│       │   │   │   └── getTenantSocialLinks.ts  # Fetch link social per biglietto digitale
+│       │   │   ├── utils/
+│       │   │   │   ├── cn.ts          # Helper classnames
+│       │   │   │   └── format.ts      # formatPrice/formatDate
 │       │   │   └── supabase/
-│       │   │       ├── server.ts      # createClient() — richiede API cookie get/set/remove E getAll/setAll
+│       │   │       ├── client.ts      # Browser client
+│       │   │       ├── server.ts      # createClient()/createServiceClient() — richiede API cookie get/set/remove E getAll/setAll
 │       │   │       └── types.ts       # Database types generati
 │       │   └── stores/
 │       │       └── cartStore.ts       # Zustand cart store
@@ -144,12 +163,14 @@ lepefy-food-platform/
 │           ├── sw.js                  # Service worker PWA
 │           └── favicon.ico, icons/apple-touch-icon.png  # ⚠️ eccezione statica mono-tenant, da rimediare al 2° tenant
 ├── packages/
-│   └── types/                         # Shared TypeScript interfaces
+│   └── types/                         # Shared TypeScript interfaces (@lepefy/types)
+│       ├── index.ts                   # Ri-esporta tutti i moduli sottostanti
 │       ├── tenant.ts, product.ts, order.ts, customer.ts, socialLinks.ts
+│       ├── ai.ts                      # Tipi AiPricing/AiUsageLogEntry — vedi §13bis
 │       ├── labels.ts                  # ⚠️ NON legacy — file più aggiornato del package, allineato a migration 018–025
 │       └── shipping.ts                # Legacy (zone/rate) — superato dal modello Packlink/shipping_provider, ma ancora esportato
 └── supabase/
-    └── migrations/                    # 001–025, numerazione non lineare (vedi §4)
+    └── migrations/                    # 001–028, numerazione non lineare (vedi §4)
 ```
 
 ---
@@ -215,10 +236,13 @@ lepefy-food-platform/
 | `023_label_print_jobs_drafts_reprint.sql` | Variante quasi duplicata della precedente — aggiunge anche GRANT UPDATE a `service_role`, trigger `updated_at`, indice `(tenant_id, product_id, status, updated_at)` |
 | `024_label_palette_and_natural_badge.sql` | `label_print_jobs.palette` (verde_palma/blu_epices/terra_piccante, default blu_epices) + `natural_badge` boolean |
 | `025_label_origin_style.sql` | `label_print_jobs.origin_style` (pill/block/medallion, default pill) |
+| `026_ai_descriptions.sql` | `products.descriptions` jsonb + `products.description_source` (`ai`/`human`) + configurazione lingue tenant |
+| `027_ai_rate_limiting_cost_tracking.sql` | Tabelle `ai_pricing` (listino prezzi per provider/model) e `ai_usage_log` (log per-chiamata) + funzione `check_ai_rate_limit` + vista `ai_usage_monthly_by_tenant` |
+| `028_semantic_search.sql` | Estensione `vector`; `products.embedding` vector(768); indice HNSW cosine; funzione `match_products` |
 
 **Non esistono file 005 e 012** — non sono stati saltati per errore, la numerazione riflette semplicemente collisioni risolte con suffissi (003b/003c) o rinomina all'atto della scrittura, come documentato nei commenti di intestazione di `018` e `023`.
 
-**⚠️ Migration IA (descrizioni, rate limiting/cost tracking, ricerca semantica) — numerazione da verificare su filesystem reale.** Le tre feature sono state sviluppate consultando questo stesso documento come riferimento numerico (indicativamente 023 descrizioni → 024/025 rate limiting → 026 ricerca semantica), ma la sequenza reale applicata su Supabase potrebbe differire (i numeri 023/024/025 risultavano già occupati da `023_label_job_drafts.sql`/`023_label_print_jobs_drafts_reprint.sql`/`024_label_palette_and_natural_badge.sql`/`025_label_origin_style.sql` al momento della scrittura di questo paragrafo). **Verificare i nomi file reali in `supabase/migrations/` e correggere questa nota alla prossima revisione** — contenuto delle migration comunque confermato applicato e funzionante (vedi §13bis).
+**✅ Migration IA — numerazione confermata su filesystem reale (revisione 15/07).** Le tre feature sono finite su `026_ai_descriptions.sql` → `027_ai_rate_limiting_cost_tracking.sql` → `028_semantic_search.sql`, cioè i tre numeri immediatamente successivi a `025_label_origin_style.sql` (non collisioni con 023/024/025 come si temeva in una nota precedente di questo documento, ormai superata).
 
 ### Pattern permessi Supabase (critico)
 
@@ -358,7 +382,7 @@ Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento
 - Dettaglio ordine: aggiornamento stato + codice tracking
 - Select corriere configurabile con modale conferma cambio
 - Toggle lingua FR/IT
-- **Picking list stampabile** (`/admin/orders/[id]/picking-list`) — layout dedicato senza navbar admin, `@media print`, icona di stampa su ogni riga ordine
+- **Picking list stampabile** — ⚠️ non è una route separata: `admin/(protected)/orders/[id]/page.tsx` renderizza sia il dettaglio ordine (avvolto in `div.no-print`) sia `PickingList.tsx`; `@media print` nasconde `.no-print` al momento della stampa, mostrando solo la picking list; icona di stampa su ogni riga ordine
 - **Gestione catalogo prodotti** (`/admin/catalogue`): sidebar con accordion per categoria, ricerca client-side (soglia `catalogue_search_threshold`), colonne ordinabili via URL params, toggle inline Actif, editing inline stock con indicatori colore, drag&drop upload immagine, generazione immagine AI (Gemini); **`/admin/catalogue/nouveau`** per creazione nuovo prodotto (riusa `ProductEditClient` con uno stub `emptyProduct`)
 - **Sistema etichette** (`/admin/products/[id]/etichetta`) — vedi §16, ora maturo: multi-template, multi-palette, draft/ristampa, preview live, autosave
 - **Pannello billing** (`/admin/billing`)
@@ -514,7 +538,7 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 
 - **Modello legale a tre livelli:** produttore → importatore → distributore/tenant (tabelle `producers`, `importers`), dati produttore a livello prodotto
 - **Output:** PDF per tipografo, layout N-up su A4 (dimensione etichetta configurabile), generato da `lib/labels/gotenberg.ts` → `htmlToPdf()` chiama realmente `${GOTENBERG_URL}/forms/chromium/convert/html`
-- **Due template:** `default.tsx` ("Classico", due colonne, con scelta stile origine) e `fullbleed.tsx` (sfondo a piena pagina — nota: lo stile bandiera/origine **non** è implementato in questo template, solo in `default.tsx`)
+- **Tre template** (`templates/`, selezionabili in `LabelJobEditorClient.tsx`): `default.tsx` ("Classico", due colonne, stile origine implementato), `fullbleed.tsx` (sfondo a piena pagina — ⚠️ lo stile bandiera/origine **non** è implementato qui, solo testo semplice "Origine: ...") e `banner.tsx` ("Fascia Dorata" — fascia logo a tutta larghezza, nutrizione a sinistra/nome al centro/foto a destra, stile origine implementato come in `default.tsx`)
 - **Tre palette colore** (`lib/labels/palettes.ts`): `verde_palma`, `blu_epices` (default), `terra_piccante` — ciascuna con primary/secondary/accent/ambient + helper per sfondi sfumati e strip decorativo "kente"
 - **Bandiere origine disegnate a mano** (`originFlags.tsx`, SVG per 9 paesi: Camerun, Senegal, Ghana, Nigeria, Costa d'Avorio, Mali, Guinea, Ciad, Etiopia) — scelta deliberata al posto delle emoji per evitare problemi di rendering colore-font in Chromium headless (Gotenberg)
 - **Stile origine configurabile:** `pill` / `block` / `medallion` (`origin_style`, migration 025)
@@ -692,4 +716,17 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.1 — 15 Luglio 2026 (aggiunta §13bis Intelligenza artificiale; numerazione migration IA da riverificare contro filesystem reale)*
+## 22. Changelog di questa revisione (v3.2, 15 Luglio 2026)
+
+Verifica riga-per-riga di v3.1 contro il filesystem reale del repo (branch `claude/lepefy-context-audit-i2teds`). Correzioni apportate:
+
+- **§4** — numerazione migration IA confermata: `026_ai_descriptions.sql`, `027_ai_rate_limiting_cost_tracking.sql`, `028_semantic_search.sql` (non collisioni con 023–025 come temuto in v3.1). Tabella migration aggiornata da 001–025 a 001–028.
+- **§3** — corretta la struttura repo: `lib/` mancava intere sottocartelle reali (`ai/embeddings.ts`, `ai/usageTracking.ts`, `images/removeBackground.ts`, `store/localeStore.ts`, `tenant/getTenantSocialLinks.ts`, `utils/`); `packages/types/` mancava `index.ts` e `ai.ts`; aggiunti `admin/_components/AdminSidebar.tsx` e i componenti dashboard (`AdminNav.tsx`, `AdminFilters.tsx`, `OrdersTable.tsx`) non elencati prima.
+- **§3/§8** — corretta l'affermazione errata di una route dedicata `/admin/orders/[id]/picking-list`: non esiste come route separata. La picking list è renderizzata nella stessa pagina `admin/(protected)/orders/[id]/page.tsx` di fianco al dettaglio ordine, con `@media print` che nasconde il blocco `.no-print` in fase di stampa.
+- **§16** — il sistema etichette ha **tre** template, non due: oltre a `default.tsx` e `fullbleed.tsx` esiste `banner.tsx` ("Fascia Dorata"), anch'esso con stile origine implementato (a differenza di `fullbleed.tsx`, che resta l'unico senza bandiera/stile origine).
+
+Il resto del documento (stack tecnologico, sicurezza, shipping, checkout, admin auth, PWA, roadmap) è stato controllato a campione contro `package.json`, `pnpm-workspace.yaml`, le route API reali e `docs/PROJECT_REVIEW.md` e risulta accurato — nessuna ulteriore discrepanza rilevata in questa passata.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.2 — 15 Luglio 2026 (audit completo contro il codice reale del repo; vedi §22 per il changelog dettagliato)*
