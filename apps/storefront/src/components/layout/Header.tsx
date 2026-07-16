@@ -10,7 +10,7 @@ export function Header() {
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-        <Link href="/" className="font-bold text-xl" style={{ color: 'var(--color-primary)' }}>
+        <Link href="/" className="font-display font-bold text-xl" style={{ color: 'var(--color-primary)' }}>
           {tenant.logo_url ? <img src={tenant.logo_url} alt={tenant.name} className="h-12 w-auto" /> : tenant.name}
         </Link>
         <div className="flex items-center gap-4">

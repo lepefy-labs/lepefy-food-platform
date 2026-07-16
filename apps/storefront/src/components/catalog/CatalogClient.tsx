@@ -197,8 +197,8 @@ export function CatalogClient({
         ) : (
           <h1 className="font-display text-lg font-bold text-gray-900">
             {activeSlug
-              ? (categories.find(c => c.slug === activeSlug)?.name ?? 'Catalogue')
-              : 'Catalogue'
+              ? (categories.find(c => c.slug === activeSlug)?.name ?? 'Sélection de la boutique')
+              : 'Sélection de la boutique'
             }
           </h1>
         )}

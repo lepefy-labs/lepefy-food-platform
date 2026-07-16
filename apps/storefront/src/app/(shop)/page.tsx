@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { formatPrice } from '@/lib/utils/format';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ShopTag } from '@/components/ui/ShopTag';
 
@@ -79,6 +80,7 @@ export default async function HomePage() {
         tagline={tenant.tagline ?? 'Épicerie africaine'}
         primaryColor={tenant.primary_color}
         previewProducts={featuredProducts}
+        currency={tenant.currency}
       />
 
       {/* Contenuto centrato */}
@@ -165,28 +167,61 @@ function HeroTrianglePattern({ patternId }: { patternId: string }) {
   );
 }
 
+const TRUST_ROW: { icon: ReactNode; label: string }[] = [
+  {
+    label: 'Livraison Europe',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="7" width="15" height="10" rx="1" /><path d="M16 10h4l3 3v4h-7z" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="19" r="2" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Frais & surgelés',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v20M2 12h20" /><circle cx="12" cy="12" r="9" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Sélection artisanale',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2 3 7v10l9 5 9-5V7z" />
+      </svg>
+    ),
+  },
+];
+
 // ── HeroBanner (Server Component interno, non esportato) ──
 function HeroBanner({
   heroImageUrl,
   tagline,
   primaryColor,
   previewProducts,
+  currency,
 }: {
   heroImageUrl: string | null;
   tagline: string;
   primaryColor: string;
   previewProducts: HomeProduct[];
+  currency: string;
 }) {
   // `--hero-primary` expose la couleur du tenant reçue en prop aux enfants ;
   // le fallback var(--color-primary) couvre le cas où le composant serait
   // rendu hors du contexte de tenant CSS vars injecté par le layout racine.
   const heroVars = { '--hero-primary': primaryColor } as CSSProperties;
-  const preview = previewProducts.slice(0, 3);
+  // Le mockup approuvé montre 2 mini-previews produit, pas 3.
+  const preview = previewProducts.slice(0, 2);
 
   return (
     <div
-      className="relative overflow-hidden min-h-[160px] md:min-h-[280px]"
-      style={{ backgroundColor: 'var(--color-primary-dark)', ...heroVars }}
+      className="relative overflow-hidden"
+      style={{
+        backgroundImage: 'linear-gradient(180deg, var(--color-primary-dark), var(--hero-primary, var(--color-primary)))',
+        ...heroVars,
+      }}
     >
       {/* Immagine di sfondo opzionale */}
       {heroImageUrl && (
@@ -223,43 +258,69 @@ function HeroBanner({
         </div>
       )}
 
-      {/* Contenu — deux colonnes sur desktop, empilé sur mobile */}
-      <div className="relative z-10 px-5 py-6 md:px-10 md:py-10 md:flex md:items-center md:gap-10 md:max-w-6xl md:mx-auto">
-        <div className="md:flex-1">
-          <ShopTag className="mb-2">{tagline}</ShopTag>
+      {/* Contenu — deux colonnes sur desktop, empilé sur mobile (comme le mockup) */}
+      <div className="relative z-10 px-5 py-8 md:px-10 md:py-12 grid gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center md:max-w-6xl md:mx-auto">
+        <div>
+          <ShopTag className="mb-3">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2 3 7v10l9 5 9-5V7z" />
+            </svg>
+            {tagline}
+          </ShopTag>
           <h1 className="font-display text-white font-bold leading-tight text-2xl md:text-4xl">
-            Les saveurs<br />de chez nous
+            L&apos;épicerie africaine<br />qui a du caractère.
           </h1>
-          <p className="mt-1 text-white/60 leading-snug text-2xs md:text-sm md:mt-3">
-            Frais · Surgelés · Épices · Livraison Europe
+          <p className="mt-2 text-white/85 leading-snug text-sm max-w-[38ch]">
+            Produits frais, surgelés et d&apos;épicerie fine, sélectionnés avec soin et livrés partout en Europe.
           </p>
-          <Link
-            href="/products"
-            className="hidden md:inline-flex mt-6 items-center gap-1.5 bg-white rounded-full px-5 py-2.5 text-sm font-semibold transition-transform hover:scale-105"
-            style={{ color: 'var(--color-primary)' }}
-          >
-            Voir le catalogue →
-          </Link>
+          <div className="flex flex-wrap gap-2.5 mt-5">
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-1.5 bg-white rounded-md px-5 py-3 text-sm font-bold transition-transform hover:scale-105"
+              style={{ color: 'var(--color-primary-dark)' }}
+            >
+              Découvrir le catalogue
+            </Link>
+            {/* TODO produit : pas encore de page "Notre histoire" — pointe vers le catalogue
+                en attendant qu'une vraie destination existe (voir résumé de la Fase 3). */}
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-1.5 rounded-md px-5 py-3 text-sm font-semibold text-white border-2 border-white/45 transition-colors hover:border-white/70"
+            >
+              Notre histoire
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 mt-6">
+            {TRUST_ROW.map(item => (
+              <div key={item.label} className="flex items-center gap-1.5 text-white/90 text-xs font-semibold">
+                <span className="w-4 h-4 shrink-0">{item.icon}</span>
+                {item.label}
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Mini-preview prodotti reali — solo desktop */}
+        {/* Mini-preview prodotti reali — dati veri, jamais de placeholder statique */}
         {preview.length > 0 && (
-          <div className="hidden md:block md:flex-1 relative h-40">
+          <div className="flex gap-3.5">
             {preview.map((product, i) => (
               <div
                 key={product.id}
-                className="absolute top-1/2 w-28 aspect-square rounded-lg overflow-hidden border-4 border-white shadow-card bg-white"
-                style={{
-                  left: `calc(50% + ${i * 34}px)`,
-                  transform: `translate(-50%, -50%) rotate(${(i - 1) * 8}deg)`,
-                  zIndex: preview.length - i,
-                }}
+                className="flex-1 bg-white rounded-lg shadow-card p-3"
+                style={{ transform: `rotate(${i === 0 ? -3 : 2}deg)` }}
               >
-                {product.image_url ? (
-                  <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="112px" />
-                ) : (
-                  <div className="w-full h-full bg-primary-light" />
-                )}
+                <div className="aspect-square bg-primary-light rounded-md overflow-hidden relative mb-2.5">
+                  {product.image_url && (
+                    <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="180px" />
+                  )}
+                </div>
+                <p className="text-xs font-semibold text-gray-900 line-clamp-1">{product.name}</p>
+                <p
+                  className="text-xs font-bold mt-0.5"
+                  style={{ color: 'var(--color-primary-dark)', fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {formatPrice(product.price, currency)}
+                </p>
               </div>
             ))}
           </div>

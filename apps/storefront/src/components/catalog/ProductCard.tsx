@@ -26,7 +26,7 @@ export interface ProductCardProduct {
 
 interface ProductCardProps {
   product: ProductCardProduct;
-  /** `grid` = grille catalogue (bouton "Ajouter" plein, catégorie visible).
+  /** `grid` = grille catalogue (bouton "+" circulaire, catégorie/poids visibles).
    *  `shelf` = shelf horizontale home (carte étroite, bouton "+" flottant). */
   variant?: 'grid' | 'shelf';
 }
@@ -47,12 +47,29 @@ function getTagLabel(product: ProductCardProduct): string | null {
   return null;
 }
 
+/** Équivalent réel de la ligne "origine" du mockup (ex. "Cameroun · 1kg") —
+ *  la provenance n'existe pas dans le schéma produit, donc pas de valeur
+ *  inventée : on compose catégorie + poids, les deux seuls champs réels
+ *  disponibles pour ce rôle. */
+function formatWeightLabel(grams: number | null): string | null {
+  if (!grams) return null;
+  return grams >= 1000 ? `${+(grams / 1000).toFixed(2)}kg` : `${grams}g`;
+}
+
+function getDetailLine(product: ProductCardProduct): string | null {
+  const parts = [product.category?.name, formatWeightLabel(product.weight_grams)].filter(
+    (v): v is string => Boolean(v),
+  );
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
   const { currency } = useTenant();
   const addItem = useCartStore((s) => s.addItem);
   const outOfStock = product.stock === 0;
   const [added, setAdded] = useState(false);
   const tagLabel = getTagLabel(product);
+  const detailLine = getDetailLine(product);
 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
@@ -68,10 +85,8 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
       stock:        product.stock ?? 999,
       storage_type: product.storage_type ?? null,
     });
-    if (variant === 'shelf') {
-      setAdded(true);
-      setTimeout(() => setAdded(false), 1500);
-    }
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
   }
 
   const imageSizes = variant === 'grid'
@@ -88,7 +103,9 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
       }
     >
       {tagLabel && (
-        <ShopTag className="absolute -top-2 left-3 z-10">{tagLabel}</ShopTag>
+        <ShopTag className={variant === 'grid' ? 'absolute -top-2.5 left-3 z-10' : 'absolute -top-2 left-3 z-10'}>
+          {tagLabel}
+        </ShopTag>
       )}
 
       <div
@@ -126,10 +143,18 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
         {variant === 'grid' ? (
           <div className="p-3">
             <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">{product.name}</p>
-            {product.category && <p className="text-xs text-gray-400 mb-2">{product.category.name}</p>}
+            {detailLine && <p className="text-xs text-gray-400 mb-2">{detailLine}</p>}
             <div className="flex items-center justify-between gap-2">
               <span className="text-base font-bold" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
-              <button onClick={handleAddToCart} disabled={outOfStock} className="text-xs px-3 py-1.5 rounded-sm font-medium text-white transition-opacity disabled:opacity-40" style={{ backgroundColor: 'var(--color-primary)' }}>Ajouter</button>
+              <button
+                onClick={handleAddToCart}
+                aria-label="Ajouter au panier"
+                disabled={outOfStock}
+                className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 disabled:opacity-40"
+                style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+              >
+                {added ? '✓' : '+'}
+              </button>
             </div>
           </div>
         ) : (
