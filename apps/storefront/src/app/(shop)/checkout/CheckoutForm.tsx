@@ -12,6 +12,7 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
+import { IconMapPin, IconClock, IconCreditCard, IconBuildingStore } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import type { Tenant } from '@lepefy/types';
@@ -316,12 +317,16 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           {/* Click & Collect info */}
           {isPickup && tenant.click_collect_address && (
             <div className="bg-blue-50 rounded-2xl p-4 text-sm space-y-1">
-              <p className="font-semibold text-blue-800 mb-2">📍 Adresse de retrait</p>
+              <p className="font-semibold text-blue-800 mb-2 flex items-center gap-1.5">
+                <IconMapPin size={16} /> Adresse de retrait
+              </p>
               <p className="text-blue-700">{tenant.click_collect_address}</p>
               {tenant.click_collect_hours && (
-                <p className="text-blue-600">🕐 {tenant.click_collect_hours}</p>
+                <p className="text-blue-600 flex items-center gap-1.5">
+                  <IconClock size={14} /> {tenant.click_collect_hours}
+                </p>
               )}
-              <p style={{ fontSize: 12, color: '#3B82F6' }} className="pt-1">
+              <p style={{ color: '#3B82F6' }} className="pt-1 text-xs">
                 Votre commande sera prête dans quelques heures. Vous recevrez un email dès qu&apos;elle est disponible.
               </p>
             </div>
@@ -341,7 +346,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <span className="block text-base mb-0.5">💳</span>
+                  <IconCreditCard size={20} className="mx-auto mb-0.5" />
                   Carte / Satispay
                 </button>
                 <button
@@ -353,7 +358,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <span className="block text-base mb-0.5">🏪</span>
+                  <IconBuildingStore size={20} className="mx-auto mb-0.5" />
                   Payer en boutique
                 </button>
               </div>

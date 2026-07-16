@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { IconShoppingCartOff, IconTruck, IconBuildingStore, IconMapPin } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import type { Tenant } from '@lepefy/types';
@@ -104,7 +106,7 @@ export default function CartClient({ tenant }: Props) {
   if (items.length === 0) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
-        <div className="text-6xl mb-4">🛒</div>
+        <IconShoppingCartOff size={56} className="text-gray-300 mb-4" stroke={1.25} />
         <h1 className="text-2xl font-bold mb-2">Votre panier est vide</h1>
         <p className="text-gray-500 mb-6">
           Ajoutez des produits pour commencer votre commande.
@@ -132,9 +134,11 @@ export default function CartClient({ tenant }: Props) {
             className="flex gap-3 bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
           >
             {item.product.image_url && (
-              <img
+              <Image
                 src={item.product.image_url}
                 alt={item.product.name}
+                width={64}
+                height={64}
                 className="w-16 h-16 object-cover rounded-xl flex-shrink-0"
               />
             )}
@@ -204,19 +208,22 @@ export default function CartClient({ tenant }: Props) {
               <button
                 key={type}
                 onClick={() => setFulfillmentType(type)}
-                className={`flex-1 py-3 rounded-2xl border text-sm font-medium transition-all ${
+                className={`flex-1 py-3 rounded-2xl border text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
                   fulfillmentType === type
                     ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
                     : 'border-gray-200 text-gray-600'
                 }`}
               >
-                {type === 'delivery' ? '🚚 Livraison' : '🏪 Click & Collect'}
+                {type === 'delivery' ? <IconTruck size={18} /> : <IconBuildingStore size={18} />}
+                {type === 'delivery' ? 'Livraison' : 'Click & Collect'}
               </button>
             ))}
           </div>
           {fulfillmentType === 'pickup' && tenant.click_collect_address && (
             <div className="mt-3 p-4 bg-gray-50 rounded-2xl text-sm text-gray-700">
-              <p className="font-semibold mb-1">📍 Adresse de retrait</p>
+              <p className="font-semibold mb-1 flex items-center gap-1.5">
+                <IconMapPin size={16} /> Adresse de retrait
+              </p>
               <p>{tenant.click_collect_address}</p>
             </div>
           )}

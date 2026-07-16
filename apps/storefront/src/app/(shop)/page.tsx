@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
@@ -82,12 +83,12 @@ export default async function HomePage() {
       {featuredProducts.length > 0 && (
         <section>
           <div className="flex items-center justify-between px-4 mb-2 mt-5">
-            <h2 className="text-[13px] font-bold text-gray-900">
+            <h2 className="text-sm font-bold text-gray-900">
               Nos produits vedettes
             </h2>
             <Link
               href="/products"
-              className="text-[11px] font-medium"
+              className="text-2xs font-medium"
               style={{ color: 'var(--color-primary)' }}
             >
               Voir tout →
@@ -113,10 +114,10 @@ export default async function HomePage() {
         return (
           <section key={cat.id}>
             <div className="flex items-center justify-between px-4 mb-2 mt-5">
-              <h2 className="text-[13px] font-bold text-gray-900">{cat.name}</h2>
+              <h2 className="text-sm font-bold text-gray-900">{cat.name}</h2>
               <Link
                 href={`/products?category=${cat.slug}`}
-                className="text-[11px] font-medium"
+                className="text-2xs font-medium"
                 style={{ color: 'var(--color-primary)' }}
               >
                 Voir tout →
@@ -165,12 +166,14 @@ function HeroBanner({
       {/* Immagine di sfondo opzionale */}
       {heroImageUrl && (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={heroImageUrl}
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
           />
           <div
             className="absolute inset-0"
@@ -205,7 +208,7 @@ function HeroBanner({
       <div className="absolute inset-0 flex flex-col justify-end px-5 pb-5">
         <div
           className="inline-flex items-center self-start mb-2 px-2 py-0.5 rounded
-                     text-[9px] font-semibold tracking-widest uppercase"
+                     text-2xs font-semibold tracking-widest uppercase"
           style={{
             backgroundColor: 'rgba(242, 200, 17, 0.18)',
             border: '1px solid rgba(242, 200, 17, 0.38)',
@@ -214,16 +217,10 @@ function HeroBanner({
         >
           {tagline}
         </div>
-        <h1
-          className="text-white font-bold leading-tight"
-          style={{ fontSize: '22px' }}
-        >
+        <h1 className="text-white font-bold leading-tight text-2xl">
           Les saveurs<br />de chez nous
         </h1>
-        <p
-          className="mt-1 text-white/60 leading-snug"
-          style={{ fontSize: '11px' }}
-        >
+        <p className="mt-1 text-white/60 leading-snug text-2xs">
           Frais · Surgelés · Épices · Livraison Europe
         </p>
       </div>

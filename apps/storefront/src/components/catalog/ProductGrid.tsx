@@ -1,7 +1,35 @@
 import type { ProductWithCategory } from '@lepefy/types';
 import { ProductCard } from './ProductCard';
 
-export function ProductGrid({ products }: { products: ProductWithCategory[] }) {
+/** Placeholder animé — même gabarit (image + 2 lignes) et mêmes tokens
+ *  radius que la ProductCard réelle, pour que le passage skeleton → contenu
+ *  ne "saute" pas visuellement. */
+function ProductCardSkeleton() {
+  return (
+    <div className="rounded-lg overflow-hidden border border-gray-200 animate-pulse">
+      <div className="aspect-square bg-gray-100" />
+      <div className="p-3 space-y-2">
+        <div className="h-3.5 bg-gray-100 rounded-sm w-full" />
+        <div className="h-3.5 bg-gray-100 rounded-sm w-2/3" />
+      </div>
+    </div>
+  );
+}
+
+interface ProductGridProps {
+  products: ProductWithCategory[];
+  /** Affiche des skeletons à la place des produits (chargement en cours). */
+  loading?: boolean;
+}
+
+export function ProductGrid({ products, loading = false }: ProductGridProps) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+      </div>
+    );
+  }
   if (products.length === 0) {
     return (
       <div className="min-h-[40vh] flex flex-col items-center justify-center px-4 py-16 text-center">

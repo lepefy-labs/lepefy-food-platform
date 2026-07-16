@@ -28,13 +28,13 @@ export function FeaturedProducts({ products }: Props) {
 
       <div className="mt-4">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-[13px] font-bold text-gray-900">
+          <h2 className="text-sm font-bold text-gray-900">
             {query ? `Résultats (${filtered.length})` : 'Nos produits vedettes'}
           </h2>
           {!query && (
             <Link
               href="/products"
-              className="text-[11px] font-medium"
+              className="text-2xs font-medium"
               style={{ color: 'var(--color-primary)' }}
             >
               Voir tout →
@@ -93,7 +93,7 @@ function SearchBar({
         value={query}
         onChange={e => onChange(e.target.value)}
         placeholder="Rechercher un produit..."
-        className="flex-1 bg-transparent text-[13px] text-gray-700
+        className="flex-1 bg-transparent text-sm text-gray-700
                    placeholder:text-gray-400 outline-none border-none"
         aria-label="Rechercher un produit"
       />

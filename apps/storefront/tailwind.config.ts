@@ -17,6 +17,13 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
+      /* Un seul step ajouté à l'échelle par défaut de Tailwind (xs=12/sm=14/
+         base=16/lg=18/xl=20/...) pour couvrir les libellés/badges les plus
+         petits — les text-[Npx] arbitraires migrent vers ce vocabulaire fini
+         plutôt que d'en générer un nouveau par valeur trouvée. */
+      fontSize: {
+        '2xs': ['10px', { lineHeight: '1.3' }],
+      },
       borderRadius: {
         sm: 'var(--radius-sm)',
         md: 'var(--radius-md)',

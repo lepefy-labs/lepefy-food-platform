@@ -70,14 +70,14 @@ export function BottomNav() {
                 {tab.icon(active)}
                 {badgeCount > 0 && (
                   <span
-                    className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full text-[10px] font-bold flex items-center justify-center"
+                    className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full text-2xs font-bold flex items-center justify-center"
                     style={{ background: 'var(--color-secondary)', color: '#1a1a1a' }}
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
               </div>
-              <span className={`text-[10px] ${active ? 'font-medium' : 'font-normal'}`}>
+              <span className={`text-2xs ${active ? 'font-medium' : 'font-normal'}`}>
                 {tab.label}
               </span>
             </Link>

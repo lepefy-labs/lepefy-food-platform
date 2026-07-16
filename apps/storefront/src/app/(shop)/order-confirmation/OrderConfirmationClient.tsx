@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import {
+  IconClock,
+  IconCircleCheck,
+  IconBuildingStore,
+  IconMapPin,
+  IconCreditCard,
+  IconPackage,
+} from '@tabler/icons-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice } from '@/lib/utils/format';
 
@@ -94,8 +102,8 @@ export default function OrderConfirmationClient({
   if (isInStore && !order) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 text-2xl">
-          ⏳
+        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+          <IconClock size={28} className="text-yellow-700" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Commande en cours de création…</h1>
         <p className="text-gray-500 text-sm mb-6">
@@ -112,8 +120,8 @@ export default function OrderConfirmationClient({
   if (!paymentIntentId && !isInStore) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 text-2xl">
-          ⏳
+        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+          <IconClock size={28} className="text-yellow-700" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Commande en cours de traitement</h1>
         <p className="text-gray-500 text-sm mb-6">
@@ -130,8 +138,8 @@ export default function OrderConfirmationClient({
   if (timedOut && !order) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4 text-2xl">
-          ✅
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+          <IconCircleCheck size={28} className="text-green-600" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Merci pour votre commande !</h1>
         <p className="text-gray-500 text-sm mb-2">
@@ -148,8 +156,8 @@ export default function OrderConfirmationClient({
   if (!order) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 animate-pulse text-2xl">
-          ⏳
+        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <IconClock size={28} className="text-yellow-700" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Paiement reçu — commande en cours</h1>
         <p className="text-gray-500 text-sm">
@@ -168,8 +176,8 @@ export default function OrderConfirmationClient({
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Status header */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4 text-2xl">
-          ✅
+        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+          <IconCircleCheck size={28} className="text-green-600" />
         </div>
         <h1 className="text-2xl font-bold mb-2">
           {isInStorePayment ? 'Commande enregistrée !' : 'Commande confirmée !'}
@@ -184,13 +192,15 @@ export default function OrderConfirmationClient({
           N° {order.id.slice(0, 8).toUpperCase()}
         </p>
         {isInStorePayment && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            marginTop: 8, fontSize: 12, fontWeight: 600,
-            padding: '3px 10px', borderRadius: 20,
-            background: '#FEF3C7', color: '#92400E', border: '0.5px solid #FDE68A',
-          }}>
-            🏪 Paiement en boutique
+          <span
+            className="text-xs font-semibold mt-2"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '3px 10px', borderRadius: 20,
+              background: '#FEF3C7', color: '#92400E', border: '0.5px solid #FDE68A',
+            }}
+          >
+            <IconBuildingStore size={14} /> Paiement en boutique
           </span>
         )}
       </div>
@@ -232,16 +242,16 @@ export default function OrderConfirmationClient({
       {/* Click & Collect */}
       {isPickup && tenant.click_collect_address && (
         <div className="bg-blue-50 rounded-2xl p-4 mb-4">
-          <p className="font-semibold text-sm text-blue-800 mb-2">
-            📍 {isInStorePayment ? 'Retrait et paiement en boutique' : 'Instructions Click & Collect'}
+          <p className="font-semibold text-sm text-blue-800 mb-2 flex items-center gap-1.5">
+            <IconMapPin size={16} /> {isInStorePayment ? 'Retrait et paiement en boutique' : 'Instructions Click & Collect'}
           </p>
           <p className="text-sm text-blue-700">
             Venez récupérer votre commande à l&apos;adresse suivante :
           </p>
           <p className="text-sm font-semibold text-blue-900 mt-1">{tenant.click_collect_address}</p>
           {isInStorePayment && (
-            <p className="text-xs text-amber-700 mt-2 font-medium">
-              💳 Le paiement sera effectué lors du retrait en boutique.
+            <p className="text-xs text-amber-700 mt-2 font-medium flex items-center gap-1.5">
+              <IconCreditCard size={14} /> Le paiement sera effectué lors du retrait en boutique.
             </p>
           )}
         </div>
@@ -250,7 +260,9 @@ export default function OrderConfirmationClient({
       {/* Delivery address */}
       {!isPickup && address && (
         <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-          <p className="font-semibold text-sm text-gray-700 mb-2">📦 Adresse de livraison</p>
+          <p className="font-semibold text-sm text-gray-700 mb-2 flex items-center gap-1.5">
+            <IconPackage size={16} /> Adresse de livraison
+          </p>
           {address.full_name   && <p className="text-sm text-gray-700">{address.full_name}</p>}
           {address.line1       && <p className="text-sm text-gray-700">{address.line1}</p>}
           {(address.postal_code || address.city) && (

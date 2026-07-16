@@ -1,6 +1,14 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { formatPrice } from '@/lib/utils/format';
 import crypto from 'crypto';
+import {
+  IconCircleCheck,
+  IconPackage,
+  IconTruck,
+  IconHome,
+  IconLock,
+  IconClipboardList,
+} from '@tabler/icons-react';
 import CopyButton from './CopyButton';
 
 export const dynamic = 'force-dynamic';
@@ -75,12 +83,20 @@ function isValidToken(orderId: string, email: string, token: string): boolean {
 
 // ─── Timeline ────────────────────────────────────────────────────────────────
 
-const STEPS: { key: TrackingStatus; icon: string; label: string }[] = [
-  { key: 'confirmed',  icon: '✅', label: 'Confirmé'       },
-  { key: 'preparing',  icon: '📦', label: 'En préparation' },
-  { key: 'shipped',    icon: '🚚', label: 'Expédié'        },
-  { key: 'delivered',  icon: '🏠', label: 'Livré'          },
+type StepIcon = typeof IconCircleCheck;
+
+const STEPS: { key: TrackingStatus; icon: StepIcon; label: string }[] = [
+  { key: 'confirmed',  icon: IconCircleCheck, label: 'Confirmé'       },
+  { key: 'preparing',  icon: IconPackage,     label: 'En préparation' },
+  { key: 'shipped',    icon: IconTruck,       label: 'Expédié'        },
+  { key: 'delivered',  icon: IconHome,        label: 'Livré'          },
 ];
+
+/** Couleur d'icône selon l'état de l'étape — contraste garanti sur chaque fond. */
+function stepIconColor(done: boolean, current: boolean): string {
+  if (!done) return '#9CA3AF';
+  return current ? 'white' : 'var(--color-primary)';
+}
 
 function toTimelineStatus(dbStatus: string): TrackingStatus {
   const map: Record<string, TrackingStatus> = {
@@ -127,8 +143,8 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
   if (!order || !tokenValid) {
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center">
-        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 text-2xl">
-          🔒
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <IconLock size={28} className="text-red-600" />
         </div>
         <h1 className="text-xl font-bold text-gray-900 mb-2">Lien invalide ou expiré</h1>
         <p className="text-sm text-gray-500">
@@ -203,13 +219,13 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
             return (
               <div key={step.key} className="flex flex-col items-center gap-2 z-10 flex-1">
                 <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-base border-2 transition-all"
+                  className="w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all"
                   style={{
                     background:  done ? (current ? 'var(--color-primary)' : 'var(--color-primary-light)') : '#F9FAFB',
                     borderColor: done ? 'var(--color-primary)' : '#E5E7EB',
                   }}
                 >
-                  {step.icon}
+                  <step.icon size={18} color={stepIconColor(done, current)} />
                 </div>
                 <span
                   className="text-xs font-medium text-center leading-tight"
@@ -232,13 +248,13 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
               <div key={step.key} className="flex gap-3">
                 <div className="flex flex-col items-center">
                   <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-base border-2 flex-shrink-0"
+                    className="w-9 h-9 rounded-full flex items-center justify-center border-2 flex-shrink-0"
                     style={{
                       background:  done ? (current ? 'var(--color-primary)' : 'var(--color-primary-light)') : '#F9FAFB',
                       borderColor: done ? 'var(--color-primary)' : '#E5E7EB',
                     }}
                   >
-                    {step.icon}
+                    <step.icon size={18} color={stepIconColor(done, current)} />
                   </div>
                   {!last && (
                     <div
@@ -275,7 +291,9 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
       {/* ── Tracking code (shipped / delivered only) ───────────────────── */}
       {isShipped && trackingCode && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">🚚 Informations de suivi</p>
+          <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+            <IconTruck size={16} /> Informations de suivi
+          </p>
 
           <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3 mb-3">
             <div className="min-w-0">
@@ -306,7 +324,9 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
       {/* ── Order summary ──────────────────────────────────────────────── */}
       {orderItems.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">📋 Récapitulatif</p>
+          <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+            <IconClipboardList size={16} /> Récapitulatif
+          </p>
           <div className="space-y-1.5">
             {orderItems.map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
@@ -335,7 +355,9 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
       {/* ── Delivery address ───────────────────────────────────────────── */}
       {addr && (
         <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-          <p className="text-sm font-semibold text-gray-700 mb-2">📦 Adresse de livraison</p>
+          <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <IconPackage size={16} /> Adresse de livraison
+          </p>
           {addr.full_name   && <p className="text-sm text-gray-700">{addr.full_name}</p>}
           {addr.line1       && <p className="text-sm text-gray-700">{addr.line1}</p>}
           {(addr.postal_code || addr.city) && (

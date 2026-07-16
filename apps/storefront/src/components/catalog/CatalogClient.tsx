@@ -214,9 +214,7 @@ export function CatalogClient({
       </div>
 
       {/* Griglia */}
-      <div className={isPending ? 'opacity-60 transition-opacity duration-150' : 'opacity-100 transition-opacity duration-150'}>
-        <ProductGrid products={products} />
-      </div>
+      <ProductGrid products={products} loading={isPending} />
 
       {/* Résultats similaires — recherche sémantique, cascade uniquement si peu de résultats textuels */}
       {isSemanticLoading && (
