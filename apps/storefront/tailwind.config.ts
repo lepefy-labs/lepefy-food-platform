@@ -15,7 +15,8 @@ const config: Config = {
         secondary: 'var(--color-secondary)',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-body)'],
+        display: ['var(--font-display)'],
       },
       /* Un seul step ajouté à l'échelle par défaut de Tailwind (xs=12/sm=14/
          base=16/lg=18/xl=20/...) pour couvrir les libellés/badges les plus

@@ -16,6 +16,13 @@
   --radius-lg: 16px;
   --radius-full: 999px;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+  /* Typographie — décision de plateforme, jamais dérivée du tenant.
+     --font-body reste Inter (paragraphes, prix, UI système) ;
+     --font-display est réservé aux titres et moments "signalétiques"
+     (H1/H2, eyebrow, cartellino signature). */
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-body);
 }
 
 @layer base {

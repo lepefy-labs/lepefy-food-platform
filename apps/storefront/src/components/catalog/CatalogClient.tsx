@@ -195,7 +195,7 @@ export function CatalogClient({
             <span className="font-medium text-gray-900">&ldquo;{initialQuery}&rdquo;</span>
           </p>
         ) : (
-          <h1 className="text-lg font-bold text-gray-900">
+          <h1 className="font-display text-lg font-bold text-gray-900">
             {activeSlug
               ? (categories.find(c => c.slug === activeSlug)?.name ?? 'Catalogue')
               : 'Catalogue'
