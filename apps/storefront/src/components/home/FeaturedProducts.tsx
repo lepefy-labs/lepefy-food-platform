@@ -2,16 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { formatPrice } from '@/lib/utils/format';
-import { AddToCartButton } from '@/components/home/AddToCartButton';
+import { ProductCard } from '@/components/catalog/ProductCard';
 import type { HomeProduct } from '@/app/(shop)/page';
 
 interface Props {
   products: HomeProduct[];
-  currency: string;
 }
 
-export function FeaturedProducts({ products, currency }: Props) {
+export function FeaturedProducts({ products }: Props) {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -54,37 +52,7 @@ export function FeaturedProducts({ products, currency }: Props) {
                           [-ms-overflow-style:none]
                           [scrollbar-width:none]">
             {filtered.map(product => (
-              <Link
-                key={product.id}
-                href={`/products/${product.slug}`}
-                className="relative block flex-shrink-0 w-36 rounded-xl overflow-hidden
-                           border border-gray-100 bg-white"
-              >
-                <div className="aspect-square bg-[#E1F5EE] overflow-hidden">
-                  {product.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-3xl">🛒</span>
-                    </div>
-                  )}
-                </div>
-                <div className="px-2 pt-1 pb-6">
-                  <p className="text-xs font-medium line-clamp-2 text-gray-900">
-                    {product.name}
-                  </p>
-                  <p className="text-sm font-bold mt-0.5"
-                     style={{ color: 'var(--color-primary)' }}>
-                    {formatPrice(product.price, currency)}
-                  </p>
-                </div>
-                <AddToCartButton product={product} />
-              </Link>
+              <ProductCard key={product.id} product={product} variant="shelf" />
             ))}
           </div>
         )}

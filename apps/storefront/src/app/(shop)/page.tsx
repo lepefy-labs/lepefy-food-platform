@@ -3,8 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { formatPrice } from '@/lib/utils/format';
-import { AddToCartButton } from '@/components/home/AddToCartButton';
+import { ProductCard } from '@/components/catalog/ProductCard';
 
 export const metadata: Metadata = {
   title: 'Accueil',
@@ -101,11 +100,7 @@ export default async function HomePage() {
             md:overflow-x-visible md:pb-4
           ">
             {featuredProducts.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                currency={tenant.currency}
-              />
+              <ProductCard key={product.id} product={product} variant="shelf" />
             ))}
           </div>
         </section>
@@ -134,11 +129,7 @@ export default async function HomePage() {
               md:overflow-x-visible md:pb-4
             ">
               {products.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  currency={tenant.currency}
-                />
+                <ProductCard key={product.id} product={product} variant="shelf" />
               ))}
             </div>
           </section>
@@ -237,47 +228,5 @@ function HeroBanner({
         </p>
       </div>
     </div>
-  );
-}
-
-// ── ProductCard (Server Component interno, non esportato) ──
-function ProductCard({
-  product,
-  currency,
-}: {
-  product: HomeProduct;
-  currency: string;
-}) {
-  return (
-    <Link
-      href={`/products/${product.slug}`}
-      className="relative block flex-shrink-0 w-36 rounded-xl overflow-hidden
-                 border border-gray-100 bg-white
-                 md:w-full md:flex-shrink"
-    >
-      <div className="aspect-square bg-[#E1F5EE] overflow-hidden">
-        {product.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-3xl">🛒</span>
-          </div>
-        )}
-      </div>
-      <div className="px-2 pt-1 pb-6">
-        <p className="text-xs font-medium line-clamp-2 text-gray-900">
-          {product.name}
-        </p>
-        <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--color-primary)' }}>
-          {formatPrice(product.price, currency)}
-        </p>
-      </div>
-      <AddToCartButton product={product} />
-    </Link>
   );
 }
