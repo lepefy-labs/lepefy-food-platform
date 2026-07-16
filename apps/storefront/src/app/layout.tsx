@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { TenantProvider } from '@/providers/TenantProvider';
 import { PWARegister } from '@/components/PWARegister';
 import './globals.css';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
 export async function generateMetadata(): Promise<Metadata> {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -40,7 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
-      <body>
+      <body className={inter.variable}>
         <TenantProvider tenant={tenant}>{children}</TenantProvider>
         <PWARegister />
       </body>

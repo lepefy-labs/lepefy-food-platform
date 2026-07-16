@@ -40,10 +40,10 @@ export function AddToCartButton({ product }: Props) {
     <button
       onClick={handleAdd}
       aria-label="Ajouter au panier"
-      className="absolute bottom-2 right-2 w-7 h-7 rounded-full flex items-center
-                 justify-center text-white text-sm font-bold
+      className="absolute bottom-2 right-2 w-11 h-11 rounded-full flex items-center
+                 justify-center text-white text-base font-bold
                  transition-all active:scale-90 shadow-sm"
-      style={{ backgroundColor: added ? '#16a34a' : '#1D9E75' }}
+      style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
     >
       {added ? '✓' : '+'}
     </button>

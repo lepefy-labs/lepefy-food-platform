@@ -194,7 +194,7 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
             className="absolute top-[18px] left-8 h-0.5 transition-all"
             style={{
               width:      `calc(${progressPct}% * (100% - 64px) / 100)`,
-              background: '#2d6a4f',
+              background: 'var(--color-primary)',
             }}
           />
           {STEPS.map((step, i) => {
@@ -205,15 +205,15 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-base border-2 transition-all"
                   style={{
-                    background:  done ? (current ? '#2d6a4f' : '#d8f3dc') : '#F9FAFB',
-                    borderColor: done ? '#2d6a4f' : '#E5E7EB',
+                    background:  done ? (current ? 'var(--color-primary)' : 'var(--color-primary-light)') : '#F9FAFB',
+                    borderColor: done ? 'var(--color-primary)' : '#E5E7EB',
                   }}
                 >
                   {step.icon}
                 </div>
                 <span
                   className="text-xs font-medium text-center leading-tight"
-                  style={{ color: done ? '#2d6a4f' : '#9CA3AF' }}
+                  style={{ color: done ? 'var(--color-primary-dark)' : '#9CA3AF' }}
                 >
                   {step.label}
                 </span>
@@ -234,8 +234,8 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
                   <div
                     className="w-9 h-9 rounded-full flex items-center justify-center text-base border-2 flex-shrink-0"
                     style={{
-                      background:  done ? (current ? '#2d6a4f' : '#d8f3dc') : '#F9FAFB',
-                      borderColor: done ? '#2d6a4f' : '#E5E7EB',
+                      background:  done ? (current ? 'var(--color-primary)' : 'var(--color-primary-light)') : '#F9FAFB',
+                      borderColor: done ? 'var(--color-primary)' : '#E5E7EB',
                     }}
                   >
                     {step.icon}
@@ -245,7 +245,7 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
                       className="w-0.5 my-1"
                       style={{
                         height:     24,
-                        background: done && i < activeIdx ? '#2d6a4f' : '#E5E7EB',
+                        background: done && i < activeIdx ? 'var(--color-primary)' : '#E5E7EB',
                       }}
                     />
                   )}
@@ -253,14 +253,14 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
                 <div className={`pt-1.5 ${last ? '' : 'pb-4'}`}>
                   <span
                     className="text-sm font-medium"
-                    style={{ color: done ? '#2d6a4f' : '#9CA3AF' }}
+                    style={{ color: done ? 'var(--color-primary-dark)' : '#9CA3AF' }}
                   >
                     {step.label}
                   </span>
                   {current && (
                     <span
                       className="ml-2 text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                      style={{ background: '#d8f3dc', color: '#1b4332' }}
+                      style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary-dark)' }}
                     >
                       En cours
                     </span>
@@ -295,7 +295,7 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#2d6a4f' }}
+              style={{ backgroundColor: 'var(--color-primary)' }}
             >
               Suivre sur le site {trackingCarrier}&nbsp;→
             </a>

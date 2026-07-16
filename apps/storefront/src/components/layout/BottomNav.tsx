@@ -64,14 +64,14 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               className="flex-1 flex flex-col items-center justify-center gap-0.5"
-              style={{ color: active ? '#1D9E75' : '#9ca3af' }}
+              style={{ color: active ? 'var(--color-primary)' : '#9ca3af' }}
             >
               <div className="relative">
                 {tab.icon(active)}
                 {badgeCount > 0 && (
                   <span
                     className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full text-[10px] font-bold flex items-center justify-center"
-                    style={{ background: '#F2C811', color: '#1a1a1a' }}
+                    style={{ background: 'var(--color-secondary)', color: '#1a1a1a' }}
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>

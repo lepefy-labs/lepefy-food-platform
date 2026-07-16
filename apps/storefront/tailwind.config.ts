@@ -14,7 +14,7 @@ const config: Config = {
         secondary: 'var(--color-secondary)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
     },
   },

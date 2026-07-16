@@ -159,10 +159,10 @@ export default function CartClient({ tenant }: Props) {
                 </button>
               </div>
               <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                    className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100"
+                    className="w-11 h-11 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100"
                   >
                     −
                   </button>
@@ -175,7 +175,7 @@ export default function CartClient({ tenant }: Props) {
                       )
                     }
                     disabled={item.quantity >= item.product.stock}
-                    className="w-7 h-7 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-30"
+                    className="w-11 h-11 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-30"
                   >
                     +
                   </button>

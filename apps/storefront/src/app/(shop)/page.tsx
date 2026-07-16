@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -154,20 +155,21 @@ export default async function HomePage() {
 function HeroBanner({
   heroImageUrl,
   tagline,
-  primaryColor: _primaryColor,
+  primaryColor,
 }: {
   heroImageUrl: string | null;
   tagline: string;
   primaryColor: string;
 }) {
-  const darkBg   = '#085041';
-  const midBg    = '#0F6E56';
-  const accentBg = '#1D9E75';
+  // `--hero-primary` expose la couleur du tenant reçue en prop aux enfants ;
+  // le fallback var(--color-primary) couvre le cas où le composant serait
+  // rendu hors du contexte de tenant CSS vars injecté par le layout racine.
+  const heroVars = { '--hero-primary': primaryColor } as CSSProperties;
 
   return (
     <div
       className="relative overflow-hidden"
-      style={{ height: '160px', backgroundColor: darkBg }}
+      style={{ height: '160px', backgroundColor: 'var(--color-primary-dark)', ...heroVars }}
     >
       {/* Immagine di sfondo opzionale */}
       {heroImageUrl && (
@@ -181,7 +183,7 @@ function HeroBanner({
           />
           <div
             className="absolute inset-0"
-            style={{ backgroundColor: 'rgba(4, 52, 44, 0.72)' }}
+            style={{ backgroundColor: 'var(--color-primary-dark)', opacity: 0.72 }}
           />
         </>
       )}
@@ -191,11 +193,11 @@ function HeroBanner({
         <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
           <div
             className="absolute rounded-full"
-            style={{ width: '220px', height: '220px', top: '-70px', right: '-50px', backgroundColor: midBg, opacity: 0.6 }}
+            style={{ width: '220px', height: '220px', top: '-70px', right: '-50px', backgroundColor: 'var(--hero-primary, var(--color-primary))', opacity: 0.6 }}
           />
           <div
             className="absolute rounded-full"
-            style={{ width: '130px', height: '130px', top: '15px', right: '65px', backgroundColor: accentBg, opacity: 0.35 }}
+            style={{ width: '130px', height: '130px', top: '15px', right: '65px', backgroundColor: 'var(--hero-primary, var(--color-primary))', opacity: 0.35 }}
           />
           <div
             className="absolute rounded-full"
