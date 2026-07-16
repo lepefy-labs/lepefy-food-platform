@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 15 Luglio 2026 — revisione riga-per-riga contro il filesystem reale del repo (`claude/lepefy-context-audit-i2teds`): numerazione migration IA confermata, struttura repo corretta (template etichette, picking list, file mancanti in §3), vedi changelog in fondo al documento.
+> Aggiornato: 16 Luglio 2026 — deploy Gotenberg confermato completo e verificato end-to-end (era correttamente segnalato come "non verificabile da repo" nell'audit v3.2, perché lo stato di un deploy live su Hetzner non è deducibile dal codice; qui la conferma arriva da verifica diretta fuori-repo). Base di questa revisione: v3.2 (15 Luglio, audit `claude/lepefy-context-audit-i2teds`), invariata su tutto il resto.
 
 ---
 
@@ -38,7 +38,7 @@
 | **Spedizione** | Packlink PRO API | Quote real-time, importo certificato da token HMAC (§6/§7) — ⚠️ ancora in sandbox, da passare a `api.packlink.com` |
 | **Email/Automation** | n8n self-hosted | Hetzner CX23, Ubuntu 24.04, Docker + Caddy, SMTP Brevo |
 | **PWA** | `manifest.ts` dinamico + SW + `/api/pwa-icon` | Icona dinamica per tenant via API route (sharp) |
-| **Rendering etichette** | Gotenberg (Docker, Hetzner) | **Integrazione codice completa e funzionante** (`lib/labels/gotenberg.ts`) — legge `GOTENBERG_URL` a runtime; stato del deploy effettivo su Hetzner non verificabile da repo, vedi §16 |
+| **Rendering etichette** | Gotenberg (Docker, Hetzner) | **✅ Deploy completo e verificato end-to-end** (`lib/labels/gotenberg.ts`) — container attivo su Hetzner, `gotenberg.lepefy.com` con Caddy basic auth + SSL Let's Encrypt, header Authorization aggiunto, PDF reale generato e verificato da un job vero, vedi §16 |
 | **AI immagini prodotto** | Gemini 2.5 Flash + `gemini-2.5-flash-image` | SDK `@google/genai`, pipeline a due step |
 | **AI descrizioni prodotto** | Gemini 2.5 Flash (testo) | ✅ Completo, batch eseguito su tutto il catalogo — vedi §13bis |
 | **AI rate limiting + cost tracking** | Tabelle `ai_pricing`/`ai_usage_log` (Supabase) | ✅ Completo su tutte le route AI (admin + pubbliche) — vedi §13bis |
@@ -556,7 +556,7 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 
 - ✅ Migrations 018, 019, 023, 024, 025 applicate (schema + data fix + feature palette/origin-style)
 - ✅ **Errore 400 su `/api/labels/preview`** — RISOLTO. Causa: import "nudo" di `react-dom/server` intercettato dal Next.js App Router. Fix: import cambiato in `react-dom/server.node` + `export const runtime = 'nodejs'` nelle route preview/generate
-- **Integrazione Gotenberg:** il codice è completo e funzionante (`gotenberg.ts` legge `GOTENBERG_URL`, throw esplicito se assente) — **non verificabile da repo se il servizio Gotenberg è effettivamente raggiungibile su Hetzner**, nessun `.env`/`.env.example` committato per confermare la config runtime. Richiede comunque reverse proxy Caddy con autenticazione per essere raggiungibile da Vercel (bind solo localhost non sufficiente)
+- **✅ Integrazione Gotenberg completa e verificata end-to-end (14/07, fuori dall'audit repo — deploy live, non verificabile leggendo il codice):** container Docker attivo su Hetzner nella stessa rete di n8n/Caddy, sottodominio `gotenberg.lepefy.com` con certificato SSL Let's Encrypt automatico e Caddy `basic_auth`, header `Authorization: Basic` aggiunto a `gotenberg.ts` (env var `GOTENBERG_URL`/`GOTENBERG_AUTH`, formato `user:password` Base64-encoded), entrambe settate su Vercel. Endpoint `/forms/chromium/convert/html` testato sia via curl diretto sia da un job reale in `/admin/products/[id]/etichetta/[jobId]` → PDF generato correttamente (layout N-up A4, QR code, badge, blocco legale). Nota tecnica risolta durante il deploy: Gotenberg richiede il file HTML nominato esattamente `index.html` nel form-data.
 - ⚠️ **Data quality flag:** i valori nutrizionali usati nell'etichetta BOBOLO Sous Vide corrispondevano alla scheda prodotto Foufou, non Bobolo — richiede verifica dal produttore prima di ristampare
 - **Dati Excel etichette (~24 prodotti):** confermati dati legali reali — ragione sociale "Chloé Food ETS", indirizzo "Via Angelo Zanti, 1C - 42122 Reggio Emilia", email `chloefood.ets@gmail.com`; importatore ricorrente **AFRICOOP Società Cooperativa** (Modena). Problemi noti: campi lotto/data corrotti (seriali Excel tipo `42026.0`) in ~8 schede, titoli scheda non corrispondenti per errori di copia-incolla, valori nutrizionali espressi in percentuale in 2 schede da chiarire col produttore
 
@@ -568,7 +568,7 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 
 **Esclusi sempre dall'IA:** valori nutrizionali, allergeni, dati legali produttore/importatore, lotto/date — mai dedotti o generati, sempre campo esplicito con default sicuro. Nessun output IA su questi campi pubblicato senza conferma umana esplicita.
 
-**Priorità attuale:** con il sistema base ormai maturo (multi-template/palette/origin-style, workflow draft/ristampa), il prossimo step reale è confermare il deploy effettivo di Gotenberg su Hetzner (reverse proxy Caddy + auth) e verificare i dati nutrizionali/lotto ancora incerti prima di procedere con le funzionalità IA.
+**Priorità attuale:** con il sistema base ormai maturo (multi-template/palette/origin-style, workflow draft/ristampa) e Gotenberg confermato funzionante end-to-end (deploy live verificato, vedi sopra), il blocco residuo è **non tecnico**: verifica dei dati nutrizionali (in particolare Bobolo, valori sospetti — probabile scambio con la scheda Foufou nell'Excel originale) e del lotto/data prima della stampa fisica reale — competenza di ChloeFood nelle proprie verifiche interne, non un task di sviluppo.
 
 ---
 
@@ -630,8 +630,8 @@ GOTENBERG_AUTH=...
 | Confermare trattamento IVA spedizione con commercialista | ChloeFood | ⚠️ DA FARE |
 | Eliminare ordini di test dal DB | Robertin | ⚠️ DA FARE |
 | Test E2E: ordine IT + ordine FR + Click & Collect | Robertin | ⚠️ DA FARE |
-| Installare/confermare Gotenberg raggiungibile su Hetzner + Caddy auth | Robertin | ⚠️ DA FARE (integrazione codice completa, deploy da verificare) |
-| Verificare dati nutrizionali/lotto con produttori prima di stampare etichette | Robertin / produttori | ⚠️ DA FARE |
+| Installare/confermare Gotenberg raggiungibile su Hetzner + Caddy auth | Robertin | ✅ FATTO (verificato end-to-end 14/07: deploy Hetzner + PDF reale generato da job vero) |
+| Verificare dati nutrizionali/lotto con produttori prima di stampare etichette (in particolare Bobolo, valori sospetti) | ChloeFood / produttori | ⚠️ DA FARE — competenza ChloeFood, non blocco tecnico |
 | Rimuovere file morti `admin/orders/id/` e cartella componenti condivisi non-route | Robertin | ⚠️ DA FARE (non bloccante) |
 | Decisione brand charter v2 (verde vs blu) | Dalice | ⚠️ PENDENTE (nessun codice ancora aggiornato verso il blu) |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
@@ -647,7 +647,7 @@ GOTENBERG_AUTH=...
 | Autenticazione clienti (Supabase Auth) + pagina `/orders` storico | Contrattuale | P0 | Non avviato |
 | Enforcement `subscription_status` (blocco soft storefront tenant scaduto) | Tecnico | P0 | Non avviato — mai controllato oggi |
 | Gestione stock reale al checkout (decremento, blocco esaurito) | Tecnico | P0 | Non avviato |
-| Sistema etichette prodotto — deploy Gotenberg su Hetzner | Tecnico | P0 | 🔧 Codice completo, deploy da confermare |
+| Sistema etichette prodotto — deploy Gotenberg su Hetzner | Tecnico | P0 | ✅ FATTO — verificato end-to-end (14/07) |
 | Draft Packlink automatico al pagamento ("effet waouhhh") | Tecnico | P1 | Non avviato |
 | `carrierName` + `serviceName` in `shipping_details` DB | Tecnico | P1 | Non avviato |
 | Stripe Connect (destination charges, giroconto automatico tenant) | Tecnico/Business | P1 | Non avviato |
@@ -729,4 +729,14 @@ Il resto del documento (stack tecnologico, sicurezza, shipping, checkout, admin 
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.2 — 15 Luglio 2026 (audit completo contro il codice reale del repo; vedi §22 per il changelog dettagliato)*
+## 23. Changelog v3.3 (16 Luglio 2026) — conferma deploy Gotenberg fuori-repo
+
+L'audit v3.2 aveva correttamente lasciato lo stato del deploy Gotenberg come "non verificabile da repo" — è una limitazione intrinseca di un audit basato solo sul codice: uno stato di infrastruttura live (container Docker su Hetzner, DNS, certificato SSL, reverse proxy) non è deducibile leggendo `gotenberg.ts`. Questa revisione aggiorna quel punto con una verifica diretta effettuata fuori-repo (sessione SSH sul VPS + test curl + generazione PDF reale da un job in produzione):
+
+- **§2** (stack), **§16** (dettaglio etichette), **§18** (checklist go-live), **§19** (roadmap Phase 2) — tutte le occorrenze "deploy da verificare/confermare" sostituite con conferma di deploy completo e funzionante end-to-end.
+- **§18** — riga verifica dati nutrizionali/lotto: responsabile corretto da "Robertin" a "ChloeFood / produttori" (è una verifica di competenza del tenant sui propri dati prodotto, non un task di sviluppo piattaforma).
+- Nessuna modifica al resto del documento (struttura repo, template etichette, migration IA) rispetto a v3.2 — quella parte resta l'audit di riferimento.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.3 — 16 Luglio 2026 (base: audit repo v3.2; + conferma deploy Gotenberg verificato fuori-repo, vedi §23)*
