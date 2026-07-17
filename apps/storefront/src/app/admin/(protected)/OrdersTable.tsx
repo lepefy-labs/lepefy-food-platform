@@ -291,17 +291,37 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
     const res = await fetch('/api/admin/orders/bulk-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderIds: ids, status: 'shipped' }),
+      body: JSON.stringify({ orderIds: ids }),
     });
-    if (res.ok) {
-      const { updated } = await res.json();
-      setSelectedIds(new Set());
-      setToast({ msg: `${updated} commande${updated > 1 ? 's' : ''} marquée${updated > 1 ? 's' : ''} expédiée${updated > 1 ? 's' : ''}.`, type: 'success' });
-      router.refresh(); // la pagina server rilegge gli ordini aggiornati
-    } else {
+
+    if (!res.ok) {
       const body = await res.json().catch(() => null);
       setToast({ msg: body?.error ?? 'Erreur lors de la mise à jour.', type: 'error' });
+      return;
     }
+
+    const { shipped, readyForPickup, skipped } = await res.json();
+
+    // Le righe risolte (spedite o pronte per ritiro) escono dalla selezione;
+    // quelle saltate restano selezionate così lo staff le vede subito e può
+    // intervenire (aggiungere il tracking, o capire perché sono state escluse).
+    setSelectedIds(new Set(skipped.map((s: { id: string }) => s.id)));
+
+    const missingTracking = skipped.filter((s: { reason: string }) => s.reason === 'missing_tracking').length;
+    const wrongStatus     = skipped.filter((s: { reason: string }) => s.reason === 'wrong_status').length;
+
+    const parts: string[] = [];
+    if (shipped.length)        parts.push(`${shipped.length} expédiée${shipped.length > 1 ? 's' : ''}`);
+    if (readyForPickup.length) parts.push(`${readyForPickup.length} prête${readyForPickup.length > 1 ? 's' : ''} (retrait)`);
+    if (missingTracking)       parts.push(`${missingTracking} ignorée${missingTracking > 1 ? 's' : ''} (code de suivi manquant)`);
+    if (wrongStatus)           parts.push(`${wrongStatus} ignorée${wrongStatus > 1 ? 's' : ''} (statut incompatible)`);
+
+    setToast({
+      msg:  parts.length ? parts.join(' · ') : 'Aucune commande à traiter.',
+      type: skipped.length > 0 && shipped.length === 0 && readyForPickup.length === 0 ? 'error' : 'success',
+    });
+
+    router.refresh(); // la pagina server rilegge gli ordini aggiornati
   }
 
   return (
@@ -696,7 +716,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
             Imprimer les listes
           </button>
           <button onClick={handleMarkShipped} className="text-sm hover:opacity-80 transition-opacity">
-            Marquer expédié
+            Traiter la sélection
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
