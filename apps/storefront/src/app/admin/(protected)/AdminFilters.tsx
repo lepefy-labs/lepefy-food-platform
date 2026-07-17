@@ -60,8 +60,9 @@ function isDefault(paramKey: string, value: string | undefined) {
 }
 
 const defaultClass =
-  'text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 ' +
-  'bg-white text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer ' +
+  'text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 ' +
+  'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 ' +
+  'hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none cursor-pointer ' +
   'focus:ring-2 focus:ring-[var(--color-primary)]'
 
 const activeClass =

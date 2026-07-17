@@ -26,11 +26,11 @@ function KpiCard({
 }) {
   const inner = (
     <>
-      <p className="text-xs text-gray-500 font-medium mb-1">{label}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>}
       {delta != null && (
-        <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+        <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
           {delta >= 0 ? '+' : ''}{delta}%
         </p>
       )}
@@ -44,14 +44,14 @@ function KpiCard({
 
   if (href) {
     return (
-      <Link href={href} className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+      <Link href={href} className="block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 hover:shadow-md transition-shadow">
         {inner}
       </Link>
     )
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
       {inner}
     </div>
   )
@@ -161,14 +161,14 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const orderList = orders ?? []
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 py-8">
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Commandes</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Commandes</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {orderList.length} commande{orderList.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -210,7 +210,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
         </div>
 
         {/* ── Filter bar ──────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 mb-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-3 mb-4">
           <Suspense fallback={<div className="h-9" />}>
             <AdminFilters
               currentStatus={filterStatus}

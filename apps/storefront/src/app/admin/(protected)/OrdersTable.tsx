@@ -7,6 +7,7 @@ import {
   IconX,
   IconChevronDown,
   IconChevronRight,
+  IconChevronUp,
   IconPrinter,
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
@@ -66,11 +67,12 @@ const FLAGS: Record<string, string> = {
 
 function FlagBadge({ country }: { country: string }) {
   const svg = FLAGS[country.toUpperCase()];
-  if (!svg) return <span className="text-xs text-gray-500">{country}</span>;
+  if (!svg) return <span className="text-xs text-gray-500 dark:text-gray-400">{country}</span>;
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold"
-      style={{ background: '#FEF3C7', color: '#92400E', border: '0.5px solid #FDE68A' }}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold
+                 bg-amber-50 text-amber-800 border border-amber-200
+                 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
     >
       <span
         className="inline-block w-4 h-3 rounded-sm overflow-hidden"
@@ -94,21 +96,22 @@ function DestinationCell({
   if (fulfillmentType === 'pickup') {
     return (
       <span
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold"
-        style={{ background: '#EFF6FF', color: '#1E40AF', border: '0.5px solid #BFDBFE' }}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold
+                   bg-blue-50 text-blue-800 border border-blue-200
+                   dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
       >
         🏪 C&amp;C
       </span>
     );
   }
-  if (!shippingAddress) return <span className="text-gray-400 text-xs">—</span>;
+  if (!shippingAddress) return <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>;
 
   const country = shippingAddress.country ?? '';
   const isIT    = country.toUpperCase() === 'IT' || country === '';
 
   if (isIT) {
     return (
-      <span className="text-xs text-gray-500">
+      <span className="text-xs text-gray-500 dark:text-gray-400">
         {shippingAddress.postal_code && (
           <span className="font-mono">{shippingAddress.postal_code}</span>
         )}
@@ -122,43 +125,40 @@ function DestinationCell({
 
 // ─── PaymentBadge ─────────────────────────────────────────────────────────────
 
-const PAYMENT_CONFIG: Record<string, { label: string; icon: string; bg: string; color: string }> = {
+const PAYMENT_CONFIG: Record<string, { label: string; icon: string; className: string }> = {
   stripe: {
-    label: 'Carte',
-    icon:  '💳',
-    bg:    '#F3F4F6',
-    color: '#374151',
+    label:     'Carte',
+    icon:      '💳',
+    className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
   },
   satispay: {
-    label: 'Satispay',
-    icon:  '🟠',
-    bg:    '#FFF7ED',
-    color: '#C2410C',
+    label:     'Satispay',
+    icon:      '🟠',
+    className: 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
   },
   in_store: {
-    label: 'En magasin',
-    icon:  '🏪',
-    bg:    '#EFF6FF',
-    color: '#1D4ED8',
+    label:     'En magasin',
+    icon:      '🏪',
+    className: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
   },
   cash: {
-    label: 'Espèces',
-    icon:  '💶',
-    bg:    '#F0FDF4',
-    color: '#15803D',
+    label:     'Espèces',
+    icon:      '💶',
+    className: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300',
   },
 };
 
 function PaymentBadge({ method }: { method: string | null }) {
-  if (!method) return <span className="text-gray-400 text-xs">—</span>;
+  if (!method) return <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>;
 
-  const cfg = PAYMENT_CONFIG[method] ?? { label: method, icon: '💶', bg: '#F3F4F6', color: '#374151' };
+  const cfg = PAYMENT_CONFIG[method] ?? {
+    label:     method,
+    icon:      '💶',
+    className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+  };
 
   return (
-    <span
-      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ background: cfg.bg, color: cfg.color }}
-    >
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${cfg.className}`}>
       <span>{cfg.icon}</span>
       {cfg.label}
     </span>
@@ -175,6 +175,8 @@ interface OrdersTableProps {
 export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps) {
   const [searchQuery, setSearchQuery]   = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy]             = useState<'date' | 'total' | null>(null);
+  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc');
 
   function toggleRow(orderId: string) {
     setExpandedRows(prev => {
@@ -182,6 +184,20 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
       next.has(orderId) ? next.delete(orderId) : next.add(orderId);
       return next;
     });
+  }
+
+  function toggleSort(col: 'date' | 'total') {
+    if (sortBy === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortDir('desc');
+    }
+  }
+
+  function ariaSort(col: 'date' | 'total'): 'ascending' | 'descending' | 'none' {
+    if (sortBy !== col) return 'none';
+    return sortDir === 'asc' ? 'ascending' : 'descending';
   }
 
   const filteredOrders = searchQuery.trim()
@@ -196,6 +212,14 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
       })
     : orders;
 
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (!sortBy) return 0;
+    const mult = sortDir === 'asc' ? 1 : -1;
+    if (sortBy === 'date')  return mult * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    if (sortBy === 'total') return mult * (a.total - b.total);
+    return 0;
+  });
+
   return (
     <div>
 
@@ -204,7 +228,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
         <div className="relative flex-1 max-w-sm">
           <IconSearch
             size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
           />
           <input
             type="text"
@@ -212,7 +236,8 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Client, email ou n° commande..."
             className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200
-                       rounded-lg bg-white focus:outline-none
+                       dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900
+                       text-gray-900 dark:text-gray-100 focus:outline-none
                        focus:ring-2 focus:ring-[var(--color-primary)]
                        focus:border-transparent"
           />
@@ -220,7 +245,8 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
             <button
               onClick={() => setSearchQuery('')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2
-                         p-1.5 -m-1.5 text-gray-400 hover:text-gray-600"
+                         p-1.5 -m-1.5 text-gray-400 hover:text-gray-600
+                         dark:text-gray-500 dark:hover:text-gray-300"
               aria-label="Effacer"
             >
               <IconX size={13} />
@@ -229,7 +255,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
         </div>
 
         {searchQuery && (
-          <span className="text-xs text-gray-500 flex-shrink-0">
+          <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
             {filteredOrders.length} résultat
             {filteredOrders.length !== 1 ? 's' : ''}
           </span>
@@ -237,38 +263,60 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
       </div>
 
       {/* ── Tabella ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {filteredOrders.length === 0 ? (
-          <p className="text-center text-gray-500 text-sm py-12">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+        {sortedOrders.length === 0 ? (
+          <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-12">
             {searchQuery
               ? `Aucune commande pour « ${searchQuery} »`
               : 'Aucune commande.'
             }
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* ── Desktop / tablet ≥ md: tabella ──────────────────────────────── */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-xs
-                               font-semibold text-gray-500 uppercase tracking-wide">
+                <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-xs
+                               font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   <th scope="col" className="w-8 px-3 py-3">
                     <span className="sr-only">Développer</span>
                   </th>
-                  <th scope="col" className="px-4 py-3 text-left">Commande</th>
-                  <th scope="col" className="px-4 py-3 text-left">Client</th>
+                  <th scope="col" className="px-4 py-3 text-left" aria-sort={ariaSort('date')}>
+                    <button
+                      onClick={() => toggleSort('date')}
+                      className="flex items-center gap-1 uppercase tracking-wide
+                                 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Commande
+                      {sortBy === 'date' && (sortDir === 'asc'
+                        ? <IconChevronUp size={12} />
+                        : <IconChevronDown size={12} />)}
+                    </button>
+                  </th>
                   <th scope="col" className="px-4 py-3 text-left">Produits</th>
                   <th scope="col" className="px-4 py-3 text-left">Destination</th>
-                  <th scope="col" className="px-4 py-3 text-left">Montant</th>
+                  <th scope="col" className="px-4 py-3 text-left" aria-sort={ariaSort('total')}>
+                    <button
+                      onClick={() => toggleSort('total')}
+                      className="flex items-center gap-1 uppercase tracking-wide
+                                 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Montant
+                      {sortBy === 'total' && (sortDir === 'asc'
+                        ? <IconChevronUp size={12} />
+                        : <IconChevronDown size={12} />)}
+                    </button>
+                  </th>
                   <th scope="col" className="px-4 py-3 text-left">Statut</th>
-                  <th scope="col" className="px-4 py-3 text-left">Paiement</th>
-                  <th scope="col" className="px-4 py-3 text-left">Transporteur</th>
+                  <th scope="col" className="hidden lg:table-cell px-4 py-3 text-left">Paiement</th>
                   <th scope="col" className="px-4 py-3">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map(order => {
+                {sortedOrders.map(order => {
                   const isExpanded   = expandedRows.has(order.id);
                   const items        = order.order_items ?? [];
                   const visibleItems = items.slice(0, 2);
@@ -279,16 +327,16 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                     <Fragment key={order.id}>
 
                       {/* ── Riga principale ──────────────────────────────── */}
-                      <tr className={`border-b border-gray-50 hover:bg-gray-50 transition-colors${isExpanded ? ' bg-gray-50/60' : ''}`}>
+                      <tr className={`border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors${isExpanded ? ' bg-gray-50/60 dark:bg-gray-800/60' : ''}`}>
 
                         {/* Freccia espansione */}
                         <td className="px-3 py-3 w-8">
                           {items.length > 0 && (
                             <button
                               onClick={() => toggleRow(order.id)}
-                              className="p-2 rounded text-gray-400
-                                         hover:text-gray-600
-                                         hover:bg-gray-200 transition-colors"
+                              className="p-2 rounded text-gray-400 dark:text-gray-500
+                                         hover:text-gray-600 dark:hover:text-gray-300
+                                         hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                               aria-label={isExpanded ? 'Réduire' : 'Développer'}
                               aria-expanded={isExpanded}
                             >
@@ -300,31 +348,25 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           )}
                         </td>
 
-                        {/* Commande */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <p className="font-mono text-xs font-medium text-gray-700">
+                        {/* Commande + Client */}
+                        <td className="px-4 py-3">
+                          <p className="font-mono text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             #{order.id.slice(0, 8).toUpperCase()}
                           </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                             {new Date(order.created_at).toLocaleDateString('fr-FR', {
                               day: '2-digit', month: '2-digit',
                             })}
                           </p>
                           {isToday && (
                             <span className="text-xs font-medium bg-yellow-50 text-yellow-700
+                                             dark:bg-yellow-950 dark:text-yellow-300
                                              px-1.5 py-0.5 rounded mt-0.5 inline-block">
                               Aujourd&apos;hui
                             </span>
                           )}
-                        </td>
-
-                        {/* Client */}
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-gray-900 leading-snug">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-snug mt-1 truncate max-w-[160px]">
                             {order.full_name ?? '—'}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[160px]">
-                            {order.email}
                           </p>
                         </td>
 
@@ -333,11 +375,11 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           <div className="space-y-1">
                             {visibleItems.map((item, idx) => (
                               <div key={item.id ?? idx} className="flex items-center gap-1.5">
-                                <span className="text-xs font-medium text-gray-500
-                                                 bg-gray-100 rounded px-1.5 py-0.5 flex-shrink-0">
+                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400
+                                                 bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 flex-shrink-0">
                                   ×{item.quantity}
                                 </span>
-                                <span className="text-xs text-gray-700 truncate">
+                                <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
                                   {item.name}
                                 </span>
                                 {item.storage_type === 'frozen' && (
@@ -349,9 +391,9 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                               </div>
                             ))}
                             {hiddenCount > 0 && !isExpanded && (
-                              <p className="text-xs text-gray-500 mt-0.5">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 + {hiddenCount} autre{hiddenCount > 1 ? 's' : ''}{' '}
-                                <span className="text-gray-500">(↑ développer)</span>
+                                <span className="text-gray-500 dark:text-gray-400">(↑ développer)</span>
                               </p>
                             )}
                           </div>
@@ -365,11 +407,19 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           />
                         </td>
 
-                        {/* Montant */}
+                        {/* Montant (+ Transporteur) */}
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-semibold text-gray-900">
+                          <span className="font-semibold text-gray-900 dark:text-gray-100">
                             {formatPrice(order.total, tenantCurrency)}
                           </span>
+                          {order.shipping_details?.carrierName && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
+                              {order.shipping_details.carrierName}
+                              {order.shipping_details.numParcels != null && order.shipping_details.numParcels > 1
+                                ? ` · ${order.shipping_details.numParcels} colis`
+                                : ''}
+                            </span>
+                          )}
                         </td>
 
                         {/* Statut */}
@@ -377,22 +427,9 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           <StatusBadge status={order.status} />
                         </td>
 
-                        {/* Paiement */}
-                        <td className="px-4 py-3">
+                        {/* Paiement — secondaria, visibile solo ≥ lg */}
+                        <td className="hidden lg:table-cell px-4 py-3">
                           <PaymentBadge method={order.payment_method} />
-                        </td>
-
-                        {/* Transporteur */}
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-gray-500">
-                            {order.shipping_details?.carrierName ?? '—'}
-                          </span>
-                          {order.shipping_details?.numParcels != null &&
-                           order.shipping_details.numParcels > 1 && (
-                            <span className="text-xs text-gray-500 block mt-0.5">
-                              {order.shipping_details.numParcels} colis
-                            </span>
-                          )}
                         </td>
 
                         {/* Actions */}
@@ -403,7 +440,8 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                               target="_blank"
                               rel="noopener noreferrer"
                               className="p-1.5 text-gray-400 hover:text-gray-600
-                                         hover:bg-gray-100 rounded transition-colors"
+                                         dark:text-gray-500 dark:hover:text-gray-300
+                                         hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                               title="Liste de préparation"
                               aria-label="Imprimer la liste de préparation"
                             >
@@ -412,7 +450,9 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                             <Link
                               href={`/admin/orders/${order.id}`}
                               className="text-xs font-medium px-3 py-1.5 rounded-lg
-                                         border border-gray-200 hover:bg-gray-50
+                                         border border-gray-200 dark:border-gray-700
+                                         text-gray-700 dark:text-gray-300
+                                         hover:bg-gray-50 dark:hover:bg-gray-800
                                          transition-colors whitespace-nowrap"
                             >
                               Voir →
@@ -425,22 +465,30 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                       {isExpanded && (
                         <tr key={`${order.id}-detail`}>
                           <td />
-                          <td colSpan={9} className="px-4 pb-4 pt-1">
-                            <div className="bg-white rounded-lg border border-gray-100
+                          <td colSpan={7} className="px-4 pb-4 pt-1">
+                            <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800
                                             overflow-hidden shadow-sm">
 
-                              <div className="px-4 py-2 border-b border-gray-100
-                                              bg-gray-50 flex items-center justify-between">
-                                <span className="text-xs font-medium text-gray-500
+                              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800
+                                              bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400
                                                  uppercase tracking-wide">
                                   Détail de la commande
                                 </span>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
                                   {items.length} article{items.length > 1 ? 's' : ''}
                                 </span>
                               </div>
 
-                              <div className="divide-y divide-gray-50">
+                              {/* Dati non più visibili nella riga principale */}
+                              <div className="px-4 py-2.5 border-b border-gray-50 dark:border-gray-800
+                                              flex flex-wrap items-center gap-x-6 gap-y-1
+                                              text-xs text-gray-500 dark:text-gray-400">
+                                <span>{order.email}</span>
+                                <span className="lg:hidden"><PaymentBadge method={order.payment_method} /></span>
+                              </div>
+
+                              <div className="divide-y divide-gray-50 dark:divide-gray-800">
                                 {items.map((item, idx) => (
                                   <div
                                     key={item.id ?? idx}
@@ -453,7 +501,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                                                        rounded px-2 py-0.5 flex-shrink-0">
                                         ×{item.quantity}
                                       </span>
-                                      <span className="text-sm text-gray-800">{item.name}</span>
+                                      <span className="text-sm text-gray-800 dark:text-gray-200">{item.name}</span>
                                       {item.storage_type === 'frozen' && (
                                         <span className="text-xs" title="Surgelé" aria-label="Surgelé" role="img">❄</span>
                                       )}
@@ -461,7 +509,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                                         <span className="text-xs" title="Frais" aria-label="Frais" role="img">🌿</span>
                                       )}
                                     </div>
-                                    <span className="text-sm font-medium text-gray-600
+                                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300
                                                      flex-shrink-0 ml-4">
                                       {formatPrice(item.subtotal, tenantCurrency)}
                                     </span>
@@ -469,10 +517,10 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                                 ))}
                               </div>
 
-                              <div className="px-4 py-2.5 border-t border-gray-100
-                                              bg-gray-50 flex justify-between items-center">
-                                <span className="text-xs text-gray-500">Total commande</span>
-                                <span className="text-sm font-bold text-gray-900">
+                              <div className="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800
+                                              bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Total commande</span>
+                                <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
                                   {formatPrice(order.total, tenantCurrency)}
                                 </span>
                               </div>
@@ -487,6 +535,39 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
               </tbody>
             </table>
           </div>
+
+          {/* ── Mobile < md: card list, tap-through al dettaglio ────────────── */}
+          <ul className="md:hidden divide-y divide-gray-100 dark:divide-gray-800" role="list" aria-label="Commandes">
+            {sortedOrders.map(order => (
+              <li key={order.id}>
+                <Link
+                  href={`/admin/orders/${order.id}`}
+                  className="flex items-start gap-3 p-4 active:bg-gray-50 dark:active:bg-gray-800"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-medium text-gray-600 dark:text-gray-300">
+                        #{order.id.slice(0, 8).toUpperCase()}
+                      </span>
+                      <StatusBadge status={order.status} />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1 truncate">
+                      {order.full_name ?? '—'}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {(order.order_items ?? []).length} article{(order.order_items ?? []).length > 1 ? 's' : ''}
+                      {' · '}
+                      {new Date(order.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                    </p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mt-1">
+                      {formatPrice(order.total, tenantCurrency)}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          </>
         )}
       </div>
     </div>

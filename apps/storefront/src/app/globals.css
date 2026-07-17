@@ -44,6 +44,25 @@
   --font-display: var(--font-bricolage), var(--font-body);
 }
 
+/* ── Admin dark mode ──────────────────────────────────────────────────────────
+   La classe .dark è applicata da AdminThemeProvider solo sul sottoalbero
+   admin, mai su <html>: lo storefront resta sempre chiaro. */
+.dark {
+  /* Status tokens — varianti dark-safe, stessa logica di piattaforma della
+     Fase 0 (indipendenti dal tenant). */
+  --status-info-bg:     #1a2740; --status-info-fg:    #93b4f5;
+  --status-warn-bg:     #33270e; --status-warn-fg:    #f3c064;
+  --status-success-bg:  #142e1d; --status-success-fg: #7fd8a0;
+  --status-danger-bg:   #371a1a; --status-danger-fg:  #f3a1a1;
+
+  /* Ricalcolati dal primario del tenant — mai hex fissi (multi-tenant).
+     primary-light scurisce (sfondi di stato attivo); primary-dark si
+     schiarisce perché dalla Fase 1 è il token "testo primario leggibile"
+     e su fondo scuro la variante scura non avrebbe contrasto. */
+  --color-primary-light: color-mix(in srgb, var(--color-primary) 22%, black);
+  --color-primary-dark:  color-mix(in srgb, var(--color-primary) 60%, white);
+}
+
 @layer base {
   * { box-sizing: border-box; }
   body { @apply bg-white text-gray-900 antialiased; }

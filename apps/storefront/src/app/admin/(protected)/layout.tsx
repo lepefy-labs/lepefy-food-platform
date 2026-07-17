@@ -6,6 +6,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import LogoutButton from '../LogoutButton';
 import AdminSidebar from '../_components/AdminSidebar';
+import AdminThemeProvider from '../_components/AdminThemeProvider';
+import ThemeToggleButton from '../_components/ThemeToggleButton';
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
@@ -53,31 +55,32 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .order('position');
 
   return (
-    <>
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
+    <AdminThemeProvider>
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
         {tenant.logo_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />
         )}
         <div>
-          <span className="font-bold text-gray-900 text-sm">{tenant.name}</span>
-          <span className="ml-2 text-xs text-gray-400 font-medium uppercase tracking-wide">
+          <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{tenant.name}</span>
+          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
             Administration
           </span>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggleButton />
           <LogoutButton />
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-57px)]">
-        <aside className="w-56 bg-white border-r border-gray-200 px-3 py-2 shrink-0 hidden md:block">
+      <div className="flex min-h-[calc(100vh-57px)] bg-gray-50 dark:bg-gray-950">
+        <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 px-3 py-2 shrink-0 hidden md:block">
           <Suspense fallback={<div className="w-56 h-full" />}>
             <AdminSidebar categories={categories ?? []} />
           </Suspense>
         </aside>
         <main className="flex-1 p-6 min-w-0">{children}</main>
       </div>
-    </>
+    </AdminThemeProvider>
   );
 }

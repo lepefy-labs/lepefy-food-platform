@@ -30,13 +30,13 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
   function navClass(active: boolean) {
     return active
       ? 'bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] font-medium'
-      : 'text-gray-600 hover:bg-gray-100';
+      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800';
   }
 
   return (
     <nav className="flex flex-col h-full">
 
-      <p className="text-xs font-medium text-gray-500 uppercase
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
                     tracking-widest px-3 mb-1 mt-4">
         Gestion
       </p>
@@ -76,14 +76,14 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
       </button>
 
       {catalogueOpen && (
-        <div className="ml-5 border-l border-gray-100 pl-3 mb-1 space-y-0.5">
+        <div className="ml-5 border-l border-gray-100 dark:border-gray-800 pl-3 mb-1 space-y-0.5">
           <Link
             href="/admin/catalogue"
             className={`block py-1.5 px-2 rounded-lg text-xs
                         transition-colors ${
               pathname === '/admin/catalogue' && !activeCategory
-                ? 'text-[var(--color-primary)] bg-[var(--color-primary-light)] font-medium'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                ? 'text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] font-medium'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}
           >
             Tout
@@ -96,8 +96,8 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
               className={`block py-1.5 px-2 rounded-lg text-xs
                           transition-colors ${
                 activeCategory === cat.slug
-                  ? 'text-[var(--color-primary)] bg-[var(--color-primary-light)] font-medium'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  ? 'text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] font-medium'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
               }`}
             >
               {cat.name}
@@ -107,26 +107,26 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
       )}
 
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg
-                      text-sm mx-1 text-gray-300 cursor-not-allowed">
+                      text-sm mx-1 text-gray-300 dark:text-gray-600 cursor-not-allowed">
         <IconUsers size={16} stroke={1.5} />
         <span className="flex-1">Clients</span>
         <span className="text-xs font-medium px-1.5 py-0.5 rounded-full
-                         bg-gray-100 text-gray-500">
+                         bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
           Bientôt
         </span>
       </div>
 
-      <p className="text-xs font-medium text-gray-500 uppercase
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
                     tracking-widest px-3 mb-1 mt-5">
         Boutique
       </p>
 
       <div className="flex items-center gap-2 px-3 py-2 rounded-lg
-                      text-sm mx-1 text-gray-300 cursor-not-allowed">
+                      text-sm mx-1 text-gray-300 dark:text-gray-600 cursor-not-allowed">
         <IconTag size={16} stroke={1.5} />
         <span className="flex-1">Promotions</span>
         <span className="text-xs font-medium px-1.5 py-0.5 rounded-full
-                         bg-gray-100 text-gray-500">
+                         bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
           Bientôt
         </span>
       </div>
@@ -145,7 +145,7 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
         Paramètres
       </Link>
 
-      <p className="text-xs font-medium text-gray-500 uppercase
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
                     tracking-widest px-3 mb-1 mt-5">
         Compte
       </p>
