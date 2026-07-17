@@ -14,6 +14,7 @@ import {
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import StatusBadge from '../_components/ui/StatusBadge';
+import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/BulkTrackingModal';
 import type { OrderStatus } from '@lepefy/types';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -172,17 +173,19 @@ function PaymentBadge({ method }: { method: string | null }) {
 interface OrdersTableProps {
   orders:         ListOrder[];
   tenantCurrency: string;
+  carriers:       string[];
 }
 
-export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps) {
+export default function OrdersTable({ orders, tenantCurrency, carriers }: OrdersTableProps) {
   const router = useRouter();
 
-  const [searchQuery, setSearchQuery]   = useState('');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy]             = useState<'date' | 'total' | null>(null);
-  const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc');
-  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set());
-  const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [searchQuery, setSearchQuery]     = useState('');
+  const [expandedRows, setExpandedRows]   = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy]               = useState<'date' | 'total' | null>(null);
+  const [sortDir, setSortDir]             = useState<'asc' | 'desc'>('desc');
+  const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
+  const [toast, setToast]                 = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [pendingTracking, setPendingTracking] = useState<PendingTrackingOrder[] | null>(null);
 
   // Reset selezione quando cambia la ricerca testuale — altrimenti si
   // rischia di agire su ordini non più visibili. (Sui filtri di
@@ -286,12 +289,12 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
     window.open(`/admin/orders/picking-list?ids=${ids}`, '_blank', 'noopener,noreferrer');
   }
 
-  async function handleMarkShipped() {
-    const ids = Array.from(selectedIds);
+  async function handleMarkShipped(tracking?: Record<string, { carrier: string; code: string }>) {
+    const ids = tracking ? Object.keys(tracking) : Array.from(selectedIds);
     const res = await fetch('/api/admin/orders/bulk-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderIds: ids }),
+      body: JSON.stringify({ orderIds: ids, tracking }),
     });
 
     if (!res.ok) {
@@ -301,25 +304,39 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
     }
 
     const { shipped, readyForPickup, skipped } = await res.json();
+    const missingTracking = skipped.filter((s: { reason: string }) => s.reason === 'missing_tracking');
+    const wrongStatus     = skipped.filter((s: { reason: string }) => s.reason === 'wrong_status');
 
-    // Le righe risolte (spedite o pronte per ritiro) escono dalla selezione;
-    // quelle saltate restano selezionate così lo staff le vede subito e può
-    // intervenire (aggiungere il tracking, o capire perché sono state escluse).
-    setSelectedIds(new Set(skipped.map((s: { id: string }) => s.id)));
+    if (missingTracking.length > 0 && !tracking) {
+      // Primo giro: apri il pannello solo per chi manca ancora il tracking
+      setPendingTracking(missingTracking.map((s: { id: string }) => {
+        const order = orders.find(o => o.id === s.id);
+        return {
+          id:    s.id,
+          label: `#${s.id.slice(0, 8).toUpperCase()} — ${order?.full_name ?? order?.email ?? ''}`,
+        };
+      }));
+    } else {
+      setPendingTracking(null);
+    }
 
-    const missingTracking = skipped.filter((s: { reason: string }) => s.reason === 'missing_tracking').length;
-    const wrongStatus     = skipped.filter((s: { reason: string }) => s.reason === 'wrong_status').length;
+    // Le risolte escono dalla selezione; quelle bloccate per statuto sbagliato
+    // restano selezionate; quelle in attesa di tracking restano selezionate
+    // finché il pannello non si chiude con successo o annullamento.
+    setSelectedIds(new Set([...wrongStatus.map((s: { id: string }) => s.id), ...missingTracking.map((s: { id: string }) => s.id)]));
 
     const parts: string[] = [];
-    if (shipped.length)        parts.push(`${shipped.length} expédiée${shipped.length > 1 ? 's' : ''}`);
-    if (readyForPickup.length) parts.push(`${readyForPickup.length} prête${readyForPickup.length > 1 ? 's' : ''} (retrait)`);
-    if (missingTracking)       parts.push(`${missingTracking} ignorée${missingTracking > 1 ? 's' : ''} (code de suivi manquant)`);
-    if (wrongStatus)           parts.push(`${wrongStatus} ignorée${wrongStatus > 1 ? 's' : ''} (statut incompatible)`);
+    if (shipped.length)             parts.push(`${shipped.length} expédiée${shipped.length > 1 ? 's' : ''}`);
+    if (readyForPickup.length)      parts.push(`${readyForPickup.length} prête${readyForPickup.length > 1 ? 's' : ''} (retrait)`);
+    if (missingTracking.length && tracking) parts.push(`${missingTracking.length} ignorée${missingTracking.length > 1 ? 's' : ''} (code de suivi manquant)`);
+    if (wrongStatus.length)         parts.push(`${wrongStatus.length} ignorée${wrongStatus.length > 1 ? 's' : ''} (statut incompatible)`);
 
-    setToast({
-      msg:  parts.length ? parts.join(' · ') : 'Aucune commande à traiter.',
-      type: skipped.length > 0 && shipped.length === 0 && readyForPickup.length === 0 ? 'error' : 'success',
-    });
+    if (parts.length) {
+      setToast({
+        msg:  parts.join(' · '),
+        type: shipped.length === 0 && readyForPickup.length === 0 ? 'error' : 'success',
+      });
+    }
 
     router.refresh(); // la pagina server rilegge gli ordini aggiornati
   }
@@ -715,7 +732,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
           <button onClick={handlePrintPickingLists} className="text-sm hover:opacity-80 transition-opacity">
             Imprimer les listes
           </button>
-          <button onClick={handleMarkShipped} className="text-sm hover:opacity-80 transition-opacity">
+          <button onClick={() => handleMarkShipped()} className="text-sm hover:opacity-80 transition-opacity">
             Traiter la sélection
           </button>
           <button
@@ -726,6 +743,19 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
             <IconX size={14} />
           </button>
         </div>
+      )}
+
+      {/* ── Pannello tracking — apre quando il primo giro segnala ordini senza
+           codice di spedizione, invece di limitarsi a saltarli ─────────────── */}
+      {pendingTracking && (
+        <BulkTrackingModal
+          orders={pendingTracking}
+          carrierOptions={carriers}
+          onCancel={() => setPendingTracking(null)}
+          onConfirm={(tracking) => {
+            handleMarkShipped(tracking);
+          }}
+        />
       )}
 
       {/* ── Toast — stesso pattern dei client etichette ─────────────────────── */}

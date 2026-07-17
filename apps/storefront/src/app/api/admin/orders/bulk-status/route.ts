@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  const { orderIds } = await req.json();
+  const { orderIds, tracking } = await req.json() as {
+    orderIds: string[];
+    tracking?: Record<string, { carrier: string; code: string }>;
+  };
 
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
     return NextResponse.json({ error: 'orderIds manquant ou vide.' }, { status: 400 });
@@ -36,6 +39,7 @@ export async function POST(req: NextRequest) {
 
   const toShipped:        string[] = [];
   const toReadyForPickup: string[] = [];
+  const trackingUpdates:  { id: string; carrier: string; code: string }[] = [];
   const skipped: { id: string; reason: SkipReason }[] = [];
 
   for (const order of orders ?? []) {
@@ -52,13 +56,30 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    // Regola 3 — una consegna richiede tracking_code già valorizzato
-    if (!order.tracking_code || order.tracking_code.trim() === '') {
+    // Regola 3 — una consegna richiede tracking_code già valorizzato, oppure
+    // fornito ora dal pannello di compilazione (secondo giro della bulk bar)
+    const providedTracking = tracking?.[order.id];
+    const hasTracking = (order.tracking_code && order.tracking_code.trim() !== '')
+                      || (providedTracking?.code && providedTracking.code.trim() !== '');
+
+    if (!hasTracking) {
       skipped.push({ id: order.id, reason: 'missing_tracking' });
       continue;
     }
 
+    if (providedTracking) {
+      trackingUpdates.push({ id: order.id, ...providedTracking });
+    }
     toShipped.push(order.id);
+  }
+
+  for (const t of trackingUpdates) {
+    const { error } = await admin
+      .from('orders')
+      .update({ tracking_code: t.code, tracking_carrier: t.carrier })
+      .eq('id', t.id)
+      .eq('tenant_id', tenant.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   if (toShipped.length > 0) {

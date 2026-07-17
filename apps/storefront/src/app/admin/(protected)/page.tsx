@@ -160,6 +160,17 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const { data: orders } = await query as { data: ListOrder[] | null }
   const orderList = orders ?? []
 
+  // Stessa query di (protected)/orders/[id]/page.tsx — lista trasportatori
+  // per il pannello di compilazione tracking nella bulk bar.
+  const { data: carriersRaw } = await supabase
+    .from('carriers')
+    .select('name')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('position', { ascending: true })
+
+  const carriers = ((carriersRaw ?? []) as { name: string }[]).map(c => c.name)
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -225,6 +236,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <OrdersTable
           orders={orderList}
           tenantCurrency={tenant.currency}
+          carriers={carriers}
         />
 
       </div>

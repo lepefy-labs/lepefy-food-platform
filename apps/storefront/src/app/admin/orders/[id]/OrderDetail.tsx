@@ -251,6 +251,12 @@ export default function OrderDetail({
 
   const statusOptions = isPickup ? STATUS_OPTIONS_PICKUP : STATUS_OPTIONS_DELIVERY;
 
+  // STATUS_OPTIONS_PICKUP ne propose jamais 'shipped' (picked_up y tient sa place) :
+  // cette situation ne peut donc se produire que pour une livraison, sans condition
+  // supplémentaire sur fulfillment_type nécessaire.
+  const shippedWithoutTracking =
+    status === 'shipped' && (!trackingCode || trackingCode.trim() === '');
+
   function switchLang(l: Lang) {
     setLang(l);
     localStorage.setItem('lepefy-admin-lang', l);
@@ -538,12 +544,20 @@ export default function OrderDetail({
 
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || shippedWithoutTracking}
             className="w-full py-2.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50 transition-opacity"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
             {saving ? t.saving : t.save}
           </button>
+
+          {shippedWithoutTracking && (
+            <p className="text-xs text-red-600 mt-2">
+              {lang === 'fr'
+                ? 'Le code de suivi est requis pour marquer la commande comme expédiée.'
+                : 'Il codice di tracking è obbligatorio per segnare l\'ordine come spedito.'}
+            </p>
+          )}
         </div>
       </section>
 
