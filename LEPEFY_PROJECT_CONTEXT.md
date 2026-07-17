@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 17 Luglio 2026 — audit e redesign UI/UX dello storefront (Fase 1–3, branch `claude/lepefy-storefront-audit-69xss0`) verificati riga per riga contro il filesystem reale e documentati in §12bis. **Lavoro completato solo in locale su quel branch: 5 commit, MAI pushati su `origin`** — `main` resta al commit precedente a tutto questo lavoro. Base di questa revisione: v3.3 (16 Luglio), invariata su tutto il resto tranne dove esplicitamente segnalato.
+> Aggiornato: 17 Luglio 2026 — branch `claude/lepefy-storefront-audit-69xss0` **pushato e mergiato su `main`**, query `UPDATE tenants SET primary_color='#1267C7'` **eseguita**: il redesign UI/UX in 3 fasi (§12bis) è ora interamente live su `chloefood.com`. Resta aperta solo la decisione di prodotto sulla destinazione del CTA hero "Notre histoire" (spostata in roadmap, §19). Base di questa revisione: v3.4 (verificata da Claude Code contro filesystem/git reale), invariata su tutto il resto tranne dove esplicitamente segnalato.
 
 ---
 
@@ -46,16 +46,18 @@
 | **Monorepo** | pnpm workspaces (`pnpm@8.15.0`) | `apps/storefront` + `packages/types` |
 | **TypeScript** | Strict | Types condivisi in `packages/types` |
 
-**Colori brand ChloeFood (valore DB attuale — invariato, vedi nota migrazione sotto):**
-- Primary: `#1D9E75` (verde) — default DB in `001_initial_schema.sql`, ancora il valore live in `tenants.primary_color`
+**Colori brand ChloeFood (valore DB attuale — aggiornato 17/07):**
+- Primary: **`#1267C7` (blu)** — live in `tenants.primary_color`, query eseguita manualmente da Robertin (era `#1D9E75` fino a questa revisione)
 - Secondary: `#F2C811` (giallo/moutarde)
-- Accent light: `#E1F5EE`
+- Accent light: `#E1F5EE` — ⚠️ non toccato dalla migrazione colore, nota di coerenza visiva ancora aperta (vedi §12bis)
 
-**✅ Codice storefront ora interamente token-based (Fase 1–3, branch `claude/lepefy-storefront-audit-69xss0`, non ancora pushato — vedi §12bis per il dettaglio completo).** Prima di questo lavoro, il verde `#1D9E75` era hardcoded in punti multipli (BottomNav, PWABanner, AddToCartButton, HeroBanner, pagina tracking ordine) invece di derivare da `tenant.primary_color` — bug di multi-tenancy reale, non solo teorico: un cambio colore via DB non si sarebbe propagato ovunque. **Tutti questi punti sono stati corretti**: l'intero storefront pubblico deriva ora da variabili CSS iniettate da `layout.tsx` (`--color-primary`, `--color-primary-light`, `--color-primary-dark`, `--color-primary-hover`, `--color-secondary`, più `--radius-*`/`--shadow-card`/`--font-body`/`--font-display`, vedi §12bis) — un cambio di `tenant.primary_color` in DB oggi si propaga correttamente ovunque, incluso ai nuovi elementi introdotti (cartellino signature `ShopTag`, pattern decorativo hero).
+**✅ Codice storefront ora interamente token-based E in produzione (Fase 1–3, branch `claude/lepefy-storefront-audit-69xss0` pushato e mergiato su `main` il 17/07 — vedi §12bis per il dettaglio completo).** Prima di questo lavoro, il verde `#1D9E75` era hardcoded in punti multipli (BottomNav, PWABanner, AddToCartButton, HeroBanner, pagina tracking ordine) invece di derivare da `tenant.primary_color` — bug di multi-tenancy reale, non solo teorico: un cambio colore via DB non si sarebbe propagato ovunque. **Tutti questi punti sono stati corretti**: l'intero storefront pubblico deriva ora da variabili CSS iniettate da `layout.tsx` (`--color-primary`, `--color-primary-light`, `--color-primary-dark`, `--color-primary-hover`, `--color-secondary`, più `--radius-*`/`--shadow-card`/`--font-body`/`--font-display`, vedi §12bis) — il cambio di `tenant.primary_color` in DB (eseguito il 17/07) si è propagato correttamente ovunque, incluso ai nuovi elementi introdotti (cartellino signature `ShopTag`, pattern decorativo hero).
 
-**⚠️ Brand charter v2 — decisione presa sul font e sull'elemento signature, migrazione colore ancora da eseguire.** Dalice ha ricevuto una nuova charter grafica (20 pagine) con logo, palette e materiali completamente diversi — colore primario proposto **blu `#1267C7`**. Charter incompleta all'origine (mancano varianti icona/monocromatiche, riferimenti Pantone, dati placeholder errati come dominio e nome fittizio "TSANA"), ma le tre decisioni di design derivate ne sono state validate su mockup interattivo (`Mockup_Fase3_Validazione_UIUX.html`, allegato non versionato nel repo) e implementate in codice:
+**⚠️ Nota di coerenza aperta:** `tenant.accent_light` (`#E1F5EE`, verde menta) non è stato aggiornato insieme al primary e resta visivamente scollegato dal nuovo blu nei punti che lo usano ancora come sfondo chiaro (es. contenitore icona prodotto in `ProductCard`). Non bloccante, ma da valutare — vedi §19.
+
+**✅ Brand charter v2 — le 3 decisioni derivate sono ora tutte live in produzione.** Dalice ha ricevuto una nuova charter grafica (20 pagine) con logo, palette e materiali completamente diversi — colore primario proposto **blu `#1267C7`**. Charter incompleta all'origine (mancano varianti icona/monocromatiche, riferimenti Pantone, dati placeholder errati come dominio e nome fittizio "TSANA"), ma le tre decisioni di design derivate ne sono state validate su mockup interattivo (`Mockup_Fase3_Validazione_UIUX.html`, allegato non versionato nel repo), implementate in codice e ora deployate:
 1. **Font titoli/segnaletica: Bricolage Grotesque** (corpo testo resta Inter) — caricato via `next/font/google`, decisione di piattaforma applicata a tutti i tenant, non tenant-specifica.
-2. **Colore primario → blu `#1267C7`** — decisione di **dato**, non di codice: nessuna occorrenza di questo hex è mai stata scritta nel codice (verificato), il codice legge sempre `tenant.primary_color`. **Query SQL pronta ma non ancora eseguita** (vedi §12bis/§18): `UPDATE tenants SET primary_color = '#1267C7' WHERE slug = 'chloefood';`.
+2. **Colore primario → blu `#1267C7`** — era una decisione di **dato**, non di codice: nessuna occorrenza di questo hex è mai stata scritta nel codice, il codice legge sempre `tenant.primary_color`. **Query SQL eseguita il 17/07.**
 3. **Elemento signature "cartellino da bottega"** (`ShopTag.tsx`) — nel mockup era descritto come oro fisso "dal logo"; **deliberatamente non implementato così**, perché quel ragionamento è specifico a ChloeFood. In produzione usa `var(--color-secondary)` (già `#F2C811`, visivamente equivalente per ChloeFood), quindi resta corretto per qualunque tenant futuro.
 
 Il nuovo logo (JPEG, versione completa + versione icona) resta integrato solo sulla landing page `chloefood.com` (hero, favicon, PWA icon, colore hero blu) — quella parte non fa parte di questo audit (`apps/storefront`) ed è rimasta invariata.
@@ -459,9 +461,9 @@ TRACKING_SECRET=...    # Per HMAC token ordini — ora obbligatoria anche per la
 
 ---
 
-## 12bis. Audit e redesign UI/UX storefront (Fase 1–3) — ⚠️ branch locale, non pushato
+## 12bis. Audit e redesign UI/UX storefront (Fase 1–3) — ✅ live in produzione
 
-**Stato:** lavoro completo (typecheck verde su tutte le fasi), **5 commit sul branch `claude/lepefy-storefront-audit-69xss0`, mai pushati su `origin`** — `main` non contiene nulla di questo lavoro. Perimetro: solo `apps/storefront`, `apps/admin` (route `src/app/admin/**`) esplicitamente escluso in ogni fase.
+**Stato:** lavoro completo (typecheck verde su tutte le fasi), **mergiato su `main` e deployato** (branch `claude/lepefy-storefront-audit-69xss0`, 5 commit, pushato il 17/07). Perimetro: solo `apps/storefront`, `apps/admin` (route `src/app/admin/**`) esplicitamente escluso in ogni fase.
 
 Origine: audit strategico dello storefront pubblico (home, catalogo, scheda prodotto, carrello, checkout, tracking ordine), poi implementato in 3 fasi + una passata di allineamento a un mockup di validazione approvato (`Mockup_Fase3_Validazione_UIUX.html`, allegato di sessione, non versionato nel repo).
 
@@ -494,21 +496,20 @@ Origine: audit strategico dello storefront pubblico (home, catalogo, scheda prod
 - **Hero ridisegnato**: gradiente `primary-dark → primary`, pattern a triangoli via SVG/`<pattern>` (nessuna immagine raster), layout a due colonne su desktop con preview di prodotti reali (featured, non placeholder), impilato su mobile; copy H1/sottotitolo aggiornata, doppio CTA ("Découvrir le catalogue" + "Notre histoire" — quest'ultimo **punta temporaneamente a `/products` per mancanza di una pagina di destinazione reale, marcato `TODO` nel codice**, decisione di prodotto aperta), trust-row a 3 voci
 - **Verifica contrasto per il futuro blu `#1267C7`** (calcolata, non stimata): testo bianco su `--color-primary` 5.54:1, su `--color-primary-dark` 8.36:1, testo `--color-primary` su bianco 5.54:1 — tutti ≥ AA. Nota di coerenza dati non bloccante: `tenant.accent_light` (verde menta) non fa parte della migrazione colore e resterebbe visivamente scollegato dal nuovo blu se non aggiornato in parallelo
 
-### Migrazione dati preparata, non eseguita
+### Migrazione dati — ✅ eseguita il 17/07
 
 ```sql
--- Da eseguire manualmente su Supabase — NON incorporata nel codice
+-- Eseguita manualmente su Supabase il 17/07:
 UPDATE tenants SET primary_color = '#1267C7' WHERE slug = 'chloefood';
 
--- Facoltativa, consigliata per coerenza visiva col nuovo blu:
+-- Non ancora eseguita — valutare in roadmap (§19), non bloccante:
 -- UPDATE tenants SET accent_light = '#E3EFFB' WHERE slug = 'chloefood';
 ```
 
 ### Cosa resta aperto
 
-- **Push del branch** — 5 commit locali mai arrivati su `origin`, quindi nemmeno su `main`
-- **Query `primary_color` non eseguita** — il blu resta solo pronto lato codice
-- **CTA "Notre histoire"** senza destinazione reale (punta a `/products`)
+- **CTA "Notre histoire"** senza destinazione reale (punta a `/products`) — decisione di prodotto spostata in roadmap, §19
+- `tenant.accent_light` non aggiornato in coerenza col nuovo blu (non bloccante, vedi §2)
 - Copy H1/sottotitolo hero restano stringhe FR fisse uguali per ogni tenant (preesistente, non introdotto né risolto da questo audit)
 - Nessun campo prodotto per una vera "origine/provenienza" (usato `storage_type` + `weight_grams` come miglior proxy reale disponibile)
 
@@ -696,10 +697,9 @@ GOTENBERG_AUTH=...
 | Installare/confermare Gotenberg raggiungibile su Hetzner + Caddy auth | Robertin | ✅ FATTO (verificato end-to-end 14/07: deploy Hetzner + PDF reale generato da job vero) |
 | Verificare dati nutrizionali/lotto con produttori prima di stampare etichette (in particolare Bobolo, valori sospetti) | ChloeFood / produttori | ⚠️ DA FARE — competenza ChloeFood, non blocco tecnico |
 | Rimuovere file morti `admin/orders/id/` e cartella componenti condivisi non-route | Robertin | ⚠️ DA FARE (non bloccante) |
-| Decisione brand charter v2 (font + elemento signature) | Dalice | ✅ DECISO — Bricolage Grotesque + cartellino `ShopTag`, validati su mockup e implementati (§12bis) |
-| **Pushare il branch `claude/lepefy-storefront-audit-69xss0`** (5 commit locali, mai su `origin`/`main`) | Robertin | ⚠️ DA FARE — bloccante per tutto il resto di questa lista relativo al redesign |
-| Eseguire query SQL `UPDATE tenants SET primary_color='#1267C7' WHERE slug='chloefood'` | Robertin | ⚠️ DA FARE — codice già pronto, vedi §12bis |
-| Decidere destinazione reale del CTA hero "Notre histoire" (oggi punta a `/products`) | Robertin / Dalice | ⚠️ DA FARE |
+| Decisione brand charter v2 (font, colore, elemento signature) | Dalice | ✅ FATTO — Bricolage Grotesque, blu `#1267C7`, cartellino `ShopTag`: validati su mockup, implementati e deployati (§12bis) |
+| ~~Pushare il branch redesign UI/UX~~ | Robertin | ✅ FATTO (17/07) |
+| ~~Eseguire query SQL colore primario ChloeFood~~ | Robertin | ✅ FATTO (17/07) |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
 
 ---
@@ -729,6 +729,8 @@ GOTENBERG_AUTH=...
 | Apple App Store via Capacitor | Growth | P2 | Non avviato |
 | Onboarding secondo tenant (self-service, wizard) | SaaS | P1 | Guida `Lepefy_Onboarding_Tenant_v1.docx` pronta; asset statici mono-tenant + limite build-time tenant da rimediare prima |
 | Rate limiting su `/api/checkout` e `/api/shipping/quote` | Tecnico | P1 | Non avviato |
+| Decidere destinazione reale del CTA hero "Notre histoire" (oggi placeholder `/products`) | Contenuto/Prodotto | P1 | Non avviato — vedi §12bis |
+| Allineare `tenant.accent_light` al nuovo primary blu (coerenza visiva, non bloccante) | Tecnico | P2 | Non avviato — query pronta, vedi §12bis |
 
 ### Phase 2 — Packlink draft feature (dettaglio)
 
@@ -823,4 +825,18 @@ Nessuna modifica alle sezioni non toccate da questo lavoro (shipping, checkout, 
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.4 — 17 Luglio 2026 (base: v3.3; + audit e redesign UI/UX storefront Fase 1–3, branch locale non pushato, vedi §12bis e §24)*
+## 25. Changelog v3.5 (17 Luglio 2026) — branch pushato, colore live, CTA in roadmap
+
+Chiusura operativa del redesign UI/UX documentato in v3.4: i due blocchi che risultavano ancora "solo pronti in locale" sono stati eseguiti manualmente da Robertin (workflow abituale: nessun ambiente locale, esecuzione via GitHub web UI + Supabase).
+
+- **§1 (intestazione)** — branch `claude/lepefy-storefront-audit-69xss0` confermato pushato e mergiato su `main`; query colore confermata eseguita.
+- **§2** — colore primario ChloeFood aggiornato da `#1D9E75` a **`#1267C7`** come valore DB live (non più "pronto ma non eseguito"). Aggiunta nota di coerenza su `tenant.accent_light`, non toccato dalla migrazione.
+- **§12bis** — stato sezione da "⚠️ branch locale, non pushato" a "✅ live in produzione"; blocco migrazione dati aggiornato da "preparata, non eseguita" a "eseguita"; "Cosa resta aperto" ridotto al solo CTA hero + nota accent_light (push e query rimossi, essendo risolti).
+- **§18** — righe push branch e query SQL segnate FATTO; riga CTA hero rimossa dalla checklist go-live e spostata in roadmap (vedi sotto), su richiesta esplicita: non è un blocco per il go-live, è una decisione di prodotto a sé.
+- **§19** — aggiunte due righe roadmap Phase 2: decisione destinazione CTA "Notre histoire" (P1) e allineamento `accent_light` al nuovo blu (P2, non bloccante).
+
+Nessuna modifica alle sezioni non toccate da questo aggiornamento rispetto alla revisione di v3.4 verificata da Claude Code.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.5 — 17 Luglio 2026 (base: v3.4 verificata su git/filesystem; + branch mergiato, colore live, CTA spostato in roadmap, vedi §25)*
