@@ -14,11 +14,13 @@ const filters = [
     paramKey: 'status',
     label:    'Statut',
     options: [
-      { key: '',           label: 'Tous les statuts' },
-      { key: 'preparing',  label: 'En préparation' },
-      { key: 'shipped',    label: 'Expédié' },
-      { key: 'delivered',  label: 'Livré' },
-      { key: 'cancelled',  label: 'Annulé' },
+      { key: '',                 label: 'Tous les statuts' },
+      { key: 'new',              label: 'Nouveau' },
+      { key: 'preparing',        label: 'En préparation' },
+      { key: 'ready_for_pickup', label: 'Prêt à retirer' },
+      { key: 'shipped',          label: 'Expédié' },
+      { key: 'delivered',        label: 'Livré' },
+      { key: 'cancelled',        label: 'Annulé' },
     ],
   },
   {

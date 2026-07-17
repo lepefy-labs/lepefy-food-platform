@@ -10,6 +10,7 @@ import {
   IconPrinter,
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import StatusBadge from '../_components/ui/StatusBadge';
 import type { OrderStatus } from '@lepefy/types';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -117,38 +118,6 @@ function DestinationCell({
   }
 
   return <FlagBadge country={country} />;
-}
-
-// ─── StatusBadge ──────────────────────────────────────────────────────────────
-
-const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
-  new:              { bg: '#F0F9FF', color: '#0369A1', border: '#BAE6FD' },
-  preparing:        { bg: '#FFFBEB', color: '#B45309', border: '#FDE68A' },
-  ready_for_pickup: { bg: '#F0FDF4', color: '#15803D', border: '#BBF7D0' },
-  shipped:          { bg: '#EFF6FF', color: '#1D4ED8', border: '#BFDBFE' },
-  delivered:        { bg: '#F0FDF4', color: '#166534', border: '#A7F3D0' },
-  cancelled:        { bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA' },
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  new:              'Nouveau',
-  preparing:        'En préparation',
-  ready_for_pickup: 'Prêt à retirer',
-  shipped:          'Expédié',
-  delivered:        'Livré',
-  cancelled:        'Annulé',
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_STYLE[status] ?? { bg: '#F3F4F6', color: '#374151', border: '#D1D5DB' };
-  return (
-    <span
-      className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold"
-      style={{ background: s.bg, color: s.color, border: `0.5px solid ${s.border}` }}
-    >
-      {STATUS_LABELS[status] ?? status}
-    </span>
-  );
 }
 
 // ─── PaymentBadge ─────────────────────────────────────────────────────────────

@@ -17,6 +17,25 @@
   --radius-full: 999px;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
 
+  /* Semantic status colors — platform-level, tenant-independent.
+     NON derivano da tenant.primary_color: lo stato di un ordine ha lo
+     stesso significato in ogni negozio. */
+  --status-info-bg:     #EFF6FF;
+  --status-info-fg:     #1D4ED8;
+  --status-info-dot:    #3B82F6;
+
+  --status-warn-bg:     #FFFBEB;
+  --status-warn-fg:     #B45309;
+  --status-warn-dot:    #F59E0B;
+
+  --status-success-bg:  #F0FDF4;
+  --status-success-fg:  #15803D;
+  --status-success-dot: #22C55E;
+
+  --status-danger-bg:   #FEF2F2;
+  --status-danger-fg:   #B91C1C;
+  --status-danger-dot:  #EF4444;
+
   /* Typographie — décision de plateforme, jamais dérivée du tenant.
      --font-body reste Inter (paragraphes, prix, UI système) ;
      --font-display est réservé aux titres et moments "signalétiques"
