@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 17 Luglio 2026 — chiuso il ciclo di audit e redesign frontend/UI-UX dello storefront (Fase 1: de-hardcoding token + accessibilità; Fase 2: unificazione ProductCard + immagini/icone/skeleton/tipografia; Fase 3: font Bricolage Grotesque, colore primario blu `#1267C7`, elemento signature "cartellino da bottega"). Dettaglio completo in §12bis. Base di questa revisione: v3.3 (16 Luglio), invariata su tutto il resto non toccato dal redesign.
+> Aggiornato: 17 Luglio 2026 — audit e redesign UI/UX dello storefront (Fase 1–3, branch `claude/lepefy-storefront-audit-69xss0`) verificati riga per riga contro il filesystem reale e documentati in §12bis. **Lavoro completato solo in locale su quel branch: 5 commit, MAI pushati su `origin`** — `main` resta al commit precedente a tutto questo lavoro. Base di questa revisione: v3.3 (16 Luglio), invariata su tutto il resto tranne dove esplicitamente segnalato.
 
 ---
 
@@ -28,7 +28,7 @@
 | Layer | Tecnologia | Dettaglio |
 |---|---|---|
 | **Frontend** | Next.js 14.2.3 (App Router) | Storefront + API routes, SSR — versione confermata in `apps/storefront/package.json` |
-| **Stile** | Tailwind CSS 3.4.3 | Design system tokenizzato (audit UI/UX Luglio 2026, §12bis): colori tenant via CSS vars (`--color-primary`, `--color-secondary`, `--color-primary-dark/-light/-hover` derivati via `color-mix()`), scala `--radius-sm/md/lg/full`, `--shadow-card`, scala tipografica dichiarata in `tailwind.config.ts`. Font: Inter (body, `next/font/google`) + Bricolage Grotesque (display/titoli, font di piattaforma non tenant-specifico) |
+| **Stile** | Tailwind CSS 3.4.3 | Token system via CSS vars (`--color-primary`, `--color-secondary`, `--radius-*`, `--shadow-card`, `--font-body`/`--font-display`), iniettate per tenant da `layout.tsx` — vedi §12bis |
 | **State** | Zustand 4.5.2 | Cart store con persist + `shippingPayload()` |
 | **Database** | Supabase (PostgreSQL) | `lepefy-food-platform`, RLS attivo su tutte le tabelle |
 | **Auth** | Supabase Auth | **Admin: ✅ implementata** (pagine via route group `(protected)` **+ API routes via `requireAdmin()`**, vedi §2.1) · Clienti: Phase 2 |
@@ -46,12 +46,19 @@
 | **Monorepo** | pnpm workspaces (`pnpm@8.15.0`) | `apps/storefront` + `packages/types` |
 | **TypeScript** | Strict | Types condivisi in `packages/types` |
 
-**Colori brand ChloeFood (attuali, in produzione dal redesign Fase 3 — vedi §12bis):**
-- Primary: **`#1267C7` (blu)** — valore in `tenants.primary_color` per il tenant `chloefood`, letto dinamicamente da `getTenant()`; nessun hex hardcodato nel codice, solo `var(--color-primary)` e derivati
-- Secondary: `#F2C811` (giallo/oro) — usato anche come colore del componente signature `ShopTag` (cartellino da bottega, §12bis)
+**Colori brand ChloeFood (valore DB attuale — invariato, vedi nota migrazione sotto):**
+- Primary: `#1D9E75` (verde) — default DB in `001_initial_schema.sql`, ancora il valore live in `tenants.primary_color`
+- Secondary: `#F2C811` (giallo/moutarde)
 - Accent light: `#E1F5EE`
 
-**✅ Brand charter v2 — decisione presa e implementata (17/07):** il colore primario è passato dal verde `#1D9E75` al blu `#1267C7`, allineando lo storefront al colore dominante del wordmark nel logo reale (`chloe_food_logo.svg`), verificato durante il redesign: il logo era già a dominanza blu con verde solo su foglie/swoosh e oro sulle posate — il sito precedente (tutto verde) divergeva dal proprio logo. Il cambio è stato applicato come **dato** (update `tenants.primary_color`), non come hex hardcodato in nessun componente. Charter completa (20 pagine, `Charte_graphique_Chloe_Food_1.pdf`) resta di riferimento solo per asset grafici extra (packaging, materiali stampa) non ancora affrontati.
+**✅ Codice storefront ora interamente token-based (Fase 1–3, branch `claude/lepefy-storefront-audit-69xss0`, non ancora pushato — vedi §12bis per il dettaglio completo).** Prima di questo lavoro, il verde `#1D9E75` era hardcoded in punti multipli (BottomNav, PWABanner, AddToCartButton, HeroBanner, pagina tracking ordine) invece di derivare da `tenant.primary_color` — bug di multi-tenancy reale, non solo teorico: un cambio colore via DB non si sarebbe propagato ovunque. **Tutti questi punti sono stati corretti**: l'intero storefront pubblico deriva ora da variabili CSS iniettate da `layout.tsx` (`--color-primary`, `--color-primary-light`, `--color-primary-dark`, `--color-primary-hover`, `--color-secondary`, più `--radius-*`/`--shadow-card`/`--font-body`/`--font-display`, vedi §12bis) — un cambio di `tenant.primary_color` in DB oggi si propaga correttamente ovunque, incluso ai nuovi elementi introdotti (cartellino signature `ShopTag`, pattern decorativo hero).
+
+**⚠️ Brand charter v2 — decisione presa sul font e sull'elemento signature, migrazione colore ancora da eseguire.** Dalice ha ricevuto una nuova charter grafica (20 pagine) con logo, palette e materiali completamente diversi — colore primario proposto **blu `#1267C7`**. Charter incompleta all'origine (mancano varianti icona/monocromatiche, riferimenti Pantone, dati placeholder errati come dominio e nome fittizio "TSANA"), ma le tre decisioni di design derivate ne sono state validate su mockup interattivo (`Mockup_Fase3_Validazione_UIUX.html`, allegato non versionato nel repo) e implementate in codice:
+1. **Font titoli/segnaletica: Bricolage Grotesque** (corpo testo resta Inter) — caricato via `next/font/google`, decisione di piattaforma applicata a tutti i tenant, non tenant-specifica.
+2. **Colore primario → blu `#1267C7`** — decisione di **dato**, non di codice: nessuna occorrenza di questo hex è mai stata scritta nel codice (verificato), il codice legge sempre `tenant.primary_color`. **Query SQL pronta ma non ancora eseguita** (vedi §12bis/§18): `UPDATE tenants SET primary_color = '#1267C7' WHERE slug = 'chloefood';`.
+3. **Elemento signature "cartellino da bottega"** (`ShopTag.tsx`) — nel mockup era descritto come oro fisso "dal logo"; **deliberatamente non implementato così**, perché quel ragionamento è specifico a ChloeFood. In produzione usa `var(--color-secondary)` (già `#F2C811`, visivamente equivalente per ChloeFood), quindi resta corretto per qualunque tenant futuro.
+
+Il nuovo logo (JPEG, versione completa + versione icona) resta integrato solo sulla landing page `chloefood.com` (hero, favicon, PWA icon, colore hero blu) — quella parte non fa parte di questo audit (`apps/storefront`) ed è rimasta invariata.
 
 ### 2.1 Revisione di sicurezza — ✅ 4 criticità risolte (deployate 2026-07-02)
 
@@ -259,6 +266,7 @@ GRANT UPDATE ON public.[tabella] TO service_role;  -- richiesto per ogni tabella
 
 - Ogni query DB **deve** usare `tenant.id` caricato da `NEXT_PUBLIC_TENANT_SLUG` + `getTenant()`
 - Mai hardcodare slug (`'chloefood'`), colori, nomi, label corrieri, o valori tenant-specifici nel codice
+- **✅ Audit dedicato eseguito su questa regola per lo storefront pubblico (Fase 1–3, §12bis).** Prima dell'audit la regola era violata in più punti concreti (colori hardcoded in BottomNav/PWABanner/AddToCartButton/HeroBanner/tracking ordine, nome tenant hardcoded `"Chloé Food"` in PWABanner). Tutti corretti; il pattern ora è: solo `var(--color-*)` o classi Tailwind mappate nei componenti storefront, mai hex literal — vedi §12bis per il dettaglio e per il lavoro analogo ancora da fare fuori da `apps/storefront` se in futuro si aggiungerà un secondo tenant con branding diverso
 - La logica del corriere è **switch-based** su `tenants.shipping_provider` (`packlink` / `flat_rate` / `pickup_only`)
 - RLS attivo su tutte le tabelle — il `service_role` bypassa RLS nelle API routes admin (ora tutte protette anche a livello applicativo da `requireAdmin()`, vedi §2.1)
 - **Eccezioni statiche note (da rimediare prima del 2° tenant):** `favicon.ico` e `apple-touch-icon.png` in `public/` sono file statici mono-tenant, accettabili temporaneamente con un solo tenant attivo
@@ -430,7 +438,7 @@ TRACKING_SECRET=...    # Per HMAC token ordini — ora obbligatoria anche per la
 
 - `manifest.ts` dinamico per tenant (genera `/manifest.json` al runtime)
 - Service worker (`public/sw.js`) con cache strategy
-- Banner installazione Android animato, colore `#F2C811`
+- Banner installazione Android animato — colore `var(--color-secondary)` e nome `tenant.name` (corretti in Fase 1/2.2 dell'audit UI/UX, §12bis: prima erano hardcoded `#F2C811` e `"Chloé Food"` rispettivamente, con un `TODO multi-tenant` esplicito nel codice mai risolto fino ad allora)
 - Visibile solo su mobile, scompare dopo installazione
 - **Icona PWA dinamica:** route `/api/pwa-icon?size=192` con `sharp` per resize server-side, legge `tenant.logo_url` a runtime (nessun file statico per tenant)
 - ⚠️ Nota tecnica: la route attualmente serve lo stesso asset indipendentemente da `size`/`purpose` — nessuna vera distinzione tra icona maskable e "any" a runtime; raccomandato usare la versione maskable (con safe-zone) come master unico
@@ -440,9 +448,10 @@ TRACKING_SECRET=...    # Per HMAC token ordini — ora obbligatoria anche per la
 
 ## 12. Layout app mobile
 
-- **Hero editoriale (ridisegnato in Fase 3, §12bis):** layout a due colonne su desktop (testo/CTA + preview prodotti reali), impilato su mobile; sfondo `var(--color-primary)`/`var(--color-primary-dark)` con pattern decorativo triangolare ispirato all'anello tribale del logo (SVG inline, bassa opacità), non più cerchi piatti. Eyebrow sopra il titolo reso col componente signature `ShopTag`. Supporta ancora `tenant.hero_image_url` opzionale.
-- **Notification bar** (36px, "ticker") sotto l'header con animazione CSS
-- **Bottom navigation bar** (4 tab): 🏠 Accueil · 🛍️ Catalogue · 🛒 Panier (con badge, ora `var(--color-secondary)`) · 📦 Commandes
+- **Hero compatto:** logo 44px + testo, sostituisce il vecchio hero centrato a blocco largo
+- **Notification bar** (36px) sotto l'header con animazione ticker CSS
+- **Banner emozionale (ridisegnato in Fase 3, vedi §12bis):** sfondo a gradiente `var(--color-primary-dark)` → `var(--color-primary)`, pattern decorativo a triangoli ripetuti (SVG, bassa opacità, non più i cerchi piatti verde scuro `#085041` della versione precedente), layout a due colonne su desktop (testo + doppio CTA + trust-row a sinistra, mini-preview di prodotti reali in evidenza a destra) impilato su mobile; eyebrow ora il cartellino signature `ShopTag`; supporta `tenant.hero_image_url` opzionale (quando presente sostituisce pattern+gradiente con l'immagine + overlay scuro)
+- **Bottom navigation bar** (4 tab, icone Tabler non emoji): Accueil · Catalogue · Panier (con badge) · Commandes
 - Visibile solo su mobile (`md:hidden`), nascosta nel layout admin
 - Homepage: scroll orizzontale per categoria (stile Netflix/App Store); grid su desktop
 - **Ricerca real-time:** debounce 300ms + `router.replace` (URL params) + `useTransition`, mantenuta nel catalogo completo
@@ -450,23 +459,58 @@ TRACKING_SECRET=...    # Per HMAC token ordini — ora obbligatoria anche per la
 
 ---
 
-## 12bis. Design System & Redesign UI/UX (Audit Luglio 2026) — ✅ COMPLETO
+## 12bis. Audit e redesign UI/UX storefront (Fase 1–3) — ⚠️ branch locale, non pushato
 
-Ciclo in tre fasi, avviato da un audit strategico dello storefront pubblico (`AUDIT_STOREFRONT_UIUX.md`, esterno al repo) e chiuso il 17/07. Obiettivo: modernizzare UI/UX mantenendo la piattaforma multi-tenant by design — nessun valore di brand hardcodato in nessuna fase.
+**Stato:** lavoro completo (typecheck verde su tutte le fasi), **5 commit sul branch `claude/lepefy-storefront-audit-69xss0`, mai pushati su `origin`** — `main` non contiene nulla di questo lavoro. Perimetro: solo `apps/storefront`, `apps/admin` (route `src/app/admin/**`) esplicitamente escluso in ogni fase.
 
-**Fase 1 — De-hardcoding token + accessibilità.** Rimossi tutti gli hex fissi da `BottomNav.tsx`, HeroBanner (`page.tsx`), `AddToCartButton.tsx`, timeline tracking ordine (`orders/[id]/page.tsx`), `PWABanner.tsx` (trovato fuori scope durante lo sweep tipografico di Fase 2, conteneva sia colore che nome tenant hardcodati). Introdotto `--color-primary-dark` via `color-mix()`. Font Inter caricato realmente via `next/font/google` (era dichiarato in Tailwind ma mai importato). Touch target dei controlli quantità/carrello portati a 44×44px. Regola `:focus-visible` globale aggiunta in `globals.css`. Stato vuoto di `ProductGrid` allineato al pattern già curato del carrello vuoto.
+Origine: audit strategico dello storefront pubblico (home, catalogo, scheda prodotto, carrello, checkout, tracking ordine), poi implementato in 3 fasi + una passata di allineamento a un mockup di validazione approvato (`Mockup_Fase3_Validazione_UIUX.html`, allegato di sessione, non versionato nel repo).
 
-**Fase 2 — Consolidamento design system.**
-- *2.1:* Unificate in un solo componente `ProductCard.tsx` (prop `variant: 'grid' | 'shelf'`) le tre implementazioni duplicate prima sparse in `page.tsx`, `FeaturedProducts.tsx` e nel componente standalone; `AddToCartButton.tsx` standalone eliminato (era usato solo dalle card duplicate). Introdotti i token `--color-primary-hover`, `--radius-sm/md/lg/full`, `--shadow-card`.
-- *2.2:* `<img>` residue migrate a `next/image` (thumbnail carrello, hero); emoji di stato (🛒🚚📦✅🏪🔒⏳) sostituite con icone Tabler coerenti con quelle già in `BottomNav`; introdotto skeleton loading su griglia catalogo (sostituisce il precedente `opacity-60`); dichiarata una scala `fontSize` ufficiale in Tailwind, eliminati i `text-[Npx]` arbitrari sparsi; rimosso un `CategoryFilter.tsx` duplicato mai importato.
+### Fase 1 — de-hardcoding colori, font reale, accessibilità
 
-**Fase 3 — Decisioni di brand validate su mockup interattivo.** Un mockup HTML (`Mockup_Fase3_Validazione_UIUX.html`, esterno al repo) con toggle live colore/font ha permesso di validare prima dell'implementazione:
-- **Font display:** Bricolage Grotesque (`next/font/google`), applicato solo a titoli/segnaletica — decisione di piattaforma, non per-tenant, come già Inter per il body.
-- **Colore primario ChloeFood:** blu `#1267C7` (vedi §2 e §1 — cambio di dato in `tenants.primary_color`, non di codice).
-- **Elemento signature:** nuovo componente `src/components/ui/ShopTag.tsx` — "cartellino da bottega" (forma a tag con clip-path, piccola perforazione, leggera rotazione), colorato **sempre** via `var(--color-secondary)` (non oro hardcodato: nel mockup era descritto come fisso dal logo, corretto in implementazione per restare valido su qualunque tenant). Applicato su `ProductCard` (entrambe le varianti) e sull'eyebrow dell'hero.
-- Verificato il contrasto AA di testo bianco su `var(--color-primary)`/`-dark` col nuovo blu prima del rilascio.
+- Rimossi gli hex hardcoded (`#1D9E75`/`#F2C811`) in `BottomNav.tsx`, `AddToCartButton.tsx` (poi eliminato in Fase 2.1), `HeroBanner` (`page.tsx`), pagina tracking ordine (`orders/[id]/page.tsx`) — sostituiti con `var(--color-primary)`/`var(--color-secondary)`
+- Font **Inter** dichiarato in `tailwind.config.ts` ma mai davvero caricato prima di questa fase — ora caricato via `next/font/google` in `layout.tsx`
+- Nuovo token `--color-primary-dark` (`color-mix(in srgb, var(--color-primary) 75%, black)`) — varianti scure derivate senza bisogno di nuove colonne DB
+- `:focus-visible` globale coerente (era assente su bottoni/link, solo gli input l'avevano)
+- Touch target dei pulsanti quantità/aggiungi portati a 44×44px (WCAG)
 
-**Regola derivata da questo ciclo, valida per ogni redesign futuro:** un mockup di validazione può legittimamente usare colori "fissi" per velocità di iterazione, ma ogni colore che nel mockup sembra "proprio del brand ChloeFood" va ricontrollato in fase di implementazione — se non deriva già da un campo `tenant.*` esistente, deve mappare su un token esistente (`--color-primary`/`--color-secondary`) prima di andare in produzione, mai restare un valore fisso nuovo.
+### Fase 2.1 — unificazione ProductCard + estensione token
+
+- **Le 3 implementazioni parallele della card prodotto** (`components/catalog/ProductCard.tsx`, più due copie inline in `page.tsx` e `FeaturedProducts.tsx` con `<img>` raw e colori hardcoded) **unificate in una sola**, con prop `variant: 'grid' | 'shelf'`
+- `AddToCartButton.tsx` eliminato (era usato solo dalle due copie ora rimosse, zero altri riferimenti)
+- Nuovi token: `--color-primary-hover`, `--radius-sm/md/lg/full`, `--shadow-card`, mappati su classi Tailwind (`rounded-sm/md/lg/full`, `shadow-card`) — applicati per allora solo alla ProductCard
+
+### Fase 2.2 — immagini, icone, skeleton, tipografia, pulizia duplicati
+
+- `<img>` raw residue migrate a `next/image` (thumbnail carrello, sfondo hero)
+- Emoji di stato (🛒🚚📦✅🏪🔒⏳📍🕐💳📋) sostituite con icone `@tabler/icons-react` (già dipendenza esistente) in tracking ordine, conferma ordine, carrello, checkout
+- Skeleton loading (`ProductCardSkeleton` in `ProductGrid.tsx`) al posto del semplice `opacity-60` durante la ricerca catalogo
+- Scala tipografica: un solo step aggiuntivo `2xs` (10px) sopra la scala Tailwind di default — i `text-[Npx]` arbitrari sparsi nel codice migrati al riuso di `2xs/xs/sm/xl/2xl`
+- **`CategoryFilter.tsx` eliminato** — duplicato mai importato (verificato via grep sugli import); il filtro categorie realmente reso è quello inline in `CatalogClient.tsx`. `src/lib/utils/cn.ts` è rimasto come dipendenza orfana di quel componente eliminato (nessun altro import nel repo) — non rimosso, essendo un helper generico
+
+### Fase 3 — font display, elemento signature, hero editoriale (validati su mockup)
+
+- **Font Bricolage Grotesque** caricato accanto a Inter, nuovi token `--font-body`/`--font-display` in `globals.css`, classe `font-display` applicata a H1 hero, H2 sezioni home, H1 catalogo (rinominato "Catalogue" → "Sélection de la boutique"), wordmark header, testo del cartellino
+- **Nuovo componente signature `src/components/ui/ShopTag.tsx`** — il "cartellino da bottega" (clip-path a tag con perforazione dipinta, leggera rotazione), colorato `var(--color-secondary)` — **non** l'oro fisso descritto nel mockup come "dal logo": quel ragionamento è specifico a ChloeFood e non generalizzabile, vedi §2. Applicato su `ProductCard` (etichetta derivata da `storage_type` reale → "Frais"/"Surgelé"/"Épicerie", fallback categoria, mai una stringa fissa uguale per tutti i prodotti) e nell'eyebrow dell'hero (testo rimasto `tenant.tagline`, tenant-driven, non sostituito dal copy fisso del mockup)
+- **Hero ridisegnato**: gradiente `primary-dark → primary`, pattern a triangoli via SVG/`<pattern>` (nessuna immagine raster), layout a due colonne su desktop con preview di prodotti reali (featured, non placeholder), impilato su mobile; copy H1/sottotitolo aggiornata, doppio CTA ("Découvrir le catalogue" + "Notre histoire" — quest'ultimo **punta temporaneamente a `/products` per mancanza di una pagina di destinazione reale, marcato `TODO` nel codice**, decisione di prodotto aperta), trust-row a 3 voci
+- **Verifica contrasto per il futuro blu `#1267C7`** (calcolata, non stimata): testo bianco su `--color-primary` 5.54:1, su `--color-primary-dark` 8.36:1, testo `--color-primary` su bianco 5.54:1 — tutti ≥ AA. Nota di coerenza dati non bloccante: `tenant.accent_light` (verde menta) non fa parte della migrazione colore e resterebbe visivamente scollegato dal nuovo blu se non aggiornato in parallelo
+
+### Migrazione dati preparata, non eseguita
+
+```sql
+-- Da eseguire manualmente su Supabase — NON incorporata nel codice
+UPDATE tenants SET primary_color = '#1267C7' WHERE slug = 'chloefood';
+
+-- Facoltativa, consigliata per coerenza visiva col nuovo blu:
+-- UPDATE tenants SET accent_light = '#E3EFFB' WHERE slug = 'chloefood';
+```
+
+### Cosa resta aperto
+
+- **Push del branch** — 5 commit locali mai arrivati su `origin`, quindi nemmeno su `main`
+- **Query `primary_color` non eseguita** — il blu resta solo pronto lato codice
+- **CTA "Notre histoire"** senza destinazione reale (punta a `/products`)
+- Copy H1/sottotitolo hero restano stringhe FR fisse uguali per ogni tenant (preesistente, non introdotto né risolto da questo audit)
+- Nessun campo prodotto per una vera "origine/provenienza" (usato `storage_type` + `weight_grams` come miglior proxy reale disponibile)
 
 ---
 
@@ -652,7 +696,10 @@ GOTENBERG_AUTH=...
 | Installare/confermare Gotenberg raggiungibile su Hetzner + Caddy auth | Robertin | ✅ FATTO (verificato end-to-end 14/07: deploy Hetzner + PDF reale generato da job vero) |
 | Verificare dati nutrizionali/lotto con produttori prima di stampare etichette (in particolare Bobolo, valori sospetti) | ChloeFood / produttori | ⚠️ DA FARE — competenza ChloeFood, non blocco tecnico |
 | Rimuovere file morti `admin/orders/id/` e cartella componenti condivisi non-route | Robertin | ⚠️ DA FARE (non bloccante) |
-| Decisione brand charter v2 (verde vs blu) | Dalice | ✅ FATTO — blu `#1267C7` approvato e in produzione (17/07, vedi §12bis) |
+| Decisione brand charter v2 (font + elemento signature) | Dalice | ✅ DECISO — Bricolage Grotesque + cartellino `ShopTag`, validati su mockup e implementati (§12bis) |
+| **Pushare il branch `claude/lepefy-storefront-audit-69xss0`** (5 commit locali, mai su `origin`/`main`) | Robertin | ⚠️ DA FARE — bloccante per tutto il resto di questa lista relativo al redesign |
+| Eseguire query SQL `UPDATE tenants SET primary_color='#1267C7' WHERE slug='chloefood'` | Robertin | ⚠️ DA FARE — codice già pronto, vedi §12bis |
+| Decidere destinazione reale del CTA hero "Notre histoire" (oggi punta a `/products`) | Robertin / Dalice | ⚠️ DA FARE |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
 
 ---
@@ -730,11 +777,9 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 | `Lepefy_Onboarding_Tenant_v1.docx` | Guida interna onboarding secondo tenant |
 | `Contrat_SaaS_LepefyLabs_ChloeFood.docx` | Contratto SaaS bilingue FR/IT (versione precedente) |
 | Contratto SaaS 16 articoli (diritto italiano) | Versione estesa — mancano dati fiscali, foro, email contrattuale, DPA |
-| `Charte_graphique_Chloe_Food_1.pdf` | Nuova brand charter v2 (20 pagine) — in valutazione, nessun codice ancora allineato |
-| `chloe_food_logo.svg` | Logo vettoriale ricostruito (bug viewBox corretto) — riferimento usato per validare che il blu `#1267C7` è il colore dominante reale del wordmark, vedi §12bis |
-| `AUDIT_STOREFRONT_UIUX.md` | Audit strategico storefront pubblico che ha originato il redesign in 3 fasi — file esterno, non nel repo |
-| `Mockup_Fase3_Validazione_UIUX.html` | Mockup interattivo (toggle colore/font live) usato per validare le decisioni di Fase 3 prima dell'implementazione — file esterno, non nel repo |
-| `ClaudeCode_Prompt_Fase1_DehardcodingA11y.md` / `Fase2.1_ProductCardTokens.md` / `Fase2.2_ImmaginiIconeTipografia.md` / `Fase3_Implementazione.md` | Prompt Claude Code dei tre cicli del redesign UI/UX — file esterni, non nel repo |
+| `Charte_graphique_Chloe_Food_1.pdf` | Nuova brand charter v2 (20 pagine) — decisioni derivate (font, elemento signature) implementate, colore primario ancora da migrare via SQL (§12bis) |
+| `chloe_food_logo.svg` | Logo vettoriale ricostruito (bug viewBox corretto) |
+| `Mockup_Fase3_Validazione_UIUX.html` | Mockup interattivo di validazione Fase 3 (toggle colore verde/blu, toggle font Bricolage/Fraunces) — allegato di sessione, non versionato nel repo; decisioni approvate implementate in `apps/storefront`, vedi §12bis |
 
 ---
 
@@ -761,19 +806,21 @@ L'audit v3.2 aveva correttamente lasciato lo stato del deploy Gotenberg come "no
 
 ---
 
-## 24. Changelog v3.4 (17 Luglio 2026) — redesign UI/UX storefront completato
+## 24. Changelog v3.4 (17 Luglio 2026) — audit e redesign UI/UX storefront (Fase 1–3)
 
-Chiuso il ciclo di audit e redesign frontend avviato con `AUDIT_STOREFRONT_UIUX.md`, eseguito in tre fasi (dettaglio completo in §12bis, nuova sezione):
+Verifica del documento contro lo stato reale del branch `claude/lepefy-storefront-audit-69xss0` (5 commit, tutti locali, **mai pushati**) dopo un audit UI/UX completo dello storefront pubblico seguito da implementazione in 3 fasi più una passata di allineamento a un mockup di validazione approvato. Dettaglio completo in §12bis (sezione nuova). Correzioni apportate al resto del documento:
 
-- **§1/§2** — colori brand ChloeFood aggiornati: primary passato da verde `#1D9E75` a blu `#1267C7` (cambio di dato in `tenants.primary_color`, non di codice). Charter v2 non più "in valutazione": decisione presa e implementata.
-- **§2** — riga "Stile" aggiornata per riflettere il design system tokenizzato (radius, shadow, scala tipografica, coppia Inter/Bricolage Grotesque).
-- **§12** — hero riscritto: non più "banner emozionale verde scuro con cerchi", ma layout editoriale a due colonne con pattern triangolare ispirato al logo e componente signature `ShopTag` nell'eyebrow.
-- **§12bis (nuova sezione)** — documentazione completa delle tre fasi del redesign: de-hardcoding e accessibilità, unificazione `ProductCard` e consolidamento token, decisioni di brand validate su mockup (font, colore, elemento signature).
-- **§18** — riga "Decisione brand charter v2" spostata da PENDENTE a FATTO.
-- **§21** — aggiunti alla tabella documenti: audit, mockup di validazione, i quattro prompt Claude Code del redesign.
+- **§2** — la nota "il verde `#1D9E75` è l'unico colore nel codice" era vera fino a questa fase ma descriveva anche un problema (hardcoding sparso, non solo un dato): riscritta per distinguere il valore DB attuale (invariato) dallo stato del codice (ora interamente token-based). Aggiunto il dettaglio delle 3 decisioni brand-charter-v2 effettivamente prese (font, colore come task dato, elemento signature) con la query SQL preparata e non eseguita.
+- **§3** (tabella stack) — corretti i nomi dei CSS vars (`--primary`/`--secondary` → `--color-primary`/`--color-secondary`, mai stati questi i nomi reali nel codice).
+- **§5** — aggiunta nota sul de-hardcoding completato per lo storefront pubblico.
+- **§11** — colore/nome del banner PWA erano hardcoded (con un `TODO multi-tenant` esplicito mai risolto, scoperto durante l'audit) — ora corretti, sezione aggiornata.
+- **§12** — la descrizione dell'hero ("verde scuro `#085041` con cerchi") era quella pre-redesign, ora obsoleta — riscritta per riflettere gradiente/pattern a triangoli/layout a due colonne introdotti in Fase 3.
+- **§12bis** — nuova sezione, riepiloga le 3 fasi dell'audit UI/UX + la passata di allineamento al mockup, cosa è stato corretto, cosa resta aperto, la query SQL da eseguire.
+- **§18** — riga "Decisione brand charter v2" aggiornata da "pendente" a "deciso" per font/elemento signature; aggiunte 3 righe nuove (push del branch, esecuzione query colore, destinazione CTA "Notre histoire").
+- **§21** — aggiunto il mockup di validazione alla tabella documenti di riferimento.
 
-Nessuna modifica alle sezioni non toccate dal redesign (spedizione, checkout, admin auth, IA, etichette, n8n) rispetto a v3.3.
+Nessuna modifica alle sezioni non toccate da questo lavoro (shipping, checkout, admin auth, n8n, sistema etichette, feature IA, roadmap Phase 2) — verificate a campione, restano accurate rispetto a v3.3.
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.4 — 17 Luglio 2026 (base: v3.3; + redesign UI/UX storefront completato in 3 fasi, vedi §12bis e §24)*
+*Lepefy Labs — Lepefy Food Platform — Context document v3.4 — 17 Luglio 2026 (base: v3.3; + audit e redesign UI/UX storefront Fase 1–3, branch locale non pushato, vedi §12bis e §24)*
