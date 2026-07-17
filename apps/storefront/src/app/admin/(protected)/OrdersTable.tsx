@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   IconSearch,
   IconX,
+  IconCheck,
   IconChevronDown,
   IconChevronRight,
   IconChevronUp,
@@ -173,10 +175,28 @@ interface OrdersTableProps {
 }
 
 export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps) {
+  const router = useRouter();
+
   const [searchQuery, setSearchQuery]   = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy]             = useState<'date' | 'total' | null>(null);
   const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc');
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set());
+  const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  // Reset selezione quando cambia la ricerca testuale — altrimenti si
+  // rischia di agire su ordini non più visibili. (Sui filtri di
+  // AdminFilters il reset avviene già gratis: cambiano i searchParams,
+  // la pagina server rifà il fetch e OrdersTable viene rimontato.)
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   function toggleRow(orderId: string) {
     setExpandedRows(prev => {
@@ -219,6 +239,70 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
     if (sortBy === 'total') return mult * (a.total - b.total);
     return 0;
   });
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(prev =>
+      prev.size === sortedOrders.length ? new Set() : new Set(sortedOrders.map(o => o.id))
+    );
+  }
+
+  function handleExportCsv() {
+    const rows = sortedOrders.filter(o => selectedIds.has(o.id));
+    const header = ['Commande', 'Date', 'Client', 'Email', 'Total', 'Statut', 'Paiement', 'Transporteur'];
+    const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+    const lines = rows.map(o => [
+      o.id.slice(0, 8).toUpperCase(),
+      new Date(o.created_at).toLocaleDateString('fr-FR'),
+      o.full_name ?? '',
+      o.email,
+      formatPrice(o.total, tenantCurrency),
+      o.status,
+      o.payment_method ?? '',
+      o.shipping_details?.carrierName ?? '',
+    ].map(v => csvEscape(String(v))).join(','));
+
+    const csv = [header.map(csvEscape).join(','), ...lines].join('\r\n');
+    // BOM per far riconoscere l'UTF-8 a Excel su Windows (accenti francesi)
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `commandes_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handlePrintPickingLists() {
+    const ids = Array.from(selectedIds).join(',');
+    window.open(`/admin/orders/picking-list?ids=${ids}`, '_blank', 'noopener,noreferrer');
+  }
+
+  async function handleMarkShipped() {
+    const ids = Array.from(selectedIds);
+    const res = await fetch('/api/admin/orders/bulk-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: ids, status: 'shipped' }),
+    });
+    if (res.ok) {
+      const { updated } = await res.json();
+      setSelectedIds(new Set());
+      setToast({ msg: `${updated} commande${updated > 1 ? 's' : ''} marquée${updated > 1 ? 's' : ''} expédiée${updated > 1 ? 's' : ''}.`, type: 'success' });
+      router.refresh(); // la pagina server rilegge gli ordini aggiornati
+    } else {
+      const body = await res.json().catch(() => null);
+      setToast({ msg: body?.error ?? 'Erreur lors de la mise à jour.', type: 'error' });
+    }
+  }
 
   return (
     <div>
@@ -280,6 +364,16 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-xs
                                font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   <th scope="col" className="w-8 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size > 0 && selectedIds.size === sortedOrders.length}
+                      ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < sortedOrders.length; }}
+                      onChange={toggleSelectAll}
+                      aria-label="Sélectionner toutes les commandes"
+                      className="rounded border-gray-300 dark:border-gray-600"
+                    />
+                  </th>
+                  <th scope="col" className="w-8 px-3 py-3">
                     <span className="sr-only">Développer</span>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left" aria-sort={ariaSort('date')}>
@@ -328,6 +422,17 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
 
                       {/* ── Riga principale ──────────────────────────────── */}
                       <tr className={`border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors${isExpanded ? ' bg-gray-50/60 dark:bg-gray-800/60' : ''}`}>
+
+                        {/* Checkbox selezione */}
+                        <td className="px-3 py-3 w-8">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(order.id)}
+                            onChange={() => toggleSelect(order.id)}
+                            aria-label={`Sélectionner la commande #${order.id.slice(0, 8).toUpperCase()}`}
+                            className="rounded border-gray-300 dark:border-gray-600"
+                          />
+                        </td>
 
                         {/* Freccia espansione */}
                         <td className="px-3 py-3 w-8">
@@ -465,7 +570,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                       {isExpanded && (
                         <tr key={`${order.id}-detail`}>
                           <td />
-                          <td colSpan={7} className="px-4 pb-4 pt-1">
+                          <td colSpan={8} className="px-4 pb-4 pt-1">
                             <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800
                                             overflow-hidden shadow-sm">
 
@@ -570,6 +675,50 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
           </>
         )}
       </div>
+
+      {/* ── Bulk bar — visibile solo con ≥1 selezione ───────────────────────── */}
+      {selectedIds.size > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Actions groupées"
+          className="sticky bottom-4 z-20 mx-auto max-w-fit flex items-center gap-3
+                     bg-gray-900 dark:bg-gray-800 text-white rounded-full
+                     shadow-lg px-4 py-2.5 mt-4"
+        >
+          <span className="text-sm font-medium">
+            {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
+          </span>
+          <div className="h-4 w-px bg-white/20" />
+          <button onClick={handleExportCsv} className="text-sm hover:opacity-80 transition-opacity">
+            Exporter CSV
+          </button>
+          <button onClick={handlePrintPickingLists} className="text-sm hover:opacity-80 transition-opacity">
+            Imprimer les listes
+          </button>
+          <button onClick={handleMarkShipped} className="text-sm hover:opacity-80 transition-opacity">
+            Marquer expédié
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            aria-label="Annuler la sélection"
+            className="ml-1 p-1 hover:bg-white/10 rounded-full"
+          >
+            <IconX size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Toast — stesso pattern dei client etichette ─────────────────────── */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
+            toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
+          }`}
+        >
+          {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }
