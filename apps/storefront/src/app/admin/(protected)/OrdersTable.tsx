@@ -150,7 +150,7 @@ const PAYMENT_CONFIG: Record<string, { label: string; icon: string; bg: string; 
 };
 
 function PaymentBadge({ method }: { method: string | null }) {
-  if (!method) return <span className="text-gray-300 text-xs">—</span>;
+  if (!method) return <span className="text-gray-400 text-xs">—</span>;
 
   const cfg = PAYMENT_CONFIG[method] ?? { label: method, icon: '💶', bg: '#F3F4F6', color: '#374151' };
 
@@ -220,7 +220,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
             <button
               onClick={() => setSearchQuery('')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2
-                         text-gray-400 hover:text-gray-600"
+                         p-1.5 -m-1.5 text-gray-400 hover:text-gray-600"
               aria-label="Effacer"
             >
               <IconX size={13} />
@@ -229,7 +229,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
         </div>
 
         {searchQuery && (
-          <span className="text-xs text-gray-400 flex-shrink-0">
+          <span className="text-xs text-gray-500 flex-shrink-0">
             {filteredOrders.length} résultat
             {filteredOrders.length !== 1 ? 's' : ''}
           </span>
@@ -239,7 +239,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
       {/* ── Tabella ─────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filteredOrders.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-12">
+          <p className="text-center text-gray-500 text-sm py-12">
             {searchQuery
               ? `Aucune commande pour « ${searchQuery} »`
               : 'Aucune commande.'
@@ -251,16 +251,20 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-xs
                                font-semibold text-gray-500 uppercase tracking-wide">
-                  <th className="w-8 px-3 py-3" />
-                  <th className="px-4 py-3 text-left">Commande</th>
-                  <th className="px-4 py-3 text-left">Client</th>
-                  <th className="px-4 py-3 text-left">Produits</th>
-                  <th className="px-4 py-3 text-left">Destination</th>
-                  <th className="px-4 py-3 text-left">Montant</th>
-                  <th className="px-4 py-3 text-left">Statut</th>
-                  <th className="px-4 py-3 text-left">Paiement</th>
-                  <th className="px-4 py-3 text-left">Transporteur</th>
-                  <th className="px-4 py-3" />
+                  <th scope="col" className="w-8 px-3 py-3">
+                    <span className="sr-only">Développer</span>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left">Commande</th>
+                  <th scope="col" className="px-4 py-3 text-left">Client</th>
+                  <th scope="col" className="px-4 py-3 text-left">Produits</th>
+                  <th scope="col" className="px-4 py-3 text-left">Destination</th>
+                  <th scope="col" className="px-4 py-3 text-left">Montant</th>
+                  <th scope="col" className="px-4 py-3 text-left">Statut</th>
+                  <th scope="col" className="px-4 py-3 text-left">Paiement</th>
+                  <th scope="col" className="px-4 py-3 text-left">Transporteur</th>
+                  <th scope="col" className="px-4 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -282,10 +286,11 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           {items.length > 0 && (
                             <button
                               onClick={() => toggleRow(order.id)}
-                              className="p-0.5 rounded text-gray-400
+                              className="p-2 rounded text-gray-400
                                          hover:text-gray-600
                                          hover:bg-gray-200 transition-colors"
                               aria-label={isExpanded ? 'Réduire' : 'Développer'}
+                              aria-expanded={isExpanded}
                             >
                               {isExpanded
                                 ? <IconChevronDown size={14} stroke={2} />
@@ -300,13 +305,13 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           <p className="font-mono text-xs font-medium text-gray-700">
                             #{order.id.slice(0, 8).toUpperCase()}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-xs text-gray-500 mt-0.5">
                             {new Date(order.created_at).toLocaleDateString('fr-FR', {
                               day: '2-digit', month: '2-digit',
                             })}
                           </p>
                           {isToday && (
-                            <span className="text-[10px] font-medium bg-yellow-50 text-yellow-700
+                            <span className="text-xs font-medium bg-yellow-50 text-yellow-700
                                              px-1.5 py-0.5 rounded mt-0.5 inline-block">
                               Aujourd&apos;hui
                             </span>
@@ -318,7 +323,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           <p className="text-sm font-medium text-gray-900 leading-snug">
                             {order.full_name ?? '—'}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[160px]">
+                          <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[160px]">
                             {order.email}
                           </p>
                         </td>
@@ -328,7 +333,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           <div className="space-y-1">
                             {visibleItems.map((item, idx) => (
                               <div key={item.id ?? idx} className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-medium text-gray-500
+                                <span className="text-xs font-medium text-gray-500
                                                  bg-gray-100 rounded px-1.5 py-0.5 flex-shrink-0">
                                   ×{item.quantity}
                                 </span>
@@ -336,17 +341,17 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                                   {item.name}
                                 </span>
                                 {item.storage_type === 'frozen' && (
-                                  <span className="text-[10px]" title="Surgelé">❄</span>
+                                  <span className="text-[10px]" title="Surgelé" aria-label="Surgelé" role="img">❄</span>
                                 )}
                                 {item.storage_type === 'fresh' && (
-                                  <span className="text-[10px]" title="Frais">🌿</span>
+                                  <span className="text-[10px]" title="Frais" aria-label="Frais" role="img">🌿</span>
                                 )}
                               </div>
                             ))}
                             {hiddenCount > 0 && !isExpanded && (
-                              <p className="text-[10px] text-gray-400 mt-0.5">
+                              <p className="text-xs text-gray-500 mt-0.5">
                                 + {hiddenCount} autre{hiddenCount > 1 ? 's' : ''}{' '}
-                                <span className="text-gray-300">(↑ développer)</span>
+                                <span className="text-gray-500">(↑ développer)</span>
                               </p>
                             )}
                           </div>
@@ -384,7 +389,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                           </span>
                           {order.shipping_details?.numParcels != null &&
                            order.shipping_details.numParcels > 1 && (
-                            <span className="text-[10px] text-gray-400 block mt-0.5">
+                            <span className="text-xs text-gray-500 block mt-0.5">
                               {order.shipping_details.numParcels} colis
                             </span>
                           )}
@@ -400,6 +405,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                               className="p-1.5 text-gray-400 hover:text-gray-600
                                          hover:bg-gray-100 rounded transition-colors"
                               title="Liste de préparation"
+                              aria-label="Imprimer la liste de préparation"
                             >
                               <IconPrinter size={15} />
                             </Link>
@@ -429,7 +435,7 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                                                  uppercase tracking-wide">
                                   Détail de la commande
                                 </span>
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs text-gray-500">
                                   {items.length} article{items.length > 1 ? 's' : ''}
                                 </span>
                               </div>
@@ -449,10 +455,10 @@ export default function OrdersTable({ orders, tenantCurrency }: OrdersTableProps
                                       </span>
                                       <span className="text-sm text-gray-800">{item.name}</span>
                                       {item.storage_type === 'frozen' && (
-                                        <span className="text-xs" title="Surgelé">❄</span>
+                                        <span className="text-xs" title="Surgelé" aria-label="Surgelé" role="img">❄</span>
                                       )}
                                       {item.storage_type === 'fresh' && (
-                                        <span className="text-xs" title="Frais">🌿</span>
+                                        <span className="text-xs" title="Frais" aria-label="Frais" role="img">🌿</span>
                                       )}
                                     </div>
                                     <span className="text-sm font-medium text-gray-600

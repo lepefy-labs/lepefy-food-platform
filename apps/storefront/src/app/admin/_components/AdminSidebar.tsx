@@ -29,14 +29,14 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
 
   function navClass(active: boolean) {
     return active
-      ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)] font-medium'
+      ? 'bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] font-medium'
       : 'text-gray-600 hover:bg-gray-100';
   }
 
   return (
     <nav className="flex flex-col h-full">
 
-      <p className="text-[10px] font-medium text-gray-400 uppercase
+      <p className="text-xs font-medium text-gray-500 uppercase
                     tracking-widest px-3 mb-1 mt-4">
         Gestion
       </p>
@@ -110,13 +110,13 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
                       text-sm mx-1 text-gray-300 cursor-not-allowed">
         <IconUsers size={16} stroke={1.5} />
         <span className="flex-1">Clients</span>
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full
-                         bg-gray-100 text-gray-400">
+        <span className="text-xs font-medium px-1.5 py-0.5 rounded-full
+                         bg-gray-100 text-gray-500">
           Bientôt
         </span>
       </div>
 
-      <p className="text-[10px] font-medium text-gray-400 uppercase
+      <p className="text-xs font-medium text-gray-500 uppercase
                     tracking-widest px-3 mb-1 mt-5">
         Boutique
       </p>
@@ -125,8 +125,8 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
                       text-sm mx-1 text-gray-300 cursor-not-allowed">
         <IconTag size={16} stroke={1.5} />
         <span className="flex-1">Promotions</span>
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full
-                         bg-gray-100 text-gray-400">
+        <span className="text-xs font-medium px-1.5 py-0.5 rounded-full
+                         bg-gray-100 text-gray-500">
           Bientôt
         </span>
       </div>
@@ -145,7 +145,7 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
         Paramètres
       </Link>
 
-      <p className="text-[10px] font-medium text-gray-400 uppercase
+      <p className="text-xs font-medium text-gray-500 uppercase
                     tracking-widest px-3 mb-1 mt-5">
         Compte
       </p>

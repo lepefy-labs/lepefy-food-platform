@@ -67,7 +67,7 @@ const defaultClass =
 const activeClass =
   'text-xs font-medium px-3 py-1.5 rounded-lg border cursor-pointer focus:outline-none ' +
   'focus:ring-2 focus:ring-[var(--color-primary)] ' +
-  'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
+  'border-[var(--color-primary)] text-[var(--color-primary-dark)] bg-[var(--color-primary-light,#f0fdf4)]'
 
 export default function AdminFilters({
   currentStatus,

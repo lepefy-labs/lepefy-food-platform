@@ -26,16 +26,16 @@ function KpiCard({
 }) {
   const inner = (
     <>
-      <p className="text-xs text-gray-400 font-medium mb-1">{label}</p>
+      <p className="text-xs text-gray-500 font-medium mb-1">{label}</p>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
       {delta != null && (
         <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
           {delta >= 0 ? '+' : ''}{delta}%
         </p>
       )}
       {href && (
-        <p className="text-xs mt-1" style={{ color: 'var(--color-primary)' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--color-primary-dark)' }}>
           Voir →
         </p>
       )}
