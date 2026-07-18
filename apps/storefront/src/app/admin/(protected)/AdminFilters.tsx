@@ -4,9 +4,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 interface AdminFiltersProps {
   currentStatus:      string
-  currentPeriod:      string
+  currentDateFrom:    string
+  currentDateTo:      string
   currentFulfillment: string
   currentPayment:     string
+  statusCounts?:      Record<string, number>
 }
 
 const filters = [
@@ -21,16 +23,6 @@ const filters = [
       { key: 'shipped',          label: 'Expédié' },
       { key: 'delivered',        label: 'Livré' },
       { key: 'cancelled',        label: 'Annulé' },
-    ],
-  },
-  {
-    paramKey: 'period',
-    label:    'Période',
-    options: [
-      { key: 'all',   label: 'Toutes les dates' },
-      { key: 'today', label: "Aujourd'hui" },
-      { key: 'week',  label: 'Cette semaine' },
-      { key: 'month', label: 'Ce mois' },
     ],
   },
   {
@@ -54,8 +46,7 @@ const filters = [
   },
 ]
 
-function isDefault(paramKey: string, value: string | undefined) {
-  if (paramKey === 'period') return !value || value === 'all' || value === ''
+function isDefault(value: string | undefined) {
   return !value || value === ''
 }
 
@@ -72,23 +63,24 @@ const activeClass =
 
 export default function AdminFilters({
   currentStatus,
-  currentPeriod,
+  currentDateFrom,
+  currentDateTo,
   currentFulfillment,
   currentPayment,
+  statusCounts,
 }: AdminFiltersProps) {
   const router      = useRouter()
   const searchParams = useSearchParams()
 
   const currentValues: Record<string, string | undefined> = {
     status:      currentStatus,
-    period:      currentPeriod,
     fulfillment: currentFulfillment,
     payment:     currentPayment,
   }
 
   function handleChange(paramKey: string, value: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (!value || value === 'all') {
+    if (!value) {
       params.delete(paramKey)
     } else {
       params.set(paramKey, value)
@@ -96,24 +88,62 @@ export default function AdminFilters({
     router.push(`/admin?${params.toString()}`)
   }
 
-  return (
-    <div className="flex flex-wrap gap-2 mb-4">
-      {filters.map(f => (
-        <select
-          key={f.paramKey}
-          value={currentValues[f.paramKey]}
-          onChange={e => handleChange(f.paramKey, e.target.value)}
-          className={
-            isDefault(f.paramKey, currentValues[f.paramKey])
-              ? defaultClass
-              : activeClass
+  function setDateParam(key: 'dateFrom' | 'dateTo', value: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) params.set(key, value); else params.delete(key)
+    router.push(`/admin?${params.toString()}`)
+  }
+
+  function renderSelect(f: typeof filters[number]) {
+    return (
+      <select
+        key={f.paramKey}
+        value={currentValues[f.paramKey]}
+        onChange={e => handleChange(f.paramKey, e.target.value)}
+        className={
+          isDefault(currentValues[f.paramKey])
+            ? defaultClass
+            : activeClass
+        }
+      >
+        {f.options.map(o => {
+          let label = o.label
+          if (f.paramKey === 'status' && o.key && statusCounts) {
+            const count = statusCounts[o.key]
+            if (count) label = `${o.label} (${count})`
           }
-        >
-          {f.options.map(o => (
-            <option key={o.key} value={o.key}>{o.label}</option>
-          ))}
-        </select>
-      ))}
+          return <option key={o.key} value={o.key}>{label}</option>
+        })}
+      </select>
+    )
+  }
+
+  const statusFilter = filters.find(f => f.paramKey === 'status')!
+  const otherFilters  = filters.filter(f => f.paramKey !== 'status')
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-4 items-center">
+      {renderSelect(statusFilter)}
+
+      <div className="flex items-center gap-1.5">
+        <input
+          type="date"
+          value={currentDateFrom}
+          onChange={e => setDateParam('dateFrom', e.target.value)}
+          aria-label="Date de début"
+          className={isDefault(currentDateFrom) ? defaultClass : activeClass}
+        />
+        <span className="text-xs text-gray-400">→</span>
+        <input
+          type="date"
+          value={currentDateTo}
+          onChange={e => setDateParam('dateTo', e.target.value)}
+          aria-label="Date de fin"
+          className={isDefault(currentDateTo) ? defaultClass : activeClass}
+        />
+      </div>
+
+      {otherFilters.map(renderSelect)}
     </div>
   )
 }

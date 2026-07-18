@@ -62,7 +62,8 @@ function KpiCard({
 interface PageProps {
   searchParams: {
     status?:      string
-    period?:      string
+    dateFrom?:    string
+    dateTo?:      string
     fulfillment?: string
     payment?:     string
   }
@@ -74,7 +75,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const supabase   = createServiceClient()
 
   const filterStatus      = searchParams.status      ?? ''
-  const filterPeriod      = searchParams.period      ?? 'all'
+  const filterDateFrom    = searchParams.dateFrom     ?? ''
+  const filterDateTo      = searchParams.dateTo       ?? ''
   const filterFulfillment = searchParams.fulfillment ?? ''
   const filterPayment     = searchParams.payment     ?? ''
 
@@ -129,6 +131,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
     o => o.status === 'preparing' || o.status === 'ready_for_pickup'
   ).length
 
+  const statusCounts = allData.reduce<Record<string, number>>((acc, o) => {
+    acc[o.status] = (acc[o.status] ?? 0) + 1
+    return acc
+  }, {})
+
   // ── List query (filtered) ───────────────────────────────────────────────────
   let query = supabase
     .from('orders')
@@ -146,19 +153,14 @@ export default async function AdminPage({ searchParams }: PageProps) {
   if (filterFulfillment) query = query.eq('fulfillment_type', filterFulfillment)
   if (filterPayment)     query = query.eq('payment_method',   filterPayment)
 
-  if (filterPeriod && filterPeriod !== 'all') {
-    const periodNow = new Date()
-    if (filterPeriod === 'today') {
-      const start = new Date(periodNow)
-      start.setHours(0, 0, 0, 0)
-      query = query.gte('created_at', start.toISOString())
-    } else if (filterPeriod === 'week') {
-      const start = new Date(periodNow.getTime() - 7 * 24 * 60 * 60 * 1000)
-      query = query.gte('created_at', start.toISOString())
-    } else if (filterPeriod === 'month') {
-      const start = new Date(periodNow.getFullYear(), periodNow.getMonth(), 1)
-      query = query.gte('created_at', start.toISOString())
-    }
+  if (filterDateFrom) {
+    query = query.gte('created_at', new Date(filterDateFrom).toISOString())
+  }
+  if (filterDateTo) {
+    // fine giornata inclusa, altrimenti "à" esclude gli ordini dello stesso giorno
+    const end = new Date(filterDateTo)
+    end.setHours(23, 59, 59, 999)
+    query = query.lte('created_at', end.toISOString())
   }
 
   const { data: orders } = await query as { data: ListOrder[] | null }
@@ -230,9 +232,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
           <Suspense fallback={<div className="h-9" />}>
             <AdminFilters
               currentStatus={filterStatus}
-              currentPeriod={filterPeriod}
+              currentDateFrom={filterDateFrom}
+              currentDateTo={filterDateTo}
               currentFulfillment={filterFulfillment}
               currentPayment={filterPayment}
+              statusCounts={statusCounts}
             />
           </Suspense>
         </div>
