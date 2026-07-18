@@ -8,6 +8,7 @@ import LogoutButton from '../LogoutButton';
 import AdminSidebar from '../_components/AdminSidebar';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import ThemeToggleButton from '../_components/ThemeToggleButton';
+import NotificationBell from '../_components/ui/NotificationBell';
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
@@ -68,6 +69,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           </span>
         </div>
         <div className="ml-auto flex items-center gap-1">
+          <NotificationBell />
           <ThemeToggleButton />
           <LogoutButton />
         </div>

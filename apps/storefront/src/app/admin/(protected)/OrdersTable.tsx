@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -15,6 +15,7 @@ import {
 import { formatPrice } from '@/lib/utils/format';
 import StatusBadge from '../_components/ui/StatusBadge';
 import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/BulkTrackingModal';
+import AdminOrdersPoller from './AdminOrdersPoller';
 import type { OrderStatus } from '@lepefy/types';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -341,8 +342,29 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
     router.refresh(); // la pagina server rilegge gli ordini aggiornati
   }
 
+  const handleNewOrders = useCallback((newOrders: { id: string }[]) => {
+    if (newOrders.length === 0) return;
+
+    if (newOrders.length === 1) {
+      setToast({ msg: `Nouvelle commande #${newOrders[0].id.slice(0, 8).toUpperCase()}`, type: 'success' });
+    } else {
+      setToast({ msg: `${newOrders.length} nouvelles commandes`, type: 'success' });
+    }
+
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('Nouvelle commande', {
+        body: `Commande #${newOrders[0].id.slice(0, 8).toUpperCase()}`,
+        tag:  'lepefy-new-order',
+      });
+    }
+  }, []);
+
   return (
     <div>
+
+      {/* ── Polling live (Fase 4) — sospeso in background, non forza il refresh
+           mentre il pannello tracking della Fase 3 è aperto ──────────────────── */}
+      <AdminOrdersPoller onNewOrders={handleNewOrders} isEditing={pendingTracking !== null} />
 
       {/* ── Search bar + contatore ──────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-4">
