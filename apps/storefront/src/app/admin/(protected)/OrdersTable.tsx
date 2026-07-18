@@ -343,17 +343,18 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
   }
 
   const handleNewOrders = useCallback((newOrders: { id: string }[]) => {
-    if (newOrders.length === 0) return;
+    const first = newOrders[0];
+    if (!first) return;
 
     if (newOrders.length === 1) {
-      setToast({ msg: `Nouvelle commande #${newOrders[0].id.slice(0, 8).toUpperCase()}`, type: 'success' });
+      setToast({ msg: `Nouvelle commande #${first.id.slice(0, 8).toUpperCase()}`, type: 'success' });
     } else {
       setToast({ msg: `${newOrders.length} nouvelles commandes`, type: 'success' });
     }
 
     if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
       new Notification('Nouvelle commande', {
-        body: `Commande #${newOrders[0].id.slice(0, 8).toUpperCase()}`,
+        body: `Commande #${first.id.slice(0, 8).toUpperCase()}`,
         tag:  'lepefy-new-order',
       });
     }
