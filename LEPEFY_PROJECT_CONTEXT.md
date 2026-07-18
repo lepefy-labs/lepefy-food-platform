@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 17 Luglio 2026 — branch `claude/lepefy-storefront-audit-69xss0` **pushato e mergiato su `main`**, query `UPDATE tenants SET primary_color='#1267C7'` **eseguita**: il redesign UI/UX in 3 fasi (§12bis) è ora interamente live su `chloefood.com`. Resta aperta solo la decisione di prodotto sulla destinazione del CTA hero "Notre histoire" (spostata in roadmap, §19). Base di questa revisione: v3.4 (verificata da Claude Code contro filesystem/git reale), invariata su tutto il resto tranne dove esplicitamente segnalato.
+> Aggiornato: 18 Luglio 2026 — aggiunto l'audit e redesign UI/UX del **pannello admin** (Fase 0–4 + 2 addenda, §8bis): accessibilità, tabella responsive, dark mode, azioni bulk, polling ordini live, filtri con date range e conteggi. A differenza del redesign storefront (§12bis, confermato live su `chloefood.com`), questo lavoro **non ha una conferma esplicita di merge su `main`/deploy produzione** raccolta in sessione — build e typecheck risultano verdi a ogni fase, ma diverse verifiche manuali su preview Vercel autenticata restano non confermate (dettaglio in §8bis, "Cosa resta aperto"). Due punti aperti col committente: export bulk in **CSV** invece di XLSX (deviazione motivata, non ancora ricomunicata a Dalice) e le **notifiche push vere** (Web Push/service worker), decise con Dalice il 17/07 ma rimandate in roadmap su richiesta di Robertin il 18/07 — solo l'avviso in-tab è stato implementato. Base di questa revisione: v3.5, invariata su tutto il resto tranne dove esplicitamente segnalato.
 
 ---
 
@@ -377,26 +377,102 @@ Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento
 - **Bug critico risolto:** `@supabase/ssr` 0.3.x richiede l'implementazione simultanea delle API cookie vecchie (`get/set/remove`) E nuove (`getAll/setAll`) — fornirne solo una rompe la sessione tra client e server
 - **Recovery password:** flusso testato via Supabase Dashboard → Authentication → Users; Site URL in Auth settings deve puntare a `https://chloefood.com` (non `localhost`) per redirect corretto del link di recupero
 
-### ⚠️ File morti da pulire (non urgente, debito noto)
+### ⚠️ File morti — ✅ rimossi (Fase 0 redesign admin, §8bis)
 
-`src/app/admin/orders/[id]/` **non è una route** (nessun `page.tsx`): è una cartella di componenti (`OrderDetail.tsx`, `PickingList.tsx`) importati via percorso relativo dalla vera pagina protetta `admin/(protected)/orders/[id]/page.tsx`. `src/app/admin/orders/id/PickingList.tsx` (cartella letterale `id`, senza parentesi quadre) è invece **codice morto**: nessun import nel repo, sembra una bozza precedente rimasta dopo lo spostamento in `[id]/`.
+`AdminNav.tsx` (soppiantato da `AdminSidebar.tsx`), `AdminOrdersClient.tsx` (dashboard client-side parallela, mai più montata) e `src/app/admin/orders/id/PickingList.tsx` (cartella letterale `id`, bozza abbandonata) sono stati eliminati, verificato via grep globale sugli import prima della cancellazione. Resta com'era, e non è un problema: `src/app/admin/orders/[id]/` **non è una route** (nessun `page.tsx`), è una cartella di componenti (`OrderDetail.tsx`, `PickingList.tsx`) importati via percorso relativo dalla vera pagina protetta `admin/(protected)/orders/[id]/page.tsx` — pattern confermato corretto, non toccato dal redesign.
+
+⚠️ **Bug pre-esistente trovato e corretto durante il redesign**: l'icona di stampa "Liste de préparation" nella tabella ordini puntava a `/admin/orders/[id]/picking-list`, una route mai esistita — 404 silenzioso presente da prima di questo lavoro. Corretto in Fase 3 creando la route mancante (vedi §8bis).
 
 ### Funzionalità implementate
 
-- Lista ordini con KPI cards (totale ordini, fatturato **totale + mese corrente con indicatore delta**, ordini nuovi, "À expédier" cliccabile con filtro)
-- Filtri: 4 dropdown selettivi con etichetta esplicita (Statut, Période, Livraison, Paiement)
-- Colonna badge metodo di pagamento nella tabella ordini
+- Lista ordini con **KPI cards** — dettaglio aggiornamenti in §8bis, in sintesi: fatturato totale + mese corrente con delta, "À expédier" cliccabile con filtro; card "Commandes totales" → "Aujourd'hui" **prevista ma non ancora eseguita**, vedi §8bis
+- Filtri: **6** (Statut con conteggi per stato, date range nativo `<input type="date">` ×2 al posto del preset fisso, Livraison, Paiement) — aggiornati in Fase 0 e nell'addendum filtri, vedi §8bis
+- Tabella ordini: **responsive tablet-first** con colonne raggruppate, righe espandibili mantenute, ordinamento data/montant, **dark mode** scoped al solo layout admin, **selezione multipla + bulk bar** (export CSV, stampa massiva liste di preparazione, cambio stato con guardrail) — dettaglio completo in §8bis
+- Colonna badge metodo di pagamento nella tabella ordini (ora componente condiviso `StatusBadge.tsx`, non più duplicato inline)
 - Badge visivo per ordini di oggi
 - Badge bandiere SVG per ordini internazionali
 - Indicatori storage: ❄ surgelé / 🌿 frais
-- Dettaglio ordine: aggiornamento stato + codice tracking
+- Dettaglio ordine: aggiornamento stato + codice tracking — **ora con blocco**: non si può salvare stato "Expédié" senza `tracking_code` valorizzato, vedi §8bis
 - Select corriere configurabile con modale conferma cambio
 - Toggle lingua FR/IT
-- **Picking list stampabile** — ⚠️ non è una route separata: `admin/(protected)/orders/[id]/page.tsx` renderizza sia il dettaglio ordine (avvolto in `div.no-print`) sia `PickingList.tsx`; `@media print` nasconde `.no-print` al momento della stampa, mostrando solo la picking list; icona di stampa su ogni riga ordine
-- **Gestione catalogo prodotti** (`/admin/catalogue`): sidebar con accordion per categoria, ricerca client-side (soglia `catalogue_search_threshold`), colonne ordinabili via URL params, toggle inline Actif, editing inline stock con indicatori colore, drag&drop upload immagine, generazione immagine AI (Gemini); **`/admin/catalogue/nouveau`** per creazione nuovo prodotto (riusa `ProductEditClient` con uno stub `emptyProduct`)
-- **Sistema etichette** (`/admin/products/[id]/etichetta`) — vedi §16, ora maturo: multi-template, multi-palette, draft/ristampa, preview live, autosave
-- **Pannello billing** (`/admin/billing`)
-- **Impostazioni boutique** (`/admin/parametres`) — include download QR code biglietto da visita digitale
+- **Picking list stampabile** — ora raggiungibile anche come route dedicata `admin/(protected)/orders/[id]/picking-list/page.tsx` (bug fix Fase 3, vedi sopra) oltre che dalla pagina dettaglio esistente; nuova route gemella `admin/(protected)/orders/picking-list?ids=...` per la stampa massiva da selezione multipla
+- Aggiornamento **live via polling** (18s, sospeso a tab nascosta) + toast + avviso in-tab (Notification API) su nuovo ordine — **non** vera push PWA, vedi §8bis e §19
+- **Gestione catalogo prodotti** (`/admin/catalogue`): sidebar con accordion per categoria, ricerca client-side (soglia `catalogue_search_threshold`), colonne ordinabili via URL params, toggle inline Actif, editing inline stock con indicatori colore, drag&drop upload immagine, generazione immagine AI (Gemini); **`/admin/catalogue/nouveau`** per creazione nuovo prodotto (riusa `ProductEditClient` con uno stub `emptyProduct`) — ⚠️ fuori dal perimetro del redesign Fase 0–4, non toccato
+- **Sistema etichette** (`/admin/products/[id]/etichetta`) — vedi §16, ora maturo: multi-template, multi-palette, draft/ristampa, preview live, autosave — ⚠️ fuori dal perimetro del redesign Fase 0–4, non toccato
+- **Pannello billing** (`/admin/billing`) — non toccato
+- **Impostazioni boutique** (`/admin/parametres`) — include download QR code biglietto da visita digitale — non toccato
+
+---
+
+## 8bis. Audit e redesign UI/UX pannello admin (Fase 0–4) — ⚠️ implementato, deploy non confermato
+
+**Stato:** tutte le fasi implementate con build/typecheck verdi ad ogni passaggio, checklist di ogni fase confermata da Robertin in sessione. **Non risulta però una conferma esplicita di push finale/merge su `main`/deploy produzione** raccolta in questa sessione, a differenza del redesign storefront (§12bis). Diverse verifiche manuali "da fare sulla preview Vercel autenticata" (il container di build non ha le env Supabase) sono state segnalate fase per fase ma non tutte esplicitamente richiuse — dettaglio in "Cosa resta aperto" sotto. **Da verificare con Robertin prima di considerare questo lavoro concluso.**
+
+Origine: `AUDIT_ADMIN_UIUX.md` (17/07), scope dichiarato: dashboard commandes (`(protected)/page.tsx`), `OrdersTable.tsx`, `AdminFilters.tsx`, `AdminSidebar.tsx`, design token (`globals.css`, `tailwind.config.ts`) — **`/admin/catalogue`, sistema etichette, billing, paramètres esplicitamente fuori scope**. Mockup di validazione: `admincommandesredesign.html` (allegato di sessione, non versionato nel repo, come il suo equivalente storefront in §12bis).
+
+### Fase 0 — fondamenta
+
+Token semantici di stato (`--status-info/warn/success/danger-{bg,fg,dot}`) in `globals.css`, indipendenti dal tenant per design (lo stato di un ordine ha lo stesso significato in ogni negozio). Componente condiviso `StatusBadge.tsx` (`admin/_components/ui/`), sostituisce due implementazioni duplicate identiche (`OrdersTable.tsx` e il poi-eliminato `AdminOrdersClient.tsx`). Fix del filtro Statut (mancavano `new` e `ready_for_pickup` come opzioni filtrabili, pur esistendo come stati reali). Rimozione dei 3 file morti (vedi §8).
+
+### Fase 1 — accessibilità (WCAG 2.2 AA)
+
+- Nessun testo informativo sotto 12px (`text-[10px]` → `text-xs` su badge "Aujourd'hui", tag quantità, contatori — le emoji di conservazione ❄/🌿 restano piccole per design, ora con `aria-label`+`role="img"`)
+- `text-gray-400` → `text-gray-500` su testo informativo (2.5:1 → 4.8:1); `gray-400` resta solo per icone/placeholder
+- `var(--color-primary)` **come colore di testo** (non solo sfondo) su bianco/chiaro sostituito con `--color-primary-dark` in 3 punti (`KpiCard` "Voir →", filtro attivo, voce attiva sidebar) — stesso problema di contrasto misurato dall'audit sui pulsanti pieni (~3.4:1 col verde ChloeFood), esteso per coerenza al testo
+- Target size ≥24×24px su freccia espansione riga e bottone "Effacer" ricerca; `aria-expanded` sulla freccia; `aria-label` sul link picking-list
+- `scope="col"` su tutti i `<th>`, testo `sr-only` sulle colonne senza etichetta visibile
+- ⚠️ **Lighthouse/axe non eseguibile in sessione** (container senza env Supabase) — baseline da raccogliere su preview autenticata, mai confermata fatta
+- Stesso pattern di contrasto esiste ancora in `OrderDetail.tsx`, `ProductEditClient.tsx`, `admin/login/page.tsx` — deliberatamente fuori scope, segnalato come mini-fase futura
+
+### Fase 2 — tabella responsive tablet-first + dark mode
+
+- Colonne da 10 a 7: Commande+Client fuse (email spostata nel pannello espanso), Transporteur confluito come sotto-riga di Montant, Paiement secondaria (`hidden lg:table-cell`)
+- **Righe espandibili mantenute** — decisione esplicita di Robertin (17/07): il pattern "riga troncata → link a pagina dettaglio" mostrato nel mockup di validazione **non è stato implementato**, resta il pannello inline già esistente, arricchito con email + paiement quando nascosto
+- Ordinamento client-side data/montant (`aria-sort` sul `<th>`)
+- Card list `md:hidden` con tap-through al dettaglio (pattern diverso dalle righe espandibili solo perché sotto `md` non c'è spazio per un pannello leggibile, non una contraddizione della decisione sopra)
+- **Dark mode**: decisione tecnica esplicita di **non** migrare tutto a CSS custom properties come nel mockup (troppo invasivo sul codice reale, quasi interamente classi Tailwind letterali) — usato invece `darkMode: 'class'` di Tailwind, wrapper `.dark` scoped al solo `(protected)/layout.tsx` (mai su `<html>`, storefront non toccato), `AdminThemeProvider`+`ThemeToggleButton`, persistenza `localStorage`. Token `.dark` in `globals.css` per i componenti già CSS-var-based (`StatusBadge`); **`--color-primary-light` ricalcolato via `color-mix()` dal primario del tenant, non hardcoded** (stesso principio multi-tenant di §5); `--color-primary-dark` risistemato in `.dark` (schiarito verso il bianco, direzione invertita rispetto al chiaro) perché altrimenti illeggibile su fondo scuro. `PaymentBadge`/`FlagBadge`/badge "C&C" convertiti da `style` inline con hex fissi a `className` con varianti `dark:` (gli stili inline non rispondono mai alle classi Tailwind)
+- ⚠️ `OrderDetail.tsx` eredita il wrapper `.dark` (sta dentro `(protected)`) ma non ha classi `dark:` — resta visivamente chiaro col tema scuro attivo, atteso non un bug, da comunicare prima di mostrarlo a Dalice
+- ⚠️ Verifica visuale 768/1023px e Lighthouse in dark mode segnalate "da fare su preview", mai confermate esplicitamente chiuse
+
+### Fase 3 — selezione multipla e azioni bulk
+
+- Checkbox riga + "seleziona tutto" (stato `indeterminate`), selezione azzerata al cambio ricerca/filtri
+- Bulk bar sticky (`role="toolbar"`): **Export CSV** (client-side puro, Blob + BOM UTF-8 per gli accenti francesi in Excel — **non XLSX**: `xlsx@0.18.5` ha vulnerabilità note senza fix, coerente con la voce roadmap §19 che ne raccomandava già la sostituzione; **deviazione dalla decisione presa con Dalice il 17/07** che indicava XLSX come formato unico — accettata da Robertin il 18/07, non risulta ricomunicata a Dalice), **stampa massiva liste di preparazione** (route `orders/picking-list?ids=...`, un solo tab, `page-break-before` tra ordini), **cambio stato bulk** con guardrail multipli
+- **Guardrail bulk status** (aggiunti dopo revisione, non nella prima versione): solo da stato `preparing`; ordini `pickup` (Click & Collect) vanno sempre a `ready_for_pickup`, **mai** a `shipped`; ordini `delivery` senza `tracking_code` **non vengono più saltati silenziosamente** — si apre un pannello (`BulkTrackingModal.tsx`) per inserire trasportatore+codice riga per riga prima di procedere. Nessuna cancellazione/rimborso bulk (tocca Stripe, va gestito singolarmente)
+- API `bulk-status`: `requireAdmin()` + rilettura server-side dello stato reale (mai fidarsi della selezione del client) + `tenant_id` esplicito nella query (il service client bypassa RLS)
+- **Dettaglio ordine singolo**: salvataggio bloccato se si imposta "Expédié" senza `tracking_code` valorizzato (stesso vincolo di business della bulk, applicato anche al percorso singolo)
+
+### Fase 4 — aggiornamenti live (polling, non Realtime) + KPI
+
+- **Decisione presa dopo aver verificato i volumi reali di ChloeFood** (1, raramente 2 admin in parallelo; <10 ordini/giorno il 18/07): **polling leggero** (18s, sospeso a tab nascosta, giro extra su `visibilitychange`) invece di Supabase Realtime vero. Un primo prompt con Realtime + nuova tabella `tenant_admins` + policy RLS `SELECT` su `orders` è stato scritto e **scartato prima dell'esecuzione** — resta come riferimento se il volume o il numero di admin concorrenti crescerà
+- Endpoint `/api/admin/orders/poll` riusa `requireAdmin()`, nessuna nuova superficie di accesso
+- **Guardia anti-interruzione**: se l'operatore ha il pannello tracking bulk aperto (`isEditing`), il poll continua a girare ma il `router.refresh()` viene rimandato finché il pannello non si chiude, per non perdere lavoro in corso
+- `NotificationBell.tsx`: avviso di sistema **solo mentre la scheda è aperta** (Notification API, non service worker) — esplicitamente **non** le notifiche push vere promesse a Dalice il 17/07, vedi sotto e §19
+- ⚠️ **KPI "Aujourd'hui"**: prevista dal piano originale dell'audit, persa nella riscrittura della fase attorno alla decisione Realtime→polling — prompt correttivo scritto (sostituisce "Commandes totales" con "Aujourd'hui", mantiene il totale come sotto-riga) ma **non risulta ancora eseguito** ("prompt dato a Claude Code, in attesa")
+
+### Addendum — filtri: date range nativo + conteggi
+
+Completa l'audit §3.5 (solo il punto 1, filtro Statut, era stato coperto in Fase 0): filtro "Période" sostituito da due `<input type="date">` nativi (`dateFrom`/`dateTo`, zero librerie), filtro Statut con conteggio per stato (es. "En préparation (3)", nessun `(0)` per stati vuoti). Dati derivati da query già esistenti, nessuna nuova query pesante.
+
+### Decisioni prese in sessione (18/07) — divergono dal piano originale dell'audit
+
+| Tema | Decisione audit/17-07 | Decisione effettiva 18/07 | Note |
+|---|---|---|---|
+| Export bulk | XLSX (decisione col committente) | **CSV** | Vulnerabilità nota `xlsx@0.18.5`; accettato da Robertin, **non risulta comunicato a Dalice** |
+| Notifiche | Push vera (Web Push/service worker, decisione col committente) | **Rimandata in roadmap** | Solo avviso in-tab implementato; vedi §19 |
+| Aggiornamenti live | Supabase Realtime | **Polling 18s** | Basato sui volumi reali verificati in sessione, non sulla raccomandazione originale dell'audit |
+| Righe tabella | Mockup: troncate + link dettaglio | **Espandibili, mantenute** | Decisione esplicita di Robertin, 17/07 |
+
+### Cosa resta aperto
+
+- **Conferma push/merge su `main`** del lavoro Fase 0–4 — non raccolta in questa sessione, a differenza di §12bis
+- **KPI "Aujourd'hui"**: prompt scritto, non ancora eseguito
+- Diverse verifiche manuali su preview Vercel autenticata segnalate ma non esplicitamente richiuse: Lighthouse/axe baseline (Fase 1), verifica visuale 768/1023px + Lighthouse dark mode (Fase 2), fix 404 picking-list + 3 azioni bulk + page-break multi-ordine + accenti CSV in Excel (Fase 3), comportamento guardia anti-interruzione poller su tre scenari (Fase 4)
+- **Comunicare a Dalice** la deviazione CSV (invece di XLSX) e il rinvio delle notifiche push vere, essendo entrambe decisioni prese con lei il 17/07 e cambiate il giorno dopo senza il suo coinvolgimento diretto in sessione
+- Estrazione componenti condivisi rimasta parziale: solo `StatusBadge.tsx` estratto; `Badge.tsx` (generico), `KpiCard.tsx`, `Toast.tsx`, `BulkBar.tsx` restano inline nei rispettivi file (§4 dell'audit li raccomandava come componenti condivisi) — debito di organizzazione, zero impatto utente
+- Test manuali WCAG mai eseguiti: zoom 200% (1.4.4), screen reader reale (VoiceOver/NVDA) — solo Lighthouse/axe automatici pianificati
+- Stesso pattern di contrasto/target-size delle Fasi 1-2 esiste ancora in `OrderDetail.tsx`, `ProductEditClient.tsx`, `admin/login/page.tsx` — fuori scope per scelta, non per svista
+- Se in futuro serve davvero il Realtime (più admin concorrenti, volume cresciuto): il prompt scartato in Fase 4 (RLS `tenant_admins` + `postgres_changes`) resta un punto di partenza valido, non va ripreso "perché più elegante"
 
 ---
 
@@ -696,10 +772,13 @@ GOTENBERG_AUTH=...
 | Test E2E: ordine IT + ordine FR + Click & Collect | Robertin | ⚠️ DA FARE |
 | Installare/confermare Gotenberg raggiungibile su Hetzner + Caddy auth | Robertin | ✅ FATTO (verificato end-to-end 14/07: deploy Hetzner + PDF reale generato da job vero) |
 | Verificare dati nutrizionali/lotto con produttori prima di stampare etichette (in particolare Bobolo, valori sospetti) | ChloeFood / produttori | ⚠️ DA FARE — competenza ChloeFood, non blocco tecnico |
-| Rimuovere file morti `admin/orders/id/` e cartella componenti condivisi non-route | Robertin | ⚠️ DA FARE (non bloccante) |
+| Rimuovere file morti admin (`AdminNav.tsx`, `AdminOrdersClient.tsx`, `orders/id/`) | Robertin | ✅ FATTO (Fase 0 redesign admin, §8bis) |
 | Decisione brand charter v2 (font, colore, elemento signature) | Dalice | ✅ FATTO — Bricolage Grotesque, blu `#1267C7`, cartellino `ShopTag`: validati su mockup, implementati e deployati (§12bis) |
 | ~~Pushare il branch redesign UI/UX~~ | Robertin | ✅ FATTO (17/07) |
 | ~~Eseguire query SQL colore primario ChloeFood~~ | Robertin | ✅ FATTO (17/07) |
+| Redesign admin (Fase 0–4 + addenda) — accessibilità, responsive, dark mode, bulk actions, polling | Robertin | ⚠️ Implementato, deploy/push finale non confermato in sessione — vedi §8bis |
+| Eseguire KPI "Aujourd'hui" (prompt già scritto) | Robertin | ⚠️ DA FARE |
+| Comunicare a Dalice la deviazione export CSV (invece di XLSX) e il rinvio delle notifiche push | Robertin | ⚠️ DA FARE — vedi §8bis |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
 
 ---
@@ -723,7 +802,10 @@ GOTENBERG_AUTH=...
 | IA nel sistema etichette (sfondi, estrazione dati bozza, QA coerenza) | Tecnico | P2 | Idea salvata, non implementata |
 | Query embedding cache (risparmio chiamate Gemini su ricerca semantica) | Tecnico | P2 | Idea salvata, non implementata — vedi §13bis |
 | i18n (`next-intl` + `tenants.locale`) prima di espandere fuori da area francofona | Tecnico | P2 | Non avviato |
-| Sostituire `xlsx@0.18.5` (vulnerabilità note) con alternativa (es. `exceljs`) | Tecnico | P2 | Non avviato |
+| Sostituire `xlsx@0.18.5` (vulnerabilità note) con alternativa (es. `exceljs`) | Tecnico | P2 | Non avviato — nel frattempo l'export bulk admin (§8bis) usa CSV puro proprio per questo motivo |
+| Notifiche push vere per l'admin (Web Push API, service worker, VAPID, `push_subscriptions`, trigger da webhook Stripe) | Tecnico | P1 | Decisa con Dalice il 17/07, **rimandata** il 18/07 — solo avviso in-tab (Notification API, richiede la scheda aperta) implementato, vedi §8bis |
+| Realtime vero per l'admin (Supabase Realtime + RLS `tenant_admins` su `orders`) invece del polling attuale | Tecnico | P2 | Prompt scritto e scartato consapevolmente (18/07) — volumi attuali non lo giustificano; riprendere solo se crescono admin concorrenti o ordini/giorno, vedi §8bis |
+| Estrarre `Badge.tsx`/`KpiCard.tsx`/`Toast.tsx`/`BulkBar.tsx` come componenti condivisi admin (oggi inline) | Tecnico | P2 | Non avviato — raccomandazione audit §4, debito di organizzazione, zero impatto utente |
 | Test automatizzati (almeno `calculateShipping.ts` + webhook, Vitest) | Tecnico | P2 | Non avviato |
 | Google Play Store via TWA/PWABuilder | Growth | P1 | Non avviato |
 | Apple App Store via Capacitor | Growth | P2 | Non avviato |
@@ -782,6 +864,8 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 | `Charte_graphique_Chloe_Food_1.pdf` | Nuova brand charter v2 (20 pagine) — decisioni derivate (font, elemento signature) implementate, colore primario ancora da migrare via SQL (§12bis) |
 | `chloe_food_logo.svg` | Logo vettoriale ricostruito (bug viewBox corretto) |
 | `Mockup_Fase3_Validazione_UIUX.html` | Mockup interattivo di validazione Fase 3 (toggle colore verde/blu, toggle font Bricolage/Fraunces) — allegato di sessione, non versionato nel repo; decisioni approvate implementate in `apps/storefront`, vedi §12bis |
+| `AUDIT_ADMIN_UIUX.md` | Audit UI/UX del pannello admin (17/07) — origine del redesign Fase 0–4, allegato di sessione, non versionato nel repo; vedi §8bis |
+| `admincommandesredesign.html` | Mockup interattivo di validazione redesign admin (tabella responsive, dark mode, bulk bar) — allegato di sessione, non versionato nel repo; decisioni approvate implementate parzialmente (righe espandibili mantenute contro il mockup, vedi §8bis) |
 
 ---
 
@@ -839,4 +923,18 @@ Nessuna modifica alle sezioni non toccate da questo aggiornamento rispetto alla 
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.5 — 17 Luglio 2026 (base: v3.4 verificata su git/filesystem; + branch mergiato, colore live, CTA spostato in roadmap, vedi §25)*
+## 26. Changelog v3.6 (18 Luglio 2026) — audit e redesign UI/UX pannello admin (Fase 0–4)
+
+Aggiunto il resoconto completo di una sessione separata dedicata al pannello admin (`(protected)/page.tsx`, `OrdersTable.tsx`, `AdminFilters.tsx`, `AdminSidebar.tsx`), partita da un audit UI/UX (`AUDIT_ADMIN_UIUX.md`) e proseguita in 5 fasi + 2 addenda. **Differenza importante rispetto a v3.5**: questa revisione documenta lo stato riportato in chat dal committente (checklist di fine-fase confermate), non una verifica indipendente di Claude Code contro git/filesystem come le revisioni precedenti — vale la stessa cautela di "non ancora confermato" ovunque segnalato.
+
+- **§8** — rimossa la nota "file morti da pulire" (ora eliminati); aggiornata la lista funzionalità con tabella responsive, dark mode, bulk actions, polling, blocco tracking obbligatorio; segnalato il bug pre-esistente della route picking-list (mai esistita, ora corretta) trovato durante il redesign, non dal lavoro precedente.
+- **§8bis** — nuova sezione, riepiloga le 5 fasi + 2 addenda del redesign admin: cosa è stato fatto, le decisioni tecniche prese in sessione che divergono dal piano originale dell'audit (CSV invece di XLSX, notifiche rimandate, polling invece di Realtime), e un elenco esplicito di verifiche manuali segnalate ma mai confermate chiuse.
+- **§18** — riga file morti admin segnata FATTO; aggiunte righe per il redesign admin (stato "implementato, deploy non confermato"), l'esecuzione pendente della KPI "Aujourd'hui", e la comunicazione a Dalice ancora da fare sulle due deviazioni.
+- **§19** — aggiunta la voce "notifiche push vere per l'admin" (decisa con Dalice il 17/07, rimandata il 18/07); aggiunta la voce "Realtime vero per l'admin" come possibile upgrade futuro del polling attuale, con la condizione esplicita per cui vale la pena riprenderlo; aggiunta la voce estrazione componenti condivisi admin; annotata la riga esistente su `xlsx@0.18.5` con il collegamento alla scelta CSV fatta nel frattempo.
+- **§21** — aggiunti `AUDIT_ADMIN_UIUX.md` e `admincommandesredesign.html` alla tabella documenti di riferimento.
+
+Nessuna modifica alle sezioni relative allo storefront pubblico (§12bis e altre) rispetto a v3.5 — quel lavoro resta confermato live, non riverificato in questa sessione.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.6 — 18 Luglio 2026 (base: v3.5; + audit e redesign UI/UX pannello admin Fase 0–4, stato riportato in chat non riverificato su git/filesystem, vedi §8bis e §26)*
