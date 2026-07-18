@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 18 Luglio 2026 — aggiunto l'audit e redesign UI/UX del **pannello admin** (Fase 0–4 + 2 addenda, §8bis): accessibilità, tabella responsive, dark mode, azioni bulk, polling ordini live, filtri con date range e conteggi. A differenza del redesign storefront (§12bis, confermato live su `chloefood.com`), questo lavoro **non ha una conferma esplicita di merge su `main`/deploy produzione** raccolta in sessione — build e typecheck risultano verdi a ogni fase, ma diverse verifiche manuali su preview Vercel autenticata restano non confermate (dettaglio in §8bis, "Cosa resta aperto"). Due punti aperti col committente: export bulk in **CSV** invece di XLSX (deviazione motivata, non ancora ricomunicata a Dalice) e le **notifiche push vere** (Web Push/service worker), decise con Dalice il 17/07 ma rimandate in roadmap su richiesta di Robertin il 18/07 — solo l'avviso in-tab è stato implementato. Base di questa revisione: v3.5, invariata su tutto il resto tranne dove esplicitamente segnalato.
+> Aggiornato: 18 Luglio 2026 (v3.7) — **verifica indipendente contro git/filesystem reale** (branch `claude/update-lepefy-project-context-fke5jo`), non solo stato riportato in chat. Due correzioni rilevanti rispetto a v3.6: (1) la **KPI "Aujourd'hui"**, segnalata come "prompt scritto ma non eseguito", **risulta invece già eseguita** nel codice (`admin/(protected)/page.tsx`) — il commit che l'ha implementata precede cronologicamente quello che ha scritto v3.6, semplicemente lo stato in chat non era stato aggiornato di conseguenza; (2) **`main` non contiene né il redesign admin (Fase 0–4, §8bis) né il redesign storefront (§12bis)** — `git merge-base main HEAD` coincide con la punta di `main` stessa (ultimo commit 16/07 alle 11:47): **tutto** il lavoro di entrambi gli audit (storefront 16–17/07, admin 17–18/07) esiste solo su questo branch, mai mergiato. La precedente affermazione "branch pushato e mergiato su `main`" (§12bis/§25, v3.4–v3.6) **non è supportata dallo stato reale del repository** — verificato anche puntualmente: `ShopTag.tsx` non esiste su `main`, e `BottomNav.tsx` su `main` contiene ancora l'hex hardcoded `#1D9E75`. Non è verificabile da qui se Vercel effettivamente deploya da `main` o da questo branch (nessun `vercel.json` nel repo) — **da confermare con Robertin prima di dare per assodato lo stato di produzione**. Scoperta anche una funzionalità non documentata: `AdminMobileNav.tsx`, un drawer di navigazione mobile per l'admin (vedi §8bis). Base di questa revisione: v3.6, con le correzioni sopra.
 
 ---
 
@@ -51,11 +51,11 @@
 - Secondary: `#F2C811` (giallo/moutarde)
 - Accent light: `#E1F5EE` — ⚠️ non toccato dalla migrazione colore, nota di coerenza visiva ancora aperta (vedi §12bis)
 
-**✅ Codice storefront ora interamente token-based E in produzione (Fase 1–3, branch `claude/lepefy-storefront-audit-69xss0` pushato e mergiato su `main` il 17/07 — vedi §12bis per il dettaglio completo).** Prima di questo lavoro, il verde `#1D9E75` era hardcoded in punti multipli (BottomNav, PWABanner, AddToCartButton, HeroBanner, pagina tracking ordine) invece di derivare da `tenant.primary_color` — bug di multi-tenancy reale, non solo teorico: un cambio colore via DB non si sarebbe propagato ovunque. **Tutti questi punti sono stati corretti**: l'intero storefront pubblico deriva ora da variabili CSS iniettate da `layout.tsx` (`--color-primary`, `--color-primary-light`, `--color-primary-dark`, `--color-primary-hover`, `--color-secondary`, più `--radius-*`/`--shadow-card`/`--font-body`/`--font-display`, vedi §12bis) — il cambio di `tenant.primary_color` in DB (eseguito il 17/07) si è propagato correttamente ovunque, incluso ai nuovi elementi introdotti (cartellino signature `ShopTag`, pattern decorativo hero).
+**✅ Codice storefront ora interamente token-based su questo branch di lavoro (Fase 1–3 — vedi §12bis per il dettaglio completo). ⚠️ Correzione v3.7: non risulta invece mergiato su `main`** (verificato via `git merge-base`, contrariamente a quanto affermato nelle revisioni precedenti — vedi §12bis per l'evidenza). Prima di questo lavoro, il verde `#1D9E75` era hardcoded in punti multipli (BottomNav, PWABanner, AddToCartButton, HeroBanner, pagina tracking ordine) invece di derivare da `tenant.primary_color` — bug di multi-tenancy reale, non solo teorico: un cambio colore via DB non si sarebbe propagato ovunque. **Tutti questi punti sono stati corretti**: l'intero storefront pubblico deriva ora da variabili CSS iniettate da `layout.tsx` (`--color-primary`, `--color-primary-light`, `--color-primary-dark`, `--color-primary-hover`, `--color-secondary`, più `--radius-*`/`--shadow-card`/`--font-body`/`--font-display`, vedi §12bis) — il cambio di `tenant.primary_color` in DB (eseguito il 17/07) si è propagato correttamente ovunque, incluso ai nuovi elementi introdotti (cartellino signature `ShopTag`, pattern decorativo hero).
 
 **⚠️ Nota di coerenza aperta:** `tenant.accent_light` (`#E1F5EE`, verde menta) non è stato aggiornato insieme al primary e resta visivamente scollegato dal nuovo blu nei punti che lo usano ancora come sfondo chiaro (es. contenitore icona prodotto in `ProductCard`). Non bloccante, ma da valutare — vedi §19.
 
-**✅ Brand charter v2 — le 3 decisioni derivate sono ora tutte live in produzione.** Dalice ha ricevuto una nuova charter grafica (20 pagine) con logo, palette e materiali completamente diversi — colore primario proposto **blu `#1267C7`**. Charter incompleta all'origine (mancano varianti icona/monocromatiche, riferimenti Pantone, dati placeholder errati come dominio e nome fittizio "TSANA"), ma le tre decisioni di design derivate ne sono state validate su mockup interattivo (`Mockup_Fase3_Validazione_UIUX.html`, allegato non versionato nel repo), implementate in codice e ora deployate:
+**✅ Brand charter v2 — le 3 decisioni derivate sono implementate nel codice di questo branch. ⚠️ "Deployate" corretto in v3.7: non risulta mergiato su `main`, vedi §12bis.** Dalice ha ricevuto una nuova charter grafica (20 pagine) con logo, palette e materiali completamente diversi — colore primario proposto **blu `#1267C7`**. Charter incompleta all'origine (mancano varianti icona/monocromatiche, riferimenti Pantone, dati placeholder errati come dominio e nome fittizio "TSANA"), ma le tre decisioni di design derivate ne sono state validate su mockup interattivo (`Mockup_Fase3_Validazione_UIUX.html`, allegato non versionato nel repo) e implementate in codice su questo branch:
 1. **Font titoli/segnaletica: Bricolage Grotesque** (corpo testo resta Inter) — caricato via `next/font/google`, decisione di piattaforma applicata a tutti i tenant, non tenant-specifica.
 2. **Colore primario → blu `#1267C7`** — era una decisione di **dato**, non di codice: nessuna occorrenza di questo hex è mai stata scritta nel codice, il codice legge sempre `tenant.primary_color`. **Query SQL eseguita il 17/07.**
 3. **Elemento signature "cartellino da bottega"** (`ShopTag.tsx`) — nel mockup era descritto come oro fisso "dal logo"; **deliberatamente non implementato così**, perché quel ragionamento è specifico a ChloeFood. In produzione usa `var(--color-secondary)` (già `#F2C811`, visivamente equivalente per ChloeFood), quindi resta corretto per qualunque tenant futuro.
@@ -268,7 +268,7 @@ GRANT UPDATE ON public.[tabella] TO service_role;  -- richiesto per ogni tabella
 
 - Ogni query DB **deve** usare `tenant.id` caricato da `NEXT_PUBLIC_TENANT_SLUG` + `getTenant()`
 - Mai hardcodare slug (`'chloefood'`), colori, nomi, label corrieri, o valori tenant-specifici nel codice
-- **✅ Audit dedicato eseguito su questa regola per lo storefront pubblico (Fase 1–3, §12bis).** Prima dell'audit la regola era violata in più punti concreti (colori hardcoded in BottomNav/PWABanner/AddToCartButton/HeroBanner/tracking ordine, nome tenant hardcoded `"Chloé Food"` in PWABanner). Tutti corretti; il pattern ora è: solo `var(--color-*)` o classi Tailwind mappate nei componenti storefront, mai hex literal — vedi §12bis per il dettaglio e per il lavoro analogo ancora da fare fuori da `apps/storefront` se in futuro si aggiungerà un secondo tenant con branding diverso
+- **✅ Audit dedicato eseguito su questa regola per lo storefront pubblico (Fase 1–3, §12bis), ⚠️ ma solo su questo branch di lavoro, non su `main`.** Prima dell'audit la regola era violata in più punti concreti (colori hardcoded in BottomNav/PWABanner/AddToCartButton/HeroBanner/tracking ordine, nome tenant hardcoded `"Chloé Food"` in PWABanner). Tutti corretti su questo branch; il pattern qui è: solo `var(--color-*)` o classi Tailwind mappate nei componenti storefront, mai hex literal — ma `main` risulta ancora con gli hex hardcoded originali (verificato v3.7, vedi §12bis). Vedi §12bis per il dettaglio e per il lavoro analogo ancora da fare fuori da `apps/storefront` se in futuro si aggiungerà un secondo tenant con branding diverso
 - La logica del corriere è **switch-based** su `tenants.shipping_provider` (`packlink` / `flat_rate` / `pickup_only`)
 - RLS attivo su tutte le tabelle — il `service_role` bypassa RLS nelle API routes admin (ora tutte protette anche a livello applicativo da `requireAdmin()`, vedi §2.1)
 - **Eccezioni statiche note (da rimediare prima del 2° tenant):** `favicon.ico` e `apple-touch-icon.png` in `public/` sono file statici mono-tenant, accettabili temporaneamente con un solo tenant attivo
@@ -385,7 +385,7 @@ Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento
 
 ### Funzionalità implementate
 
-- Lista ordini con **KPI cards** — dettaglio aggiornamenti in §8bis, in sintesi: fatturato totale + mese corrente con delta, "À expédier" cliccabile con filtro; card "Commandes totales" → "Aujourd'hui" **prevista ma non ancora eseguita**, vedi §8bis
+- Lista ordini con **KPI cards** — dettaglio aggiornamenti in §8bis, in sintesi: fatturato totale + mese corrente con delta, "À expédier" cliccabile con filtro; prima card **"Aujourd'hui"** (conteggio ordini di oggi, "X au total" come sotto-riga) — ✅ eseguita, verificato nel codice (`admin/(protected)/page.tsx`), correzione rispetto a v3.6 che la segnalava ancora pendente
 - Filtri: **6** (Statut con conteggi per stato, date range nativo `<input type="date">` ×2 al posto del preset fisso, Livraison, Paiement) — aggiornati in Fase 0 e nell'addendum filtri, vedi §8bis
 - Tabella ordini: **responsive tablet-first** con colonne raggruppate, righe espandibili mantenute, ordinamento data/montant, **dark mode** scoped al solo layout admin, **selezione multipla + bulk bar** (export CSV, stampa massiva liste di preparazione, cambio stato con guardrail) — dettaglio completo in §8bis
 - Colonna badge metodo di pagamento nella tabella ordini (ora componente condiviso `StatusBadge.tsx`, non più duplicato inline)
@@ -395,6 +395,7 @@ Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento
 - Dettaglio ordine: aggiornamento stato + codice tracking — **ora con blocco**: non si può salvare stato "Expédié" senza `tracking_code` valorizzato, vedi §8bis
 - Select corriere configurabile con modale conferma cambio
 - Toggle lingua FR/IT
+- **Navigazione mobile** (`AdminMobileNav.tsx`, non documentata nelle revisioni precedenti): la sidebar admin è `hidden md:block`, quindi sotto `md` non esisteva alcun modo di navigare tra le sezioni admin — colmato con un drawer a comparsa da sinistra (bottone hamburger in header, overlay, chiusura su `Escape`/click fuori/cambio route), riusa lo stesso `AdminSidebar.tsx` del desktop
 - **Picking list stampabile** — ora raggiungibile anche come route dedicata `admin/(protected)/orders/[id]/picking-list/page.tsx` (bug fix Fase 3, vedi sopra) oltre che dalla pagina dettaglio esistente; nuova route gemella `admin/(protected)/orders/picking-list?ids=...` per la stampa massiva da selezione multipla
 - Aggiornamento **live via polling** (18s, sospeso a tab nascosta) + toast + avviso in-tab (Notification API) su nuovo ordine — **non** vera push PWA, vedi §8bis e §19
 - **Gestione catalogo prodotti** (`/admin/catalogue`): sidebar con accordion per categoria, ricerca client-side (soglia `catalogue_search_threshold`), colonne ordinabili via URL params, toggle inline Actif, editing inline stock con indicatori colore, drag&drop upload immagine, generazione immagine AI (Gemini); **`/admin/catalogue/nouveau`** per creazione nuovo prodotto (riusa `ProductEditClient` con uno stub `emptyProduct`) — ⚠️ fuori dal perimetro del redesign Fase 0–4, non toccato
@@ -404,9 +405,9 @@ Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento
 
 ---
 
-## 8bis. Audit e redesign UI/UX pannello admin (Fase 0–4) — ⚠️ implementato, deploy non confermato
+## 8bis. Audit e redesign UI/UX pannello admin (Fase 0–4 + 2 addenda) — ⚠️ implementato, non su `main`
 
-**Stato:** tutte le fasi implementate con build/typecheck verdi ad ogni passaggio, checklist di ogni fase confermata da Robertin in sessione. **Non risulta però una conferma esplicita di push finale/merge su `main`/deploy produzione** raccolta in questa sessione, a differenza del redesign storefront (§12bis). Diverse verifiche manuali "da fare sulla preview Vercel autenticata" (il container di build non ha le env Supabase) sono state segnalate fase per fase ma non tutte esplicitamente richiuse — dettaglio in "Cosa resta aperto" sotto. **Da verificare con Robertin prima di considerare questo lavoro concluso.**
+**Stato:** tutte le fasi implementate con build/typecheck verdi ad ogni passaggio. **Verificato ora (v3.7) direttamente su git/filesystem, non solo su checklist riportate in chat**: `git merge-base main HEAD` coincide con la punta di `main`, cioè **nessun commit di questo lavoro è mai stato mergiato su `main`** — esiste solo su questo branch. Questo vale anche per il redesign storefront (§12bis), nonostante affermazioni precedenti del contrario — vedi intestazione documento. Diverse verifiche manuali "da fare sulla preview Vercel autenticata" (il container di build non ha le env Supabase) restano non confermate — dettaglio in "Cosa resta aperto" sotto. **Da verificare con Robertin quale branch sia effettivamente collegato al deploy Vercel prima di considerare questo lavoro live.**
 
 Origine: `AUDIT_ADMIN_UIUX.md` (17/07), scope dichiarato: dashboard commandes (`(protected)/page.tsx`), `OrdersTable.tsx`, `AdminFilters.tsx`, `AdminSidebar.tsx`, design token (`globals.css`, `tailwind.config.ts`) — **`/admin/catalogue`, sistema etichette, billing, paramètres esplicitamente fuori scope**. Mockup di validazione: `admincommandesredesign.html` (allegato di sessione, non versionato nel repo, come il suo equivalente storefront in §12bis).
 
@@ -448,11 +449,15 @@ Token semantici di stato (`--status-info/warn/success/danger-{bg,fg,dot}`) in `g
 - Endpoint `/api/admin/orders/poll` riusa `requireAdmin()`, nessuna nuova superficie di accesso
 - **Guardia anti-interruzione**: se l'operatore ha il pannello tracking bulk aperto (`isEditing`), il poll continua a girare ma il `router.refresh()` viene rimandato finché il pannello non si chiude, per non perdere lavoro in corso
 - `NotificationBell.tsx`: avviso di sistema **solo mentre la scheda è aperta** (Notification API, non service worker) — esplicitamente **non** le notifiche push vere promesse a Dalice il 17/07, vedi sotto e §19
-- ⚠️ **KPI "Aujourd'hui"**: prevista dal piano originale dell'audit, persa nella riscrittura della fase attorno alla decisione Realtime→polling — prompt correttivo scritto (sostituisce "Commandes totales" con "Aujourd'hui", mantiene il totale come sotto-riga) ma **non risulta ancora eseguito** ("prompt dato a Claude Code, in attesa")
+- ✅ **KPI "Aujourd'hui"**: prevista dal piano originale dell'audit, persa nella riscrittura della fase attorno alla decisione Realtime→polling, poi **eseguita** — sostituisce "Commandes totales" come prima card, con il totale mantenuto come sotto-riga (`${totalCount} au total`). Correzione v3.7: la revisione precedente (v3.6) la segnalava ancora pendente, ma il commit che l'ha implementata (18/07, 23:03) precede quello che ha scritto v3.6 (18/07, 23:42) — la chat non era stata aggiornata di conseguenza, non un errore del codice
 
-### Addendum — filtri: date range nativo + conteggi
+### Addendum 1 — filtri: date range nativo + conteggi
 
 Completa l'audit §3.5 (solo il punto 1, filtro Statut, era stato coperto in Fase 0): filtro "Période" sostituito da due `<input type="date">` nativi (`dateFrom`/`dateTo`, zero librerie), filtro Statut con conteggio per stato (es. "En préparation (3)", nessun `(0)` per stati vuoti). Dati derivati da query già esistenti, nessuna nuova query pesante.
+
+### Addendum 2 — navigazione mobile (`AdminMobileNav.tsx`)
+
+Non presente nel piano originale dell'audit né nelle revisioni precedenti di questo documento — scoperta durante la verifica v3.7 contro il codice reale (commit 18/07, 23:20). Prima di questa aggiunta, `AdminSidebar` era `hidden md:block`: sotto la soglia `md`, l'admin non aveva alcun modo di raggiungere catalogue/etichette/billing/paramètres se non digitando l'URL a mano. `AdminMobileNav.tsx` apre un drawer da sinistra (bottone hamburger nell'header, overlay cliccabile, chiusura su `Escape` e al cambio route) che riusa lo stesso `AdminSidebar.tsx` del desktop — nessuna duplicazione di markup di navigazione.
 
 ### Decisioni prese in sessione (18/07) — divergono dal piano originale dell'audit
 
@@ -465,8 +470,7 @@ Completa l'audit §3.5 (solo il punto 1, filtro Statut, era stato coperto in Fas
 
 ### Cosa resta aperto
 
-- **Conferma push/merge su `main`** del lavoro Fase 0–4 — non raccolta in questa sessione, a differenza di §12bis
-- **KPI "Aujourd'hui"**: prompt scritto, non ancora eseguito
+- **Merge su `main`** del lavoro Fase 0–4 — verificato in v3.7 che **non è mai avvenuto** (`git merge-base main HEAD` = punta di `main`), non solo "non confermato in sessione" come detto in v3.6. Stesso discorso per il redesign storefront (§12bis). Da chiarire con Robertin quale branch Vercel deploya realmente
 - Diverse verifiche manuali su preview Vercel autenticata segnalate ma non esplicitamente richiuse: Lighthouse/axe baseline (Fase 1), verifica visuale 768/1023px + Lighthouse dark mode (Fase 2), fix 404 picking-list + 3 azioni bulk + page-break multi-ordine + accenti CSV in Excel (Fase 3), comportamento guardia anti-interruzione poller su tre scenari (Fase 4)
 - **Comunicare a Dalice** la deviazione CSV (invece di XLSX) e il rinvio delle notifiche push vere, essendo entrambe decisioni prese con lei il 17/07 e cambiate il giorno dopo senza il suo coinvolgimento diretto in sessione
 - Estrazione componenti condivisi rimasta parziale: solo `StatusBadge.tsx` estratto; `Badge.tsx` (generico), `KpiCard.tsx`, `Toast.tsx`, `BulkBar.tsx` restano inline nei rispettivi file (§4 dell'audit li raccomandava come componenti condivisi) — debito di organizzazione, zero impatto utente
@@ -537,9 +541,9 @@ TRACKING_SECRET=...    # Per HMAC token ordini — ora obbligatoria anche per la
 
 ---
 
-## 12bis. Audit e redesign UI/UX storefront (Fase 1–3) — ✅ live in produzione
+## 12bis. Audit e redesign UI/UX storefront (Fase 1–3) — ⚠️ non su `main`, contrariamente a quanto documentato finora
 
-**Stato:** lavoro completo (typecheck verde su tutte le fasi), **mergiato su `main` e deployato** (branch `claude/lepefy-storefront-audit-69xss0`, 5 commit, pushato il 17/07). Perimetro: solo `apps/storefront`, `apps/admin` (route `src/app/admin/**`) esplicitamente escluso in ogni fase.
+**Stato:** lavoro completo (typecheck verde su tutte le fasi). **Correzione v3.7:** le revisioni precedenti (v3.4–v3.6) affermavano "mergiato su `main` e deployato" tramite un branch dedicato `claude/lepefy-storefront-audit-69xss0`. Verifica diretta contro il repository reale in questa sessione mostra che **quel branch non esiste** (né in locale né su `origin`) e che **`main` non contiene queste modifiche**: `git merge-base main HEAD` coincide con la punta di `main` (ultimo commit 16/07 11:47, precedente a tutto questo lavoro), `ShopTag.tsx` non esiste su `main`, e `BottomNav.tsx` su `main` ha ancora l'hex hardcoded `#1D9E75`. Tutti i commit del redesign risultano invece su questo stesso branch di lavoro condiviso (`claude/update-lepefy-project-context-fke5jo`), insieme al lavoro successivo sull'admin (§8bis) — coerente con il workflow reale di Robertin (upload diretto via GitHub web UI su un unico branch aperto, non PR separate per feature). **Non verificabile da qui se `chloefood.com` deploya effettivamente da `main` o da questo branch** (nessun `vercel.json` nel repo) — da confermare con Robertin prima di considerare questo lavoro live in produzione. Perimetro: solo `apps/storefront`, `apps/admin` (route `src/app/admin/**`) esplicitamente escluso in ogni fase.
 
 Origine: audit strategico dello storefront pubblico (home, catalogo, scheda prodotto, carrello, checkout, tracking ordine), poi implementato in 3 fasi + una passata di allineamento a un mockup di validazione approvato (`Mockup_Fase3_Validazione_UIUX.html`, allegato di sessione, non versionato nel repo).
 
@@ -774,10 +778,11 @@ GOTENBERG_AUTH=...
 | Verificare dati nutrizionali/lotto con produttori prima di stampare etichette (in particolare Bobolo, valori sospetti) | ChloeFood / produttori | ⚠️ DA FARE — competenza ChloeFood, non blocco tecnico |
 | Rimuovere file morti admin (`AdminNav.tsx`, `AdminOrdersClient.tsx`, `orders/id/`) | Robertin | ✅ FATTO (Fase 0 redesign admin, §8bis) |
 | Decisione brand charter v2 (font, colore, elemento signature) | Dalice | ✅ FATTO — Bricolage Grotesque, blu `#1267C7`, cartellino `ShopTag`: validati su mockup, implementati e deployati (§12bis) |
-| ~~Pushare il branch redesign UI/UX~~ | Robertin | ✅ FATTO (17/07) |
-| ~~Eseguire query SQL colore primario ChloeFood~~ | Robertin | ✅ FATTO (17/07) |
-| Redesign admin (Fase 0–4 + addenda) — accessibilità, responsive, dark mode, bulk actions, polling | Robertin | ⚠️ Implementato, deploy/push finale non confermato in sessione — vedi §8bis |
-| Eseguire KPI "Aujourd'hui" (prompt già scritto) | Robertin | ⚠️ DA FARE |
+| Pushare il branch redesign storefront | Robertin | ⚠️ Commit presenti solo su questo branch — **non mergiati su `main`** (correzione v3.7, verificato via `git merge-base`; smentisce lo stato "FATTO" delle revisioni precedenti) — vedi §12bis |
+| Eseguire query SQL colore primario ChloeFood | Robertin | ✅ FATTO (17/07, operazione DB indipendente da git) — ma il codice che lo consuma tramite `var(--color-primary)` è solo su questo branch, non su `main` (vedi riga sopra) |
+| Redesign admin (Fase 0–4 + 2 addenda) — accessibilità, responsive, dark mode, bulk actions, polling, nav mobile | Robertin | ⚠️ Implementato, ma **non mergiato su `main`** (correzione v3.7, verificato via git — non solo "non confermato in sessione" come detto in v3.6) — vedi §8bis |
+| Eseguire KPI "Aujourd'hui" (prompt già scritto) | Robertin | ✅ FATTO — correzione v3.7, verificato nel codice (v3.6 la segnalava per errore ancora pendente) |
+| Confermare quale branch è collegato al deploy Vercel di `chloefood.com` | Robertin | ⚠️ DA FARE — punto critico aperto da v3.7, nessun `vercel.json` nel repo per verificarlo da qui |
 | Comunicare a Dalice la deviazione export CSV (invece di XLSX) e il rinvio delle notifiche push | Robertin | ⚠️ DA FARE — vedi §8bis |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
 
@@ -894,6 +899,8 @@ L'audit v3.2 aveva correttamente lasciato lo stato del deploy Gotenberg come "no
 
 ## 24. Changelog v3.4 (17 Luglio 2026) — audit e redesign UI/UX storefront (Fase 1–3)
 
+> ⚠️ **Nota v3.7:** il "branch `claude/lepefy-storefront-audit-69xss0`" citato sotto non risulta mai esistito nel repository remoto verificabile da questa sessione, e le affermazioni di questo changelog e di v3.5 sul push/merge su `main` **non sono confermate dallo stato reale di git** — vedi intestazione documento e §12bis per il dettaglio.
+
 Verifica del documento contro lo stato reale del branch `claude/lepefy-storefront-audit-69xss0` (5 commit, tutti locali, **mai pushati**) dopo un audit UI/UX completo dello storefront pubblico seguito da implementazione in 3 fasi più una passata di allineamento a un mockup di validazione approvato. Dettaglio completo in §12bis (sezione nuova). Correzioni apportate al resto del documento:
 
 - **§2** — la nota "il verde `#1D9E75` è l'unico colore nel codice" era vera fino a questa fase ma descriveva anche un problema (hardcoding sparso, non solo un dato): riscritta per distinguere il valore DB attuale (invariato) dallo stato del codice (ora interamente token-based). Aggiunto il dettaglio delle 3 decisioni brand-charter-v2 effettivamente prese (font, colore come task dato, elemento signature) con la query SQL preparata e non eseguita.
@@ -937,4 +944,18 @@ Nessuna modifica alle sezioni relative allo storefront pubblico (§12bis e altre
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.6 — 18 Luglio 2026 (base: v3.5; + audit e redesign UI/UX pannello admin Fase 0–4, stato riportato in chat non riverificato su git/filesystem, vedi §8bis e §26)*
+## 27. Changelog v3.7 (18 Luglio 2026) — verifica indipendente su git/filesystem, due correzioni
+
+A differenza di v3.6 (basata sullo stato riportato in chat), questa revisione verifica il documento **direttamente contro il repository reale** (`git log`, `git merge-base`, `git diff main..HEAD`, lettura diretta dei file sorgente) sul branch `claude/update-lepefy-project-context-fke5jo`. Due correzioni rilevanti:
+
+1. **KPI "Aujourd'hui" — da "non eseguita" a "eseguita".** v3.6 la segnalava ancora pendente ("prompt dato a Claude Code, in attesa"). Il codice mostra invece che è già implementata in `admin/(protected)/page.tsx` (prima KPI card, conteggio ordini di oggi + totale come sotto-riga). Causa della discrepanza: il commit che l'ha implementata (18/07, 23:03) precede cronologicamente il commit che ha scritto v3.6 (18/07, 23:42) — la chat riportata a Claude Code non rifletteva più lo stato reale del codice al momento della stesura. **§8, §8bis, §18 aggiornati.**
+
+2. **Nessuno dei due redesign (storefront §12bis, admin §8bis) risulta mergiato su `main`.** Le revisioni v3.4–v3.6 affermavano che il branch storefront `claude/lepefy-storefront-audit-69xss0` fosse stato "pushato e mergiato su `main`". Verifica reale: quel branch non esiste (né locale né su `origin`); `git merge-base main HEAD` coincide con la punta di `main` stessa (ultimo commit 16/07 11:47); `ShopTag.tsx` non esiste su `main`; `BottomNav.tsx` su `main` ha ancora l'hex hardcoded `#1D9E75`. In realtà **tutto** il lavoro di entrambi gli audit (storefront 16–17/07, admin 17–18/07, 27 commit "Add files via upload" più le 3 delete) è finito su questo unico branch di lavoro, mai mergiato — coerente col workflow reale di Robertin (upload diretto GitHub web UI, non PR per feature). **Non verificabile da qui quale branch Vercel deploya effettivamente** (nessun `vercel.json` committato) — punto critico da chiarire con Robertin, aggiunto come voce propria in checklist go-live (§18). **Intestazione, §2, §5, §12bis, §8bis, §18 aggiornati**, changelog storici (§24) annotati con nota di correzione senza riscrivere la cronologia.
+
+Scoperta aggiuntiva, non un errore ma un'omissione: **`AdminMobileNav.tsx`** (drawer di navigazione mobile per l'admin, commit 18/07 23:20) non era mai stato documentato — colma un gap reale (sidebar admin `hidden md:block`, nessuna navigazione alternativa sotto `md` prima di questo componente). Aggiunto a §8 e §8bis (nuovo "Addendum 2").
+
+Nessuna modifica al resto del documento (shipping, checkout, n8n, sistema etichette, feature IA, roadmap Phase 2) — verificato a campione, resta accurato rispetto a v3.6.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.7 — 18 Luglio 2026 (base: v3.6; verifica indipendente su git/filesystem reale — KPI "Aujourd'hui" corretta a eseguita, nessuno dei due redesign risulta mergiato su `main`, aggiunto `AdminMobileNav.tsx` non documentato — vedi §27)*
