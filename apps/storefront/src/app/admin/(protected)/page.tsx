@@ -121,6 +121,10 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   const allData   = allOrders ?? []
   const totalCount = allData.length
+  const todayCount = allData.filter(o => {
+    const d = new Date(o.created_at)
+    return d.toDateString() === now.toDateString()
+  }).length
   const toShip    = allData.filter(
     o => o.status === 'preparing' || o.status === 'ready_for_pickup'
   ).length
@@ -188,8 +192,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
         {/* ── KPI cards ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           <KpiCard
-            label="Commandes totales"
-            value={String(totalCount)}
+            label="Aujourd'hui"
+            value={String(todayCount)}
+            sub={`${totalCount} au total`}
           />
           <KpiCard
             label="CA total"
