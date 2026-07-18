@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import LogoutButton from '../LogoutButton';
 import AdminSidebar from '../_components/AdminSidebar';
+import AdminMobileNav from '../_components/AdminMobileNav';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import ThemeToggleButton from '../_components/ThemeToggleButton';
 import NotificationBell from '../_components/ui/NotificationBell';
@@ -57,7 +58,10 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
+        <Suspense fallback={<div className="w-9 h-9 md:hidden" />}>
+          <AdminMobileNav categories={categories ?? []} />
+        </Suspense>
         {tenant.logo_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />
