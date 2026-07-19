@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 
+// Explicite depuis que getTenant() n'utilise plus cookies() (Prompt 4) :
+// cette route perdait son seul déclencheur dynamique implicite. Contenu
+// non personnalisé (branding tenant uniquement) — bon candidat ISR pour un
+// futur prompt, même raisonnement que /card ; pas converti ici pour ne pas
+// élargir le périmètre de ce prompt au-delà de ce qui était demandé.
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);

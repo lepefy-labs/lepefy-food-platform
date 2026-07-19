@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
+import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatPrice } from '@/lib/utils/format';
 import { ProductCard } from '@/components/catalog/ProductCard';
@@ -12,6 +12,10 @@ export const metadata: Metadata = {
   title: 'Accueil',
   description: 'Épicerie africaine en ligne — frais, surgelés et épicerie fine. Livraison en Europe.',
 };
+
+// ISR : tenant, catégories et produits vedettes ne sont jamais personnalisés
+// (le panier reste 100% client, Zustand/localStorage — rien à isoler ici).
+export const revalidate = 300;
 
 export type HomeProduct = {
   id: string;
@@ -28,7 +32,7 @@ export type HomeProduct = {
 export default async function HomePage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);
-  const supabase = createClient();
+  const supabase = createPublicClient();
 
   // 1. Categorie
   const { data: categoriesRaw } = await supabase

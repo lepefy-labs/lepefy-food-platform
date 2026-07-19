@@ -3,6 +3,12 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { buildProductsQuery, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 
+// Toujours dynamique : dépend de ?page=/?q=/?category=, jamais cacheable
+// comme une réponse unique. Explicite depuis que getTenant() n'utilise plus
+// cookies() (Prompt 4) — sans ce marqueur cette route perdait son seul
+// déclencheur dynamique implicite.
+export const dynamic = 'force-dynamic';
+
 /**
  * Page suivante du catalogue pour le bouton "Charger plus" (CatalogClient).
  * Contrairement au SSR de /products (range cumulatif), cette route ne

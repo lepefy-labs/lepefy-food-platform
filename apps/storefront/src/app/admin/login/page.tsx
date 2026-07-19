@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Surface admin — reste dynamique (cf. audit Prompt 4, classification
+// "/admin/**"). Explicite depuis que getTenant() n'utilise plus cookies() :
+// cette page perdait son seul déclencheur dynamique implicite.
+export const dynamic = 'force-dynamic';
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();

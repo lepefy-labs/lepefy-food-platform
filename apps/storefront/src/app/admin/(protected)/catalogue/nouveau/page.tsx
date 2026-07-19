@@ -3,6 +3,12 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import ProductEditClient from '../[id]/ProductEditClient';
 
+// Surface admin — reste dynamique (cf. audit Prompt 4, classification
+// "/admin/**"). Explicite depuis que getTenant() n'utilise plus cookies() :
+// cette page perdait son seul déclencheur dynamique implicite (elle-même
+// n'utilise que createServiceClient(), sans cookies()).
+export const dynamic = 'force-dynamic';
+
 export default async function AdminNouveauProduitPage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);

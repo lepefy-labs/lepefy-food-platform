@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createPublicClient } from '@/lib/supabase/public';
 import type { TenantSocialLink } from '@lepefy/types';
 
 export async function getTenantSocialLinks(tenantId: string): Promise<TenantSocialLink[]> {
-  const supabase = createClient();
+  const supabase = createPublicClient();
 
   const { data, error } = await supabase
     .from('tenant_social_links')

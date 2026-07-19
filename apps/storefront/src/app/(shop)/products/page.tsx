@@ -5,6 +5,13 @@ import { CatalogClient } from '@/components/catalog/CatalogClient';
 import { buildProductsQuery, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import type { Category, ProductWithCategory } from '@lepefy/types';
 
+// Toujours dynamique : recherche/filtre/pagination pilotés par ?q=/?category=/
+// ?page=, jamais une même réponse pour tous. Explicite depuis que getTenant()
+// n'utilise plus cookies() (Prompt 4) — sans ce marqueur cette page perdait
+// son seul déclencheur dynamique implicite (le cookie-bound client utilisé
+// plus bas n'est atteint qu'après getTenant(), donc pas garanti détecté).
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata(): Promise<Metadata> {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);

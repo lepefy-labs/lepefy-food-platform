@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconTruckDelivery } from '@tabler/icons-react';
 
+// Marqueur défensif — cette page n'a elle-même aucune donnée serveur
+// (formulaire client pur, aucun contenu commande affiché ici), donc aucun
+// risque réel de fraîcheur si elle finit statique malgré ce marqueur. Son
+// seul déclencheur dynamique implicite venait du layout racine (getTenant),
+// désormais public — cf. résumé du prompt pour le détail de cette nuance.
+export const dynamic = 'force-dynamic';
+
 export default function OrdersPage() {
   const router = useRouter();
   const [orderId, setOrderId] = useState('');

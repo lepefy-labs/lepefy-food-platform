@@ -2,7 +2,10 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { DigitalCard } from '@/components/card/DigitalCard';
 
-export const dynamic = 'force-dynamic';
+// ISR : carte digitale = branding tenant + liens sociaux, jamais personnalisé
+// par visiteur. force-dynamic était un résidu — ni cette page ni les deux
+// fonctions qu'elle appelle ne lisent plus de client lié aux cookies.
+export const revalidate = 300;
 
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
