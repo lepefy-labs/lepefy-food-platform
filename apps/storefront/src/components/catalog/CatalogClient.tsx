@@ -12,6 +12,9 @@ interface Props {
   activeSlug?:     string;
   initialQuery:    string;
   semanticEnabled: boolean;
+  totalCount:      number;
+  currentPage:     number;
+  hasNextPage:     boolean;
 }
 
 export function CatalogClient({
@@ -20,12 +23,23 @@ export function CatalogClient({
   activeSlug,
   initialQuery,
   semanticEnabled,
+  totalCount,
+  currentPage,
+  hasNextPage,
 }: Props) {
   const router        = useRouter();
   const searchParams  = useSearchParams();
   const [query, setQuery]            = useState(initialQuery);
   const [isPending, startTransition] = useTransition();
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Accumulation des pages chargées via "Charger plus" — remise à zéro
+  // chaque fois qu'un nouveau rendu serveur arrive (recherche/catégorie
+  // changée, ou chargement direct d'une URL ?page=N).
+  const [items, setItems]             = useState<ProductWithCategory[]>(products);
+  const [page, setPage]               = useState(currentPage);
+  const [hasMore, setHasMore]         = useState(hasNextPage);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const [semanticResults, setSemanticResults]     = useState<SemanticMatch[]>([]);
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
@@ -34,11 +48,19 @@ export function CatalogClient({
     setQuery(initialQuery);
   }, [initialQuery]);
 
+  useEffect(() => {
+    setItems(products);
+    setPage(currentPage);
+    setHasMore(hasNextPage);
+  }, [products, currentPage, hasNextPage]);
+
   // Cascade : la recherche sémantique ne se déclenche que si la recherche
-  // textuelle existante donne peu de résultats — elle ne la remplace jamais.
+  // textuelle existante donne peu de résultats au total — elle ne la
+  // remplace jamais. `totalCount` (pas `items.length`) car le seuil doit
+  // porter sur le nombre réel de résultats, pas sur ce qui est déjà chargé.
   useEffect(() => {
     const trimmed = initialQuery.trim();
-    if (!semanticEnabled || !trimmed || products.length >= 3) {
+    if (!semanticEnabled || !trimmed || totalCount >= 3) {
       setSemanticResults([]);
       setIsSemanticLoading(false);
       return;
@@ -60,9 +82,9 @@ export function CatalogClient({
       .finally(() => setIsSemanticLoading(false));
 
     return () => controller.abort();
-  }, [initialQuery, products.length, semanticEnabled]);
+  }, [initialQuery, totalCount, semanticEnabled]);
 
-  const textualIds = new Set(products.map(p => p.id));
+  const textualIds = new Set(items.map(p => p.id));
   const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
 
   function buildUrl(overrides: { q?: string; category?: string | null }) {
@@ -74,8 +96,47 @@ export function CatalogClient({
       if (overrides.category) params.set('category', overrides.category);
       else params.delete('category');
     }
+    // Changer de filtre repart toujours de la page 1 — jamais de ?page=
+    // résiduel d'une navigation précédente.
+    params.delete('page');
     const qs = params.toString();
     return `/products${qs ? '?' + qs : ''}`;
+  }
+
+  async function handleLoadMore() {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const params = new URLSearchParams();
+      params.set('page', String(nextPage));
+      const trimmedQuery = initialQuery.trim();
+      if (trimmedQuery) params.set('q', trimmedQuery);
+      else if (activeSlug) params.set('category', activeSlug);
+
+      const res = await fetch(`/api/products?${params.toString()}`);
+      if (!res.ok) return;
+      const data: { products?: ProductWithCategory[]; hasNextPage?: boolean } = await res.json();
+
+      setItems(prev => [...prev, ...(data.products ?? [])]);
+      setPage(nextPage);
+      setHasMore(Boolean(data.hasNextPage));
+
+      // Met à jour l'URL affichée (deep-link/partage) sans passer par
+      // router.replace() : celui-ci re-exécuterait le Server Component de
+      // /products et re-fetcherait tout le cumul qu'on vient de charger en
+      // léger via /api/products — on perdrait tout le bénéfice du fetch
+      // incrémental. On garde donc l'historique intact (pas de nouvelle
+      // entrée par clic) ; ?page= n'est réellement consulté par le serveur
+      // que sur une vraie navigation (lien direct, partage, retour arrière).
+      const urlParams = new URLSearchParams(window.location.search);
+      urlParams.set('page', String(nextPage));
+      window.history.replaceState(null, '', `${window.location.pathname}?${urlParams.toString()}`);
+    } catch {
+      // Dégradation silencieuse — le bouton reste cliquable pour réessayer.
+    } finally {
+      setIsLoadingMore(false);
+    }
   }
 
   function handleQueryChange(value: string) {
@@ -190,8 +251,8 @@ export function CatalogClient({
       <div className="flex items-center justify-between mb-4">
         {hasActiveSearch ? (
           <p className="text-sm text-gray-500">
-            <span className="font-medium text-gray-900">{products.length}</span>
-            {products.length === 1 ? ' résultat' : ' résultats'} pour{' '}
+            <span className="font-medium text-gray-900">{totalCount}</span>
+            {totalCount === 1 ? ' résultat' : ' résultats'} pour{' '}
             <span className="font-medium text-gray-900">&ldquo;{initialQuery}&rdquo;</span>
           </p>
         ) : (
@@ -214,7 +275,23 @@ export function CatalogClient({
       </div>
 
       {/* Griglia */}
-      <ProductGrid products={products} loading={isPending} />
+      <ProductGrid products={items} loading={isPending} />
+
+      {/* Bouton "Charger plus" — pagination server-side, pas de scroll auto.
+          Masqué pendant une transition de filtre (isPending) : la grille va
+          être remplacée par le skeleton, "Charger plus" n'a plus de sens. */}
+      {!isPending && hasMore && (
+        <div className="flex justify-center mt-6">
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={isLoadingMore}
+            className="px-6 py-2.5 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+          >
+            {isLoadingMore ? 'Chargement…' : 'Charger plus'}
+          </button>
+        </div>
+      )}
 
       {/* Résultats similaires — recherche sémantique, cascade uniquement si peu de résultats textuels */}
       {isSemanticLoading && (

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { CatalogClient } from '@/components/catalog/CatalogClient';
+import { buildProductsQuery, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import type { Category, ProductWithCategory } from '@lepefy/types';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -11,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 interface ProductsPageProps {
-  searchParams: { category?: string; q?: string };
+  searchParams: { category?: string; q?: string; page?: string };
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
@@ -26,29 +27,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     .order('position');
   const categories: Category[] = categoriesRaw ?? [];
 
-  let dbQuery = supabase
-    .from('products')
-    .select(`
-      id, name, slug, price, image_url,
-      weight_grams, stock, storage_type,
-      category:categories(name)
-    `)
-    .eq('tenant_id', tenant.id)
-    .eq('active', true)
-    .order('position');
-
   const searchQuery = searchParams.q?.trim() ?? '';
+  const page = parsePageParam(searchParams.page);
 
-  if (searchQuery) {
-    // Ricerca full-text case-insensitive sul nome
-    dbQuery = dbQuery.ilike('name', `%${searchQuery}%`);
-  } else if (searchParams.category) {
-    const activeCategory = categories.find(c => c.slug === searchParams.category);
-    if (activeCategory) dbQuery = dbQuery.eq('category_id', activeCategory.id);
-  }
+  // Range cumulatif (0 → page*PAGE_SIZE-1), pas la seule tranche de `page` :
+  // un accès direct/partagé à /products?page=3 doit afficher le même
+  // ensemble cumulé (72 produits) que 2 clics sur "Charger plus" depuis la
+  // page 1, pas seulement les produits 49-72. Pour page=1 les deux formules
+  // coïncident, donc le SSR de la première page reste inchangé.
+  const { data: productsRaw, count } = await buildProductsQuery(supabase, tenant.id, categories, {
+    q: searchQuery,
+    category: searchParams.category,
+  }).range(0, page * PRODUCTS_PAGE_SIZE - 1);
 
-  const { data: productsRaw } = await dbQuery;
   const products: ProductWithCategory[] = (productsRaw as unknown as ProductWithCategory[] | null) ?? [];
+  const totalCount = count ?? products.length;
+  const hasNextPage = page * PRODUCTS_PAGE_SIZE < totalCount;
 
   return (
     <CatalogClient
@@ -57,6 +51,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       activeSlug={searchQuery ? undefined : searchParams.category}
       initialQuery={searchQuery}
       semanticEnabled={tenant.ai_semantic_search ?? false}
+      totalCount={totalCount}
+      currentPage={page}
+      hasNextPage={hasNextPage}
     />
   );
 }
