@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
+import Image from 'next/image';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -63,8 +64,14 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           <AdminMobileNav categories={categories ?? []} />
         </Suspense>
         {tenant.logo_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />
+          <Image
+            src={tenant.logo_url}
+            alt={tenant.name}
+            width={140}
+            height={32}
+            className="h-8 w-auto object-contain"
+            priority
+          />
         )}
         <div>
           <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{tenant.name}</span>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { removeBackground } from '@/lib/images/removeBackground';
@@ -44,17 +45,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Resize côté serveur — les photos prises au téléphone dépassent souvent
+  // 3000px de large ; on limite à 1600px sans jamais agrandir une image plus
+  // petite. Le format de sortie reste celui déterminé plus haut (pas de
+  // conversion ici).
+  const resized = await sharp(buffer)
+    .resize({ width: 1600, withoutEnlargement: true })
+    .toBuffer();
+
   const path = `products/${slug}.${ext}`;
 
   const { error: upErr } = await supabase.storage
     .from('assets')
-    .upload(path, buffer, { contentType, upsert: true });
+    .upload(path, resized, { contentType, upsert: true });
 
   if (upErr) {
     return NextResponse.json({ error: upErr.message }, { status: 500 });
   }
 
-  const imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}`;
+  // Cache-busting : le path reste identique à chaque ré-upload (upsert:true),
+  // donc sans ce paramètre l'ancienne image resterait servie depuis le cache
+  // CDN/Next Image jusqu'à minimumCacheTTL (7 jours).
+  const imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}?v=${Date.now()}`;
 
   const { error: dbErr } = await supabase
     .from('products')
