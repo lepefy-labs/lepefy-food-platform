@@ -23,14 +23,20 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const supabase = createClient();
 
   const { data: product } = await supabase
-    .from('products').select('*, category:categories(*)')
+    .from('products')
+    .select(`
+      id, name, slug, price, compare_at_price, image_url,
+      weight_grams, stock, storage_type,
+      description, descriptions,
+      category:categories(name)
+    `)
     .eq('slug', params.slug).eq('tenant_id', tenant.id).eq('active', true).single();
 
   if (!product) notFound();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <ProductDetail product={product as ProductWithCategory} />
+      <ProductDetail product={product as unknown as ProductWithCategory} />
     </div>
   );
 }

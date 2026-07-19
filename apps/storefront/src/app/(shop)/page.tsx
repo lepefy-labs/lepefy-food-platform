@@ -55,21 +55,22 @@ export default async function HomePage() {
     ? featuredIds
     : ['00000000-0000-0000-0000-000000000000'];
 
-  const categoryProducts: Record<string, HomeProduct[]> = {};
-  for (const cat of categories) {
-    const { data: catRaw } = await supabase
-      .from('products')
-      .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
-      .eq('tenant_id', tenant.id)
-      .eq('active', true)
-      .eq('category_id', cat.id)
-      .not('id', 'in', `(${excludeIds.join(',')})`)
-      .order('position', { ascending: true })
-      .limit(4);
-    if (catRaw && catRaw.length > 0) {
-      categoryProducts[cat.id] = catRaw as unknown as HomeProduct[];
-    }
-  }
+  const categoryProducts: Record<string, HomeProduct[]> = Object.fromEntries(
+    await Promise.all(
+      categories.map(async (cat) => {
+        const { data: catRaw } = await supabase
+          .from('products')
+          .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+          .eq('tenant_id', tenant.id)
+          .eq('active', true)
+          .eq('category_id', cat.id)
+          .not('id', 'in', `(${excludeIds.join(',')})`)
+          .order('position', { ascending: true })
+          .limit(4);
+        return [cat.id, (catRaw as unknown as HomeProduct[] | null) ?? []] as const;
+      }),
+    ),
+  );
 
   return (
     <div className="min-h-screen bg-[#f7f9f8]">

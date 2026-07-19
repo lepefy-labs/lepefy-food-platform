@@ -28,7 +28,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   let dbQuery = supabase
     .from('products')
-    .select('*, category:categories(*)')
+    .select(`
+      id, name, slug, price, image_url,
+      weight_grams, stock, storage_type,
+      category:categories(name)
+    `)
     .eq('tenant_id', tenant.id)
     .eq('active', true)
     .order('position');
@@ -44,7 +48,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   }
 
   const { data: productsRaw } = await dbQuery;
-  const products: ProductWithCategory[] = productsRaw ?? [];
+  const products: ProductWithCategory[] = (productsRaw as unknown as ProductWithCategory[] | null) ?? [];
 
   return (
     <CatalogClient
