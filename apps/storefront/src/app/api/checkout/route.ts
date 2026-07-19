@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     const productIds = [...new Set(rawItems.map((i) => i.productId))];
     const { data: dbProducts, error: productsError } = await supabase
       .from('products')
-      .select('id, name, price, storage_type')
+      .select('id, name, price, storage_type, stock')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .in('id', productIds) as {
@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
           name:         string;
           price:        number;
           storage_type: 'dry' | 'fresh' | 'frozen' | null;
+          stock:        number;
         }> | null;
         error: unknown;
       };
@@ -96,6 +97,32 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+
+    // ── Contrôle stock (avant paiement — "fail fast") ────────────────────────
+    // Ne suffit pas seul : une race condition reste possible entre ce contrôle
+    // et la confirmation réelle du paiement. C'est une première barrière pour
+    // le cas courant, pas la protection définitive (cf. décrément atomique
+    // plus bas / dans le webhook Stripe).
+    const quantityByProduct = new Map<string, number>();
+    for (const i of rawItems) {
+      quantityByProduct.set(i.productId, (quantityByProduct.get(i.productId) ?? 0) + i.quantity);
+    }
+
+    const insufficientStock: string[] = [];
+    for (const [productId, requestedQty] of quantityByProduct) {
+      const p = productById.get(productId)!;
+      if (p.stock < requestedQty) insufficientStock.push(p.name);
+    }
+    if (insufficientStock.length > 0) {
+      return NextResponse.json(
+        { error: `Stock insuffisant pour : ${insufficientStock.join(', ')}.` },
+        { status: 400 },
+      );
+    }
+
+    const stockDecrementItems = Array.from(quantityByProduct.entries()).map(
+      ([productId, quantity]) => ({ product_id: productId, quantity }),
+    );
 
     const items: CartItemPayload[] = rawItems.map((i) => {
       const p = productById.get(i.productId)!;
@@ -154,6 +181,26 @@ export async function POST(req: NextRequest) {
 
     // ── In-store payment: create order directly, no Stripe ──────────────────
     if (paymentMethod === 'in_store') {
+      // Décrément atomique AVANT la création de la commande : aucun paiement
+      // Stripe n'a eu lieu pour ce flux (paiement en boutique au retrait), donc
+      // en cas d'échec (race condition depuis le contrôle ci-dessus) on peut
+      // simplement rejeter la commande — rien à rembourser, rien à annuler.
+      const { error: stockError } = await supabase.rpc('decrement_stock_for_order', {
+        items: stockDecrementItems,
+      });
+
+      if (stockError) {
+        console.warn('[checkout] in_store stock decrement failed:', stockError.message);
+        return NextResponse.json(
+          {
+            error:
+              'Un ou plusieurs articles ne sont plus disponibles dans la quantité demandée. ' +
+              'Veuillez repasser par le panier.',
+          },
+          { status: 409 },
+        );
+      }
+
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({

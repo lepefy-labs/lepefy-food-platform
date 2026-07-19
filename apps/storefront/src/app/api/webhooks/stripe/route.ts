@@ -196,7 +196,32 @@ export async function POST(req: NextRequest) {
 
     console.info('[webhook] Order created — id:', order.id);
 
+    // ── Décrément atomique du stock (confirmation définitive du paiement) ────
+    // Le paiement Stripe est déjà capturé à ce stade — en cas d'échec on ne
+    // peut plus rejeter la commande, cf. bloc "stock conflict" plus bas.
+    const stockByProduct = new Map<string, number>();
+    for (const i of items) {
+      if (!i.productId) continue;
+      stockByProduct.set(i.productId, (stockByProduct.get(i.productId) ?? 0) + i.quantity);
+    }
+    const stockDecrementItems = Array.from(stockByProduct.entries()).map(
+      ([productId, quantity]) => ({ product_id: productId, quantity }),
+    );
+
+    const { error: stockError } = await supabase.rpc('decrement_stock_for_order', {
+      items: stockDecrementItems,
+    });
+
+    if (stockError) {
+      console.error('[webhook] Stock decrement failed AFTER payment capture — order:', order.id,
+        '— reason:', stockError.message);
+    } else {
+      console.info('[webhook] Stock decremented — order:', order.id);
+    }
+
     // ── Insert order_items ───────────────────────────────────────────────────
+    // Fait dans tous les cas (succès ou conflit) : trace de ce qui a été
+    // commandé, nécessaire pour le remboursement/diagnostic ci-dessous.
     const orderItemsPayload = items.map((i) => ({
       order_id:     order.id,
       tenant_id:    resolvedTenantId,
@@ -232,6 +257,72 @@ export async function POST(req: NextRequest) {
         '— id:', sessionId);
     } else {
       console.info('[webhook] checkout_session deleted — id:', sessionId);
+    }
+
+    // ── Cas conflit de stock post-paiement : remboursement + alerte admin ────
+    // Le client a déjà payé (Stripe) mais on ne peut pas honorer la commande.
+    // Pas de rejet possible ici — on rembourse automatiquement et on marque
+    // la commande pour intervention manuelle. Aucune notification client
+    // automatique dans ce prompt (texte à valider avec Dalice — hors scope).
+    if (stockError) {
+      let refundSucceeded = false;
+      try {
+        const refund = await stripe.refunds.create({ payment_intent: intent.id });
+        refundSucceeded = true;
+        console.info('[webhook] Refund issued — order:', order.id, '— refund id:', refund.id);
+      } catch (refundErr) {
+        console.error('[webhook] Refund FAILED — order:', order.id, '— needs manual refund:', refundErr);
+      }
+
+      const { error: statusUpdateError } = await supabase
+        .from('orders')
+        .update({
+          status:         'stock_conflict',
+          payment_status: refundSucceeded ? 'refunded' : 'paid',
+        })
+        .eq('id', order.id);
+
+      if (statusUpdateError) {
+        console.error('[webhook] Failed to mark order as stock_conflict:', statusUpdateError,
+          '— order:', order.id);
+      }
+
+      if (process.env.N8N_WEBHOOK_URL) {
+        try {
+          const storefrontUrl  = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+          const adminOrderLink = `${storefrontUrl}/admin/orders/${order.id}`;
+
+          const n8nConflictPayload = {
+            orderId:         order.id,
+            email:           checkoutSession.email,
+            fullName:        checkoutSession.full_name ?? '',
+            total,
+            reason:          stockError.message, // "insufficient_stock:<product_id>"
+            refundSucceeded,
+            adminOrderLink,
+          };
+
+          console.info('[webhook] Notifying n8n (stock conflict) — url:',
+            `${process.env.N8N_WEBHOOK_URL}/webhook/order-stock-conflict`);
+
+          const n8nRes = await fetch(
+            `${process.env.N8N_WEBHOOK_URL}/webhook/order-stock-conflict`,
+            {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify(n8nConflictPayload),
+            },
+          );
+
+          console.info('[webhook] n8n (stock conflict) response status:', n8nRes.status);
+        } catch (n8nErr) {
+          console.error('[webhook] n8n stock-conflict notification failed:', n8nErr);
+        }
+      } else {
+        console.warn('[webhook] N8N_WEBHOOK_URL not set — skipping stock-conflict admin notification');
+      }
+
+      return NextResponse.json({ received: true });
     }
 
     // ── Notify n8n ───────────────────────────────────────────────────────────
