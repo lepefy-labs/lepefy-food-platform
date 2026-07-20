@@ -15,8 +15,15 @@ import {
   IconBrandYoutube,
   IconBrandLinkedin,
   IconBrandX,
+  IconBuildingBank,
+  IconCash,
+  IconBrandPaypal,
+  IconQrcode,
+  IconWallet,
+  IconCopy,
+  IconCheck,
 } from '@tabler/icons-react';
-import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink } from '@lepefy/types';
+import { SOCIAL_PLATFORM_REGISTRY, PAYMENT_METHOD_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
 
 const ICONS = {
   IconBrandInstagram,
@@ -27,6 +34,14 @@ const ICONS = {
   IconBrandX,
 };
 
+const PAYMENT_ICONS = {
+  IconBuildingBank,
+  IconCash,
+  IconBrandPaypal,
+  IconQrcode,
+  IconWallet,
+};
+
 type Lang = 'fr' | 'it';
 
 const COPY: Record<Lang, {
@@ -34,20 +49,55 @@ const COPY: Record<Lang, {
   whatsapp: string;
   products: string;
   addContact: string;
+  payTitle: string;
+  copy: string;
+  copied: string;
+  cashNote: string;
 }> = {
   fr: {
     followUs: 'Suivez-nous',
     whatsapp: 'Contacter sur WhatsApp',
     products: 'Voir nos produits',
     addContact: 'Ajouter aux contacts',
+    payTitle: 'Comment payer',
+    copy: 'Copier',
+    copied: 'Copié !',
+    cashNote: 'Espèces acceptées en boutique',
   },
   it: {
     followUs: 'Seguici',
     whatsapp: 'Contatta su WhatsApp',
     products: 'Vedi i nostri prodotti',
     addContact: 'Aggiungi ai contatti',
+    payTitle: 'Come pagare',
+    copy: 'Copia',
+    copied: 'Copiato!',
+    cashNote: 'Contanti accettati in negozio',
   },
 };
+
+function CopyableValue({ value, copyLabel: _copyLabel, copiedLabel: _copiedLabel }: {
+  value: string; copyLabel: string; copiedLabel: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="flex items-center justify-between w-full gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-left"
+    >
+      <span className="font-mono text-xs text-gray-700 truncate">{value}</span>
+      {copied ? (
+        <IconCheck size={14} stroke={2} className="text-green-600 shrink-0" />
+      ) : (
+        <IconCopy size={14} stroke={1.5} className="text-gray-400 shrink-0" />
+      )}
+    </button>
+  );
+}
 
 interface DigitalCardProps {
   tenant: {
@@ -62,9 +112,10 @@ interface DigitalCardProps {
     whatsapp_number: string | null;
   };
   socialLinks: TenantSocialLink[];
+  paymentMethods: TenantPaymentMethod[];
 }
 
-export function DigitalCard({ tenant, socialLinks }: DigitalCardProps) {
+export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCardProps) {
   const [lang, setLang] = useState<Lang>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('lepefy-card-lang') as Lang) ?? 'fr';
@@ -119,6 +170,60 @@ export function DigitalCard({ tenant, socialLinks }: DigitalCardProps) {
               </button>
             ))}
           </div>
+
+          {paymentMethods.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs text-gray-400 mb-2">{t.payTitle}</p>
+              <div className="flex flex-col gap-2">
+                {paymentMethods.map((pm) => {
+                  const meta = PAYMENT_METHOD_REGISTRY[pm.method];
+                  const Icon = PAYMENT_ICONS[meta.iconName];
+                  const label = pm.label ?? meta.label;
+
+                  return (
+                    <div key={pm.id} className="rounded-lg border border-gray-100 p-2.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon size={16} stroke={1.5} className="text-gray-500 shrink-0" />
+                        <span className="text-sm font-medium text-gray-800">{label}</span>
+                      </div>
+
+                      {pm.method === 'cash' && (
+                        <p className="text-xs text-gray-400 pl-6">{t.cashNote}</p>
+                      )}
+
+                      {pm.method === 'bank_transfer' && pm.value && (
+                        <div className="pl-6 flex flex-col gap-1">
+                          {pm.extra?.beneficiary && (
+                            <p className="text-xs text-gray-500">{pm.extra.beneficiary}</p>
+                          )}
+                          <CopyableValue value={pm.value} copyLabel={t.copy} copiedLabel={t.copied} />
+                          {pm.extra?.bic && (
+                            <p className="text-[11px] text-gray-400">BIC: {pm.extra.bic}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {(pm.method === 'paypal' || pm.method === 'satispay') && pm.value && (
+                        <a
+                          href={pm.value}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pl-6 text-xs font-medium underline"
+                          style={{ color: tenant.primary_color }}
+                        >
+                          {pm.value}
+                        </a>
+                      )}
+
+                      {pm.method === 'other' && pm.value && (
+                        <p className="text-xs text-gray-500 pl-6">{pm.value}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {tenant.whatsapp_number && (
             <a

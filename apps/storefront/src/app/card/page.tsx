@@ -1,5 +1,6 @@
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
+import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { DigitalCard } from '@/components/card/DigitalCard';
 
 // ISR : carte digitale = branding tenant + liens sociaux, jamais personnalisé
@@ -10,7 +11,10 @@ export const revalidate = 300;
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const socialLinks = await getTenantSocialLinks(tenant.id);
+  const [socialLinks, paymentMethods] = await Promise.all([
+    getTenantSocialLinks(tenant.id),
+    getTenantPaymentMethods(tenant.id),
+  ]);
 
   return (
     <DigitalCard
@@ -26,6 +30,7 @@ export default async function CardPage() {
         whatsapp_number: tenant.whatsapp_number,
       }}
       socialLinks={socialLinks}
+      paymentMethods={paymentMethods}
     />
   );
 }
