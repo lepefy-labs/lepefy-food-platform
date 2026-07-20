@@ -80,6 +80,12 @@ export default async function ParametresPage() {
               >
                 Télécharger QR (PNG)
               </a>
+              <a
+                href="/api/admin/card/poster"
+                className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-center"
+              >
+                Télécharger l&apos;affiche à imprimer (PDF A5)
+              </a>
             </div>
           </div>
         </section>
