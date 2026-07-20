@@ -1,13 +1,24 @@
-import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod } from '@lepefy/types';
+import { PAYMENT_METHOD_REGISTRY, SOCIAL_PLATFORM_REGISTRY, type TenantPaymentMethod, type TenantSocialLink } from '@lepefy/types';
 import {
   IconBuildingBank,
   IconCash,
   IconBrandPaypal,
   IconQrcode,
   IconWallet,
+  IconBrandInstagram,
+  IconBrandFacebook,
+  IconBrandTiktok,
+  IconBrandYoutube,
+  IconBrandLinkedin,
+  IconBrandX,
 } from '@tabler/icons-react';
 
 const ICONS = { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet };
+
+const ICONS_SOCIAL = {
+  IconBrandInstagram, IconBrandFacebook, IconBrandTiktok,
+  IconBrandYoutube, IconBrandLinkedin, IconBrandX,
+};
 
 // Colori brand a livello di piattaforma (non tenant-specific): PayPal blu
 // ufficiale, contanti verde, Satispay coral, virement/altro nel colore
@@ -31,10 +42,11 @@ interface PosterTemplateProps {
     click_collect_hours: string | null;
   };
   paymentMethods: TenantPaymentMethod[];
+  socialLinks: TenantSocialLink[];
   qrUrl: string;
 }
 
-export function PosterTemplate({ tenant, paymentMethods, qrUrl }: PosterTemplateProps) {
+export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl }: PosterTemplateProps) {
   return (
     <div className="poster">
       <div className="header" style={{ backgroundColor: tenant.primary_color }}>
@@ -61,6 +73,20 @@ export function PosterTemplate({ tenant, paymentMethods, qrUrl }: PosterTemplate
                 <div className="method" key={pm.id}>
                   <Icon size={28} stroke={1.5} color={methodColor(pm.method, tenant.primary_color)} />
                   <span>{pm.label ?? meta.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {socialLinks.length > 0 && (
+          <div className="social-row">
+            {socialLinks.map((link) => {
+              const meta = SOCIAL_PLATFORM_REGISTRY[link.platform];
+              const Icon = ICONS_SOCIAL[meta.iconName];
+              return (
+                <div className="social-badge" key={link.id} style={{ background: meta.badgeBackground }}>
+                  <Icon size={16} stroke={1.5} color="#ffffff" />
                 </div>
               );
             })}

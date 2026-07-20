@@ -274,9 +274,10 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={meta.label}
-                      className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center"
+                      className="w-9 h-9 rounded-full flex items-center justify-center"
+                      style={{ background: meta.badgeBackground }}
                     >
-                      <Icon size={18} stroke={1.5} className="text-gray-600" />
+                      <Icon size={18} stroke={1.5} style={{ color: '#ffffff' }} />
                     </a>
                   );
                 })}

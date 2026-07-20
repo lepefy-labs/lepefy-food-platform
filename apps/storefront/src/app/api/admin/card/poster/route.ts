@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
+import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { buildPosterHtml } from '@/lib/card/buildPosterHtml';
 import { htmlToPdf } from '@/lib/labels/gotenberg';
@@ -14,7 +15,10 @@ export async function GET(req: NextRequest) {
 
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const paymentMethods = await getTenantPaymentMethods(tenant.id);
+  const [paymentMethods, socialLinks] = await Promise.all([
+    getTenantPaymentMethods(tenant.id),
+    getTenantSocialLinks(tenant.id),
+  ]);
 
   const qrUrl = `${req.nextUrl.origin}/api/card/qr-code?format=png&size=900`;
 
@@ -27,6 +31,7 @@ export async function GET(req: NextRequest) {
       click_collect_hours: tenant.click_collect_hours,
     },
     paymentMethods,
+    socialLinks,
     qrUrl,
   });
 
