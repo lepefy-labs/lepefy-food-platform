@@ -1,21 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { IconDeviceMobilePlus, IconShare, IconX } from '@tabler/icons-react';
+import { IconShare } from '@tabler/icons-react';
 
 type Lang = 'fr' | 'it';
 
 const COPY: Record<Lang, {
-  addToHome: string;
+  addToHome: (name: string) => string;
   addToHomeIos: string;
+  install: string;
+  later: string;
 }> = {
   fr: {
-    addToHome: 'Ajouter à l\'écran d\'accueil',
+    addToHome: (name) => `Ajouter ${name} à l'écran d'accueil`,
     addToHomeIos: 'Appuyez sur Partager, puis « Sur l\'écran d\'accueil »',
+    install: 'Ajouter',
+    later: 'Plus tard',
   },
   it: {
-    addToHome: 'Aggiungi alla schermata Home',
+    addToHome: (name) => `Aggiungi ${name} alla schermata Home`,
     addToHomeIos: 'Tocca Condividi, poi "Aggiungi a Home"',
+    install: 'Aggiungi',
+    later: 'Più tardi',
   },
 };
 
@@ -24,31 +30,51 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const IOS_DISMISS_KEY = 'card-add-to-home-ios-dismissed';
+// Clé distincte de PWABanner (pwa-banner-dismissed) : contexte différent
+// (card vs boutique), ne doit pas partager son état de dismiss.
+const DISMISS_KEY = 'card-a2hs-dismissed';
+const SEVEN_DAYS  = 7 * 24 * 60 * 60 * 1000;
 
 interface AddToHomeScreenProps {
   lang: Lang;
+  tenant: {
+    name: string;
+    primary_color: string;
+  };
 }
 
-export function AddToHomeScreen({ lang }: AddToHomeScreenProps) {
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isIos, setIsIos] = useState(false);
-  const [iosDismissed, setIosDismissed] = useState(true);
+export function AddToHomeScreen({ lang, tenant }: AddToHomeScreenProps) {
+  const [show,           setShow]           = useState(false);
+  const [isIos,          setIsIos]          = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
+    // Already installed as standalone app — hide
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       // iOS Safari expose ce flag hors norme, absent du DOM lib standard
       (navigator as Navigator & { standalone?: boolean }).standalone === true;
-    setIsStandalone(standalone);
+    if (standalone) return;
 
-    setIsIos(/iPad|iPhone|iPod/.test(navigator.userAgent));
-    setIosDismissed(localStorage.getItem(IOS_DISMISS_KEY) === '1');
+    // Dismissed within the last 7 days — hide
+    const dismissed = localStorage.getItem(DISMISS_KEY);
+    if (dismissed && Date.now() - parseInt(dismissed, 10) < SEVEN_DAYS) return;
 
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsIos(ios);
+
+    // iOS n'a pas d'API beforeinstallprompt : on affiche directement le
+    // bandeau instructif, sans attendre un événement qui ne viendra jamais.
+    if (ios) {
+      setShow(true);
+      return;
+    }
+
+    // beforeinstallprompt only fires on Android Chrome — never on iOS or desktop
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
+      setShow(true);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -59,41 +85,111 @@ export function AddToHomeScreen({ lang }: AddToHomeScreenProps) {
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setDeferredPrompt(null);
+    if (outcome === 'accepted') setShow(false);
   }
 
-  function dismissIosHint() {
-    localStorage.setItem(IOS_DISMISS_KEY, '1');
-    setIosDismissed(true);
+  function handleDismiss() {
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    setShow(false);
   }
 
   const t = COPY[lang];
 
-  if (isStandalone) return null;
+  if (!show) return null;
 
-  if (deferredPrompt) {
-    return (
-      <button
-        onClick={handleInstall}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-700 mt-2.5"
+  return (
+    <>
+      <style>{`
+        @keyframes pwa-slide-down {
+          from { transform: translateY(-100%); opacity: 0; }
+          to   { transform: translateY(0);     opacity: 1; }
+        }
+        @keyframes pwa-pulse {
+          0%, 100% { box-shadow: 0 0 0 0   color-mix(in srgb, ${tenant.primary_color} 40%, transparent); }
+          50%       { box-shadow: 0 0 0 6px transparent; }
+        }
+      `}</style>
+
+      <div
+        role="banner"
+        style={{
+          background:   tenant.primary_color,
+          borderBottom: `2px solid color-mix(in srgb, ${tenant.primary_color} 80%, black)`,
+          padding:      '10px 14px',
+          display:      'flex',
+          alignItems:   'center',
+          gap:          10,
+          position:     'relative',
+          zIndex:       50,
+          animation:    'pwa-slide-down 0.4s cubic-bezier(0.4,0,0.2,1) both',
+        }}
       >
-        <IconDeviceMobilePlus size={16} stroke={1.5} />
-        {t.addToHome}
-      </button>
-    );
-  }
+        {/* Icon — pulse sur Android (CTA d'installation directe), statique sur iOS (pas d'action, juste une consigne) */}
+        <div
+          aria-hidden
+          style={{
+            width:          36,
+            height:         36,
+            borderRadius:   8,
+            background:     'white',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            flexShrink:     0,
+            animation:      isIos ? undefined : 'pwa-pulse 2s ease-in-out infinite',
+          }}
+        >
+          <IconShare size={18} stroke={1.5} style={{ color: tenant.primary_color }} />
+        </div>
 
-  if (isIos && !iosDismissed) {
-    return (
-      <div className="flex items-center gap-2.5 rounded-lg border border-gray-100 px-3 py-2.5 mt-2.5">
-        <IconShare size={16} stroke={1.5} className="text-gray-400 shrink-0" />
-        <span className="flex-1 text-xs text-gray-500">{t.addToHomeIos}</span>
-        <button onClick={dismissIosHint} aria-label="Fermer" className="text-gray-300 shrink-0">
-          <IconX size={14} stroke={1.5} />
-        </button>
+        {/* Text */}
+        <div style={{ flex: 1 }}>
+          <div className="text-sm" style={{ color: '#fff', fontWeight: 700, lineHeight: '1.3' }}>
+            {t.addToHome(tenant.name)}
+          </div>
+          {isIos && (
+            <div className="text-2xs" style={{ color: 'rgba(255,255,255,0.85)', lineHeight: '1.3' }}>
+              {t.addToHomeIos}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+          {!isIos && (
+            <button
+              onClick={handleInstall}
+              className="text-2xs"
+              style={{
+                background:   'white',
+                color:        tenant.primary_color,
+                border:       'none',
+                borderRadius: 6,
+                padding:      '5px 11px',
+                fontWeight:   700,
+                cursor:       'pointer',
+                whiteSpace:   'nowrap',
+              }}
+            >
+              {t.install}
+            </button>
+          )}
+          <button
+            onClick={handleDismiss}
+            className="text-2xs"
+            style={{
+              background:     'transparent',
+              color:          'rgba(255,255,255,0.75)',
+              border:         'none',
+              textDecoration: 'underline',
+              cursor:         'pointer',
+              padding:        0,
+            }}
+          >
+            {t.later}
+          </button>
+        </div>
       </div>
-    );
-  }
-
-  return null;
+    </>
+  );
 }

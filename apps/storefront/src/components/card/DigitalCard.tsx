@@ -136,6 +136,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
       <div className="w-full max-w-sm bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
 
+        <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
+
         <div
           className="px-6 pt-8 pb-6 text-center"
           style={{ backgroundColor: tenant.primary_color }}
@@ -293,8 +295,6 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             <IconUserPlus size={16} stroke={1.5} />
             {t.addContact}
           </a>
-
-          <AddToHomeScreen lang={lang} />
 
         </div>
       </div>
