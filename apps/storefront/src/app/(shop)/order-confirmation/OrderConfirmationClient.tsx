@@ -76,7 +76,10 @@ export default function OrderConfirmationClient({
     const interval = setInterval(async () => {
       const { data } = await supabase
         .from('orders')
-        .select('*, order_items(*)')
+        .select(
+          'id, email, fulfillment_type, payment_method, payment_status, shipping_address, ' +
+          'shipping_cost, subtotal, total, order_items(id, name, quantity, subtotal)',
+        )
         .eq('stripe_payment_intent_id', paymentIntentId)
         .eq('tenant_id', tenant.id)
         .maybeSingle();

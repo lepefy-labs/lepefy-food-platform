@@ -17,7 +17,17 @@ import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import type { Tenant } from '@lepefy/types';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+// Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
+// Stripe (step === 'payment'), jamais pour un client qui choisit le retrait
+// en boutique : ce module est importé/monté pour CHAQUE checkout, delivery
+// ou pickup, in_store ou stripe.
+let stripePromise: ReturnType<typeof loadStripe> | null = null;
+function getStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+  }
+  return stripePromise;
+}
 
 const formSchema = z.object({
   firstName:   z.string().min(1, 'Prénom requis'),
@@ -393,7 +403,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
               {submitError}
             </p>
           )}
-          <Elements stripe={stripePromise} options={{ clientSecret, locale: 'fr' }}>
+          <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
             <StripePaymentStep
               total={total}
               tenant={tenant}

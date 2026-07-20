@@ -154,7 +154,11 @@ async function uploadToStorage(
 
   if (error) throw new Error(`Storage upload: ${error.message}`);
 
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}`;
+  // Cache-busting : même path à chaque régénération (upsert:true), donc sans
+  // ce paramètre l'ancienne image resterait servie depuis le cache CDN/Next
+  // Image jusqu'à minimumCacheTTL (7 jours) — même risque que
+  // upload-product-image/route.ts (Prompt 2), même correctif.
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}?v=${Date.now()}`;
 }
 
 // ─── Route Handler ────────────────────────────────────────────────────────────

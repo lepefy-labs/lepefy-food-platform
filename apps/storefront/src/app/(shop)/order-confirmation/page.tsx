@@ -24,16 +24,18 @@ export default async function OrderConfirmationPage({ searchParams }: PageProps)
 
     const { data: order } = await supabase
       .from('orders')
-      .select('*')
+      .select(
+        'id, email, fulfillment_type, payment_method, payment_status, shipping_address, shipping_cost, subtotal, total',
+      )
       .eq('id', searchParams.order_id)
       .eq('tenant_id', tenant.id)
-      .maybeSingle() as { data: Order | null };
+      .maybeSingle() as unknown as { data: Order | null };
 
     let orderItems: OrderItem[] = [];
     if (order) {
       const { data: items } = await (supabase as unknown as {
         from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>;
-      }).from('order_items').select('*').eq('order_id', order.id) as { data: OrderItem[] | null };
+      }).from('order_items').select('id, name, quantity, subtotal').eq('order_id', order.id) as unknown as { data: OrderItem[] | null };
       orderItems = items ?? [];
     }
 
