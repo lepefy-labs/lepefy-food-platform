@@ -24,6 +24,7 @@ import {
   IconCheck,
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, PAYMENT_METHOD_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
+import { AddToHomeScreen } from './AddToHomeScreen';
 
 const ICONS = {
   IconBrandInstagram,
@@ -291,6 +292,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             <IconUserPlus size={16} stroke={1.5} />
             {t.addContact}
           </a>
+
+          <AddToHomeScreen lang={lang} />
 
         </div>
       </div>

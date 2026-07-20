@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
@@ -7,6 +8,12 @@ import { DigitalCard } from '@/components/card/DigitalCard';
 // par visiteur. force-dynamic était un résidu — ni cette page ni les deux
 // fonctions qu'elle appelle ne lisent plus de client lié aux cookies.
 export const revalidate = 300;
+
+// Manifest dédié : installer /card doit créer une icône distincte de
+// l'app boutique (racine), pas un second raccourci vers le même manifeste.
+export const metadata: Metadata = {
+  manifest: '/api/card/manifest',
+};
 
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
