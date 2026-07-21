@@ -5,6 +5,7 @@ import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
 import { LABEL_PALETTES, NATURAL_BADGE_COLOR, kenteStripBackground } from '../palettes';
 import { resolveOriginFlag, FlagSwatch } from '../originFlags';
+import { renderBarcodeSVG } from '@/lib/barcode';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -67,6 +68,9 @@ export function BannerLabelTemplate({
   const showOrigin = sections.origin && !!product.country_of_origin;
   const originFlag = showOrigin ? resolveOriginFlag(product.country_of_origin) : null;
   const hasClaims = (sections.usage && !!product.usage_instructions) || (sections.conservation && !!product.conservation_instructions);
+  const barcodeSvg = sections.barcode && product.barcode_value
+    ? renderBarcodeSVG(product.barcode_value, { widthMm: 22 })
+    : null;
 
   const bandHeightMm = labelHeightMm * 0.26;
   // Il riquadro nutrizionale invade parzialmente la fascia del logo, come nell'esempio allegato
@@ -162,6 +166,12 @@ export function BannerLabelTemplate({
               {tenant.legal_email ? ` — ${tenant.legal_email}` : ''}
               {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
             </div>
+            {barcodeSvg && (
+              <div
+                style={{ marginTop: '1mm', display: 'flex', justifyContent: 'center' }}
+                dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+              />
+            )}
             {product.packaging_material && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6mm', marginTop: '0.5mm' }}>
                 <IconPackage size="2.2mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />

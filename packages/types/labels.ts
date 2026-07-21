@@ -65,6 +65,7 @@ export interface ProductLabelData {
   nutrition: NutritionInfo | null;
   label_background_image_url: string | null;
   label_background_color: string | null;
+  barcode_value: string | null;
   producer: Producer | null;
   importer: Importer | null;
   category: {
@@ -95,6 +96,7 @@ export interface LabelSections {
   usage: boolean;
   conservation: boolean;
   origin: boolean;
+  barcode: boolean;
 }
 
 export interface LabelJobInput {

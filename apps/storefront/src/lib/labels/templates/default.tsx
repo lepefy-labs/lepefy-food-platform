@@ -4,6 +4,7 @@ import { resolveBackground, resolveAmbientColor } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
 import { LABEL_PALETTES, NATURAL_BADGE_COLOR, ambientWashBackground, footerWashBackground, kenteStripBackground } from '../palettes';
 import { resolveOriginFlag, FlagSwatch } from '../originFlags';
+import { renderBarcodeSVG } from '@/lib/barcode';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -57,6 +58,9 @@ export function DefaultLabelTemplate({
   const netQty = product.net_quantity_display ?? formatWeight(product.weight_grams);
   const showOrigin = sections.origin && !!product.country_of_origin;
   const originFlag = showOrigin ? resolveOriginFlag(product.country_of_origin) : null;
+  const barcodeSvg = sections.barcode && product.barcode_value
+    ? renderBarcodeSVG(product.barcode_value)
+    : null;
 
   return (
     <div style={{
@@ -262,6 +266,12 @@ export function DefaultLabelTemplate({
             {tenant.legal_email ? ` — ${tenant.legal_email}` : ''}
             {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
           </div>
+          {barcodeSvg && (
+            <div
+              style={{ marginTop: '1mm', display: 'flex', justifyContent: 'flex-start' }}
+              dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+            />
+          )}
           {product.packaging_material && (
             <div style={{ color: '#555', display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
               <IconPackage size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />

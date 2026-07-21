@@ -29,7 +29,7 @@ export default async function AdminProductEditPage({
       conservation_after_opening, country_of_origin, durability_type,
       quid_ingredient, quid_percentage, alcohol_pct, net_quantity_display,
       packaging_material, recycling_note, nutrition_basis, nutrition,
-      label_background_image_url, label_background_color
+      label_background_image_url, label_background_color, barcode_value
     `)
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)

@@ -8,7 +8,7 @@ import type { LabelPrintJob } from '@lepefy/types';
 export const runtime = 'nodejs';
 
 const DEFAULT_SECTIONS = {
-  image: true, nutrition: true, allergens: true, usage: true, conservation: true, origin: true,
+  image: true, nutrition: true, allergens: true, usage: true, conservation: true, origin: true, barcode: true,
 };
 
 // GET /api/admin/labels/jobs?productId=xxx — liste des brouillons + historique pour un produit

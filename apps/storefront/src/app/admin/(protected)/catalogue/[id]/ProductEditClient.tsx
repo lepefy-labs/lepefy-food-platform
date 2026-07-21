@@ -12,6 +12,7 @@ import {
   IconTag,
 } from '@tabler/icons-react';
 import type { Producer, Importer, NutritionInfo, DurabilityType } from '@lepefy/types';
+import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 
 interface ProductEditProps {
   product: {
@@ -51,6 +52,7 @@ interface ProductEditProps {
     nutrition: NutritionInfo | null;
     label_background_image_url: string | null;
     label_background_color: string | null;
+    barcode_value: string | null;
   };
   categories: { id: string; name: string; slug: string }[];
   producers: Producer[];
@@ -190,6 +192,8 @@ export default function ProductEditClient({
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
   const [isUploadingLabelBg, setIsUploadingLabelBg] = useState(false);
   const [removeBgOnUpload, setRemoveBgOnUpload]     = useState(false);
+  const [isRegeneratingBarcode, setIsRegeneratingBarcode] = useState(false);
+  const [displayBarcode, setDisplayBarcode]         = useState(product.barcode_value ?? null);
   const [removeBgOnLabelBg, setRemoveBgOnLabelBg]   = useState(false);
   const [toast, setToast]               = useState<{
     msg: string;
@@ -291,6 +295,29 @@ export default function ProductEditClient({
       showToast('Erreur lors de l\'enregistrement', 'error');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleRegenerateBarcode() {
+    if (displayBarcode && !window.confirm(
+      'Rigenerare il barcode? Se sono già state stampate etichette con il codice ' +
+      'attuale, la merce a scaffale non corrisponderà più al nuovo codice finché ' +
+      'non verranno ristampate.'
+    )) return;
+
+    setIsRegeneratingBarcode(true);
+    try {
+      const res = await fetch(`/api/admin/catalogue/${product.id}/regenerate-barcode`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Génération échouée');
+      const { barcode } = await res.json() as { barcode: string };
+      setDisplayBarcode(barcode);
+      showToast('Barcode généré', 'success');
+    } catch {
+      showToast('Erreur lors de la génération du code-barres', 'error');
+    } finally {
+      setIsRegeneratingBarcode(false);
     }
   }
 
@@ -664,6 +691,36 @@ export default function ProductEditClient({
               />
             </div>
           </section>
+
+          {/* Card: Code-barres */}
+          {!isNew && (
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Code-barres</h2>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  {displayBarcode ? (
+                    <p className="font-mono text-sm text-gray-800">
+                      {formatBarcodeDisplay(displayBarcode)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-400">Aucun code-barres généré</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    Généré automatiquement en interne — jamais un vrai code GS1 fabricant.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRegenerateBarcode}
+                  disabled={isRegeneratingBarcode}
+                  className="flex-shrink-0 text-xs font-medium px-3 py-2 rounded-lg border
+                             border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {isRegeneratingBarcode ? 'Génération...' : displayBarcode ? 'Régénérer' : 'Générer'}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* ── Right column ────────────────────────────────────────────────── */}

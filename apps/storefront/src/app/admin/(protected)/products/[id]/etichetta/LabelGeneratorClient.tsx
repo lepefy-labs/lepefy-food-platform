@@ -23,6 +23,7 @@ const SECTION_LABELS: { key: keyof LabelSections; label: string }[] = [
   { key: 'usage', label: "Consigli d'uso" },
   { key: 'conservation', label: 'Conservazione' },
   { key: 'origin', label: 'Origine' },
+  { key: 'barcode', label: 'Code-barres' },
 ];
 
 export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo, settings }: LabelGeneratorProps) {
@@ -35,7 +36,7 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   const [sections, setSections] = useState<LabelSections>({
-    image: true, nutrition: true, allergens: true, usage: true, conservation: true, origin: true,
+    image: true, nutrition: true, allergens: true, usage: true, conservation: true, origin: true, barcode: true,
   });
   const [lotNumber, setLotNumber] = useState('');
   const [productionDate, setProductionDate] = useState('');

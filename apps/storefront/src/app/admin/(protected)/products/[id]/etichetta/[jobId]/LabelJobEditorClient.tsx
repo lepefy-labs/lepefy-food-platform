@@ -45,6 +45,7 @@ const SECTION_LABELS: { key: keyof LabelSections; label: string }[] = [
   { key: 'usage', label: "Consigli d'uso" },
   { key: 'conservation', label: 'Conservazione' },
   { key: 'origin', label: 'Origine' },
+  { key: 'barcode', label: 'Code-barres' },
 ];
 
 // Champs autosauvegardés — miroir de PATCHABLE_FIELDS côté API

@@ -24,6 +24,7 @@ interface Product {
   image_url: string | null;
   storage_type: string | null;
   description_source: 'ai' | 'human' | null;
+  barcode_value: string | null;
   categories: { name: string; slug: string } | null;
 }
 
@@ -55,7 +56,8 @@ export default function CatalogueTable({
     ? products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.categories?.name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+        (p.categories?.name ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.barcode_value ?? '').includes(searchQuery.trim())
       )
     : products;
 

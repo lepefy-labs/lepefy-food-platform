@@ -3,6 +3,7 @@ import type { ProductLabelData, LabelSections, LabelPaletteKey, LabelOriginStyle
 import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
 import { LABEL_PALETTES, NATURAL_BADGE_COLOR } from '../palettes';
+import { renderBarcodeSVG } from '@/lib/barcode';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -57,6 +58,9 @@ export function FullBleedLabelTemplate({
   const colors = LABEL_PALETTES[palette];
   const bg = resolveBackground(product, colors.ambient);
   const netQty = product.net_quantity_display ?? formatWeight(product.weight_grams);
+  const barcodeSvg = sections.barcode && product.barcode_value
+    ? renderBarcodeSVG(product.barcode_value, { widthMm: 26 })
+    : null;
 
   return (
     <div style={{
@@ -195,6 +199,12 @@ export function FullBleedLabelTemplate({
             <IconRecycle size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, verticalAlign: 'middle' }} />{' '}
             {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
           </div>
+        )}
+        {barcodeSvg && (
+          <div
+            style={{ marginTop: '1mm', display: 'flex', justifyContent: 'center' }}
+            dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+          />
         )}
       </div>
     </div>

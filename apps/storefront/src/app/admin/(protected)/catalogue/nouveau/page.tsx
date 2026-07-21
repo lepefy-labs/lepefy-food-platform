@@ -71,6 +71,7 @@ export default async function AdminNouveauProduitPage() {
     nutrition:                    null,
     label_background_image_url:   null,
     label_background_color:       null,
+    barcode_value:                null,
   };
 
   return (

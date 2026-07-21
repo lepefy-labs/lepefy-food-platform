@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { syncProductEmbedding } from '@/lib/ai/embeddings';
+import { assignBarcodeToProduct } from '@/lib/barcode';
 
 export const runtime = 'nodejs';
 
@@ -94,6 +95,14 @@ export async function POST(req: NextRequest) {
   }
 
   await syncProductEmbedding(tenant.id, data.id);
+
+  try {
+    await assignBarcodeToProduct(supabase, tenant.id, data.id);
+  } catch (barcodeError) {
+    // Non bloccante: il prodotto è comunque creato, il barcode può essere
+    // generato più tardi dal pulsante "Rigenera" nell'admin.
+    console.error('[catalogue] Génération barcode échouée:', barcodeError);
+  }
 
   return NextResponse.json({ id: data.id }, { status: 201 });
 }
