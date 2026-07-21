@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server.node';
 import { DefaultLabelTemplate } from './templates/default';
 import { FullBleedLabelTemplate } from './templates/fullbleed';
 import { BannerLabelTemplate } from './templates/banner';
+import { EtnicoLabelTemplate } from './templates/etnico';
 import { calculateLayout } from './calculateLayout';
 import type { ProductLabelData, LabelSections, LabelSettings, LabelTemplateKey, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 
@@ -29,6 +30,7 @@ export function buildSheetHtml(params: BuildSheetParams): { html: string; layout
 
   const Template = templateKey === 'fullbleed' ? FullBleedLabelTemplate
     : templateKey === 'banner' ? BannerLabelTemplate
+    : templateKey === 'etnico' ? EtnicoLabelTemplate
     : DefaultLabelTemplate;
 
   const layout = calculateLayout({

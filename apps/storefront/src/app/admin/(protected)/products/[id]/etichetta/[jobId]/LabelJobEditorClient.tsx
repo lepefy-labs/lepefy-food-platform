@@ -20,6 +20,7 @@ const TEMPLATE_OPTIONS: { key: LabelTemplateKey; label: string; description: str
   { key: 'default', label: 'Classico (due colonne)', description: 'Logo e testo su colonne separate, secondo la maquette approvata.' },
   { key: 'fullbleed', label: 'Full-bleed (sfondo intero)', description: "Lo sfondo copre l'intera etichetta, i testi poggiano su pannelli traslucidi." },
   { key: 'banner', label: 'Fascia Dorata (fascia superiore)', description: 'Fascia logo a tutta larghezza, nutrizione a sinistra, nome al centro, foto a destra.' },
+  { key: 'etnico', label: 'Etnico', description: 'Foto a tutta larghezza con logo e bandiera in alto, titolo FR/IT-EN, feature bar e nutrizione su 2 colonne. Palette fissa (blu royal, verde, crema).' },
 ];
 
 const PALETTE_OPTIONS: { key: LabelPaletteKey }[] = [
@@ -379,6 +380,12 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                         </div>
                       </div>
                     )}
+                    {opt.key === 'etnico' && (
+                      <div className="flex h-10 w-14 shrink-0 flex-col overflow-hidden rounded border border-gray-200">
+                        <div className="h-6 w-full bg-gray-300" />
+                        <div className="flex-1 bg-[#1E3A8A]" />
+                      </div>
+                    )}
                     <span>
                       <div className="font-medium text-gray-800">{opt.label}</div>
                       <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
@@ -390,7 +397,10 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="text-sm font-semibold text-gray-700 mb-4">Palette colori</h2>
-              <div className="grid grid-cols-1 gap-2">
+              {templateKey === 'etnico' ? (
+                <p className="text-xs text-gray-400 mb-4">Questo template ha una palette fissa.</p>
+              ) : null}
+              <div className={`grid grid-cols-1 gap-2 ${templateKey === 'etnico' ? 'opacity-50 pointer-events-none' : ''}`}>
                 {PALETTE_OPTIONS.map(({ key }) => {
                   const p = LABEL_PALETTES[key];
                   return (
@@ -482,9 +492,14 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                   (in alto e in basso a destra) — verifica che il risultato ti piaccia nell&apos;anteprima.
                 </p>
               )}
-              {originStyle === 'medallion' && templateKey !== 'default' && (
+              {originStyle === 'medallion' && templateKey !== 'default' && templateKey !== 'etnico' && (
                 <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   Il bollino speculare è disponibile solo sul template Classico — su questo template l&apos;origine verrà mostrata nell&apos;asola.
+                </p>
+              )}
+              {templateKey === 'etnico' && (
+                <p className="mt-3 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  Il template Etnico mostra sempre la bandiera come pillola in alto a destra — questa scelta non ha effetto qui.
                 </p>
               )}
             </section>
