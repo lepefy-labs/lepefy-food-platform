@@ -36,16 +36,24 @@ function formatWeight(grams: number | null): string {
   return grams >= 1000 ? `${(grams / 1000).toLocaleString('it-IT')} kg` : `${grams} g`;
 }
 
-const NUTRITION_ROWS: Array<{ key: keyof NonNullable<ProductLabelData['nutrition']>; label: string }> = [
-  { key: 'kcal', label: 'Energia (Energy)' },
-  { key: 'kj', label: 'Valore energetico (kJ)' },
-  { key: 'fat_g', label: 'Grassi (Fat)' },
+type NutritionKey = keyof NonNullable<ProductLabelData['nutrition']>;
+
+// Due colonne affiancate sotto un'unica intestazione: dimezza l'altezza della
+// tabella. Etichette solo in italiano — a colonna dimezzata il bilingue va a
+// capo e vanifica il risparmio di spazio.
+const NUTRITION_ROWS_LEFT: Array<{ key: NutritionKey; label: string }> = [
+  { key: 'kcal', label: 'Energia' },
+  { key: 'kj', label: 'Valore energetico' },
+  { key: 'fat_g', label: 'Grassi' },
   { key: 'saturated_fat_g', label: 'di cui saturi' },
-  { key: 'carbs_g', label: 'Carboidrati (Carbohydrate)' },
+];
+
+const NUTRITION_ROWS_RIGHT: Array<{ key: NutritionKey; label: string }> = [
+  { key: 'carbs_g', label: 'Carboidrati' },
   { key: 'sugars_g', label: 'di cui zuccheri' },
-  { key: 'fiber_g', label: 'Fibre (Fiber)' },
-  { key: 'protein_g', label: 'Proteine (Protein)' },
-  { key: 'salt_g', label: 'Sale (Salt)' },
+  { key: 'fiber_g', label: 'Fibre' },
+  { key: 'protein_g', label: 'Proteine' },
+  { key: 'salt_g', label: 'Sale' },
 ];
 
 const PANEL_BG = 'rgba(255,255,255,0.92)';
@@ -134,25 +142,36 @@ export function FullBleedLabelTemplate({
           </div>
 
           {sections.nutrition && product.nutrition && (
-            <table style={{ borderCollapse: 'collapse', fontSize: '2mm', width: '100%', marginTop: '1.5mm' }}>
-              <thead>
-                <tr>
-                  <th colSpan={2} style={{ background: colors.primary, color: '#fff', padding: '1mm', fontSize: '2.1mm', textAlign: 'left' }}>
-                    Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {NUTRITION_ROWS.filter((r) => product.nutrition?.[r.key] != null).map((r) => (
-                  <tr key={r.key}>
-                    <td style={{ padding: '0.6mm 1.5mm', borderBottom: '0.15mm solid rgba(0,0,0,0.15)' }}>{r.label}</td>
-                    <td style={{ padding: '0.6mm 1.5mm', borderBottom: '0.15mm solid rgba(0,0,0,0.15)', textAlign: 'right', fontWeight: 700 }}>
-                      {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ marginTop: '1.5mm' }}>
+              <div style={{ background: colors.primary, color: '#fff', padding: '1mm', fontSize: '2.1mm', fontWeight: 700 }}>
+                Valori Nutrizionali Medi ({product.nutrition_basis === '100ml' ? 'per 100 ml' : 'per 100 g'})
+              </div>
+              <div style={{ display: 'flex', gap: '1.5mm' }}>
+                {[NUTRITION_ROWS_LEFT, NUTRITION_ROWS_RIGHT].map((group, i) => {
+                  const rows = group.filter((r) => product.nutrition?.[r.key] != null);
+                  if (rows.length === 0) return null;
+                  return (
+                    <table key={i} style={{ borderCollapse: 'collapse', fontSize: '1.9mm', flex: 1, minWidth: 0 }}>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.key}>
+                            <td style={{ padding: '0.5mm 1mm', borderBottom: '0.15mm solid rgba(0,0,0,0.15)' }}>
+                              {r.label}
+                            </td>
+                            <td style={{
+                              padding: '0.5mm 1mm', borderBottom: '0.15mm solid rgba(0,0,0,0.15)',
+                              textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap',
+                            }}>
+                              {product.nutrition?.[r.key]}{r.key === 'kcal' ? ' kcal' : r.key === 'kj' ? ' kJ' : ' g'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           <div style={{ fontSize: '2.1mm', lineHeight: 1.35, marginTop: '1.5mm' }}>
