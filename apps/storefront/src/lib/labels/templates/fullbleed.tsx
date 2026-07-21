@@ -1,4 +1,4 @@
-import { IconRecycle } from '@tabler/icons-react';
+import { IconPackage, IconRecycle } from '@tabler/icons-react';
 import type { ProductLabelData, LabelSections, LabelPaletteKey, LabelOriginStyleKey } from '@lepefy/types';
 import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
@@ -59,7 +59,7 @@ export function FullBleedLabelTemplate({
   const bg = resolveBackground(product, colors.ambient);
   const netQty = product.net_quantity_display ?? formatWeight(product.weight_grams);
   const barcodeSvg = sections.barcode && product.barcode_value
-    ? renderBarcodeSVG(product.barcode_value, { widthMm: 26 })
+    ? renderBarcodeSVG(product.barcode_value, { widthMm: 14 })
     : null;
 
   return (
@@ -104,9 +104,19 @@ export function FullBleedLabelTemplate({
         <div style={{
           position: 'absolute', top: '3mm', right: '3mm', bottom: '3mm', width: '58%',
           background: PANEL_BG, borderRadius: '1.5mm', padding: '2.5mm',
-          display: 'grid', gridTemplateRows: 'auto auto 1fr auto', overflow: 'hidden',
+          overflow: 'hidden',
           color: TEXT_COLOR,
         }}>
+          {/* Wrapper scalabile: se il contenuto non entra nel pannello a dimensione
+              fissa, lo script shrink-to-fit in fondo al template lo riduce (min 75%). */}
+          <div
+            id={`label-info-panel-${product.id}`}
+            className="label-shrink-to-fit"
+            style={{
+              display: 'grid', gridTemplateRows: 'auto auto 1fr auto',
+              minHeight: '100%', width: '100%', transformOrigin: 'top left',
+            }}
+          >
           <div>
             <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700, fontSize: product.name_alt ? '3.8mm' : '4.6mm', color: TEXT_COLOR }}>
               {product.name}
@@ -145,7 +155,7 @@ export function FullBleedLabelTemplate({
             </table>
           )}
 
-          <div style={{ fontSize: '2.1mm', lineHeight: 1.35, marginTop: '1.5mm', overflow: 'hidden' }}>
+          <div style={{ fontSize: '2.1mm', lineHeight: 1.35, marginTop: '1.5mm' }}>
             {product.ingredients_text && (
               <div><b>Ingredienti:</b> {product.ingredients_text}</div>
             )}
@@ -179,34 +189,83 @@ export function FullBleedLabelTemplate({
               <div>{durabilityLabel}: {formatDateIT(durabilityDate)}</div>
             </div>
           </div>
+          </div>
         </div>
       </div>
 
-      {/* Pannello legale, in basso, largo tutta l'etichetta */}
+      {/* Pannello legale, in basso, largo tutta l'etichetta — testo a sinistra,
+          stack verticale barcode+QR in basso a destra */}
       <div style={{
         margin: '0 3mm 3mm', background: PANEL_BG, borderRadius: '1.5mm',
         fontSize: '1.8mm', padding: '1.5mm 3mm', lineHeight: 1.5, color: TEXT_COLOR,
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '2mm',
       }}>
-        {product.importer && <div>Importato da: {product.importer.name}, {product.importer.legal_address}</div>}
-        <div>
-          Per: {tenant.legal_name}, {tenant.legal_address}
-          {tenant.legal_email ? ` — ${tenant.legal_email}` : ''}
-          {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
-        </div>
-        {product.packaging_material && (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {product.importer && <div>Importato da: {product.importer.name}, {product.importer.legal_address}</div>}
           <div>
-            Imballaggio: {product.packaging_material}.{' '}
-            <IconRecycle size="2.6mm" style={{ color: NATURAL_BADGE_COLOR, verticalAlign: 'middle' }} />{' '}
-            {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
+            Per: {tenant.legal_name}, {tenant.legal_address}
+            {tenant.legal_email ? ` — ${tenant.legal_email}` : ''}
+            {tenant.legal_website ? ` — ${tenant.legal_website}` : ''}
           </div>
-        )}
-        {barcodeSvg && (
-          <div
-            style={{ marginTop: '1mm', display: 'flex', justifyContent: 'center' }}
-            dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+          {product.packaging_material && (
+            <div style={{ color: '#555', display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
+              <IconPackage size="2.4mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />
+              {product.packaging_material}.{' '}
+              <IconRecycle size="2.4mm" style={{ color: NATURAL_BADGE_COLOR, flexShrink: 0 }} />{' '}
+              {product.recycling_note ?? 'Verificare le disposizioni del proprio comune.'}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6mm', flexShrink: 0 }}>
+          {barcodeSvg && (
+            <div
+              style={{ width: '14mm' }}
+              dangerouslySetInnerHTML={{ __html: barcodeSvg }}
+            />
+          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${process.env.NEXT_PUBLIC_STOREFRONT_URL}/api/card/qr-code?format=png&size=200`}
+            alt=""
+            style={{ width: '7mm', height: '7mm' }}
           />
-        )}
+        </div>
       </div>
+
+      {/* Shrink-to-fit del pannello info: Gotenberg usa Chromium reale ed esegue
+          il JS prima della cattura PDF. Class-based e idempotente perché
+          buildSheetHtml duplica lo stesso markup (e questo script) in ogni cella
+          del foglio — un getElementById scalerebbe solo la prima copia. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              var els = document.querySelectorAll('.label-shrink-to-fit');
+              for (var i = 0; i < els.length; i++) {
+                var el = els[i];
+                if (el.getAttribute('data-shrunk')) continue;
+                el.setAttribute('data-shrunk', '1');
+                var container = el.parentElement;
+                if (!container) continue;
+                var cs = window.getComputedStyle(container);
+                var available = container.clientHeight
+                  - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+                var scale = 1;
+                var minScale = 0.75;
+                var step = 0.05;
+                var guard = 0;
+                while (el.scrollHeight * scale > available + 1 && scale > minScale && guard < 20) {
+                  scale -= step;
+                  el.style.transform = 'scale(' + scale.toFixed(2) + ')';
+                  el.style.width = (100 / scale) + '%';
+                  guard++;
+                }
+              }
+            })();
+          `,
+        }}
+      />
     </div>
   );
 }
