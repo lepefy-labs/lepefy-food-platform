@@ -4,6 +4,7 @@ import { resolveBackground } from '../resolveBackground';
 import { formatDateIT } from '../formatDate';
 import { LABEL_PALETTES, NATURAL_BADGE_COLOR } from '../palettes';
 import { renderBarcodeSVG } from '@/lib/barcode';
+import { resolveOriginFlag, FlagSwatch } from '../originFlags';
 
 interface TenantLabelProps {
   primary_color: string;
@@ -20,7 +21,6 @@ interface FullBleedLabelTemplateProps {
   tenant: TenantLabelProps;
   palette: LabelPaletteKey;
   naturalBadge: boolean;
-  /** Non ancora usato in questo template — la scelta di stile bandiera è implementata solo su default.tsx. */
   originStyle: LabelOriginStyleKey;
   sections: LabelSections;
   labelWidthMm: number;
@@ -60,12 +60,14 @@ const PANEL_BG = 'rgba(255,255,255,0.92)';
 const TEXT_COLOR = '#2A2118';
 
 export function FullBleedLabelTemplate({
-  product, tenant, palette, naturalBadge, sections, labelWidthMm, labelHeightMm,
+  product, tenant, palette, naturalBadge, originStyle, sections, labelWidthMm, labelHeightMm,
   lotNumber, productionDate, durabilityDate, durabilityLabel,
 }: FullBleedLabelTemplateProps) {
   const colors = LABEL_PALETTES[palette];
   const bg = resolveBackground(product, colors.ambient);
   const netQty = product.net_quantity_display ?? formatWeight(product.weight_grams);
+  const showOrigin = sections.origin && !!product.country_of_origin;
+  const originFlag = showOrigin ? resolveOriginFlag(product.country_of_origin) : null;
   const barcodeSvg = sections.barcode && product.barcode_value
     ? renderBarcodeSVG(product.barcode_value, { widthMm: 14 })
     : null;
@@ -109,6 +111,29 @@ export function FullBleedLabelTemplate({
           </div>
         )}
 
+        {/* Medaglione origine — ancorato al bordo della fascia foto visibile (a
+            sinistra del pannello dati), centrato in verticale per non
+            sovrapporsi né al logo (top-left) né al bollino naturale (bottom-left). */}
+        {originStyle === 'medallion' && showOrigin && originFlag && (
+          <div style={{
+            position: 'absolute', top: '50%', right: 'calc(58% + 5mm)', transform: 'translateY(-50%)',
+            width: '9mm', height: '9mm', borderRadius: '50%',
+            background: colors.primary, border: '0.3mm solid rgba(255,255,255,0.9)',
+            boxShadow: '0 0.3mm 0.8mm rgba(0,0,0,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+              <path id={`fbOriginArcPath-${product.id}`} d="M 15,55 A 35,35 0 1 1 85,55" fill="none" />
+              <text fontSize="9" fontWeight={700} letterSpacing="0.3" fill="#fff">
+                <textPath href={`#fbOriginArcPath-${product.id}`} startOffset="50%" textAnchor="middle">
+                  PRODOTTO IN {product.country_of_origin?.toUpperCase()}
+                </textPath>
+              </text>
+            </svg>
+            <FlagSwatch spec={originFlag} width="4.2mm" height="2.8mm" style={{ boxShadow: '0 0 0 0.15mm rgba(255,255,255,.8)' }} />
+          </div>
+        )}
+
         <div style={{
           position: 'absolute', top: '3mm', right: '3mm', bottom: '3mm', width: '58%',
           background: PANEL_BG, borderRadius: '1.5mm', padding: '2.5mm',
@@ -134,9 +159,22 @@ export function FullBleedLabelTemplate({
                 {product.name_alt}
               </div>
             )}
-            {sections.origin && product.country_of_origin && (
-              <div style={{ fontSize: '2.2mm', color: '#666', marginTop: '0.5mm' }}>
-                Origine: {product.country_of_origin}
+            {showOrigin && originStyle === 'block' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1mm', marginTop: '0.5mm' }}>
+                {originFlag && <FlagSwatch spec={originFlag} width="5.5mm" height="3.7mm" />}
+                <span style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontWeight: 700, fontSize: '2.2mm', color: colors.primary }}>
+                  Origine: {product.country_of_origin}
+                </span>
+              </div>
+            )}
+            {showOrigin && originStyle === 'pill' && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.8mm', marginTop: '0.5mm',
+                border: `0.25mm solid ${colors.primary}`, borderRadius: '3mm',
+                padding: '0.3mm 2mm 0.3mm 1.4mm', fontSize: '2mm', fontWeight: 700, color: colors.primary,
+              }}>
+                {originFlag && <FlagSwatch spec={originFlag} width="3.2mm" height="2.1mm" />}
+                {product.country_of_origin}
               </div>
             )}
           </div>
