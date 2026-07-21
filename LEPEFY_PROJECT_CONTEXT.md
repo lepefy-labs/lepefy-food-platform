@@ -1,7 +1,9 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 18 Luglio 2026 (v3.7) — **verifica indipendente contro git/filesystem reale** (branch `claude/update-lepefy-project-context-fke5jo`), non solo stato riportato in chat. Due correzioni rilevanti rispetto a v3.6: (1) la **KPI "Aujourd'hui"**, segnalata come "prompt scritto ma non eseguito", **risulta invece già eseguita** nel codice (`admin/(protected)/page.tsx`) — il commit che l'ha implementata precede cronologicamente quello che ha scritto v3.6, semplicemente lo stato in chat non era stato aggiornato di conseguenza; (2) **`main` non contiene né il redesign admin (Fase 0–4, §8bis) né il redesign storefront (§12bis)** — `git merge-base main HEAD` coincide con la punta di `main` stessa (ultimo commit 16/07 alle 11:47): **tutto** il lavoro di entrambi gli audit (storefront 16–17/07, admin 17–18/07) esiste solo su questo branch, mai mergiato. La precedente affermazione "branch pushato e mergiato su `main`" (§12bis/§25, v3.4–v3.6) **non è supportata dallo stato reale del repository** — verificato anche puntualmente: `ShopTag.tsx` non esiste su `main`, e `BottomNav.tsx` su `main` contiene ancora l'hex hardcoded `#1D9E75`. Non è verificabile da qui se Vercel effettivamente deploya da `main` o da questo branch (nessun `vercel.json` nel repo) — **da confermare con Robertin prima di dare per assodato lo stato di produzione**. Scoperta anche una funzionalità non documentata: `AdminMobileNav.tsx`, un drawer di navigazione mobile per l'admin (vedi §8bis). Base di questa revisione: v3.6, con le correzioni sopra.
+> Aggiornato: 20 Luglio 2026 (v3.8) — **audit performance frontend + 5 prompt di ottimizzazione + fix urgente stock/overselling**, tutti confermati caricati su `main` via GitHub web UI (workflow diretto di Robertin per questo lavoro — non passa dal problema di branch non mergiati descritto sotto per i redesign UI/UX). Dettaglio completo in §17bis (nuova sezione). In sintesi: query Supabase mirate (mai più `select('*')` su prodotti/ordini), fetch paralleli, paginazione server-side del catalogo, ISR su home e pagina prodotto via client Supabase pubblico, lazy-load di Stripe.js, e — separatamente dall'audit performance ma scoperto durante quel lavoro — **il primo controllo/decremento stock reale mai esistito nel checkout**, con decremento atomico race-safe e gestione del caso "pagato ma stock nel frattempo esaurito" (rimborso Stripe automatico + notifica admin via n8n). **Il test di race condition in staging resta da eseguire** — il fix è in produzione ma non ancora verificato empiricamente, vedi §17bis e §18.
+>
+> Aggiornamento 18 Luglio 2026 (v3.7) — **verifica indipendente contro git/filesystem reale** (branch `claude/update-lepefy-project-context-fke5jo`), non solo stato riportato in chat. Due correzioni rilevanti rispetto a v3.6: (1) la **KPI "Aujourd'hui"**, segnalata come "prompt scritto ma non eseguito", **risulta invece già eseguita** nel codice (`admin/(protected)/page.tsx`) — il commit che l'ha implementata precede cronologicamente quello che ha scritto v3.6, semplicemente lo stato in chat non era stato aggiornato di conseguenza; (2) **`main` non contiene né il redesign admin (Fase 0–4, §8bis) né il redesign storefront (§12bis)** — `git merge-base main HEAD` coincide con la punta di `main` stessa (ultimo commit 16/07 alle 11:47): **tutto** il lavoro di entrambi gli audit (storefront 16–17/07, admin 17–18/07) esiste solo su questo branch, mai mergiato. La precedente affermazione "branch pushato e mergiato su `main`" (§12bis/§25, v3.4–v3.6) **non è supportata dallo stato reale del repository** — verificato anche puntualmente: `ShopTag.tsx` non esiste su `main`, e `BottomNav.tsx` su `main` contiene ancora l'hex hardcoded `#1D9E75`. Non è verificabile da qui se Vercel effettivamente deploya da `main` o da questo branch (nessun `vercel.json` nel repo) — **da confermare con Robertin prima di dare per assodato lo stato di produzione**. Scoperta anche una funzionalità non documentata: `AdminMobileNav.tsx`, un drawer di navigazione mobile per l'admin (vedi §8bis). Base di questa revisione: v3.6, con le correzioni sopra.
 
 ---
 
@@ -71,7 +73,9 @@ Una code review tecnica (`docs/PROJECT_REVIEW.md`) ha identificato e la piattafo
 3. **Policy RLS troppo permissive (ALTO).** `orders_insert_any`/`order_items_insert_any` con `with check (true)` permettevano insert arbitrari con la anon key pubblica. **Fix:** `016_security_hardening.sql` rimuove le due policy — tutti gli insert reali passano dal service role.
 4. **Idempotenza webhook fragile (ALTO).** Il check "ordine già esistente?" era check-then-insert, vulnerabile a doppio retry Stripe concorrente. **Fix:** stessa migration 016, indice unico parziale su `orders.stripe_payment_intent_id`; il webhook tratta la unique violation (23505) come ordine già creato da un retry concorrente.
 
-**Debito residuo noto (non ancora corretto):** nessuna gestione stock reale al checkout (stock default 999, mai decrementato); `FROM_ADDRESS` ancora hardcoded `IT 42122` in `api/shipping/quote/route.ts` nonostante esista `warehouse_location`; il breakdown spedizione (`_internal`: corriere, IVA, surcharge 3€/pacco) è visibile nei devtools nonostante la doc affermi sia nascosto; file morti `src/app/admin/orders/[id]/` e `src/app/admin/orders/id/` (vedi §8); `xlsx@0.18.5` ha vulnerabilità note senza fix; `@supabase/ssr@0.3` datato; zero test automatizzati. Dettaglio completo in `docs/PROJECT_REVIEW.md`.
+**Debito residuo noto (non ancora corretto):** `FROM_ADDRESS` ancora hardcoded `IT 42122` in `api/shipping/quote/route.ts` nonostante esista `warehouse_location`; il breakdown spedizione (`_internal`: corriere, IVA, surcharge 3€/pacco) è visibile nei devtools nonostante la doc affermi sia nascosto; file morti `src/app/admin/orders/[id]/` e `src/app/admin/orders/id/` (vedi §8); `xlsx@0.18.5` ha vulnerabilità note senza fix; `@supabase/ssr@0.3` datato; zero test automatizzati. Dettaglio completo in `docs/PROJECT_REVIEW.md`.
+
+**✅ Gestione stock reale al checkout — RISOLTO (20/07, fix urgente separato dall'audit performance, vedi §17bis).** Fino a questa fix, il punto precedente di questo elenco era "nessuna gestione stock reale al checkout (stock default 999, mai decrementato)" — confermato **letteralmente vero**: né il checkout né alcun trigger DB verificavano o decrementavano mai `products.stock`. Ora: controllo pre-pagamento in `/api/checkout` (fail-fast, nessun addebito se stock insufficiente) + decremento atomico race-safe (`UPDATE ... WHERE stock >= qty RETURNING`, migration `029_atomic_stock_decrement.sql`) nel punto corretto per ciascun flusso (webhook Stripe per il flusso online, sincrono in `/api/checkout` per il flusso in-store) + rimborso Stripe automatico e notifica admin via n8n per il caso limite "pagato ma stock esaurito nel frattempo". **⚠️ Il test di race condition in staging (due checkout quasi simultanei sull'ultimo pezzo) non è ancora stato eseguito** — il fix è live ma non verificato empiricamente, vedi §17bis e §18.
 
 ---
 
@@ -248,6 +252,7 @@ lepefy-food-platform/
 | `026_ai_descriptions.sql` | `products.descriptions` jsonb + `products.description_source` (`ai`/`human`) + configurazione lingue tenant |
 | `027_ai_rate_limiting_cost_tracking.sql` | Tabelle `ai_pricing` (listino prezzi per provider/model) e `ai_usage_log` (log per-chiamata) + funzione `check_ai_rate_limit` + vista `ai_usage_monthly_by_tenant` |
 | `028_semantic_search.sql` | Estensione `vector`; `products.embedding` vector(768); indice HNSW cosine; funzione `match_products` |
+| `029_atomic_stock_decrement.sql` | Funzione PL/pgSQL per decremento stock atomico/condizionale (`UPDATE ... WHERE stock >= qty RETURNING`, transazionale); aggiunge `'stock_conflict'` al constraint `orders.status` (ricostruito includendo esplicitamente anche `ready_for_pickup`, che era in uso nel codice admin ma non risultava mai aggiunto da nessuna migration — vedi §17bis) |
 
 **Non esistono file 005 e 012** — non sono stati saltati per errore, la numerazione riflette semplicemente collisioni risolte con suffissi (003b/003c) o rinomina all'atto della scrittura, come documentato nei commenti di intestazione di `018` e `023`.
 
@@ -601,7 +606,7 @@ UPDATE tenants SET primary_color = '#1267C7' WHERE slug = 'chloefood';
 
 Mapping storage: Produits frais → `fresh`, Produits surgelés → `frozen`, tutti gli altri → `dry`.
 
-**Regola stock:** `stock` rappresenta il numero di unità vendibili nell'unità di vendita dichiarata. ⚠️ Nessun controllo/decremento reale al checkout — è solo un cap lato client nel carrello (default 999 se non impostato), problema concreto per fresco/surgelato.
+**Regola stock:** `stock` rappresenta il numero di unità vendibili nell'unità di vendita dichiarata. **✅ Controllo e decremento reale al checkout implementati (20/07)** — vedi §2.1 e §17bis per il dettaglio del fix. Il cap lato client nel carrello resta come prima barriera UX (fail-fast prima ancora di arrivare al checkout), ma non è più l'unica protezione.
 
 **Generazione immagini AI:** pipeline Gemini a due step — Step 1 `gemini-2.5-flash` genera un prompt fotografico dettagliato; Step 2 `gemini-2.5-flash-image` genera l'immagine. SDK `@google/genai`. Upload su Supabase Storage. Architettura a tre livelli per accuratezza: tabella lookup hardcoded per prodotti critici, generazione Flash-guidata per prodotti semi-noti, template fissi per categoria per prodotti generici.
 
@@ -756,6 +761,39 @@ GOTENBERG_AUTH=...
 
 ---
 
+## 17bis. Ottimizzazione performance frontend + fix urgente stock/overselling (20 Luglio 2026)
+
+Due lavori distinti, condotti in sequenza nella stessa sessione: un audit performance con 5 prompt di implementazione (`AUDIT_PERFORMANCE_FRONTEND.md`), e — scoperto come debito già noto (§2.1/§13) ma reso urgente dall'introduzione di ISR — un fix del tutto separato per il controllo/decremento stock al checkout, mai esistito prima. **Tutto confermato caricato su `main` via GitHub web UI** (workflow diretto di Robertin).
+
+### Audit e roadmap (5 prompt)
+
+**Prompt 1 — Query mirate + fetch parallelo home.** `select('*')` → colonne esplicite su `/products` e `/products/[slug]` (mai `embedding`, `descriptions` solo dove serve). Home: loop sequenziale `for...await` sostituito con `Promise.all` per categoria. `loading.tsx` su home/catalogo/pagina prodotto (riuso dello skeleton già esistente in `ProductGrid`). Nota tecnica: PostgREST infetta un tipo strutturale più stretto quando la `select()` elenca colonne esplicite invece di `'*'` — richiede occasionalmente un cast `as unknown as X`, pattern già presente altrove nel codebase, non nuovo.
+
+**Prompt 2 — Immagini + caching.** Logo tenant `<img>` → `next/image` (header pubblico e admin), `width`/`height` come hint di aspect-ratio (il rendering reale resta governato da classi Tailwind `h-*/w-auto`, nessuna distorsione per loghi con proporzioni diverse). `next.config.mjs`: `formats: ['avif','webp']`, `minimumCacheTTL` 7 giorni. Resize server-side via `sharp` sull'upload manuale immagine prodotto (`upload-product-image`), con **cache-busting** (`?v=${Date.now()}` sull'`image_url` salvato) per evitare che il `minimumCacheTTL` lungo serva foto stale dopo un re-upload sullo stesso path. `sharp` aggiunto come dipendenza diretta (richiede `experimental.serverComponentsExternalPackages: ['sharp']` in `next.config.mjs` — nome corretto per Next.js 14.2.3, non `serverExternalPackages` che è la chiave Next.js 15). ⚠️ **Rischio segnalato e non risolto:** `tenants.logo_url` non ha vincolo di dominio — un tenant futuro con logo su un host esterno non in `images.remotePatterns` romperebbe l'header con un errore runtime "hostname not configured".
+
+**Prompt 3 — Paginazione server-side catalogo.** `PAGE_SIZE = 24`, bottone "Charger plus" con **accumulo** (non sostituzione) dei prodotti già mostrati, nuovo endpoint `GET /api/products` (route handler, coerente con lo stile del resto del codebase — nessuna Server Action nel repo). URL riflette `?page=` via `window.history.replaceState()` — **non** `router.push`/`replace` di Next.js, deliberatamente: quest'ultimo avrebbe ri-eseguito il Server Component ad ogni click (nuovo fetch Supabase ridondante), vanificando il senso dell'endpoint leggero. Nuovo file condiviso `src/lib/catalog/pagination.ts` (`PRODUCTS_PAGE_SIZE` + `buildProductsQuery()`) per evitare divergenza tra la query SSR e quella di `/api/products`. **Testato su mobile, nessun problema riscontrato.**
+
+**Prompt 4 — Client Supabase pubblico + ISR.** Nuovo `src/lib/supabase/public.ts` (senza `cookies()`) usato da `getTenant()`, home e `/products/[slug]` (`revalidate = 300`, `generateStaticParams`). **Scoperta corretta durante l'esecuzione:** il baseline originale dell'audit ("36/36 route dynamic") era un errore di conteggio — il numero reale era **44 dynamic + 1 static su 45**. Dopo il prompt: **6 statiche, 1 ISR (`/products/[slug]`), 39 dynamic** su 46 route totali (build verificata con un mock-server Supabase locale, non solo stimata). Effetto collaterale scoperto: passare `getTenant()` al client pubblico rimuoveva silenziosamente l'unico trigger di dinamismo per diverse route che non ne avevano bisogno proprio (dipendevano dal layout radice, non da sé stesse) — `force-dynamic` esplicito ripristinato dove serviva, con una nota tecnica: il marcatore non è affidabile se co-locato in un file `'use client'` insieme al componente pagina, va spostato su un layout server-side ancestor. **Scoperta critica non anticipata dal prompt:** un errore non gestito in `generateStaticParams` fa fallire l'intero `next build`, non solo quella route — mitigato con `try/catch` → fallback a ISR on-demand su `generateStaticParams` e `manifest.ts`; nessun fallback aggiunto per `/` e `/card` (nessun "tenant di riserva" onesto da mostrare — un fallimento di build durante un vero outage Supabase resta un rischio accettato, non nascosto).
+
+**Prompt 5 — Stripe lazy + cleanup.** `loadStripe()` in `CheckoutForm.tsx` era invocato a livello di modulo (bundle Stripe.js caricato anche per chi sceglie ritiro in negozio) — reso lazy (`getStripe()`, chiamato solo nel ramo `PaymentMode: 'stripe'`, verificato per lettura del codice come strutturalmente irraggiungibile dal ramo `in_store`). `select('*')` mirata su `/order-confirmation` (sia Server Component che il ramo di polling client-side in `OrderConfirmationClient.tsx`). Cache-busting applicato anche a `generate-product-image` (stesso pattern del Prompt 2). **Rate limiting su `/api/products` — deliberatamente non implementato:** nessun costo per chiamata (a differenza di `/api/search/semantic`), dati già pubblici, nessun Redis/Upstash nello stack — solo hardening di validazione input (cap superiore su `page`, lunghezza massima query di ricerca, riusando la stessa convenzione di `MAX_QUERY_LENGTH` già in `/api/search/semantic`). **Nota sui numeri di bundle:** `First Load JS` di `/checkout` e `/order-confirmation` risulta invariato nel build — atteso: `loadStripe()` non include mai il codice Stripe.js nel bundle webpack, inietta uno `<script>` esterno a runtime; il guadagno del lazy-load (una richiesta di rete + script terzi in meno per il flusso in-store) non è visibile in quella metrica.
+
+### Fix urgente — stock/overselling al checkout
+
+**Perché era urgente:** nessuna route né trigger DB verificava o decrementava mai lo stock — un cliente poteva pagare per un prodotto già esaurito, e l'introduzione di ISR (Prompt 4, `revalidate = 300`) allungava fino a 5 minuti la finestra in cui la pagina prodotto poteva mostrare "disponibile" per qualcosa che non lo era più.
+
+**Architettura reale ricostruita (diversa dall'ipotesi iniziale):** il flusso Stripe non crea mai un ordine `pending` — il carrello viene salvato in `checkout_sessions`, il `PaymentIntent` creato, e solo il webhook `payment_intent.succeeded` crea la riga `orders` + `order_items` (mai prima). Il flusso in-store (pagamento al ritiro) crea l'ordine sincronamente in `/api/checkout`, nessun gap temporale.
+
+- **Controllo pre-pagamento** in `/api/checkout` (condiviso da entrambi i flussi): stock verificato per prodotto con quantità aggregate (gestisce righe carrello duplicate), 400 con nomi prodotto se insufficiente — nessuna `checkout_session`/`PaymentIntent`/ordine creato in quel caso.
+- **Decremento atomico race-safe**: funzione PL/pgSQL, `UPDATE products SET stock = stock - qty WHERE id = pid AND stock >= qty` con `GET DIAGNOSTICS` sul row count → `RAISE EXCEPTION` se zero righe, transazionale (un fallimento su un prodotto annulla i decrementi già fatti per gli altri prodotti dello stesso ordine). Chiamato nel webhook Stripe (dopo la creazione ordine, il pagamento è già incassato) e sincronamente in `/api/checkout` per il flusso in-store (prima della creazione ordine — se fallisce, 409, nessun addebito da annullare perché non c'è mai stato).
+- **Caso limite — pagato ma stock esaurito nel frattempo** (solo possibile nel flusso Stripe, tra checkout e conferma webhook): nuovo stato `orders.status = 'stock_conflict'`, rimborso Stripe automatico (`stripe.refunds.create`, nessuna funzione di rimborso preesistente nel codebase, implementata qui), notifica admin via n8n (stesso meccanismo esistente — POST a `${N8N_WEBHOOK_URL}/webhook/order-stock-conflict`, pattern coerente con le notifiche ordine esistenti). **Nessuna notifica automatica al cliente** — testo da concordare con Dalice, deliberatamente fuori scope.
+- **Scoperta laterale durante la migration:** `ready_for_pickup` è usato attivamente in tutto il codice admin (bulk-status, filtri, dropdown) ma nessuna migration lo aveva mai aggiunto al constraint `orders.status` — doveva essere stato modificato manualmente sul DB reale, fuori da ogni migration tracciata. Un semplice `DROP + CREATE` del constraint l'avrebbe rimosso silenziosamente, rompendo quel flusso; la migration 029 lo include esplicitamente.
+
+**⚠️ Non ancora fatto:** test di race condition in staging (due checkout quasi simultanei sull'ultimo pezzo di un prodotto) — il fix è live su `main` ma verificato solo per lettura di codice, non empiricamente. Piano di test concordato ma non ancora eseguito: prodotto dedicato `stock = 1`, due tab/browser, checkout in-store quasi simultaneo (più semplice da forzare del flusso Stripe, nessuna carta reale richiesta); per il flusso Stripe, forzare il conflitto decrementando manualmente lo stock via SQL mentre un pagamento test è "in volo" tra conferma carta e arrivo webhook.
+
+**Follow-up minori non bloccanti, per un'eventuale sesta iterazione:** `StatusBadge.tsx` mostra `stock_conflict` come testo grezzo su sfondo grigio neutro (fallback esistente, non un crash — solo polish); resize di `generate-product-image` mai verificato con accesso reale all'API Gemini (nessun accesso disponibile nell'ambiente di esecuzione dei prompt finora); cache-busting non applicato a `/card/vcard` e `manifest.webmanifest` (lasciati `force-dynamic`, rischio di staleness basso e diverso in natura, candidati futuri se si vorrà renderli ISR).
+
+---
+
 ## 18. Checklist go-live
 
 | Task | Responsabile | Stato |
@@ -785,6 +823,9 @@ GOTENBERG_AUTH=...
 | Confermare quale branch è collegato al deploy Vercel di `chloefood.com` | Robertin | ⚠️ DA FARE — punto critico aperto da v3.7, nessun `vercel.json` nel repo per verificarlo da qui |
 | Comunicare a Dalice la deviazione export CSV (invece di XLSX) e il rinvio delle notifiche push | Robertin | ⚠️ DA FARE — vedi §8bis |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
+| Audit performance frontend + 5 prompt di ottimizzazione (query, immagini, paginazione, ISR, Stripe lazy) | Robertin | ✅ FATTO — confermato live su `main` (20/07), vedi §17bis |
+| Fix urgente stock/overselling al checkout (controllo pre-pagamento + decremento atomico + rimborso automatico) | Robertin | ✅ FATTO — live su `main` (20/07), vedi §17bis e §2.1 |
+| Test race condition stock in staging (verifica empirica del fix sopra) | Robertin | ⚠️ DA FARE — piano di test concordato, non ancora eseguito, vedi §17bis |
 
 ---
 
@@ -796,7 +837,7 @@ GOTENBERG_AUTH=...
 |---|---|---|---|
 | Autenticazione clienti (Supabase Auth) + pagina `/orders` storico | Contrattuale | P0 | Non avviato |
 | Enforcement `subscription_status` (blocco soft storefront tenant scaduto) | Tecnico | P0 | Non avviato — mai controllato oggi |
-| Gestione stock reale al checkout (decremento, blocco esaurito) | Tecnico | P0 | Non avviato |
+| Gestione stock reale al checkout (decremento, blocco esaurito) | Tecnico | P0 | ✅ FATTO (fix urgente 20/07) — ⚠️ test race condition in staging ancora da eseguire, vedi §17bis |
 | Sistema etichette prodotto — deploy Gotenberg su Hetzner | Tecnico | P0 | ✅ FATTO — verificato end-to-end (14/07) |
 | Draft Packlink automatico al pagamento ("effet waouhhh") | Tecnico | P1 | Non avviato |
 | `carrierName` + `serviceName` in `shipping_details` DB | Tecnico | P1 | Non avviato |
@@ -818,6 +859,11 @@ GOTENBERG_AUTH=...
 | Rate limiting su `/api/checkout` e `/api/shipping/quote` | Tecnico | P1 | Non avviato |
 | Decidere destinazione reale del CTA hero "Notre histoire" (oggi placeholder `/products`) | Contenuto/Prodotto | P1 | Non avviato — vedi §12bis |
 | Allineare `tenant.accent_light` al nuovo primary blu (coerenza visiva, non bloccante) | Tecnico | P2 | Non avviato — query pronta, vedi §12bis |
+| Notifica automatica al cliente per conflitto stock (pagato ma esaurito) — testo da concordare con Dalice | Contenuto/Prodotto | P1 | Non avviato — deliberatamente fuori scope del fix urgente, vedi §17bis |
+| Styling dedicato badge admin per stato ordine `stock_conflict` (oggi testo grezzo su grigio neutro) | Tecnico | P2 | Non avviato — cosmetico, zero rischio funzionale, vedi §17bis |
+| Verificare risoluzione reale immagini `generate-product-image` (Gemini) e applicare resize se >1600px | Tecnico | P2 | Non avviato — non verificabile senza accesso reale all'API Gemini nell'ambiente di esecuzione prompt, vedi §17bis |
+| Cache-busting su `/card/vcard` e `manifest.webmanifest` (stesso pattern già applicato alle immagini prodotto) | Tecnico | P2 | Non avviato — route lasciate `force-dynamic`, rischio di staleness basso, vedi §17bis |
+| Vincolo di dominio su `tenants.logo_url` (oggi nessun controllo — un host esterno non whitelisted romperebbe l'header) | Tecnico | P1 | Non avviato — rischio reale ma preesistente, segnalato durante l'audit performance, vedi §17bis |
 
 ### Phase 2 — Packlink draft feature (dettaglio)
 
@@ -958,4 +1004,20 @@ Nessuna modifica al resto del documento (shipping, checkout, n8n, sistema etiche
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.7 — 18 Luglio 2026 (base: v3.6; verifica indipendente su git/filesystem reale — KPI "Aujourd'hui" corretta a eseguita, nessuno dei due redesign risulta mergiato su `main`, aggiunto `AdminMobileNav.tsx` non documentato — vedi §27)*
+## 28. Changelog v3.8 (20 Luglio 2026) — audit performance frontend, 5 prompt, fix urgente stock
+
+Aggiunge il resoconto di due lavori distinti condotti in sequenza: un audit performance (`AUDIT_PERFORMANCE_FRONTEND.md`) con 5 prompt di implementazione, e un fix urgente per il controllo/decremento stock al checkout — funzionalità mai esistita prima, scoperta come debito già noto in §2.1/§13 ma resa urgente dall'introduzione di ISR nel Prompt 4. **A differenza di v3.4–v3.6 (i cui redesign non risultavano mai mergiati su `main`, vedi v3.7), questo lavoro è stato confermato da Robertin come caricato su `main`** via il consueto workflow GitHub web UI, ad ogni prompt eseguito — non c'è quindi l'incertezza branch-vs-main che ha afflitto le revisioni precedenti.
+
+- **Intestazione** — aggiunto blocco di riepilogo v3.8 sopra quello v3.7 esistente (mantenuto per continuità storica, non riscritto).
+- **§2.1** — riga "nessuna gestione stock reale al checkout" del debito residuo spostata da "non ancora corretto" a un paragrafo dedicato "✅ RISOLTO", con richiamo esplicito al test di race condition ancora da eseguire.
+- **§4** — aggiunta la migration `029_atomic_stock_decrement.sql` alla tabella, inclusa la scoperta laterale su `ready_for_pickup` mai aggiunto al constraint `orders.status` da nessuna migration precedente.
+- **§13** — "Regola stock" aggiornata da "nessun controllo/decremento reale" a "implementato", con rimando a §2.1/§17bis.
+- **§17bis** — nuova sezione, il resoconto completo di entrambi i lavori: per l'audit performance, il dettaglio dei 5 prompt (query mirate, immagini/caching, paginazione, ISR/client pubblico, Stripe lazy) con le scoperte/correzioni emerse durante l'esecuzione (baseline route dynamic corretto da 36 a 44, effetto collaterale del client pubblico su route che diventavano staticamente cacheable per errore, il bug non anticipato di `generateStaticParams` che fa fallire l'intero build); per il fix stock, l'architettura reale ricostruita (diversa dall'ipotesi iniziale), il meccanismo di decremento atomico, la gestione del caso limite pagato-ma-esaurito, e cosa resta da testare.
+- **§18** — aggiunte 3 righe: audit performance (FATTO), fix stock (FATTO), test race condition in staging (DA FARE).
+- **§19** — riga "Gestione stock reale al checkout" aggiornata da "Non avviato" a "FATTO, test pendente"; aggiunte 5 nuove voci emerse durante il lavoro (notifica cliente per conflitto stock, styling badge admin, verifica resize immagini AI, cache-busting `/card/vcard`+manifest, vincolo dominio `logo_url`).
+
+Nessuna modifica alle sezioni non toccate da questo lavoro (shipping, sistema etichette, feature IA, redesign UI/UX admin/storefront con il loro stato branch/`main` invariato) — verificate a campione, restano accurate rispetto a v3.7.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.8 — 20 Luglio 2026 (base: v3.7; audit performance frontend con 5 prompt di ottimizzazione + fix urgente stock/overselling al checkout, entrambi confermati live su `main` — test race condition in staging ancora da eseguire — vedi §17bis)*
