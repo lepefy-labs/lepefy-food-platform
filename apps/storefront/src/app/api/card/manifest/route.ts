@@ -9,16 +9,16 @@ export async function GET() {
 
   return NextResponse.json({
     id: '/card',
-    name: `${tenant.name} — Carte`,
-    short_name: tenant.name.length > 12 ? 'Carte' : `${tenant.name} Carte`,
+    name: `${tenant.name} — Carte de contact`,
+    short_name: `Carte ${tenant.name}`,
     start_url: '/card',
     scope: '/card',
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: tenant.primary_color,
     icons: [
-      { src: '/api/pwa-icon?size=192', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/api/pwa-icon?size=512', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/api/card/pwa-icon?size=192', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/api/card/pwa-icon?size=512', sizes: '512x512', type: 'image/png', purpose: 'any' },
     ],
   }, {
     headers: {
