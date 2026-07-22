@@ -37,6 +37,12 @@ export async function GET(req: NextRequest) {
   const size = clampSize(searchParams.get('size'));
   const forceDownload = searchParams.get('download') === '1';
 
+  // Opzionale: forza il colore dei moduli scuri invece del primary_color del tenant.
+  // Serve ai template etichetta con look fisso (es. "Etnico") che non possono garantire
+  // contrasto sufficiente con qualunque primary_color di tenant venga configurato.
+  const darkParam = searchParams.get('dark');
+  const darkColor = darkParam && /^[0-9a-fA-F]{6}$/.test(darkParam) ? `#${darkParam}` : tenant.primary_color;
+
   const origin = req.nextUrl.origin;
   const targetUrl = `${origin}/card`;
 
@@ -45,7 +51,7 @@ export async function GET(req: NextRequest) {
     margin: 1,
     width: size,
     color: {
-      dark: tenant.primary_color,
+      dark: darkColor,
       light: '#ffffff',
     },
   };
