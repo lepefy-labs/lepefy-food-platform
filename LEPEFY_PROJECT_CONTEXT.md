@@ -1,6 +1,9 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
+> Aggiornato: 23 Luglio 2026 (v3.11) — toggle FR/IT spostato dall'header globale alla scheda descrizione prodotto, titolo prodotto localizzato via `name_alt` (già esistente, finora usato solo dall'editor etichette), nuova sezione "Produits similaires" nella pagina prodotto: similarità semantica come metodo primario (riuso `match_products`/embedding già calcolato, zero chiamate Gemini aggiuntive), repli su categoria, prodotti esauriti esclusi del tutto dal pool. Nessuna migrazione DB. Confermato funzionante da Robertin in chat — nessuna verifica indipendente contro git/filesystem in questa sessione (come v3.8/v3.9). Dettaglio in §12bis (Fase 4) e §13bis. Revisione precedente (v3.10) sotto.
+> Aggiornato: 21 Luglio 2026 (v3.10) — chiusura ciclo barcode/full-bleed: migration 031 applicata al DB, PDF reale Gotenberg testato, prompt split tabella nutrizionale eseguito e testato. Rimossa la voce GS1 ufficiale dalla roadmap (curiosità di Robertin, non un'esigenza reale — non perseguita). Dettaglio in §29. Revisione precedente (v3.9) sotto.
+> Aggiornato: 21 Luglio 2026 (v3.9) — ciclo "Sistema barcode + fix layout etichetta full-bleed": barcode EAN-13 interno multi-tenant (migration 031, **non ancora applicata al DB**), QR mancante aggiunto al template full-bleed, barcode+QR impilati in basso a destra, shrink-to-fit contro il taglio silenzioso di contenuto, split tabella nutrizionale a due colonne (**prompt scritto, esecuzione non ancora confermata**). Dettaglio in §28. Revisione basata sullo stato riportato in chat in questa sessione — nessuna verifica indipendente contro git/filesystem (a differenza di v3.7). Revisione precedente (v3.8) sotto.
 > Aggiornato: 21 Luglio 2026 (v3.8) — ciclo "Digital card evolution": metodi di pagamento, self-service settings tenant, poster stampabile A5, loghi social a colori, shortcut home screen dedicato a `/card`, fix resize icona PWA. Dettaglio in §27bis. Revisione precedente (v3.7) sotto.
 > Aggiornato: 18 Luglio 2026 (v3.7) — **verifica indipendente contro git/filesystem reale** (branch `claude/update-lepefy-project-context-fke5jo`), non solo stato riportato in chat. Due correzioni rilevanti rispetto a v3.6: (1) la **KPI "Aujourd'hui"**, segnalata come "prompt scritto ma non eseguito", **risulta invece già eseguita** nel codice (`admin/(protected)/page.tsx`) — il commit che l'ha implementata precede cronologicamente quello che ha scritto v3.6, semplicemente lo stato in chat non era stato aggiornato di conseguenza; (2) **`main` non contiene né il redesign admin (Fase 0–4, §8bis) né il redesign storefront (§12bis)** — `git merge-base main HEAD` coincide con la punta di `main` stessa (ultimo commit 16/07 alle 11:47): **tutto** il lavoro di entrambi gli audit (storefront 16–17/07, admin 17–18/07) esiste solo su questo branch, mai mergiato. La precedente affermazione "branch pushato e mergiato su `main`" (§12bis/§25, v3.4–v3.6) **non è supportata dallo stato reale del repository** — verificato anche puntualmente: `ShopTag.tsx` non esiste su `main`, e `BottomNav.tsx` su `main` contiene ancora l'hex hardcoded `#1D9E75`. Non è verificabile da qui se Vercel effettivamente deploya da `main` o da questo branch (nessun `vercel.json` nel repo) — **da confermare con Robertin prima di dare per assodato lo stato di produzione**. Scoperta anche una funzionalità non documentata: `AdminMobileNav.tsx`, un drawer di navigazione mobile per l'admin (vedi §8bis). Base di questa revisione: v3.6, con le correzioni sopra.
 
@@ -191,9 +194,9 @@ lepefy-food-platform/
 
 | Tabella | Descrizione |
 |---|---|
-| `tenants` | Un record per boutique. Colori, slug, Stripe account, `shipping_provider`, `show_powered_by`, `ai_image_generation`, `whatsapp_number`, `catalogue_search_threshold`, campi billing, **`locales`** (lingue attive, prima = default), **`ai_description_generation`**, **`ai_semantic_search`**, **`ai_rate_limit_public_per_minute`/`ai_rate_limit_public_per_day`/`ai_rate_limit_admin_per_day`** |
+| `tenants` | Un record per boutique. Colori, slug, Stripe account, `shipping_provider`, `show_powered_by`, `ai_image_generation`, `whatsapp_number`, `catalogue_search_threshold`, campi billing, **`locales`** (lingue attive, prima = default), **`ai_description_generation`**, **`ai_semantic_search`**, **`ai_rate_limit_public_per_minute`/`ai_rate_limit_public_per_day`/`ai_rate_limit_admin_per_day`**, **`barcode_prefix`** (3 cifre, assegnate automaticamente da trigger alla creazione tenant, mai a mano — vedi §16bis), **`barcode_sequence`** (contatore atomico) |
 | `categories` | Categorie prodotti per tenant (con supporto background per etichette) |
-| `products` | Prodotti — `storage_type` (dry/fresh/frozen), `weight_grams`, `position`, `warehouse_location`, `name_alt`, `producer_id`/`importer_id`, campi etichetta (ingredienti, allergeni, nutrizione, paese origine), **`descriptions`** jsonb multilingue (`{"fr":"...","it":"..."}`), **`description_source`** (`ai`/`human`), **`embedding`** vector(768) per ricerca semantica |
+| `products` | Prodotti — `storage_type` (dry/fresh/frozen), `weight_grams`, `position`, `warehouse_location`, `name_alt` (⚠️ dal 23/07 letto anche dal titolo prodotto storefront, non più solo dall'editor etichette — vedi §12bis Fase 4), `producer_id`/`importer_id`, campi etichetta (ingredienti, allergeni, nutrizione, paese origine), **`descriptions`** jsonb multilingue (`{"fr":"...","it":"..."}`), **`description_source`** (`ai`/`human`), **`embedding`** vector(768) per ricerca semantica (dal 23/07 riusato anche per i prodotti correlati, vedi §12bis Fase 4), **`barcode_value`** (EAN-13 a 13 cifre, generato internamente, unique a livello piattaforma), **`barcode_generated_at`** — vedi §16bis |
 | `ai_pricing` | Listino prezzi AI configurabile — `provider` (`gemini`, futuro `anthropic`), `model`, prezzi input/output/immagine per milione token, `currency`. Aggiornato via SQL quando i provider cambiano prezzo, mai hardcoded nel codice |
 | `ai_usage_log` | Log per-chiamata di ogni richiesta AI (tutte le route, admin e pubbliche) — token input/output, immagini generate, `estimated_cost_usd` calcolato dai prezzi correnti in `ai_pricing`, `status` (`success`/`error`/`rate_limited`). Base sia per il rate limiting (query su finestra temporale) sia per il cruscotto costi (vista `ai_usage_monthly_by_tenant`) |
 | `orders` | Ordini creati SOLO dopo `payment_intent.succeeded` webhook; indice unico su `stripe_payment_intent_id` (idempotenza) |
@@ -249,6 +252,9 @@ lepefy-food-platform/
 | `026_ai_descriptions.sql` | `products.descriptions` jsonb + `products.description_source` (`ai`/`human`) + configurazione lingue tenant |
 | `027_ai_rate_limiting_cost_tracking.sql` | Tabelle `ai_pricing` (listino prezzi per provider/model) e `ai_usage_log` (log per-chiamata) + funzione `check_ai_rate_limit` + vista `ai_usage_monthly_by_tenant` |
 | `028_semantic_search.sql` | Estensione `vector`; `products.embedding` vector(768); indice HNSW cosine; funzione `match_products` |
+| `029_atomic_stock_decrement.sql` | Decremento stock atomico con rollback transazionale post-pagamento (fix urgente overselling) — *riga aggiunta per coerenza numerica in questa revisione, contenuto da lavoro precedente non riverificato in questa sessione* |
+| `030_payment_methods.sql` | `tenant_payment_methods` — vedi §27bis — *riga aggiunta per coerenza numerica in questa revisione, contenuto da lavoro precedente non riverificato in questa sessione* |
+| `031_barcode_system.sql` | Sistema barcode EAN-13 interno: `tenants.barcode_prefix`/`barcode_sequence`, trigger `assign_tenant_barcode_prefix` (assegna il prefisso alla creazione tenant), funzione `next_product_barcode()` (generazione atomica + checksum), `products.barcode_value`/`barcode_generated_at`, backfill dei 121 prodotti chloefood esistenti — **✅ applicata al DB, PDF reale testato**, vedi §16bis |
 
 **Non esistono file 005 e 012** — non sono stati saltati per errore, la numerazione riflette semplicemente collisioni risolte con suffissi (003b/003c) o rinomina all'atto della scrittura, come documentato nei commenti di intestazione di `018` e `023`.
 
@@ -588,12 +594,28 @@ UPDATE tenants SET primary_color = '#1267C7' WHERE slug = 'chloefood';
 -- UPDATE tenants SET accent_light = '#E3EFFB' WHERE slug = 'chloefood';
 ```
 
+### Fase 4 — localizzazione titolo/descrizione + prodotti correlati semantici (23/07) — ✅ eseguito, confermato da Robertin in chat
+
+Come per gli altri cicli post-audit di questa sezione, lo stato sotto riflette il report di Robertin ("Fatto e tutto ok"), non una verifica indipendente contro git/filesystem come in v3.7.
+
+- **Toggle lingua FR/IT spostato**: non più nell'header globale (`Header.tsx`), ora renderizzato accanto alla descrizione prodotto (`ProductDescription.tsx`). Stesso store Zustand persistito (`localeStore.ts`) di prima — solo il punto di render è cambiato, quindi la preferenza lingua resta condivisa tra titolo e descrizione e sopravvive alla navigazione tra prodotti
+- **Titolo prodotto localizzato** (`ProductTitle.tsx`, nuovo componente): usa `products.name_alt` (campo già esistente, finora consumato solo dall'editor etichette admin) quando la lingua attiva ≠ lingua di default del tenant, altrimenti `name`. ⚠️ Limite noto e accettato: `name_alt` è un campo singolo, non jsonb multilingua come `descriptions` — funziona per un tenant a 2 lingue (caso attuale ChloeFood), andrebbe esteso a jsonb per un tenant futuro a 3+ lingue
+- **Nuova sezione "Produits similaires"** sotto la scheda prodotto (`RelatedProducts.tsx`, riusa `ProductCard` esistente, variant `shelf`):
+  - metodo primario: similarità semantica via la funzione RPC `match_products` (la stessa della ricerca semantica, §13bis), usando l'embedding già calcolato del prodotto corrente come query — **zero chiamate Gemini aggiuntive**
+  - repli su categoria (`category_id`) quando il tenant non ha `ai_semantic_search` attivo, il prodotto non ha ancora un embedding, o i risultati semantici non bastano a riempire il limite (8)
+  - prodotti esauriti **esclusi del tutto** dal pool dei correlati (non solo deprioritizzati) — su un catalogo di 121 prodotti uno slot sprecato su un prodotto non acquistabile ha un costo reale
+  - l'embedding del prodotto (vector(768)) viene recuperato con una query separata e **non transita mai** nel payload React inviato al client, per non appesantire inutilmente l'RSC payload
+- File toccati: `Header.tsx` (rimosso toggle), `ProductDescription.tsx` (aggiunto toggle), `ProductTitle.tsx` (nuovo), `RelatedProducts.tsx` (nuovo), `products/[slug]/page.tsx` (query correlati + select `name_alt`/`category_id`), `packages/types/product.ts` (aggiunto `name_alt` all'interfaccia `Product`)
+- Punto tecnico che era segnalato come il rischio principale nel prompt di esecuzione: il valore restituito da Supabase per la colonna `embedding` (vector(768)) è stato accettato correttamente come parametro `query_embedding` della RPC `match_products`, nessuna conversione manuale necessaria — confermato su preview
+- **Nessuna migrazione DB** — riusa `products.name_alt`, `products.embedding` e `match_products` già esistenti (migration 026 e 028)
+
 ### Cosa resta aperto
 
 - **CTA "Notre histoire"** senza destinazione reale (punta a `/products`) — decisione di prodotto spostata in roadmap, §19
 - `tenant.accent_light` non aggiornato in coerenza col nuovo blu (non bloccante, vedi §2)
 - Copy H1/sottotitolo hero restano stringhe FR fisse uguali per ogni tenant (preesistente, non introdotto né risolto da questo audit)
 - Nessun campo prodotto per una vera "origine/provenienza" (usato `storage_type` + `weight_grams` come miglior proxy reale disponibile)
+- `name_alt` come campo singolo (non jsonb) limita la localizzazione del titolo a 2 lingue — vedi Fase 4 sopra
 
 ---
 
@@ -620,7 +642,7 @@ Tre feature sviluppate in sequenza (luglio 2026), tutte **✅ completate e in pr
 - `products.descriptions` jsonb (`{"fr": "...", "it": "..."}`), chiavi determinate da `tenants.locales` (mai lingue hardcoded nel codice)
 - Route `POST /api/admin/generate-product-description`: una chiamata `gemini-2.5-flash` (`responseMimeType: 'application/json'`, `maxOutputTokens: 4096`, `thinkingConfig: { thinkingBudget: 0 }`) genera tutte le lingue del tenant in un colpo solo. Guardrail esplicito nel prompt: mai allergeni, claim nutrizionali/salutistici, origine non fornita — solo descrizione sensoriale/culturale/d'uso. La route non scrive in DB: propone, il salvataggio dal form conferma
 - UI in `ProductEditClient.tsx`: due textarea (una per locale), bottone "✨ Générer avec IA", badge `IA` + filtro "Descriptions à revoir" in `CatalogueTable.tsx` quando `description_source = 'ai'`
-- Toggle lingua `FR | IT` nello storefront (si nasconde da solo se il tenant è monolingua), store Zustand con persist
+- Toggle lingua `FR | IT` nello storefront (si nasconde da solo se il tenant è monolingua), store Zustand con persist — **dal 23/07 renderizzato accanto alla descrizione prodotto invece che nell'header globale**, e il titolo prodotto si localizza in coppia con la descrizione via `name_alt`; vedi §12bis Fase 4
 - Script batch `scripts/generate-product-descriptions.mjs` + workflow `generate-product-descriptions.yml`: batch completo sui 121 prodotti eseguito con successo
 
 **Bug risolti durante lo sviluppo (lezioni utili per i prossimi script batch AI):**
@@ -646,6 +668,7 @@ Tre feature sviluppate in sequenza (luglio 2026), tutte **✅ completate e in pr
 - Route pubblica `GET /api/search/semantic`: rate limit applicato PRIMA della chiamata embedding (vedi sopra); se bloccata o fallita, degradazione silenziosa — il cliente non vede mai un errore di rate limit
 - **Ricerca ibrida a cascata** in `CatalogClient.tsx`: la ricerca testuale `ilike` esistente resta invariata e parte per prima; solo se restituisce meno di 3 risultati scatta la chiamata semantica, mostrata sotto un'intestazione "Résultats similaires" — risolve casi come "fufu" che non matcha testualmente "Farine de manioc" ma è semanticamente vicino
 - Script batch `scripts/generate-product-embeddings.mjs` + workflow `generate-product-embeddings.yml`: batch completo sui 121 prodotti eseguito con successo (stesse fix preventive su skip-filter/logging del punto precedente, applicate fin dall'inizio)
+- **Dal 23/07, `match_products` è riusata anche per i "Produits similaires"** nella scheda prodotto (`query_embedding` = embedding del prodotto corrente invece che di una ricerca testuale utente) — zero chiamate Gemini aggiuntive, vedi §12bis Fase 4
 
 ### Costi AI — ordine di grandezza verificato
 
@@ -705,7 +728,7 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 
 - **Modello legale a tre livelli:** produttore → importatore → distributore/tenant (tabelle `producers`, `importers`), dati produttore a livello prodotto
 - **Output:** PDF per tipografo, layout N-up su A4 (dimensione etichetta configurabile), generato da `lib/labels/gotenberg.ts` → `htmlToPdf()` chiama realmente `${GOTENBERG_URL}/forms/chromium/convert/html`
-- **Tre template** (`templates/`, selezionabili in `LabelJobEditorClient.tsx`): `default.tsx` ("Classico", due colonne, stile origine implementato), `fullbleed.tsx` (sfondo a piena pagina — ⚠️ lo stile bandiera/origine **non** è implementato qui, solo testo semplice "Origine: ...") e `banner.tsx` ("Fascia Dorata" — fascia logo a tutta larghezza, nutrizione a sinistra/nome al centro/foto a destra, stile origine implementato come in `default.tsx`)
+- **Tre template** (`templates/`, selezionabili in `LabelJobEditorClient.tsx`): `default.tsx` ("Classico", due colonne, stile origine implementato), `fullbleed.tsx` (sfondo a piena pagina — ⚠️ lo stile bandiera/origine **non** è implementato qui, solo testo semplice "Origine: ..."; vedi §16bis per i fix layout recenti: QR aggiunto, barcode ripristinato in verticale, shrink-to-fit, tabella nutrizionale a due colonne) e `banner.tsx` ("Fascia Dorata" — fascia logo a tutta larghezza, nutrizione a sinistra/nome al centro/foto a destra, stile origine implementato come in `default.tsx`)
 - **Tre palette colore** (`lib/labels/palettes.ts`): `verde_palma`, `blu_epices` (default), `terra_piccante` — ciascuna con primary/secondary/accent/ambient + helper per sfondi sfumati e strip decorativo "kente"
 - **Bandiere origine disegnate a mano** (`originFlags.tsx`, SVG per 9 paesi: Camerun, Senegal, Ghana, Nigeria, Costa d'Avorio, Mali, Guinea, Ciad, Etiopia) — scelta deliberata al posto delle emoji per evitare problemi di rendering colore-font in Chromium headless (Gotenberg)
 - **Stile origine configurabile:** `pill` / `block` / `medallion` (`origin_style`, migration 025)
@@ -736,6 +759,39 @@ Sistema per generare e stampare etichette prodotto (formato tipografico, non bro
 **Esclusi sempre dall'IA:** valori nutrizionali, allergeni, dati legali produttore/importatore, lotto/date — mai dedotti o generati, sempre campo esplicito con default sicuro. Nessun output IA su questi campi pubblicato senza conferma umana esplicita.
 
 **Priorità attuale:** con il sistema base ormai maturo (multi-template/palette/origin-style, workflow draft/ristampa) e Gotenberg confermato funzionante end-to-end (deploy live verificato, vedi sopra), il blocco residuo è **non tecnico**: verifica dei dati nutrizionali (in particolare Bobolo, valori sospetti — probabile scambio con la scheda Foufou nell'Excel originale) e del lotto/data prima della stampa fisica reale — competenza di ChloeFood nelle proprie verifiche interne, non un task di sviluppo.
+
+---
+
+## 16bis. Sistema barcode (EAN-13 interno, multi-tenant) — ✅ migration applicata, PDF testato
+
+Richiesta di Dalice: barcode su ogni etichetta prodotto, uso duplice fin da subito (cassa/POS in negozio + gestione magazzino/picking). Decisione presa con Robertin: i prodotti non hanno mai un codice reale del produttore da riusare → **generazione sempre interna**.
+
+### Formato e architettura
+- **EAN-13 "GS1 restricted circulation"**: `20` (range riservato GS1 all'uso interno) + 3 cifre prefisso tenant + 7 cifre sequenza prodotto + 1 check digit — 13 cifre totali, checksum standard mod-10, letto correttamente da qualunque scanner ma **non un vero codice GS1 registrato** (non compare in database pubblici tipo Amazon/GS1 Data Source).
+- **Non è un codice hardcoded**: il prefisso a 3 cifre è assegnato automaticamente da un trigger DB (`assign_tenant_barcode_prefix`, migration 031) alla creazione di ogni tenant — mai impostato a mano, mai in codice applicativo. Fino a 1000 tenant supportati con 3 cifre.
+- **Univocità a livello di piattaforma**, non solo di tenant — `products.barcode_value` con `unique` globale, a prova di futuro anche se due tenant condividessero magazzino/scanner.
+- Generazione **automatica alla creazione di ogni prodotto** (`POST /api/admin/catalogue`), non bloccante — se fallisce il prodotto si crea comunque, il barcode si rigenera dal bottone admin.
+- Rendering su etichetta: `bwip-js` (pura JS, nessun binario nativo, compatibile Vercel serverless) → SVG iniettato nei template.
+- `formatBarcodeDisplay`/`renderBarcodeSVG`/`assignBarcodeToProduct` in `apps/storefront/src/lib/barcode.ts`. **Deviazione emersa in esecuzione:** `formatBarcodeDisplay` vive in un modulo separato `barcodeFormat.ts` (ri-esportato da `barcode.ts`, contratto pubblico invariato) — `bwip-js` con `moduleResolution: "bundler"` risolve solo via subpath `bwip-js/node`, che importa moduli Node (`url`/`zlib`/`stream`); importarlo da un Client Component (`ProductEditClient`) avrebbe rotto il bundle browser.
+- UI admin: campo "Code-barres" nel tab Général di `ProductEditClient.tsx` (sola visualizzazione + bottone "Régénérer", con conferma se esiste già un barcode — non su prodotto nuovo senza codice, nulla da disallineare in quel caso). Ricerca per barcode integrata nel filtro esistente di `/admin/catalogue` (uno scanner USB/Bluetooth funziona già cliccando sul campo ricerca, si comporta come tastiera).
+
+### Barcode "ufficiale" (GS1) — valutato, non perseguito
+Discusso con Robertin se servisse un codice riconosciuto pubblicamente (marketplace/distribuzione terzi) invece del solo range interno — chiarito che era **curiosità di Robertin, non un'esigenza reale del progetto**. Non perseguito, nessuna azione richiesta. Se dovesse servire in futuro, l'architettura resta comunque pronta al cambio (basta sostituire il prefisso interno generato dal trigger con quello reale assegnato da GS1).
+
+### Fix layout template full-bleed (stesso ciclo, prompt separati)
+Partiti da uno screenshot di Robertin: il pannello info a destra (nome/nutrizione/ingredienti/allergeni/uso/conservazione/peso/lotto/scadenza) aveva altezza fissa con `overflow: hidden` "cieco" — contenuto lungo tagliato silenziosamente invece di adattarsi, bug preesistente indipendente dal barcode ma reso più visibile da esso.
+
+1. **QR mancante aggiunto** — `default.tsx` e `banner.tsx` avevano già il QR verso `/card` (`<img src=".../api/card/qr-code?format=png&size=200">`), `fullbleed.tsx` no. Aggiunto con lo stesso pattern.
+2. **Barcode ripristinato**: da riga a piena larghezza nel pannello legale a stack verticale compatto (barcode ~14mm sopra, QR ~8mm sotto) in basso a destra — libera spazio verticale. **Confermato via screenshot funzionante.**
+3. **Shrink-to-fit**: contenuto del pannello info avvolto in un wrapper scalabile; script iniettato nell'HTML (eseguito da Chromium reale prima della cattura Gotenberg) misura `scrollHeight` vs spazio disponibile e riduce la scala in step del 5% fino a un pavimento del 75% (sotto quella soglia il testo diventerebbe non conforme al Reg. 1169/2011 — se un prodotto tocca il pavimento e resta tagliato, è segnale che serve un formato etichetta fisico più grande per quel prodotto specifico, non altro testo compresso). **Confermato via screenshot: entrata in gioco solo quando serve.**
+4. **Tabella nutrizionale a due colonne** (richiesta di Robertin dopo aver visto che con tutti e 9 i valori compilati la tabella singola spingeva fuori altro contenuto): split in colonna sinistra (energia + grassi, 4 righe) e destra (carboidrati + fibre/proteine/sale, 5 righe) sotto un'unica intestazione — dimezza l'ingombro verticale. Etichette senza traduzione inglese in questa versione compatta (l'italiano da solo è legalmente sufficiente per la dichiarazione nutrizionale). **✅ Eseguito e testato (confermato da Robertin).**
+
+### Stato — ciclo chiuso
+1. ✅ Migration 031 applicata al DB reale.
+2. ✅ PDF reale generato da Gotenberg testato (non solo preview HTML).
+3. ✅ Split tabella nutrizionale eseguito e testato.
+4. GS1 ufficiale — non perseguito, era solo curiosità (vedi sopra).
+5. Resta aperto solo: comunicare a Dalice che il barcode è generato internamente (non un vero codice prodotto pubblico) — utile per evitare sorprese se lo scansiona con lo smartphone senza trovare nulla online. Non bloccante.
 
 ---
 
@@ -808,6 +864,11 @@ GOTENBERG_AUTH=...
 | Confermare quale branch è collegato al deploy Vercel di `chloefood.com` | Robertin | ⚠️ DA FARE — punto critico aperto da v3.7, nessun `vercel.json` nel repo per verificarlo da qui |
 | Comunicare a Dalice la deviazione export CSV (invece di XLSX) e il rinvio delle notifiche push | Robertin | ⚠️ DA FARE — vedi §8bis |
 | Completare contratto SaaS (dati fiscali, foro, DPA) | Robertin | ⚠️ DA FARE |
+| Applicare migration 031 sistema barcode (`supabase db push`) + verificare 0 prodotti senza barcode/0 duplicati | Robertin | ✅ FATTO |
+| Verifica visiva PDF reale Gotenberg per layout full-bleed (barcode+QR+nutrizione due colonne) | Robertin | ✅ FATTO |
+| Eseguire prompt split tabella nutrizionale a due colonne (template full-bleed) | Robertin | ✅ FATTO — eseguito e testato |
+| Comunicare a Dalice che il barcode è generato internamente (non un vero codice GS1 pubblico) | Robertin | ⚠️ DA FARE |
+| Toggle lingua a livello descrizione, titolo prodotto localizzato, prodotti correlati semantici | Robertin | ✅ FATTO — vedi §12bis Fase 4 |
 
 ---
 
@@ -894,6 +955,7 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 | `Mockup_Fase3_Validazione_UIUX.html` | Mockup interattivo di validazione Fase 3 (toggle colore verde/blu, toggle font Bricolage/Fraunces) — allegato di sessione, non versionato nel repo; decisioni approvate implementate in `apps/storefront`, vedi §12bis |
 | `AUDIT_ADMIN_UIUX.md` | Audit UI/UX del pannello admin (17/07) — origine del redesign Fase 0–4, allegato di sessione, non versionato nel repo; vedi §8bis |
 | `admincommandesredesign.html` | Mockup interattivo di validazione redesign admin (tabella responsive, dark mode, bulk bar) — allegato di sessione, non versionato nel repo; decisioni approvate implementate parzialmente (righe espandibili mantenute contro il mockup, vedi §8bis) |
+| `ClaudeCode_Prompt_ProductLocaleToggle_RelatedProducts.md` | Prompt Claude Code per toggle lingua a livello descrizione, titolo prodotto localizzato (`name_alt`) e prodotti correlati semantici (file esterno, non nel repo) — vedi §12bis Fase 4 |
 
 ---
 
@@ -995,4 +1057,45 @@ Nessuna modifica alle sezioni relative a shipping, checkout, admin dashboard (§
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.8 — 21 Luglio 2026 (base: v3.7; ciclo "Digital card evolution" — metodi di pagamento, self-service settings tenant, poster A5, loghi social a colori, shortcut home screen `/card`, fix resize icona PWA — vedi §27bis per il dettaglio e per cosa resta da verificare live)*
+## 28. Changelog v3.9 (21 Luglio 2026) — ciclo "Sistema barcode + fix layout etichetta full-bleed"
+
+Come v3.8, questa revisione documenta lo stato riportato in chat in questa sessione (report di esecuzione di Claude Code + screenshot di verifica di Robertin), **non** una verifica indipendente contro git/filesystem come v3.7 — vale la stessa cautela su "riportato" vs "confermato" ovunque segnalato.
+
+- **§4** — aggiunte le colonne `tenants.barcode_prefix`/`barcode_sequence` e `products.barcode_value`/`barcode_generated_at` allo schema; aggiunte le migration `029_atomic_stock_decrement.sql` e `030_payment_methods.sql` alla tabella per colmare il salto numerico 028→031 (contenuto da lavoro precedente non riverificato in questa sessione, riportato per coerenza) e la nuova `031_barcode_system.sql` (contenuto verificato in questa sessione — typecheck pulito, checksum controllato a mano — **ma non ancora applicata al DB reale**).
+- **§16** — nota aggiornata sul template `fullbleed.tsx`: non più solo "origine non implementata", ora rimanda a §16bis per i fix recenti (QR, barcode, shrink-to-fit, tabella nutrizionale).
+- **§16bis** — nuova sezione: sistema barcode EAN-13 interno multi-tenant (formato, generazione automatica, deviazioni emerse in esecuzione), valutazione GS1 ufficiale non implementata (in attesa di risposta di Dalice su marketplace/wholesale), e i tre fix successivi al template full-bleed (QR mancante, barcode+QR impilati, shrink-to-fit, split tabella nutrizionale — quest'ultimo scritto ma non ancora eseguito). Elenco esplicito di cosa resta da verificare prima di chiudere il ciclo.
+- **§18** — aggiunte quattro righe: apply migration 031, verifica visiva PDF reale Gotenberg, esecuzione prompt split nutrizionale, comunicazione a Dalice sulla natura interna del barcode.
+- **§19** — aggiunta la voce "Registrazione GS1 Italy ufficiale" (P2, condizionata a una decisione di Dalice non ancora raccolta).
+
+Nessuna modifica alle sezioni non toccate da questo aggiornamento (shipping, checkout, n8n, admin dashboard, storefront, catalogo, IA, digital card) rispetto a v3.8 — non riverificate in questa sessione, restano quanto documentato in precedenza.
+
+---
+
+## 29. Changelog v3.10 (21 Luglio 2026) — chiusura ciclo barcode/full-bleed
+
+Chiusura dei punti aperti lasciati da v3.9, confermati da Robertin in chat (nessuna verifica indipendente contro git/filesystem in questa sessione).
+
+- **§4** — migration 031 segnata applicata al DB.
+- **§16bis** — titolo sezione aggiornato a "✅ migration applicata, PDF testato"; blocco GS1 riscritto: era curiosità di Robertin, non un'esigenza del progetto, **non perseguito** (nessuna voce roadmap residua); blocco fix full-bleed punto 4 (split nutrizionale) segnato eseguito e testato; elenco "cosa resta da verificare" sostituito da elenco "stato — ciclo chiuso", con un solo punto ancora aperto (comunicazione a Dalice sulla natura interna del barcode, non bloccante).
+- **§18** — tre righe segnate FATTO (migration applicata, PDF testato, split nutrizionale eseguito).
+- **§19** — rimossa la voce "Registrazione GS1 Italy ufficiale" — su richiesta esplicita di Robertin, non era un'esigenza reale.
+
+Nessuna modifica alle sezioni non toccate da questo aggiornamento rispetto a v3.9.
+
+---
+
+## 30. Changelog v3.11 (23 Luglio 2026) — localizzazione titolo prodotto + prodotti correlati semantici
+
+Come v3.8/v3.9, questa revisione documenta lo stato riportato in chat da Robertin ("Fatto e tutto ok"), non una verifica indipendente contro git/filesystem come v3.7.
+
+- **§4** — nota aggiunta alla riga `products`: `name_alt` è oggi consumato anche dal titolo prodotto storefront, non solo dall'editor etichette admin; `embedding` è oggi riusato anche per i prodotti correlati.
+- **§12bis** — nuova sottosezione "Fase 4": toggle FR/IT spostato dall'header globale alla scheda descrizione, titolo prodotto localizzato via `name_alt`, nuova sezione "Produits similaires" con similarità semantica come metodo primario (riuso `match_products`/embedding esistente, zero costo Gemini aggiuntivo) e repli su categoria, prodotti esauriti esclusi del tutto dal pool dei correlati. Nessuna migrazione DB — riusa solo oggetti già esistenti (migration 026, 028). Aggiunta anche una riga in "Cosa resta aperto" sul limite di `name_alt` a 2 lingue.
+- **§13bis** — bullet "Toggle lingua FR|IT" aggiornato per riflettere lo spostamento a livello descrizione; aggiunta menzione del riuso di `match_products` per i correlati nella sottosezione ricerca semantica.
+- **§18** — aggiunta una riga FATTO per il ciclo.
+- **§21** — aggiunto il prompt `ClaudeCode_Prompt_ProductLocaleToggle_RelatedProducts.md` all'elenco dei documenti di riferimento.
+
+Nessuna modifica alle sezioni non toccate da questo aggiornamento (shipping, checkout, n8n, admin dashboard, sistema etichette/barcode, digital card) rispetto a v3.10.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.11 — 23 Luglio 2026 (base: v3.10; toggle lingua spostato a livello descrizione, titolo prodotto localizzato via `name_alt`, nuova sezione prodotti correlati con similarità semantica e repli su categoria — nessuna migrazione DB, vedi §30 e §12bis Fase 4 per il dettaglio)*
