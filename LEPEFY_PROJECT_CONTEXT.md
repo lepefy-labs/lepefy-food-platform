@@ -1,7 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
-> Aggiornato: 23 Luglio 2026 (v3.11) — toggle FR/IT spostato dall'header globale alla scheda descrizione prodotto, titolo prodotto localizzato via `name_alt` (già esistente, finora usato solo dall'editor etichette), nuova sezione "Produits similaires" nella pagina prodotto: similarità semantica come metodo primario (riuso `match_products`/embedding già calcolato, zero chiamate Gemini aggiuntive), repli su categoria, prodotti esauriti esclusi del tutto dal pool. Nessuna migrazione DB. Confermato funzionante da Robertin in chat — nessuna verifica indipendente contro git/filesystem in questa sessione (come v3.8/v3.9). Dettaglio in §12bis (Fase 4) e §13bis. Revisione precedente (v3.10) sotto.
+> Aggiornato: 23 Luglio 2026 (v3.12) — **verifica indipendente contro git/filesystem reale** (branch `claude/storefront-lang-toggle-related-11741t`, stesso branch su cui sono stati scritti sia il ciclo v3.11 sia il chatbox sotto). Nuova feature **Chatbox IA pubblica** (fasi 1+2): widget storefront con ricerca semantica su prodotti + knowledge base culturale curata a mano, filtro small-talk a costo zero, gated dietro `tenants.ai_chatbox_enabled` (default `false`, nessun tenant abilitato automaticamente). Scritta e verificata (typecheck) in questa sessione — non solo riportata in chat. **Scoperta operativa rilevante:** `git fetch origin main` mostra che Robertin ha già applicato entrambi gli zip di consegna direttamente su `main` (4 commit "Add files via upload", 24/07), quindi il codice chatbox **è già su `main`**, non solo su questo branch — confermato con `git diff HEAD origin/main` (zero differenze di codice, solo questo documento). Non verificabile da qui se le migration SQL 032/033 siano state eseguite su Supabase (nessuna riga chatbox esisterebbe finché non lo sono) — vedi §13ter e §18. Dettaglio completo in §13ter (nuova sezione). Revisione precedente (v3.11) sotto.
 > Aggiornato: 21 Luglio 2026 (v3.10) — chiusura ciclo barcode/full-bleed: migration 031 applicata al DB, PDF reale Gotenberg testato, prompt split tabella nutrizionale eseguito e testato. Rimossa la voce GS1 ufficiale dalla roadmap (curiosità di Robertin, non un'esigenza reale — non perseguita). Dettaglio in §29. Revisione precedente (v3.9) sotto.
 > Aggiornato: 21 Luglio 2026 (v3.9) — ciclo "Sistema barcode + fix layout etichetta full-bleed": barcode EAN-13 interno multi-tenant (migration 031, **non ancora applicata al DB**), QR mancante aggiunto al template full-bleed, barcode+QR impilati in basso a destra, shrink-to-fit contro il taglio silenzioso di contenuto, split tabella nutrizionale a due colonne (**prompt scritto, esecuzione non ancora confermata**). Dettaglio in §28. Revisione basata sullo stato riportato in chat in questa sessione — nessuna verifica indipendente contro git/filesystem (a differenza di v3.7). Revisione precedente (v3.8) sotto.
 > Aggiornato: 21 Luglio 2026 (v3.8) — ciclo "Digital card evolution": metodi di pagamento, self-service settings tenant, poster stampabile A5, loghi social a colori, shortcut home screen dedicato a `/card`, fix resize icona PWA. Dettaglio in §27bis. Revisione precedente (v3.7) sotto.
@@ -91,6 +91,7 @@ lepefy-food-platform/
 │       │   │   ├── (shop)/            # Layout storefront pubblico
 │       │   │   │   ├── page.tsx       # Homepage (bottom nav, hero compatto, scroll orizzontale per categoria)
 │       │   │   │   ├── products/      # Catalogo con ricerca real-time debounced (URL params)
+│       │   │   │   ├── products/[slug]/  # Scheda prodotto — dal 23/07 include anche i "Produits similaires" (§12bis Fase 4)
 │       │   │   │   ├── cart/          # Carrello
 │       │   │   │   ├── checkout/      # Checkout Stripe Elements
 │       │   │   │   └── orders/[id]/   # Tracking ordine (token HMAC)
@@ -112,8 +113,9 @@ lepefy-food-platform/
 │       │   │   │       ├── products/[id]/etichetta/         # Lista job etichetta per prodotto
 │       │   │   │       ├── products/[id]/etichetta/[jobId]/ # Editor draft etichetta (template/palette/origin-style/preview live/autosave)
 │       │   │   │       ├── billing/              # Pannello abbonamento (Stripe Payment Link + bonifico)
-│       │   │   │       └── parametres/           # Impostazioni boutique, QR biglietto digitale
-│       │   │   ├── admin/_components/AdminSidebar.tsx   # Sidebar navigazione admin (fuori dal route group, condivisa)
+│       │   │   │       ├── parametres/           # Impostazioni boutique, QR biglietto digitale
+│       │   │   │       └── ai-lab/               # Nuovo (23/07) — CRUD tenant_knowledge_base per il chatbox, vedi §13ter
+│       │   │   ├── admin/_components/AdminSidebar.tsx   # Sidebar navigazione admin (fuori dal route group, condivisa) — voce "IA — Base de connaissance" aggiunta il 23/07
 │       │   │   ├── admin/(protected)/AdminNav.tsx, AdminFilters.tsx, OrdersTable.tsx  # Componenti dashboard ordini
 │       │   │   └── api/
 │       │   │       ├── checkout/                    # Ricalcola prezzi/spedizione server-side, crea PaymentIntent
@@ -123,6 +125,7 @@ lepefy-food-platform/
 │       │   │       ├── pwa-icon/                     # Icona PWA dinamica per tenant (sharp resize)
 │       │   │       ├── card/qr-code/                 # QR code biglietto digitale con logo overlay
 │       │   │       ├── card/vcard/                   # Download vCard biglietto digitale
+│       │   │       ├── chat/                         # Nuovo (23/07) — POST pubblica del chatbox, gated su ai_chatbox_enabled, vedi §13ter
 │       │   │       └── admin/                        # Tutte protette da requireAdmin()
 │       │   │           ├── login/                    # Login admin, imposta cookie sessione
 │       │   │           ├── catalogue/, catalogue/[id]/  # CRUD prodotti
@@ -130,17 +133,28 @@ lepefy-food-platform/
 │       │   │           ├── generate-product-image/   # AI Gemini (maxDuration 60s)
 │       │   │           ├── upload-product-image/     # Upload immagine prodotto storefront
 │       │   │           ├── upload-label-asset/       # Upload sfondo/logo per etichette
+│       │   │           ├── knowledge-base/, knowledge-base/[id]/  # Nuovo (23/07) — CRUD tenant_knowledge_base, embedding calcolato server-side, vedi §13ter
 │       │   │           └── labels/
 │       │   │               ├── preview/              # Solo HTML (no Gotenberg), per iframe live
 │       │   │               ├── generate/             # Chiama Gotenberg + upload PDF + aggiorna job → 'generated'
 │       │   │               ├── jobs/                 # GET lista / POST crea draft (con duplicateFromId per ristampa)
 │       │   │               └── jobs/[id]/             # PATCH autosave draft / DELETE draft
+│       │   ├── components/                  # ⚠️ Albero non enumerato integralmente qui, solo le aggiunte recenti rilevanti
+│       │   │   ├── catalog/ProductCard.tsx   # Card prodotto unificata (variant grid/shelf) — vedi §12bis Fase 2.1
+│       │   │   ├── ui/ShopTag.tsx            # Cartellino signature — vedi §12bis Fase 3
+│       │   │   ├── product/
+│       │   │   │   ├── ProductTitle.tsx      # Nuovo (23/07) — titolo localizzato via name_alt, vedi §12bis Fase 4
+│       │   │   │   └── RelatedProducts.tsx   # Nuovo (23/07) — sezione "Produits similaires", riusa ProductCard variant shelf
+│       │   │   └── chat/
+│       │   │       └── ChatWidget.tsx        # Nuovo (23/07) — widget flottante chatbox, montato in (shop)/layout.tsx, vedi §13ter
 │       │   ├── lib/
 │       │   │   ├── auth/
 │       │   │   │   └── requireAdmin.ts   # Guard riusato da tutte le API admin (sessione + whitelist) — unica eccezione: admin/login/route.ts
 │       │   │   ├── ai/
 │       │   │   │   ├── embeddings.ts     # Genera embedding gemini-embedding-001 (ricerca semantica)
-│       │   │   │   └── usageTracking.ts  # checkRateLimit()/logAiUsage() — vedi §13bis
+│       │   │   │   ├── usageTracking.ts  # checkRateLimit()/logAiUsage() — vedi §13bis
+│       │   │   │   ├── chatbox.ts        # Nuovo (23/07) — buildSystemPrompt() (prodotti + knowledge base + info negozio), vedi §13ter
+│       │   │   │   └── smallTalk.ts      # Nuovo (23/07) — matchSmallTalk(), intercetta saluti prima di ogni chiamata AI, vedi §13ter
 │       │   │   ├── images/
 │       │   │   │   └── removeBackground.ts  # Rimozione sfondo immagine prodotto (pipeline AI)
 │       │   │   ├── shipping/
@@ -194,7 +208,7 @@ lepefy-food-platform/
 
 | Tabella | Descrizione |
 |---|---|
-| `tenants` | Un record per boutique. Colori, slug, Stripe account, `shipping_provider`, `show_powered_by`, `ai_image_generation`, `whatsapp_number`, `catalogue_search_threshold`, campi billing, **`locales`** (lingue attive, prima = default), **`ai_description_generation`**, **`ai_semantic_search`**, **`ai_rate_limit_public_per_minute`/`ai_rate_limit_public_per_day`/`ai_rate_limit_admin_per_day`**, **`barcode_prefix`** (3 cifre, assegnate automaticamente da trigger alla creazione tenant, mai a mano — vedi §16bis), **`barcode_sequence`** (contatore atomico) |
+| `tenants` | Un record per boutique. Colori, slug, Stripe account, `shipping_provider`, `show_powered_by`, `ai_image_generation`, `whatsapp_number`, `catalogue_search_threshold`, campi billing, **`locales`** (lingue attive, prima = default), **`ai_description_generation`**, **`ai_semantic_search`**, **`ai_rate_limit_public_per_minute`/`ai_rate_limit_public_per_day`/`ai_rate_limit_admin_per_day`**, **`barcode_prefix`** (3 cifre, assegnate automaticamente da trigger alla creazione tenant, mai a mano — vedi §16bis), **`barcode_sequence`** (contatore atomico), **`ai_chatbox_enabled`** (default `false`, nessun tenant abilitato automaticamente dalla migration), **`chatbox_extra_context`** (testo libero scritto a mano in admin, iniettato nel system prompt — mai generato dall'IA) — vedi §13ter |
 | `categories` | Categorie prodotti per tenant (con supporto background per etichette) |
 | `products` | Prodotti — `storage_type` (dry/fresh/frozen), `weight_grams`, `position`, `warehouse_location`, `name_alt` (⚠️ dal 23/07 letto anche dal titolo prodotto storefront, non più solo dall'editor etichette — vedi §12bis Fase 4), `producer_id`/`importer_id`, campi etichetta (ingredienti, allergeni, nutrizione, paese origine), **`descriptions`** jsonb multilingue (`{"fr":"...","it":"..."}`), **`description_source`** (`ai`/`human`), **`embedding`** vector(768) per ricerca semantica (dal 23/07 riusato anche per i prodotti correlati, vedi §12bis Fase 4), **`barcode_value`** (EAN-13 a 13 cifre, generato internamente, unique a livello piattaforma), **`barcode_generated_at`** — vedi §16bis |
 | `ai_pricing` | Listino prezzi AI configurabile — `provider` (`gemini`, futuro `anthropic`), `model`, prezzi input/output/immagine per milione token, `currency`. Aggiornato via SQL quando i provider cambiano prezzo, mai hardcoded nel codice |
@@ -211,6 +225,7 @@ lepefy-food-platform/
 | `producers` | Anagrafica produttori (sistema etichette) |
 | `importers` | Anagrafica importatori (sistema etichette) — es. AFRICOOP Società Cooperativa |
 | `label_print_jobs` | Job di stampa etichette — `status` (`draft`/`generated`), `duplicated_from_id` (ristampa), `palette`, `natural_badge`, `origin_style`, `pdf_url` |
+| `tenant_knowledge_base` | Contenuto culturale curato **sempre a mano** (ricette, espressioni, contesto, FAQ) per il chatbox — `category` (`recipe`/`expression`/`greeting`/`cultural_context`/`faq`), `content`, `embedding` vector(768), `source`/`reviewed_by`/`reviewed_at`, `active`. RLS attiva senza policy anon/authenticated: solo `service_role` (route admin per scrivere, route chatbox per leggere via `match_knowledge_base`) — vedi §13ter |
 
 **121 prodotti reali importati e poi riseminati** (`020_reseed_products_catalogue_v2.sql`, idempotente `ON CONFLICT (tenant_id, slug) DO UPDATE`) dal catalogo `ChloeFood_Template_Catalogue_v2`, 8 categorie: Épices, Légumes, Farines, Poissons, Sauces & Huiles, Snacks, Viandes séchées, Boissons. Ulteriori prodotti aggiunti da `022_new_products_from_labels.sql` (scoperti nei dati etichette ma assenti dal catalogo v2, seminati inattivi/prezzo 0 in attesa di attivazione admin).
 
@@ -253,8 +268,10 @@ lepefy-food-platform/
 | `027_ai_rate_limiting_cost_tracking.sql` | Tabelle `ai_pricing` (listino prezzi per provider/model) e `ai_usage_log` (log per-chiamata) + funzione `check_ai_rate_limit` + vista `ai_usage_monthly_by_tenant` |
 | `028_semantic_search.sql` | Estensione `vector`; `products.embedding` vector(768); indice HNSW cosine; funzione `match_products` |
 | `029_atomic_stock_decrement.sql` | Decremento stock atomico con rollback transazionale post-pagamento (fix urgente overselling) — *riga aggiunta per coerenza numerica in questa revisione, contenuto da lavoro precedente non riverificato in questa sessione* |
-| `030_payment_methods.sql` | `tenant_payment_methods` — vedi §27bis — *riga aggiunta per coerenza numerica in questa revisione, contenuto da lavoro precedente non riverificato in questa sessione* |
+| `030_tenant_payment_methods.sql` | `tenant_payment_methods` — vedi §27bis — *riga aggiunta per coerenza numerica in questa revisione, contenuto da lavoro precedente non riverificato in questa sessione* (correzione v3.12: nome file corretto, la revisione precedente riportava `030_payment_methods.sql`) |
 | `031_barcode_system.sql` | Sistema barcode EAN-13 interno: `tenants.barcode_prefix`/`barcode_sequence`, trigger `assign_tenant_barcode_prefix` (assegna il prefisso alla creazione tenant), funzione `next_product_barcode()` (generazione atomica + checksum), `products.barcode_value`/`barcode_generated_at`, backfill dei 121 prodotti chloefood esistenti — **✅ applicata al DB, PDF reale testato**, vedi §16bis |
+| `032_ai_chatbox.sql` | `tenants.ai_chatbox_enabled` (default `false`) + `tenants.chatbox_extra_context` (testo libero admin, mai IA) — **numerata 032 perché 029/030/031 già occupate** al momento della scrittura (il prompt originale la chiamava `029_ai_chatbox.sql`, rinumerata prima della consegna); vedi §13ter |
+| `033_ai_chatbox_knowledge_base.sql` | Tabella `tenant_knowledge_base` (contenuto curato a mano) + indice HNSW + funzione `match_knowledge_base(query_embedding, p_tenant_id, match_count, min_similarity)`, stesso pattern di `match_products` — **numerata 033 per lo stesso motivo di collisione** (il prompt originale la chiamava `030_...`); vedi §13ter |
 
 **Non esistono file 005 e 012** — non sono stati saltati per errore, la numerazione riflette semplicemente collisioni risolte con suffissi (003b/003c) o rinomina all'atto della scrittura, come documentato nei commenti di intestazione di `018` e `023`.
 
@@ -669,6 +686,7 @@ Tre feature sviluppate in sequenza (luglio 2026), tutte **✅ completate e in pr
 - **Ricerca ibrida a cascata** in `CatalogClient.tsx`: la ricerca testuale `ilike` esistente resta invariata e parte per prima; solo se restituisce meno di 3 risultati scatta la chiamata semantica, mostrata sotto un'intestazione "Résultats similaires" — risolve casi come "fufu" che non matcha testualmente "Farine de manioc" ma è semanticamente vicino
 - Script batch `scripts/generate-product-embeddings.mjs` + workflow `generate-product-embeddings.yml`: batch completo sui 121 prodotti eseguito con successo (stesse fix preventive su skip-filter/logging del punto precedente, applicate fin dall'inizio)
 - **Dal 23/07, `match_products` è riusata anche per i "Produits similaires"** nella scheda prodotto (`query_embedding` = embedding del prodotto corrente invece che di una ricerca testuale utente) — zero chiamate Gemini aggiuntive, vedi §12bis Fase 4
+- **Stesso giorno, riusata anche dal chatbox pubblico** (`POST /api/chat`) — terzo consumatore della stessa funzione RPC, questa volta con `query_embedding` = embedding del messaggio utente; stesso principio "zero infrastruttura AI nuova, solo nuova composizione" — vedi §13ter
 
 ### Costi AI — ordine di grandezza verificato
 
@@ -677,6 +695,47 @@ Batch descrizioni completo (121 prodotti × 2 lingue): sotto $1. Batch embedding
 ### Idea futura non implementata — Query embedding cache
 
 Tabella `ai_query_embedding_cache` (query normalizzata lowercase/trim + locale come chiave, vector(768), `hit_count`, `last_used_at`), condivisa a livello **piattaforma** (non per-tenant — l'embedding del testo non dipende dal tenant). Lookup prima di chiamare Gemini in `/api/search/semantic`: hit → riusa il vettore salvato, zero chiamate Gemini; miss → chiama Gemini come oggi e salva in cache. Nessun TTL prospettato (query catalogo food stabili nel tempo). Da valutare dopo aver osservato l'uso reale della ricerca semantica per capire quali query si ripetono davvero — non implementata, salvata per quando ci sarà volume sufficiente da giustificarla.
+
+---
+
+## 13ter. Chatbox IA pubblica (fasi 1+2) — ✅ codice scritto e verificato (typecheck), gating attivo su `ai_chatbox_enabled`
+
+**Stato:** implementata in due prompt consecutivi nella stessa sessione (23/07), **scritta e verificata direttamente in questa sessione** (non solo riportata in chat come alcuni cicli precedenti) — `pnpm typecheck` verde dopo ciascuna fase. **Confermato via `git diff HEAD origin/main` che il codice è già su `main`**: Robertin ha applicato entrambi gli zip di consegna direttamente via GitHub web UI (stesso workflow abituale, coerente con §20). **Non verificabile da qui se le migration 032/033 siano state eseguite su Supabase** — finché non lo sono, `tenants.ai_chatbox_enabled`/`chatbox_extra_context` e la tabella `tenant_knowledge_base` non esistono nel DB reale e ogni chiamata a `/api/chat` o `/admin/ai-lab` fallirebbe. Nessun tenant ha il chatbox abilitato di default (`ai_chatbox_enabled = false`), richiede un `UPDATE` manuale — vedi §18.
+
+Obiettivo dichiarato: rispondere a domande su catalogo, disponibilità, prezzo, descrizione generale e info negozio (orari, zone di consegna, politiche) riusando l'infrastruttura AI già in produzione (ricerca semantica, rate limiting, cost tracking) — **zero nuova infrastruttura AI**, solo nuova composizione di quella esistente.
+
+### Perimetro escluso deliberatamente (decisione di prodotto, non un limite tecnico)
+
+Il bot **non risponde mai** ad allergeni, ingredienti, valori nutrizionali, lotto, origine legale — redirect standard verso WhatsApp. Motivo: `match_products` non espone questi campi e alcuni dati etichetta nel catalogo reale sono noti come incompleti/da verificare (vedi §16, nota Bobolo/Foufou) — nessun canale AI deve poterli citare finché non confermati dal produttore. Stessa filosofia già applicata al sistema etichette (§16): l'IA recupera e fraseggia, non inventa fatti su dati sensibili. Guardrail scritto esplicitamente nel system prompt (`buildSystemPrompt`), non solo nella descrizione del prompt di consegna.
+
+### Fase 1 — widget + ricerca semantica prodotti
+
+- **Migration `032_ai_chatbox.sql`** (rinumerata da `029` per collisione, vedi §4): `tenants.ai_chatbox_enabled` (default `false`) + `tenants.chatbox_extra_context` (testo libero admin — orari, zone di consegna, politiche di reso — **mai generato o modificato dall'IA**, solo scritto a mano)
+- `POST /api/chat`: gated su `tenant.ai_chatbox_enabled` (404 se disattivo) → `checkRateLimit`/`logAiUsage` riusati identici a `search-semantic` (stesso endpoint pattern, `isPublic: true`) → `embedText(message)` → `match_products` (stessa funzione RPC della ricerca semantica e dei prodotti correlati, §12bis Fase 4 — terzo riuso dello stesso embedding/funzione) → `gemini-2.5-flash` con system prompt costruito da `buildSystemPrompt()` (`lib/ai/chatbox.ts`)
+- `buildSystemPrompt()`: lista prodotti matchati (nome/categoria/prezzo/stock/peso) + `chatbox_extra_context` + istruzione esplicita di redirect WhatsApp fuori perimetro — mai lingua/nome/colore tenant hardcoded, tutto da `getTenant()`
+- `ChatWidget.tsx`: bottone flottante rotondo (`fixed bottom-[84px] right-4 md:bottom-6`, sopra `BottomNav` mobile), pannello con header/messaggi/input, stato conversazione **solo React state** (nessuna persistenza, nessuna scrittura DB lato client), cap 6 turni di history inviati ad ogni chiamata. Su 429/502/errore rete: messaggio di fallback + link `wa.me/{numero}` (nascosto se `whatsapp_number` è `null`)
+- Montato una sola volta in `(shop)/layout.tsx`, dopo `<BottomNav />` — non tocca `/admin`
+
+### Fase 2 — filtro small-talk, knowledge base culturale, admin insert
+
+- **`lib/ai/smallTalk.ts`** (`matchSmallTalk`): intercetta saluti/ringraziamenti (regex FR/IT/EN generiche, **non tenant-specifiche** — placeholder in attesa di frasi autentiche di Dalice) **prima** di `checkRateLimit`/embedding/Gemini — bypassa completamente la pipeline AI, **zero riga in `ai_usage_log`** per questi messaggi, costo realmente zero non solo "basso"
+- **Migration `033_ai_chatbox_knowledge_base.sql`** (rinumerata da `030` per collisione, vedi §4): tabella `tenant_knowledge_base` + funzione `match_knowledge_base` (stesso pattern esatto di `match_products`: filtro `tenant_id`+`active` dentro la funzione, mai delegato al client)
+- **Principio non negoziabile:** il contenuto di `tenant_knowledge_base.content` è sempre scritto da un umano (Dalice/Robertin) — l'IA lo recupera via similarità semantica e lo usa come riferimento di stile/fatti, **mai lo genera**. Stessa filosofia del perimetro escluso sopra e delle etichette (§16): dati sensibili/culturali sempre a conferma umana
+- Admin: `POST /api/admin/knowledge-base` calcola l'embedding via `embedText()` esistente (stesso helper della ricerca semantica) e salva `reviewed_by` = email admin corrente (letta con una query cookie separata da `requireAdmin()`, che non la espone) + `reviewed_at = now()`; `DELETE .../[id]` filtra sempre per `id` **e** `tenant_id`. Nuova pagina `/admin/ai-lab` (stesso layout/sidebar protetta esistente, form + tabella, nessun editing inline — si elimina e si reinserisce)
+- Wiring nel chatbox pubblico: `match_knowledge_base` riusa lo **stesso vector già calcolato** per `match_products` nella stessa richiesta (nessun secondo embedding), risultati iniettati nel system prompt sotto una sezione "esempi autentici di tono" con istruzione esplicita di non recitarli parola per parola salvo corrispondenza esatta; **degradazione silenziosa** se la RPC fallisce (`?? []`), non blocca mai la risposta del chatbox
+- Tabella parte vuota di proposito — nessun contenuto reale nel seed SQL, il popolamento arriva dall'admin dopo la raccolta con Dalice
+
+### File toccati/aggiunti (riepilogo)
+
+`lib/ai/chatbox.ts` (nuovo, poi esteso in fase 2 con `KnowledgeSnippet`), `lib/ai/smallTalk.ts` (nuovo), `api/chat/route.ts` (nuovo, poi esteso), `components/chat/ChatWidget.tsx` (nuovo), `(shop)/layout.tsx` (mount widget), `api/admin/knowledge-base/route.ts` + `[id]/route.ts` (nuovi), `admin/(protected)/ai-lab/page.tsx` + `KnowledgeBaseClient.tsx` (nuovi), `admin/_components/AdminSidebar.tsx` (voce nav aggiunta — non richiesta esplicitamente dal prompt, aggiunta per rendere la pagina raggiungibile), `packages/types/tenant.ts` (`ai_chatbox_enabled`/`chatbox_extra_context`), `packages/types/ai.ts` (`KnowledgeBaseEntry`/`KnowledgeBaseCategory`, stesso pattern di `SemanticMatch`)
+
+### Cosa resta aperto
+
+- **Migration 032 e 033 non confermate eseguite su Supabase** — nessuna verifica possibile da questa sessione (nessuna credenziale Supabase nell'ambiente di sviluppo); finché non lo sono il codice deployato su `main` è inerte (404 silenzioso su `/api/chat`, errore su `/admin/ai-lab`)
+- **Nessun tenant ha il chatbox attivo** — richiede `UPDATE tenants SET ai_chatbox_enabled = true WHERE slug = 'chloefood';` dopo le migration, prima del test manuale
+- **Knowledge base vuota** — zero voci finché Dalice non fornisce contenuto reale da inserire via `/admin/ai-lab`; fino ad allora il chatbox risponde solo su prodotti/info negozio, senza gli "esempi autentici di tono"
+- Placeholder small-talk generici (non le frasi reali di Dalice) — da promuovere eventualmente a voci `tenant_knowledge_base` categoria `greeting` in futuro, come segnalato nel commento del file stesso
+- Nessun test end-to-end su preview Vercel autenticata in questa sessione (stesso limite ambientale di molti cicli precedenti, vedi §8bis/§12bis) — in particolare il punto segnalato come più a rischio nel prompt originale (formato del valore `embedding` restituito da Supabase, stringa vs array, quando letto per i prodotti correlati) è stato gestito con una normalizzazione difensiva in `products/[slug]/page.tsx` (§12bis Fase 4), non nel chatbox stesso (che chiama sempre `embedText()` fresco, non rilegge mai un embedding già salvato dal DB)
 
 ---
 
@@ -869,6 +928,9 @@ GOTENBERG_AUTH=...
 | Eseguire prompt split tabella nutrizionale a due colonne (template full-bleed) | Robertin | ✅ FATTO — eseguito e testato |
 | Comunicare a Dalice che il barcode è generato internamente (non un vero codice GS1 pubblico) | Robertin | ⚠️ DA FARE |
 | Toggle lingua a livello descrizione, titolo prodotto localizzato, prodotti correlati semantici | Robertin | ✅ FATTO — vedi §12bis Fase 4 |
+| Applicare migration 032+033 chatbox su Supabase (`ai_chatbox_enabled`/`chatbox_extra_context`, tabella `tenant_knowledge_base`) | Robertin | ⚠️ DA FARE — non verificabile da questa sessione, vedi §13ter |
+| Abilitare `ai_chatbox_enabled` per ChloeFood (`UPDATE tenants ... WHERE slug = 'chloefood'`) e test manuale su preview | Robertin | ⚠️ DA FARE — dopo le migration sopra, vedi §13ter |
+| Raccogliere contenuto reale da Dalice per `tenant_knowledge_base` (ricette, espressioni, FAQ) | Dalice / Robertin | ⚠️ DA FARE — tabella vuota di proposito, vedi §13ter |
 
 ---
 
@@ -902,6 +964,8 @@ GOTENBERG_AUTH=...
 | Rate limiting su `/api/checkout` e `/api/shipping/quote` | Tecnico | P1 | Non avviato |
 | Decidere destinazione reale del CTA hero "Notre histoire" (oggi placeholder `/products`) | Contenuto/Prodotto | P1 | Non avviato — vedi §12bis |
 | Allineare `tenant.accent_light` al nuovo primary blu (coerenza visiva, non bloccante) | Tecnico | P2 | Non avviato — query pronta, vedi §12bis |
+| Promuovere le frasi small-talk del chatbox da placeholder generico a voci `tenant_knowledge_base` categoria `greeting` (tono autentico Dalice) | Contenuto | P2 | Idea salvata, non implementata — vedi §13ter |
+| Estendere `name_alt` da campo singolo a jsonb multilingua (come `descriptions`) per un tenant futuro a 3+ lingue | Tecnico | P2 | Non avviato — limite noto, non bloccante con 2 lingue, vedi §12bis Fase 4 |
 
 ### Phase 2 — Packlink draft feature (dettaglio)
 
@@ -956,6 +1020,8 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 | `AUDIT_ADMIN_UIUX.md` | Audit UI/UX del pannello admin (17/07) — origine del redesign Fase 0–4, allegato di sessione, non versionato nel repo; vedi §8bis |
 | `admincommandesredesign.html` | Mockup interattivo di validazione redesign admin (tabella responsive, dark mode, bulk bar) — allegato di sessione, non versionato nel repo; decisioni approvate implementate parzialmente (righe espandibili mantenute contro il mockup, vedi §8bis) |
 | `ClaudeCode_Prompt_ProductLocaleToggle_RelatedProducts.md` | Prompt Claude Code per toggle lingua a livello descrizione, titolo prodotto localizzato (`name_alt`) e prodotti correlati semantici (file esterno, non nel repo) — vedi §12bis Fase 4 |
+| `ClaudeCode_Prompt_ChatboxIA.md` | Prompt Claude Code Fase 1 chatbox: widget storefront + ricerca semantica prodotti + rate limiting/cost tracking riusati (file esterno, non nel repo) — vedi §13ter |
+| `ClaudeCode_Prompt_ChatboxIA_Fase2.md` | Prompt Claude Code Fase 2 chatbox: filtro small-talk, `tenant_knowledge_base`, admin `/ai-lab` (file esterno, non nel repo) — vedi §13ter |
 
 ---
 
@@ -1098,4 +1164,21 @@ Nessuna modifica alle sezioni non toccate da questo aggiornamento (shipping, che
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.11 — 23 Luglio 2026 (base: v3.10; toggle lingua spostato a livello descrizione, titolo prodotto localizzato via `name_alt`, nuova sezione prodotti correlati con similarità semantica e repli su categoria — nessuna migrazione DB, vedi §30 e §12bis Fase 4 per il dettaglio)*
+## 31. Changelog v3.12 (23 Luglio 2026) — Chatbox IA pubblica (fasi 1+2)
+
+A differenza di v3.9/v3.11 (stato riportato in chat), questa revisione documenta lavoro **scritto e verificato direttamente in questa sessione** (`pnpm typecheck` verde dopo ciascuna delle due fasi) sullo stesso branch che aveva già prodotto v3.11 (`claude/storefront-lang-toggle-related-11741t`), più una **verifica indipendente contro git/filesystem reale** nello stile di v3.7: `git fetch origin main` + `git diff HEAD origin/main` confermano che Robertin ha già applicato entrambi gli zip di consegna direttamente su `main` (4 commit "Add files via upload", 24/07) — il codice chatbox esiste già su `main`, non solo su questo branch. Non verificabile da qui se le migration SQL 032/033 siano state eseguite su Supabase.
+
+- **Intestazione** — nuova voce v3.12, con la scoperta della sincronizzazione già avvenuta su `main`.
+- **§3** — aggiunti alla struttura repository: `products/[slug]/` (nota correlati), `api/chat/`, `api/admin/knowledge-base/` (+`[id]`), `admin/(protected)/ai-lab/`, `lib/ai/chatbox.ts`/`smallTalk.ts`; aggiunto un blocco `components/` (assente prima in questa sezione) con le aggiunte recenti (`ProductTitle.tsx`, `RelatedProducts.tsx`, `ChatWidget.tsx`) oltre a due file preesistenti mai elencati (`ProductCard.tsx`, `ShopTag.tsx`).
+- **§4** — riga `tenants` estesa con `ai_chatbox_enabled`/`chatbox_extra_context`; nuova riga tabella `tenant_knowledge_base`; tabella migrations estesa con `032_ai_chatbox.sql`/`033_ai_chatbox_knowledge_base.sql` (entrambe rinumerate rispetto al prompt originale, che le chiamava `029`/`030` — già occupate); corretto il nome file della riga `030` (`030_tenant_payment_methods.sql`, non `030_payment_methods.sql` come scritto in v3.11).
+- **§13bis** — aggiunta menzione del terzo riuso di `match_products` (dal chatbox, oltre a ricerca semantica e prodotti correlati).
+- **Nuova §13ter** — sezione dedicata: architettura fase 1 (widget + ricerca semantica), fase 2 (filtro small-talk a costo zero, `tenant_knowledge_base` scritta sempre a mano, admin `/ai-lab`, wiring nel system prompt), perimetro escluso deliberatamente (allergeni/ingredienti/nutrizione/lotto/origine — mai risposti dall'IA), file toccati, cosa resta aperto (migration non confermate, tenant non abilitato, knowledge base vuota).
+- **§18** — 3 nuove righe: applicare migration 032+033, abilitare `ai_chatbox_enabled` per ChloeFood, raccogliere contenuto reale da Dalice.
+- **§19** — 2 nuove righe roadmap: promuovere i placeholder small-talk a voci knowledge base autentiche; estendere `name_alt` a jsonb per tenant multilingua futuri (limite già notato in v3.11, non ancora in roadmap).
+- **§21** — aggiunti i due prompt Claude Code del ciclo (`ClaudeCode_Prompt_ChatboxIA.md`, `ClaudeCode_Prompt_ChatboxIA_Fase2.md`).
+
+Nessuna modifica alle sezioni non toccate da questo ciclo (shipping, checkout, n8n, admin dashboard/redesign, sistema etichette/barcode, digital card, catalogo) rispetto a v3.11 — verificate a campione, restano accurate.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.12 — 23 Luglio 2026 (base: v3.11; nuova Chatbox IA pubblica — ricerca semantica su prodotti, filtro small-talk a costo zero, knowledge base culturale curata a mano con admin CRUD dedicato, gated dietro `tenants.ai_chatbox_enabled` — codice verificato in sessione e già presente su `main`, migration SQL 032/033 non confermate eseguite; vedi §31 e §13ter per il dettaglio)*
