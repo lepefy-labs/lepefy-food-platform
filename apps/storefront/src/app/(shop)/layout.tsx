@@ -2,8 +2,12 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { ChatWidget } from '@/components/chat/ChatWidget';
+import { getTenant } from '@/lib/tenant/getTenant';
 
-export default function ShopLayout({ children }: { children: React.ReactNode }) {
+export default async function ShopLayout({ children }: { children: React.ReactNode }) {
+  const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+
   return (
     <div className="min-h-screen flex flex-col">
       <PWABanner />
@@ -87,6 +91,11 @@ export default function ShopLayout({ children }: { children: React.ReactNode }) 
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
       <Footer />
       <BottomNav />
+      <ChatWidget
+        enabled={tenant.ai_chatbox_enabled}
+        tenantName={tenant.name}
+        whatsappNumber={tenant.whatsapp_number ?? null}
+      />
     </div>
   );
 }
