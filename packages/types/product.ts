@@ -13,6 +13,7 @@ export interface Product {
   tenant_id: string;
   category_id: string | null;
   name: string;
+  name_alt: string | null;
   slug: string;
   description: string | null;
   descriptions: Record<string, string>;

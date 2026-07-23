@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
 import { QuantitySelector } from './QuantitySelector';
+import { ProductTitle } from './ProductTitle';
 import { ProductDescription } from './ProductDescription';
 import { formatPrice } from '@/lib/utils/format';
 import type { ProductWithCategory } from '@lepefy/types';
@@ -43,7 +44,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       </div>
       <div className="flex flex-col gap-4">
         {product.category && <p className="text-sm font-medium uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>{product.category.name}</p>}
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{product.name}</h1>
+        <ProductTitle product={product} />
         <div className="flex items-baseline gap-3">
           <span className="text-3xl font-bold" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
           {product.compare_at_price && product.compare_at_price > product.price && (

@@ -3,7 +3,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
-import { LanguageToggle } from './LanguageToggle';
 
 export function Header() {
   const tenant = useTenant();
@@ -24,7 +23,6 @@ export function Header() {
           ) : tenant.name}
         </Link>
         <div className="flex items-center gap-4">
-          <LanguageToggle locales={tenant.locales ?? []} />
           {/* Nav desktop — hidden on mobile, bottom bar handles navigation */}
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-gray-900">Catalogue</Link>
