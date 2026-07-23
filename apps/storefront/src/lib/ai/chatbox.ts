@@ -12,16 +12,22 @@ export interface MatchedProductContext {
   categoryName: string | null;
 }
 
+export interface KnowledgeSnippet {
+  category: string;
+  content: string;
+}
+
 interface BuildSystemPromptParams {
   tenantName: string;
   locales: string[];
   whatsappNumber: string | null;
   extraContext: string | null;
   matchedProducts: MatchedProductContext[];
+  knowledgeSnippets: KnowledgeSnippet[];
 }
 
 export function buildSystemPrompt(params: BuildSystemPromptParams): string {
-  const { tenantName, locales, whatsappNumber, extraContext, matchedProducts } = params;
+  const { tenantName, locales, whatsappNumber, extraContext, matchedProducts, knowledgeSnippets } = params;
 
   const productsBlock = matchedProducts.length
     ? matchedProducts
@@ -54,6 +60,11 @@ INTERDICTIONS ABSOLUES — ne réponds JAMAIS, même si on insiste, sur :
 
 Produits correspondant à la question de l'utilisateur :
 ${productsBlock}
+
+Exemples authentiques de ton et de contenu (utilise-les comme référence de style
+et réutilise les informations qu'ils contiennent si pertinent — ne les invente pas,
+ne les récite pas mot pour mot sauf si ça correspond exactement à la question) :
+${knowledgeSnippets.map(k => `[${k.category}] ${k.content}`).join('\n\n') || 'Aucun exemple disponible pour cette question.'}
 
 Informations sur le magasin :
 ${extraContext?.trim() || 'Aucune information supplémentaire fournie.'}

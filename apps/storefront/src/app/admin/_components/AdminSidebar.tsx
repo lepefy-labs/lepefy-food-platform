@@ -12,6 +12,7 @@ import {
   IconCreditCard,
   IconChevronDown,
   IconChevronRight,
+  IconSparkles,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -143,6 +144,20 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
           stroke={pathname === '/admin/parametres' ? 2 : 1.5}
         />
         Paramètres
+      </Link>
+
+      <Link
+        href="/admin/ai-lab"
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+                    text-sm transition-colors mx-1 ${
+          pathname === '/admin/ai-lab' ? navClass(true) : navClass(false)
+        }`}
+      >
+        <IconSparkles
+          size={16}
+          stroke={pathname === '/admin/ai-lab' ? 2 : 1.5}
+        />
+        IA — Base de connaissance
       </Link>
 
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase

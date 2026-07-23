@@ -33,6 +33,20 @@ export interface AiUsageMonthlyByTenant {
   total_cost_usd: number;
 }
 
+export type KnowledgeBaseCategory = 'recipe' | 'expression' | 'greeting' | 'cultural_context' | 'faq';
+
+/** Ligne de tenant_knowledge_base — contenu toujours écrit par un humain, jamais par l'IA. */
+export interface KnowledgeBaseEntry {
+  id: string;
+  category: KnowledgeBaseCategory;
+  content: string;
+  source: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  active: boolean;
+  created_at: string;
+}
+
 /** Ligne renvoyée par la fonction SQL match_products (ricerca semantica). */
 export interface SemanticMatch {
   id: string;

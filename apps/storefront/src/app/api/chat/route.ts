@@ -4,7 +4,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { embedText } from '@/lib/ai/embeddings';
-import { buildSystemPrompt, type ChatTurn, type MatchedProductContext } from '@/lib/ai/chatbox';
+import { buildSystemPrompt, type ChatTurn, type MatchedProductContext, type KnowledgeSnippet } from '@/lib/ai/chatbox';
+import { matchSmallTalk } from '@/lib/ai/smallTalk';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'message_too_short' }, { status: 400 });
   }
 
+  const smallTalkReply = matchSmallTalk(message, tenant.name);
+  if (smallTalkReply) {
+    return NextResponse.json({ reply: smallTalkReply });
+  }
+
   const allowed = await checkRateLimit(tenant.id, ENDPOINT, true);
   if (!allowed) {
     await logAiUsage({
@@ -78,12 +84,25 @@ export async function POST(req: NextRequest) {
       categoryName: m.category_name,
     }));
 
+    const { data: knowledgeMatches } = await supabase.rpc('match_knowledge_base', {
+      query_embedding: vector,
+      p_tenant_id: tenant.id,
+      match_count: 3,
+      min_similarity: 0.35,
+    });
+
+    const knowledgeSnippets: KnowledgeSnippet[] = ((knowledgeMatches ?? []) as { category: string; content: string }[]).map((k) => ({
+      category: k.category,
+      content: k.content,
+    }));
+
     const systemPrompt = buildSystemPrompt({
       tenantName: tenant.name,
       locales: tenant.locales ?? ['fr'],
       whatsappNumber: tenant.whatsapp_number ?? null,
       extraContext: tenant.chatbox_extra_context ?? null,
       matchedProducts,
+      knowledgeSnippets,
     });
 
     const conversationText = [
