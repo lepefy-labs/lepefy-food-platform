@@ -327,41 +327,47 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             </div>
           )}
 
-          <div className="flex items-center gap-2.5 py-2.5 mb-3 border-b border-gray-100">
-            <IconShoppingBag size={17} stroke={1.5} className={tenant.storefront_ready ? 'text-gray-400 shrink-0' : 'text-gray-300 shrink-0'} />
-            {tenant.storefront_ready ? (
-              <Link href="/" className="text-sm font-medium" style={{ color: tenant.primary_color }}>
-                {t.products} →
-              </Link>
-            ) : (
-              <span className="text-sm text-gray-400 italic">{t.comingSoon}</span>
+          <div
+            className="rounded-2xl p-3.5 mb-3"
+            style={{ backgroundColor: tenant.accent_light }}
+          >
+            <div className="flex items-center gap-2.5">
+              <IconShoppingBag size={17} stroke={1.5} className="text-gray-400 shrink-0" />
+              {tenant.storefront_ready ? (
+                <Link href="/" className="text-sm font-medium" style={{ color: tenant.primary_color }}>
+                  {t.products} →
+                </Link>
+              ) : (
+                <span className="text-sm text-gray-400 italic">{t.comingSoon}</span>
+              )}
+            </div>
+
+            {socialLinks.length > 0 && (
+              <>
+                <div className="border-t my-3" style={{ borderColor: 'rgba(0,0,0,0.06)' }} />
+                <p className="text-xs text-gray-400 text-center mb-2">{t.followUs}</p>
+                <div className="flex justify-center gap-2.5">
+                  {socialLinks.map((link) => {
+                    const meta = SOCIAL_PLATFORM_REGISTRY[link.platform];
+                    const Icon = ICONS[meta.iconName];
+                    return (
+                      <a
+                        key={link.id}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={meta.label}
+                        className="w-9 h-9 rounded-full flex items-center justify-center"
+                        style={{ background: meta.badgeBackground }}
+                      >
+                        <Icon size={18} stroke={1.5} style={{ color: '#ffffff' }} />
+                      </a>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
-
-          {socialLinks.length > 0 && (
-            <>
-              <p className="text-xs text-gray-400 text-center mb-2">{t.followUs}</p>
-              <div className="flex justify-center gap-2.5 mb-4">
-                {socialLinks.map((link) => {
-                  const meta = SOCIAL_PLATFORM_REGISTRY[link.platform];
-                  const Icon = ICONS[meta.iconName];
-                  return (
-                    <a
-                      key={link.id}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={meta.label}
-                      className="w-9 h-9 rounded-full flex items-center justify-center"
-                      style={{ background: meta.badgeBackground }}
-                    >
-                      <Icon size={18} stroke={1.5} style={{ color: '#ffffff' }} />
-                    </a>
-                  );
-                })}
-              </div>
-            </>
-          )}
 
         </div>
       </div>
