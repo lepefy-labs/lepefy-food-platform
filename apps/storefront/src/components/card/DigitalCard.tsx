@@ -159,7 +159,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
           )}
         </div>
 
-        <div className="p-5">
+        <div className="p-5 pb-28">
 
           <div className="flex gap-1.5 mb-4">
             {(['fr', 'it'] as Lang[]).map((l) => (
@@ -296,18 +296,21 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
           )}
 
         </div>
+      </div>
 
-        <div className="sticky bottom-0 px-5 pb-5 pt-3 bg-gradient-to-t from-white via-white to-transparent">
-          <a
-            href="/api/card/vcard"
-            download
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white shadow-sm"
-            style={{ backgroundColor: tenant.primary_color }}
-          >
-            <IconUserPlus size={18} stroke={1.5} />
-            {t.addContact}
-          </a>
-        </div>
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-gradient-to-t from-white via-white/95 to-transparent px-5 pt-3"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
+        <a
+          href="/api/card/vcard"
+          download
+          className="w-full max-w-sm flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white shadow-sm"
+          style={{ backgroundColor: tenant.primary_color }}
+        >
+          <IconUserPlus size={18} stroke={1.5} />
+          {t.addContact}
+        </a>
       </div>
     </div>
   );
