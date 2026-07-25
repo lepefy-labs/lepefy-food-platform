@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { IconShoppingCartOff, IconTruck, IconBuildingStore, IconMapPin } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import type { Tenant } from '@lepefy/types';
 
 const COUNTRIES = [
@@ -28,6 +29,7 @@ export default function CartClient({ tenant }: Props) {
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
   const [country, setCountry] = useState('IT');
   const [postalCode, setPostalCode] = useState('');
+  const [manualMode, setManualMode] = useState(false);
   const [shippingTotal, setShippingTotal] = useState<number | null>(null);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(null);
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
@@ -246,15 +248,25 @@ export default function CartClient({ tenant }: Props) {
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="Code postal"
-              value={postalCode}
-              onChange={(e) => setPostalCode(e.target.value)}
-              maxLength={10}
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
+            {manualMode ? (
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Code postal"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                maxLength={10}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              />
+            ) : (
+              <AddressAutocomplete
+                country={country}
+                onSelect={(r) => {
+                  setPostalCode(r.postalCode);
+                }}
+                onManualFallback={() => setManualMode(true)}
+              />
+            )}
           </div>
           <div className="flex justify-between items-center px-1 text-sm h-5">
             <span className="text-gray-500">Livraison</span>
