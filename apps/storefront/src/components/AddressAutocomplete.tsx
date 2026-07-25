@@ -5,19 +5,21 @@ import { useEffect, useRef, useState } from 'react';
 interface AddressAutocompleteProps {
   country: string;
   placeholder?: string;
-  onSelect: (result: { postalCode: string; city: string; label: string }) => void;
+  onSelect: (result: { line1: string; city: string; postalCode: string; country: string; label: string }) => void;
   onManualFallback?: () => void;
 }
 
 interface GeocodeResult {
   label: string;
-  postalCode: string;
+  line1: string;
   city: string;
+  postalCode: string;
+  country: string;
 }
 
 export default function AddressAutocomplete({
   country,
-  placeholder = 'Ville ou adresse',
+  placeholder = 'Rue et numéro, ville',
   onSelect,
   onManualFallback,
 }: AddressAutocompleteProps) {

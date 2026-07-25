@@ -10,8 +10,10 @@ import { NextResponse } from 'next/server';
 
 interface GeocodeResult {
   label: string;
-  postalCode: string;
+  line1: string;
   city: string;
+  postalCode: string;
+  country: string;
 }
 
 interface NominatimAddress {
@@ -19,6 +21,9 @@ interface NominatimAddress {
   city?: string;
   town?: string;
   village?: string;
+  road?: string;
+  house_number?: string;
+  country_code?: string;
 }
 
 interface NominatimResult {
@@ -52,12 +57,17 @@ export async function GET(request: Request) {
     const data = (await res.json()) as NominatimResult[];
 
     const results: GeocodeResult[] = data
-      .filter((item) => item.address?.postcode)
-      .map((item) => ({
-        label: item.display_name,
-        postalCode: item.address!.postcode!,
-        city: item.address?.city || item.address?.town || item.address?.village || '',
-      }));
+      .filter((item) => item.address?.postcode && item.address?.road)
+      .map((item) => {
+        const address = item.address!;
+        return {
+          label: item.display_name,
+          line1: address.house_number ? `${address.road} ${address.house_number}` : address.road!,
+          city: address.city || address.town || address.village || '',
+          postalCode: address.postcode!,
+          country: (address.country_code ?? '').toUpperCase(),
+        };
+      });
 
     return NextResponse.json({ results });
   } catch (err) {

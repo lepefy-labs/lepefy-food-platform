@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -49,6 +49,19 @@ interface CheckoutShipping {
   fulfillmentType: 'delivery' | 'pickup';
   country:         string | null;
   postalCode:      string | null;
+  line1:           string | null;
+  city:            string | null;
+}
+
+function readStoredShipping(): CheckoutShipping | null {
+  if (typeof window === 'undefined') return null;
+  const stored = sessionStorage.getItem('lepefy-checkout-shipping');
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as CheckoutShipping;
+  } catch {
+    return null;
+  }
 }
 
 type PaymentMode = 'stripe' | 'in_store';
@@ -112,46 +125,117 @@ function StripePaymentStep({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
-  const { items, totalPrice } = useCartStore();
+  const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
 
-  const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(null);
+  const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(() => readStoredShipping());
   const [step, setStep]                 = useState<'form' | 'payment'>('form');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentMode, setPaymentMode]   = useState<PaymentMode>('stripe');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError]   = useState<string | null>(null);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
+  // Ces trois valeurs peuvent changer pendant le checkout si l'utilisateur
+  // modifie le code postal ou le pays : le quoteToken doit toujours
+  // correspondre exactement à l'adresse envoyée à /api/checkout.
+  const [shippingTotal, setShippingTotal]     = useState<number>(
+    shippingInfo && shippingInfo.fulfillmentType !== 'pickup' ? shippingInfo.shippingTotal : 0,
+  );
+  const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(
+    shippingInfo?.shippingDetails ?? null,
+  );
+  const [quoteToken, setQuoteToken]           = useState<string | null>(shippingInfo?.quoteToken ?? null);
+  const [shippingRecalcError, setShippingRecalcError]         = useState<string | null>(null);
+  const [shippingRecalculating, setShippingRecalculating]     = useState(false);
+  const [quotedFor, setQuotedFor] = useState<{ country: string; postalCode: string } | null>(
+    shippingInfo?.country && shippingInfo?.postalCode
+      ? { country: shippingInfo.country, postalCode: shippingInfo.postalCode }
+      : null,
+  );
+  const recalcDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      line1:       shippingInfo?.line1 ?? '',
+      city:        shippingInfo?.city ?? '',
+      postal_code: shippingInfo?.postalCode ?? '',
+      country:     shippingInfo?.country ?? '',
+    },
   });
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('lepefy-checkout-shipping');
-    if (stored) {
-      try {
-        const info: CheckoutShipping = JSON.parse(stored);
-        setShippingInfo(info);
-        if (info.country)    setValue('country',     info.country);
-        if (info.postalCode) setValue('postal_code', info.postalCode);
-      } catch {
-        router.push('/cart');
-      }
-    } else {
+    if (!shippingInfo) {
       router.push('/cart');
+      return;
     }
     if (items.length === 0) router.push('/cart');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const subtotal        = totalPrice();
-  const shippingTotal   = shippingInfo?.fulfillmentType === 'pickup' ? 0 : (shippingInfo?.shippingTotal ?? 0);
-  const total           = subtotal + shippingTotal;
   const fulfillmentType = shippingInfo?.fulfillmentType ?? 'delivery';
   const isPickup        = fulfillmentType === 'pickup';
+  const effectiveShippingTotal = isPickup ? 0 : shippingTotal;
+  const total            = subtotal + effectiveShippingTotal;
+
+  // ── Recalcul live si le code postal / pays change en checkout ──────────────
+  const watchedPostalCode = watch('postal_code');
+  const watchedCountry    = watch('country');
+
+  useEffect(() => {
+    if (fulfillmentType !== 'delivery') return;
+    const zip = (watchedPostalCode ?? '').trim();
+    const c   = (watchedCountry ?? '').trim();
+    if (zip.length < 4 || !c) return;
+    if (quotedFor && quotedFor.country === c && quotedFor.postalCode === zip) return;
+
+    if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
+    recalcDebounceRef.current = setTimeout(async () => {
+      setShippingRecalculating(true);
+      setShippingRecalcError(null);
+      try {
+        const res = await fetch('/api/shipping/quote', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            items: shippingPayload(),
+            to:    { country: c, zip_code: zip },
+          }),
+        });
+        const data = await res.json();
+        if (data.available) {
+          setShippingTotal(data.shippingTotal);
+          setShippingDetails(data.shippingDetails ?? null);
+          setQuoteToken(data.quoteToken ?? null);
+          setQuotedFor({ country: c, postalCode: zip });
+        } else {
+          setShippingRecalcError(data.message ?? 'Livraison non disponible pour cette adresse.');
+          setQuoteToken(null);
+        }
+      } catch {
+        setShippingRecalcError('Erreur lors du calcul des frais de livraison.');
+        setQuoteToken(null);
+      } finally {
+        setShippingRecalculating(false);
+      }
+    }, 800);
+
+    return () => {
+      if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
+    };
+  }, [watchedPostalCode, watchedCountry, fulfillmentType, quotedFor, shippingPayload]);
+
+  const isSubmitDisabled =
+    isSubmitting ||
+    (fulfillmentType === 'delivery' && (shippingRecalculating || quoteToken === null));
 
   const onSubmit = async (data: FormValues) => {
     if (fulfillmentType === 'delivery' && (!data.line1 || !data.city || !data.postal_code)) {
       setSubmitError('Veuillez compléter votre adresse de livraison.');
+      return;
+    }
+    if (fulfillmentType === 'delivery' && quoteToken === null) {
+      setSubmitError('Veuillez corriger votre adresse pour recalculer les frais de livraison.');
       return;
     }
     setIsSubmitting(true);
@@ -179,9 +263,9 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
         email:           data.email,
         phone:           data.phone ?? null,
         fullName:        `${data.firstName} ${data.lastName}`,
-        shippingTotal,
-        shippingDetails: shippingInfo?.shippingDetails ?? null,
-        quoteToken:      shippingInfo?.quoteToken ?? null,
+        shippingTotal:   effectiveShippingTotal,
+        shippingDetails: isPickup ? null : shippingDetails,
+        quoteToken:      isPickup ? null : quoteToken,
         paymentMethod:   isPickup ? paymentMode : 'stripe',
       };
 
@@ -247,10 +331,12 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           <div className="flex justify-between text-sm text-gray-500">
             <span>Livraison</span>
             <span>
-              {shippingTotal === 0 ? (
+              {shippingRecalculating ? (
+                <span className="text-gray-400 text-xs animate-pulse">Recalcul en cours…</span>
+              ) : effectiveShippingTotal === 0 ? (
                 <span className="text-green-600 font-medium">Gratuit</span>
               ) : (
-                formatPrice(shippingTotal, tenant.currency)
+                formatPrice(effectiveShippingTotal, tenant.currency)
               )}
             </span>
           </div>
@@ -258,6 +344,9 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             <span>Total</span>
             <span>{formatPrice(total, tenant.currency)}</span>
           </div>
+          {!isPickup && shippingRecalcError && (
+            <p className="text-red-500 text-xs text-right">{shippingRecalcError}</p>
+          )}
         </div>
       </div>
 
@@ -381,15 +470,17 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitDisabled}
             className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
             {isSubmitting
               ? 'Traitement…'
-              : paymentMode === 'in_store'
-                ? `Confirmer la commande — ${formatPrice(total, tenant.currency)}`
-                : 'Continuer vers le paiement'
+              : shippingRecalculating
+                ? 'Recalcul des frais de livraison…'
+                : paymentMode === 'in_store'
+                  ? `Confirmer la commande — ${formatPrice(total, tenant.currency)}`
+                  : 'Continuer vers le paiement'
             }
           </button>
         </form>

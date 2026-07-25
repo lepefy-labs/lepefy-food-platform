@@ -29,6 +29,8 @@ export default function CartClient({ tenant }: Props) {
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
   const [country, setCountry] = useState('IT');
   const [postalCode, setPostalCode] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressCity, setAddressCity] = useState('');
   const [manualMode, setManualMode] = useState(false);
   const [shippingTotal, setShippingTotal] = useState<number | null>(null);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(null);
@@ -100,6 +102,8 @@ export default function CartClient({ tenant }: Props) {
         fulfillmentType,
         country: fulfillmentType === 'delivery' ? country : null,
         postalCode: fulfillmentType === 'delivery' ? postalCode : null,
+        line1: fulfillmentType === 'delivery' ? addressLine1 : null,
+        city: fulfillmentType === 'delivery' ? addressCity : null,
       }),
     );
     router.push('/checkout');
@@ -261,10 +265,17 @@ export default function CartClient({ tenant }: Props) {
             ) : (
               <AddressAutocomplete
                 country={country}
+                placeholder="Rue et numéro, ville"
                 onSelect={(r) => {
                   setPostalCode(r.postalCode);
+                  setAddressLine1(r.line1);
+                  setAddressCity(r.city);
                 }}
-                onManualFallback={() => setManualMode(true)}
+                onManualFallback={() => {
+                  setManualMode(true);
+                  setAddressLine1('');
+                  setAddressCity('');
+                }}
               />
             )}
           </div>
