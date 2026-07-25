@@ -54,6 +54,7 @@ const COPY: Record<Lang, {
   copy: string;
   copied: string;
   cashNote: string;
+  comingSoon: string;
 }> = {
   fr: {
     followUs: 'Suivez-nous',
@@ -64,6 +65,7 @@ const COPY: Record<Lang, {
     copy: 'Copier',
     copied: 'Copié !',
     cashNote: 'Espèces acceptées en boutique',
+    comingSoon: 'Boutique en ligne bientôt disponible',
   },
   it: {
     followUs: 'Seguici',
@@ -74,6 +76,7 @@ const COPY: Record<Lang, {
     copy: 'Copia',
     copied: 'Copiato!',
     cashNote: 'Contanti accettati in negozio',
+    comingSoon: 'Negozio online in arrivo',
   },
 };
 
@@ -111,6 +114,7 @@ interface DigitalCardProps {
     click_collect_address: string | null;
     click_collect_hours: string | null;
     whatsapp_number: string | null;
+    storefront_ready: boolean;
   };
   socialLinks: TenantSocialLink[];
   paymentMethods: TenantPaymentMethod[];
@@ -174,6 +178,33 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             ))}
           </div>
 
+          {tenant.whatsapp_number && (
+            <a
+              href={`https://wa.me/${tenant.whatsapp_number}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 rounded-lg px-3 py-3 mb-2.5"
+              style={{ backgroundColor: tenant.secondary_color }}
+            >
+              <IconBrandWhatsapp size={20} stroke={1.5} />
+              <span className="text-sm font-medium">{t.whatsapp}</span>
+            </a>
+          )}
+
+          {tenant.click_collect_address && (
+            <div className="flex items-start gap-2.5 py-2.5 border-b border-gray-100">
+              <IconMapPin size={17} stroke={1.5} className="text-gray-400 mt-0.5 shrink-0" />
+              <span className="text-sm text-gray-600 leading-relaxed">{tenant.click_collect_address}</span>
+            </div>
+          )}
+
+          {tenant.click_collect_hours && (
+            <div className="flex items-center gap-2.5 py-2.5 mb-3 border-b border-gray-100">
+              <IconClock size={17} stroke={1.5} className="text-gray-400 shrink-0" />
+              <span className="text-sm text-gray-600">{tenant.click_collect_hours}</span>
+            </div>
+          )}
+
           {paymentMethods.length > 0 && (
             <div className="mb-4">
               <p className="text-xs text-gray-400 mb-2">{t.payTitle}</p>
@@ -228,38 +259,15 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             </div>
           )}
 
-          {tenant.whatsapp_number && (
-            <a
-              href={`https://wa.me/${tenant.whatsapp_number}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-3 mb-2.5"
-              style={{ backgroundColor: tenant.secondary_color }}
-            >
-              <IconBrandWhatsapp size={20} stroke={1.5} />
-              <span className="text-sm font-medium">{t.whatsapp}</span>
-            </a>
-          )}
-
-          {tenant.click_collect_address && (
-            <div className="flex items-start gap-2.5 py-2.5 border-b border-gray-100">
-              <IconMapPin size={17} stroke={1.5} className="text-gray-400 mt-0.5 shrink-0" />
-              <span className="text-sm text-gray-600 leading-relaxed">{tenant.click_collect_address}</span>
-            </div>
-          )}
-
-          {tenant.click_collect_hours && (
-            <div className="flex items-center gap-2.5 py-2.5 border-b border-gray-100">
-              <IconClock size={17} stroke={1.5} className="text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-600">{tenant.click_collect_hours}</span>
-            </div>
-          )}
-
           <div className="flex items-center gap-2.5 py-2.5 mb-3 border-b border-gray-100">
-            <IconShoppingBag size={17} stroke={1.5} className="text-gray-400 shrink-0" />
-            <Link href="/" className="text-sm font-medium" style={{ color: tenant.primary_color }}>
-              {t.products} →
-            </Link>
+            <IconShoppingBag size={17} stroke={1.5} className={tenant.storefront_ready ? 'text-gray-400 shrink-0' : 'text-gray-300 shrink-0'} />
+            {tenant.storefront_ready ? (
+              <Link href="/" className="text-sm font-medium" style={{ color: tenant.primary_color }}>
+                {t.products} →
+              </Link>
+            ) : (
+              <span className="text-sm text-gray-400 italic">{t.comingSoon}</span>
+            )}
           </div>
 
           {socialLinks.length > 0 && (
@@ -287,15 +295,18 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             </>
           )}
 
+        </div>
+
+        <div className="sticky bottom-0 px-5 pb-5 pt-3 bg-gradient-to-t from-white via-white to-transparent">
           <a
             href="/api/card/vcard"
             download
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-700"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white shadow-sm"
+            style={{ backgroundColor: tenant.primary_color }}
           >
-            <IconUserPlus size={16} stroke={1.5} />
+            <IconUserPlus size={18} stroke={1.5} />
             {t.addContact}
           </a>
-
         </div>
       </div>
     </div>

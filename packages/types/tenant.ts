@@ -25,6 +25,7 @@ export interface Tenant {
   legal_email: string | null;
   legal_website: string | null;
   active: boolean;
+  storefront_ready: boolean;
   ai_image_generation: boolean;
   locales: string[];
   ai_description_generation: boolean;
@@ -33,8 +34,6 @@ export interface Tenant {
   ai_rate_limit_admin_per_day: number;
   ai_semantic_search: boolean;
   catalogue_search_threshold: number;
-  ai_chatbox_enabled: boolean;
-  chatbox_extra_context: string | null;
   // Spedizione
   shipping_provider: ShippingProvider;
   packlink_api_key: string | null;

@@ -35,6 +35,7 @@ export default async function CardPage() {
         click_collect_address: tenant.click_collect_address,
         click_collect_hours: tenant.click_collect_hours,
         whatsapp_number: tenant.whatsapp_number,
+        storefront_ready: tenant.storefront_ready,
       }}
       socialLinks={socialLinks}
       paymentMethods={paymentMethods}
