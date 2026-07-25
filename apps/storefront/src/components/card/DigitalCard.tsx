@@ -25,6 +25,7 @@ import {
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, PAYMENT_METHOD_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
+import { methodColor, hexToRgba, maskSensitiveValue } from '@/lib/card/methodColor';
 
 const ICONS = {
   IconBrandInstagram,
@@ -80,8 +81,8 @@ const COPY: Record<Lang, {
   },
 };
 
-function CopyableValue({ value, copyLabel: _copyLabel, copiedLabel: _copiedLabel }: {
-  value: string; copyLabel: string; copiedLabel: string;
+function CopyableValue({ value, displayValue, copyLabel: _copyLabel, copiedLabel: _copiedLabel }: {
+  value: string; displayValue?: string; copyLabel: string; copiedLabel: string;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -93,7 +94,7 @@ function CopyableValue({ value, copyLabel: _copyLabel, copiedLabel: _copiedLabel
       }}
       className="flex items-center justify-between w-full gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-left"
     >
-      <span className="font-mono text-xs text-gray-700 truncate">{value}</span>
+      <span className="font-mono text-xs text-gray-700 truncate">{displayValue ?? value}</span>
       {copied ? (
         <IconCheck size={14} stroke={2} className="text-green-600 shrink-0" />
       ) : (
@@ -138,7 +139,10 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
-      <div className="w-full max-w-sm bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+      <div
+        className="w-full max-w-sm bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden"
+        style={{ fontFamily: 'var(--font-card-body)' }}
+      >
 
         <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
 
@@ -153,7 +157,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
               <span className="font-semibold text-lg" style={{ color: tenant.primary_color }}>{initials}</span>
             )}
           </div>
-          <p className="text-white text-lg font-semibold">{tenant.name}</p>
+          <p className="text-white text-lg font-semibold" style={{ fontFamily: 'var(--font-card-heading)' }}>{tenant.name}</p>
           {tenant.tagline && (
             <p className="text-sm italic mt-1" style={{ color: tenant.accent_light }}>{tenant.tagline}</p>
           )}
@@ -207,30 +211,49 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
 
           {paymentMethods.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs text-gray-400 mb-2">{t.payTitle}</p>
+              <p className="text-xs text-gray-400 mb-2" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.payTitle}</p>
               <div className="flex flex-col gap-2">
                 {paymentMethods.map((pm) => {
                   const meta = PAYMENT_METHOD_REGISTRY[pm.method];
                   const Icon = PAYMENT_ICONS[meta.iconName];
                   const label = pm.label ?? meta.label;
 
+                  const color = methodColor(pm.method, tenant.primary_color);
+
                   return (
-                    <div key={pm.id} className="rounded-lg border border-gray-100 p-2.5">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon size={16} stroke={1.5} className="text-gray-500 shrink-0" />
-                        <span className="text-sm font-medium text-gray-800">{label}</span>
+                    <div
+                      key={pm.id}
+                      className="rounded-2xl p-3.5"
+                      style={{
+                        background: hexToRgba(color, 0.08),
+                        border: `1px solid ${hexToRgba(color, 0.25)}`,
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: color }}
+                        >
+                          <Icon size={16} stroke={1.8} className="text-white" />
+                        </div>
+                        <span className="text-sm font-bold text-gray-800" style={{ fontFamily: 'var(--font-card-heading)' }}>{label}</span>
                       </div>
 
                       {pm.method === 'cash' && (
-                        <p className="text-xs text-gray-400 pl-6">{t.cashNote}</p>
+                        <p className="text-xs text-gray-400 pl-[42px]">{t.cashNote}</p>
                       )}
 
                       {pm.method === 'bank_transfer' && pm.value && (
-                        <div className="pl-6 flex flex-col gap-1">
+                        <div className="pl-[42px] flex flex-col gap-1">
                           {pm.extra?.beneficiary && (
                             <p className="text-xs text-gray-500">{pm.extra.beneficiary}</p>
                           )}
-                          <CopyableValue value={pm.value} copyLabel={t.copy} copiedLabel={t.copied} />
+                          <CopyableValue
+                            value={pm.value}
+                            displayValue={maskSensitiveValue(pm.value)}
+                            copyLabel={t.copy}
+                            copiedLabel={t.copied}
+                          />
                           {pm.extra?.bic && (
                             <p className="text-[11px] text-gray-400">BIC: {pm.extra.bic}</p>
                           )}
@@ -242,7 +265,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                           href={pm.value}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="pl-6 text-xs font-medium underline"
+                          className="pl-[42px] text-xs font-medium underline"
                           style={{ color: tenant.primary_color }}
                         >
                           {pm.value}
@@ -250,7 +273,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                       )}
 
                       {pm.method === 'other' && pm.value && (
-                        <p className="text-xs text-gray-500 pl-6">{pm.value}</p>
+                        <p className="text-xs text-gray-500 pl-[42px]">{pm.value}</p>
                       )}
                     </div>
                   );
@@ -309,7 +332,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
           style={{ backgroundColor: tenant.primary_color }}
         >
           <IconUserPlus size={18} stroke={1.5} />
-          {t.addContact}
+          <span style={{ fontFamily: 'var(--font-card-heading)' }}>{t.addContact}</span>
         </a>
       </div>
     </div>

@@ -12,6 +12,7 @@ import {
   IconBrandLinkedin,
   IconBrandX,
 } from '@tabler/icons-react';
+import { methodColor } from './methodColor';
 
 const ICONS = { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet };
 
@@ -19,19 +20,6 @@ const ICONS_SOCIAL = {
   IconBrandInstagram, IconBrandFacebook, IconBrandTiktok,
   IconBrandYoutube, IconBrandLinkedin, IconBrandX,
 };
-
-// Colori brand a livello di piattaforma (non tenant-specific): PayPal blu
-// ufficiale, contanti verde, Satispay coral, virement/altro nel colore
-// primario del tenant (nessun brand fisso a cui ancorarsi). Migliora il
-// riconoscimento a colpo d'occhio rispetto a icone tutte in grigio.
-function methodColor(method: TenantPaymentMethod['method'], tenantPrimary: string): string {
-  switch (method) {
-    case 'paypal':   return '#003087';
-    case 'cash':     return '#2E7D32';
-    case 'satispay': return '#FF3B30';
-    default:         return tenantPrimary; // bank_transfer, other
-  }
-}
 
 interface PosterTemplateProps {
   tenant: {
