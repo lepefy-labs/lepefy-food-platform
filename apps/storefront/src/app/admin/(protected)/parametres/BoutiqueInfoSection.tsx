@@ -11,6 +11,7 @@ interface BoutiqueInfoSectionProps {
   whatsapp_number: string | null;
   click_collect_address: string | null;
   click_collect_hours: string | null;
+  click_collect_hours_it: string | null;
 }
 
 export function BoutiqueInfoSection({
@@ -18,12 +19,14 @@ export function BoutiqueInfoSection({
   whatsapp_number,
   click_collect_address,
   click_collect_hours,
+  click_collect_hours_it,
 }: BoutiqueInfoSectionProps) {
   const [form, setForm] = useState({
     tagline: tagline ?? '',
     whatsapp_number: whatsapp_number ?? '',
     click_collect_address: click_collect_address ?? '',
     click_collect_hours: click_collect_hours ?? '',
+    click_collect_hours_it: click_collect_hours_it ?? '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -106,6 +109,20 @@ export function BoutiqueInfoSection({
             onChange={(e) => setForm({ ...form, click_collect_hours: e.target.value })}
             className={INPUT_CLS}
           />
+        </div>
+
+        <div>
+          <label className={LABEL_CLS}>Horaires click & collect (italien)</label>
+          <input
+            type="text"
+            value={form.click_collect_hours_it}
+            onChange={(e) => setForm({ ...form, click_collect_hours_it: e.target.value })}
+            placeholder="ex: Lun-Sab: 9h-20h · Dom: 10h-19h"
+            className={INPUT_CLS}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Si vide, le français sera affiché même en italien.
+          </p>
         </div>
       </div>
 

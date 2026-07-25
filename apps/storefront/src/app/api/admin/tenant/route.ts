@@ -10,6 +10,7 @@ const EDITABLE_TENANT_FIELDS = [
   'whatsapp_number',
   'click_collect_address',
   'click_collect_hours',
+  'click_collect_hours_it',
   'legal_name',
   'legal_address',
   'legal_email',

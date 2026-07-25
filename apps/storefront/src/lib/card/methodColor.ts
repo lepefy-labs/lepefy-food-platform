@@ -33,3 +33,10 @@ export function maskSensitiveValue(value: string): string {
   if (clean.length <= 8) return value;
   return `${clean.slice(0, 4)} •••• •••• ${clean.slice(-4)}`;
 }
+
+// Distingue un indirizzo email (PayPal via email, copiabile) da un link
+// (PayPal.me o altro URL, cliccabile) — nessun campo DB aggiuntivo,
+// rilevamento diretto dal formato del valore salvato.
+export function isEmailValue(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}

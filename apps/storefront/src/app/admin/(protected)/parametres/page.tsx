@@ -39,6 +39,7 @@ export default async function ParametresPage() {
           whatsapp_number={tenant.whatsapp_number}
           click_collect_address={tenant.click_collect_address}
           click_collect_hours={tenant.click_collect_hours}
+          click_collect_hours_it={tenant.click_collect_hours_it}
         />
 
         <SocialLinksSection initialLinks={(socialLinks ?? []) as TenantSocialLink[]} />
