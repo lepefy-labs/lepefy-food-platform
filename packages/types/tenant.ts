@@ -33,6 +33,8 @@ export interface Tenant {
   ai_rate_limit_public_per_day: number;
   ai_rate_limit_admin_per_day: number;
   ai_semantic_search: boolean;
+  ai_chatbox_enabled: boolean;
+  chatbox_extra_context: string | null;
   catalogue_search_threshold: number;
   // Spedizione
   shipping_provider: ShippingProvider;
