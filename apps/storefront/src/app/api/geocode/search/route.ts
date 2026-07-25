@@ -10,7 +10,8 @@ import { NextResponse } from 'next/server';
 
 interface GeocodeResult {
   label: string;
-  line1: string;
+  street: string;
+  houseNumber: string;
   city: string;
   postalCode: string;
   country: string;
@@ -62,7 +63,8 @@ export async function GET(request: Request) {
         const address = item.address!;
         return {
           label: item.display_name,
-          line1: address.house_number ? `${address.road} ${address.house_number}` : address.road!,
+          street: address.road!,
+          houseNumber: address.house_number ?? '',
           city: address.city || address.town || address.village || '',
           postalCode: address.postcode!,
           country: (address.country_code ?? '').toUpperCase(),

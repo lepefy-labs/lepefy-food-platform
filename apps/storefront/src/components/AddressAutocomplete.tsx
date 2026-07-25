@@ -5,13 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 interface AddressAutocompleteProps {
   country: string;
   placeholder?: string;
-  onSelect: (result: { line1: string; city: string; postalCode: string; country: string; label: string }) => void;
+  onSelect: (result: { street: string; houseNumber: string; city: string; postalCode: string; country: string; label: string }) => void;
   onManualFallback?: () => void;
 }
 
 interface GeocodeResult {
   label: string;
-  line1: string;
+  street: string;
+  houseNumber: string;
   city: string;
   postalCode: string;
   country: string;

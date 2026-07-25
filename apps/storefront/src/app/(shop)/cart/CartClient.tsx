@@ -29,7 +29,8 @@ export default function CartClient({ tenant }: Props) {
   const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
   const [country, setCountry] = useState('IT');
   const [postalCode, setPostalCode] = useState('');
-  const [addressLine1, setAddressLine1] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressHouseNumber, setAddressHouseNumber] = useState('');
   const [addressCity, setAddressCity] = useState('');
   const [manualMode, setManualMode] = useState(false);
   const [shippingTotal, setShippingTotal] = useState<number | null>(null);
@@ -102,7 +103,8 @@ export default function CartClient({ tenant }: Props) {
         fulfillmentType,
         country: fulfillmentType === 'delivery' ? country : null,
         postalCode: fulfillmentType === 'delivery' ? postalCode : null,
-        line1: fulfillmentType === 'delivery' ? addressLine1 : null,
+        street: fulfillmentType === 'delivery' ? addressStreet : null,
+        houseNumber: fulfillmentType === 'delivery' ? addressHouseNumber : null,
         city: fulfillmentType === 'delivery' ? addressCity : null,
       }),
     );
@@ -268,12 +270,14 @@ export default function CartClient({ tenant }: Props) {
                 placeholder="Rue et numéro, ville"
                 onSelect={(r) => {
                   setPostalCode(r.postalCode);
-                  setAddressLine1(r.line1);
+                  setAddressStreet(r.street);
+                  setAddressHouseNumber(r.houseNumber);
                   setAddressCity(r.city);
                 }}
                 onManualFallback={() => {
                   setManualMode(true);
-                  setAddressLine1('');
+                  setAddressStreet('');
+                  setAddressHouseNumber('');
                   setAddressCity('');
                 }}
               />

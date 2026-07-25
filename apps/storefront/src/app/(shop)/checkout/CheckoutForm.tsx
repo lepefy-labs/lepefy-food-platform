@@ -34,7 +34,8 @@ const formSchema = z.object({
   lastName:    z.string().min(1, 'Nom requis'),
   email:       z.string().email('Email invalide'),
   phone:       z.string().optional(),
-  line1:       z.string().optional(),
+  street:      z.string().optional(),
+  houseNumber: z.string().optional(),
   city:        z.string().optional(),
   postal_code: z.string().optional(),
   country:     z.string().optional(),
@@ -49,7 +50,8 @@ interface CheckoutShipping {
   fulfillmentType: 'delivery' | 'pickup';
   country:         string | null;
   postalCode:      string | null;
-  line1:           string | null;
+  street:          string | null;
+  houseNumber:     string | null;
   city:            string | null;
 }
 
@@ -157,7 +159,8 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      line1:       shippingInfo?.line1 ?? '',
+      street:      shippingInfo?.street ?? '',
+      houseNumber: shippingInfo?.houseNumber ?? '',
       city:        shippingInfo?.city ?? '',
       postal_code: shippingInfo?.postalCode ?? '',
       country:     shippingInfo?.country ?? '',
@@ -230,7 +233,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     (fulfillmentType === 'delivery' && (shippingRecalculating || quoteToken === null));
 
   const onSubmit = async (data: FormValues) => {
-    if (fulfillmentType === 'delivery' && (!data.line1 || !data.city || !data.postal_code)) {
+    if (fulfillmentType === 'delivery' && (!data.street || !data.houseNumber || !data.city || !data.postal_code)) {
       setSubmitError('Veuillez compléter votre adresse de livraison.');
       return;
     }
@@ -253,7 +256,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           fulfillmentType === 'delivery'
             ? {
                 full_name:   `${data.firstName} ${data.lastName}`,
-                line1:       data.line1,
+                line1:       `${data.street} ${data.houseNumber}`.trim(),
                 city:        data.city,
                 postal_code: data.postal_code,
                 country:     data.country ?? shippingInfo?.country ?? 'IT',
@@ -398,7 +401,17 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
               <div className="space-y-3">
-                <input {...register('line1')} placeholder="Adresse" className={inputClass} />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <input {...register('street')} placeholder="Rue" className={inputClass} />
+                  </div>
+                  <div>
+                    <input {...register('houseNumber')} placeholder="Numéro" className={inputClass} />
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Indiquez « s.n. » si votre adresse n&apos;a pas de numéro
+                    </p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     {...register('postal_code')}
