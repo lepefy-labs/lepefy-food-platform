@@ -13,10 +13,13 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <PWABanner />
       <Header />
 
-      {/* Notification bar — ticker scorrevole CSS puro */}
+      {/* Notification bar — ticker scorrevole CSS puro.
+          Fond volontairement plus sombre que l'hero en dessous (color-mix
+          dérivé de --color-primary, jamais un noir fixe — reste correct
+          pour n'importe quel tenant). */}
       <div
         className="relative overflow-hidden shrink-0"
-        style={{ backgroundColor: 'var(--color-primary)', height: '36px' }}
+        style={{ backgroundColor: 'color-mix(in oklch, var(--color-primary) 25%, black)', height: '36px' }}
       >
         <style>{`
           @keyframes lepefy-ticker {
@@ -59,26 +62,13 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
         <div className="lepefy-ticker-track" aria-hidden="true">
           {[0, 1, 2].map((i) => (
             <span key={i} className="lepefy-ticker-item">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="13" height="13" viewBox="0 0 24 24"
-                fill="none" stroke="rgba(255,255,255,0.85)"
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                aria-hidden="true"
-                style={{ flexShrink: 0 }}
-              >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                <path d="M5 17h-2v-11a1 1 0 0 1 1 -1h9v12m-4 0h6m4 0h2v-6h-8m0 -5h5l3 5" />
-              </svg>
-              Livraison en Europe
+              🚚 Livraison en Europe
               <span className="lepefy-ticker-sep" />
-              Frais, surgelés &amp; épicerie fine
+              ❄️ Frais, surgelés &amp; épicerie fine
               <span className="lepefy-ticker-sep" />
-              Commandez depuis toute l&apos;Europe
+              🌍 Commandez depuis toute l&apos;Europe
               <span className="lepefy-ticker-sep" />
-              Produits africains authentiques
+              🌿 Produits africains authentiques
             </span>
           ))}
         </div>

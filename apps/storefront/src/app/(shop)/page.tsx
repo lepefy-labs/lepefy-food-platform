@@ -172,22 +172,18 @@ function HeroTrianglePattern({ patternId }: { patternId: string }) {
   );
 }
 
+// Emoji plutôt qu'icônes SVG monochromes pour les deux premiers badges —
+// décision de plateforme inversée (voir LEPEFY_PROJECT_CONTEXT.md §12).
+// "Sélection artisanale" garde son SVG en forme de blason : c'est un élément
+// de branding graphique fidèle au mockup, pas une icône fonctionnelle 1:1.
 const TRUST_ROW: { icon: ReactNode; label: string }[] = [
   {
     label: 'Livraison Europe',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="7" width="15" height="10" rx="1" /><path d="M16 10h4l3 3v4h-7z" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="19" r="2" />
-      </svg>
-    ),
+    icon: <span aria-hidden="true">🚚</span>,
   },
   {
     label: 'Frais & surgelés',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2v20M2 12h20" /><circle cx="12" cy="12" r="9" />
-      </svg>
-    ),
+    icon: <span aria-hidden="true">❄️</span>,
   },
   {
     label: 'Sélection artisanale',
@@ -298,7 +294,7 @@ function HeroBanner({
           <div className="flex flex-wrap gap-x-5 gap-y-2 mt-6">
             {TRUST_ROW.map(item => (
               <div key={item.label} className="flex items-center gap-1.5 text-white/90 text-xs font-semibold">
-                <span className="w-4 h-4 shrink-0">{item.icon}</span>
+                <span className="w-4 h-4 shrink-0 flex items-center justify-center text-sm leading-none">{item.icon}</span>
                 {item.label}
               </div>
             ))}
