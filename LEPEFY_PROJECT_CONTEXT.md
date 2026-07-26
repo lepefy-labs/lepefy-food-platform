@@ -1,6 +1,8 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
+> Aggiornato: 26 Luglio 2026 (v3.15) — stato riportato in chat da Robertin ("Fatto e testato ok!", poi "Fatto"), nessuna verifica indipendente contro git/filesystem in questa sessione. Ciclo "UX checkout — autocomplete indirizzo": sostituito il campo CAP libero nel carrello con autocomplete indirizzo via Nominatim (OpenStreetMap, proxy server-side `/api/geocode/search` + componente `AddressAutocomplete.tsx`); scoperto in test reale che la ricerca a livello di sola città non funziona per comuni con più CAP (es. Modena 41121–41126, confine amministrativo Nominatim senza `postcode` univoco) — un primo prompt di fix (reverse-geocoding) è stato scritto ma **reso obsoleto prima dell'esecuzione**, sostituito dalla decisione di richiedere sempre un indirizzo puntuale (via+civico), che elimina il problema alla radice; l'indirizzo selezionato nel carrello ora precompila i campi del form checkout (editabili), con ricalcolo automatico della spedizione (nuovo token HMAC) se l'utente modifica CAP/paese in checkout — necessario perché `/api/checkout` rifiuta ordini con token non corrispondente esattamente all'indirizzo inviato; via e numero civico infine separati in due campi distinti nel form (riduce rischio mancata consegna per civico dimenticato), separazione solo a livello UI — `line1` resta stringa unica concatenata ovunque a valle (DB, email n8n, Packlink, admin), nessuna migration necessaria. Nuova env var `NOMINATIM_USER_AGENT` impostata su Vercel. Dettaglio in §7bis (nuova sezione) e §35. Revisione precedente (v3.14) sotto.
+> Aggiornato: 26 Luglio 2026 (v3.14) — stato riportato in chat da Robertin ("Fatto tutto!" dopo screenshot), nessuna verifica indipendente contro git/filesystem in questa sessione. Ciclo "Digital card — riordino, stile, dati pagamento": nuovo flag `tenants.storefront_ready` (boutique online non ancora pronta, il link su `/card` diventa un messaggio muto invece di sparire), sezioni riordinate (contatto/WhatsApp/indirizzo/orari sopra i pagamenti), CTA "Ajouter aux contacts" portata da inline a `position: fixed` ancorata al viewport (il primo tentativo con `sticky` non funzionava per via di un antenato `overflow-hidden` — corretto in un secondo prompt), stile visivo integrato da un mockup Claude Design (font Manrope/DM Sans scoped alla sola card, badge colorati per metodo di pagamento con sfondo tinto, IBAN mascherato con copia del valore reale, copia rapida anche per intestatario/BIC), PayPal ora distingue email (copiabile) da link (cliccabile) per rilevamento automatico del formato, nuovo campo `tenants.click_collect_hours_it` per orari in italiano editabile da admin (fallback al francese se vuoto). **Non confermato:** l'ultimo prompt del ciclo (unificare messaggio boutique + social in un'unica card con tinta `tenant.accent_light`, per coerenza visiva con le card pagamento) è stato scritto ma non ancora testato da Robertin in questa sessione. Dettaglio in §14 (sezione riscritta) e §33. Revisione precedente (v3.13) sotto.
 > Aggiornato: 24 Luglio 2026 (v3.13) — confermato da Robertin in chat (nessuna verifica indipendente contro git/filesystem in questa sessione): migration 032+033 chatbox eseguite su Supabase, checklist go-live aggiornata di conseguenza. Integrata la "roadmap" discussa in chat per la chatbox: bozza `chatbox_extra_context` ChloeFood preparata ma non eseguita (dati email/paesi consegna da confermare), questionario di raccolta contenuto per Dalice preparato, regola "una voce = un concetto" formalizzata (con eccezione per `greeting`), due idee salvate in roadmap P3 (unificazione `chatbox_extra_context`/`click_collect_hours`, import batch multi-voce se il volume cresce). `ai_chatbox_enabled` e popolamento knowledge base restano da fare. Dettaglio in §13ter (sezioni aggiornate) e §32. Revisione precedente (v3.12) sotto.
 > Aggiornato: 23 Luglio 2026 (v3.12) — **verifica indipendente contro git/filesystem reale** (branch `claude/storefront-lang-toggle-related-11741t`, stesso branch su cui sono stati scritti sia il ciclo v3.11 sia il chatbox sotto). Nuova feature **Chatbox IA pubblica** (fasi 1+2): widget storefront con ricerca semantica su prodotti + knowledge base culturale curata a mano, filtro small-talk a costo zero, gated dietro `tenants.ai_chatbox_enabled` (default `false`, nessun tenant abilitato automaticamente). Scritta e verificata (typecheck) in questa sessione — non solo riportata in chat. **Scoperta operativa rilevante:** `git fetch origin main` mostra che Robertin ha già applicato entrambi gli zip di consegna direttamente su `main` (4 commit "Add files via upload", 24/07), quindi il codice chatbox **è già su `main`**, non solo su questo branch — confermato con `git diff HEAD origin/main` (zero differenze di codice, solo questo documento). Non verificabile da qui se le migration SQL 032/033 siano state eseguite su Supabase (nessuna riga chatbox esisterebbe finché non lo sono) — vedi §13ter e §18. Dettaglio completo in §13ter (nuova sezione). Revisione precedente (v3.11) sotto.
 > Aggiornato: 21 Luglio 2026 (v3.10) — chiusura ciclo barcode/full-bleed: migration 031 applicata al DB, PDF reale Gotenberg testato, prompt split tabella nutrizionale eseguito e testato. Rimossa la voce GS1 ufficiale dalla roadmap (curiosità di Robertin, non un'esigenza reale — non perseguita). Dettaglio in §29. Revisione precedente (v3.9) sotto.
@@ -121,6 +123,7 @@ lepefy-food-platform/
 │       │   │   └── api/
 │       │   │       ├── checkout/                    # Ricalcola prezzi/spedizione server-side, crea PaymentIntent
 │       │   │       ├── shipping/quote/               # Calcolo spedizione + emissione token HMAC
+│       │   │       ├── geocode/search/               # Nuovo (26/07) — proxy Nominatim per autocomplete indirizzo, vedi §7bis
 │       │   │       ├── webhooks/stripe/              # Crea ordine dopo payment_intent.succeeded (idempotente)
 │       │   │       ├── health/                       # Health check ({ ok, tenant, ts })
 │       │   │       ├── pwa-icon/                     # Icona PWA dinamica per tenant (sharp resize)
@@ -148,6 +151,7 @@ lepefy-food-platform/
 │       │   │   │   └── RelatedProducts.tsx   # Nuovo (23/07) — sezione "Produits similaires", riusa ProductCard variant shelf
 │       │   │   └── chat/
 │       │   │       └── ChatWidget.tsx        # Nuovo (23/07) — widget flottante chatbox, montato in (shop)/layout.tsx, vedi §13ter
+│       │   │   ├── AddressAutocomplete.tsx   # Nuovo (26/07) — autocomplete indirizzo via /api/geocode/search, riusato in cart + checkout, vedi §7bis
 │       │   ├── lib/
 │       │   │   ├── auth/
 │       │   │   │   └── requireAdmin.ts   # Guard riusato da tutte le API admin (sessione + whitelist) — unica eccezione: admin/login/route.ts
@@ -209,7 +213,7 @@ lepefy-food-platform/
 
 | Tabella | Descrizione |
 |---|---|
-| `tenants` | Un record per boutique. Colori, slug, Stripe account, `shipping_provider`, `show_powered_by`, `ai_image_generation`, `whatsapp_number`, `catalogue_search_threshold`, campi billing, **`locales`** (lingue attive, prima = default), **`ai_description_generation`**, **`ai_semantic_search`**, **`ai_rate_limit_public_per_minute`/`ai_rate_limit_public_per_day`/`ai_rate_limit_admin_per_day`**, **`barcode_prefix`** (3 cifre, assegnate automaticamente da trigger alla creazione tenant, mai a mano — vedi §16bis), **`barcode_sequence`** (contatore atomico), **`ai_chatbox_enabled`** (default `false`, nessun tenant abilitato automaticamente dalla migration), **`chatbox_extra_context`** (testo libero scritto a mano in admin, iniettato nel system prompt — mai generato dall'IA) — vedi §13ter |
+| `tenants` | Un record per boutique. Colori, slug, Stripe account, `shipping_provider`, `show_powered_by`, `ai_image_generation`, `whatsapp_number`, `catalogue_search_threshold`, campi billing, **`locales`** (lingue attive, prima = default), **`ai_description_generation`**, **`ai_semantic_search`**, **`ai_rate_limit_public_per_minute`/`ai_rate_limit_public_per_day`/`ai_rate_limit_admin_per_day`**, **`barcode_prefix`** (3 cifre, assegnate automaticamente da trigger alla creazione tenant, mai a mano — vedi §16bis), **`barcode_sequence`** (contatore atomico), **`ai_chatbox_enabled`** (default `false`, nessun tenant abilitato automaticamente dalla migration), **`chatbox_extra_context`** (testo libero scritto a mano in admin, iniettato nel system prompt — mai generato dall'IA), **`storefront_ready`** (default `true`, se `false` il link boutique su `/card` diventa un messaggio muto "bientôt disponible" invece di un link — nuovo dal 26/07, vedi §14), **`click_collect_hours_it`** (orari click & collect in italiano, editabile da admin, fallback su `click_collect_hours` francese se vuoto — nuovo dal 26/07, vedi §14) — vedi §13ter |
 | `categories` | Categorie prodotti per tenant (con supporto background per etichette) |
 | `products` | Prodotti — `storage_type` (dry/fresh/frozen), `weight_grams`, `position`, `warehouse_location`, `name_alt` (⚠️ dal 23/07 letto anche dal titolo prodotto storefront, non più solo dall'editor etichette — vedi §12bis Fase 4), `producer_id`/`importer_id`, campi etichetta (ingredienti, allergeni, nutrizione, paese origine), **`descriptions`** jsonb multilingue (`{"fr":"...","it":"..."}`), **`description_source`** (`ai`/`human`), **`embedding`** vector(768) per ricerca semantica (dal 23/07 riusato anche per i prodotti correlati, vedi §12bis Fase 4), **`barcode_value`** (EAN-13 a 13 cifre, generato internamente, unique a livello piattaforma), **`barcode_generated_at`** — vedi §16bis |
 | `ai_pricing` | Listino prezzi AI configurabile — `provider` (`gemini`, futuro `anthropic`), `model`, prezzi input/output/immagine per milione token, `currency`. Aggiornato via SQL quando i provider cambiano prezzo, mai hardcoded nel codice |
@@ -273,6 +277,8 @@ lepefy-food-platform/
 | `031_barcode_system.sql` | Sistema barcode EAN-13 interno: `tenants.barcode_prefix`/`barcode_sequence`, trigger `assign_tenant_barcode_prefix` (assegna il prefisso alla creazione tenant), funzione `next_product_barcode()` (generazione atomica + checksum), `products.barcode_value`/`barcode_generated_at`, backfill dei 121 prodotti chloefood esistenti — **✅ applicata al DB, PDF reale testato**, vedi §16bis |
 | `032_ai_chatbox.sql` | `tenants.ai_chatbox_enabled` (default `false`) + `tenants.chatbox_extra_context` (testo libero admin, mai IA) — **numerata 032 perché 029/030/031 già occupate** al momento della scrittura (il prompt originale la chiamava `029_ai_chatbox.sql`, rinumerata prima della consegna); vedi §13ter |
 | `033_ai_chatbox_knowledge_base.sql` | Tabella `tenant_knowledge_base` (contenuto curato a mano) + indice HNSW + funzione `match_knowledge_base(query_embedding, p_tenant_id, match_count, min_similarity)`, stesso pattern di `match_products` — **numerata 033 per lo stesso motivo di collisione** (il prompt originale la chiamava `030_...`); vedi §13ter |
+| `034_storefront_ready.sql` *(numero atteso, non riverificato)* | `tenants.storefront_ready` boolean default `true` — i prompt di questo ciclo (26/07) istruivano Claude Code a controllare l'ultima migration esistente e usare il numero successivo, senza fissarne uno: **034 è la numerazione attesa in base alla sequenza sopra, non confermata contro il filesystem reale in questa sessione** — vedi §14 |
+| `035_click_collect_hours_it.sql` *(numero atteso, non riverificato)* | `tenants.click_collect_hours_it` text nullable — stesso discorso di numerazione attesa non verificata del punto sopra — vedi §14 |
 
 **Non esistono file 005 e 012** — non sono stati saltati per errore, la numerazione riflette semplicemente collisioni risolte con suffissi (003b/003c) o rinomina all'atto della scrittura, come documentato nei commenti di intestazione di `018` e `023`.
 
@@ -386,6 +392,46 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento — **Stripe Payment Link** (~1,59 € commissione/transazione) e **bonifico bancario** (0 commissioni, opzione raccomandata, causale bonifico auto-generata). Automazione billing completa (Customer Portal / webhook ricorrenti) valutata e **scartata volontariamente** per lo stage attuale: 1 solo tenant attivo, relazione diretta preferita a soluzione tecnica complessa. PayPal personale esplicitamente sconsigliato per raccolta pagamenti business.
 
 ⚠️ **Gap noto:** lo storefront non controlla mai `tenants.subscription_status` — un tenant con abbonamento scaduto continuerebbe a vendere indefinitamente. Nessun enforcement automatico implementato.
+
+---
+
+## 7bis. UX indirizzo di spedizione — autocomplete Nominatim
+
+Ciclo nato da uno screenshot di Robertin: il campo "Code postal" libero nel carrello (necessario per la stima spedizione, §6) presuppone che l'utente ricordi il proprio CAP a memoria — attrito reale, specialmente su mobile. Tre iterazioni successive nella stessa sessione, dettagliate di seguito.
+
+### Iterazione 1 — autocomplete a livello città (poi corretta)
+
+- Nuova route `apps/storefront/src/app/api/geocode/search/route.ts`: proxy server-side verso Nominatim (OpenStreetMap, gratuito), mai chiamato direttamente dal client — richiede uno `User-Agent` identificativo per la usage policy di Nominatim (`NOMINATIM_USER_AGENT`, nuova env var Vercel)
+- Nuovo componente `apps/storefront/src/components/AddressAutocomplete.tsx`: debounce 450ms, `AbortController` per race condition su digitazione rapida, dropdown risultati, fallback manuale sempre disponibile (mai bloccare l'utente), attribuzione OpenStreetMap richiesta da licenza ODbL
+- **Problema scoperto in test reale su Vercel preview:** cercando solo il nome di una città (es. "Modena"), Nominatim associa `postcode` ai risultati di tipo indirizzo puntuale, ma **non** ai confini amministrativi di comuni con più zone CAP (Modena: 41121–41126) — il filtro "scarta risultati senza postcode" restituiva quindi zero suggerimenti utilizzabili
+- Un prompt di fix è stato scritto (`ClaudeCode_Prompt_FixGeocodeCityPostcode.md` — fallback: se il match città non ha `postcode`, reverse-geocoding sulle sue coordinate a zoom alto per stimarne uno) ma **reso obsoleto prima dell'esecuzione** dalla decisione presa nell'iterazione 2 sotto — non eseguirlo se non lo è già stato, non più necessario
+
+### Iterazione 2 — indirizzo puntuale + precompilazione checkout + ricalcolo live
+
+Decisione: invece di gestire il caso limite del CAP multiplo, il campo richiede sempre un **indirizzo puntuale** (via + civico) — elimina il problema alla radice, e in più produce dati riusabili nel checkout invece che solo un CAP isolato.
+
+- `GeocodeResult` esteso con `line1` (poi `street`+`houseNumber` separati, vedi iterazione 3), `city`, `country`
+- Nel carrello, la selezione di un indirizzo popola anche questi campi (non solo `postalCode`) e li salva in `sessionStorage` (`lepefy-checkout-shipping`) insieme a `shippingTotal`/`shippingDetails`/`quoteToken` già esistenti
+- In checkout (`CheckoutForm.tsx`), i campi indirizzo vengono **precompilati** da questi dati letti da `sessionStorage` nei `defaultValues` del form, ma restano **completamente editabili**
+- **Ricalcolo live:** se l'utente modifica `postal_code` o `country` in checkout, `watch()` di react-hook-form intercetta il cambio (debounce 800ms, coerente col carrello) e richiama `/api/shipping/quote` per un nuovo `quoteToken` — necessario perché `/api/checkout` verifica che il token corrisponda **esattamente** a `country`+`postal_code` dell'indirizzo inviato (`quoteToken.ts`, invariato) e rifiuterebbe altrimenti l'ordine con "l'adresse a changé, repassez par le panier". Submit disabilitato durante il ricalcolo
+- Il flusso `manualMode` (indirizzo non trovato dall'autocomplete → CAP libero) resta come rete di sicurezza: in quel caso i campi indirizzo restano vuoti in checkout, compilati a mano come già accadeva prima di questo ciclo
+
+### Iterazione 3 — separazione via / numero civico
+
+Motivazione di Robertin: un campo "adresse" libero è la causa più comune di mancata consegna quando il civico viene dimenticato. Il form checkout ora ha due campi distinti — "Rue" e "Numéro" — entrambi obbligatori, `houseNumber` testo libero non numerico (accetta "42/A", "s.n." per indirizzi rurali senza civico, mai bloccante per casi legittimi).
+
+**Punto implementativo chiave:** la separazione è **solo a livello di UI e validazione del form**. Al submit i due campi vengono riconcatenati in un unico `line1` (es. "Via Emilia 42") — tutto ciò che sta a valle (DB `orders.shipping_address`, template email n8n, payload Packlink, vista admin ordine) continua a ricevere `line1` come stringa singola, esattamente come prima. **Nessuna migration DB necessaria.**
+
+### File chiave (nuovi/modificati in questo ciclo)
+
+- `apps/storefront/src/app/api/geocode/search/route.ts` — nuovo, proxy Nominatim
+- `apps/storefront/src/components/AddressAutocomplete.tsx` — nuovo, riutilizzabile
+- `apps/storefront/src/app/(shop)/cart/CartClient.tsx` — modificato: cattura indirizzo puntuale invece di CAP libero, lo passa a `sessionStorage`
+- `apps/storefront/src/app/(shop)/checkout/CheckoutForm.tsx` — modificato: precompilazione campi + ricalcolo live + due campi via/civico
+
+### Stato
+
+Confermato funzionante in chat da Robertin ("Fatto e testato ok!", poi "Fatto e testato" per l'ultimo prompt) — **non verificato indipendentemente contro git/filesystem** in questa sessione (come v3.8–v3.11, v3.13, v3.14). Nessun debito residuo noto segnalato da Robertin sui test manuali richiesti (ordine con CAP modificato in checkout, civico "s.n.", email/admin/Packlink invariati).
 
 ---
 
@@ -751,7 +797,26 @@ Il bot **non risponde mai** ad allergeni, ingredienti, valori nutrizionali, lott
 - Architettura rigorosamente multi-tenant: nessun colore/URL/telefono/piattaforma social hardcoded, tutto da `tenants` + `tenant_social_links`
 - Pricing concordato con Dalice: 100 € totali per landing page + biglietto digitale + QR (stampa fisica esclusa)
 
-**Metodi di pagamento (nuovo):** tabella `tenant_payment_methods` (migration 030) — `satispay` / `bank_transfer` / `cash` / `paypal` / `other`, con `label`/`value`/`extra` (jsonb, per `beneficiary`/`bic` sul bonifico), CRUD completo in `/admin/parametres` (`PaymentMethodsSection.tsx` + `api/admin/payment-methods/`). Sezione "Comment payer" mostrata su `/card` subito dopo il toggle lingua, prima del bottone WhatsApp — priorità deliberata: è il motivo principale per cui un cliente scansiona il poster in negozio. Solo icona + etichetta, mai i valori sul poster stampato (vedi sotto) — così i dati sensibili restano dietro al QR e un cambio di IBAN non richiede ristampa. ⚠️ ChloeFood ha ancora dati placeholder attivi (IBAN fittizio, `paypal.me/CHANGEME`) — non condividere `/card` né stampare il poster prima della sostituzione con i dati reali di Dalice.
+**Metodi di pagamento:** tabella `tenant_payment_methods` (migration 030) — `satispay` / `bank_transfer` / `cash` / `paypal` / `other`, con `label`/`value`/`extra` (jsonb, per `beneficiary`/`bic` sul bonifico), CRUD completo in `/admin/parametres` (`PaymentMethodsSection.tsx` + `api/admin/payment-methods/`). ⚠️ ChloeFood ha ancora dati placeholder attivi (IBAN fittizio, `paypal.me/CHANGEME`) — non condividere `/card` né stampare il poster prima della sostituzione con i dati reali di Dalice.
+
+**⚠️ Ordine sezioni cambiato dal 26/07** (vedi ciclo sotto): il blocco contatto (WhatsApp/indirizzo/orari) ora precede "Comment payer", non lo segue più. La nota storica "priorità deliberata, motivo principale per cui un cliente scansiona il poster" (dalla revisione v3.8) **non riflette più l'ordine reale** — decisione rivista in sessione: la card oggi è condivisa direttamente con clienti già in trattativa (non solo scansionata da un poster anonimo in negozio), per cui orientamento/contatto viene prima del "come pagare". Solo icona + etichetta restano sul poster stampato, mai i valori — così un cambio di IBAN non richiede ristampa.
+
+### Ciclo "Digital card — riordino, stile, dati pagamento" (26/07) — ✅ confermato in chat ("Fatto tutto!"), tranne l'ultimo punto
+
+Come per altri cicli post-audit di questo documento, lo stato sotto riflette il report di Robertin in chat (screenshot + conferma), non una verifica indipendente contro git/filesystem.
+
+- **Boutique in costruzione (`storefront_ready`):** nuovo flag booleano su `tenants` (default `true`, multi-tenant — nessun valore hardcoded per ChloeFood). Quando `false`, il link "Voir nos produits →" verso lo storefront (`/`) diventa una riga muta non cliccabile ("Boutique en ligne bientôt disponible" / it: "Negozio online in arrivo"), stessa icona, stile spento (grigio, corsivo, nessuna freccia). Motivazione: `/card` è già condivisa con clienti reali per i pagamenti mentre lo storefront è ancora in redesign — non si vuole che ci arrivino sopra. Non implementata la variante più ampia discussa inizialmente (pagina "coming soon" a livello di intero route group `(shop)` con bypass admin/link segreto) — scartata a favore della soluzione minima, coerente col principio "no premature complexity" (§20)
+- **CTA "Ajouter aux contacts" sempre visibile in scroll:** richiesta esplicita di Robertin. Primo tentativo con `position: sticky` **non ha funzionato** — bug CSS reale, non solo di implementazione: `sticky` calcola la posizione rispetto al primo antenato con `overflow` diverso da `visible`, e il contenitore card ha `overflow-hidden` (per gli angoli arrotondati) con altezza `auto` pari al contenuto, quindi lo sticky non aveva spazio per ancorarsi — il bottone restava semplicemente in fondo al flusso normale. **Fix:** bottone spostato fuori dal contenitore `overflow-hidden`, reso `position: fixed` ancorato al viewport (`bottom-0 left-0 right-0`), larghezza vincolata a `max-w-sm` per allinearsi visivamente alla card, `padding-bottom: env(safe-area-inset-bottom)` per gli iPhone con home indicator, `pb-28` aggiunto al contenuto scrollabile della card per non farlo coprire dal bottone fisso. Confermato funzionante ("Ok, ora funziona!")
+- **Stile integrato da un mockup Claude Design** (condiviso da Robertin, non versionato nel repo — link `claude.ai/design/...` non accessibile senza login, contenuto ricevuto come file `StoreCard.tsx` caricato in chat): solo alcuni elementi integrati nello stile già in produzione, non una sostituzione completa (decisione esplicita di Robertin) —
+  - Font **Manrope** (titoli/label) + **DM Sans** (corpo) caricati via `next/font/google`, **scoped alla sola card** (variabili CSS `--font-card-heading`/`--font-card-body`, applicate solo dentro `card/page.tsx`) — deliberatamente **non** allineati al Bricolage Grotesque della piattaforma (§2/§12bis), scelta confermata voluta da Robertin
+  - Nuovo file condiviso `apps/storefront/src/lib/card/methodColor.ts`: `methodColor()` (colori brand per metodo — PayPal blu ufficiale, contanti verde, Satispay coral, bonifico/altro nel colore primario del tenant) estratta da `PosterTemplate.tsx` per essere riusata anche da `DigitalCard.tsx` senza duplicazione; più `hexToRgba()` (sfondi tinti) e `maskSensitiveValue()`/`isEmailValue()` (vedi sotto)
+  - Ogni metodo di pagamento ora in una card `rounded-2xl` con sfondo tinto (`hexToRgba(methodColor(...), 0.08)`) e badge icona colorato 32×32px, invece del riquadro grigio piatto precedente
+  - **IBAN mascherato**: il valore mostrato tiene visibili solo le prime/ultime 4 cifre (`FR76 •••• •••• •696`), ma il bottone copia negli appunti il valore **reale completo** — pensato per non esporre dati bancari in chiaro durante screenshot/condivisione schermo. PayPal/Satispay restano link cliccabili invariati (non sono dati sensibili da mascherare)
+- **PayPal — email o link, rilevati automaticamente:** `isEmailValue()` distingue un indirizzo email (es. `nome@dominio.com`, reso copiabile come l'IBAN, senza mascheramento) da un URL tipo `paypal.me/...` (resta link cliccabile) — nessun campo DB nuovo, solo pattern-matching sul valore già salvato in `pm.value`
+- **Copia rapida anche per intestatario e BIC** sul metodo bonifico: nuovo componente leggero `CopyableLine` (icona copia inline, senza lo sfondo più marcato di `CopyableValue` usato per l'IBAN principale) accanto a `pm.extra.beneficiary`/`pm.extra.bic`
+- **Orari in italiano dedicati (`click_collect_hours_it`):** nuovo campo testo libero su `tenants`, editabile in `/admin/parametres` (sezione "Infos boutique", sotto "Horaires click & collect"), mostrato su `/card` quando la lingua attiva è IT — **fallback automatico sul francese se vuoto**, mai una riga vuota. Scelta deliberata rispetto all'alternativa (traduzione automatica dei nomi giorno FR→IT): un campo dedicato modificabile da admin regge qualunque formato un tenant scelga di usare, una traduzione automatica per pattern si romperebbe silenziosamente su formati diversi da quello di ChloeFood — coerente con la regola multi-tenant. ⚠️ **Da fare:** compilare il campo per ChloeFood in Paramètres — finché resta vuoto la card mostra sempre gli orari francesi anche in modalità IT (comportamento sicuro, mai una riga mancante, ma non ancora tradotto)
+- **⚠️ Non confermato — card boutique+social unificata:** ultimo prompt del ciclo, richiesto dopo che uno screenshot mostrava il blocco "Boutique en ligne bientôt disponible" + "Suivez-nous" visivamente staccato dal resto (bordo sopra, spazio bianco sotto le icone social) rispetto alle nuove card colorate dei metodi di pagamento. Fix proposto: racchiudere entrambi in un'unica card `rounded-2xl` con sfondo tinto `tenant.accent_light` (non un grigio fisso — coerente multi-tenant), rimuovendo il vecchio divisore `border-b` esterno. **Scritto ma non ancora testato da Robertin in questa sessione**, da confermare nella prossima
+- File toccati in questo ciclo: `apps/storefront/src/lib/card/methodColor.ts` (nuovo), `apps/storefront/src/lib/card/PosterTemplate.tsx` (import aggiornato, nessun'altra modifica), `apps/storefront/src/lib/supabase/types.ts`, `apps/storefront/src/app/api/admin/tenant/route.ts` (`EDITABLE_TENANT_FIELDS` esteso con `click_collect_hours_it`), `apps/storefront/src/app/admin/(protected)/parametres/BoutiqueInfoSection.tsx` e `page.tsx`, `apps/storefront/src/app/card/page.tsx`, `apps/storefront/src/components/card/DigitalCard.tsx` (il più modificato: font, riordino sezioni, CTA fissa, badge pagamento, PayPal/IBAN, orari IT, card boutique+social)
 
 **Réseaux sociaux — ora autogestibili:** `tenant_social_links` (migration 017) esisteva da tempo ma senza alcuna UI/API admin — scoperto durante questo ciclo. Aggiunto CRUD mirror del pattern payment-methods (`SocialLinksSection.tsx` + `api/admin/social-links/`), upsert su `unique(tenant_id, platform)` invece di blocco lato UI (edge case noto: cambiare la piattaforma di un link esistente verso una già in uso sovrascrive silenziosamente, nessuna conferma richiesta — rischio giudicato accettabile, dato recuperabile).
 
@@ -893,6 +958,9 @@ ADMIN_EMAILS=...
 # Gotenberg (necessaria per /api/admin/labels/generate — throw esplicito se assente)
 GOTENBERG_URL=...
 GOTENBERG_AUTH=...
+
+# Geocoding autocomplete indirizzo (Nominatim/OpenStreetMap, §7bis)
+NOMINATIM_USER_AGENT=LepefyFoodPlatform/1.0 (robertin.smartinvestor@gmail.com)
 ```
 
 ---
@@ -935,6 +1003,12 @@ GOTENBERG_AUTH=...
 | Popolare `chatbox_extra_context` ChloeFood (orari, indirizzo Click&Collect, paesi consegna, soglia spedizione gratuita) | Robertin | ⚠️ DA FARE — bozza SQL preparata in chat, in attesa di conferma email/telefono pro e paesi consegna reali prima dell'esecuzione, vedi §13ter |
 | Abilitare `ai_chatbox_enabled` per ChloeFood (`UPDATE tenants ... WHERE slug = 'chloefood'`) e test manuale su preview | Robertin | ⚠️ DA FARE — vedi §13ter |
 | Raccogliere contenuto reale da Dalice per `tenant_knowledge_base` (ricette, espressioni, FAQ) | Dalice / Robertin | ⚠️ DA FARE — tabella vuota, questionario di raccolta già preparato, vedi §13ter |
+| Riordino card, messaggio boutique in costruzione, CTA fissa, stile pagamenti (font/badge/mascheramento IBAN), PayPal email/link, copia beneficiario/BIC | Robertin | ✅ FATTO — confermato in chat ("Fatto tutto!"), vedi §14 |
+| Card unificata boutique+social (`tenant.accent_light`) | Robertin | ⚠️ Prompt scritto, esecuzione non ancora confermata in questa sessione — vedi §14 |
+| Impostare `storefront_ready = false` per ChloeFood finché lo storefront non è pronto (`UPDATE tenants ...`) | Robertin | ⚠️ DA FARE — query pronta, vedi §14 |
+| Compilare `click_collect_hours_it` per ChloeFood in Paramètres | Robertin / Dalice | ⚠️ DA FARE — finché vuoto la card mostra gli orari francesi anche in IT (fallback sicuro, non bloccante), vedi §14 |
+| Autocomplete indirizzo spedizione (Nominatim) — precompilazione + ricalcolo live in checkout, separazione via/civico | Robertin | ✅ FATTO — confermato in chat ("Fatto e testato ok!"/"Fatto"), vedi §7bis |
+| Impostare `NOMINATIM_USER_AGENT` su Vercel (env var) | Robertin | ✅ FATTO |
 
 ---
 
@@ -972,6 +1046,7 @@ GOTENBERG_AUTH=...
 | Unificare `chatbox_extra_context` con `tenants.click_collect_hours` esistente (migration 009) — oggi rischiano di duplicare la stessa informazione (orari) in due campi che possono disallinearsi | Tecnico | P3 | Idea salvata, non implementata — il system prompt del chatbox potrebbe leggere `click_collect_hours` direttamente invece di richiederne la ritrascrizione manuale in `chatbox_extra_context` |
 | Import batch multi-voce per `tenant_knowledge_base` (incolla un blocco di testo con separatore, il server lo spezza e calcola gli embedding uno per uno) | Tecnico | P3 | Idea salvata, non implementata — non necessaria per il volume iniziale (8-10 voci), da valutare solo se il volume di contenuto da Dalice/altri tenant cresce molto |
 | Estendere `name_alt` da campo singolo a jsonb multilingua (come `descriptions`) per un tenant futuro a 3+ lingue | Tecnico | P2 | Non avviato — limite noto, non bloccante con 2 lingue, vedi §12bis Fase 4 |
+| Self-hosting Nominatim su Hetzner (coerente con approccio data sovereignty/no recurring cost già usato per Gotenberg/rembg) | Tecnico | P3 | Idea salvata, non implementata — istanza pubblica sufficiente al volume attuale, vedi §7bis |
 
 ### Phase 2 — Packlink draft feature (dettaglio)
 
@@ -1028,6 +1103,15 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 | `ClaudeCode_Prompt_ProductLocaleToggle_RelatedProducts.md` | Prompt Claude Code per toggle lingua a livello descrizione, titolo prodotto localizzato (`name_alt`) e prodotti correlati semantici (file esterno, non nel repo) — vedi §12bis Fase 4 |
 | `ClaudeCode_Prompt_ChatboxIA.md` | Prompt Claude Code Fase 1 chatbox: widget storefront + ricerca semantica prodotti + rate limiting/cost tracking riusati (file esterno, non nel repo) — vedi §13ter |
 | `ClaudeCode_Prompt_ChatboxIA_Fase2.md` | Prompt Claude Code Fase 2 chatbox: filtro small-talk, `tenant_knowledge_base`, admin `/ai-lab` (file esterno, non nel repo) — vedi §13ter |
+| `ClaudeCode_Prompt_CardReorgAndConstructionMsg.md` | Prompt Claude Code: flag `storefront_ready`, riordino sezioni card, messaggio boutique in costruzione, CTA sticky (primo tentativo) (file esterno, non nel repo) — vedi §14 |
+| `ClaudeCode_Prompt_FixCtaFixed.md` | Prompt Claude Code: fix CTA da `sticky` (non funzionante) a `fixed` ancorata al viewport (file esterno, non nel repo) — vedi §14 |
+| `ClaudeCode_Prompt_CardStyleIntegration.md` | Prompt Claude Code: integrazione stile da mockup Claude Design — font Manrope/DM Sans scoped, badge colorati pagamento, mascheramento IBAN (file esterno, non nel repo) — vedi §14 |
+| `ClaudeCode_Prompt_PaypalIbanHoursIT.md` | Prompt Claude Code: PayPal email/link, copia beneficiario/BIC, campo `click_collect_hours_it` (file esterno, non nel repo) — vedi §14 |
+| `ClaudeCode_Prompt_UnifyBoutiqueSocialCard.md` | Prompt Claude Code: unificazione card boutique+social con tinta `tenant.accent_light` (file esterno, non nel repo) — esecuzione non confermata, vedi §14 |
+| `ClaudeCode_Prompt_AddressAutocomplete.md` | Prompt Claude Code: autocomplete indirizzo Nominatim nel carrello, iterazione 1 (solo città) (file esterno, non nel repo) — vedi §7bis |
+| `ClaudeCode_Prompt_FixGeocodeCityPostcode.md` | Prompt Claude Code: fix reverse-geocoding per CAP mancante su ricerca città (file esterno, non nel repo) — **reso obsoleto, non eseguito**, superato dall'iterazione 2, vedi §7bis |
+| `ClaudeCode_Prompt_AddressAutocompleteCheckoutSync.md` | Prompt Claude Code: indirizzo puntuale + precompilazione checkout + ricalcolo live spedizione (file esterno, non nel repo) — vedi §7bis |
+| `ClaudeCode_Prompt_SplitStreetHouseNumber.md` | Prompt Claude Code: separazione via/numero civico in checkout, `line1` concatenato solo al submit (file esterno, non nel repo) — vedi §7bis |
 
 ---
 
@@ -1200,4 +1284,38 @@ Nessuna modifica alle sezioni non toccate da questo ciclo (shipping, checkout, n
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.13 — 24 Luglio 2026 (base: v3.12; confermata esecuzione migration 032/033 chatbox su Supabase, documentata la roadmap di popolamento contenuto (chatbox_extra_context, knowledge base, questionario Dalice) discussa in chat — nessuna modifica di codice in questo ciclo; vedi §32 e §13ter per il dettaglio)*
+## 33. Changelog v3.14 (26 Luglio 2026) — Digital card: riordino, stile, dati pagamento
+
+Come v3.9/v3.11/v3.13, questa revisione documenta lo stato riportato in chat da Robertin (screenshot + "Fatto tutto!"), non una verifica indipendente contro git/filesystem come v3.7/v3.12. Un punto del ciclo resta esplicitamente non confermato (vedi sotto).
+
+- **Intestazione** — nuova voce v3.14.
+- **§4** — riga `tenants` estesa con `storefront_ready`/`click_collect_hours_it`; tabella migrations estesa con `034_storefront_ready.sql`/`035_click_collect_hours_it.sql`, entrambe marcate come **numero atteso non riverificato** (i prompt di questo ciclo istruivano Claude Code a controllare l'ultima migration esistente e usare il successivo, senza fissare un numero — a differenza dei cicli precedenti dove la collisione era nota in anticipo).
+- **§14** — sezione riscritta: nota sul cambio d'ordine delle sezioni (contatto ora prima di "Comment payer", motivazione aggiornata rispetto a v3.8) + nuova sottosezione dedicata al ciclo con il dettaglio di ciascun prompt (flag `storefront_ready`, fix CTA sticky→fixed, integrazione stile da mockup Claude Design con font scoped/badge colorati/mascheramento IBAN, PayPal email/link, copia beneficiario/BIC, `click_collect_hours_it`, card boutique+social non confermata).
+- **§18** — 4 nuove righe: ciclo principale segnato ✅ FATTO, card boutique+social segnata ⚠️ non confermata, più due azioni manuali da fare (disattivare `storefront_ready` per ChloeFood, compilare `click_collect_hours_it`).
+- **§21** — aggiunti i 5 prompt Claude Code del ciclo.
+
+**Punto tecnico non banale emerso in sessione:** il primo tentativo di rendere la CTA "sempre visibile in scroll" con `position: sticky` non ha funzionato per un motivo strutturale (non un errore di battitura o di classe dimenticata) — un antenato con `overflow-hidden` e altezza `auto` pari al contenuto priva lo sticky dello spazio in cui "galleggiare". Vale la pena ricordarlo per la prossima volta che si usa `sticky` dentro un contenitore con angoli arrotondati/`overflow-hidden`: verificare sempre che il contenitore abbia un'altezza maggiore del contenuto, altrimenti serve `fixed` come qui.
+
+Nessuna modifica alle sezioni non toccate da questo ciclo (shipping, checkout, n8n, admin dashboard/redesign, sistema etichette/barcode, catalogo, chatbox) rispetto a v3.13.
+
+---
+
+## 35. Changelog v3.15 (26 Luglio 2026) — UX checkout: autocomplete indirizzo Nominatim
+
+Come v3.9/v3.11/v3.13/v3.14, questa revisione documenta lo stato riportato in chat da Robertin ("Fatto e testato ok!", poi "Fatto"), non una verifica indipendente contro git/filesystem come v3.7/v3.12. Ciclo composto da tre iterazioni successive nella stessa sessione, partito da uno screenshot del carrello.
+
+- **Intestazione** — nuova voce v3.15.
+- **Nuova §7bis** — sezione dedicata tra Checkout (§7) e Admin dashboard (§8): iterazione 1 (autocomplete a livello città, poi problema scoperto in test reale — Modena e comuni con più CAP non hanno un `postcode` univoco a livello di confine amministrativo Nominatim), iterazione 2 (decisione di richiedere sempre indirizzo puntuale invece di gestire il caso limite; precompilazione checkout da dati carrello; ricalcolo live del token HMAC se CAP/paese cambiano in checkout — necessario perché `/api/checkout` rifiuta ordini con token non corrispondente), iterazione 3 (separazione via/civico nel form, riconcatenati in `line1` solo al submit — nessun impatto a valle, nessuna migration).
+- **§3** — aggiunta `api/geocode/search/` alla struttura API routes; aggiunto `AddressAutocomplete.tsx` all'elenco componenti.
+- **Env vars** — aggiunta `NOMINATIM_USER_AGENT` al blocco documentato.
+- **§18** — 2 nuove righe: ciclo autocomplete indirizzo segnato ✅ FATTO; env var `NOMINATIM_USER_AGENT` segnata ✅ FATTO.
+- **§19** — 1 nuova idea roadmap P3: self-hosting Nominatim su Hetzner (coerente con l'approccio già usato per Gotenberg/rembg), non necessario al volume attuale.
+- **§21** — aggiunti i 4 prompt Claude Code del ciclo, incluso quello reso obsoleto prima dell'esecuzione (`ClaudeCode_Prompt_FixGeocodeCityPostcode.md`) — lasciato in elenco con nota esplicita per evitare che venga eseguito per errore in una sessione futura.
+
+**Punto tecnico non banale emerso in sessione:** Nominatim associa `postcode` in modo affidabile solo a indirizzi puntuali (via + civico), non ai confini amministrativi di città con più zone CAP — un limite strutturale dei dati OpenStreetMap, non un bug del codice. Vale la pena ricordarlo prima di reintrodurre in futuro una ricerca "solo città": non è un problema di query mal formata, ma di cosa Nominatim può restituire per quel tipo di entità geografica.
+
+Nessuna modifica alle sezioni non toccate da questo ciclo (admin dashboard/redesign, sistema etichette/barcode, digital card, catalogo, chatbox) rispetto a v3.14 — verificate a campione, restano accurate.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.15 — 26 Luglio 2026 (base: v3.14; ciclo UX checkout — autocomplete indirizzo Nominatim nel carrello, precompilazione + ricalcolo live spedizione in checkout, separazione via/numero civico — confermato in chat da Robertin; vedi §35 e §7bis per il dettaglio)*
