@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { PaymentMethodsSection } from './PaymentMethodsSection';
 import { SocialLinksSection } from './SocialLinksSection';
 import { BoutiqueInfoSection } from './BoutiqueInfoSection';
+import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
 import type { TenantPaymentMethod, TenantSocialLink } from '@lepefy/types';
 
@@ -40,6 +41,14 @@ export default async function ParametresPage() {
           click_collect_address={tenant.click_collect_address}
           click_collect_hours={tenant.click_collect_hours}
           click_collect_hours_it={tenant.click_collect_hours_it}
+        />
+
+        <OriginSection
+          tenantId={tenant.id}
+          story_heading={tenant.story_heading}
+          story_text={tenant.story_text}
+          story_image_url={tenant.story_image_url}
+          countries_served={tenant.countries_served}
         />
 
         <SocialLinksSection initialLinks={(socialLinks ?? []) as TenantSocialLink[]} />

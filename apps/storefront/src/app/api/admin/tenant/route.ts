@@ -14,7 +14,15 @@ const EDITABLE_TENANT_FIELDS = [
   'legal_name',
   'legal_address',
   'legal_email',
+  'story_heading',
+  'story_text',
+  'countries_served',
 ] as const;
+
+// Champs numériques de la whitelist — jamais forcés à un minimum, une valeur
+// vide reste `null` (ex. countries_served : pas de chiffre tant qu'il n'est
+// pas confirmé par le tenant, jamais une valeur par défaut inventée).
+const NUMERIC_FIELDS = new Set<string>(['countries_served']);
 
 export async function PATCH(req: NextRequest) {
   const denied = await requireAdmin();
@@ -27,7 +35,12 @@ export async function PATCH(req: NextRequest) {
   const updatePayload = EDITABLE_TENANT_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
     if (field in body) {
       const raw = body[field];
-      acc[field] = typeof raw === 'string' ? raw.trim() || null : null;
+      if (NUMERIC_FIELDS.has(field)) {
+        const num = typeof raw === 'number' ? raw : parseInt(String(raw ?? '').trim(), 10);
+        acc[field] = Number.isFinite(num) ? num : null;
+      } else {
+        acc[field] = typeof raw === 'string' ? raw.trim() || null : null;
+      }
     }
     return acc;
   }, {});
