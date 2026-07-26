@@ -16,10 +16,11 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       {/* Notification bar — ticker scorrevole CSS puro.
           Fond volontairement plus sombre que l'hero en dessous (color-mix
           dérivé de --color-primary, jamais un noir fixe — reste correct
-          pour n'importe quel tenant). */}
+          pour n'importe quel tenant). 55% et non 25% : à 25% la teinte se
+          lisait comme un noir neutre, perdant tout lien avec le brand. */}
       <div
         className="relative overflow-hidden shrink-0"
-        style={{ backgroundColor: 'color-mix(in oklch, var(--color-primary) 25%, black)', height: '36px' }}
+        style={{ backgroundColor: 'color-mix(in oklch, var(--color-primary) 55%, black)', height: '36px' }}
       >
         <style>{`
           @keyframes lepefy-ticker {

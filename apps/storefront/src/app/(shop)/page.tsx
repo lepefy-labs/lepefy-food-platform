@@ -305,10 +305,12 @@ function HeroBanner({
         {preview.length > 0 && (
           <div className="flex gap-3.5">
             {preview.map((product, i) => (
-              <div
+              <Link
                 key={product.id}
-                className="flex-1 bg-white rounded-lg shadow-card p-3"
-                style={{ transform: `rotate(${i === 0 ? -3 : 2}deg)` }}
+                href={`/products/${product.slug}`}
+                className={`flex-1 bg-white rounded-lg shadow-card p-3 transition-transform hover:scale-[1.02] hover:shadow-lg ${
+                  i === 0 ? 'rotate-[-3deg]' : 'rotate-[2deg]'
+                }`}
               >
                 <div className="aspect-square bg-primary-light rounded-md overflow-hidden relative mb-2.5">
                   {product.image_url && (
@@ -322,7 +324,7 @@ function HeroBanner({
                 >
                   {formatPrice(product.price, currency)}
                 </p>
-              </div>
+              </Link>
             ))}
           </div>
         )}
