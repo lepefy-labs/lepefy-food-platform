@@ -560,7 +560,7 @@ TRACKING_SECRET=...    # Per HMAC token ordini — ora obbligatoria anche per la
 - **Hero compatto:** logo 44px + testo, sostituisce il vecchio hero centrato a blocco largo
 - **Notification bar** (36px) sotto l'header con animazione ticker CSS
 - **Banner emozionale (ridisegnato in Fase 3, vedi §12bis):** sfondo a gradiente `var(--color-primary-dark)` → `var(--color-primary)`, pattern decorativo a triangoli ripetuti (SVG, bassa opacità, non più i cerchi piatti verde scuro `#085041` della versione precedente), layout a due colonne su desktop (testo + doppio CTA + trust-row a sinistra, mini-preview di prodotti reali in evidenza a destra) impilato su mobile; eyebrow ora il cartellino signature `ShopTag`; supporta `tenant.hero_image_url` opzionale (quando presente sostituisce pattern+gradiente con l'immagine + overlay scuro)
-- **Bottom navigation bar** (4 tab, **emoji, non più icone Tabler — decisione invertita**, vedi nota sotto): Accueil 🏠 · Catalogue 🛍️ · Panier 🛒 (con badge) · Commandes 📦
+- **Bottom navigation bar** (4 tab, **icone Tabler**, decisione di piattaforma confermata — un ciclo successivo aveva invertito temporaneamente a emoji, poi ripristinato): Accueil `IconSmartHome` · Catalogue `IconCategory` · Panier `IconShoppingBag` (con badge) · Commandes `IconTruckDelivery`. Hero trust-row e ticker notification bar restano invece a emoji (🚚 ❄️ 🌍 🌿), perimetro invariato rispetto alla nota precedente
 - Visibile solo su mobile (`md:hidden`), nascosta nel layout admin
 - Homepage: scroll orizzontale per categoria (stile Netflix/App Store); grid su desktop
 - **Ricerca real-time:** debounce 300ms + `router.replace` (URL params) + `useTransition`, mantenuta nel catalogo completo

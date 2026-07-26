@@ -7,6 +7,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { formatPrice } from '@/lib/utils/format';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ShopTag } from '@/components/ui/ShopTag';
+import { StorySection } from '@/components/home/StorySection';
 
 export const metadata: Metadata = {
   title: 'Accueil',
@@ -53,6 +54,17 @@ export default async function HomePage() {
     .limit(8);
   const featuredProducts: HomeProduct[] = (featuredRaw as unknown as HomeProduct[] | null) ?? [];
 
+  // 2bis. Compte réel de produits actifs — alimente la statistique "Notre
+  // origine" (Task B) : jamais un nombre codé en dur, toujours la vraie
+  // cardinalité au moment du rendu.
+  const { count: activeProductsCount } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenant.id)
+    .eq('active', true);
+
+  const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
+
   // 3. Prodotti per categoria (escludi featured)
   const featuredIds = featuredProducts.map(p => p.id);
   const excludeIds  = featuredIds.length > 0
@@ -86,6 +98,7 @@ export default async function HomePage() {
         primaryColor={tenant.primary_color}
         previewProducts={featuredProducts}
         currency={tenant.currency}
+        storyEnabled={storyEnabled}
       />
 
       {/* Contenuto centrato */}
@@ -105,18 +118,22 @@ export default async function HomePage() {
               Voir tout →
             </Link>
           </div>
-          <div className="
-            flex gap-2.5 overflow-x-auto px-4 pb-3
-            [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
-            md:grid md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]
-            md:overflow-x-visible md:pb-4
-          ">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 px-4 pb-3">
             {featuredProducts.map(product => (
-              <ProductCard key={product.id} product={product} variant="shelf" />
+              <ProductCard key={product.id} product={product} variant="grid" />
             ))}
           </div>
         </section>
       )}
+
+      {/* ── NOTRE ORIGINE ── */}
+      <StorySection
+        heading={tenant.story_heading}
+        text={tenant.story_text}
+        imageUrl={tenant.story_image_url}
+        productsCount={activeProductsCount ?? 0}
+        countriesServed={tenant.countries_served}
+      />
 
       {/* ── SEZIONI PER CATEGORIA ── */}
       {categories.map(cat => {
@@ -202,12 +219,14 @@ function HeroBanner({
   primaryColor,
   previewProducts,
   currency,
+  storyEnabled,
 }: {
   heroImageUrl: string | null;
   tagline: string;
   primaryColor: string;
   previewProducts: HomeProduct[];
   currency: string;
+  storyEnabled: boolean;
 }) {
   // `--hero-primary` expose la couleur du tenant reçue en prop aux enfants ;
   // le fallback var(--color-primary) couvre le cas où le composant serait
@@ -282,14 +301,17 @@ function HeroBanner({
             >
               Découvrir le catalogue
             </Link>
-            {/* TODO produit : pas encore de page "Notre histoire" — pointe vers le catalogue
-                en attendant qu'une vraie destination existe (voir résumé de la Fase 3). */}
-            <Link
-              href="/products"
-              className="inline-flex items-center gap-1.5 rounded-md px-5 py-3 text-sm font-semibold text-white border-2 border-white/45 transition-colors hover:border-white/70"
-            >
-              Notre histoire
-            </Link>
+            {/* N'existe que si la section "Notre origine" est réellement rendue
+                (tenant.story_heading + story_text remplis) — jamais un lien
+                vers un anchor inexistant. */}
+            {storyEnabled && (
+              <Link
+                href="#origine"
+                className="inline-flex items-center gap-1.5 rounded-md px-5 py-3 text-sm font-semibold text-white border-2 border-white/45 transition-colors hover:border-white/70"
+              >
+                Notre histoire
+              </Link>
+            )}
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2 mt-6">
             {TRUST_ROW.map(item => (

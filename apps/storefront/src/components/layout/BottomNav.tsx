@@ -2,6 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  IconSmartHome,
+  IconCategory,
+  IconShoppingBag,
+  IconTruckDelivery,
+} from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 
 interface Tab {
@@ -10,21 +16,6 @@ interface Tab {
   isActive: (pathname: string) => boolean;
   icon: (active: boolean) => React.ReactNode;
   badge?: () => number;
-}
-
-// Emoji plutôt qu'icônes Tabler : décision de plateforme inversée (voir
-// LEPEFY_PROJECT_CONTEXT.md §12, qui documentait le choix inverse) — la
-// nav du bas est vitrine client, pas dashboard admin.
-function NavEmoji({ emoji, active }: { emoji: string; active: boolean }) {
-  return (
-    <span
-      className="text-2xl leading-none transition-opacity"
-      style={{ opacity: active ? 1 : 0.6 }}
-      aria-hidden="true"
-    >
-      {emoji}
-    </span>
-  );
 }
 
 export function BottomNav() {
@@ -36,26 +27,26 @@ export function BottomNav() {
       href: '/',
       label: 'Accueil',
       isActive: (p) => p === '/',
-      icon: (active) => <NavEmoji emoji="🏠" active={active} />,
+      icon: (active) => <IconSmartHome size={24} stroke={active ? 2 : 1.5} />,
     },
     {
       href: '/products',
       label: 'Catalogue',
       isActive: (p) => p === '/products' || p.startsWith('/products/'),
-      icon: (active) => <NavEmoji emoji="🛍️" active={active} />,
+      icon: (active) => <IconCategory size={24} stroke={active ? 2 : 1.5} />,
     },
     {
       href: '/cart',
       label: 'Panier',
       isActive: (p) => p === '/cart',
-      icon: (active) => <NavEmoji emoji="🛒" active={active} />,
+      icon: (active) => <IconShoppingBag size={24} stroke={active ? 2 : 1.5} />,
       badge: () => totalItems,
     },
     {
       href: '/orders',
       label: 'Commandes',
       isActive: (p) => p === '/orders' || p.startsWith('/orders/'),
-      icon: (active) => <NavEmoji emoji="📦" active={active} />,
+      icon: (active) => <IconTruckDelivery size={24} stroke={active ? 2 : 1.5} />,
     },
   ];
 

@@ -4,9 +4,12 @@ import { PWABanner } from '@/components/PWABanner';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { ChatWidget } from '@/components/chat/ChatWidget';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  const socialLinks = await getTenantSocialLinks(tenant.id);
+  const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -80,7 +83,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       </div>
 
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
-      <Footer />
+      <Footer socialLinks={socialLinks} storyEnabled={storyEnabled} />
       <BottomNav />
       <ChatWidget
         enabled={tenant.ai_chatbox_enabled}

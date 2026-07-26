@@ -42,6 +42,11 @@ export interface Tenant {
   packlink_api_key: string | null;
   flat_rate_amount: number | null;
   show_powered_by: boolean;
+  // Sezione "Notre origine" (home)
+  story_heading: string | null;
+  story_text: string | null;
+  story_image_url: string | null;
+  countries_served: number | null;
   created_at: string;
   updated_at: string;
 }
