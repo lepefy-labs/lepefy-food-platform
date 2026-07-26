@@ -28,6 +28,17 @@ export interface Product {
   featured: boolean;
   position: number;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  is_homemade: boolean;
+  // Champs "étiquette" (migration 018_label_system.sql) — même source de
+  // données que le système d'étiquettes imprimées, à ne pas dupliquer ailleurs.
+  ingredients_text: string | null;
+  allergens_text: string | null;
+  gluten_free_certified: boolean;
+  usage_instructions: string | null;
+  conservation_instructions: string | null;
+  conservation_after_opening: string | null;
+  country_of_origin: string | null;
+  net_quantity_display: string | null;
   created_at: string;
   updated_at: string;
 }

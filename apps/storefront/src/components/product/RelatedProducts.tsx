@@ -10,7 +10,7 @@ export function RelatedProducts({ products }: { products: ProductCardProduct[] }
 
   return (
     <section className="mt-12">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Produits similaires</h2>
+      <h2 className="font-display text-lg font-bold text-gray-900 mb-4">Vous aimerez aussi</h2>
       <div className="
         flex gap-3 overflow-x-auto pb-3
         [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]

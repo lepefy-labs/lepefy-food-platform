@@ -164,10 +164,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { data: product } = await supabase
     .from('products')
     .select(`
-      id, name, name_alt, slug, price, compare_at_price, image_url,
-      weight_grams, stock, storage_type, category_id,
+      id, name, name_alt, slug, price, compare_at_price, image_url, images,
+      weight_grams, stock, storage_type, category_id, is_homemade,
       description, descriptions,
-      category:categories(name)
+      ingredients_text, allergens_text, gluten_free_certified,
+      usage_instructions, conservation_instructions, conservation_after_opening,
+      country_of_origin, net_quantity_display,
+      category:categories(name, slug)
     `)
     .eq('slug', params.slug).eq('tenant_id', tenant.id).eq('active', true).single();
 
