@@ -25,7 +25,7 @@ import {
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, PAYMENT_METHOD_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
-import { methodColor, hexToRgba, maskSensitiveValue, isEmailValue } from '@/lib/card/methodColor';
+import { methodColor, hexToRgba, isEmailValue } from '@/lib/card/methodColor';
 
 const ICONS = {
   IconBrandInstagram,
@@ -277,7 +277,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                           )}
                           <CopyableValue
                             value={pm.value}
-                            displayValue={maskSensitiveValue(pm.value)}
+                            displayValue={pm.value}
                             copyLabel={t.copy}
                             copiedLabel={t.copied}
                           />
