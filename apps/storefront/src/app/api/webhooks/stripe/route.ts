@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
         data: {
           id:               string;
           tenant_id:        string;
+          customer_id:      string | null;
           email:            string;
           full_name:        string | null;
           phone:            string | null;
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
       .from('orders')
       .insert({
         tenant_id:                 resolvedTenantId,
-        customer_id:               null,
+        customer_id:               checkoutSession.customer_id ?? null,
         email:                     checkoutSession.email,
         full_name:                 checkoutSession.full_name ?? null,
         fulfillment_type:          checkoutSession.fulfillment_type,

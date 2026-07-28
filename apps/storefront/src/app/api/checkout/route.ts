@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { verifyQuote } from '@/lib/shipping/quoteToken';
+import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -53,6 +54,10 @@ export async function POST(req: NextRequest) {
     const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant     = await getTenant(tenantSlug);
     const supabase   = createServiceClient();
+
+    // ── Session client optionnelle ───────────────────────────────────────────
+    // null pour un guest : le parcours guest reste identique à aujourd'hui.
+    const sessionCustomer = await getSessionCustomer(tenant.id);
 
     // ── Ricalcolo prezzi server-side ─────────────────────────────────────────
     // Il client invia solo productId + quantity come dati fidati: prezzo, nome
@@ -205,7 +210,7 @@ export async function POST(req: NextRequest) {
         .from('orders')
         .insert({
           tenant_id:        tenant.id,
-          customer_id:      null,
+          customer_id:      sessionCustomer?.id ?? null,
           email,
           full_name:        fullName ?? null,
           fulfillment_type: fulfillmentType,
@@ -262,6 +267,7 @@ export async function POST(req: NextRequest) {
       .from('checkout_sessions')
       .insert({
         tenant_id:        tenant.id,
+        customer_id:      sessionCustomer?.id ?? null,
         email,
         full_name:        fullName ?? null,
         phone:            phone ?? null,

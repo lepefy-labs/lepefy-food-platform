@@ -12,9 +12,11 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import { IconMapPin, IconClock, IconCreditCard, IconBuildingStore } from '@tabler/icons-react';
+import { IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
+import { useSessionCustomer } from '@/hooks/useSessionCustomer';
+import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import type { Tenant } from '@lepefy/types';
 
 // Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
@@ -129,6 +131,9 @@ function StripePaymentStep({
 export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
+
+  const { customer: sessionCustomer, refresh: refreshSessionCustomer } = useSessionCustomer();
+  const [showLoginForm, setShowLoginForm] = useState(false);
 
   const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(() => readStoredShipping());
   const [step, setStep]                 = useState<'form' | 'payment'>('form');
@@ -356,6 +361,24 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
       {/* Step 1: Contact + address form */}
       {step === 'form' && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+          {/* Guest → compte, optionnel — n'interrompt jamais le checkout guest */}
+          {sessionCustomer ? (
+            <p className="text-xs text-gray-400">
+              Connecté(e) en tant que <span className="font-medium text-gray-600">{sessionCustomer.email}</span> — cette commande te fera gagner des points.
+            </p>
+          ) : showLoginForm ? (
+            <OtpLoginForm onAuthenticated={() => { refreshSessionCustomer(); setShowLoginForm(false); }} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowLoginForm(true)}
+              className="w-full flex items-center justify-between text-left text-xs text-gray-500 bg-gray-50 rounded-xl px-4 py-3"
+            >
+              <span>Tu as un compte ? Connecte-toi pour gagner des points sur cette commande</span>
+              <IconChevronDown size={16} className="flex-shrink-0 ml-2" />
+            </button>
+          )}
+
           {/* Customer info */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">Vos informations</p>
