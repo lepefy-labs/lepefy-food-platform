@@ -7,8 +7,10 @@ import {
   IconCategory,
   IconShoppingBag,
   IconTruckDelivery,
+  IconUserCircle,
 } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
+import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 
 interface Tab {
   href: string;
@@ -16,11 +18,13 @@ interface Tab {
   isActive: (pathname: string) => boolean;
   icon: (active: boolean) => React.ReactNode;
   badge?: () => number;
+  dot?: () => boolean;
 }
 
 export function BottomNav() {
   const pathname = usePathname();
   const totalItems = useCartStore((s) => s.totalItems());
+  const { customer } = useSessionCustomer();
 
   const tabs: Tab[] = [
     {
@@ -48,6 +52,13 @@ export function BottomNav() {
       isActive: (p) => p === '/orders' || p.startsWith('/orders/'),
       icon: (active) => <IconTruckDelivery size={24} stroke={active ? 2 : 1.5} />,
     },
+    {
+      href: '/compte/connexion',
+      label: 'Compte',
+      isActive: (p) => p === '/compte' || p.startsWith('/compte/'),
+      icon: (active) => <IconUserCircle size={24} stroke={active ? 2 : 1.5} />,
+      dot: () => !!customer,
+    },
   ];
 
   return (
@@ -59,6 +70,7 @@ export function BottomNav() {
         {tabs.map((tab) => {
           const active = tab.isActive(pathname);
           const badgeCount = tab.badge ? tab.badge() : 0;
+          const showDot = tab.dot ? tab.dot() : false;
           return (
             <Link
               key={tab.href}
@@ -75,6 +87,12 @@ export function BottomNav() {
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
+                )}
+                {showDot && (
+                  <span
+                    className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  />
                 )}
               </div>
               <span className={`text-2xs ${active ? 'font-medium' : 'font-normal'}`}>
