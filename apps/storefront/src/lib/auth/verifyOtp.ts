@@ -6,7 +6,20 @@ export async function verifyOtp(
   token: string,
   tenantId: string,
 ): Promise<{ session: Session | null; error?: string }> {
-  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+  // signInWithOtp({ shouldCreateUser: true }) verifica normalmente con
+  // type: 'email' sia per un utente nuovo che esistente. Per sicurezza —
+  // alcune versioni/configurazioni GoTrue instradano il primo login di un
+  // utente appena creato sul flow 'signup' invece di 'email', facendo
+  // fallire silenziosamente la verifica con "Token has expired or is
+  // invalid" anche con un codice corretto — riproviamo con type: 'signup'
+  // prima di arrenderci.
+  let { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+
+  if (error || !data.session) {
+    const retry = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+    data  = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data.session) {
     console.error('[auth] verifyOtp error:', error?.message);
