@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconUserCircle } from '@tabler/icons-react';
+import Link from 'next/link';
+import { IconUserCircle, IconGift } from '@tabler/icons-react';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import type { SessionCustomer } from '@/lib/auth/getSessionCustomer';
 
@@ -43,6 +44,14 @@ export function ConnexionClient({ initialCustomer }: { initialCustomer: SessionC
               Connecté(e) en tant que{' '}
               <span className="font-medium text-gray-800">{initialCustomer.email}</span>
             </p>
+            <Link
+              href="/compte/parrainage"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm text-white"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              <IconGift size={16} stroke={1.8} />
+              Invite un ami
+            </Link>
             <button
               type="button"
               onClick={handleLogout}

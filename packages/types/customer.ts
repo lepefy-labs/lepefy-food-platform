@@ -1,3 +1,5 @@
+import type { ReferralAccessReason } from './loyalty';
+
 export interface Customer {
   id: string;
   tenant_id: string;
@@ -5,6 +7,16 @@ export interface Customer {
   full_name: string | null;
   phone: string | null;
   created_at: string;
+  // Loyalty & referral
+  referred_by_id: string | null;
+  referral_code: string | null;
+  signup_ip: string | null;
+  signup_device_fingerprint: string | null;
+  referral_access_granted: boolean;
+  referral_access_reason: ReferralAccessReason | null;
+  referral_access_granted_at: string | null;
+  referral_access_granted_by: string | null;
+  referral_suspended: boolean;
 }
 
 export interface Address {

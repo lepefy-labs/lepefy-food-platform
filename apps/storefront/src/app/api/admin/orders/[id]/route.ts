@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { processOrderPointsOnDelivery } from '@/lib/loyalty/processOrderPointsOnDelivery';
 import type { OrderStatus, PaymentStatus } from '@lepefy/types';
 
 interface PatchBody {
@@ -107,6 +108,20 @@ export async function PATCH(
 
     console.info('[admin/orders PATCH] updated — order_id:', params.id,
       '— fields:', Object.keys(update).join(', '));
+
+    // ── Hook loyalty: transitioning to delivered ───────────────────────────
+    // Punto esatto richiesto dal prompt loyalty/referral: qui è dove
+    // orders.status passa a 'delivered'. Idempotente (processOrderPointsOnDelivery
+    // controlla orders.points_processed) — un errore qui non deve far fallire
+    // l'aggiornamento status già persistito, quindi solo log, mai throw.
+    if (status === 'delivered' && existing.status !== 'delivered') {
+      try {
+        await processOrderPointsOnDelivery(params.id);
+      } catch (loyaltyErr) {
+        console.error('[admin/orders PATCH] processOrderPointsOnDelivery failed:', loyaltyErr,
+          '— order_id:', params.id);
+      }
+    }
 
     // ── Notify n8n when transitioning to shipped ──────────────────────────
     const transitioningToShipped =

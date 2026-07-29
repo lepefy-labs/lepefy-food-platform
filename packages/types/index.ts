@@ -7,3 +7,4 @@ export * from './socialLinks';
 export * from './paymentMethods';
 export * from './labels';
 export * from './ai';
+export * from './loyalty';

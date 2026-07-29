@@ -13,6 +13,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconSparkles,
+  IconGift,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -131,6 +132,20 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
           Bientôt
         </span>
       </div>
+
+      <Link
+        href="/admin/loyalty"
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+                    text-sm transition-colors mx-1 ${
+          pathname === '/admin/loyalty' ? navClass(true) : navClass(false)
+        }`}
+      >
+        <IconGift
+          size={16}
+          stroke={pathname === '/admin/loyalty' ? 2 : 1.5}
+        />
+        Fidélité & parrainage
+      </Link>
 
       <Link
         href="/admin/parametres"

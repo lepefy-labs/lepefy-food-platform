@@ -1,3 +1,5 @@
+import type { ReferralAvailabilityMode, ReferralFraudAction } from './loyalty';
+
 export type ShippingProvider = 'packlink' | 'flat_rate' | 'pickup_only';
 
 export interface Tenant {
@@ -47,6 +49,17 @@ export interface Tenant {
   story_text: string | null;
   story_image_url: string | null;
   countries_served: number | null;
+  // Loyalty & referral
+  loyalty_enabled: boolean;
+  referral_max_depth: number;
+  purchase_points_rate: number;
+  points_to_currency_rate: number;
+  referral_signup_bonus_points: number;
+  referral_fraud_max_conversions: number;
+  referral_fraud_period_days: number;
+  referral_fraud_action: ReferralFraudAction;
+  referral_availability_mode: ReferralAvailabilityMode;
+  referral_unlock_spending_threshold: number | null;
   created_at: string;
   updated_at: string;
 }
