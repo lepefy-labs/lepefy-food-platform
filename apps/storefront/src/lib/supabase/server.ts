@@ -4,6 +4,12 @@ import { NextResponse } from 'next/server';
 
 export function createClient() {
   const cookieStore = cookies();
+
+  // Fournit à la fois l'ancienne API (get/set/remove) et la nouvelle
+  // (getAll/setAll) : @supabase/ssr@0.3.x lit les cookies en interne via
+  // get(name), pas getAll() — sans get() ici, auth.getUser()/getSession()
+  // échoue silencieusement (retourne toujours null) même avec un cookie de
+  // session valide. Même pattern que admin/(protected)/layout.tsx.
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -21,7 +27,25 @@ export function createClient() {
             // Server Component — cookies may be read-only
           }
         },
-      },
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options?: object) {
+          try {
+            cookieStore.set(name, value, options as never);
+          } catch {
+            // Server Component — cookies may be read-only
+          }
+        },
+        remove(name: string, options?: object) {
+          try {
+            cookieStore.set(name, '', { ...options, maxAge: 0 } as never);
+          } catch {
+            // Server Component — cookies may be read-only
+          }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
     },
   );
 }
