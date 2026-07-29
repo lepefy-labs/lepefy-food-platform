@@ -183,6 +183,38 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
   });
   if (error) throw error;
 
+  // ── 6b. Conferma SIGNUP_BONUS al primo ordine consegnato ─────────────────────
+  // Scelta: UPDATE della riga esistente (PENDING→CONFIRMED), non una nuova riga
+  // di conferma — riusa esattamente il meccanismo di confirm-reviewed-entry
+  // (l'unica transizione di stato già esistente su una riga ledger preesistente
+  // nel progetto), non un meccanismo nuovo. Un INSERT equivalente duplicherebbe
+  // l'importo a meno di lasciare la riga PENDING originale a marcire nel ledger
+  // (doppio conteggio in pending_balance) — l'UPDATE è l'unica opzione che non
+  // rischia doppio conteggio.
+  // Non nella stessa transazione DB di process_order_points_atomic (che accetta
+  // solo INSERT di nuove entries, non tocca righe esistenti) — estendere quella
+  // funzione SQL è fuori dallo scope di questo fix mirato. Stessa classe di
+  // rischio "post-idempotenza" già presente allo step 7 sottostante
+  // (checkReferralAccessUnlock gira anch'esso dopo che points_processed è già
+  // stato marcato true, senza garanzie transazionali con la RPC).
+  const { count: priorDeliveredCount } = await supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('customer_id', buyerId)
+    .eq('status', 'delivered')
+    .neq('id', orderId);
+
+  if ((priorDeliveredCount ?? 0) === 0) {
+    await supabase
+      .from('points_ledger')
+      .update({ status: 'CONFIRMED' })
+      .eq('tenant_id', tenantId)
+      .eq('customer_id', buyerId)
+      .eq('transaction_type', 'SIGNUP_BONUS')
+      .eq('status', 'PENDING');
+  }
+
   // ── 7. Sblocco eleggibilità referral per l'acquirente ────────────────────────
   await checkReferralAccessUnlock(tenantId, buyerId);
 }

@@ -5,7 +5,7 @@ export async function verifyOtp(
   email: string,
   token: string,
   tenantId: string,
-): Promise<{ session: Session | null; error?: string }> {
+): Promise<{ session: Session | null; error?: string; isNewCustomer?: boolean }> {
   // signInWithOtp({ shouldCreateUser: true }) verifica normalmente con
   // type: 'email' sia per un utente nuovo che esistente. Per sicurezza —
   // alcune versioni/configurazioni GoTrue instradano il primo login di un
@@ -26,6 +26,21 @@ export async function verifyOtp(
     return { session: null, error: error?.message };
   }
 
+  // "Primo login/creazione" (serve a registerWithReferral, vedi verify-otp
+  // route): unico modo affidabile è verificare l'assenza pregressa della riga
+  // `customers` per questo id PRIMA dell'upsert sottostante — user.created_at
+  // non è usato perché non distingue "utente auth appena creato" da "riga
+  // customers già esistente per altra via" con la stessa affidabilità di una
+  // query diretta sulla tabella che stiamo per scrivere.
+  const { data: existingCustomer } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('id', data.session.user.id)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  const isNewCustomer = !existingCustomer;
+
   // Upsert su `customers` — ON CONFLICT (tenant_id, email) DO NOTHING: se un
   // customer con questa email esisteva già (es. da un checkout guest
   // precedente), non sovrascriviamo full_name/phone già raccolti.
@@ -40,5 +55,5 @@ export async function verifyOtp(
     console.error('[auth] customers upsert error:', upsertError.message);
   }
 
-  return { session: data.session };
+  return { session: data.session, isNewCustomer };
 }
