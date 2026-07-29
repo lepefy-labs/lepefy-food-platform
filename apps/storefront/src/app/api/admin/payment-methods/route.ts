@@ -17,12 +17,13 @@ function cleanExtra(raw: unknown): Record<string, string> | null {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
+  const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant   = await getTenant(slug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   try {
-    const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant   = await getTenant(slug);
     const body     = await req.json();
     const supabase = createServiceClient();
 

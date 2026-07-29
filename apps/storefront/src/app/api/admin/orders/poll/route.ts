@@ -4,7 +4,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 
 export async function GET(req: NextRequest) {
-  const authError = await requireAdmin();
+  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(slug);
+
+  const authError = await requireAdmin(tenant.id);
   if (authError) return authError;
 
   const since = req.nextUrl.searchParams.get('since'); // ISO timestamp, ultimo controllo del client
@@ -12,8 +15,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Paramètre since manquant.' }, { status: 400 });
   }
 
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
   const admin  = createServiceClient();
 
   // Basta sapere SE qualcosa è cambiato dopo `since` — non serve restituire i

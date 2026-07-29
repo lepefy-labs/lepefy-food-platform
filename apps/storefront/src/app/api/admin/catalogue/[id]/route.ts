@@ -26,11 +26,12 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+
+  const denied = await requireAdmin(tenant.id);
+  if (denied) return denied;
+
   const body   = await req.json() as Record<string, unknown>;
 
   const supabase = createServiceClient();

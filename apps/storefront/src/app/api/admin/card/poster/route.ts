@@ -10,11 +10,12 @@ export const runtime = 'nodejs'; // stesso fix già applicato in labels/generate
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+
+  const denied = await requireAdmin(tenant.id);
+  if (denied) return denied;
+
   const [paymentMethods, socialLinks] = await Promise.all([
     getTenantPaymentMethods(tenant.id),
     getTenantSocialLinks(tenant.id),

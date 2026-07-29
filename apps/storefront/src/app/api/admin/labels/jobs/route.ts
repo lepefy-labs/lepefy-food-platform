@@ -13,14 +13,15 @@ const DEFAULT_SECTIONS = {
 
 // GET /api/admin/labels/jobs?productId=xxx — liste des brouillons + historique pour un produit
 export async function GET(req: NextRequest) {
-  const denied = await requireAdmin();
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   const productId = req.nextUrl.searchParams.get('productId');
   if (!productId) return NextResponse.json({ error: 'productId manquant' }, { status: 400 });
 
-  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
   const supabase = createServiceClient();
 
   const { data, error } = await supabase
@@ -36,14 +37,15 @@ export async function GET(req: NextRequest) {
 
 // POST /api/admin/labels/jobs — crée un nouveau brouillon vide (ou dupliqué d'un job existant)
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   const body = await req.json() as { productId: string; duplicateFromId?: string };
   if (!body.productId) return NextResponse.json({ error: 'productId manquant' }, { status: 400 });
 
-  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
   const supabase = createServiceClient();
 
   let seed: Record<string, unknown> = {

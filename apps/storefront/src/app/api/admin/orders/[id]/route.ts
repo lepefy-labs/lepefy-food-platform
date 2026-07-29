@@ -31,15 +31,16 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const denied = await requireAdmin();
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant     = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   try {
     const body: PatchBody = await req.json();
     const { status, tracking_carrier, tracking_code, notes, payment_status } = body;
 
-    const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant     = await getTenant(tenantSlug);
     const supabase   = createServiceClient();
 
     const { data: existingRaw, error: fetchError } = await supabase

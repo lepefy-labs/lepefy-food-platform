@@ -7,11 +7,12 @@ import { assignBarcodeToProduct } from '@/lib/barcode';
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
+  if (denied) return denied;
+
   const supabase = createServiceClient();
 
   // Segnala se esistono etichette già generate (immutabili) per questo prodotto:

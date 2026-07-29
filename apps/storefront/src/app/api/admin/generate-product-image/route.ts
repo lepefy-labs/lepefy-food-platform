@@ -164,7 +164,10 @@ async function uploadToStorage(
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
+  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(slug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   if (!process.env.GEMINI_API_KEY) {
@@ -173,9 +176,6 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
 
   if (!tenant.ai_image_generation) {
     return NextResponse.json(

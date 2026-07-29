@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createServiceClient } from '@/lib/supabase/server';
 
 /**
  * Guard per le route API admin.
@@ -9,10 +10,12 @@ import { createServerClient } from '@supabase/ssr';
  * sono chiamabili direttamente: ogni handler deve invocare questo guard
  * prima di usare il service client (che bypassa RLS).
  *
- * @returns null se l'utente è autenticato e in whitelist ADMIN_EMAILS,
+ * @param tenantId tenant della route corrente — un tenant_admin viene
+ *   rifiutato se non combacia con il proprio tenant_id in `admin_users`.
+ * @returns null se l'utente è autenticato e autorizzato per questo tenant,
  *          altrimenti la NextResponse 401/403 da restituire subito.
  */
-export async function requireAdmin(): Promise<NextResponse | null> {
+export async function requireAdmin(tenantId: string): Promise<NextResponse | null> {
   const cookieStore = cookies();
 
   // Provide both old (get/set/remove) and new (getAll/setAll) cookie APIs.
@@ -38,13 +41,24 @@ export async function requireAdmin(): Promise<NextResponse | null> {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase());
+  // admin_users n'a aucune policy publique (service_role uniquement) — le
+  // client anon/authenticated ci-dessus ne peut pas la lire directement.
+  const adminClient = createServiceClient();
 
-  if (!adminEmails.includes(user.email?.toLowerCase() ?? '')) {
+  const { data: admin } = await adminClient
+    .from('admin_users')
+    .select('id, role, tenant_id, active')
+    .eq('id', user.id)
+    .eq('active', true)
+    .single();
+
+  if (!admin) {
     return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
   }
 
-  return null;
+  if (admin.role === 'tenant_admin' && admin.tenant_id !== tenantId) {
+    return NextResponse.json({ error: 'Accès refusé pour ce tenant.' }, { status: 403 });
+  }
+
+  return null; // platform_owner passa sempre, tenant_admin solo se tenant combacia
 }

@@ -25,11 +25,12 @@ const EDITABLE_TENANT_FIELDS = [
 const NUMERIC_FIELDS = new Set<string>(['countries_served']);
 
 export async function PATCH(req: NextRequest) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+
+  const denied = await requireAdmin(tenant.id);
+  if (denied) return denied;
+
   const body   = await req.json() as Record<string, unknown>;
 
   const updatePayload = EDITABLE_TENANT_FIELDS.reduce<Record<string, unknown>>((acc, field) => {

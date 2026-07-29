@@ -12,12 +12,13 @@ const PATCHABLE_FIELDS = [
 
 // PATCH /api/admin/labels/jobs/[id] — autosave des champs du brouillon (seulement si status='draft')
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const denied = await requireAdmin();
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   const body = await req.json() as Record<string, unknown>;
-  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
   const supabase = createServiceClient();
 
   const payload: Record<string, unknown> = {};
@@ -44,11 +45,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 // DELETE /api/admin/labels/jobs/[id] — abandonne un brouillon
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
+  if (denied) return denied;
+
   const supabase = createServiceClient();
 
   const { error } = await supabase

@@ -39,17 +39,27 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     redirect('/admin/login');
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase());
-
-  if (!adminEmails.includes(user.email?.toLowerCase() ?? '')) {
-    redirect('/admin/login?error=unauthorized');
-  }
-
   const slug      = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant    = await getTenant(slug);
   const adminClient  = createServiceClient();
+
+  // admin_users n'a aucune policy publique (service_role uniquement) — même
+  // mécanisme que requireAdmin.ts (lib/auth/requireAdmin.ts), pour ne jamais
+  // avoir deux sources de vérité sur les permissions admin.
+  const { data: admin } = await adminClient
+    .from('admin_users')
+    .select('id, role, tenant_id, active')
+    .eq('id', user.id)
+    .eq('active', true)
+    .single();
+
+  if (!admin) {
+    redirect('/admin/login?error=unauthorized');
+  }
+
+  if (admin.role === 'tenant_admin' && admin.tenant_id !== tenant.id) {
+    redirect('/admin/login?error=unauthorized');
+  }
 
   const { data: categories } = await adminClient
     .from('categories')

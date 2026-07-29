@@ -9,7 +9,10 @@ type SkipReason = 'wrong_status' | 'missing_tracking';
 // client: è l'unico modo per rispettare le regole quando la selezione
 // contiene ordini misti (delivery + pickup, con e senza tracking).
 export async function POST(req: NextRequest) {
-  const authError = await requireAdmin();
+  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(slug);
+
+  const authError = await requireAdmin(tenant.id);
   if (authError) return authError;
 
   const { orderIds, tracking } = await req.json() as {
@@ -21,8 +24,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'orderIds manquant ou vide.' }, { status: 400 });
   }
 
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(slug);
   const admin  = createServiceClient();
 
   // Rilettura server-side dello stato reale — mai fidarsi di quello che il

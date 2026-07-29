@@ -8,12 +8,13 @@ import type { LabelJobInput } from '@lepefy/types';
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(tenantSlug);
+
+  const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   const body = await req.json() as LabelJobInput;
-  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant = await getTenant(tenantSlug);
 
   if (!tenant.label_logo_url) {
     return NextResponse.json({ error: 'Logo etichetta non caricato per questo tenant.' }, { status: 400 });
