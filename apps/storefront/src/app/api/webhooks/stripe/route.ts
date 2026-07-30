@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-// ─── Token ────────────────────────────────────────────────────────────────────
-
-function generateTrackingToken(orderId: string, email: string): string {
-  return crypto
-    .createHmac('sha256', process.env.TRACKING_SECRET!)
-    .update(orderId + email)
-    .digest('hex');
-}
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 

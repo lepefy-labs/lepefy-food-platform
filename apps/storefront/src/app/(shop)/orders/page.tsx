@@ -1,77 +1,67 @@
-'use client';
+import { getTenant } from '@/lib/tenant/getTenant';
+import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
+import { createServiceClient } from '@/lib/supabase/server';
+import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
+import { OrdersLoginPrompt } from './OrdersLoginPrompt';
+import { OrdersEmptyState } from './OrdersEmptyState';
+import { OrdersListClient, type OrderListItem } from './OrdersListClient';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { IconTruckDelivery } from '@tabler/icons-react';
-
-// Marqueur défensif — cette page n'a elle-même aucune donnée serveur
-// (formulaire client pur, aucun contenu commande affiché ici), donc aucun
-// risque réel de fraîcheur si elle finit statique malgré ce marqueur. Son
-// seul déclencheur dynamique implicite venait du layout racine (getTenant),
-// désormais public — cf. résumé du prompt pour le détail de cette nuance.
+// Lit la session (cookies) et interroge Supabase à chaque requête — jamais
+// statique, comme les autres pages qui dépendent de getSessionCustomer().
 export const dynamic = 'force-dynamic';
 
-export default function OrdersPage() {
-  const router = useRouter();
-  const [orderId, setOrderId] = useState('');
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
+interface OrderRow {
+  id:         string;
+  status:     string;
+  created_at: string;
+  total:      number;
+  email:      string;
+}
 
-  function handleSubmit() {
-    if (!orderId.trim() || !email.trim()) {
-      setError('Veuillez remplir tous les champs.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Adresse email invalide.');
-      return;
-    }
-    setError('');
-    router.push(`/orders/${orderId.trim()}?email=${encodeURIComponent(email.trim())}`);
+export default async function OrdersListPage() {
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(tenantSlug);
+  const sessionCustomer = await getSessionCustomer(tenant.id);
+
+  if (!sessionCustomer) {
+    return <OrdersLoginPrompt />;
   }
 
-  return (
-    <div className="max-w-sm mx-auto px-4 pt-10 pb-4 flex flex-col items-center gap-6">
-      <IconTruckDelivery size={56} stroke={1.2} color="#1D9E75" />
-      <div className="text-center">
-        <h1 className="text-xl font-bold text-gray-900">Suivez votre commande</h1>
-        <p className="text-sm text-gray-400 mt-2">
-          Entrez votre numéro de commande et votre email pour voir le statut
-        </p>
-      </div>
-      <div className="w-full flex flex-col gap-4">
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">
-            Numéro de commande
-          </label>
-          <input
-            type="text"
-            placeholder="ex: A1B2C3D4"
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D9E75]/30"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-500 mb-1 block">
-            Email utilisé lors de la commande
-          </label>
-          <input
-            type="email"
-            placeholder="votre@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D9E75]/30"
-          />
-        </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <button
-          onClick={handleSubmit}
-          className="w-full bg-[#1D9E75] text-white font-medium py-3 rounded-xl text-sm hover:bg-[#0F6E56] transition-colors"
-        >
-          Voir ma commande
-        </button>
-      </div>
-    </div>
-  );
+  const supabase = createServiceClient();
+
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, status, created_at, total, email')
+    .eq('tenant_id', tenant.id)
+    .eq('customer_id', sessionCustomer.id)
+    .order('created_at', { ascending: false }) as { data: OrderRow[] | null };
+
+  if (!orders || orders.length === 0) {
+    return <OrdersEmptyState />;
+  }
+
+  const orderIds = orders.map((o) => o.id);
+  const { data: rawItems } = await (supabase as unknown as {
+    from(t: 'order_items'): {
+      select(cols: string): {
+        in(col: string, vals: string[]): Promise<{ data: { order_id: string }[] | null }>;
+      };
+    };
+  }).from('order_items').select('order_id').in('order_id', orderIds);
+
+  const itemCounts = new Map<string, number>();
+  for (const row of rawItems ?? []) {
+    itemCounts.set(row.order_id, (itemCounts.get(row.order_id) ?? 0) + 1);
+  }
+
+  const ordersWithTokens: OrderListItem[] = orders.map((o) => ({
+    id:            o.id,
+    status:        o.status,
+    created_at:    o.created_at,
+    total:         o.total,
+    itemCount:     itemCounts.get(o.id) ?? 0,
+    trackingToken: generateTrackingToken(o.id, o.email),
+  }));
+
+  return <OrdersListClient orders={ordersWithTokens} />;
 }

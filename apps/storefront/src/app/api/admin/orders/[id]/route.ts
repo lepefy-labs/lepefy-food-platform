@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { processOrderPointsOnDelivery } from '@/lib/loyalty/processOrderPointsOnDelivery';
+import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import type { OrderStatus, PaymentStatus } from '@lepefy/types';
 
 interface PatchBody {
@@ -19,13 +19,6 @@ interface ExistingOrder {
   status:    string;
   email:     string;
   full_name: string | null;
-}
-
-function generateTrackingToken(orderId: string, email: string): string {
-  return crypto
-    .createHmac('sha256', process.env.TRACKING_SECRET!)
-    .update(orderId + email)
-    .digest('hex');
 }
 
 export async function PATCH(
