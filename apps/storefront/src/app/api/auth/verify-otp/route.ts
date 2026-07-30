@@ -35,6 +35,11 @@ export async function POST(req: NextRequest) {
       const signupIp = forwardedFor?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || '';
 
       try {
+        // Esito definitivo (referred: true o false con reason) → il codice è
+        // stato valutato, il cookie va consumato in entrambi i casi. Solo
+        // un'eccezione imprevista (errore permessi, rete, RPC) prima di
+        // arrivare a un esito lascia il cookie intatto, per permettere un
+        // retry entro la finestra dei 30 giorni già prevista.
         await registerWithReferral({
           tenantId: tenant.id,
           newCustomerId: result.session.user.id,
@@ -46,13 +51,13 @@ export async function POST(req: NextRequest) {
           // produrre un match SAME_DEVICE finché non verrà implementato altrove.
           deviceFingerprint: '',
         });
+
+        // Consumato — non riusabile su un secondo account.
+        response.cookies.delete('referral_code');
       } catch (referralErr) {
         console.error('[api/auth/verify-otp] registerWithReferral failed:', referralErr,
           '— customer_id:', result.session.user.id);
       }
-
-      // Consumato — non riusabile su un secondo account.
-      response.cookies.delete('referral_code');
     }
 
     return response;
