@@ -1,4 +1,5 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 
 export async function verifyOtp(
   supabase: SupabaseClient,
@@ -32,7 +33,16 @@ export async function verifyOtp(
   // non è usato perché non distingue "utente auth appena creato" da "riga
   // customers già esistente per altra via" con la stessa affidabilità di una
   // query diretta sulla tabella che stiamo per scrivere.
-  const { data: existingCustomer } = await supabase
+  //
+  // Eseguita col service client, non col client `supabase` passato a questa
+  // funzione: subito dopo verifyOtp(), la sessione restituita in data.session
+  // non è ancora detto sia attaccata a quel client per questa stessa richiesta
+  // (propagazione cookie/sessione), e una query con client ancora anonimo
+  // fallisce con "permission denied for table customers" (anon non ha grant
+  // su customers, solo authenticated e service_role). Questo è un controllo
+  // interno pre-upsert, non un'azione per conto dell'utente — non c'è motivo
+  // di farla dipendere dal timing della sessione.
+  const { data: existingCustomer } = await createServiceClient()
     .from('customers')
     .select('id')
     .eq('id', data.session.user.id)
