@@ -54,7 +54,16 @@ export async function verifyOtp(
   // Upsert su `customers` — ON CONFLICT (tenant_id, email) DO NOTHING: se un
   // customer con questa email esisteva già (es. da un checkout guest
   // precedente), non sovrascriviamo full_name/phone già raccolti.
-  const { error: upsertError } = await supabase
+  //
+  // Stesso motivo del service client usato sopra per existingCustomer: il
+  // client `supabase` passato a questa funzione non ha garanzia di avere la
+  // sessione appena verificata già attaccata per questa richiesta, quindi un
+  // upsert su di esso può fallire con lo stesso "permission denied for table
+  // customers" (mascherato finché la query precedente falliva per prima).
+  // Anche questo è un write interno di sistema (creazione riga customers a
+  // fronte di un signup riuscito), non un'azione the utente esegue "come sé
+  // stesso" — nessuna ragione per dipendere dal timing della sessione qui.
+  const { error: upsertError } = await createServiceClient()
     .from('customers')
     .upsert(
       { id: data.session.user.id, tenant_id: tenantId, email },
