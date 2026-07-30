@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { resolveReferralChain } from './resolveReferralChain';
 import { checkReferralAccessUnlock } from './checkReferralAccessUnlock';
 import { checkFraudSignals } from './checkFraudSignals';
+import { confirmSignupBonus } from './confirmSignupBonus';
 
 interface OrderPointsEntry {
   tenantId: string;
@@ -176,28 +177,23 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
     }
   }
 
-  // ── 6. RPC atomica ──────────────────────────────────────────────────────────
-  const { error } = await supabase.rpc('process_order_points_atomic', {
-    p_order_id: orderId,
-    p_entries: entries,
-  });
-  if (error) throw error;
-
-  // ── 6b. Conferma SIGNUP_BONUS al primo ordine consegnato ─────────────────────
-  // Scelta: UPDATE della riga esistente (PENDING→CONFIRMED), non una nuova riga
-  // di conferma — riusa esattamente il meccanismo di confirm-reviewed-entry
-  // (l'unica transizione di stato già esistente su una riga ledger preesistente
-  // nel progetto), non un meccanismo nuovo. Un INSERT equivalente duplicherebbe
-  // l'importo a meno di lasciare la riga PENDING originale a marcire nel ledger
-  // (doppio conteggio in pending_balance) — l'UPDATE è l'unica opzione che non
-  // rischia doppio conteggio.
-  // Non nella stessa transazione DB di process_order_points_atomic (che accetta
-  // solo INSERT di nuove entries, non tocca righe esistenti) — estendere quella
-  // funzione SQL è fuori dallo scope di questo fix mirato. Stessa classe di
-  // rischio "post-idempotenza" già presente allo step 7 sottostante
-  // (checkReferralAccessUnlock gira anch'esso dopo che points_processed è già
-  // stato marcato true, senza garanzie transazionali con la RPC).
-  const { count: priorDeliveredCount } = await supabase
+  // ── 5b. Conferma SIGNUP_BONUS al primo ordine consegnato ─────────────────────
+  // Fix A (riordino): eseguita PRIMA della RPC idempotente, non dopo.
+  // process_order_points_atomic marca points_processed=true — il guard di
+  // idempotenza dell'intero hook (vedi step 1). Se questa conferma fallisse
+  // DOPO quella chiamata, l'hook non verrebbe mai più ri-eseguito per questo
+  // ordine e il bonus resterebbe PENDING per sempre, silenziosamente. Eseguita
+  // prima, un suo fallimento propaga (throw, non solo log) e blocca la RPC in
+  // questo giro: il prossimo trigger sullo stesso ordine (points_processed
+  // ancora false) ritenterà tutto da capo. Per lo stesso motivo la query di
+  // conteggio stessa non ignora più un eventuale errore: un fallimento nel
+  // determinare "primo ordine consegnato" è trattato come fallimento della
+  // conferma, non come "nessun ordine precedente" per default.
+  //
+  // Meccanismo di conferma centralizzato in confirmSignupBonus() — stessa
+  // funzione riusata (non duplicata) dall'azione admin manuale "Confirmer"
+  // nel pannello bonus bloccati.
+  const { count: priorDeliveredCount, error: priorDeliveredError } = await supabase
     .from('orders')
     .select('id', { count: 'exact', head: true })
     .eq('tenant_id', tenantId)
@@ -205,15 +201,22 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
     .eq('status', 'delivered')
     .neq('id', orderId);
 
+  if (priorDeliveredError) throw priorDeliveredError;
+
   if ((priorDeliveredCount ?? 0) === 0) {
-    await supabase
-      .from('points_ledger')
-      .update({ status: 'CONFIRMED' })
-      .eq('tenant_id', tenantId)
-      .eq('customer_id', buyerId)
-      .eq('transaction_type', 'SIGNUP_BONUS')
-      .eq('status', 'PENDING');
+    await confirmSignupBonus(tenantId, buyerId); // throws on error — blocca la RPC sotto
   }
+
+  // ── 6. RPC atomica ──────────────────────────────────────────────────────────
+  // PURCHASE_EARNED/REFERRAL_EARNED invariate: restano interamente gestite qui,
+  // nell'unica chiamata a process_order_points_atomic — il riordino sopra non
+  // le tocca in alcun modo, sposta solo il punto in cui gira la conferma
+  // SIGNUP_BONUS rispetto a questa chiamata.
+  const { error } = await supabase.rpc('process_order_points_atomic', {
+    p_order_id: orderId,
+    p_entries: entries,
+  });
+  if (error) throw error;
 
   // ── 7. Sblocco eleggibilità referral per l'acquirente ────────────────────────
   await checkReferralAccessUnlock(tenantId, buyerId);

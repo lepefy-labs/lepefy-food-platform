@@ -1,8 +1,10 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getStuckSignupBonuses } from '@/lib/loyalty/getStuckSignupBonuses';
 import { LoyaltyConfigSection } from './LoyaltyConfigSection';
 import { ReferralAccessSection } from './ReferralAccessSection';
 import { PendingReviewSection } from './PendingReviewSection';
+import { StuckSignupBonusSection } from './StuckSignupBonusSection';
 import type { PointsLedgerEntry, TenantReferralTier } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +15,7 @@ export default async function AdminLoyaltyPage() {
 
   const supabase = createServiceClient();
 
-  const [{ data: tiers }, { data: pendingEntries }] = await Promise.all([
+  const [{ data: tiers }, { data: pendingEntries }, stuckSignupBonuses] = await Promise.all([
     supabase
       .from('tenant_referral_tiers')
       .select('*')
@@ -27,6 +29,7 @@ export default async function AdminLoyaltyPage() {
       .eq('requires_manual_review', true)
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false }),
+    getStuckSignupBonuses(tenant.id),
   ]);
 
   return (
@@ -52,6 +55,8 @@ export default async function AdminLoyaltyPage() {
         <ReferralAccessSection />
 
         <PendingReviewSection initialEntries={(pendingEntries ?? []) as PointsLedgerEntry[]} />
+
+        <StuckSignupBonusSection initialItems={stuckSignupBonuses} />
       </div>
     </div>
   );
