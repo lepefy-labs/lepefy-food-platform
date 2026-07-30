@@ -9,7 +9,6 @@ export interface Customer {
   created_at: string;
   // Loyalty & referral
   referred_by_id: string | null;
-  referral_code: string | null;
   signup_ip: string | null;
   signup_device_fingerprint: string | null;
   referral_access_granted: boolean;

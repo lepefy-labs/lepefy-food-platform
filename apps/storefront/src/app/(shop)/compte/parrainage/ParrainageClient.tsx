@@ -32,7 +32,7 @@ export function ParrainageClient({
 }: ParrainageClientProps) {
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = code ? `${appUrl}/compte/connexion?ref=${code}` : '';
+  const shareUrl = code ? `${appUrl}/invite/${code}` : '';
 
   async function handleCopy() {
     if (!shareUrl) return;
