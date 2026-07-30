@@ -71,7 +71,13 @@ export async function verifyOtp(
     );
 
   if (upsertError) {
+    // Non un fallimento da loggare e ignorare: se questa riga non viene
+    // scritta, l'account auth esiste ma il customer no. Propagare l'errore
+    // impedisce alla route di trattare il login come riuscito (e quindi di
+    // procedere a registerWithReferral / consumare il cookie referral_code
+    // su un signup che in realtà non si è completato).
     console.error('[auth] customers upsert error:', upsertError.message);
+    throw upsertError;
   }
 
   return { session: data.session, isNewCustomer };
