@@ -1,0 +1,28 @@
+-- ============================================================
+-- 042_customers_service_role_grant.sql
+-- Fix: "permission denied for table customers" per service_role
+-- ============================================================
+--
+-- Causa esatta (confermata dall'errore reale restituito in produzione da
+-- GET /api/admin/loyalty/customers-search: {"error":"permission denied for
+-- table customers"}): 038_customers_grants.sql documenta questo STESSO bug
+-- ("pattern Lepefy: RLS non basta") e lo aveva risolto SOLO per il ruolo
+-- `authenticated` — mai per `service_role`, il ruolo usato da
+-- createServiceClient() in tutto il sistema loyalty. RLS bypass
+-- (service_role ha l'attributo bypassrls) e GRANT a livello di tabella sono
+-- due meccanismi Postgres distinti: bypassare RLS permette di vedere/toccare
+-- tutte le righe una volta che la query è autorizzata, ma senza un GRANT
+-- esplicito il ruolo non può nemmeno eseguire la query sulla tabella.
+--
+-- Impatto reale: non solo la ricerca customer nel pannello admin — verificato
+-- che customers è letta/scritta via createServiceClient() in almeno 17 punti
+-- del sistema loyalty (registerWithReferral, grantReferralAccess/
+-- revokeReferralAccess, checkReferralAccessUnlock, generateReferralCode,
+-- processOrderPointsOnDelivery, getStuckSignupBonuses, la pagina
+-- /compte/parrainage, verifyOtp, ecc.), oltre alla funzione
+-- apply_referral_on_signup (plpgsql senza SECURITY DEFINER, quindi eseguita
+-- coi privilegi di chi la chiama — service_role — e che fa un UPDATE su
+-- customers). Questo GRANT sblocca l'intero sistema, non solo l'endpoint di
+-- ricerca dove si è manifestato per primo.
+
+grant select, insert, update on public.customers to service_role;
