@@ -1,6 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
+> Aggiornato: 31 Luglio 2026 (v3.17) — **nuovo ciclo consistente: autenticazione cliente + `admin_users` + storico ordini `/orders` + sistema Loyalty/Referral multi-tier**, il lavoro più corposo del progetto finora in termini di superficie DB (3 nuove migration: `037_checkout_sessions_customer_id.sql`, `038_customers_grants.sql`, `039_loyalty_referral_system.sql`, quest'ultima da sola con 7 tabelle nuove + funzioni Postgres). Riassunto: (1) autenticazione cliente via Supabase Auth con **OTP a codice a 6 cifre** (non magic link — scelta deliberata perché i magic link su iOS/Android aprono il browser di sistema invece della PWA installata, rompendo il contesto app, stesso tipo di limite già noto per l'installazione PWA); checkout guest resta possibile ma senza punti/referral; (2) tabella `admin_users` sostituisce la whitelist flat `ADMIN_EMAILS`, introduce ruoli `platform_owner`/`tenant_admin` con scoping per tenant, `requireAdmin()` cambia firma in `requireAdmin(tenantId)`; (3) pagina storico ordini cliente `/orders` (riusa il pattern token HMAC di `/orders/[id]?token=xxx`), voce "Compte" aggiunta al BottomNav mobile (punto d'ingresso mancante, corretto in sessione); (4) checkout con pre-compilazione profilo per clienti autenticati; (5) **sistema Loyalty/Referral multi-tier** completo: albero referral a profondità configurabile per tenant (default 2, tetto hard indipendente dalla config — modificabile solo via migration esplicita), percentuali per livello versionate per tenant (mai sovrascritte — ogni riga del ledger salva `pct_applied`/`referral_level` per restare storicamente accurata anche se le percentuali cambiano in futuro), ledger punti append-only (pattern Ledger, righe `REVERSED` invece di update), controlli anti-frode graduati (`FLAG_FOR_REVIEW`/`CAP_AT_THRESHOLD`/`AUTO_BLOCK`), gating eleggibilità codice referral (`ALL_CUSTOMERS`/`SPENDING_THRESHOLD`/`ADMIN_GRANTED_ONLY`), link referral in formato path `/invite/[code]` (non query param `?ref=` — scelta tecnica: il middleware Next.js non gira per via del Root Directory Vercel, e le pagine ISR non possono leggere in sicurezza cookie per-utente), visualizzazione albero referral lato utente. Eseguito e verificato da Claude Code con diversi bug intercettati e corretti in sessione (dettaglio in §9bis). Vedi §9bis (nuova sezione) e §35 per il changelog completo. Revisione precedente (v3.16) sotto.
 > Aggiornato: 26 Luglio 2026 (v3.16) — **verifica di coerenza contro filesystem/repo reale** (branch `claude/lepefy-project-context-check-rl2zy3`, staccato dallo stesso `main` di v3.15). Trovata e corretta una lacuna concreta in §4: `ls supabase/migrations/` mostra **41 file**, non i ~39 impliciti dalla tabella precedente — mancava `031_storefront_ready.sql` (collisione di numero con `031_barcode_system.sql`, mai segnalata) e `034_click_collect_hours_it.sql` era ancora segnato "contenuto non identificato" nonostante il campo sia cablato end-to-end nel codice (`packages/types/tenant.ts`, `/card`, `/admin/parametres`). Entrambe le feature (flag `tenants.storefront_ready` per il link "Voir nos produits" su `/card`, campo `click_collect_hours_it` per gli orari in italiano) sono ora documentate in §4/§14/§14bis. Confermato anche, senza sorprese: `git merge-base main HEAD` coincide ancora con la punta di `main` (questo branch resta non mergiato, coerente con lo stato riportato da v3.7 in poi); i componenti nuovi elencati in §33 (`ProductDetail.tsx`, `ProductGallery.tsx`, `ProductSpecs.tsx`, `ProductTabs.tsx`, `TrustBadges.tsx`, `StorySection.tsx`, `upload-story-photo`) esistono tutti sul filesystem; `packages/types/product.ts`/`tenant.ts` contengono i campi attesi (`is_homemade`, `storefront_ready`, `click_collect_hours_it`); BottomNav conferma icone Tabler (coerente col revert §12/§33). Dettaglio completo in §34. Revisione precedente (v3.15) sotto.
 > Aggiornato: 26 Luglio 2026 (v3.15) — **tre cicli consolidati in questo aggiornamento** (mai documentati individualmente finora, gap riconosciuto — vedi §33 per il dettaglio): (1) redesign completo Product Detail Page (galleria dinamica, spec row Poids/Origine/Conservation con mapping esplicito, tab Ingrédients&Allergènes/Conservation da campi etichetta già esistenti, trust badge in stile "card" con contrasto rifinito su feedback iterativo, `products.is_homemade` nuovo campo esplicito mai dedotto — migration `035`); (2) home page: "Nos produits vedettes" da scroll orizzontale a grid con quick-add, nuova sezione condizionale "Notre origine" (migration `036`, invisibile finché `story_text` non è compilato, statistiche reali mai hardcoded), footer esteso a 4 colonne **solo in home** (altrove resta la versione minimale, per non competere con la bottom nav fissa su mobile — nessun link a pagine inesistenti, colonne "Boutique"/"Aide" omesse per mancanza di pagine reali), card prodotto hero rese cliccabili, colore ticker rifinito (`color-mix` 55% invece di 25%, per restare riconoscibile come tinta brand); (3) form admin `/admin/parametres` per i campi "Notre origine" (riuso del pattern `EDITABLE_TENANT_FIELDS`/`BoutiqueInfoSection` esistente, upload foto indipendente dal Save principale via endpoint già esistente) — report dettagliato ricevuto, `pnpm typecheck` pulito; migration `035`+`036` confermate eseguite su Supabase in chat (non riverificate contro il DB reale da questa sessione). Revisione precedente (v3.14) sotto.
 > Aggiornato: 26 Luglio 2026 (v3.14) — **decisione di piattaforma invertita esplicitamente**: la bottom navigation bar dello storefront cliente (§12) passa da icone Tabler a emoji (🏠 🛍️ 🛒 📦), insieme a hero trust-row (🚚 livraison, ❄️ frais/surgelés — "Sélection artisanale" resta un SVG a blason, branding grafico non icona funzionale) e ticker notification bar (🚚 ❄️ 🌍 🌿 su tutte e 4 le frasi, sfondo scurito via `color-mix(in oklch, var(--color-primary) 25%, black)` invece di ereditare `--color-primary` puro). Perimetro volutamente limitato a questi 3 punti esplicitamente mappati — un audit più ampio ha trovato icone Tabler anche in ChatWidget, CartClient, CheckoutForm, pagine Orders/OrderConfirmation e nella Digital Card pubblica (`/card`), lasciate invariate in questo giro (nessun mapping emoji deciso per quelle, decisione rimandata). `apps/admin/**` non toccato: lì le icone Tabler restano, coerenza con densità/leggibilità per uso interno. Revisione precedente (v3.13) sotto.
@@ -228,8 +229,9 @@ lepefy-food-platform/
 | `ai_usage_log` | Log per-chiamata di ogni richiesta AI (tutte le route, admin e pubbliche) — token input/output, immagini generate, `estimated_cost_usd` calcolato dai prezzi correnti in `ai_pricing`, `status` (`success`/`error`/`rate_limited`). Base sia per il rate limiting (query su finestra temporale) sia per il cruscotto costi (vista `ai_usage_monthly_by_tenant`) |
 | `orders` | Ordini creati SOLO dopo `payment_intent.succeeded` webhook; indice unico su `stripe_payment_intent_id` (idempotenza) |
 | `order_items` | Righe ordine con `storage_type`, `warehouse_location`, `name_alt` copiati dal prodotto |
-| `customers` | Linked a `auth.users` — Phase 2 |
+| `customers` | Linked a `auth.users(id)` — la FK esisteva già dallo schema iniziale ma **restava inutilizzata fino al 31/07**: il checkout creava solo ordini guest con `customer_id null`. Dal 31/07 il login cliente via Supabase Auth (OTP email, vedi §9bis) popola effettivamente questa relazione. Colonna `referral_code` rimossa (era ridondata, mai scritta — la fonte di verità per i codici referral è la nuova tabella dedicata, vedi §9bis) |
 | `addresses` | Indirizzi clienti |
+| `admin_users` | **Nuova (31/07)**, sostituisce la whitelist flat `ADMIN_EMAILS` in env var. Ruoli `platform_owner` (accesso a tutti i tenant, Robertin) e `tenant_admin` (scoped a un tenant specifico, es. Dalice per ChloeFood quando verrà attivata). `requireAdmin()` cambia firma in `requireAdmin(tenantId)` — ogni route sotto `/api/admin/*` deve passare esplicitamente il tenant, non solo verificare l'email — vedi §8, §9bis |
 | `checkout_sessions` | Sessioni temporanee checkout (eliminate dal webhook dopo creazione ordine) — contengono anche email/telefono carrelli incompleti, mai sfruttate per recupero carrello abbandonato (vedi §19) |
 | `packaging_surcharges` | Configurazione surplus imballaggio per tenant (1 riga, incluse dimensioni box L×W×H) |
 | `shipping_vat_rates` | IVA spedizione per paese (N righe per tenant) |
@@ -239,6 +241,7 @@ lepefy-food-platform/
 | `importers` | Anagrafica importatori (sistema etichette) — es. AFRICOOP Società Cooperativa |
 | `label_print_jobs` | Job di stampa etichette — `status` (`draft`/`generated`), `duplicated_from_id` (ristampa), `palette`, `natural_badge`, `origin_style`, `pdf_url` |
 | `tenant_knowledge_base` | Contenuto culturale curato **sempre a mano** (ricette, espressioni, contesto, FAQ) per il chatbox — `category` (`recipe`/`expression`/`greeting`/`cultural_context`/`faq`), `content`, `embedding` vector(768), `source`/`reviewed_by`/`reviewed_at`, `active`. RLS attiva senza policy anon/authenticated: solo `service_role` (route admin per scrivere, route chatbox per leggere via `match_knowledge_base`) — vedi §13ter |
+| **7 tabelle Loyalty/Referral** (`039_loyalty_referral_system.sql`, 31/07) | Sistema completo albero referral multi-livello + ledger punti — copre: configurazione profondità/percentuali per tenant (versionata, mai sovrascritta), codici referral per cliente con regola di eleggibilità, ledger punti append-only (righe `PENDING`/`CONFIRMED`/`REVERSED`, mai update in-place), stato anti-frode per cliente/ordine. Dettaglio completo in §9bis — nomi tabella e funzioni Postgres esatti non ricopiati qui campo per campo, vedi il file migration nel repo per lo schema completo |
 
 **121 prodotti reali importati e poi riseminati** (`020_reseed_products_catalogue_v2.sql`, idempotente `ON CONFLICT (tenant_id, slug) DO UPDATE`) dal catalogo `ChloeFood_Template_Catalogue_v2`, 8 categorie: Épices, Légumes, Farines, Poissons, Sauces & Huiles, Snacks, Viandes séchées, Boissons. Ulteriori prodotti aggiunti da `022_new_products_from_labels.sql` (scoperti nei dati etichette ma assenti dal catalogo v2, seminati inattivi/prezzo 0 in attesa di attivazione admin).
 
@@ -289,6 +292,9 @@ lepefy-food-platform/
 | `034_click_collect_hours_it.sql` | **Correzione 26/07: contenuto ora identificato** (la revisione precedente di questo documento lo segnalava come "non identificato", nessuna verifica indipendente era stata fatta contro il filesystem). `tenants.click_collect_hours_it` — versione italiana degli orari click & collect, editabile separatamente dal francese (`click_collect_hours`, migration 009) perché testo libero non traducibile automaticamente in modo affidabile. Mostrato su `/card` e checkout quando `lang=it`; se `null`, fallback sul campo francese. Editabile da `/admin/parametres` (`BoutiqueInfoSection.tsx`, whitelist `EDITABLE_TENANT_FIELDS` in `api/admin/tenant/route.ts`) |
 | `035_product_is_homemade.sql` | `products.is_homemade` boolean default `false` — nessun prodotto attivato in questa migration, attivazione manuale per prodotto è scelta editoriale successiva; **numerata 035 perché 030–034 già occupate** (il prompt originale la chiamava `030_...`) — vedi §33 |
 | `036_tenant_story.sql` | `tenants.story_heading`/`story_text`/`story_image_url`/`countries_served` — solo colonne, nessun contenuto ChloeFood popolato in questa migration (contenuto editoriale, non generato) — vedi §33 |
+| `037_checkout_sessions_customer_id.sql` | Emersa durante il debug del prerequisito auth cliente (31/07) — collega `checkout_sessions`/ordini a `customer_id` quando l'utente è autenticato. Numero occupato prima che il prompt loyalty potesse usarlo, causando la rinumerazione a cascata sotto — vedi §9bis |
+| `038_customers_grants.sql` | Anch'essa emersa durante il debug auth (31/07) — GRANT mancanti su `customers` causavano `permission denied for table customers` (client service usato per il check `isNewCustomer` invece del client legato alla sessione) — vedi §9bis |
+| `039_loyalty_referral_system.sql` | Sistema Loyalty/Referral multi-tier completo — 7 tabelle nuove + funzioni Postgres (incluso `resolve_referral_chain` per la risoluzione dinamica dell'albero) — **numerata 039 per doppia collisione a cascata** con `037_checkout_sessions_customer_id.sql` e `038_customers_grants.sql`, entrambe scritte da Claude Code durante il debug del prerequisito auth e non previste al momento della stesura del prompt originale (che la chiamava `037_...`). Eseguita e verificata (report positivo su typecheck + flusso end-to-end registrazione→ordine→consegna→punti `PENDING`) — vedi §9bis |
 
 **⚠️ Verificato in questa sessione (26/07, seconda passata):** `ls supabase/migrations/` conta **41 file**, non i ~38 impliciti dalla tabella sopra nelle revisioni precedenti — mancavano `031_storefront_ready.sql` (collisione di numero mai segnalata) e l'identificazione di `034_click_collect_hours_it.sql`. Entrambi i campi (`storefront_ready`, `click_collect_hours_it`) sono confermati letti/scritti nel codice reale (`packages/types/tenant.ts`, `card/page.tsx`, `DigitalCard.tsx`, `api/admin/tenant/route.ts`, `BoutiqueInfoSection.tsx`) — non sono migration orfane, la feature è cablata end-to-end, solo mai documentata qui prima d'ora.
 
@@ -416,7 +422,7 @@ Pannello `/admin/billing`: mostra stato abbonamento con due opzioni di pagamento
 - **Causa del fallimento iniziale:** Root Directory Vercel = `apps/storefront` impedisce l'esecuzione dell'Edge middleware Next.js in monorepo
 - **Soluzione pagine:** route group `(protected)` con `admin/layout.tsx` Server Component che chiama `supabase.auth.getUser()` e reindirizza se non autenticato; `admin/login/` fuori dal gruppo protetto per evitare redirect loop
 - **Soluzione API:** helper `src/lib/auth/requireAdmin.ts` chiamato in testa a ogni route sotto `/api/admin/*` — prima della revisione le API scrivevano senza alcun controllo (vedi §2.1)
-- **Whitelist:** variabile d'ambiente `ADMIN_EMAILS` — solo email designate accedono, non ogni utente registrato sullo storefront
+- **Whitelist:** variabile d'ambiente `ADMIN_EMAILS` — solo email designate accedono, non ogni utente registrato sullo storefront. **⚠️ Superato dal 31/07**: sostituito dalla tabella `admin_users` (ruoli `platform_owner`/`tenant_admin`, scoping per tenant) — `requireAdmin()` ha ora firma `requireAdmin(tenantId)`, ogni route admin deve passare esplicitamente il tenant invece di limitarsi a verificare l'email. Vedi §4, §9bis. `ADMIN_EMAILS` non risulta ancora rimossa dalle env Vercel (verificare se serve ancora come fallback)
 - **Bug critico risolto:** `@supabase/ssr` 0.3.x richiede l'implementazione simultanea delle API cookie vecchie (`get/set/remove`) E nuove (`getAll/setAll`) — fornirne solo una rompe la sessione tra client e server
 - **Recovery password:** flusso testato via Supabase Dashboard → Authentication → Users; Site URL in Auth settings deve puntare a `https://chloefood.com` (non `localhost`) per redirect corretto del link di recupero
 
@@ -530,7 +536,61 @@ Non presente nel piano originale dell'audit né nelle revisioni precedenti di qu
 - Timeline stati: `confirmé → en préparation → expédié → livré`
 - Link tracking corriere incluso quando disponibile
 - Link inviato dal workflow n8n nella email di conferma ordine
-- **Phase 2 non ancora avviata:** Supabase Auth clienti + pagina storico ordini `/orders` con tab bottom bar 📦 Commandes come da maquette originale (attualmente Commandes Phase 1 = form inserimento numero ordine + redirect tracking)
+- **✅ Phase 2 implementata (31/07)** — vedi §9bis per il dettaglio completo: Supabase Auth clienti (OTP email) + pagina storico ordini `/orders` che riusa il pattern token HMAC esistente, voce "Compte" ora presente nel BottomNav mobile. Sostituisce lo stato precedente ("Phase 1 = form inserimento numero ordine + redirect tracking, guest-only")
+
+---
+
+## 9bis. Autenticazione cliente + `admin_users` + Sistema Loyalty/Referral multi-tier (31/07/2026)
+
+**Contesto:** ciclo unico e più corposo del progetto ad oggi, tre workstream costruiti in sequenza perché il sistema loyalty dipende da una sessione cliente persistente per identificare gli acquirenti (prima di questo ciclo, `customers.id` era già `references auth.users(id)` con RLS pronte su `auth.uid()`, ma nessun flusso di login era mai stato costruito sopra — il checkout produceva solo ordini guest).
+
+### 1. Autenticazione cliente (prerequisito)
+
+- **Supabase Auth, email OTP a codice a 6 cifre — non magic link.** Scelta deliberata: i magic link aperti dal client Mail su iOS (e in certi flussi anche Android) si aprono nel browser di sistema invece che nella PWA standalone installata, rompendo il contesto app — stesso tipo di limite già documentato nel progetto per l'asimmetria di installazione PWA su Android (§11/§14). L'OTP a codice elimina il problema alla radice: l'utente digita 6 cifre senza mai lasciare la PWA.
+- **Login opzionale, non obbligatorio al checkout** — il guest checkout resta possibile, ma senza punti/referral collegati (decisione esplicita di Robertin).
+- **Bug noto Supabase incontrato in sessione**: il progetto generava di default codici a **8 cifre**, non 6 — impostazione in **Supabase Dashboard → Authentication → Providers → Email → OTP Length** (range 6–10), corretta manualmente. Punto di attenzione lasciato a Claude Code: la lunghezza non deve essere hardcoded in un solo punto isolato lato client (regex/input a celle fisse), altrimenti un cambio futuro di questa impostazione rompe silenziosamente la validazione senza errori in log.
+- **Bug `verifyOtp` type**: il parametro `type` passato a `supabase.auth.verifyOtp()` differisce tra primo login (`'signup'`) e login successivi (`'email'`) — se non gestito correttamente il codice arriva ma la verifica fallisce con errore tipo "token invalido"/"OTP expired" nonostante il codice sia corretto.
+- Migration `037_checkout_sessions_customer_id.sql` e `038_customers_grants.sql` emerse durante questo debug (non previste, numerazione a cascata — vedi §4).
+- Colonna `customers.referral_code` (mai scritta) rimossa in questo ciclo.
+
+### 2. `admin_users` — sostituisce `ADMIN_EMAILS`
+
+Tabella con ruoli `platform_owner` (Robertin, accesso multi-tenant) e `tenant_admin` (scoped a un tenant, es. Dalice per ChloeFood in futuro). `requireAdmin()` cambia firma in `requireAdmin(tenantId)` — ogni route sotto `/api/admin/*`, incluse tutte le nuove `/api/admin/loyalty/*`, deve passare esplicitamente il tenant. Vedi §4, §8.
+
+### 3. Storico ordini cliente `/orders`
+
+Nuova pagina che riusa il pattern token HMAC già esistente in `/orders/[id]?token=xxx` (§9), ora aggregato per cliente autenticato. Voce "Compte" aggiunta al BottomNav mobile — punto d'ingresso mancante identificato e corretto in sessione (senza questo, la maggioranza degli utenti reali non avrebbe trovato `/compte/connexion`).
+
+### 4. Pre-compilazione checkout per clienti autenticati
+
+Scoping per risolvere il fastidio di dover re-inserire i propri dati a ogni ordine — profilo salvato e riusato al checkout successivo.
+
+### 5. Sistema Loyalty/Referral multi-tier — `039_loyalty_referral_system.sql`
+
+**Architettura (7 tabelle + funzioni Postgres):**
+
+- **Albero referral a profondità configurabile per tenant** — default 2 livelli, estendibile fino a 5 dal pannello tenant, ma con un **tetto hard indipendente dalla configurazione tenant**: se in futuro serve alzarlo oltre 5, è una migration esplicita, mai un valore che un tenant admin può impostare da solo.
+- **Risoluzione dinamica dell'albero** (`resolve_referral_chain`, sostituisce un calcolo fisso L1/L2 pensato inizialmente) — risale la catena `referred_by_id` fino a `max_depth` livelli, si ferma se la catena finisce prima.
+- **Percentuali per livello, versionate per tenant, mai sovrascritte** — ogni riga confermata nel ledger salva `pct_applied` + `referral_level` al momento del calcolo. Motivazione esplicita: se ChloeFood cambia la percentuale L2 dal 3% al 5% il mese prossimo, le righe già confermate devono restare storicamente accurate — senza questi campi un audit futuro non saprebbe più con quale percentuale è stato calcolato un accredito passato.
+- **Ledger punti append-only** (pattern Ledger) — stati `PENDING`/`CONFIRMED`/`REVERSED`, mai update in-place su una riga già scritta.
+- **Anti-frode graduato**: `FLAG_FOR_REVIEW`, `CAP_AT_THRESHOLD`, `AUTO_BLOCK`.
+- **Eleggibilità codice referral**: `ALL_CUSTOMERS`, `SPENDING_THRESHOLD`, `ADMIN_GRANTED_ONLY`.
+- **Link referral in formato `/invite/[code]`, non `?ref=` query param** — scelta tecnica, non estetica: il middleware Next.js non gira (Root Directory Vercel = `apps/storefront`, stesso limite noto da §5/§8), e le pagine ISR non possono leggere in sicurezza cookie per-utente.
+- **Concept UI "la corda dei cartellini"** — estende il componente signature esistente `ShopTag.tsx` (§12bis) invece di introdurre un nuovo linguaggio visivo: i nodi dell'albero referral sono cartellini in scala su una "corda", con `color-mix` in oklch che scurisce progressivamente i livelli più profondi. Un albero referral è mostrato lato utente (confermato dal report finale di Claude Code).
+
+**Bug intercettati e corretti durante l'esecuzione:**
+
+| Bug | Causa | Fix |
+|---|---|---|
+| `permission denied for table customers` | Client service usato per il check `isNewCustomer` invece del client legato alla sessione | Uso del client corretto lato sessione |
+| Cookie referral cancellato su qualunque fallimento OTP | Cancellazione non condizionata al successo | Cancellato solo su login riuscito |
+| Link referral con `?ref=` invece di `/invite/[code]` | Formato iniziale incompatibile con middleware/ISR (vedi sopra) | Riformattato a path dedicato |
+| Righe `REVERSED` non nettate contro il saldo `CONFIRMED` in una vista di calcolo | `SUM` filtrato solo su `CONFIRMED` | `REVERSED` incluso nello stesso filtro `SUM` |
+| Entry `SIGNUP_BONUS` mai confermate | Nessun trigger di conferma collegato | Confermate alla prima consegna (`delivered`), race condition chiusa eseguendo l'UPDATE prima della RPC atomica |
+| Endpoint admin ricerca cliente → 500 su email con `@` | Routing path-vs-querystring mismatch | Corretto il routing |
+| `GRANT SELECT` mancante | Emerso nel debug prerequisito auth | Aggiunto — stesso pattern di bug ricorrente già noto nel progetto (RLS ≠ GRANT, vedi §5/§20) |
+
+**Stato:** migration + funzioni + route `/api/admin/loyalty/*` (con `requireAdmin(tenantId)`) + `lib/loyalty/*.ts` eseguiti da Claude Code, typecheck confermato, flusso end-to-end verificato (registrazione con codice referral → ordine → consegna → punti visibili `PENDING` nel ledger). Non ancora comunicato a Dalice come nuova feature (vedi §18/§19).
 
 ---
 
@@ -963,6 +1023,13 @@ GOTENBERG_AUTH=...
 | Home grid vedettes + footer esteso condizionale + revert BottomNav a Tabler | Robertin | ✅ FATTO — riportato in chat con elenco file/deviazioni, vedi §33 |
 | Form admin `/admin/parametres` per campi "Notre origine" | Robertin | ✅ FATTO — report dettagliato ricevuto (file + comportamento upload/whitelist), `pnpm typecheck` pulito, vedi §33 |
 | Creare pagine mancanti Livraison/Retours/Contact/FAQ (oggi assenti, footer "Aide" omesso per questo) | ChloeFood | ⚠️ DA FARE — gap di contenuto segnalato durante il ciclo footer, non solo estetico: rilevante anche per compliance consumatore EU |
+| Autenticazione cliente (Supabase Auth, OTP 6 cifre) + pagina storico ordini `/orders` | Robertin | ✅ FATTO (31/07) — eseguito e testato, vedi §9bis |
+| Tabella `admin_users` (ruoli `platform_owner`/`tenant_admin`) al posto di `ADMIN_EMAILS` | Robertin | ✅ FATTO (31/07) — `requireAdmin()` ora richiede `tenantId` esplicito, vedi §8/§9bis |
+| Impostare Dalice come `tenant_admin` scoped a ChloeFood in `admin_users` | Robertin | ⚠️ DA FARE — tabella pronta, riga non ancora creata per Dalice |
+| Sistema Loyalty/Referral multi-tier (albero configurabile, ledger punti, anti-frode) | Robertin | ✅ FATTO (31/07) — eseguito, typecheck pulito, flusso end-to-end verificato, vedi §9bis |
+| Configurare percentuali per livello e profondità albero referral per ChloeFood | Dalice / Robertin | ⚠️ DA FARE — sistema pronto ma nessuna configurazione tenant-specifica ancora impostata per ChloeFood |
+| Comunicare a Dalice il nuovo programma Loyalty/Referral (percentuali, funzionamento, cosa vede il cliente) | Robertin | ⚠️ DA FARE — nessuna comunicazione risulta inviata finora |
+| Rimuovere/valutare `ADMIN_EMAILS` da env Vercel ora che `admin_users` è attivo | Robertin | ⚠️ DA VERIFICARE — non chiaro se serve ancora come fallback |
 
 ---
 
@@ -972,7 +1039,10 @@ GOTENBERG_AUTH=...
 
 | Feature | Categoria | Priorità | Stato |
 |---|---|---|---|
-| Autenticazione clienti (Supabase Auth) + pagina `/orders` storico | Contrattuale | P0 | Non avviato |
+| Autenticazione clienti (Supabase Auth) + pagina `/orders` storico | Contrattuale | P0 | ✅ FATTO (31/07) — vedi §9bis |
+| Sistema Loyalty/Referral multi-tier (albero configurabile, ledger punti, anti-frode, UI "corda dei cartellini") | Contrattuale | P0 | ✅ FATTO (31/07) — vedi §9bis; **configurazione ChloeFood-specifica ancora da impostare, non comunicato a Dalice** |
+| Onboarding secondo tenant su `admin_users` (assegnare ruolo `tenant_admin` scoped) | SaaS | P1 | Non avviato — tabella pronta, nessun tenant_admin creato oltre al platform_owner |
+| Rimozione/deprecazione `ADMIN_EMAILS` ora che `admin_users` copre lo stesso ruolo | Tecnico | P2 | Non avviato — verificare se serve ancora come fallback prima di rimuoverla |
 | Enforcement `subscription_status` (blocco soft storefront tenant scaduto) | Tecnico | P0 | Non avviato — mai controllato oggi |
 | Gestione stock reale al checkout (decremento, blocco esaurito) | Tecnico | P0 | Non avviato |
 | Sistema etichette prodotto — deploy Gotenberg su Hetzner | Tecnico | P0 | ✅ FATTO — verificato end-to-end (14/07) |
@@ -1064,6 +1134,8 @@ Al pagamento, chiamare `POST /v1/draft` Packlink per creare una spedizione pre-c
 | `ClaudeCode_Prompt_IconsAndTicker.md` | Prompt Claude Code audit icone Tabler→emoji storefront cliente + fix colore ticker — vedi §12 |
 | `ClaudeCode_Prompt_HomeGridOriginFooter.md` | Prompt Claude Code grid vedettes + sezione "Notre origine" + footer condizionale + revert BottomNav a Tabler — vedi §33 |
 | `ClaudeCode_Prompt_OriginAdminForm.md` | Prompt Claude Code form admin `/admin/parametres` per campi "Notre origine" — vedi §33 |
+| `ClaudeCode_Prompt_CustomerAuth.md` (nome ricostruito, file esterno) | Prompt Claude Code prerequisito: autenticazione cliente via Supabase Auth OTP a codice, checkout guest preservato come opzionale — da eseguire prima del prompt loyalty, vedi §9bis |
+| `ClaudeCode_Prompt_LoyaltyReferralSystem.md` | Prompt Claude Code sistema Loyalty/Referral multi-tier completo — migration `039_loyalty_referral_system.sql` + route `/api/admin/loyalty/*` + `lib/loyalty/*.ts` — vedi §9bis |
 
 ---
 
@@ -1316,4 +1388,39 @@ Nessuna modifica alle altre sezioni — il resto del documento (§1–§3, §5�
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.16 — 26 Luglio 2026 (base: v3.15; verifica di coerenza contro filesystem/repo reale, due migration non documentate trovate e integrate — `031_storefront_ready.sql`, `034_click_collect_hours_it.sql` — vedi §34 per il dettaglio)*
+## 35. Changelog v3.17 (31 Luglio 2026) — Autenticazione cliente + `admin_users` + Sistema Loyalty/Referral multi-tier
+
+Ciclo più corposo del progetto ad oggi in termini di superficie DB toccata in una sola sessione. Basato sullo stato riportato in chat da Robertin (typecheck confermato pulito, flusso end-to-end verificato per il sistema loyalty) — **nessuna verifica indipendente contro git/filesystem in questa sessione**, coerente con l'approccio delle revisioni v3.8–v3.15 (a differenza delle passate di verifica esplicite v3.7/v3.16).
+
+### Cosa è stato aggiunto in questo ciclo
+
+1. **Autenticazione cliente** — Supabase Auth, OTP email a codice 6 cifre (non magic link, per non rompere il contesto PWA su iOS/Android), login opzionale al checkout (guest checkout preservato ma senza punti/referral). Due migration impreviste emerse durante il debug (`037_checkout_sessions_customer_id.sql`, `038_customers_grants.sql`).
+2. **`admin_users`** — sostituisce la whitelist `ADMIN_EMAILS`, introduce ruoli `platform_owner`/`tenant_admin` con scoping. `requireAdmin()` cambia firma in `requireAdmin(tenantId)`.
+3. **Pagina storico ordini `/orders`** — riusa il pattern token HMAC esistente di `/orders/[id]`. Voce "Compte" aggiunta al BottomNav mobile (punto d'ingresso mancante, corretto in sessione).
+4. **Pre-compilazione checkout** per clienti autenticati.
+5. **Sistema Loyalty/Referral multi-tier** (`039_loyalty_referral_system.sql`, rinumerata due volte per collisioni a cascata con le migration del punto 1) — albero referral a profondità configurabile (default 2, max 5, tetto hard), percentuali per livello versionate per tenant, ledger punti append-only con anti-frode graduato, eleggibilità codice referral configurabile, link `/invite/[code]`, concept UI "la corda dei cartellini" (estensione di `ShopTag.tsx`) con albero referral visibile lato utente. Sette bug intercettati e corretti durante l'esecuzione (dettaglio in §9bis), inclusi due pattern già noti nel progetto (RLS senza `GRANT` esplicito; client service usato al posto del client di sessione).
+
+Dettaglio architetturale completo, motivazioni delle scelte tecniche, e tabella bug→causa→fix in **§9bis** (nuova sezione).
+
+### Cosa NON è stato ancora fatto (aperto in roadmap/checklist)
+
+- Configurazione percentuali/profondità referral specifica per ChloeFood
+- Comunicazione a Dalice del nuovo programma loyalty/referral
+- Impostare Dalice come `tenant_admin` in `admin_users`
+- Verificare se `ADMIN_EMAILS` può essere rimossa dalle env Vercel
+
+### Altri aggiornamenti in questo changelog
+
+- **§4** — riga `customers` aggiornata (FK ora effettivamente in uso, colonna `referral_code` rimossa), nuova riga `admin_users`, nuova riga riassuntiva 7 tabelle loyalty/referral, tre nuove migration in tabella.
+- **§8** — sezione autenticazione admin aggiornata con `admin_users` e nuova firma `requireAdmin(tenantId)`.
+- **§9** — stato Phase 2 aggiornato da "non avviata" a fatto, con rimando a §9bis.
+- **§9bis** — nuova sezione, dettaglio completo del ciclo.
+- **§18** — 8 nuove righe checklist go-live.
+- **§19** — 2 righe portate da "Non avviato" a "✅ FATTO", 2 nuove righe roadmap.
+- **§21** — 2 nuovi riferimenti prompt Claude Code.
+
+Nessuna modifica alle sezioni non toccate da questo ciclo (shipping, checkout prezzi/spedizione, n8n, sistema etichette/barcode stampa, chatbox IA, home/product page storefront) rispetto a v3.16.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.17 — 31 Luglio 2026 (base: v3.16; nuovo ciclo — autenticazione cliente, `admin_users`, Sistema Loyalty/Referral multi-tier — vedi §9bis e §35 per il dettaglio completo)*
