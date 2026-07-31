@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
+import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -259,6 +260,21 @@ export async function POST(req: NextRequest) {
         console.info('[checkout] in_store order created — id:', order.id, '— items:', orderItemsPayload.length);
       }
 
+      // Mémorisation du profil (nom/téléphone + adresse par défaut) pour
+      // pré-remplir les commandes suivantes. Ne lève jamais : la commande est
+      // déjà créée, un échec ici ne doit rien annuler (même principe que le
+      // hook loyalty). Pour un retrait en boutique, shippingAddress est null
+      // → seuls le nom et le téléphone sont enregistrés.
+      if (sessionCustomer) {
+        await saveCheckoutProfile({
+          customerId:      sessionCustomer.id,
+          tenantId:        tenant.id,
+          fullName,
+          phone,
+          shippingAddress: fulfillmentType === 'pickup' ? null : shippingAddress,
+        });
+      }
+
       return NextResponse.json({ orderId: order.id });
     }
 
@@ -300,6 +316,18 @@ export async function POST(req: NextRequest) {
     });
 
     console.info('[checkout] PaymentIntent created — id:', paymentIntent.id, '— amount:', paymentIntent.amount);
+
+    // Idem branche Stripe — après la création du PaymentIntent, jamais avant :
+    // aucun échec de cette mémorisation ne peut empêcher le client de payer.
+    if (sessionCustomer) {
+      await saveCheckoutProfile({
+        customerId:      sessionCustomer.id,
+        tenantId:        tenant.id,
+        fullName,
+        phone,
+        shippingAddress: fulfillmentType === 'pickup' ? null : shippingAddress,
+      });
+    }
 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {

@@ -17,6 +17,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
+import type { CustomerProfile } from '@/lib/customers/types';
 import type { Tenant } from '@lepefy/types';
 
 // Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
@@ -69,6 +70,30 @@ function readStoredShipping(): CheckoutShipping | null {
 }
 
 type PaymentMode = 'stripe' | 'in_store';
+
+// ─── Pré-remplissage : helpers de mapping profil → champs du formulaire ───────
+// Le formulaire éclate en deux ce que la base stocke en un seul champ
+// (customers.full_name → prénom + nom, addresses.line1 → rue + numéro). Ces
+// deux fonctions font le chemin inverse, sans jamais perdre d'information :
+// tout ce qui n'est pas identifié reste dans le premier champ.
+
+function splitFullName(fullName: string | null): { firstName: string; lastName: string } {
+  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: '', lastName: '' };
+  return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
+}
+
+function splitLine1(line1: string): { street: string; houseNumber: string } {
+  const parts = line1.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return { street: line1.trim(), houseNumber: '' };
+  const last = parts[parts.length - 1] ?? '';
+  // Numéro de rue = dernier token contenant un chiffre, ou le « s.n. » proposé
+  // par le formulaire pour les adresses sans numéro.
+  if (/\d/.test(last) || /^s\.?\s?n\.?$/i.test(last)) {
+    return { street: parts.slice(0, -1).join(' '), houseNumber: last };
+  }
+  return { street: parts.join(' '), houseNumber: '' };
+}
 
 // ─── Stripe payment step ──────────────────────────────────────────────────────
 
@@ -161,7 +186,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   );
   const recalcDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       street:      shippingInfo?.street ?? '',
@@ -179,6 +204,64 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     }
     if (items.length === 0) router.push('/cart');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Pré-remplissage depuis le profil client ────────────────────────────────
+  // Se déclenche au montage si la session existe déjà, et après une connexion
+  // en cours de checkout (refreshSessionCustomer met à jour sessionCustomer).
+  // Une seule fois par client : si le client corrige un champ puis se
+  // reconnecte, on ne réécrit pas par-dessus sa saisie.
+  const [prefilledAddress, setPrefilledAddress] = useState(false);
+  const prefilledForCustomerRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!sessionCustomer) return;
+    if (prefilledForCustomerRef.current === sessionCustomer.id) return;
+    prefilledForCustomerRef.current = sessionCustomer.id;
+
+    let cancelled = false;
+
+    (async () => {
+      let profile: CustomerProfile | null = null;
+      try {
+        const res = await fetch('/api/customers/me');
+        if (!res.ok) return;
+        profile = (await res.json()) as CustomerProfile;
+      } catch {
+        // Confort, pas prérequis : en cas d'échec le formulaire reste vide et
+        // le checkout se déroule normalement.
+        return;
+      }
+      if (cancelled || !profile) return;
+
+      // On ne remplit QUE les champs encore vides : ce qui vient de l'étape
+      // panier (pays / code postal ayant servi au devis Packlink) et tout ce
+      // que le client a déjà tapé priment toujours sur le profil.
+      const fillIfEmpty = (field: keyof FormValues, value: string | null | undefined) => {
+        if (!value) return;
+        if ((getValues(field) ?? '').trim() !== '') return;
+        setValue(field, value, { shouldValidate: false, shouldDirty: false });
+      };
+
+      const { firstName, lastName } = splitFullName(profile.fullName);
+      fillIfEmpty('firstName', firstName);
+      fillIfEmpty('lastName',  lastName);
+      fillIfEmpty('email',     profile.email);
+      fillIfEmpty('phone',     profile.phone);
+
+      const addr = profile.defaultAddress;
+      if (addr) {
+        const { street, houseNumber } = splitLine1(addr.line1);
+        fillIfEmpty('street',      street);
+        fillIfEmpty('houseNumber', houseNumber);
+        fillIfEmpty('city',        addr.city);
+        fillIfEmpty('postal_code', addr.postalCode);
+        fillIfEmpty('country',     addr.country);
+        if (!cancelled) setPrefilledAddress(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [sessionCustomer, getValues, setValue]);
 
   const subtotal        = totalPrice();
   const fulfillmentType = shippingInfo?.fulfillmentType ?? 'delivery';
@@ -416,6 +499,11 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
                 placeholder="Téléphone (optionnel)"
                 className={inputClass}
               />
+              {sessionCustomer && (
+                <p className="text-[11px] text-gray-400">
+                  Informations pré-remplies depuis votre compte — modifiables si vous commandez pour quelqu&apos;un d&apos;autre.
+                </p>
+              )}
             </div>
           </div>
 
@@ -423,6 +511,11 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           {fulfillmentType === 'delivery' && (
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
+              {prefilledAddress && (
+                <p className="text-[11px] text-gray-400 -mt-2 mb-3">
+                  Votre adresse habituelle — vous pouvez la modifier pour cette commande.
+                </p>
+              )}
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
