@@ -1,27 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { IconUserCircle, IconGift } from '@tabler/icons-react';
+import { IconUserCircle } from '@tabler/icons-react';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import type { SessionCustomer } from '@/lib/auth/getSessionCustomer';
 
+// Déviation par rapport à la version précédente : /compte n'était qu'un
+// redirect vers cette page et n'avait pas de vrai tableau de bord, donc un
+// client déjà connecté voyait ici un mini-résumé (CTA parrainage + logout).
+// Maintenant que /compte est le vrai tableau de bord (page.tsx +
+// AccountDashboard.tsx), cette page ne doit plus faire que de l'auth : un
+// visiteur déjà connecté est renvoyé directement vers /compte au lieu de
+// dupliquer une partie de son contenu ici.
 export function ConnexionClient({ initialCustomer }: { initialCustomer: SessionCustomer | null }) {
   const router = useRouter();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  async function handleLogout() {
-    setIsLoggingOut(true);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      // refresh() ré-exécute le Server Component parent : initialCustomer
-      // redevient null et la vue bascule sur le formulaire de connexion.
-      router.refresh();
-    } finally {
-      setIsLoggingOut(false);
-    }
-  }
+  useEffect(() => {
+    if (initialCustomer) router.replace('/compte');
+  }, [initialCustomer, router]);
+
+  if (initialCustomer) return null;
 
   return (
     <div className="max-w-sm mx-auto px-4 pt-10 pb-4 flex flex-col items-center gap-6">
@@ -29,44 +28,11 @@ export function ConnexionClient({ initialCustomer }: { initialCustomer: SessionC
       <div className="text-center">
         <h1 className="text-xl font-bold text-gray-900">Mon compte</h1>
         <p className="text-sm text-gray-400 mt-2">
-          {initialCustomer
-            ? 'Tu es connecté(e) — tes commandes te font gagner des points'
-            : 'Connecte-toi pour retrouver tes commandes et gagner des points'}
+          Connecte-toi pour retrouver tes commandes et gagner des points
         </p>
       </div>
       <div className="w-full">
-        {initialCustomer ? (
-          <div
-            className="rounded-2xl border border-gray-100 p-4 space-y-3"
-            style={{ boxShadow: 'var(--shadow-card)' }}
-          >
-            <p className="text-sm text-gray-600">
-              Connecté(e) en tant que{' '}
-              <span className="font-medium text-gray-800">{initialCustomer.email}</span>
-            </p>
-            <Link
-              href="/compte/parrainage"
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm text-white"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              <IconGift size={16} stroke={1.8} />
-              Invite un ami
-            </Link>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="w-full py-2.5 rounded-xl font-semibold text-sm border border-gray-200 text-gray-600 disabled:opacity-50"
-            >
-              {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
-            </button>
-          </div>
-        ) : (
-          // refresh() après vérification : le Server Component relit la
-          // session et affiche l'état connecté dans la même vue, sans
-          // redirection — cohérent avec le choix OTP (pas de rupture PWA).
-          <OtpLoginForm onAuthenticated={() => router.refresh()} />
-        )}
+        <OtpLoginForm onAuthenticated={() => router.push('/compte')} />
       </div>
     </div>
   );
