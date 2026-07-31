@@ -84,10 +84,10 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
         <button
           onClick={() => setOpen(true)}
           aria-label="Ouvrir le chat"
-          className="fixed bottom-[84px] right-4 md:bottom-6 z-50 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
+          className="fixed bottom-[84px] right-4 md:bottom-6 z-50 w-[50px] h-[50px] rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform"
           style={{ backgroundColor: 'var(--color-primary)' }}
         >
-          <IconMessageCircle2 size={26} />
+          <IconMessageCircle2 size={24} />
         </button>
       )}
 

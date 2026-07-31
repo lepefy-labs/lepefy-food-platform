@@ -14,6 +14,7 @@ import {
   IconChevronRight,
   IconSparkles,
   IconGift,
+  IconPhoto,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -132,6 +133,20 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
           Bientôt
         </span>
       </div>
+
+      <Link
+        href="/admin/accueil-slides"
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+                    text-sm transition-colors mx-1 ${
+          pathname === '/admin/accueil-slides' ? navClass(true) : navClass(false)
+        }`}
+      >
+        <IconPhoto
+          size={16}
+          stroke={pathname === '/admin/accueil-slides' ? 2 : 1.5}
+        />
+        Slides d&apos;accueil
+      </Link>
 
       <Link
         href="/admin/loyalty"

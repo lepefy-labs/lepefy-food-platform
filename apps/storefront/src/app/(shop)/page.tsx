@@ -1,13 +1,12 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import type { CSSProperties, ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { formatPrice } from '@/lib/utils/format';
 import { ProductCard } from '@/components/catalog/ProductCard';
-import { ShopTag } from '@/components/ui/ShopTag';
 import { StorySection } from '@/components/home/StorySection';
+import { HeroCarousel, type HeroSlideData } from '@/components/home/HeroCarousel';
+import { CategoryBlock } from '@/components/home/CategoryBlock';
+import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
 
 export const metadata: Metadata = {
   title: 'Accueil',
@@ -28,6 +27,7 @@ export type HomeProduct = {
   stock: number | null;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
   category: { name: string } | null;
+  compare_at_price?: number | null;
 };
 
 export default async function HomePage() {
@@ -65,7 +65,8 @@ export default async function HomePage() {
 
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
 
-  // 3. Prodotti per categoria (escludi featured)
+  // 3. Prodotti per categoria (escludi featured) — alimente à la fois le
+  // bloc-catégorie (Feature 2, grille 2×2 de 4 images max) et son compteur.
   const featuredIds = featuredProducts.map(p => p.id);
   const excludeIds  = featuredIds.length > 0
     ? featuredIds
@@ -88,18 +89,82 @@ export default async function HomePage() {
     ),
   );
 
+  // Compte total réel par catégorie (indépendant de la limite de 4 ci-dessus)
+  // — alimente le sous-titre "N produits" du bloc-catégorie.
+  const categoryCounts: Record<string, number> = Object.fromEntries(
+    await Promise.all(
+      categories.map(async (cat) => {
+        const { count } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id)
+          .eq('active', true)
+          .eq('category_id', cat.id);
+        return [cat.id, count ?? 0] as const;
+      }),
+    ),
+  );
+
+  // 4. Suggestions (Feature 3) — étiquettes honnêtes uniquement, jamais de
+  // personnalisation inventée (pas de login client actif côté storefront).
+  const { data: discountCandidatesRaw } = await supabase
+    .from('products')
+    .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .not('compare_at_price', 'is', null)
+    .order('position', { ascending: true })
+    .limit(50);
+
+  const offerProducts: SuggestionProduct[] = (
+    (discountCandidatesRaw as unknown as SuggestionProduct[] | null) ?? []
+  )
+    .filter(p => p.compare_at_price != null && p.compare_at_price > p.price)
+    .slice(0, 6);
+
+  const offerIds = offerProducts.map(p => p.id);
+  const excludeForRecent = offerIds.length > 0 ? offerIds : ['00000000-0000-0000-0000-000000000000'];
+
+  const { data: recentRaw } = await supabase
+    .from('products')
+    .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .not('id', 'in', `(${excludeForRecent.join(',')})`)
+    .order('created_at', { ascending: false })
+    .limit(6);
+  const recentProducts: SuggestionProduct[] = (recentRaw as unknown as SuggestionProduct[] | null) ?? [];
+
+  // 5. Hero slides (Feature 1) — fallback obligatoire si le tenant n'a
+  // encore configuré aucune slide : l'hero ne doit jamais disparaître.
+  const { data: heroSlidesRaw } = await supabase
+    .from('tenant_hero_slides')
+    .select('id, badge_text, title, subtitle, cta_primary_label, cta_primary_url, cta_secondary_label, cta_secondary_url, background_variant')
+    .eq('tenant_id', tenant.id)
+    .eq('active', true)
+    .order('position', { ascending: true });
+
+  const heroSlides: HeroSlideData[] = heroSlidesRaw && heroSlidesRaw.length > 0
+    ? (heroSlidesRaw as HeroSlideData[])
+    : [
+        {
+          id: 'fallback',
+          badge_text: tenant.tagline ?? 'Épicerie africaine',
+          title: "L'épicerie africaine qui a du caractère.",
+          subtitle: "Produits frais, surgelés et d'épicerie fine, sélectionnés avec soin et livrés partout en Europe.",
+          cta_primary_label: 'Découvrir le catalogue',
+          cta_primary_url: '/products',
+          cta_secondary_label: storyEnabled ? 'Notre histoire' : null,
+          cta_secondary_url: storyEnabled ? '#origine' : null,
+          background_variant: 'primary',
+        },
+      ];
+
   return (
     <div className="min-h-screen bg-[#f7f9f8]">
 
-      {/* ── BANNER EMOZIONALE ── */}
-      <HeroBanner
-        heroImageUrl={tenant.hero_image_url ?? null}
-        tagline={tenant.tagline ?? 'Épicerie africaine'}
-        primaryColor={tenant.primary_color}
-        previewProducts={featuredProducts}
-        currency={tenant.currency}
-        storyEnabled={storyEnabled}
-      />
+      {/* ── HERO CAROUSEL ── */}
+      <HeroCarousel slides={heroSlides} />
 
       {/* Contenuto centrato */}
       <div className="max-w-6xl mx-auto w-full">
@@ -126,6 +191,10 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* ── SUGGESTIONS POUR VOUS ── */}
+      <SuggestionsRow label="Offre pour vous" products={offerProducts} currency={tenant.currency} />
+      <SuggestionsRow label="Sélection du moment" products={recentProducts} currency={tenant.currency} />
+
       {/* ── NOTRE ORIGINE ── */}
       <StorySection
         heading={tenant.story_heading}
@@ -135,222 +204,37 @@ export default async function HomePage() {
         countriesServed={tenant.countries_served}
       />
 
-      {/* ── SEZIONI PER CATEGORIA ── */}
-      {categories.map(cat => {
-        const products = categoryProducts[cat.id];
-        if (!products || products.length === 0) return null;
-        return (
-          <section key={cat.id}>
-            <div className="flex items-center justify-between px-4 mb-2 mt-5">
-              <h2 className="font-display text-sm font-bold text-gray-900">{cat.name}</h2>
-              <Link
-                href={`/products?category=${cat.slug}`}
-                className="text-2xs font-medium"
-                style={{ color: 'var(--color-primary)' }}
-              >
-                Voir tout →
-              </Link>
-            </div>
-            <div className="
-              flex gap-2.5 overflow-x-auto px-4 pb-3
+      {/* ── BLOCS CATÉGORIE ── */}
+      {categories.some(cat => (categoryProducts[cat.id]?.length ?? 0) > 0) && (
+        <section>
+          <div
+            className="
+              flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 pb-3 mt-5
               [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
-              md:grid md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]
-              md:overflow-x-visible md:pb-4
-            ">
-              {products.map(product => (
-                <ProductCard key={product.id} product={product} variant="shelf" />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+            "
+          >
+            {categories.map((cat, index) => {
+              const products = categoryProducts[cat.id];
+              if (!products || products.length === 0) return null;
+              return (
+                <CategoryBlock
+                  key={cat.id}
+                  index={index}
+                  name={cat.name}
+                  slug={cat.slug}
+                  count={categoryCounts[cat.id] ?? products.length}
+                  products={products}
+                  primaryColor={tenant.primary_color}
+                  secondaryColor={tenant.secondary_color}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="h-6" />
       </div>{/* /max-w-6xl */}
-    </div>
-  );
-}
-
-// ── Pattern décoratif "anneau tribal" — triangles répétés, blanc à faible
-//    opacité sur var(--color-primary). Généré en CSS/SVG, aucune image
-//    raster. Décision de plateforme (comme le choix de forme du ShopTag),
-//    pas une réplique pixel du logo d'un tenant précis. ──
-function HeroTrianglePattern({ patternId }: { patternId: string }) {
-  return (
-    <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <defs>
-        <pattern id={patternId} width="11" height="9.5" patternUnits="userSpaceOnUse">
-          <polygon points="5.5,0.5 10.5,9 0.5,9" fill="white" fillOpacity="0.5" />
-        </pattern>
-      </defs>
-      <rect width="100" height="100" fill="var(--hero-primary, var(--color-primary))" />
-      <rect width="100" height="100" fill={`url(#${patternId})`} />
-    </svg>
-  );
-}
-
-// Emoji plutôt qu'icônes SVG monochromes pour les deux premiers badges —
-// décision de plateforme inversée (voir LEPEFY_PROJECT_CONTEXT.md §12).
-// "Sélection artisanale" garde son SVG en forme de blason : c'est un élément
-// de branding graphique fidèle au mockup, pas une icône fonctionnelle 1:1.
-const TRUST_ROW: { icon: ReactNode; label: string }[] = [
-  {
-    label: 'Livraison Europe',
-    icon: <span aria-hidden="true">🚚</span>,
-  },
-  {
-    label: 'Frais & surgelés',
-    icon: <span aria-hidden="true">❄️</span>,
-  },
-  {
-    label: 'Sélection artisanale',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2 3 7v10l9 5 9-5V7z" />
-      </svg>
-    ),
-  },
-];
-
-// ── HeroBanner (Server Component interno, non esportato) ──
-function HeroBanner({
-  heroImageUrl,
-  tagline,
-  primaryColor,
-  previewProducts,
-  currency,
-  storyEnabled,
-}: {
-  heroImageUrl: string | null;
-  tagline: string;
-  primaryColor: string;
-  previewProducts: HomeProduct[];
-  currency: string;
-  storyEnabled: boolean;
-}) {
-  // `--hero-primary` expose la couleur du tenant reçue en prop aux enfants ;
-  // le fallback var(--color-primary) couvre le cas où le composant serait
-  // rendu hors du contexte de tenant CSS vars injecté par le layout racine.
-  const heroVars = { '--hero-primary': primaryColor } as CSSProperties;
-  // Le mockup approuvé montre 2 mini-previews produit, pas 3.
-  const preview = previewProducts.slice(0, 2);
-
-  return (
-    <div
-      className="relative overflow-hidden"
-      style={{
-        backgroundImage: 'linear-gradient(180deg, var(--color-primary-dark), var(--hero-primary, var(--color-primary)))',
-        ...heroVars,
-      }}
-    >
-      {/* Immagine di sfondo opzionale */}
-      {heroImageUrl && (
-        <>
-          <Image
-            src={heroImageUrl}
-            alt=""
-            aria-hidden="true"
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-          <div
-            className="absolute inset-0"
-            style={{ backgroundColor: 'var(--color-primary-dark)', opacity: 0.72 }}
-          />
-        </>
-      )}
-
-      {/* Pattern décoratif — visible uniquement sans hero_image_url */}
-      {!heroImageUrl && (
-        <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div className="absolute rounded-full overflow-hidden" style={{ width: 260, height: 260, top: -90, right: -70, opacity: 0.6 }}>
-            <HeroTrianglePattern patternId="heroTrianglesLg" />
-          </div>
-          <div className="absolute rounded-full overflow-hidden" style={{ width: 110, height: 110, bottom: -30, right: 20, opacity: 0.35 }}>
-            <HeroTrianglePattern patternId="heroTrianglesSm" />
-          </div>
-          <div
-            className="absolute rounded-full"
-            style={{ width: 60, height: 60, top: 8, left: 55, backgroundColor: 'var(--color-secondary)', opacity: 0.14 }}
-          />
-        </div>
-      )}
-
-      {/* Contenu — deux colonnes sur desktop, empilé sur mobile (comme le mockup) */}
-      <div className="relative z-10 px-5 py-8 md:px-10 md:py-12 grid gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center md:max-w-6xl md:mx-auto">
-        <div>
-          <ShopTag className="mb-3">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2 3 7v10l9 5 9-5V7z" />
-            </svg>
-            {tagline}
-          </ShopTag>
-          <h1 className="font-display text-white font-bold leading-tight text-2xl md:text-4xl">
-            L&apos;épicerie africaine<br />qui a du caractère.
-          </h1>
-          <p className="mt-2 text-white/85 leading-snug text-sm max-w-[38ch]">
-            Produits frais, surgelés et d&apos;épicerie fine, sélectionnés avec soin et livrés partout en Europe.
-          </p>
-          <div className="flex flex-wrap gap-2.5 mt-5">
-            <Link
-              href="/products"
-              className="inline-flex items-center gap-1.5 bg-white rounded-md px-5 py-3 text-sm font-bold transition-transform hover:scale-105"
-              style={{ color: 'var(--color-primary-dark)' }}
-            >
-              Découvrir le catalogue
-            </Link>
-            {/* N'existe que si la section "Notre origine" est réellement rendue
-                (tenant.story_heading + story_text remplis) — jamais un lien
-                vers un anchor inexistant. */}
-            {storyEnabled && (
-              <Link
-                href="#origine"
-                className="inline-flex items-center gap-1.5 rounded-md px-5 py-3 text-sm font-semibold text-white border-2 border-white/45 transition-colors hover:border-white/70"
-              >
-                Notre histoire
-              </Link>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 mt-6">
-            {TRUST_ROW.map(item => (
-              <div key={item.label} className="flex items-center gap-1.5 text-white/90 text-xs font-semibold">
-                <span className="w-4 h-4 shrink-0 flex items-center justify-center text-sm leading-none">{item.icon}</span>
-                {item.label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Mini-preview prodotti reali — dati veri, jamais de placeholder statique */}
-        {preview.length > 0 && (
-          <div className="flex gap-3.5">
-            {preview.map((product, i) => (
-              <Link
-                key={product.id}
-                href={`/products/${product.slug}`}
-                className={`flex-1 bg-white rounded-lg shadow-card p-3 transition-transform hover:scale-[1.02] hover:shadow-lg ${
-                  i === 0 ? 'rotate-[-3deg]' : 'rotate-[2deg]'
-                }`}
-              >
-                <div className="aspect-square bg-primary-light rounded-md overflow-hidden relative mb-2.5">
-                  {product.image_url && (
-                    <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="180px" />
-                  )}
-                </div>
-                <p className="text-xs font-semibold text-gray-900 line-clamp-1">{product.name}</p>
-                <p
-                  className="text-xs font-bold mt-0.5"
-                  style={{ color: 'var(--color-primary-dark)', fontVariantNumeric: 'tabular-nums' }}
-                >
-                  {formatPrice(product.price, currency)}
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
