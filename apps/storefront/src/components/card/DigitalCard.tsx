@@ -81,8 +81,8 @@ const COPY: Record<Lang, {
   },
 };
 
-function CopyableValue({ value, displayValue, copyLabel: _copyLabel, copiedLabel: _copiedLabel }: {
-  value: string; displayValue?: string; copyLabel: string; copiedLabel: string;
+function CopyableValue({ value, displayValue, color, copyLabel: _copyLabel, copiedLabel: _copiedLabel }: {
+  value: string; displayValue?: string; color: string; copyLabel: string; copiedLabel: string;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -92,13 +92,17 @@ function CopyableValue({ value, displayValue, copyLabel: _copyLabel, copiedLabel
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="flex items-center justify-between w-full gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-left"
+      className="flex items-center justify-between w-full gap-2 rounded-lg px-3 py-2 text-left border-2 transition-all active:scale-[0.98]"
+      style={{
+        backgroundColor: hexToRgba(color, copied ? 0.16 : 0.09),
+        borderColor: hexToRgba(color, copied ? 0.5 : 0.3),
+      }}
     >
-      <span className="font-mono text-xs text-gray-700 truncate">{displayValue ?? value}</span>
+      <span className="font-mono text-xs font-medium text-gray-800 truncate">{displayValue ?? value}</span>
       {copied ? (
-        <IconCheck size={14} stroke={2} className="text-green-600 shrink-0" />
+        <IconCheck size={16} stroke={2.2} className="shrink-0" style={{ color }} />
       ) : (
-        <IconCopy size={14} stroke={1.5} className="text-gray-400 shrink-0" />
+        <IconCopy size={16} stroke={2} className="shrink-0" style={{ color }} />
       )}
     </button>
   );
@@ -270,6 +274,18 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                         <p className="text-xs text-gray-400 pl-[42px]">{t.cashNote}</p>
                       )}
 
+                      {pm.extra?.link && (
+                        <a
+                          href={pm.extra.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pl-[42px] text-xs font-semibold underline block mb-1.5"
+                          style={{ color }}
+                        >
+                          {pm.extra.link}
+                        </a>
+                      )}
+
                       {pm.method === 'bank_transfer' && pm.value && (
                         <div className="pl-[42px] flex flex-col gap-1">
                           {pm.extra?.beneficiary && (
@@ -278,6 +294,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                           <CopyableValue
                             value={pm.value}
                             displayValue={pm.value}
+                            color={color}
                             copyLabel={t.copy}
                             copiedLabel={t.copied}
                           />
@@ -302,7 +319,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                       {pm.method === 'paypal' && pm.value && (
                         isEmailValue(pm.value) ? (
                           <div className="pl-[42px]">
-                            <CopyableValue value={pm.value} copyLabel={t.copy} copiedLabel={t.copied} />
+                            <CopyableValue value={pm.value} color={color} copyLabel={t.copy} copiedLabel={t.copied} />
                           </div>
                         ) : (
                           <a

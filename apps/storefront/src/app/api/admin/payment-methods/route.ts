@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         method,
         label:      body.label ? String(body.label).trim() : null,
         value:      method === 'cash' ? null : (body.value ? String(body.value).trim() : null),
-        extra:      method === 'bank_transfer' ? cleanExtra(body.extra) : null,
+        extra:      method === 'cash' ? null : cleanExtra(body.extra),
         sort_order: parseInt(body.sort_order, 10) || 0,
         active:     Boolean(body.active),
       })

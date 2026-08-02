@@ -40,7 +40,7 @@ export async function PATCH(
     if (method !== undefined) updatePayload.method = method;
     if ('label'      in body) updatePayload.label      = body.label ? String(body.label).trim() : null;
     if ('value'      in body) updatePayload.value      = (method ?? body.method) === 'cash' ? null : (body.value ? String(body.value).trim() : null);
-    if ('extra'      in body) updatePayload.extra      = (method ?? body.method) === 'bank_transfer' ? cleanExtra(body.extra) : null;
+    if ('extra'      in body) updatePayload.extra      = (method ?? body.method) === 'cash' ? null : cleanExtra(body.extra);
     if ('sort_order' in body) updatePayload.sort_order = parseInt(String(body.sort_order), 10) || 0;
     if ('active'     in body) updatePayload.active     = Boolean(body.active);
 

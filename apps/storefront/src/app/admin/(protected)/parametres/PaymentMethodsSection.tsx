@@ -16,12 +16,13 @@ interface FormState {
   value: string;
   beneficiary: string;
   bic: string;
+  link: string;
   sort_order: string;
   active: boolean;
 }
 
 function emptyForm(sortOrder: number): FormState {
-  return { method: 'bank_transfer', label: '', value: '', beneficiary: '', bic: '', sort_order: String(sortOrder), active: true };
+  return { method: 'bank_transfer', label: '', value: '', beneficiary: '', bic: '', link: '', sort_order: String(sortOrder), active: true };
 }
 
 function toForm(pm: TenantPaymentMethod): FormState {
@@ -31,6 +32,7 @@ function toForm(pm: TenantPaymentMethod): FormState {
     value: pm.value ?? '',
     beneficiary: pm.extra?.beneficiary ?? '',
     bic: pm.extra?.bic ?? '',
+    link: pm.extra?.link ?? '',
     sort_order: String(pm.sort_order),
     active: pm.active,
   };
@@ -41,7 +43,10 @@ function formToBody(form: FormState) {
     method: form.method,
     label: form.label || null,
     value: form.value || null,
-    extra: form.method === 'bank_transfer' ? { beneficiary: form.beneficiary, bic: form.bic } : null,
+    extra: form.method === 'cash' ? null : {
+      ...(form.method === 'bank_transfer' ? { beneficiary: form.beneficiary, bic: form.bic } : {}),
+      link: form.link,
+    },
     sort_order: form.sort_order,
     active: form.active,
   };
@@ -122,7 +127,10 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
         method: form.method,
         label: form.label || null,
         value: form.value || null,
-        extra: form.method === 'bank_transfer' ? { beneficiary: form.beneficiary, bic: form.bic } : null,
+        extra: form.method === 'cash' ? null : {
+          ...(form.method === 'bank_transfer' ? { beneficiary: form.beneficiary, bic: form.bic } : {}),
+          link: form.link,
+        },
         sort_order: parseInt(form.sort_order, 10) || 0,
         active: form.active,
       };
@@ -171,6 +179,19 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                   />
                 </div>
               </div>
+
+              {form.method !== 'cash' && (
+                <div className="mb-3">
+                  <label className={LABEL_CLS}>Lien de paiement direct (optionnel)</label>
+                  <input
+                    type="text"
+                    value={form.link}
+                    onChange={(e) => updateMethodField(pm.id, 'link', e.target.value)}
+                    placeholder="https://paypal.me/... ou lien de paiement"
+                    className={INPUT_CLS}
+                  />
+                </div>
+              )}
 
               {form.method !== 'cash' && (
                 <div className="mb-3">
@@ -277,6 +298,19 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
             />
           </div>
         </div>
+
+        {newForm.method !== 'cash' && (
+          <div className="mb-3">
+            <label className={LABEL_CLS}>Lien de paiement direct (optionnel)</label>
+            <input
+              type="text"
+              value={newForm.link}
+              onChange={(e) => setNewForm({ ...newForm, link: e.target.value })}
+              placeholder="https://paypal.me/... ou lien de paiement"
+              className={INPUT_CLS}
+            />
+          </div>
+        )}
 
         {newForm.method !== 'cash' && (
           <div className="mb-3">

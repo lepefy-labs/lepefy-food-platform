@@ -32,7 +32,7 @@ export interface TenantPaymentMethod {
   method: PaymentMethodType;
   label: string | null;
   value: string | null;
-  extra: { beneficiary?: string; bic?: string } | null;
+  extra: { beneficiary?: string; bic?: string; link?: string } | null;
   sort_order: number;
   active: boolean;
 }
