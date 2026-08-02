@@ -30,7 +30,8 @@ export type PointsLedgerTransactionType =
   | 'SIGNUP_BONUS'
   | 'REDEEMED'
   | 'EXPIRED'
-  | 'REVERSED';
+  | 'REVERSED'
+  | 'IN_STORE_PURCHASE_EARNED';
 
 export interface PointsLedgerEntry {
   id: string;
@@ -44,8 +45,22 @@ export interface PointsLedgerEntry {
   reference_order_id: string | null;
   reference_customer_id: string | null;
   reversal_of_ledger_id: string | null;
+  manual_purchase_id: string | null;
   requires_manual_review: boolean;
   notes: string | null;
+  created_at: string;
+}
+
+// Acquisto fisico in negozio registrato via /admin/loyalty/scan (047) — non
+// crea mai una riga orders, vedi commento su loyalty_manual_purchases in
+// 047_loyalty_card_system.sql.
+export interface LoyaltyManualPurchase {
+  id: string;
+  tenant_id: string;
+  customer_id: string;
+  staff_admin_id: string;
+  amount: number;
+  points_awarded: number;
   created_at: string;
 }
 

@@ -57,8 +57,19 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     redirect('/admin/login?error=unauthorized');
   }
 
-  if (admin.role === 'tenant_admin' && admin.tenant_id !== tenant.id) {
+  // platform_owner (tenant_id null) a un accès global, invariant. Tout autre
+  // rôle — tenant_admin ET tenant_cashier (047) — est scoped à son tenant.
+  if (admin.role !== 'platform_owner' && admin.tenant_id !== tenant.id) {
     redirect('/admin/login?error=unauthorized');
+  }
+
+  // tenant_cashier (047) n'a accès qu'à /admin/loyalty/scan (route hors de ce
+  // groupe protégé, avec sa propre vérification de rôle) — jamais au tableau
+  // de bord, aux commandes, au catalogue, etc. rendus par ce layout partagé.
+  // Point d'intervention minimal : un redirect ici évite d'avoir à masquer
+  // conditionnellement chaque section de AdminSidebar/AdminMobileNav.
+  if (admin.role === 'tenant_cashier') {
+    redirect('/admin/loyalty/scan');
   }
 
   const { data: categories } = await adminClient

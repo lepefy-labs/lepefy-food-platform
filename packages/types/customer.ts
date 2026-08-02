@@ -8,6 +8,8 @@ export interface Customer {
   full_name: string | null;
   phone: string | null;
   created_at: string;
+  // Carta fedeltà virtuale (047)
+  loyalty_card_number: string | null;
   // Loyalty & referral
   referred_by_id: string | null;
   signup_ip: string | null;

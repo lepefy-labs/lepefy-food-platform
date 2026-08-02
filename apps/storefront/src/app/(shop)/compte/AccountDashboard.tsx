@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle } from '@tabler/icons-react';
+import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle, IconQrcode } from '@tabler/icons-react';
 import type { Address } from '@lepefy/types';
 import { ProfileEditModal } from './ProfileEditModal';
 import { AddressFormModal } from './AddressFormModal';
@@ -157,6 +157,19 @@ export function AccountDashboard({
                 {pointsFormatter.format(confirmedPoints)} pts
               </div>
             </div>
+            <Link
+              href="/compte/carte-fidelite"
+              className="mt-2.5 w-full flex items-center justify-center gap-2 font-bold rounded-xl border"
+              style={{
+                fontSize: 13,
+                padding: '10px',
+                color: 'var(--color-primary)',
+                borderColor: 'color-mix(in srgb, var(--color-primary) 25%, white)',
+              }}
+            >
+              <IconQrcode size={16} stroke={1.8} />
+              Voir ma carte de fidélité
+            </Link>
           </div>
         )}
 
