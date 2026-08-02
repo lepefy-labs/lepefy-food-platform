@@ -14,6 +14,10 @@ interface CategoryBlockProps {
   products: HomeProduct[];
   primaryColor: string;
   secondaryColor: string;
+  /** Marque une copie décorative dupliquée pour l'autoscroll en boucle
+   *  (CategoryBlocksRow) — masquée des lecteurs d'écran et retirée du tab
+   *  order, jamais cliquable, pour ne pas doubler la navigation clavier. */
+  hiddenFromA11y?: boolean;
 }
 
 // Rotation de teinte appliquée au gradient brand — dérivée des vrais tokens
@@ -34,6 +38,7 @@ export function CategoryBlock({
   products,
   primaryColor,
   secondaryColor,
+  hiddenFromA11y = false,
 }: CategoryBlockProps) {
   const cyclePos = index % 4;
   const isSolidSecondary = cyclePos === 3;
@@ -50,7 +55,11 @@ export function CategoryBlock({
   return (
     <Link
       href={`/products?category=${slug}`}
-      className="relative flex-[0_0_78%] md:flex-[0_0_300px] snap-start rounded-[20px] overflow-hidden p-4 flex flex-col"
+      aria-hidden={hiddenFromA11y || undefined}
+      tabIndex={hiddenFromA11y ? -1 : undefined}
+      className={`relative flex-[0_0_78%] md:flex-[0_0_300px] snap-start rounded-[20px] overflow-hidden p-4 flex flex-col ${
+        hiddenFromA11y ? 'pointer-events-none' : ''
+      }`}
     >
       <div
         aria-hidden="true"

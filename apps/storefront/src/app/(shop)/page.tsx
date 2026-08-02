@@ -6,6 +6,7 @@ import { ProductCard } from '@/components/catalog/ProductCard';
 import { StorySection } from '@/components/home/StorySection';
 import { HeroCarousel, type HeroSlideData } from '@/components/home/HeroCarousel';
 import { CategoryBlock } from '@/components/home/CategoryBlock';
+import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
 
 export const metadata: Metadata = {
@@ -105,6 +106,13 @@ export default async function HomePage() {
     ),
   );
 
+  // Catégories réellement rendables (au moins 1 produit) — calculé une seule
+  // fois ici pour piloter à la fois le rendu JSX et la durée de l'autoscroll
+  // (Fix 3), sans dupliquer la logique de filtrage dans le JSX.
+  const renderableCategories = categories
+    .map((cat, index) => ({ cat, index, products: categoryProducts[cat.id] ?? [] }))
+    .filter((entry) => entry.products.length > 0);
+
   // 4. Suggestions (Feature 3) — étiquettes honnêtes uniquement, jamais de
   // personnalisation inventée (pas de login client actif côté storefront).
   const { data: discountCandidatesRaw } = await supabase
@@ -168,7 +176,9 @@ export default async function HomePage() {
 
       {/* Contenuto centrato */}
       <div className="max-w-6xl mx-auto w-full">
-      {/* ── PRODUITS VEDETTES ── */}
+      {/* ── PRODUITS VEDETTES — riga singola scrollabile, aucun autoscroll
+           (section "en évidence" explorée à la main, à la différence des
+           blocs-catégorie ci-dessous). ── */}
       {featuredProducts.length > 0 && (
         <section>
           <div className="flex items-center justify-between px-4 mb-2 mt-5">
@@ -183,11 +193,52 @@ export default async function HomePage() {
               Voir tout →
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 px-4 pb-3">
+          <div
+            className="
+              flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-3
+              [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
+            "
+          >
             {featuredProducts.map(product => (
-              <ProductCard key={product.id} product={product} variant="grid" />
+              <div key={product.id} className="flex-[0_0_42%] sm:flex-[0_0_30%] lg:flex-[0_0_22%] snap-start">
+                <ProductCard product={product} variant="grid" />
+              </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ── BLOCS CATÉGORIE — juste après les vedettes, autoscroll continu
+           (Fix 1 + Fix 3). ── */}
+      {renderableCategories.length > 0 && (
+        <section>
+          <CategoryBlocksRow itemCount={renderableCategories.length}>
+            {renderableCategories.map(({ cat, index, products }) => (
+              <CategoryBlock
+                key={cat.id}
+                index={index}
+                name={cat.name}
+                slug={cat.slug}
+                count={categoryCounts[cat.id] ?? products.length}
+                products={products}
+                primaryColor={tenant.primary_color}
+                secondaryColor={tenant.secondary_color}
+              />
+            ))}
+            {renderableCategories.map(({ cat, index, products }) => (
+              <CategoryBlock
+                key={`${cat.id}-dup`}
+                index={index}
+                name={cat.name}
+                slug={cat.slug}
+                count={categoryCounts[cat.id] ?? products.length}
+                products={products}
+                primaryColor={tenant.primary_color}
+                secondaryColor={tenant.secondary_color}
+                hiddenFromA11y
+              />
+            ))}
+          </CategoryBlocksRow>
         </section>
       )}
 
@@ -203,35 +254,6 @@ export default async function HomePage() {
         productsCount={activeProductsCount ?? 0}
         countriesServed={tenant.countries_served}
       />
-
-      {/* ── BLOCS CATÉGORIE ── */}
-      {categories.some(cat => (categoryProducts[cat.id]?.length ?? 0) > 0) && (
-        <section>
-          <div
-            className="
-              flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 pb-3 mt-5
-              [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
-            "
-          >
-            {categories.map((cat, index) => {
-              const products = categoryProducts[cat.id];
-              if (!products || products.length === 0) return null;
-              return (
-                <CategoryBlock
-                  key={cat.id}
-                  index={index}
-                  name={cat.name}
-                  slug={cat.slug}
-                  count={categoryCounts[cat.id] ?? products.length}
-                  products={products}
-                  primaryColor={tenant.primary_color}
-                  secondaryColor={tenant.secondary_color}
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
 
       <div className="h-6" />
       </div>{/* /max-w-6xl */}
