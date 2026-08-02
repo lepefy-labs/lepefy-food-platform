@@ -82,8 +82,6 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
             )}
           </div>
 
-          <ProductDescription product={product} />
-
           <ProductSpecs
             netQuantityDisplay={product.net_quantity_display}
             weightGrams={product.weight_grams}
@@ -91,6 +89,8 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
             storageType={product.storage_type}
             locale={activeLocale}
           />
+
+          <ProductDescription product={product} />
 
           {outOfStock ? (
             <div className="py-3 px-4 bg-gray-100 rounded-lg text-gray-500 text-sm font-medium text-center">Produit épuisé</div>

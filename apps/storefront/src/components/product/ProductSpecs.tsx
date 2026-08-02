@@ -46,13 +46,27 @@ export function ProductSpecs({ netQuantityDisplay, weightGrams, countryOfOrigin,
 
   return (
     <div
-      className="grid gap-4 py-4"
-      style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr)`, borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb' }}
+      className="grid gap-4 rounded-2xl px-4 py-3.5"
+      style={{
+        gridTemplateColumns: `repeat(${columns.length}, 1fr)`,
+        backgroundColor: 'color-mix(in srgb, var(--color-primary) 10%, white)',
+        border: '1px solid color-mix(in srgb, var(--color-primary) 30%, white)',
+      }}
     >
       {columns.map((col) => (
         <div key={col.label}>
-          <p className="text-sm text-gray-400">{col.label}</p>
-          <p className="text-sm font-bold text-gray-900">{col.value}</p>
+          <p
+            className="text-[10.5px] font-medium uppercase tracking-wide"
+            style={{ color: 'color-mix(in srgb, var(--color-primary) 70%, black)' }}
+          >
+            {col.label}
+          </p>
+          <p
+            className="text-sm font-bold mt-0.5"
+            style={{ color: 'var(--color-primary)' }}
+          >
+            {col.value}
+          </p>
         </div>
       ))}
     </div>
