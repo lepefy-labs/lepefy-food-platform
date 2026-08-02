@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle, IconQrcode } from '@tabler/icons-react';
+import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle } from '@tabler/icons-react';
 import type { Address } from '@lepefy/types';
 import { ProfileEditModal } from './ProfileEditModal';
 import { AddressFormModal } from './AddressFormModal';
+import { LoyaltyCardWidget } from './LoyaltyCardWidget';
 
 interface AccountTenant {
   name:            string;
@@ -26,9 +27,10 @@ interface AccountDashboardProps {
   addresses:       Address[];
   isAmbassador:              boolean;
   ambassadorProfileCompleted: boolean;
+  loyaltyCardNumberDisplay:  string | null;
+  loyaltyCardBarcodeSvg:     string | null;
+  loyaltyCardTextColor:      string;
 }
-
-const pointsFormatter = new Intl.NumberFormat('fr-FR');
 
 function sortAddresses(list: Address[]): Address[] {
   return [...list].sort((a, b) => {
@@ -45,6 +47,7 @@ function formatAddressLine(address: Address): string {
 export function AccountDashboard({
   tenant, email, fullName, phone, confirmedPoints, addresses,
   isAmbassador, ambassadorProfileCompleted,
+  loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyCardTextColor,
 }: AccountDashboardProps) {
   const router = useRouter();
 
@@ -138,38 +141,22 @@ export function AccountDashboard({
           </div>
         )}
 
-        {/* Points fidélité — uniquement si le programme est activé pour ce tenant.
-            Pas de badge de niveau ni de barre de progression : aucun système de
-            palier par points n'existe côté données (ledger + solde uniquement),
-            voir le rapport final. */}
+        {/* Tessera fedeltà — widget "carta fisica" cliccabile verso
+            /compte/carte-fidelite (vue agrandie, QR + barcode plein format,
+            construite au cycle précédent — non dupliquée ici). Pas de badge
+            de niveau ni de barre de progression : aucun système de palier par
+            points n'existe côté données (ledger + solde uniquement), voir le
+            rapport final. */}
         {tenant.loyaltyEnabled && (
           <div className="px-5 pt-4">
-            <div
-              className="text-white"
-              style={{
-                background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))',
-                borderRadius: 16,
-                padding: 18,
-              }}
-            >
-              <span style={{ fontSize: 12, opacity: 0.85 }}>Tes points fidélité</span>
-              <div className="font-extrabold" style={{ fontSize: 32, marginTop: 2 }}>
-                {pointsFormatter.format(confirmedPoints)} pts
-              </div>
-            </div>
-            <Link
-              href="/compte/carte-fidelite"
-              className="mt-2.5 w-full flex items-center justify-center gap-2 font-bold rounded-xl border"
-              style={{
-                fontSize: 13,
-                padding: '10px',
-                color: 'var(--color-primary)',
-                borderColor: 'color-mix(in srgb, var(--color-primary) 25%, white)',
-              }}
-            >
-              <IconQrcode size={16} stroke={1.8} />
-              Voir ma carte de fidélité
-            </Link>
+            <LoyaltyCardWidget
+              tenantName={tenant.name}
+              fullName={profile.fullName}
+              confirmedPoints={confirmedPoints}
+              cardNumberDisplay={loyaltyCardNumberDisplay}
+              barcodeSvg={loyaltyCardBarcodeSvg}
+              textColor={loyaltyCardTextColor}
+            />
           </div>
         )}
 
