@@ -7,6 +7,7 @@ import { StorySection } from '@/components/home/StorySection';
 import { HeroCarousel, type HeroSlideData } from '@/components/home/HeroCarousel';
 import { CategoryBlock } from '@/components/home/CategoryBlock';
 import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
+import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
 
 export const metadata: Metadata = {
@@ -208,8 +209,10 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── BLOCS CATÉGORIE — juste après les vedettes, autoscroll continu
-           (Fix 1 + Fix 3). ── */}
+      {/* ── BLOCS CATÉGORIE — juste après les vedettes (Fix 1). Mobile :
+           autoscroll continu (Fix 3, < md). Desktop : grille statique sans
+           scroll, tous les blocs visibles (Fix 3, >= md — pas de drag-to-
+           scroll souris, un scroll horizontal y serait inatteignable). ── */}
       {renderableCategories.length > 0 && (
         <section>
           <CategoryBlocksRow itemCount={renderableCategories.length}>
@@ -239,6 +242,21 @@ export default async function HomePage() {
               />
             ))}
           </CategoryBlocksRow>
+
+          <CategoryBlocksGrid>
+            {renderableCategories.map(({ cat, index, products }) => (
+              <CategoryBlock
+                key={cat.id}
+                index={index}
+                name={cat.name}
+                slug={cat.slug}
+                count={categoryCounts[cat.id] ?? products.length}
+                products={products}
+                primaryColor={tenant.primary_color}
+                secondaryColor={tenant.secondary_color}
+              />
+            ))}
+          </CategoryBlocksGrid>
         </section>
       )}
 

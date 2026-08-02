@@ -6,8 +6,9 @@ interface CategoryBlocksRowProps {
   /** Les blocs réels SUIVIS de leur copie décorative dupliquée (voir
    *  CategoryBlock `hiddenFromA11y`) — la duplication rend la boucle
    *  imperceptible : au moment où le scroll atteint le début de la copie
-   *  (scrollWidth / 2), on retranche silencieusement la largeur d'un jeu
-   *  complet. Les deux jeux sont concaténés par l'appelant (page.tsx). */
+   *  (offsetLeft du (itemCount+1)-ième enfant), on retranche silencieusement
+   *  la largeur d'un jeu complet. Les deux jeux sont concaténés par
+   *  l'appelant (page.tsx). */
   children: React.ReactNode;
   /** Nombre de blocs réels — pilote la durée d'un tour complet. */
   itemCount: number;
@@ -29,6 +30,26 @@ interface CategoryBlocksRowProps {
  * est fait ici — le principe du ticker (contenu dupliqué une fois, boucle
  * sans saut visible) est conservé à l'identique, seul le mécanisme de bas
  * niveau change.
+ *
+ * Fix "autoscroll ne bouge pas" (cycle suivant) : le conteneur avait
+ * `scroll-snap-type: x mandatory`. Chaque `scrollLeft +=` programmatique
+ * n'est pas reconnu comme un geste de scroll natif par le moteur de snap, qui
+ * le traite comme un saut discret et réaligne immédiatement sur le point de
+ * snap courant — annulant le micro-déplacement de chaque frame avant qu'il
+ * ne s'accumule visuellement. Le drag manuel (vrai geste tactile) n'est pas
+ * affecté, d'où "le scroll manuel marche, l'auto ne bouge pas". Retiré ici ;
+ * `scroll-snap-align` sur CategoryBlock reste dans le JSX mais devient un
+ * no-op sans `scroll-snap-type` sur l'ancêtre (inoffensif, pas besoin d'y
+ * toucher).
+ *
+ * Scoping mobile-only (< md, 768px, même breakpoint Tailwind par défaut que
+ * partout ailleurs dans le projet — BottomNav, HeroCarousel, etc.) via
+ * `md:hidden` en CSS plutôt que `matchMedia` en JS : évite un flash de
+ * mauvais layout au premier rendu. Conséquence acceptée : la boucle rAF
+ * continue de tourner même quand ce conteneur est masqué sur desktop (coût
+ * négligeable, un simple `scrollLeft +=` sur un élément non affiché) — voir
+ * CategoryBlocksGrid pour la version desktop, statique, sans scroll ni copie
+ * dupliquée.
  */
 export function CategoryBlocksRow({ children, itemCount }: CategoryBlocksRowProps) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -62,15 +83,21 @@ export function CategoryBlocksRow({ children, itemCount }: CategoryBlocksRowProp
       lastTime = time;
 
       if (track && !pausedRef.current && !reducedMotionRef.current) {
-        // La moitié de scrollWidth = largeur d'un seul jeu (réel + copie
-        // dupliquée de même taille) — boucle en retranchant cette moitié dès
-        // qu'on l'atteint, invisible car la copie est identique à l'original.
-        const halfWidth = track.scrollWidth / 2;
-        if (halfWidth > 0) {
-          const pxPerMs = halfWidth / durationMs;
+        // Largeur exacte d'un jeu complet = position de départ de la copie
+        // dupliquée (le enfant d'index `itemCount`, premier élément dupliqué).
+        // scrollWidth / 2 est FAUX ici : avec 2N enfants dans une même ligne
+        // flex à gap uniforme, il y a 2N-1 gaps au total, pas 2N — la moitié
+        // de scrollWidth dépasse donc la largeur réelle d'un jeu d'un demi-gap,
+        // ce qui décale le point de bouclage (glitch visible au raccord).
+        // `offsetLeft` du premier duplicata inclut tous les gaps réels et
+        // reste correct quel que soit le gap CSS, sans le recalculer à la main.
+        const firstDuplicate = track.children[itemCount] as HTMLElement | undefined;
+        const wrapWidth = firstDuplicate ? firstDuplicate.offsetLeft : track.scrollWidth / 2;
+        if (wrapWidth > 0) {
+          const pxPerMs = wrapWidth / durationMs;
           track.scrollLeft += pxPerMs * delta;
-          if (track.scrollLeft >= halfWidth) {
-            track.scrollLeft -= halfWidth;
+          if (track.scrollLeft >= wrapWidth) {
+            track.scrollLeft -= wrapWidth;
           }
         }
       }
@@ -94,7 +121,7 @@ export function CategoryBlocksRow({ children, itemCount }: CategoryBlocksRowProp
       onTouchStart={pause}
       onTouchEnd={resume}
       className="
-        category-blocks-track flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 pb-3 mt-5
+        category-blocks-track flex gap-3 overflow-x-auto px-4 pb-3 mt-5 bg-[#f7f9f8] md:hidden
         [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
       "
     >
