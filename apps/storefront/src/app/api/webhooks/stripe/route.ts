@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
           shipping_address: Record<string, unknown> | null;
           shipping_details: Record<string, unknown> | null;
           shipping_total:   number;
+          ambassador_discount_amount: number | null;
           items: {
             productId:    string | null;
             name:         string;
@@ -145,9 +146,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Compute totals ───────────────────────────────────────────────────────
-    const items    = checkoutSession.items ?? [];
-    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const total    = subtotal + (checkoutSession.shipping_total ?? 0);
+    // ambassador_discount_amount vient de checkout_sessions, PAS recalculé
+    // ici : c'est la valeur déjà figée au moment de créer le PaymentIntent
+    // (POST /api/checkout) — le client a payé exactement ce montant, le
+    // recalculer ici risquerait un drift si l'état (première commande,
+    // config tenant) a changé entre les deux étapes.
+    const items              = checkoutSession.items ?? [];
+    const subtotal           = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    const ambassadorDiscount = checkoutSession.ambassador_discount_amount ?? 0;
+    const total              = subtotal + (checkoutSession.shipping_total ?? 0) - ambassadorDiscount;
 
     console.info('[webhook] Creating order — tenant:', resolvedTenantId,
       '— subtotal:', subtotal, '— total:', total);
@@ -166,6 +173,7 @@ export async function POST(req: NextRequest) {
         subtotal,
         shipping_cost:             checkoutSession.shipping_total ?? 0,
         total,
+        ambassador_discount_amount: ambassadorDiscount,
         payment_method:            'stripe',
         payment_status:            'paid',
         stripe_payment_intent_id:  intent.id,

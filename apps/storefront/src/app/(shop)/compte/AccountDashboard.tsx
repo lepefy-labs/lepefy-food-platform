@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin } from '@tabler/icons-react';
+import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle } from '@tabler/icons-react';
 import type { Address } from '@lepefy/types';
 import { ProfileEditModal } from './ProfileEditModal';
 import { AddressFormModal } from './AddressFormModal';
@@ -24,6 +24,8 @@ interface AccountDashboardProps {
   phone:           string | null;
   confirmedPoints: number;
   addresses:       Address[];
+  isAmbassador:              boolean;
+  ambassadorProfileCompleted: boolean;
 }
 
 const pointsFormatter = new Intl.NumberFormat('fr-FR');
@@ -40,7 +42,10 @@ function formatAddressLine(address: Address): string {
   return `${line1}, ${address.postal_code} ${address.city}`;
 }
 
-export function AccountDashboard({ tenant, email, fullName, phone, confirmedPoints, addresses }: AccountDashboardProps) {
+export function AccountDashboard({
+  tenant, email, fullName, phone, confirmedPoints, addresses,
+  isAmbassador, ambassadorProfileCompleted,
+}: AccountDashboardProps) {
   const router = useRouter();
 
   const [profile, setProfile]           = useState({ fullName, phone });
@@ -117,6 +122,21 @@ export function AccountDashboard({ tenant, email, fullName, phone, confirmedPoin
             <strong className="text-gray-700">{email}</strong>
           </div>
         </div>
+
+        {/* Bannière ambassadeur — profil incomplet, ne bloque jamais la
+            navigation (voir 046) : juste un rappel visible tant que le
+            paiement des commissions n'est pas configurable. */}
+        {isAmbassador && !ambassadorProfileCompleted && (
+          <div className="mx-5 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 flex items-start gap-2">
+            <IconAlertCircle size={16} stroke={1.8} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-amber-800" style={{ fontSize: 12, lineHeight: 1.4 }}>
+              Complète ton profil pour recevoir tes paiements —{' '}
+              <Link href="/compte/ambassadeur" className="font-bold underline">
+                c&apos;est ici
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Points fidélité — uniquement si le programme est activé pour ce tenant.
             Pas de badge de niveau ni de barre de progression : aucun système de
@@ -244,6 +264,16 @@ export function AccountDashboard({ tenant, email, fullName, phone, confirmedPoin
 
         {/* CTA */}
         <div className="p-5 space-y-2.5">
+          {isAmbassador && (
+            <Link
+              href="/compte/ambassadeur"
+              className="w-full flex items-center justify-center gap-2 text-white font-bold rounded-xl"
+              style={{ backgroundColor: 'var(--color-primary-dark)', fontSize: 15, padding: '14px' }}
+            >
+              <IconStar size={18} stroke={1.8} />
+              Espace Ambassadeur
+            </Link>
+          )}
           <Link
             href="/compte/parrainage"
             className="w-full flex items-center justify-center gap-2 text-white font-bold rounded-xl"

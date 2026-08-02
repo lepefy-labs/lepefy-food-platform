@@ -21,6 +21,13 @@ export default async function ComptePage() {
 
   const supabase = createServiceClient();
 
+  const { data: ambassadorRow } = await supabase
+    .from('customers')
+    .select('is_ambassador, ambassador_profile_completed_at')
+    .eq('id', customer.id)
+    .eq('tenant_id', tenant.id)
+    .maybeSingle();
+
   const { data: addresses } = await supabase
     .from('addresses')
     .select('*')
@@ -58,6 +65,8 @@ export default async function ComptePage() {
       phone={profile?.phone ?? null}
       confirmedPoints={confirmedPoints}
       addresses={(addresses ?? []) as Address[]}
+      isAmbassador={ambassadorRow?.is_ambassador ?? false}
+      ambassadorProfileCompleted={!!ambassadorRow?.ambassador_profile_completed_at}
     />
   );
 }

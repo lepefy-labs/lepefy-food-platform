@@ -1,4 +1,5 @@
 import type { ReferralAccessReason } from './loyalty';
+import type { AmbassadorPaymentMethod } from './ambassador';
 
 export interface Customer {
   id: string;
@@ -16,6 +17,16 @@ export interface Customer {
   referral_access_granted_at: string | null;
   referral_access_granted_by: string | null;
   referral_suspended: boolean;
+  // Ambassador
+  is_ambassador: boolean;
+  promoted_to_ambassador_at: string | null;
+  promoted_to_ambassador_by: string | null;
+  ambassador_first_name: string | null;
+  ambassador_last_name: string | null;
+  ambassador_payment_method: AmbassadorPaymentMethod | null;
+  ambassador_iban: string | null;
+  ambassador_paypal_email: string | null;
+  ambassador_profile_completed_at: string | null;
 }
 
 export interface Address {

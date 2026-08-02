@@ -25,6 +25,13 @@ const EDITABLE_TENANT_FIELDS = [
   'referral_fraud_max_conversions',
   'referral_fraud_period_days',
   'referral_fraud_action',
+  'ambassador_min_purchase_amount',
+  'ambassador_min_commission_amount',
+  'ambassador_max_commission_amount',
+  'ambassador_loyalty_from_second_order',
+  'ambassador_first_order_discount_type',
+  'ambassador_first_order_discount_value',
+  'ambassador_payout_threshold_amount',
 ] as const;
 
 // Champs numériques de la whitelist — jamais forcés à un minimum, une valeur
@@ -40,7 +47,7 @@ const NUMERIC_FIELDS = new Set<string>([
 // ne convient ni aux nombres décimaux (purchase_points_rate, taux type 1.25)
 // ni aux booléens ; whitelist séparée pour éviter de stocker "false" comme
 // chaîne truthy.
-const BOOLEAN_FIELDS = new Set<string>(['loyalty_enabled']);
+const BOOLEAN_FIELDS = new Set<string>(['loyalty_enabled', 'ambassador_loyalty_from_second_order']);
 
 // Champs numériques pouvant être décimaux (contrairement à NUMERIC_FIELDS
 // existant, qui utilise parseInt — inadapté à un taux ou un montant en euros).
@@ -48,6 +55,11 @@ const DECIMAL_FIELDS = new Set<string>([
   'purchase_points_rate',
   'referral_unlock_spending_threshold',
   'referral_fraud_max_conversions',
+  'ambassador_min_purchase_amount',
+  'ambassador_min_commission_amount',
+  'ambassador_max_commission_amount',
+  'ambassador_first_order_discount_value',
+  'ambassador_payout_threshold_amount',
 ]);
 
 export async function PATCH(req: NextRequest) {

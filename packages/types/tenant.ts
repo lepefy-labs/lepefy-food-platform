@@ -1,4 +1,5 @@
 import type { ReferralAvailabilityMode, ReferralFraudAction } from './loyalty';
+import type { AmbassadorDiscountType } from './ambassador';
 
 export type ShippingProvider = 'packlink' | 'flat_rate' | 'pickup_only';
 
@@ -60,6 +61,14 @@ export interface Tenant {
   referral_fraud_action: ReferralFraudAction;
   referral_availability_mode: ReferralAvailabilityMode;
   referral_unlock_spending_threshold: number | null;
+  // Ambassador (commissioni + sconto primo ordine)
+  ambassador_min_purchase_amount: number;
+  ambassador_min_commission_amount: number;
+  ambassador_max_commission_amount: number;
+  ambassador_loyalty_from_second_order: boolean;
+  ambassador_first_order_discount_type: AmbassadorDiscountType | null;
+  ambassador_first_order_discount_value: number | null;
+  ambassador_payout_threshold_amount: number;
   created_at: string;
   updated_at: string;
 }

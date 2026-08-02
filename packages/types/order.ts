@@ -22,6 +22,7 @@ export interface Order {
   subtotal: number;
   shipping_cost: number;
   total: number;
+  ambassador_discount_amount: number;
   payment_method: PaymentMethod | null;
   payment_status: PaymentStatus;
   stripe_payment_intent_id: string | null;

@@ -9,3 +9,4 @@ export * from './labels';
 export * from './ai';
 export * from './loyalty';
 export * from './heroSlides';
+export * from './ambassador';

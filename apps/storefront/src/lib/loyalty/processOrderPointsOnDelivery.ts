@@ -3,6 +3,7 @@ import { resolveReferralChain } from './resolveReferralChain';
 import { checkReferralAccessUnlock } from './checkReferralAccessUnlock';
 import { checkFraudSignals } from './checkFraudSignals';
 import { confirmSignupBonus } from './confirmSignupBonus';
+import { processAmbassadorCommissionOnDelivery } from '@/lib/ambassador/processAmbassadorCommissionOnDelivery';
 
 interface OrderPointsEntry {
   tenantId: string;
@@ -36,6 +37,13 @@ function normalizeAddress(shippingAddress: unknown): string | null {
 export async function processOrderPointsOnDelivery(orderId: string): Promise<void> {
   const supabase = createServiceClient();
 
+  // ── 0. Ambassador (programma separato, indipendente da loyalty_enabled) ────
+  // Gira sempre, anche se il resto di questa funzione ritorna subito sotto
+  // (tenant senza loyalty attivo, ordine già points_processed, ecc.) — vedi
+  // 046_ambassador_commission_system.sql. Il risultato serve più sotto per
+  // escludere lo sponsor ambassador e/o il buyer dal ledger punti.
+  const ambassadorContext = await processAmbassadorCommissionOnDelivery(orderId);
+
   // ── 1. Fetch ordine ────────────────────────────────────────────────────────
   const { data: order } = await supabase
     .from('orders')
@@ -52,7 +60,7 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
   // ── 2. Fetch config tenant ─────────────────────────────────────────────────
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('loyalty_enabled, referral_max_depth, purchase_points_rate, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action')
+    .select('loyalty_enabled, referral_max_depth, purchase_points_rate, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action, ambassador_loyalty_from_second_order')
     .eq('id', tenantId)
     .single();
 
@@ -62,15 +70,30 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
   // ── 4. Costruisci entries ──────────────────────────────────────────────────
   const basePoints = Math.round(Number(order.total) * tenant.purchase_points_rate);
 
-  const entries: OrderPointsEntry[] = [
-    {
-      tenantId,
-      customerId: buyerId,
-      amount: basePoints,
-      status: 'CONFIRMED',
-      transactionType: 'PURCHASE_EARNED',
-    },
-  ];
+  // Regole programma ambassador (046) sui punti del buyer stesso:
+  // - primo ordine consegnato + sconto applicato → 0 punti per il buyer su
+  //   quest'ordine (esclusività sconto/punti, mai entrambi).
+  // - primo ordine consegnato + sconto NON applicato (soglia non raggiunta o
+  //   feature sconto disattivata) → punti normali.
+  // - dal secondo ordine consegnato in poi → punti normali solo se
+  //   tenants.ambassador_loyalty_from_second_order = true, altrimenti mai.
+  const buyerEarnsOwnPoints = ambassadorContext.sponsorIsAmbassador
+    ? ambassadorContext.isFirstDeliveredOrder
+      ? !ambassadorContext.discountWasApplied
+      : tenant.ambassador_loyalty_from_second_order
+    : true;
+
+  const entries: OrderPointsEntry[] = buyerEarnsOwnPoints
+    ? [
+        {
+          tenantId,
+          customerId: buyerId,
+          amount: basePoints,
+          status: 'CONFIRMED',
+          transactionType: 'PURCHASE_EARNED',
+        },
+      ]
+    : [];
 
   const chain = await resolveReferralChain(tenantId, buyerId, tenant.referral_max_depth);
 
@@ -96,10 +119,15 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
 
       const { data: sponsor } = await supabase
         .from('customers')
-        .select('phone, referral_suspended')
+        .select('phone, referral_suspended, is_ambassador')
         .eq('id', node.customerId)
         .eq('tenant_id', tenantId)
         .maybeSingle();
+
+      // Un ambassador non riceve mai punti loyalty (guadagna solo commissioni
+      // in denaro reale via ambassador_commissions, 046) — esclusione
+      // categorica dalla catena punti, a qualunque livello vi compaia.
+      if (sponsor?.is_ambassador) continue;
 
       // Sospeso da una precedente AUTO_BLOCK: nessun nuovo punto finché non
       // viene riabilitato manualmente (altrimenti AUTO_BLOCK non avrebbe

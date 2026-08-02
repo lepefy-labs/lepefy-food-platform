@@ -267,7 +267,36 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const fulfillmentType = shippingInfo?.fulfillmentType ?? 'delivery';
   const isPickup        = fulfillmentType === 'pickup';
   const effectiveShippingTotal = isPickup ? 0 : shippingTotal;
-  const total            = subtotal + effectiveShippingTotal;
+
+  // ── Sconto ambassador primo ordine — anteprima uniquement ──────────────────
+  // Affichage seul : POST /api/checkout recalcule indépendamment ce même
+  // montant server-side (source de vérité pour l'importo réellement débité).
+  // Réévaluée à la connexion en cours de checkout (sessionCustomer change) et
+  // si le sous-total change (quantité modifiée depuis un autre onglet, etc.).
+  const [ambassadorDiscount, setAmbassadorDiscount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/checkout/ambassador-discount', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ subtotal }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setAmbassadorDiscount(typeof data.discount === 'number' ? data.discount : 0);
+      } catch {
+        // Confort — en cas d'échec, aucune réduction affichée mais le
+        // checkout continue normalement (POST /api/checkout est la source
+        // de vérité de toute façon).
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [subtotal, sessionCustomer?.id]);
+
+  const total = subtotal + effectiveShippingTotal - ambassadorDiscount;
 
   // ── Recalcul live si le code postal / pays change en checkout ──────────────
   const watchedPostalCode = watch('postal_code');
@@ -431,6 +460,12 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
               )}
             </span>
           </div>
+          {ambassadorDiscount > 0 && (
+            <div className="flex justify-between text-sm text-green-600 font-medium">
+              <span>Réduction parrainage</span>
+              <span>−{formatPrice(ambassadorDiscount, tenant.currency)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-2 mt-1">
             <span>Total</span>
             <span>{formatPrice(total, tenant.currency)}</span>

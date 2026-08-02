@@ -15,6 +15,7 @@ import {
   IconSparkles,
   IconGift,
   IconPhoto,
+  IconStar,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -160,6 +161,20 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
           stroke={pathname === '/admin/loyalty' ? 2 : 1.5}
         />
         Fidélité & parrainage
+      </Link>
+
+      <Link
+        href="/admin/ambassadeurs"
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+                    text-sm transition-colors mx-1 ${
+          pathname === '/admin/ambassadeurs' ? navClass(true) : navClass(false)
+        }`}
+      >
+        <IconStar
+          size={16}
+          stroke={pathname === '/admin/ambassadeurs' ? 2 : 1.5}
+        />
+        Ambassadeurs
       </Link>
 
       <Link

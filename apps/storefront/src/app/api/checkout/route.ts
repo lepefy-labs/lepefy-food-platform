@@ -5,6 +5,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
+import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -183,7 +184,25 @@ export async function POST(req: NextRequest) {
     const subtotal = parseFloat(
       items.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2),
     );
-    const total = parseFloat((subtotal + shippingTotal).toFixed(2));
+
+    // ── Sconto ambassador primo ordine ───────────────────────────────────────
+    // Ricalcolato server-side allo stesso modo dell'anteprima affichée dans le
+    // récapitulatif (/api/checkout/ambassador-discount) : source de vérité
+    // pour le montant réellement débité (PaymentIntent Stripe ou commande
+    // in_store créée directement ci-dessous), jamais une valeur venant du
+    // client.
+    const ambassadorDiscount = await resolveCheckoutAmbassadorDiscount({
+      tenant: {
+        id: tenant.id,
+        ambassador_min_purchase_amount: tenant.ambassador_min_purchase_amount,
+        ambassador_first_order_discount_type: tenant.ambassador_first_order_discount_type,
+        ambassador_first_order_discount_value: tenant.ambassador_first_order_discount_value,
+      },
+      customerId: sessionCustomer?.id ?? null,
+      subtotal,
+    });
+
+    const total = parseFloat((subtotal + shippingTotal - ambassadorDiscount).toFixed(2));
 
     // ── In-store payment: create order directly, no Stripe ──────────────────
     if (paymentMethod === 'in_store') {
@@ -220,6 +239,7 @@ export async function POST(req: NextRequest) {
           subtotal,
           shipping_cost:    shippingTotal,
           total,
+          ambassador_discount_amount: ambassadorDiscount,
           payment_method:   'in_store',
           payment_status:   'pending',
           status:           'preparing',
@@ -291,6 +311,7 @@ export async function POST(req: NextRequest) {
         shipping_address: shippingAddress ?? null,
         shipping_details: shippingDetails ?? null,
         shipping_total:   shippingTotal,
+        ambassador_discount_amount: ambassadorDiscount,
         items,
       })
       .select('id')

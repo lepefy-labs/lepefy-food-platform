@@ -10,6 +10,7 @@ interface CustomerSearchRow {
   referral_access_granted: boolean;
   referral_access_reason: string | null;
   referral_suspended: boolean;
+  is_ambassador: boolean;
 }
 
 // Endpoint aggiunto (non nella spec) — necessario per la sezione admin
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceClient();
-  const columns = 'id, email, full_name, referral_access_granted, referral_access_reason, referral_suspended';
+  const columns = 'id, email, full_name, referral_access_granted, referral_access_reason, referral_suspended, is_ambassador';
 
   const [byEmail, byName] = await Promise.all([
     supabase
