@@ -177,9 +177,11 @@ export default async function HomePage() {
 
       {/* Contenuto centrato */}
       <div className="max-w-6xl mx-auto w-full">
-      {/* ── PRODUITS VEDETTES — riga singola scrollabile, aucun autoscroll
-           (section "en évidence" explorée à la main, à la différence des
-           blocs-catégorie ci-dessous). ── */}
+      {/* ── PRODUITS VEDETTES — mobile (< md) : riga singola scrollabile,
+           aucun autoscroll (section "en évidence" explorée à la main).
+           Desktop (>= md) : grille statique multi-ligne, tous les produits
+           visibles — même raisonnement que les blocs-catégorie (pas de
+           drag-to-scroll souris, un scroll horizontal y serait inatteignable). ── */}
       {featuredProducts.length > 0 && (
         <section>
           <div className="flex items-center justify-between px-4 mb-2 mt-5">
@@ -194,16 +196,23 @@ export default async function HomePage() {
               Voir tout →
             </Link>
           </div>
+
           <div
             className="
-              flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-3
+              flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-3 md:hidden
               [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
             "
           >
             {featuredProducts.map(product => (
-              <div key={product.id} className="flex-[0_0_42%] sm:flex-[0_0_30%] lg:flex-[0_0_22%] snap-start">
+              <div key={product.id} className="flex-[0_0_42%] sm:flex-[0_0_30%] snap-start">
                 <ProductCard product={product} variant="grid" />
               </div>
+            ))}
+          </div>
+
+          <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4 px-4 pb-3">
+            {featuredProducts.map(product => (
+              <ProductCard key={product.id} product={product} variant="grid" />
             ))}
           </div>
         </section>
