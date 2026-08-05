@@ -69,6 +69,9 @@ export interface Tenant {
   ambassador_first_order_discount_type: AmbassadorDiscountType | null;
   ambassador_first_order_discount_value: number | null;
   ambassador_payout_threshold_amount: number;
+  // Android app (TWA / Digital Asset Links)
+  android_package_name: string | null;
+  android_sha256_fingerprint: string | null;
   created_at: string;
   updated_at: string;
 }
