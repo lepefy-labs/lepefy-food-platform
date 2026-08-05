@@ -99,6 +99,40 @@ export default async function ParametresPage() {
             </div>
           </div>
         </section>
+
+        <section className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">QR Shop</h2>
+          <p className="text-xs text-gray-400 mb-4">
+            À imprimer pour renvoyer vos clients vers votre boutique en ligne — et vers
+            l&apos;application quand elle sera disponible.
+          </p>
+
+          <div className="flex items-start gap-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/api/shop/qr-code?size=240"
+              alt="QR code boutique"
+              width={120}
+              height={120}
+              className="rounded-lg border border-gray-100"
+            />
+
+            <div className="flex flex-col gap-2">
+              <a
+                href="/api/shop/qr-code?format=svg&size=1000&download=1"
+                className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-center"
+              >
+                Télécharger QR (SVG, impression)
+              </a>
+              <a
+                href="/api/shop/qr-code?format=png&size=1000&download=1"
+                className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-center"
+              >
+                Télécharger QR (PNG)
+              </a>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

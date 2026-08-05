@@ -72,6 +72,7 @@ export interface Tenant {
   // Android app (TWA / Digital Asset Links)
   android_package_name: string | null;
   android_sha256_fingerprint: string | null;
+  android_public: boolean;
   created_at: string;
   updated_at: string;
 }
