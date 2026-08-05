@@ -8,9 +8,9 @@ import { getTenant } from '@/lib/tenant/getTenant';
 export const dynamic = 'force-dynamic';
 
 const FALLBACK_ICONS: MetadataRoute.Manifest['icons'] = [
-  { src: '/api/pwa-icon?size=192', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-  { src: '/api/pwa-icon?size=512', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-  { src: '/api/pwa-icon?size=512', sizes: '512x512', type: 'image/png', purpose: 'any' },
+  { src: '/api/pwa-icon?size=192&purpose=maskable', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+  { src: '/api/pwa-icon?size=512&purpose=maskable', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  { src: '/api/pwa-icon?size=512&purpose=any',      sizes: '512x512', type: 'image/png', purpose: 'any' },
 ];
 
 // Générique par tenant : mêmes routes/icônes pour toutes les boutiques,
