@@ -48,6 +48,11 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
           style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
         >
           <p>© {new Date().getFullYear()} {tenant.name}. Tous droits réservés.</p>
+          <p className="mt-2">
+            <Link href="/politique-confidentialite" className="text-gray-400 hover:text-gray-600 underline">
+              Politique de confidentialité
+            </Link>
+          </p>
           {tenant.show_powered_by && <PoweredBy />}
         </div>
       </footer>
@@ -123,6 +128,11 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
           style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}
         >
           <p>© {new Date().getFullYear()} {tenant.name}. Tous droits réservés.</p>
+          <p className="mt-2">
+            <Link href="/politique-confidentialite" className="text-gray-400 hover:text-gray-600 underline">
+              Politique de confidentialité
+            </Link>
+          </p>
           {tenant.show_powered_by && <PoweredBy />}
         </div>
       </div>
