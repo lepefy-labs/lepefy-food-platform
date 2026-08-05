@@ -1,14 +1,15 @@
-'use client';
-
-import { useEffect } from 'react';
+import Script from 'next/script';
 
 export function PWARegister() {
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .catch((err) => console.warn('[PWA] Service worker registration failed:', err));
-    }
-  }, []);
-  return null;
+  return (
+    <Script id="sw-register" strategy="afterInteractive">
+      {`
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js').catch(function(err) {
+            console.warn('[PWA] Service worker registration failed:', err);
+          });
+        }
+      `}
+    </Script>
+  );
 }
