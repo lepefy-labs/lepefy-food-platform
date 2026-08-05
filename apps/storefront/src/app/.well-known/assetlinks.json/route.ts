@@ -23,7 +23,7 @@ export async function GET() {
           target: {
             namespace: 'android_app',
             package_name: tenant.android_package_name,
-            sha256_cert_fingerprints: [tenant.android_sha256_fingerprint],
+            sha256_cert_fingerprints: tenant.android_sha256_fingerprint.split(',').map(fp => fp.trim()),
           },
         },
       ],
