@@ -5,24 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle } from '@tabler/icons-react';
-import { getCountries, type CountryCode } from 'libphonenumber-js';
 import type { Address } from '@lepefy/types';
-import { ProfileEditModal } from './ProfileEditModal';
-import { AddressFormModal } from './AddressFormModal';
 import { LoyaltyCardWidget } from './LoyaltyCardWidget';
-
-// Repli neutre (jamais une décision de branding) pour les rares cas où
-// tenant.country ne serait pas un code ISO-2 exploitable par
-// libphonenumber-js — la colonne `tenants.country` est `text` en base sans
-// contrainte CHECK (défaut 'IT'), donc une valeur corrompue ne peut pas être
-// exclue par le typage seul.
-const FALLBACK_COUNTRY: CountryCode = 'FR';
-const SUPPORTED_COUNTRY_CODES = new Set<string>(getCountries());
-
-function normalizeCountryCode(raw: string): CountryCode {
-  const upper = raw.trim().toUpperCase();
-  return SUPPORTED_COUNTRY_CODES.has(upper) ? (upper as CountryCode) : FALLBACK_COUNTRY;
-}
 
 interface AccountTenant {
   name:            string;
@@ -64,12 +48,9 @@ export function AccountDashboard({
   loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyCardTextColor,
 }: AccountDashboardProps) {
   const router = useRouter();
-  const defaultCountry = normalizeCountryCode(tenant.country);
 
   const [profile, setProfile]           = useState({ fullName, phone });
   const [addressList, setAddressList]   = useState(() => sortAddresses(addresses));
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [addressModal, setAddressModal] = useState<'add' | Address | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -80,27 +61,6 @@ export function AccountDashboard({
     } finally {
       setIsLoggingOut(false);
     }
-  }
-
-  function handleProfileSaved(next: { fullName: string | null; phone: string | null }) {
-    setProfile(next);
-    setIsProfileModalOpen(false);
-    router.refresh();
-  }
-
-  function handleAddressSaved(saved: Address) {
-    setAddressList((prev) => {
-      const rest = prev.filter((a) => a.id !== saved.id).map((a) => (saved.is_default ? { ...a, is_default: false } : a));
-      return sortAddresses([...rest, saved]);
-    });
-    setAddressModal(null);
-    router.refresh();
-  }
-
-  function handleAddressDeleted(id: string) {
-    setAddressList((prev) => sortAddresses(prev.filter((a) => a.id !== id)));
-    setAddressModal(null);
-    router.refresh();
   }
 
   return (
@@ -198,14 +158,13 @@ export function AccountDashboard({
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsProfileModalOpen(true)}
-            className="w-full mt-2.5 font-semibold text-gray-700 border border-gray-200 rounded-xl"
+          <Link
+            href="/compte/modifier"
+            className="w-full mt-2.5 flex items-center justify-center font-semibold text-gray-700 border border-gray-200 rounded-xl"
             style={{ fontSize: 13, padding: '10px' }}
           >
             Modifier mes informations
-          </button>
+          </Link>
         </div>
 
         {/* Adresses de livraison */}
@@ -214,14 +173,13 @@ export function AccountDashboard({
             <div className="font-bold text-gray-500 uppercase" style={{ fontSize: 12, letterSpacing: '0.04em' }}>
               Adresses de livraison
             </div>
-            <button
-              type="button"
-              onClick={() => setAddressModal('add')}
+            <Link
+              href="/compte/adresses/nouvelle"
               className="font-bold shrink-0"
               style={{ fontSize: 12, color: 'var(--color-primary)' }}
             >
               + Ajouter
-            </button>
+            </Link>
           </div>
 
           {addressList.length === 0 ? (
@@ -231,10 +189,9 @@ export function AccountDashboard({
           ) : (
             <div className="border border-gray-200 rounded-[14px] overflow-hidden">
               {addressList.map((address, i) => (
-                <button
+                <Link
                   key={address.id}
-                  type="button"
-                  onClick={() => setAddressModal(address)}
+                  href={`/compte/adresses/${address.id}`}
                   className={`w-full flex justify-between items-start gap-2 px-3.5 py-[13px] text-left hover:bg-gray-50 ${
                     i < addressList.length - 1 ? 'border-b border-gray-100' : ''
                   }`}
@@ -263,7 +220,7 @@ export function AccountDashboard({
                       Par défaut
                     </span>
                   )}
-                </button>
+                </Link>
               ))}
             </div>
           )}
@@ -300,27 +257,6 @@ export function AccountDashboard({
           </button>
         </div>
       </div>
-
-      {isProfileModalOpen && (
-        <ProfileEditModal
-          fullName={profile.fullName}
-          phone={profile.phone}
-          defaultCountry={defaultCountry}
-          onClose={() => setIsProfileModalOpen(false)}
-          onSaved={handleProfileSaved}
-        />
-      )}
-
-      {addressModal && (
-        <AddressFormModal
-          address={addressModal === 'add' ? undefined : addressModal}
-          defaultFullName={profile.fullName}
-          defaultCountry={tenant.country}
-          onClose={() => setAddressModal(null)}
-          onSaved={handleAddressSaved}
-          onDeleted={handleAddressDeleted}
-        />
-      )}
     </div>
   );
 }
