@@ -14,9 +14,10 @@ const nextConfig = {
   },
   experimental: {
     typedRoutes: false,
-    // sharp (upload-product-image) a des bindings natifs — l'exclure du
-    // bundling webpack évite les erreurs de résolution du binaire sur Vercel.
-    serverComponentsExternalPackages: ['sharp'],
+    // sharp (upload-product-image) et @resvg/resvg-js (api/shop/qr-code) ont
+    // des bindings natifs — les exclure du bundling webpack évite les
+    // erreurs de résolution du binaire sur Vercel.
+    serverComponentsExternalPackages: ['sharp', '@resvg/resvg-js'],
   },
 };
 
