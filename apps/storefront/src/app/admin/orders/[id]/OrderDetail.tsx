@@ -47,6 +47,8 @@ const translations = {
     sdWeight:             'Poids total',
     sdCarrierCost:        'Coût transporteur',
     sdPackaging:          'Surplus emballage',
+    sdDiscount:           'Remise livraison',
+    sdFreeBadge:          'Livraison offerte',
     sdTotal:              'Total livraison facturé',
   },
   it: {
@@ -88,6 +90,8 @@ const translations = {
     sdWeight:             'Peso totale',
     sdCarrierCost:        'Costo corriere',
     sdPackaging:          'Surplus imballaggio',
+    sdDiscount:           'Sconto spedizione',
+    sdFreeBadge:          'Spedizione omaggio',
     sdTotal:              'Totale spedizione fatturato',
   },
 } as const;
@@ -125,6 +129,13 @@ interface ShippingDetails {
   surchargeMode?:           string;
   packagingSurchargeTotal?: number;
   boxDimensions?:           { length: number; width: number; height: number };
+  // Règles commerciales par pays (shipping_country_rules) — voir
+  // lib/shipping/resolveCountryRule.ts. Absents tant qu'aucune règle ne
+  // s'applique à la commande.
+  countryRuleApplied?:      boolean;
+  originalShippingCost?:    number;
+  discountApplied?:         number;
+  freeShippingApplied?:     boolean;
 }
 
 interface Props {
@@ -383,12 +394,24 @@ export default function OrderDetail({
       {/* Section 3 — Shipping details (delivery + Packlink only) */}
       {!isPickup && sd && (
         <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">{t.shippingDetails}</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">
+            {t.shippingDetails}
+            {sd.freeShippingApplied && (
+              <span
+                className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold align-middle"
+                style={{ background: '#F0FDF4', color: '#15803D', border: '0.5px solid #BBF7D0' }}
+              >
+                {t.sdFreeBadge}
+              </span>
+            )}
+          </h2>
           <div className="space-y-2">
-            <Field
-              label={t.sdCarrier}
-              value={formatCarrierName(sd.carrierName)}
-            />
+            {sd.carrierName && (
+              <Field
+                label={t.sdCarrier}
+                value={formatCarrierName(sd.carrierName)}
+              />
+            )}
             {sd.serviceName && (
               <Field label={t.sdService} value={sd.serviceName} />
             )}
@@ -418,6 +441,12 @@ export default function OrderDetail({
               <Field
                 label={t.sdPackaging}
                 value={formatPrice(sd.packagingSurchargeTotal, currency)}
+              />
+            )}
+            {sd.discountApplied != null && sd.discountApplied > 0 && (
+              <Field
+                label={t.sdDiscount}
+                value={'-' + formatPrice(sd.discountApplied, currency)}
               />
             )}
             <Divider />

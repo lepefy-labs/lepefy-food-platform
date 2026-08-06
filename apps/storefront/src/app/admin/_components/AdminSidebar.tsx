@@ -17,6 +17,7 @@ import {
   IconPhoto,
   IconStar,
   IconScan,
+  IconTruck,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -176,6 +177,20 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
           stroke={pathname === '/admin/loyalty/scan' ? 2 : 1.5}
         />
         Scan fidélité
+      </Link>
+
+      <Link
+        href="/admin/livraison"
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+                    text-sm transition-colors mx-1 ${
+          pathname === '/admin/livraison' ? navClass(true) : navClass(false)
+        }`}
+      >
+        <IconTruck
+          size={16}
+          stroke={pathname === '/admin/livraison' ? 2 : 1.5}
+        />
+        Livraison
       </Link>
 
       <Link

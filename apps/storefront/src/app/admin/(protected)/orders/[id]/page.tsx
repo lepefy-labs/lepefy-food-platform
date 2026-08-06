@@ -29,6 +29,13 @@ interface ShippingDetails {
   surchargeMode?:           string;
   packagingSurchargeTotal?: number;
   boxDimensions?:           { length: number; width: number; height: number };
+  // Règles commerciales par pays (shipping_country_rules) — voir
+  // lib/shipping/resolveCountryRule.ts. Absents tant qu'aucune règle ne
+  // s'applique à la commande.
+  countryRuleApplied?:      boolean;
+  originalShippingCost?:    number;
+  discountApplied?:         number;
+  freeShippingApplied?:     boolean;
 }
 
 export default async function AdminOrderPage({ params }: PageProps) {

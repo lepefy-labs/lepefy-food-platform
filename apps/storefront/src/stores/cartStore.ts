@@ -12,7 +12,7 @@ interface CartState {
   totalPrice: () => number;
   totalWeightG: () => number;
   /** Payload pronto per POST /api/shipping/quote */
-  shippingPayload: () => Array<{ weight_grams: number | null; quantity: number }>;
+  shippingPayload: () => Array<{ product_id: string; weight_grams: number | null; quantity: number }>;
 }
 
 export const useCartStore = create<CartState>()(
@@ -68,6 +68,7 @@ export const useCartStore = create<CartState>()(
 
       shippingPayload() {
         return get().items.map((i) => ({
+          product_id:   i.product.id,
           weight_grams: i.product.weight_grams,
           quantity:     i.quantity,
         }));
