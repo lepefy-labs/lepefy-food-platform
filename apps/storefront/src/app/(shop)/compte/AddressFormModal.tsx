@@ -124,104 +124,112 @@ export function AddressFormModal({
   }
 
   return (
-    <Modal title={isEdit ? 'Modifier l\'adresse' : 'Nouvelle adresse'} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className={LABEL_CLS}>Nom du destinataire</label>
-          <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={INPUT_CLS} placeholder="Prénom et nom" />
-        </div>
+    <form onSubmit={handleSubmit}>
+      <Modal
+        title={isEdit ? 'Modifier l\'adresse' : 'Nouvelle adresse'}
+        onClose={onClose}
+        footer={
+          <div className="space-y-3">
+            <button
+              type="submit"
+              disabled={isSaving || isDeleting}
+              className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              {isSaving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
 
-        <div>
-          <label className={LABEL_CLS}>Pays</label>
-          <select
-            value={country}
-            onChange={(e) => {
-              setCountry(e.target.value);
-              setManualMode(false);
-              setStreet('');
-              setHouseNumber('');
-              setCity('');
-              setPostalCode('');
-            }}
-            className={INPUT_CLS}
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={LABEL_CLS}>Adresse</label>
-          {manualMode ? (
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rue" className={INPUT_CLS} />
-              </div>
-              <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} placeholder="Numéro" className={INPUT_CLS} />
-            </div>
-          ) : (
-            <AddressAutocomplete
-              country={country}
-              placeholder="Rue et numéro, ville"
-              onSelect={(r) => {
-                setStreet(r.street);
-                setHouseNumber(r.houseNumber);
-                setCity(r.city);
-                setPostalCode(r.postalCode);
-              }}
-              onManualFallback={() => setManualMode(true)}
-            />
-          )}
-        </div>
-
-        {(manualMode || street) && (
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              value={postalCode}
-              onChange={(e) => setPostalCode(e.target.value)}
-              placeholder="Code postal"
-              inputMode="numeric"
-              className={INPUT_CLS}
-            />
-            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ville" className={INPUT_CLS} />
+            {isEdit && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSaving || isDeleting}
+                className="w-full py-2.5 rounded-xl font-semibold text-sm text-red-600 border border-red-200 disabled:opacity-50"
+              >
+                {isDeleting ? 'Suppression…' : 'Supprimer cette adresse'}
+              </button>
+            )}
           </div>
-        )}
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className={LABEL_CLS}>Nom du destinataire</label>
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={INPUT_CLS} placeholder="Prénom et nom" />
+          </div>
 
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={isDefault}
-            disabled={address?.is_default}
-            onChange={(e) => setIsDefault(e.target.checked)}
-            className="rounded border-gray-300"
-            style={{ accentColor: 'var(--color-primary)' }}
-          />
-          Définir comme adresse par défaut
-        </label>
+          <div>
+            <label className={LABEL_CLS}>Pays</label>
+            <select
+              value={country}
+              onChange={(e) => {
+                setCountry(e.target.value);
+                setManualMode(false);
+                setStreet('');
+                setHouseNumber('');
+                setCity('');
+                setPostalCode('');
+              }}
+              className={INPUT_CLS}
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
 
-        {error && <p className="text-red-500 text-xs">{error}</p>}
+          <div>
+            <label className={LABEL_CLS}>Adresse</label>
+            {manualMode ? (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rue" className={INPUT_CLS} />
+                </div>
+                <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} placeholder="Numéro" className={INPUT_CLS} />
+              </div>
+            ) : (
+              <AddressAutocomplete
+                country={country}
+                placeholder="Rue et numéro, ville"
+                onSelect={(r) => {
+                  setStreet(r.street);
+                  setHouseNumber(r.houseNumber);
+                  setCity(r.city);
+                  setPostalCode(r.postalCode);
+                }}
+                onManualFallback={() => setManualMode(true)}
+              />
+            )}
+          </div>
 
-        <button
-          type="submit"
-          disabled={isSaving || isDeleting}
-          className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+          {(manualMode || street) && (
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                placeholder="Code postal"
+                inputMode="numeric"
+                className={INPUT_CLS}
+              />
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ville" className={INPUT_CLS} />
+            </div>
+          )}
 
-        {isEdit && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isSaving || isDeleting}
-            className="w-full py-2.5 rounded-xl font-semibold text-sm text-red-600 border border-red-200 disabled:opacity-50"
-          >
-            {isDeleting ? 'Suppression…' : 'Supprimer cette adresse'}
-          </button>
-        )}
-      </form>
-    </Modal>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={isDefault}
+              disabled={address?.is_default}
+              onChange={(e) => setIsDefault(e.target.checked)}
+              className="rounded border-gray-300"
+              style={{ accentColor: 'var(--color-primary)' }}
+            />
+            Définir comme adresse par défaut
+          </label>
+
+          {error && <p className="text-red-500 text-xs">{error}</p>}
+        </div>
+      </Modal>
+    </form>
   );
 }

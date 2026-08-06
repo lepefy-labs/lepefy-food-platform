@@ -32,7 +32,7 @@ export function Modal({ title, onClose, children, footer }: ModalProps) {
       role="presentation"
     >
       <div
-        className="w-full sm:max-w-sm bg-white max-h-[90dvh] flex flex-col overflow-hidden rounded-t-[20px] sm:rounded-[20px]"
+        className="w-full sm:max-w-sm bg-white max-h-[90vh] max-h-[90dvh] flex flex-col overflow-hidden rounded-t-[20px] sm:rounded-[20px]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -49,7 +49,7 @@ export function Modal({ title, onClose, children, footer }: ModalProps) {
             <IconX size={20} stroke={1.8} />
           </button>
         </div>
-        <div className={`px-5 overflow-y-auto ${footer ? 'pb-4' : 'pb-6'}`}>{children}</div>
+        <div className={`px-5 overflow-y-auto min-h-0 ${footer ? 'pb-4' : 'pb-6'}`}>{children}</div>
         {footer && (
           <div
             className="px-5 pt-3 border-t border-gray-100 shrink-0"
