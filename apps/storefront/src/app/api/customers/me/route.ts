@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { getCustomerProfile } from '@/lib/customers/getCustomerProfile';
@@ -24,13 +25,6 @@ export async function GET() {
   return NextResponse.json(profile);
 }
 
-// Format volontairement permissif (indicatifs internationaux, espaces,
-// séparateurs) — l'objectif est d'écarter la saisie clairement invalide,
-// pas de valider un plan de numérotation précis (aucun validateur de ce
-// type n'existe déjà dans le projet, cf. CheckoutForm.tsx où le téléphone
-// est un simple input tel sans regex).
-const PHONE_RE = /^[+\d][\d\s().-]{5,19}$/;
-
 // PATCH /api/customers/me — édition "Informations personnelles" de la page
 // /compte (nom, téléphone). Toujours scopé customer_id + tenant_id, jamais
 // via le client anon (RLS écriture non ouverte sur customers pour les
@@ -51,12 +45,19 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Le nom ne peut pas être vide.' }, { status: 400 });
   }
 
+  // Le client envoie déjà le numéro au format E.164 (cf. toE164() dans
+  // ProfileEditModal.tsx via lib/utils/phone.ts) — ici on ne fait que
+  // vérifier que c'est bien le cas, sans defaultCountry, et on retient
+  // toujours la forme canonique .number pour la persistance en DB (jamais un
+  // texte formaté pour l'affichage, pour un réemploi futur : WhatsApp, SMS…).
   let phone: string | null = null;
   if (body.phone != null && body.phone.trim().length > 0) {
-    phone = body.phone.trim();
-    if (!PHONE_RE.test(phone)) {
+    const raw = body.phone.trim();
+    const parsed = raw.startsWith('+') ? parsePhoneNumberFromString(raw) : null;
+    if (!parsed || !parsed.isValid()) {
       return NextResponse.json({ error: 'Format de téléphone invalide.' }, { status: 400 });
     }
+    phone = parsed.number;
   }
 
   const supabase = createServiceClient();

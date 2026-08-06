@@ -5,10 +5,24 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle } from '@tabler/icons-react';
+import { getCountries, type CountryCode } from 'libphonenumber-js';
 import type { Address } from '@lepefy/types';
 import { ProfileEditModal } from './ProfileEditModal';
 import { AddressFormModal } from './AddressFormModal';
 import { LoyaltyCardWidget } from './LoyaltyCardWidget';
+
+// Repli neutre (jamais une décision de branding) pour les rares cas où
+// tenant.country ne serait pas un code ISO-2 exploitable par
+// libphonenumber-js — la colonne `tenants.country` est `text` en base sans
+// contrainte CHECK (défaut 'IT'), donc une valeur corrompue ne peut pas être
+// exclue par le typage seul.
+const FALLBACK_COUNTRY: CountryCode = 'FR';
+const SUPPORTED_COUNTRY_CODES = new Set<string>(getCountries());
+
+function normalizeCountryCode(raw: string): CountryCode {
+  const upper = raw.trim().toUpperCase();
+  return SUPPORTED_COUNTRY_CODES.has(upper) ? (upper as CountryCode) : FALLBACK_COUNTRY;
+}
 
 interface AccountTenant {
   name:            string;
@@ -50,6 +64,7 @@ export function AccountDashboard({
   loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyCardTextColor,
 }: AccountDashboardProps) {
   const router = useRouter();
+  const defaultCountry = normalizeCountryCode(tenant.country);
 
   const [profile, setProfile]           = useState({ fullName, phone });
   const [addressList, setAddressList]   = useState(() => sortAddresses(addresses));
@@ -173,14 +188,6 @@ export function AccountDashboard({
                   {profile.fullName || 'Non renseigné'}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsProfileModalOpen(true)}
-                className="font-bold shrink-0"
-                style={{ fontSize: 12, color: 'var(--color-primary)' }}
-              >
-                Modifier
-              </button>
             </div>
             <div className="flex justify-between items-center px-3.5 py-[13px]">
               <div>
@@ -189,16 +196,16 @@ export function AccountDashboard({
                   {profile.phone || 'Non renseigné'}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsProfileModalOpen(true)}
-                className="font-bold shrink-0"
-                style={{ fontSize: 12, color: 'var(--color-primary)' }}
-              >
-                Modifier
-              </button>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="w-full mt-2.5 font-semibold text-gray-700 border border-gray-200 rounded-xl"
+            style={{ fontSize: 13, padding: '10px' }}
+          >
+            Modifier mes informations
+          </button>
         </div>
 
         {/* Adresses de livraison */}
@@ -298,6 +305,7 @@ export function AccountDashboard({
         <ProfileEditModal
           fullName={profile.fullName}
           phone={profile.phone}
+          defaultCountry={defaultCountry}
           onClose={() => setIsProfileModalOpen(false)}
           onSaved={handleProfileSaved}
         />

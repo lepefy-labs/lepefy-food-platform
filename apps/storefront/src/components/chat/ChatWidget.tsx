@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { IconMessageCircle2, IconX, IconSend, IconBrandWhatsapp } from '@tabler/icons-react';
+import { useUIStore } from '@/lib/store/uiStore';
 
 interface ChatWidgetProps {
   enabled: boolean;
@@ -27,12 +28,20 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isModalOpen = useUIStore((s) => s.isModalOpen);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [turns, loading]);
 
-  if (!enabled) return null;
+  // Un modale (édition profil/adresse) prend le pas sur le FAB — évite la
+  // collision visuelle en bas d'écran ; referme aussi le panneau ouvert pour
+  // qu'il ne réapparaisse pas tel quel une fois le modale fermé.
+  useEffect(() => {
+    if (isModalOpen) setOpen(false);
+  }, [isModalOpen]);
+
+  if (!enabled || isModalOpen) return null;
 
   async function handleSend() {
     const message = input.trim();
