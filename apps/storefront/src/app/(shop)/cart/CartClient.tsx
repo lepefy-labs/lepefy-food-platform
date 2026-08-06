@@ -4,10 +4,13 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { IconShoppingCartOff, IconTruck, IconBuildingStore, IconMapPin } from '@tabler/icons-react';
+import { IconShoppingCartOff, IconTruck, IconBuildingStore, IconMapPin, IconGift } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
+import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import type { CustomerProfile } from '@/lib/customers/types';
+import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant } from '@lepefy/types';
 
 const COUNTRIES = [
@@ -17,6 +20,18 @@ const COUNTRIES = [
   { value: 'DE', label: 'Allemagne' },
   { value: 'CH', label: 'Suisse' },
 ];
+
+// Même heuristique que CheckoutForm.tsx : la base stocke rue + numéro dans un
+// seul champ (addresses.line1), le formulaire les sépare.
+function splitLine1(line1: string): { street: string; houseNumber: string } {
+  const parts = line1.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return { street: line1.trim(), houseNumber: '' };
+  const last = parts[parts.length - 1] ?? '';
+  if (/\d/.test(last) || /^s\.?\s?n\.?$/i.test(last)) {
+    return { street: parts.slice(0, -1).join(' '), houseNumber: last };
+  }
+  return { street: parts.join(' '), houseNumber: '' };
+}
 
 interface Props {
   tenant: Tenant;
@@ -35,10 +50,15 @@ export default function CartClient({ tenant }: Props) {
   const [manualMode, setManualMode] = useState(false);
   const [shippingTotal, setShippingTotal] = useState<number | null>(null);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(null);
+  const [freeShipping, setFreeShipping] = useState<FreeShippingInfo>(null);
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [prefilledAddress, setPrefilledAddress] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { customer: sessionCustomer } = useSessionCustomer();
+  const prefilledForCustomerRef = useRef<string | null>(null);
 
   const subtotal = totalPrice();
   const effectiveShipping = fulfillmentType === 'pickup' ? 0 : (shippingTotal ?? null);
@@ -62,17 +82,20 @@ export default function CartClient({ tenant }: Props) {
         if (data.available) {
           setShippingTotal(data.shippingTotal);
           setShippingDetails(data.shippingDetails ?? null);
+          setFreeShipping(data.freeShipping ?? null);
           setQuoteToken(data.quoteToken ?? null);
         } else {
           setShippingError(data.message ?? 'Livraison non disponible pour cette adresse.');
           setShippingTotal(null);
           setShippingDetails(null);
+          setFreeShipping(null);
           setQuoteToken(null);
         }
       } catch {
         setShippingError('Erreur lors du calcul des frais de livraison.');
         setShippingTotal(null);
         setShippingDetails(null);
+        setFreeShipping(null);
         setQuoteToken(null);
       } finally {
         setShippingLoading(false);
@@ -90,6 +113,82 @@ export default function CartClient({ tenant }: Props) {
     };
   }, [postalCode, country, fulfillmentType, fetchShipping]);
 
+  // ── Pré-remplissage depuis le profil client ────────────────────────────────
+  // Même pattern que CheckoutForm.tsx : une seule fois par client (ref), et on
+  // ne remplit QUE les champs encore vides — jamais par-dessus une saisie de
+  // cette session. Le prefill de country/postalCode fait naturellement partir
+  // l'effet de devis ci-dessus, aucun appel manuel nécessaire.
+  useEffect(() => {
+    if (fulfillmentType !== 'delivery') return;
+    if (!sessionCustomer) return;
+    if (prefilledForCustomerRef.current === sessionCustomer.id) return;
+    prefilledForCustomerRef.current = sessionCustomer.id;
+
+    let cancelled = false;
+
+    (async () => {
+      let profile: CustomerProfile | null = null;
+      try {
+        const res = await fetch('/api/customers/me');
+        if (!res.ok) return;
+        profile = (await res.json()) as CustomerProfile;
+      } catch {
+        // Confort, pas prérequis : sans profil le panier se comporte comme
+        // aujourd'hui (champs vides à saisir).
+        return;
+      }
+      if (cancelled) return;
+
+      const addr = profile?.defaultAddress;
+      if (!addr) return;
+
+      // Le code postal vide est le signal « l'utilisateur n'a encore rien
+      // saisi » : on ne touche à rien s'il a déjà commencé son adresse.
+      if (postalCode.trim() !== '') return;
+
+      const { street, houseNumber } = splitLine1(addr.line1);
+      if (COUNTRIES.some((c) => c.value === addr.country)) setCountry(addr.country);
+      setPostalCode(addr.postalCode);
+      if (addressStreet.trim() === '')      setAddressStreet(street);
+      if (addressHouseNumber.trim() === '') setAddressHouseNumber(houseNumber);
+      if (addressCity.trim() === '')        setAddressCity(addr.city);
+      // Le champ autocomplete ne sait pas afficher une valeur externe : on
+      // passe en saisie manuelle pour que le code postal pré-rempli soit
+      // visible (et modifiable) par l'utilisateur.
+      setManualMode(true);
+      setPrefilledAddress(true);
+    })();
+
+    return () => { cancelled = true; };
+    // postalCode/address* volontairement hors deps : ce sont des instantanés
+    // au moment où la session devient disponible, le ref-guard garantit une
+    // seule exécution par client.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCustomer, fulfillmentType]);
+
+  // ── Ricalcul au changement de quantité ─────────────────────────────────────
+  // Dépendance = payload sérialisé (valeur stable), jamais l'array `items`
+  // brut dont la référence change à chaque set() du store. Skip si le dernier
+  // devis est déjà gratuit pour une raison indépendante du sous-total
+  // (forfait/remise à 0 sur le pays) : le résultat ne peut pas changer.
+  const shippingPayloadKey = JSON.stringify(shippingPayload());
+
+  useEffect(() => {
+    if (fulfillmentType === 'pickup') return;
+    if (postalCode.length < 4) return;
+    if (shippingTotal === 0 && freeShipping !== null && freeShipping.reason !== 'threshold') return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchShipping(postalCode, country), 800);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // shippingTotal/freeShipping volontairement hors deps : ils ne servent
+    // qu'à la skip-condition, les inclure re-déclencherait l'effet à chaque
+    // réponse de devis.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shippingPayloadKey]);
+
   const canProceed =
     items.length > 0 && (fulfillmentType === 'pickup' || shippingTotal !== null);
 
@@ -99,6 +198,7 @@ export default function CartClient({ tenant }: Props) {
       JSON.stringify({
         shippingTotal: fulfillmentType === 'pickup' ? 0 : shippingTotal,
         shippingDetails: fulfillmentType === 'pickup' ? null : shippingDetails,
+        freeShipping: fulfillmentType === 'pickup' ? null : freeShipping,
         quoteToken: fulfillmentType === 'pickup' ? null : quoteToken,
         fulfillmentType,
         country: fulfillmentType === 'delivery' ? country : null,
@@ -283,13 +383,23 @@ export default function CartClient({ tenant }: Props) {
               />
             )}
           </div>
+          {prefilledAddress && (
+            <p className="text-[11px] text-gray-400 -mt-1 mb-3">
+              Votre adresse habituelle — vous pouvez la modifier.
+            </p>
+          )}
           <div className="flex justify-between items-center px-1 text-sm h-5">
             <span className="text-gray-500">Livraison</span>
             {shippingLoading && (
               <span className="text-gray-400 text-xs animate-pulse">Calcul en cours…</span>
             )}
-            {!shippingLoading && shippingTotal !== null && (
+            {!shippingLoading && shippingTotal !== null && freeShipping === null && (
               <span className="font-semibold">{formatPrice(shippingTotal, tenant.currency)}</span>
+            )}
+            {!shippingLoading && shippingTotal !== null && freeShipping !== null && (
+              <span className="font-semibold text-green-600">
+                {formatPrice(shippingTotal, tenant.currency)}
+              </span>
             )}
             {!shippingLoading && shippingError && (
               <span className="text-red-500 text-xs max-w-[60%] text-right">{shippingError}</span>
@@ -298,6 +408,16 @@ export default function CartClient({ tenant }: Props) {
               <span className="text-gray-300">—</span>
             )}
           </div>
+          {!shippingLoading && freeShipping !== null && (
+            <div className="mt-2 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 text-sm text-green-700 font-medium">
+              <IconGift size={18} className="flex-shrink-0" />
+              <span>
+                {freeShipping.reason === 'threshold'
+                  ? `🎉 Livraison offerte — votre commande dépasse ${formatPrice(freeShipping.thresholdAmount, tenant.currency)}`
+                  : '🎉 Livraison offerte pour ce pays'}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

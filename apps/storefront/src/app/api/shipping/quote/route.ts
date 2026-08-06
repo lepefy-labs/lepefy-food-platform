@@ -23,11 +23,27 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { calculateShipping } from '@/lib/shipping/calculateShipping';
 import { signQuote } from '@/lib/shipping/quoteToken';
 import { resolveCountryRule, applyCountryRule, type ShippingCountryRule } from '@/lib/shipping/resolveCountryRule';
+import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 
 const FROM_ADDRESS = {
   country:  'IT',
   zip_code: '42122',
 };
+
+// Campo informativo per la UI carrello/checkout ("Livraison offerte") — mai
+// persistito su orders/checkout_sessions e mai incluso nella firma del quote.
+function buildFreeShipping(
+  applied: ReturnType<typeof applyCountryRule>,
+  rule: ShippingCountryRule | null,
+): FreeShippingInfo {
+  if (applied.freeShippingApplied && rule?.free_shipping_above != null) {
+    return { reason: 'threshold', thresholdAmount: rule.free_shipping_above };
+  }
+  if (applied.ruleUsed && applied.finalCost === 0) {
+    return { reason: 'country_promo' };
+  }
+  return null;
+}
 
 // Applica countryRuleApplied/originalShippingCost/discountApplied/freeShippingApplied
 // solo se una regola è stata effettivamente risolta per il paese — altrimenti
@@ -169,6 +185,7 @@ export async function POST(request: Request) {
           available: true,
           shippingTotal: applied.finalCost,
           shippingDetails: mergeCountryRuleDetails(null, applied),
+          freeShipping: buildFreeShipping(applied, rule),
           quoteToken: signQuote(applied.finalCost, to.country, to.zip_code, quoteSecret),
         });
       }
@@ -198,6 +215,7 @@ export async function POST(request: Request) {
             available: true,
             shippingTotal: applied.finalCost,
             shippingDetails: mergeCountryRuleDetails(null, applied),
+            freeShipping: buildFreeShipping(applied, rule),
             quoteToken: signQuote(applied.finalCost, to.country, to.zip_code, quoteSecret),
           });
         }
@@ -259,6 +277,7 @@ export async function POST(request: Request) {
           available: true,
           shippingTotal: applied.finalCost,
           shippingDetails: mergeCountryRuleDetails(result._internal ?? null, applied),
+          freeShipping: buildFreeShipping(applied, rule),
           quoteToken: signQuote(applied.finalCost, to.country, to.zip_code, quoteSecret),
         });
       }

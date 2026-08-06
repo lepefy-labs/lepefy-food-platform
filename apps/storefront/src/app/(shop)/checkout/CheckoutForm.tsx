@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,12 +12,13 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import { IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown } from '@tabler/icons-react';
+import { IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import type { CustomerProfile } from '@/lib/customers/types';
+import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant } from '@lepefy/types';
 
 // Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
@@ -49,6 +50,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface CheckoutShipping {
   shippingTotal:   number;
   shippingDetails: Record<string, unknown> | null;
+  freeShipping?:   FreeShippingInfo;
   quoteToken:      string | null;
   fulfillmentType: 'delivery' | 'pickup';
   country:         string | null;
@@ -177,6 +179,7 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     shippingInfo?.shippingDetails ?? null,
   );
   const [quoteToken, setQuoteToken]           = useState<string | null>(shippingInfo?.quoteToken ?? null);
+  const [freeShipping, setFreeShipping]       = useState<FreeShippingInfo>(shippingInfo?.freeShipping ?? null);
   const [shippingRecalcError, setShippingRecalcError]         = useState<string | null>(null);
   const [shippingRecalculating, setShippingRecalculating]     = useState(false);
   const [quotedFor, setQuotedFor] = useState<{ country: string; postalCode: string } | null>(
@@ -302,6 +305,39 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const watchedPostalCode = watch('postal_code');
   const watchedCountry    = watch('country');
 
+  const requoteShipping = useCallback(async (c: string, zip: string) => {
+    setShippingRecalculating(true);
+    setShippingRecalcError(null);
+    try {
+      const res = await fetch('/api/shipping/quote', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          items: shippingPayload(),
+          to:    { country: c, zip_code: zip },
+        }),
+      });
+      const data = await res.json();
+      if (data.available) {
+        setShippingTotal(data.shippingTotal);
+        setShippingDetails(data.shippingDetails ?? null);
+        setFreeShipping(data.freeShipping ?? null);
+        setQuoteToken(data.quoteToken ?? null);
+        setQuotedFor({ country: c, postalCode: zip });
+      } else {
+        setShippingRecalcError(data.message ?? 'Livraison non disponible pour cette adresse.');
+        setFreeShipping(null);
+        setQuoteToken(null);
+      }
+    } catch {
+      setShippingRecalcError('Erreur lors du calcul des frais de livraison.');
+      setFreeShipping(null);
+      setQuoteToken(null);
+    } finally {
+      setShippingRecalculating(false);
+    }
+  }, [shippingPayload]);
+
   useEffect(() => {
     if (fulfillmentType !== 'delivery') return;
     const zip = (watchedPostalCode ?? '').trim();
@@ -310,40 +346,42 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     if (quotedFor && quotedFor.country === c && quotedFor.postalCode === zip) return;
 
     if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
-    recalcDebounceRef.current = setTimeout(async () => {
-      setShippingRecalculating(true);
-      setShippingRecalcError(null);
-      try {
-        const res = await fetch('/api/shipping/quote', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            items: shippingPayload(),
-            to:    { country: c, zip_code: zip },
-          }),
-        });
-        const data = await res.json();
-        if (data.available) {
-          setShippingTotal(data.shippingTotal);
-          setShippingDetails(data.shippingDetails ?? null);
-          setQuoteToken(data.quoteToken ?? null);
-          setQuotedFor({ country: c, postalCode: zip });
-        } else {
-          setShippingRecalcError(data.message ?? 'Livraison non disponible pour cette adresse.');
-          setQuoteToken(null);
-        }
-      } catch {
-        setShippingRecalcError('Erreur lors du calcul des frais de livraison.');
-        setQuoteToken(null);
-      } finally {
-        setShippingRecalculating(false);
-      }
-    }, 800);
+    recalcDebounceRef.current = setTimeout(() => requoteShipping(c, zip), 800);
 
     return () => {
       if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
     };
-  }, [watchedPostalCode, watchedCountry, fulfillmentType, quotedFor, shippingPayload]);
+  }, [watchedPostalCode, watchedCountry, fulfillmentType, quotedFor, requoteShipping]);
+
+  // ── Ricalcul si le panier a changé (retour du panier, autre onglet) ────────
+  // Même approche que CartClient : dépendance = payload sérialisé (valeur
+  // stable), jamais l'array `items` brut. Le premier rendu est ignoré (le
+  // devis transmis par le panier est déjà à jour pour ce contenu), et on ne
+  // re-quote pas si le dernier devis est gratuit pour une raison indépendante
+  // du sous-total (forfait/remise à 0 sur le pays).
+  const shippingPayloadKey = JSON.stringify(shippingPayload());
+  const lastPayloadKeyRef  = useRef(shippingPayloadKey);
+
+  useEffect(() => {
+    if (lastPayloadKeyRef.current === shippingPayloadKey) return;
+    lastPayloadKeyRef.current = shippingPayloadKey;
+
+    if (fulfillmentType !== 'delivery') return;
+    const zip = (watchedPostalCode ?? '').trim();
+    const c   = (watchedCountry ?? '').trim();
+    if (zip.length < 4 || !c) return;
+    if (shippingTotal === 0 && freeShipping !== null && freeShipping.reason !== 'threshold') return;
+
+    if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
+    recalcDebounceRef.current = setTimeout(() => requoteShipping(c, zip), 800);
+
+    return () => {
+      if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
+    };
+    // Seule la variation du panier doit déclencher cet effet — les autres
+    // valeurs (adresse, dernier devis) ne servent qu'aux guards.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shippingPayloadKey]);
 
   const isSubmitDisabled =
     isSubmitting ||
@@ -460,6 +498,16 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
               )}
             </span>
           </div>
+          {!isPickup && !shippingRecalculating && freeShipping !== null && (
+            <div className="flex items-center gap-1.5 text-green-600 text-xs font-medium">
+              <IconGift size={14} className="flex-shrink-0" />
+              <span>
+                {freeShipping.reason === 'threshold'
+                  ? `🎉 Livraison offerte — votre commande dépasse ${formatPrice(freeShipping.thresholdAmount, tenant.currency)}`
+                  : '🎉 Livraison offerte pour ce pays'}
+              </span>
+            </div>
+          )}
           {ambassadorDiscount > 0 && (
             <div className="flex justify-between text-sm text-green-600 font-medium">
               <span>Réduction parrainage</span>
