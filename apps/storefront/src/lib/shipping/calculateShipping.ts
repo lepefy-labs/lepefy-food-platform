@@ -88,12 +88,12 @@ const WEIGHT_FALLBACK_G = 400;
 
 // ─── Packlink API ─────────────────────────────────────────────────────────────
 
-interface PacklinkServiceInfo {
+export interface PacklinkServiceInfo {
   text: string;
   icon: string;
 }
 
-interface PacklinkService {
+export interface PacklinkService {
   id:           number;
   name:         string;
   carrier_name: string;
@@ -105,20 +105,48 @@ interface PacklinkService {
   };
 }
 
-function isEligibleService(s: PacklinkService): boolean {
-  if (s.dropoff) return false;
+export type PacklinkExclusionReason = 'dropoff' | 'b2b';
+
+// null = servizio eligibile. Usata sia da isEligibleService() (flusso reale)
+// sia dal simulatore admin, che deve mostrare il motivo esatto dello scarto
+// per i servizi non scelti.
+export function getExclusionReason(s: PacklinkService): PacklinkExclusionReason | null {
+  if (s.dropoff) return 'dropoff';
   const isB2B = s.service_info.some(
     (info) => info.icon === 'b2b' || info.text.includes('company-collection'),
   );
-  return !isB2B;
+  if (isB2B) return 'b2b';
+  return null;
 }
 
-async function fetchPacklinkCost(
+export function isEligibleService(s: PacklinkService): boolean {
+  return getExclusionReason(s) === null;
+}
+
+// Vista leggibile di un PacklinkService — riusata dal simulatore admin per
+// mostrare corriere/servizio senza duplicare l'accesso ai campi grezzi.
+export function describePacklinkService(s: PacklinkService): {
+  carrierName: string;
+  serviceName: string;
+  infoLabels:  string[];
+} {
+  return {
+    carrierName: s.carrier_name ?? '',
+    serviceName: s.name ?? '',
+    infoLabels:  (s.service_info ?? []).map((info) => info.text),
+  };
+}
+
+// Chiamata grezza a Packlink PRO: ritorna TUTTI i servizi per la destinazione
+// (eligibili o no), senza applicare alcun filtro. null in caso di errore rete
+// /API/parsing — non lancia mai, il chiamante decide come gestire l'assenza
+// di risultato (flusso reale vs simulatore admin hanno esigenze diverse).
+export async function fetchAllPacklinkServices(
   apiKey: string,
   from: ShippingAddress,
   to: ShippingAddress,
   parcels: Array<{ weight: number; width: number; height: number; length: number }>,
-): Promise<{ cost: number; taxPrice: number; serviceId: number; serviceName: string; carrierName: string } | null> {
+): Promise<PacklinkService[] | null> {
 
   const params = new URLSearchParams();
   params.set('from[country]', from.country);
@@ -147,15 +175,24 @@ async function fetchPacklinkCost(
     return null;
   }
 
-  let services: PacklinkService[];
   try {
-    services = await res.json();
+    const services = await res.json() as PacklinkService[];
+    console.info('[calculateShipping] Packlink services returned:', services?.length ?? 0, 'total');
+    return services ?? [];
   } catch (parseErr) {
     console.error('[calculateShipping] Packlink response JSON parse error:', parseErr);
     return null;
   }
+}
 
-  console.info('[calculateShipping] Packlink services returned:', services?.length ?? 0, 'total');
+async function fetchPacklinkCost(
+  apiKey: string,
+  from: ShippingAddress,
+  to: ShippingAddress,
+  parcels: Array<{ weight: number; width: number; height: number; length: number }>,
+): Promise<{ cost: number; taxPrice: number; serviceId: number; serviceName: string; carrierName: string } | null> {
+
+  const services = await fetchAllPacklinkServices(apiKey, from, to, parcels);
 
   if (!services?.length) {
     console.info('[calculateShipping] Packlink returned 0 services for this destination');
