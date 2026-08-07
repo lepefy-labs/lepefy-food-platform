@@ -81,6 +81,9 @@ export default async function AdminAmbassadeursPage() {
           ambassador_first_order_discount_type={tenant.ambassador_first_order_discount_type}
           ambassador_first_order_discount_value={tenant.ambassador_first_order_discount_value}
           ambassador_payout_threshold_amount={tenant.ambassador_payout_threshold_amount}
+          ambassador_commission_mode={tenant.ambassador_commission_mode}
+          ambassador_split_pool_amount={tenant.ambassador_split_pool_amount}
+          ambassador_split_pool_ambassador_percent={tenant.ambassador_split_pool_ambassador_percent}
           currency={tenant.currency}
         />
 

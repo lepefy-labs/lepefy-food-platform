@@ -1,6 +1,7 @@
 export type AmbassadorDiscountType = 'PERCENT' | 'FIXED';
 export type AmbassadorPaymentMethod = 'IBAN' | 'PAYPAL';
 export type AmbassadorCommissionStatus = 'CONFIRMED' | 'PAID' | 'CANCELLED';
+export type AmbassadorCommissionMode = 'PROPORTIONAL' | 'SPLIT_POOL';
 
 export interface AmbassadorCommission {
   id: string;
@@ -11,8 +12,11 @@ export interface AmbassadorCommission {
   order_subtotal: number;
   order_amount_paid: number;
   discount_applied: number;
-  rate_applied: number;
-  max_commission_applied: number;
+  commission_mode: AmbassadorCommissionMode;
+  rate_applied: number | null;
+  max_commission_applied: number | null;
+  pool_amount_applied: number | null;
+  pool_ambassador_percent_applied: number | null;
   commission_amount: number;
   status: AmbassadorCommissionStatus;
   paid_at: string | null;

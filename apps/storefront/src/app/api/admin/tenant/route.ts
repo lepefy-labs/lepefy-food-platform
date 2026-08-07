@@ -32,6 +32,9 @@ const EDITABLE_TENANT_FIELDS = [
   'ambassador_first_order_discount_type',
   'ambassador_first_order_discount_value',
   'ambassador_payout_threshold_amount',
+  'ambassador_commission_mode',
+  'ambassador_split_pool_amount',
+  'ambassador_split_pool_ambassador_percent',
 ] as const;
 
 // Champs numériques de la whitelist — jamais forcés à un minimum, une valeur
@@ -60,6 +63,8 @@ const DECIMAL_FIELDS = new Set<string>([
   'ambassador_max_commission_amount',
   'ambassador_first_order_discount_value',
   'ambassador_payout_threshold_amount',
+  'ambassador_split_pool_amount',
+  'ambassador_split_pool_ambassador_percent',
 ]);
 
 export async function PATCH(req: NextRequest) {

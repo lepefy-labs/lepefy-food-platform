@@ -1,5 +1,5 @@
 import type { ReferralAvailabilityMode, ReferralFraudAction } from './loyalty';
-import type { AmbassadorDiscountType } from './ambassador';
+import type { AmbassadorCommissionMode, AmbassadorDiscountType } from './ambassador';
 
 export type ShippingProvider = 'packlink' | 'flat_rate' | 'pickup_only';
 
@@ -69,6 +69,9 @@ export interface Tenant {
   ambassador_first_order_discount_type: AmbassadorDiscountType | null;
   ambassador_first_order_discount_value: number | null;
   ambassador_payout_threshold_amount: number;
+  ambassador_commission_mode: AmbassadorCommissionMode;
+  ambassador_split_pool_amount: number | null;
+  ambassador_split_pool_ambassador_percent: number | null;
   // Android app (TWA / Digital Asset Links)
   android_package_name: string | null;
   android_sha256_fingerprint: string | null;
