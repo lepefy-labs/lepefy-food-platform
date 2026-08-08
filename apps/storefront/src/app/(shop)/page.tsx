@@ -9,6 +9,7 @@ import { CategoryBlock } from '@/components/home/CategoryBlock';
 import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
 import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
+import { EventBanner } from '@/components/home/EventBanner';
 
 export const metadata: Metadata = {
   title: 'Accueil',
@@ -174,6 +175,9 @@ export default async function HomePage() {
 
       {/* ── HERO CAROUSEL ── */}
       <HeroCarousel slides={heroSlides} />
+
+      {/* ── BANNIÈRE ÉVÉNEMENTIEL (052) — cross-promo vers /evenementiel ── */}
+      <EventBanner tenant={tenant} />
 
       {/* Contenuto centrato */}
       <div className="max-w-6xl mx-auto w-full">

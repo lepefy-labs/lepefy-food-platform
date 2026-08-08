@@ -11,3 +11,4 @@ export * from './loyalty';
 export * from './heroSlides';
 export * from './ambassador';
 export * from './shippingCountryRule';
+export * from './events';

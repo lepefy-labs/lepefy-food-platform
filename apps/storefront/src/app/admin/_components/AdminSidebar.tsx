@@ -18,6 +18,7 @@ import {
   IconStar,
   IconScan,
   IconTruck,
+  IconCalendarEvent,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -31,6 +32,10 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
 
   const [catalogueOpen, setCatalogueOpen] = useState(
     pathname.startsWith('/admin/catalogue')
+  );
+
+  const [evenementielOpen, setEvenementielOpen] = useState(
+    pathname.startsWith('/admin/evenementiel')
   );
 
   function navClass(active: boolean) {
@@ -192,6 +197,52 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
         />
         Livraison
       </Link>
+
+      <button
+        onClick={() => setEvenementielOpen(!evenementielOpen)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+                    text-sm transition-colors mx-1 w-full text-left ${
+          pathname.startsWith('/admin/evenementiel')
+            ? navClass(true)
+            : navClass(false)
+        }`}
+      >
+        <IconCalendarEvent
+          size={16}
+          stroke={pathname.startsWith('/admin/evenementiel') ? 2 : 1.5}
+        />
+        <span className="flex-1">Événementiel</span>
+        {evenementielOpen
+          ? <IconChevronDown size={13} stroke={1.5} />
+          : <IconChevronRight size={13} stroke={1.5} />
+        }
+      </button>
+
+      {evenementielOpen && (
+        <div className="ml-5 border-l border-gray-100 dark:border-gray-800 pl-3 mb-1 space-y-0.5">
+          {[
+            { href: '/admin/evenementiel/evenements', label: 'Événements' },
+            { href: '/admin/evenementiel/scan', label: 'Scan' },
+            { href: '/admin/evenementiel/services', label: 'Services' },
+            { href: '/admin/evenementiel/devis', label: 'Demandes de devis' },
+            { href: '/admin/evenementiel/reservations-materiel', label: 'Réservations matériel' },
+            { href: '/admin/evenementiel/galerie', label: 'Galerie' },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`block py-1.5 px-2 rounded-lg text-xs
+                          transition-colors ${
+                pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  ? 'text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] font-medium'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <Link
         href="/admin/ambassadeurs"

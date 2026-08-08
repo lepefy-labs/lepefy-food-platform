@@ -76,6 +76,9 @@ export interface Tenant {
   android_package_name: string | null;
   android_sha256_fingerprint: string | null;
   android_public: boolean;
+  // Module Événementiel (052)
+  events_enabled: boolean;
+  services_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
