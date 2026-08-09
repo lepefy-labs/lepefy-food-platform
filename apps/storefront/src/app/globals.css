@@ -81,7 +81,7 @@
 @media print {
   /* Hide all admin UI */
   .no-print    { display: none !important; }
-  header, nav, aside { display: none !important; }
+  header, nav, aside, footer { display: none !important; }
   /* Show the picking list */
   .pl-content  { display: block !important; }
 

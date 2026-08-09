@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const { data: reservation } = await supabase
     .from('event_reservations')
-    .select('id, event_id, customer_name, customer_email, amount_paid, qr_token, quantity_total, status')
+    .select('id, event_id, customer_name, customer_email, amount_paid, qr_token, quantity_total, quantity_remaining, status')
     .eq('stripe_payment_intent_id', paymentIntentId)
     .eq('tenant_id', tenant.id)
     .maybeSingle();
