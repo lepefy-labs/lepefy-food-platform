@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
+import { extractQrToken } from '@/lib/events/ticketUrl';
 
 interface RedeemRpcRow {
   success:   boolean;
@@ -24,7 +25,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json() as { qr_token?: string; quantity?: number };
-  const qrToken  = (body.qr_token ?? '').trim();
+  // Normalisation défensive : le client envoie déjà le token extrait, mais on
+  // tolère aussi l'URL complète du billet (nouveau contenu du QR) ici.
+  const qrToken  = extractQrToken(body.qr_token ?? '');
   const quantity = Number(body.quantity);
 
   if (!qrToken || !Number.isInteger(quantity) || quantity < 1) {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconScan, IconCheck, IconAlertCircle, IconRotate, IconTicket } from '@tabler/icons-react';
 import { CameraScanButton } from '../../loyalty/scan/CameraScanButton';
+import { extractQrToken } from '@/lib/events/ticketUrl';
 
 type Step = 'scan' | 'confirm' | 'success';
 
@@ -29,6 +30,9 @@ export function ScanClient({ eventsEnabled }: { eventsEnabled: boolean }) {
   function handleScanSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!qrToken.trim()) return;
+    // Le QR encode désormais l'URL du billet — on extrait le token (les
+    // anciens QR au token nu restent acceptés, cf. extractQrToken).
+    setQrToken(extractQrToken(qrToken));
     setError(null);
     setStep('confirm');
   }
@@ -117,7 +121,7 @@ export function ScanClient({ eventsEnabled }: { eventsEnabled: boolean }) {
             </button>
           </form>
 
-          <CameraScanButton onDecoded={(text) => { setQrToken(text); setStep('confirm'); }} />
+          <CameraScanButton onDecoded={(text) => { setQrToken(extractQrToken(text)); setStep('confirm'); }} />
         </div>
       )}
 
