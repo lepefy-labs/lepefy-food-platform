@@ -41,6 +41,10 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+  // Variante sans `w-full` pour les champs à l'intérieur d'une rangée flex
+  // (formules) — combiner `w-full` et `flex-1` sur le même input écrase le
+  // partage d'espace du flexbox et réduit le champ à quelques pixels.
+  const flexInputClass = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
 
   async function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -180,29 +184,31 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
             )}
             <div className="space-y-2">
               {ticketTypes.map((t, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <input
-                    value={t.label}
-                    onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)}
-                    placeholder="Libellé (ex. Formule Repas)"
-                    className={`${inputClass} flex-1`}
-                  />
+                <div key={i} className="flex flex-col gap-1.5 border border-gray-50 rounded-lg p-2">
+                  <div className="flex items-start gap-2">
+                    <input
+                      value={t.label}
+                      onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)}
+                      placeholder="Nom de la formule (ex. Formule Repas)"
+                      className={`${flexInputClass} flex-1 min-w-0`}
+                    />
+                    <input
+                      value={t.price}
+                      onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)}
+                      placeholder="Prix €"
+                      inputMode="decimal"
+                      className={`${flexInputClass} w-24 shrink-0`}
+                    />
+                    <button type="button" onClick={() => removeTicketTypeRow(i)} className="p-2 text-gray-400 hover:text-red-500 shrink-0">
+                      <IconTrash size={16} />
+                    </button>
+                  </div>
                   <input
                     value={t.description}
                     onChange={(e) => updateTicketTypeRow(i, 'description', e.target.value)}
                     placeholder="Description (optionnel)"
-                    className={`${inputClass} flex-1`}
+                    className={inputClass}
                   />
-                  <input
-                    value={t.price}
-                    onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)}
-                    placeholder="Prix"
-                    inputMode="decimal"
-                    className={`${inputClass} w-24`}
-                  />
-                  <button type="button" onClick={() => removeTicketTypeRow(i)} className="p-2 text-gray-400 hover:text-red-500 shrink-0">
-                    <IconTrash size={16} />
-                  </button>
                 </div>
               ))}
             </div>
