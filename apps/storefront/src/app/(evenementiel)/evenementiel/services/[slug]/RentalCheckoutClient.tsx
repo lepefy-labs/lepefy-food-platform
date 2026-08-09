@@ -1,0 +1,249 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { IconMinus, IconPlus } from '@tabler/icons-react';
+import { formatPrice } from '@/lib/utils/format';
+import { useSessionCustomer } from '@/hooks/useSessionCustomer';
+import type { RentalItem } from '@lepefy/types';
+
+let stripePromise: ReturnType<typeof loadStripe> | null = null;
+function getStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+  }
+  return stripePromise;
+}
+
+interface Props {
+  service:     { id: string; slug: string; title: string };
+  rentalItems: RentalItem[];
+  tenant:      { currency: string };
+}
+
+function RentalPaymentStep({ total, currency, onError }: { total: number; currency: string; onError: (msg: string) => void }) {
+  const stripe   = useStripe();
+  const elements = useElements();
+  const router   = useRouter();
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!stripe || !elements) return;
+    setIsConfirming(true);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: `${window.location.origin}/evenementiel` },
+      redirect: 'if_required',
+    });
+
+    if (error) {
+      onError(error.message ?? 'Erreur lors du paiement.');
+      setIsConfirming(false);
+    } else {
+      router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+        <p className="text-sm font-semibold text-gray-700 mb-4">Paiement sécurisé</p>
+        <PaymentElement />
+      </div>
+      <button
+        onClick={handleConfirm}
+        disabled={isConfirming || !stripe || !elements}
+        className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+        style={{ backgroundColor: 'var(--color-primary)' }}
+      >
+        {isConfirming ? 'Traitement en cours…' : `Payer ${formatPrice(total, currency)}`}
+      </button>
+    </div>
+  );
+}
+
+export default function RentalCheckoutClient({ service, rentalItems, tenant }: Props) {
+  const { customer: sessionCustomer } = useSessionCustomer();
+
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [pickupDate, setPickupDate] = useState('');
+  const [name, setName]   = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [step, setStep]   = useState<'select' | 'payment'>('select');
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (!sessionCustomer || prefilledRef.current) return;
+    prefilledRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/customers/me');
+        if (!res.ok) return;
+        const profile = await res.json();
+        if (!name && profile.fullName) setName(profile.fullName);
+        if (!email && profile.email) setEmail(profile.email);
+        if (!phone && profile.phone) setPhone(profile.phone);
+      } catch {
+        // Confort — checkout guest continue en cas d'échec.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCustomer]);
+
+  const totalQuantity = Object.values(quantities).reduce((s, q) => s + q, 0);
+  const total = rentalItems.reduce((s, i) => s + (quantities[i.id] ?? 0) * i.price_per_unit, 0);
+
+  function setQuantity(itemId: string, delta: number, max: number) {
+    setQuantities((prev) => {
+      const next = Math.min(max, Math.max(0, (prev[itemId] ?? 0) + delta));
+      return { ...prev, [itemId]: next };
+    });
+  }
+
+  async function handleSubmit() {
+    setError(null);
+    if (totalQuantity === 0) {
+      setError('Sélectionnez au moins un article.');
+      return;
+    }
+    if (!pickupDate) {
+      setError('Indiquez une date de retrait.');
+      return;
+    }
+    if (!name.trim() || !email.trim()) {
+      setError('Nom et email sont obligatoires.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const items = rentalItems
+        .filter((i) => (quantities[i.id] ?? 0) > 0)
+        .map((i) => ({ rental_item_id: i.id, quantity: quantities[i.id] }));
+
+      const res = await fetch('/api/rental/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_offering_id: service.id,
+          items,
+          pickup_date: pickupDate,
+          customer_name: name.trim(),
+          customer_email: email.trim(),
+          customer_phone: phone.trim() || null,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error ?? 'Une erreur est survenue.');
+        return;
+      }
+
+      setClientSecret(result.clientSecret);
+      setStep('payment');
+    } catch {
+      setError('Une erreur est survenue. Veuillez réessayer.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const inputClass =
+    'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+
+  if (rentalItems.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+        <p className="text-sm text-gray-500">Aucun article disponible pour le moment.</p>
+      </div>
+    );
+  }
+
+  if (step === 'payment' && clientSecret) {
+    return (
+      <div>
+        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>}
+        <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
+          <RentalPaymentStep total={total} currency={tenant.currency} onError={setError} />
+        </Elements>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Catalogue matériel</p>
+        <div className="space-y-3">
+          {rentalItems.map((item) => (
+            <div key={item.id} className="flex items-center justify-between gap-3 py-1">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                {item.category && <p className="text-xs text-gray-400">{item.category}</p>}
+                <p className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>
+                  {formatPrice(item.price_per_unit, tenant.currency)} / unité
+                  {item.stock_quantity <= 0 && <span className="text-red-500 ml-2">Épuisé</span>}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setQuantity(item.id, -1, item.stock_quantity)}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500"
+                >
+                  <IconMinus size={14} />
+                </button>
+                <span className="w-5 text-center text-sm font-semibold">{quantities[item.id] ?? 0}</span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity(item.id, 1, item.stock_quantity)}
+                  disabled={item.stock_quantity <= 0}
+                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 disabled:opacity-30"
+                >
+                  <IconPlus size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {totalQuantity > 0 && (
+        <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-gray-700">Total ({totalQuantity} article{totalQuantity > 1 ? 's' : ''})</span>
+          <span className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+        <p className="text-sm font-semibold text-gray-700">Retrait et coordonnées</p>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Date de retrait souhaitée</label>
+          <input value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} type="date" className={inputClass} />
+        </div>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={inputClass} />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
+      </div>
+
+      {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+
+      <button
+        onClick={handleSubmit}
+        disabled={isSubmitting || totalQuantity === 0}
+        className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+        style={{ backgroundColor: 'var(--color-primary)' }}
+      >
+        {isSubmitting ? 'Traitement…' : 'Continuer vers le paiement'}
+      </button>
+    </div>
+  );
+}
