@@ -48,9 +48,28 @@ export async function POST(req: NextRequest) {
     ? body.status as EventStatus
     : 'draft';
 
+  // Formules soumises avec le formulaire de création — on les valide avant
+  // toute écriture pour ne jamais créer un événement avec des formules
+  // partiellement invalides.
+  const rawTicketTypes = Array.isArray(body.ticket_types) ? body.ticket_types : [];
+  const ticketTypesInput: { label: string; description: string | null; price: number }[] = [];
+  for (const raw of rawTicketTypes) {
+    const t = raw as Record<string, unknown>;
+    const label = String(t.label ?? '').trim();
+    const price = Number(t.price);
+    if (!label || !Number.isFinite(price) || price < 0) {
+      return NextResponse.json({ error: 'Chaque formule doit avoir un libellé et un prix valides.' }, { status: 400 });
+    }
+    ticketTypesInput.push({ label, description: t.description ? String(t.description).trim() : null, price });
+  }
+
+  if (status === 'published' && ticketTypesInput.length === 0) {
+    return NextResponse.json({ error: 'Impossible de publier un événement sans au moins une formule.' }, { status: 400 });
+  }
+
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
+  const { data: event, error } = await supabase
     .from('events')
     .insert({
       tenant_id:           tenant.id,
@@ -74,5 +93,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data, { status: 201 });
+  if (ticketTypesInput.length > 0) {
+    const { data: ticketTypes, error: ticketError } = await supabase
+      .from('event_ticket_types')
+      .insert(ticketTypesInput.map((t, i) => ({
+        tenant_id:   tenant.id,
+        event_id:    event.id,
+        label:       t.label,
+        description: t.description,
+        price:       t.price,
+        sort_order:  i,
+      })))
+      .select('*');
+
+    if (ticketError) {
+      // Compensation : l'événement ne doit pas rester orphelin de ses
+      // formules si l'insertion échoue — pas de transaction multi-table
+      // disponible côté supabase-js pour ce projet (voir 052_events_module.sql).
+      // L'insert des formules ci-dessus est un unique appel PostgREST sur un
+      // tableau de lignes (un seul statement SQL, atomique) : soit toutes les
+      // formules sont créées, soit aucune — jamais un état partiel.
+      const { error: cleanupError } = await supabase.from('events').delete().eq('id', event.id);
+      if (cleanupError) {
+        // Double échec (formules ET compensation) : l'événement orphelin
+        // reste en base, sans formule. On le signale explicitement plutôt
+        // que de laisser croire que tout a été annulé proprement.
+        return NextResponse.json(
+          { error: `Échec de la création des formules, et échec du nettoyage de l'événement associé (id: ${event.id}). Contactez un administrateur technique pour supprimer manuellement cet événement orphelin avant de réessayer.` },
+          { status: 500 },
+        );
+      }
+      return NextResponse.json({ error: ticketError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ...event, ticket_types: ticketTypes ?? [] }, { status: 201 });
+  }
+
+  return NextResponse.json({ ...event, ticket_types: [] }, { status: 201 });
 }

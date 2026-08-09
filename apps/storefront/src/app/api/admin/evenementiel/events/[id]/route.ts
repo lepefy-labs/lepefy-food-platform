@@ -72,6 +72,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const supabase = createServiceClient();
 
+  if (patch.status === 'published') {
+    const { count } = await supabase
+      .from('event_ticket_types')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', params.id)
+      .eq('active', true);
+
+    if (!count) {
+      return NextResponse.json(
+        { error: 'Impossible de publier un événement sans au moins une formule active.' },
+        { status: 400 },
+      );
+    }
+  }
+
   // Si la capacité totale change, on ajuste le restant en conservant le
   // nombre de places déjà réservées (capacity_total - déjà réservé).
   if (patch.capacity_total !== undefined) {

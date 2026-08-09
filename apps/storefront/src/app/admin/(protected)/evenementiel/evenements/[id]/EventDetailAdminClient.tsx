@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import type { EventRow, EventTicketType, EventReservation, EventStatus, EventReservationStatus } from '@lepefy/types';
 
@@ -28,14 +28,23 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
   const [savingStatus, setSavingStatus] = useState(false);
 
   const [newLabel, setNewLabel] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [addingTicket, setAddingTicket] = useState(false);
   const [refunding, setRefunding] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputClass = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
 
   async function updateStatus(status: EventStatus) {
+    setStatusError(null);
+    if (status === 'published' && ticketTypes.filter((t) => t.active).length === 0) {
+      setStatusError('Impossible de publier un événement sans au moins une formule active — ajoutez-en une ci-dessous.');
+      return;
+    }
     setSavingStatus(true);
     try {
       const res = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
@@ -44,9 +53,45 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         body: JSON.stringify({ status }),
       });
       const result = await res.json();
-      if (res.ok) setEvent(result);
+      if (!res.ok) {
+        setStatusError(result.error ?? 'Erreur lors du changement de statut.');
+        return;
+      }
+      setEvent(result);
     } finally {
       setSavingStatus(false);
+    }
+  }
+
+  async function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setUploadingBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('kind', 'event-banner');
+      const uploadRes = await fetch('/api/admin/evenementiel/upload-image', { method: 'POST', body: formData });
+      const uploadResult = await uploadRes.json();
+      if (!uploadRes.ok) {
+        setError(uploadResult.error ?? 'Erreur lors du téléversement de la bannière.');
+        return;
+      }
+      const patchRes = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banner_image_url: uploadResult.imageUrl }),
+      });
+      const patchResult = await patchRes.json();
+      if (!patchRes.ok) {
+        setError(patchResult.error ?? 'Erreur lors de l\'enregistrement de la bannière.');
+        return;
+      }
+      setEvent(patchResult);
+    } finally {
+      setUploadingBanner(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -63,7 +108,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
       const res = await fetch(`/api/admin/evenementiel/events/${event.id}/ticket-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: newLabel.trim(), price }),
+        body: JSON.stringify({ label: newLabel.trim(), description: newDescription.trim() || null, price }),
       });
       const result = await res.json();
       if (!res.ok) {
@@ -71,7 +116,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         return;
       }
       setTicketTypes((prev) => [...prev, result]);
-      setNewLabel(''); setNewPrice('');
+      setNewLabel(''); setNewDescription(''); setNewPrice('');
     } finally {
       setAddingTicket(false);
     }
@@ -115,15 +160,31 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
             {formatDate(event.date_start)} · {event.capacity_remaining}/{event.capacity_total} places restantes
           </p>
         </div>
-        <select
-          value={event.status}
-          onChange={(e) => updateStatus(e.target.value as EventStatus)}
-          disabled={savingStatus}
-          className={inputClass}
-        >
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="text-right">
+          <select
+            value={event.status}
+            onChange={(e) => updateStatus(e.target.value as EventStatus)}
+            disabled={savingStatus}
+            className={inputClass}
+          >
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          {statusError && <p className="text-red-500 text-xs mt-1.5 max-w-xs">{statusError}</p>}
+        </div>
       </div>
+
+      {/* Bannière */}
+      <section className="bg-white rounded-2xl border border-gray-100 p-4">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Bannière</p>
+        {event.banner_image_url && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={event.banner_image_url} alt="Bannière de l'événement" className="w-full max-h-56 object-cover rounded-lg mb-3" />
+        )}
+        <label className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 cursor-pointer w-fit disabled:opacity-50">
+          <IconUpload size={14} /> {uploadingBanner ? 'Téléversement…' : event.banner_image_url ? 'Changer l\'image' : 'Ajouter une bannière'}
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={uploadingBanner} />
+        </label>
+      </section>
 
       {/* Formules */}
       <section className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -144,6 +205,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         </div>
         <form onSubmit={addTicketType} className="flex items-center gap-2">
           <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Libellé (ex. Formule Repas)" className={`${inputClass} flex-1`} />
+          <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description (optionnel)" className={`${inputClass} flex-1`} />
           <input value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="Prix" inputMode="decimal" className={`${inputClass} w-24`} />
           <button
             type="submit"

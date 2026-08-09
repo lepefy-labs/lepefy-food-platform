@@ -1,10 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconPlus, IconCalendarEvent } from '@tabler/icons-react';
+import { IconPlus, IconCalendarEvent, IconUpload, IconTrash } from '@tabler/icons-react';
 import { slugify, formatDate } from '@/lib/utils/format';
 import type { EventRow, EventStatus } from '@lepefy/types';
+
+interface DraftTicketType {
+  label: string;
+  description: string;
+  price: string;
+}
 
 const STATUS_LABELS: Record<EventStatus, string> = {
   draft: 'Brouillon',
@@ -27,10 +33,48 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   const [dateStart, setDateStart] = useState('');
   const [location, setLocation] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [ticketTypes, setTicketTypes] = useState<DraftTicketType[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+
+  async function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setUploadingBanner(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('kind', 'event-banner');
+      const res = await fetch('/api/admin/evenementiel/upload-image', { method: 'POST', body: formData });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error ?? 'Erreur lors du téléversement de la bannière.');
+        return;
+      }
+      setBannerImageUrl(result.imageUrl);
+    } finally {
+      setUploadingBanner(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  function addTicketTypeRow() {
+    setTicketTypes((prev) => [...prev, { label: '', description: '', price: '' }]);
+  }
+
+  function updateTicketTypeRow(index: number, field: keyof DraftTicketType, value: string) {
+    setTicketTypes((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  }
+
+  function removeTicketTypeRow(index: number) {
+    setTicketTypes((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -40,6 +84,16 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
     if (!title.trim() || !dateStart || !Number.isInteger(capacityNum) || capacityNum < 0) {
       setError('Titre, date et capacité valides requis.');
       return;
+    }
+
+    const ticketTypesPayload: { label: string; description: string | null; price: number }[] = [];
+    for (const t of ticketTypes) {
+      const price = Number(t.price);
+      if (!t.label.trim() || !Number.isFinite(price) || price < 0) {
+        setError('Chaque formule doit avoir un libellé et un prix valides.');
+        return;
+      }
+      ticketTypesPayload.push({ label: t.label.trim(), description: t.description.trim() || null, price });
     }
 
     setIsSubmitting(true);
@@ -54,6 +108,8 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
           location: location.trim() || null,
           capacity_total: capacityNum,
           status: 'draft',
+          banner_image_url: bannerImageUrl,
+          ticket_types: ticketTypesPayload,
         }),
       });
       const result = await res.json();
@@ -64,6 +120,7 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
       setEvents((prev) => [result, ...prev]);
       setShowForm(false);
       setTitle(''); setDateStart(''); setLocation(''); setCapacity('');
+      setBannerImageUrl(null); setTicketTypes([]);
     } catch {
       setError('Erreur réseau.');
     } finally {
@@ -96,6 +153,61 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
             />
           </div>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Lieu (optionnel)" className={inputClass} />
+
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-1.5">Bannière</p>
+            {bannerImageUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={bannerImageUrl} alt="Aperçu de la bannière" className="w-full max-h-40 object-cover rounded-lg mb-2" />
+            )}
+            <label
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 cursor-pointer w-fit disabled:opacity-50"
+            >
+              <IconUpload size={14} /> {uploadingBanner ? 'Téléversement…' : bannerImageUrl ? 'Changer l\'image' : 'Ajouter une bannière'}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={uploadingBanner} />
+            </label>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs font-semibold text-gray-600">Formules</p>
+              <button type="button" onClick={addTicketTypeRow} className="flex items-center gap-1 text-xs font-semibold text-[var(--color-primary)]">
+                <IconPlus size={14} /> Ajouter une formule
+              </button>
+            </div>
+            {ticketTypes.length === 0 && (
+              <p className="text-xs text-gray-400">Aucune formule — un événement publié doit avoir au moins une formule.</p>
+            )}
+            <div className="space-y-2">
+              {ticketTypes.map((t, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <input
+                    value={t.label}
+                    onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)}
+                    placeholder="Libellé (ex. Formule Repas)"
+                    className={`${inputClass} flex-1`}
+                  />
+                  <input
+                    value={t.description}
+                    onChange={(e) => updateTicketTypeRow(i, 'description', e.target.value)}
+                    placeholder="Description (optionnel)"
+                    className={`${inputClass} flex-1`}
+                  />
+                  <input
+                    value={t.price}
+                    onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)}
+                    placeholder="Prix"
+                    inputMode="decimal"
+                    className={`${inputClass} w-24`}
+                  />
+                  <button type="button" onClick={() => removeTicketTypeRow(i)} className="p-2 text-gray-400 hover:text-red-500 shrink-0">
+                    <IconTrash size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <button
             type="submit"
