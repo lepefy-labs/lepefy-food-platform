@@ -5,10 +5,16 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { extractQrToken } from '@/lib/events/ticketUrl';
 
-interface RedeemRpcRow {
-  success:   boolean;
-  remaining: number;
-  reason:    string;
+interface RedeemItemsRpcRow {
+  success:             boolean;
+  reservation_item_id: string | null;
+  reason:              string;
+  quantity_remaining:  number | null;
+}
+
+interface ScanItemInput {
+  reservation_item_id: string;
+  quantity: number;
 }
 
 // Redemption QR le jour de l'événement — accessible à tenant_admin ET
@@ -24,14 +30,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 400 });
   }
 
-  const body = await req.json() as { qr_token?: string; quantity?: number };
+  const body = await req.json() as { qr_token?: string; items?: ScanItemInput[] };
   // Normalisation défensive : le client envoie déjà le token extrait, mais on
   // tolère aussi l'URL complète du billet (nouveau contenu du QR) ici.
-  const qrToken  = extractQrToken(body.qr_token ?? '');
-  const quantity = Number(body.quantity);
+  const qrToken = extractQrToken(body.qr_token ?? '');
+  const items   = Array.isArray(body.items) ? body.items : [];
 
-  if (!qrToken || !Number.isInteger(quantity) || quantity < 1) {
-    return NextResponse.json({ error: 'Code QR et quantité valides requis.' }, { status: 400 });
+  const validItems = items.every(
+    i => typeof i.reservation_item_id === 'string' && i.reservation_item_id.length > 0
+      && Number.isInteger(i.quantity) && i.quantity > 0,
+  );
+
+  if (!qrToken || items.length === 0 || !validItems) {
+    return NextResponse.json({ error: 'Code QR et lignes de formule valides requis.' }, { status: 400 });
   }
 
   const adminId = await getAdminId();
@@ -60,22 +71,22 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   const { data, error } = await supabase
-    .rpc('redeem_event_reservation', { p_qr_token: qrToken, p_quantity: quantity, p_admin_id: adminId })
+    .rpc('redeem_event_reservation_items', { p_qr_token: qrToken, p_items: items, p_admin_id: adminId })
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const row = data as RedeemRpcRow;
+  const row = data as RedeemItemsRpcRow;
 
   if (!row.success) {
-    return NextResponse.json({ error: row.reason, remaining: row.remaining }, { status: 409 });
+    return NextResponse.json({ error: row.reason, reservationItemId: row.reservation_item_id }, { status: 409 });
   }
 
   return NextResponse.json({
     success:       true,
-    remaining:     row.remaining,
+    remaining:     row.quantity_remaining,
     customerName:  reservation.customer_name,
     eventTitle:    eventRow?.title ?? null,
   });

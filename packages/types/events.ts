@@ -65,6 +65,19 @@ export interface EventReservationRedemption {
   redeemed_at: string;
 }
 
+// Redemption granulaire par ligne formule (053) — distincte de
+// EventReservationRedemption (052, journal au niveau réservation).
+export interface EventReservationItemRedemption {
+  id: string;
+  reservation_item_id: string;
+  quantity_redeemed: number;
+  redeemed_by: string | null;
+  redeemed_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+}
+
 export type ServiceOfferingType = 'traiteur' | 'location_materiel' | 'autre';
 export type ServiceCtaType = 'devis' | 'reservation';
 
