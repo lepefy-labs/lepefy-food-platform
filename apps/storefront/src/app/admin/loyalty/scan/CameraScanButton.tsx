@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { IconCamera, IconX } from '@tabler/icons-react';
+import type { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 
 const SCANNER_ELEMENT_ID = 'loyalty-camera-scanner';
 
@@ -15,8 +16,32 @@ interface CameraScanButtonProps {
 export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
   const [open, setOpen] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  // L'enum n'est disponible qu'après l'import dynamique (cf. commentaire
+  // ci-dessus) — on la capture ici pour pouvoir tester l'état dans le cleanup.
+  const stateEnumRef = useRef<typeof Html5QrcodeScannerState | null>(null);
+  // Ref pour éviter que le prop (fonction inline chez l'appelant) ne fasse
+  // redémarrer l'effet caméra à chaque re-render du parent.
+  const onDecodedRef = useRef(onDecoded);
+  onDecodedRef.current = onDecoded;
+
+  // `stop()` de html5-qrcode lance une exception SYNCHRONE ("Cannot stop,
+  // scanner is not running or paused.") si le scanner n'est pas en cours :
+  // un `.catch()` sur la promesse ne suffit pas, d'où la garde sur getState()
+  // + try/catch (l'état peut encore changer entre le test et l'appel).
+  function safeStop(scanner: Html5Qrcode) {
+    try {
+      const states = stateEnumRef.current;
+      const state = scanner.getState();
+      if (states && (state === states.SCANNING || state === states.PAUSED)) {
+        scanner.stop().then(() => scanner.clear()).catch((err) => {
+          console.warn('Arrêt du scanner ignoré :', err);
+        });
+      }
+    } catch (err) {
+      console.warn('Arrêt du scanner ignoré :', err);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -24,9 +49,10 @@ export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
     let cancelled = false;
 
     (async () => {
-      const { Html5Qrcode } = await import('html5-qrcode');
+      const { Html5Qrcode, Html5QrcodeScannerState } = await import('html5-qrcode');
       if (cancelled) return;
 
+      stateEnumRef.current = Html5QrcodeScannerState;
       const scanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
       scannerRef.current = scanner;
 
@@ -35,8 +61,8 @@ export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText: string) => {
-            onDecoded(decodedText);
-            void scanner.stop().then(() => scanner.clear()).catch(() => {});
+            onDecodedRef.current(decodedText);
+            safeStop(scanner);
             setOpen(false);
           },
           () => {
@@ -53,11 +79,12 @@ export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
       cancelled = true;
       const scanner = scannerRef.current;
       if (scanner) {
-        scanner.stop().then(() => scanner.clear()).catch(() => {});
+        safeStop(scanner);
         scannerRef.current = null;
       }
     };
-  }, [open, onDecoded]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
     <>
