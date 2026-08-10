@@ -7,6 +7,7 @@ import RentalCheckoutClient from './RentalCheckoutClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   params: { slug: string };

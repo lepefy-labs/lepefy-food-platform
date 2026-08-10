@@ -18,6 +18,7 @@ import type { EventReservationStatus } from '@lepefy/types';
 // aucune redemption ici — celle-ci reste exclusivement dans le scanner admin
 // authentifié (/admin/evenementiel/scan → RPC redeem_event_reservation).
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface ReservationRow {
   id: string;

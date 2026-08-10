@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+
+function revalidateEventPaths(eventSlug: string | undefined) {
+  if (!eventSlug) return;
+  revalidatePath(`/evenementiel/evenements/${eventSlug}`);
+  revalidatePath('/evenementiel');
+}
 
 const EDITABLE_FIELDS = ['label', 'description', 'price', 'sort_order', 'active'] as const;
 
@@ -31,10 +38,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { ticketId: 
     .update(patch)
     .eq('id', params.ticketId)
     .eq('tenant_id', tenant.id)
-    .select('*')
+    .select('*, events(slug)')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const patchedEventSlug = (data.events as unknown as { slug?: string } | null)?.slug;
+  revalidateEventPaths(patchedEventSlug);
+  delete data.events;
 
   return NextResponse.json(data);
 }
@@ -47,6 +58,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: { ticketId
   if (denied) return denied;
 
   const supabase = createServiceClient();
+
+  const { data: ticketRow } = await supabase
+    .from('event_ticket_types')
+    .select('events(slug)')
+    .eq('id', params.ticketId)
+    .eq('tenant_id', tenant.id)
+    .maybeSingle();
+  const eventSlug = (ticketRow?.events as unknown as { slug?: string } | null)?.slug;
 
   const { count } = await supabase
     .from('event_reservation_items')
@@ -65,6 +84,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { ticketId
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    revalidateEventPaths(eventSlug);
     return NextResponse.json({ success: true, deactivated: true, ticketType: data });
   }
 
@@ -76,5 +96,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { ticketId
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  revalidateEventPaths(eventSlug);
   return NextResponse.json({ success: true, deactivated: false });
 }

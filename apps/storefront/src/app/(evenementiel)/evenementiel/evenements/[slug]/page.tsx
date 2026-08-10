@@ -8,6 +8,7 @@ import EventCheckoutClient from './EventCheckoutClient';
 import type { EventRow, EventTicketType } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   params: { slug: string };

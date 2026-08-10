@@ -1,6 +1,7 @@
 import EventConfirmationClient from './EventConfirmationClient';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   searchParams: { payment_intent?: string };

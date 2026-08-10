@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: event } = await supabase
     .from('events')
-    .select('id')
+    .select('id, slug')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .maybeSingle();
@@ -53,6 +54,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  revalidatePath(`/evenementiel/evenements/${event.slug}`);
+  revalidatePath('/evenementiel');
 
   return NextResponse.json(data, { status: 201 });
 }

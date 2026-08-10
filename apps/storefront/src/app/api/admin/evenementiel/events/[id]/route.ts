@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
@@ -118,6 +119,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  revalidatePath(`/evenementiel/evenements/${data.slug}`);
+  revalidatePath('/evenementiel');
+
   return NextResponse.json(data);
 }
 
@@ -142,6 +146,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     );
   }
 
+  const { data: eventRow } = await supabase
+    .from('events')
+    .select('slug')
+    .eq('id', params.id)
+    .eq('tenant_id', tenant.id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from('events')
     .delete()
@@ -149,6 +160,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     .eq('tenant_id', tenant.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (eventRow) revalidatePath(`/evenementiel/evenements/${eventRow.slug}`);
+  revalidatePath('/evenementiel');
 
   return NextResponse.json({ success: true });
 }
