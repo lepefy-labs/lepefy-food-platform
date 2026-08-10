@@ -42,7 +42,7 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
             className="text-sm font-semibold px-5 py-2.5 rounded-[10px] transition-transform hover:-translate-y-0.5"
             style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}
           >
-            Réserver
+            Calendrier événement
           </a>
         </nav>
       </div>

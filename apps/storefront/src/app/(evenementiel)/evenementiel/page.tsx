@@ -139,7 +139,7 @@ export default async function EvenementielHubPage() {
                   <Link
                     key={event.id}
                     href={`/evenementiel/evenements/${event.slug}`}
-                    className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+                    className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
                   >
                     <div
                       className="h-36 bg-gray-100 bg-cover bg-center flex items-end p-3"
@@ -168,10 +168,10 @@ export default async function EvenementielHubPage() {
                         </p>
                       )}
                       <span
-                        className="text-xs font-semibold inline-flex items-center gap-1 group-hover:gap-1.5 transition-all"
-                        style={{ color: 'var(--color-primary)' }}
+                        className="text-[13px] font-semibold flex items-center justify-center gap-1.5 text-white rounded-[10px] mt-1 py-2.5 transition-colors group-hover:[background-color:var(--color-primary-dark)]"
+                        style={{ backgroundColor: 'var(--color-primary)' }}
                       >
-                        Voir les formules <IconArrowRight size={13} />
+                        Réserve ta place <IconArrowRight size={14} />
                       </span>
                     </div>
                   </Link>

@@ -98,29 +98,15 @@ export default function EventConfirmationClient({ paymentIntentId }: { paymentIn
 
   const { reservation, event } = data;
 
-  // Fichier .ics généré côté client — aucune dépendance, même approche
-  // blob+download que les exports admin.
-  function addToCalendar() {
-    if (!event || !reservation) return;
-    const ics = [
-      'BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT',
-      `SUMMARY:${event.title}`,
-      event.location ? `LOCATION:${event.location.replace(/,/g, '\\,')}` : '',
-      `DTSTART:${new Date(event.date_start).toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
-      `DESCRIPTION:Réf. #${reservation.id.slice(0, 8).toUpperCase()} — ${reservation.quantity_total} place(s)`,
-      'END:VEVENT', 'END:VCALENDAR',
-    ].filter(Boolean).join('\r\n');
-    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${event.title.replace(/\s+/g, '-').toLowerCase()}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
   const remaining = reservation?.quantity_remaining ?? 0;
+
+  // Génération .ics et PDF déplacée côté serveur (/api/events/reservation-ics,
+  // /api/events/reservation-pdf) — les anciens patterns Blob+createObjectURL
+  // et window.print() sont connus pour échouer sur iOS Safari lorsque
+  // l'app tourne en PWA installée standalone (manifest.ts, display:
+  // 'standalone'). Navigation HTTP directe, fonctionne quel que soit le mode.
+  const icsHref = reservation ? `/api/events/reservation-ics?token=${encodeURIComponent(reservation.qr_token)}` : undefined;
+  const pdfHref = reservation ? `/api/events/reservation-pdf?token=${encodeURIComponent(reservation.qr_token)}` : undefined;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-10">
@@ -199,19 +185,19 @@ export default function EventConfirmationClient({ paymentIntentId }: { paymentIn
       </div>
 
       <div className="no-print flex flex-wrap gap-3 mt-6">
-        <button
-          onClick={addToCalendar}
+        <a
+          href={icsHref}
           className="flex-1 min-w-[190px] h-12 rounded-xl border-[1.5px] border-gray-300 bg-white text-sm font-semibold text-gray-900 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
         >
           <IconCalendarPlus size={16} /> Ajouter au calendrier
-        </button>
-        <button
-          onClick={() => window.print()}
+        </a>
+        <a
+          href={pdfHref}
           className="flex-1 min-w-[190px] h-12 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 hover:-translate-y-px transition-transform"
           style={{ background: 'var(--color-primary)' }}
         >
           <IconDownload size={16} /> Télécharger le billet
-        </button>
+        </a>
       </div>
 
       <p className="no-print text-[13px] text-gray-500 text-center my-6">
