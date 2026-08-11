@@ -4,6 +4,12 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import type { ShippingDiscountType } from '@lepefy/types';
 
+// Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
+// Data Cache non disattivata da force-dynamic da solo, confermato in
+// produzione su evenementiel/scan/[token]/route.ts, 11/08).
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export const runtime = 'nodejs';
 
 const VALID_DISCOUNT_TYPES: ShippingDiscountType[] = ['percentage', 'fixed'];

@@ -7,6 +7,12 @@ import type { ServiceOfferingType, ServiceCtaType } from '@lepefy/types';
 const VALID_TYPES: ServiceOfferingType[] = ['traiteur', 'location_materiel', 'autre'];
 const VALID_CTA_TYPES: ServiceCtaType[] = ['devis', 'reservation'];
 
+// Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
+// Data Cache non disattivata da force-dynamic da solo, confermato in
+// produzione su evenementiel/scan/[token]/route.ts, 11/08).
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export async function GET() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);

@@ -3,6 +3,12 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 
+// Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
+// Data Cache non disattivata da force-dynamic da solo, confermato in
+// produzione su evenementiel/scan/[token]/route.ts, 11/08).
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 // Lookup carte fidélité → nom + solde, pour confirmation visuelle avant
 // d'attribuer des points (éviter de créditer la mauvaise personne).
 // Accessible à tenant_admin ET tenant_cashier (047) — seule route où le
