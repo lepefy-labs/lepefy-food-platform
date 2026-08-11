@@ -121,6 +121,14 @@ export function ScanClient({ eventsEnabled }: { eventsEnabled: boolean }) {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 409 && data.reservationItemId) {
+          // loadPreview() efface error/deltas au démarrage — on définit donc
+          // ce message explicatif seulement après son retour, sinon il serait
+          // écrasé par son propre setError(null).
+          await loadPreview(qrToken);
+          setError('Cette formule a été mise à jour entre-temps (peut-être validée sur un autre appareil) — les données ont été rafraîchies.');
+          return;
+        }
         setError(data.error ?? 'Erreur lors de la validation.');
         return;
       }

@@ -34,6 +34,16 @@ export interface ScanPreviewItem {
 
 // Lecture seule : renvoie la réservation + l'état de redemption par formule,
 // consommé par le step "preview" de ScanClient (avant confirmation du delta).
+//
+// force-dynamic + fetchCache=force-no-store : sans ça, un second scan du même
+// QR juste après une redemption peut resservir la réponse GET du scan
+// précédent (formule affichée comme encore consommable alors qu'elle vient
+// d'être consommée) — même famille de bug déjà rencontrée sur une page
+// publique événement qui se figeait après écriture ; règle à étendre aux
+// Route Handlers admin qui relisent des données qu'elles viennent d'écrire.
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
