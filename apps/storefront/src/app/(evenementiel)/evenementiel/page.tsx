@@ -5,7 +5,10 @@ import { IconCalendarEvent, IconMapPin, IconChefHat, IconTools, IconArrowRight }
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatDate, formatPrice } from '@/lib/utils/format';
+import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import type { EventRow, ServiceOffering, EventGalleryPhoto } from '@lepefy/types';
+
+type EventPhotoRef = Pick<EventGalleryPhoto, 'event_id' | 'image_url'>;
 
 export const revalidate = 120;
 
@@ -28,7 +31,7 @@ export default async function EvenementielHubPage() {
 
   const supabase = createPublicClient();
 
-  const [eventsRes, servicesRes, galleryRes] = await Promise.all([
+  const [eventsRes, servicesRes, galleryRes, eventPhotosRes] = await Promise.all([
     tenant.events_enabled
       ? supabase
           .from('events')
@@ -54,11 +57,34 @@ export default async function EvenementielHubPage() {
           .order('sort_order', { ascending: true })
           .limit(8)
       : Promise.resolve({ data: [] as EventGalleryPhoto[] }),
+    // Photos multi-image par événement (carousel auto-fade des cards) — pas de
+    // filtre .in(event_id) ici : les ids des events du Promise.all voisin ne
+    // sont pas encore connus au moment de construire cette requête (même
+    // Promise.all = exécution parallèle, pas séquentielle). On récupère donc
+    // toutes les photos rattachées à un événement pour ce tenant et on
+    // regroupe par event_id en JS ci-dessous ; les events non retournés
+    // ci-dessus (brouillon, passés) ne seront simplement jamais lookup.
+    tenant.events_enabled
+      ? supabase
+          .from('event_gallery_photos')
+          .select('event_id, image_url')
+          .eq('tenant_id', tenant.id)
+          .not('event_id', 'is', null)
+          .order('sort_order', { ascending: true })
+      : Promise.resolve({ data: [] as EventPhotoRef[] }),
   ]);
 
   const events   = (eventsRes.data ?? []) as EventRow[];
   const services = (servicesRes.data ?? []) as ServiceOffering[];
   const gallery  = (galleryRes.data ?? []) as EventGalleryPhoto[];
+
+  const photosByEvent = new Map<string, string[]>();
+  for (const photo of (eventPhotosRes.data ?? []) as EventPhotoRef[]) {
+    if (!photo.event_id) continue;
+    const list = photosByEvent.get(photo.event_id) ?? [];
+    list.push(photo.image_url);
+    photosByEvent.set(photo.event_id, list);
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f9f8]">
@@ -135,25 +161,25 @@ export default async function EvenementielHubPage() {
               </p>
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {events.map((event) => (
+                {events.map((event) => {
+                  const eventImages = photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : []);
+                  return (
                   <Link
                     key={event.id}
                     href={`/evenementiel/evenements/${event.slug}`}
                     className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
                   >
-                    <div
-                      className="h-36 bg-gray-100 bg-cover bg-center flex items-end p-3"
-                      style={{
-                        backgroundImage: event.banner_image_url ? `url(${event.banner_image_url})` : undefined,
-                        backgroundColor: event.banner_image_url ? undefined : 'var(--color-primary-light)',
-                      }}
+                    <EventImageFader
+                      images={eventImages}
+                      fallbackColor="var(--color-primary-light)"
+                      className="h-36 bg-gray-100 flex items-end p-3"
                     >
                       {event.capacity_remaining <= 0 && (
                         <span className="text-2xs font-semibold px-2 py-1 rounded-full bg-white/90 text-red-600">
                           Complet
                         </span>
                       )}
-                    </div>
+                    </EventImageFader>
                     <div className="p-4">
                       <p
                         className="text-2xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1"
@@ -175,7 +201,8 @@ export default async function EvenementielHubPage() {
                       </span>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

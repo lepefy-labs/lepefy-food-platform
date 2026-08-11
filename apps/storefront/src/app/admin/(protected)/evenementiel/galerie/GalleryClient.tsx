@@ -2,13 +2,28 @@
 
 import { useRef, useState } from 'react';
 import { IconUpload, IconTrash } from '@tabler/icons-react';
-import type { EventGalleryPhoto } from '@lepefy/types';
+import { formatDate } from '@/lib/utils/format';
+import type { EventGalleryPhoto, EventRow } from '@lepefy/types';
 
-export default function GalleryClient({ initialPhotos }: { initialPhotos: EventGalleryPhoto[] }) {
+export type GalleryEventOption = Pick<EventRow, 'id' | 'title' | 'date_start'>;
+
+const SELECT_CLS =
+  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
+const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+
+interface GalleryClientProps {
+  initialPhotos: EventGalleryPhoto[];
+  events: GalleryEventOption[];
+}
+
+export default function GalleryClient({ initialPhotos, events }: GalleryClientProps) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const eventTitleById = new Map(events.map((event) => [event.id, event.title]));
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -30,7 +45,7 @@ export default function GalleryClient({ initialPhotos }: { initialPhotos: EventG
       const createRes = await fetch('/api/admin/evenementiel/gallery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: uploadResult.imageUrl }),
+        body: JSON.stringify({ image_url: uploadResult.imageUrl, event_id: selectedEventId || null }),
       });
       const createResult = await createRes.json();
       if (!createRes.ok) {
@@ -52,13 +67,32 @@ export default function GalleryClient({ initialPhotos }: { initialPhotos: EventG
 
   return (
     <div className="space-y-4">
-      <label
-        className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white cursor-pointer w-fit disabled:opacity-50"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
-        <IconUpload size={16} /> {uploading ? 'Téléversement…' : 'Ajouter une photo'}
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={uploading} />
-      </label>
+      <div className="flex flex-wrap items-end gap-3">
+        <label
+          className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white cursor-pointer w-fit disabled:opacity-50"
+          style={{ backgroundColor: 'var(--color-primary)' }}
+        >
+          <IconUpload size={16} /> {uploading ? 'Téléversement…' : 'Ajouter une photo'}
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={uploading} />
+        </label>
+
+        <div className="w-full sm:w-72">
+          <label className={LABEL_CLS} htmlFor="gallery-event-select">Associer à un événement (optionnel)</label>
+          <select
+            id="gallery-event-select"
+            value={selectedEventId}
+            onChange={(e) => setSelectedEventId(e.target.value)}
+            className={SELECT_CLS}
+          >
+            <option value="">Aucun (galerie générale)</option>
+            {events.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.title} — {formatDate(event.date_start)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {error && <p className="text-red-500 text-xs">{error}</p>}
 
@@ -72,6 +106,11 @@ export default function GalleryClient({ initialPhotos }: { initialPhotos: EventG
             <div key={photo.id} className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100 group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.image_url} alt={photo.caption ?? ''} className="w-full h-full object-cover" />
+              {photo.event_id && eventTitleById.get(photo.event_id) && (
+                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-2xs px-2 py-1 truncate">
+                  {eventTitleById.get(photo.event_id)}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => handleDelete(photo.id)}

@@ -5,6 +5,7 @@ import { IconCalendarEvent, IconMapPin, IconUsers } from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatDate } from '@/lib/utils/format';
+import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import EventCheckoutClient from './EventCheckoutClient';
 import type { EventRow, EventTicketType } from '@lepefy/types';
 
@@ -59,6 +60,17 @@ export default async function EventDetailPage({ params }: PageProps) {
   const ticketTypes = (ticketTypesRaw ?? []) as EventTicketType[];
   const soldOut = eventRow.capacity_remaining <= 0;
 
+  const { data: eventPhotosRaw } = await supabase
+    .from('event_gallery_photos')
+    .select('image_url')
+    .eq('tenant_id', tenant.id)
+    .eq('event_id', eventRow.id)
+    .order('sort_order', { ascending: true });
+
+  const eventImages = eventPhotosRaw && eventPhotosRaw.length > 0
+    ? eventPhotosRaw.map((photo) => photo.image_url as string)
+    : [eventRow.banner_image_url].filter((url): url is string => Boolean(url));
+
   // Palette scoped à CET événement — fallback tenant si l'évent n'a pas de
   // thème dédié. Portée volontairement limitée à ce root div (hero + contenu
   // + EventCheckoutClient) : EventsHeader/EventsFooter sont rendus par
@@ -75,12 +87,10 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-[#f7f9f8]" style={eventThemeStyle}>
-      <div
-        className="h-48 sm:h-64 bg-cover bg-center flex items-end"
-        style={{
-          backgroundImage: eventRow.banner_image_url ? `url(${eventRow.banner_image_url})` : undefined,
-          backgroundColor: eventRow.banner_image_url ? undefined : 'var(--color-primary)',
-        }}
+      <EventImageFader
+        images={eventImages}
+        fallbackColor="var(--color-primary)"
+        className="h-48 sm:h-64 flex items-end"
       />
 
       <div className="max-w-2xl mx-auto px-4 py-6">
