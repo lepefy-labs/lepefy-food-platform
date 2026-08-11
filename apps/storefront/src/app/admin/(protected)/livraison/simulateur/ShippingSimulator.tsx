@@ -129,6 +129,23 @@ interface CountryRulePayload {
   amountMissingForFreeShipping: number | null;
 }
 
+interface SeparateParcel {
+  parcelIndex: number;
+  weightG:     number;
+  carrierName: string;
+  serviceName: string;
+  basePrice:   number;
+  vatAmount:   number;
+}
+
+interface ComparisonPayload {
+  available:       boolean;
+  groupedTotal:    number | null;
+  separateTotal:   number | null;
+  separateParcels: SeparateParcel[] | null;
+  savings:         number | null;
+}
+
 interface SimulatorResult {
   available: boolean;
   reason?:   'provider_not_packlink' | 'packlink_error' | 'no_service';
@@ -141,6 +158,7 @@ interface SimulatorResult {
   chosenServiceId?:    number | null;
   countryRule?:        CountryRulePayload;
   finalCustomerPrice?: number | null;
+  comparison?:         ComparisonPayload;
 }
 
 function exclusionLabel(reason: 'dropoff' | 'b2b' | null): string {
@@ -355,6 +373,67 @@ export function ShippingSimulator({ shippingProvider, currency }: ShippingSimula
               <p className="text-xs text-gray-400">Aucune règle pays spécifique — calcul standard.</p>
             )}
           </section>
+
+          {result.comparison && (result.input?.numParcels ?? 0) > 1 && (
+            <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-3">
+                Comparaison : envoi groupé vs colis séparés
+              </p>
+
+              {!result.comparison.available && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Comparaison indisponible : un des colis n&apos;a aucun service éligible séparément.
+                </p>
+              )}
+
+              {result.comparison.available && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div
+                      className={`rounded-lg border p-3 ${
+                        result.comparison.savings != null && result.comparison.savings < 0
+                          ? 'border-green-300 bg-green-50 dark:bg-green-950/30'
+                          : 'border-gray-200 dark:border-gray-800'
+                      }`}
+                    >
+                      <p className="text-2xs uppercase tracking-wide text-gray-400 mb-1">Groupé (actuel)</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {result.comparison.groupedTotal != null ? formatPrice(result.comparison.groupedTotal, currency) : '—'}
+                      </p>
+                    </div>
+                    <div
+                      className={`rounded-lg border p-3 ${
+                        result.comparison.savings != null && result.comparison.savings > 0
+                          ? 'border-green-300 bg-green-50 dark:bg-green-950/30'
+                          : 'border-gray-200 dark:border-gray-800'
+                      }`}
+                    >
+                      <p className="text-2xs uppercase tracking-wide text-gray-400 mb-1">Colis séparés</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                        {result.comparison.separateTotal != null ? formatPrice(result.comparison.separateTotal, currency) : '—'}
+                      </p>
+                      <ul className="space-y-1">
+                        {result.comparison.separateParcels?.map((p) => (
+                          <li key={p.parcelIndex} className="text-2xs text-gray-500 dark:text-gray-400">
+                            Colis {p.parcelIndex + 1} ({(p.weightG / 1000).toFixed(2)} kg) — {p.carrierName || '—'} · {p.serviceName || '—'} —{' '}
+                            {formatPrice(p.basePrice + p.vatAmount, currency)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {result.comparison.savings != null && (
+                    <p className={`text-sm font-medium ${result.comparison.savings > 0 ? 'text-green-700' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {result.comparison.savings > 0
+                        ? `Économie potentielle : ${formatPrice(result.comparison.savings, currency)}`
+                        : 'Le groupé reste plus économique.'}
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+          )}
         </>
       )}
     </div>

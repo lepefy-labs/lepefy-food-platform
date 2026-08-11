@@ -279,6 +279,101 @@ export async function POST(req: NextRequest) {
     };
   }
 
+  // ── Comparaison "envoi groupé" (ci-dessus) vs "colis séparés" ────────────
+  // Simulateur uniquement — aucune incidence sur le flux de checkout réel.
+  // N'a de sens que pour numParcels > 1 (avec un seul colis les deux modes
+  // sont strictement identiques).
+  let comparison: {
+    available:       boolean;
+    groupedTotal:    number | null;
+    separateTotal:   number | null;
+    separateParcels: Array<{
+      parcelIndex:  number;
+      weightG:      number;
+      carrierName:  string;
+      serviceName:  string;
+      basePrice:    number;
+      vatAmount:    number;
+    }> | null;
+    savings: number | null;
+  } | undefined;
+
+  if (numParcels > 1) {
+    const separateParcels: Array<{
+      parcelIndex: number;
+      weightG:     number;
+      carrierName: string;
+      serviceName: string;
+      basePrice:   number;
+      vatAmount:   number;
+    }> = [];
+    let separateAvailable = true;
+
+    for (let i = 0; i < parcelWeightsG.length; i++) {
+      const weightG = parcelWeightsG[i]!;
+      const singleParcelServices = await fetchAllPacklinkServices(
+        packlinkApiKey, FROM_ADDRESS, to,
+        [{
+          weight: parseFloat((weightG / 1000).toFixed(3)),
+          width:  boxDimensions.width,
+          height: boxDimensions.height,
+          length: boxDimensions.length,
+        }],
+      );
+
+      const eligibleForParcel = (singleParcelServices ?? []).filter(isEligibleService);
+      const cheapestForParcel = eligibleForParcel.length > 0
+        ? eligibleForParcel.reduce((min, s) => (s.price.base_price < min.price.base_price ? s : min))
+        : null;
+
+      if (!cheapestForParcel) {
+        separateAvailable = false;
+        break;
+      }
+
+      const { carrierName, serviceName } = describePacklinkService(cheapestForParcel);
+      const basePrice = cheapestForParcel.price.base_price;
+      const taxPrice  = cheapestForParcel.price.tax_price ?? 0;
+      const vatAmount = taxPrice > 0
+        ? parseFloat(taxPrice.toFixed(2))
+        : parseFloat((basePrice * resolveVatRate(country, vatRates)).toFixed(2));
+
+      separateParcels.push({
+        parcelIndex: i,
+        weightG,
+        carrierName,
+        serviceName,
+        basePrice,
+        vatAmount,
+      });
+    }
+
+    if (separateAvailable) {
+      const separateTotal = parseFloat(
+        (
+          separateParcels.reduce((sum, p) => sum + p.basePrice + p.vatAmount, 0)
+          + packagingSurchargeTotal
+        ).toFixed(2),
+      );
+
+      comparison = {
+        available:       true,
+        groupedTotal:    finalCustomerPrice,
+        separateTotal,
+        separateParcels,
+        savings:         finalCustomerPrice != null ? parseFloat((finalCustomerPrice - separateTotal).toFixed(2)) : null,
+      };
+    } else {
+      comparison = {
+        available:       false,
+        groupedTotal:    finalCustomerPrice,
+        separateTotal:   null,
+        separateParcels: null,
+        savings:         null,
+      };
+    }
+  }
+
   return NextResponse.json({
     available: true,
     input: {
@@ -290,5 +385,6 @@ export async function POST(req: NextRequest) {
     chosenServiceId: cheapest?.id ?? null,
     countryRule: countryRulePayload,
     finalCustomerPrice,
+    comparison,
   });
 }
