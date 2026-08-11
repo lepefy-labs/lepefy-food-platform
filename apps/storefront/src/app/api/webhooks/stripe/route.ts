@@ -3,10 +3,10 @@ import crypto from 'crypto';
 import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { generateEventQrToken } from '@/lib/events/qrToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
+import { createOrderFromCheckoutSession, type CheckoutSessionRow } from '@/lib/orders/createOrderFromCheckoutSession';
 import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -423,29 +423,7 @@ export async function POST(req: NextRequest) {
       .from('checkout_sessions')
       .select('*')
       .eq('id', sessionId)
-      .maybeSingle() as {
-        data: {
-          id:               string;
-          tenant_id:        string;
-          customer_id:      string | null;
-          email:            string;
-          full_name:        string | null;
-          phone:            string | null;
-          fulfillment_type: 'delivery' | 'pickup';
-          shipping_address: Record<string, unknown> | null;
-          shipping_details: Record<string, unknown> | null;
-          shipping_total:   number;
-          ambassador_discount_amount: number | null;
-          items: {
-            productId:    string | null;
-            name:         string;
-            price:        number;
-            quantity:     number;
-            storage_type: 'dry' | 'fresh' | 'frozen' | null;
-          }[];
-        } | null;
-        error: unknown;
-      };
+      .maybeSingle() as { data: CheckoutSessionRow | null; error: unknown };
 
     if (sessionError) {
       console.error('[webhook] Error fetching checkout_session:', sessionError);
@@ -467,222 +445,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ── Compute totals ───────────────────────────────────────────────────────
-    // ambassador_discount_amount vient de checkout_sessions, PAS recalculé
-    // ici : c'est la valeur déjà figée au moment de créer le PaymentIntent
-    // (POST /api/checkout) — le client a payé exactement ce montant, le
-    // recalculer ici risquerait un drift si l'état (première commande,
-    // config tenant) a changé entre les deux étapes.
-    const items              = checkoutSession.items ?? [];
-    const subtotal           = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const ambassadorDiscount = checkoutSession.ambassador_discount_amount ?? 0;
-    const total              = subtotal + (checkoutSession.shipping_total ?? 0) - ambassadorDiscount;
-
-    console.info('[webhook] Creating order — tenant:', resolvedTenantId,
-      '— subtotal:', subtotal, '— total:', total);
-
-    // ── Create order ─────────────────────────────────────────────────────────
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        tenant_id:                 resolvedTenantId,
-        customer_id:               checkoutSession.customer_id ?? null,
-        email:                     checkoutSession.email,
-        full_name:                 checkoutSession.full_name ?? null,
-        fulfillment_type:          checkoutSession.fulfillment_type,
-        shipping_address:          checkoutSession.shipping_address ?? null,
-        shipping_details:          checkoutSession.shipping_details ?? null,
-        subtotal,
-        shipping_cost:             checkoutSession.shipping_total ?? 0,
-        total,
-        ambassador_discount_amount: ambassadorDiscount,
-        payment_method:            'stripe',
-        payment_status:            'paid',
-        stripe_payment_intent_id:  intent.id,
-        status:                    'preparing',
-        notes:                     checkoutSession.phone ? `Téléphone: ${checkoutSession.phone}` : null,
-      })
-      .select('id')
-      .single();
-
-    if (orderError || !order) {
-      // 23505 = unique_violation su stripe_payment_intent_id: un retry
-      // concorrente ha già creato l'ordine — non è un errore.
-      if ((orderError as { code?: string } | null)?.code === '23505') {
-        console.info('[webhook] Order already created by concurrent retry — intent:', intent.id);
-        return NextResponse.json({ received: true });
-      }
-      console.error('[webhook] Failed to create order:', orderError);
-      return NextResponse.json({ received: true });
-    }
-
-    console.info('[webhook] Order created — id:', order.id);
-
-    // ── Décrément atomique du stock (confirmation définitive du paiement) ────
-    // Le paiement Stripe est déjà capturé à ce stade — en cas d'échec on ne
-    // peut plus rejeter la commande, cf. bloc "stock conflict" plus bas.
-    const stockByProduct = new Map<string, number>();
-    for (const i of items) {
-      if (!i.productId) continue;
-      stockByProduct.set(i.productId, (stockByProduct.get(i.productId) ?? 0) + i.quantity);
-    }
-    const stockDecrementItems = Array.from(stockByProduct.entries()).map(
-      ([productId, quantity]) => ({ product_id: productId, quantity }),
+    const result = await createOrderFromCheckoutSession(
+      supabase,
+      { ...checkoutSession, tenant_id: resolvedTenantId },
+      { stripePaymentIntentId: intent.id },
     );
 
-    const { error: stockError } = await supabase.rpc('decrement_stock_for_order', {
-      items: stockDecrementItems,
-    });
-
-    if (stockError) {
-      console.error('[webhook] Stock decrement failed AFTER payment capture — order:', order.id,
-        '— reason:', stockError.message);
-    } else {
-      console.info('[webhook] Stock decremented — order:', order.id);
-    }
-
-    // ── Insert order_items ───────────────────────────────────────────────────
-    // Fait dans tous les cas (succès ou conflit) : trace de ce qui a été
-    // commandé, nécessaire pour le remboursement/diagnostic ci-dessous.
-    const orderItemsPayload = items.map((i) => ({
-      order_id:     order.id,
-      tenant_id:    resolvedTenantId,
-      product_id:   i.productId ?? null,
-      name:         i.name,
-      price:        i.price,
-      quantity:     i.quantity,
-      subtotal:     i.price * i.quantity,
-      storage_type: i.storage_type ?? 'dry',
-    }));
-
-    const { error: itemsError } = await (supabase as unknown as {
-      from(table: 'order_items'): {
-        insert(data: unknown[]): Promise<{ error: unknown }>;
-      };
-    }).from('order_items').insert(orderItemsPayload);
-
-    if (itemsError) {
-      console.error('[webhook] Failed to insert order_items:', itemsError,
-        '— order_id:', order.id);
-    } else {
-      console.info('[webhook] order_items inserted —', orderItemsPayload.length, 'rows');
-    }
-
-    // ── Delete checkout_session ──────────────────────────────────────────────
-    const { error: deleteError } = await supabase
-      .from('checkout_sessions')
-      .delete()
-      .eq('id', sessionId);
-
-    if (deleteError) {
-      console.warn('[webhook] Failed to delete checkout_session:', deleteError,
-        '— id:', sessionId);
-    } else {
-      console.info('[webhook] checkout_session deleted — id:', sessionId);
-    }
-
-    // ── Cas conflit de stock post-paiement : remboursement + alerte admin ────
-    // Le client a déjà payé (Stripe) mais on ne peut pas honorer la commande.
-    // Pas de rejet possible ici — on rembourse automatiquement et on marque
-    // la commande pour intervention manuelle. Aucune notification client
-    // automatique dans ce prompt (texte à valider avec Dalice — hors scope).
-    if (stockError) {
-      let refundSucceeded = false;
-      try {
-        const refund = await stripe.refunds.create({ payment_intent: intent.id });
-        refundSucceeded = true;
-        console.info('[webhook] Refund issued — order:', order.id, '— refund id:', refund.id);
-      } catch (refundErr) {
-        console.error('[webhook] Refund FAILED — order:', order.id, '— needs manual refund:', refundErr);
-      }
-
-      const { error: statusUpdateError } = await supabase
-        .from('orders')
-        .update({
-          status:         'stock_conflict',
-          payment_status: refundSucceeded ? 'refunded' : 'paid',
-        })
-        .eq('id', order.id);
-
-      if (statusUpdateError) {
-        console.error('[webhook] Failed to mark order as stock_conflict:', statusUpdateError,
-          '— order:', order.id);
-      }
-
-      if (process.env.N8N_WEBHOOK_URL) {
-        try {
-          const storefrontUrl  = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-          const adminOrderLink = `${storefrontUrl}/admin/orders/${order.id}`;
-
-          const n8nConflictPayload = {
-            orderId:         order.id,
-            email:           checkoutSession.email,
-            fullName:        checkoutSession.full_name ?? '',
-            total,
-            reason:          stockError.message, // "insufficient_stock:<product_id>"
-            refundSucceeded,
-            adminOrderLink,
-          };
-
-          console.info('[webhook] Notifying n8n (stock conflict) — url:',
-            `${process.env.N8N_WEBHOOK_URL}/webhook/order-stock-conflict`);
-
-          const n8nRes = await fetch(
-            `${process.env.N8N_WEBHOOK_URL}/webhook/order-stock-conflict`,
-            {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify(n8nConflictPayload),
-            },
-          );
-
-          console.info('[webhook] n8n (stock conflict) response status:', n8nRes.status);
-        } catch (n8nErr) {
-          console.error('[webhook] n8n stock-conflict notification failed:', n8nErr);
-        }
-      } else {
-        console.warn('[webhook] N8N_WEBHOOK_URL not set — skipping stock-conflict admin notification');
-      }
-
+    if ('error' in result) {
+      console.error('[webhook] createOrderFromCheckoutSession failed:', result.error, '— intent:', intent.id);
       return NextResponse.json({ received: true });
     }
 
-    // ── Notify n8n ───────────────────────────────────────────────────────────
-    if (process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
-      try {
-        const trackingToken     = generateTrackingToken(order.id, checkoutSession.email);
-        const storefrontUrl     = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-        const orderTrackingLink = `${storefrontUrl}/orders/${order.id}?token=${trackingToken}`;
-
-        const n8nPayload = {
-          orderId:          order.id,
-          email:            checkoutSession.email,
-          fullName:         checkoutSession.full_name ?? '',
-          total,
-          shippingTotal:    checkoutSession.shipping_total ?? 0,
-          shippingAddress:  checkoutSession.shipping_address ?? null,
-          orderTrackingLink,
-        };
-
-        console.info('[webhook] Notifying n8n — url:',
-          `${process.env.N8N_WEBHOOK_URL}/webhook/order-confirmed`);
-
-        const n8nRes = await fetch(
-          `${process.env.N8N_WEBHOOK_URL}/webhook/order-confirmed`,
-          {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(n8nPayload),
-          },
-        );
-
-        console.info('[webhook] n8n response status:', n8nRes.status);
-      } catch (n8nErr) {
-        console.error('[webhook] n8n notification failed:', n8nErr);
-      }
-    } else {
-      console.warn('[webhook] N8N_WEBHOOK_URL or TRACKING_SECRET not set — skipping n8n');
-    }
+    console.info('[webhook] Order resolved — id:', result.order.id, '— status:', result.order.status);
   }
 
   // ── payment_intent.payment_failed ─────────────────────────────────────────

@@ -78,6 +78,13 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .eq('tenant_id', tenant.id)
     .order('position');
 
+  // Badge sidebar "Commandes" — Phase 1 lien externe (voir PendingPaymentsBanner).
+  const { count: pendingPaymentsCount } = await adminClient
+    .from('checkout_sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenant.id)
+    .eq('payment_method', 'external_link');
+
   return (
     <AdminThemeProvider>
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
@@ -110,7 +117,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
       <div className="flex min-h-[calc(100vh-57px)] bg-gray-50 dark:bg-gray-950">
         <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 px-3 py-2 shrink-0 hidden md:block">
           <Suspense fallback={<div className="w-56 h-full" />}>
-            <AdminSidebar categories={categories ?? []} />
+            <AdminSidebar categories={categories ?? []} pendingPaymentsCount={pendingPaymentsCount ?? 0} />
           </Suspense>
         </aside>
         <main className="flex-1 p-6 min-w-0">{children}</main>

@@ -23,9 +23,10 @@ import {
 
 interface AdminSidebarProps {
   categories: { id: string; name: string; slug: string }[];
+  pendingPaymentsCount?: number;
 }
 
-export default function AdminSidebar({ categories }: AdminSidebarProps) {
+export default function AdminSidebar({ categories, pendingPaymentsCount = 0 }: AdminSidebarProps) {
   const pathname      = usePathname();
   const searchParams  = useSearchParams();
   const activeCategory = searchParams.get('category');
@@ -63,7 +64,13 @@ export default function AdminSidebar({ categories }: AdminSidebarProps) {
           size={16}
           stroke={pathname === '/admin' ? 2 : 1.5}
         />
-        Commandes
+        <span className="flex-1">Commandes</span>
+        {pendingPaymentsCount > 0 && (
+          <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full
+                           bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">
+            {pendingPaymentsCount}
+          </span>
+        )}
       </Link>
 
       <button

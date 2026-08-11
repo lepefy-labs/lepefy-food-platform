@@ -5,7 +5,9 @@ import { getTenant } from '@/lib/tenant/getTenant'
 import { formatPrice } from '@/lib/utils/format'
 import AdminFilters from './AdminFilters'
 import OrdersTable from './OrdersTable'
+import PendingPaymentsBanner from './PendingPaymentsBanner'
 import type { ListOrder } from './OrdersTable'
+import type { PendingPaymentSession } from './PendingPaymentsBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -177,6 +179,18 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   const carriers = ((carriersRaw ?? []) as { name: string }[]).map(c => c.name)
 
+  // ── Paiements en attente (Phase 1 — lien externe) ───────────────────────────
+  // Aucune commande n'existe encore pour ces lignes : simple demande, stock
+  // non réservé — voir bandeau ci-dessous et createOrderFromCheckoutSession.
+  const { data: pendingPaymentsRaw } = await supabase
+    .from('checkout_sessions')
+    .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
+    .eq('tenant_id', tenant.id)
+    .eq('payment_method', 'external_link')
+    .order('created_at', { ascending: true })
+
+  const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -190,6 +204,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
             </p>
           </div>
         </div>
+
+        {/* ── Paiements en attente (Phase 1 — lien externe) ──────────────────── */}
+        {pendingPayments.length > 0 && (
+          <PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} />
+        )}
 
         {/* ── KPI cards ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">

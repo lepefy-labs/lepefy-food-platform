@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/utils/format';
+import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import type { Order, OrderStatus } from '@lepefy/types';
 
 // ─── Translations ─────────────────────────────────────────────────────────────
@@ -242,9 +243,6 @@ export default function OrderDetail({
   const [saving,         setSaving]         = useState(false);
   const [saveMsg,        setSaveMsg]        = useState<string | null>(null);
   const [saveError,      setSaveError]      = useState(false);
-  const [markingPaid,    setMarkingPaid]    = useState(false);
-  const [paidMsg,        setPaidMsg]        = useState<string | null>(null);
-  const [paidError,      setPaidError]      = useState(false);
   const [isPaid,         setIsPaid]         = useState(!isInStorePending);
 
   const t = translations[lang];
@@ -322,28 +320,6 @@ export default function OrderDetail({
     }
   }
 
-  async function handleMarkAsPaid() {
-    setMarkingPaid(true);
-    setPaidMsg(null);
-    setPaidError(false);
-    try {
-      const res = await fetch(`/api/admin/orders/${order.id}`, {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ payment_status: 'paid' }),
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      setPaidMsg(t.markAsPaidOk);
-      setIsPaid(true);
-      router.refresh();
-    } catch {
-      setPaidMsg(t.markAsPaidError);
-      setPaidError(true);
-    } finally {
-      setMarkingPaid(false);
-    }
-  }
-
   const inputClass =
     'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
 
@@ -375,19 +351,16 @@ export default function OrderDetail({
           <p className="text-sm font-semibold text-amber-800 mb-3">
             🏪 {t.pendingPaymentBanner}
           </p>
-          <button
-            onClick={handleMarkAsPaid}
-            disabled={markingPaid}
-            className="w-full py-2.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50 transition-opacity"
-            style={{ backgroundColor: '#D97706' }}
-          >
-            {markingPaid ? t.markingAsPaid : t.markAsPaid}
-          </button>
-          {paidMsg && (
-            <p className={`text-sm mt-2 ${paidError ? 'text-red-600' : 'text-green-700'}`}>
-              {paidMsg}
-            </p>
-          )}
+          <ConfirmPaymentButton
+            mode="in_store"
+            id={order.id}
+            label={t.markAsPaid}
+            confirmingLabel={t.markingAsPaid}
+            onSuccess={() => {
+              setIsPaid(true);
+              router.refresh();
+            }}
+          />
         </section>
       )}
 

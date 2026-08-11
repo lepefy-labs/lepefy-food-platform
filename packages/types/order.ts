@@ -4,10 +4,11 @@ export type OrderStatus =
   | 'ready_for_pickup'
   | 'shipped'
   | 'delivered'
-  | 'cancelled';
+  | 'cancelled'
+  | 'stock_conflict';
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
-export type PaymentMethod = 'stripe' | 'satispay' | 'cash' | 'in_store';
+export type PaymentMethod = 'stripe' | 'satispay' | 'cash' | 'in_store' | 'external_link';
 export type FulfillmentType = 'delivery' | 'pickup';
 
 export interface Order {
@@ -26,6 +27,10 @@ export interface Order {
   payment_method: PaymentMethod | null;
   payment_status: PaymentStatus;
   stripe_payment_intent_id: string | null;
+  /** Snapshot du type de moyen de paiement externe (ex. "paypal") — null si payment_method != external_link. */
+  external_payment_type: string | null;
+  /** Snapshot du label du moyen de paiement externe au moment de la confirmation. */
+  external_payment_label: string | null;
   status: OrderStatus;
   tracking_code: string | null;
   tracking_carrier: string | null;

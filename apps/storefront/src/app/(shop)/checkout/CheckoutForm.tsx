@@ -12,14 +12,29 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import { IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift } from '@tabler/icons-react';
+import {
+  IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift,
+  IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconExternalLink,
+} from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
+import { methodColor } from '@/lib/card/methodColor';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
-import type { Tenant } from '@lepefy/types';
+import { PAYMENT_METHOD_REGISTRY, type Tenant, type TenantPaymentMethod } from '@lepefy/types';
+
+// Même registre d'icônes que DigitalCard/PosterTemplate — un moyen de
+// paiement de tenant_payment_methods peut apparaître aussi bien sur la carte
+// digitale qu'ici, jamais deux jeux d'icônes différents pour la même donnée.
+const PAYMENT_ICONS = {
+  IconBuildingBank,
+  IconCash,
+  IconBrandPaypal,
+  IconQrcode,
+  IconWallet,
+};
 
 // Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
 // Stripe (step === 'payment'), jamais pour un client qui choisit le retrait
@@ -155,7 +170,13 @@ function StripePaymentStep({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
+export default function CheckoutForm({
+  tenant,
+  externalPaymentMethods = [],
+}: {
+  tenant: Tenant;
+  externalPaymentMethods?: TenantPaymentMethod[];
+}) {
   const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
 
@@ -166,6 +187,10 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
   const [step, setStep]                 = useState<'form' | 'payment'>('form');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentMode, setPaymentMode]   = useState<PaymentMode>('stripe');
+  // Décision 6 — disponible en delivery ET pickup, donc distinct de
+  // `paymentMode` (qui ne s'affiche qu'en pickup) : sélectionner un moyen
+  // externe prime sur `paymentMode` au submit, quel que soit fulfillmentType.
+  const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError]   = useState<string | null>(null);
 
@@ -399,7 +424,18 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const payload = {
+      const shippingAddress =
+        fulfillmentType === 'delivery'
+          ? {
+              full_name:   `${data.firstName} ${data.lastName}`,
+              line1:       `${data.street} ${data.houseNumber}`.trim(),
+              city:        data.city,
+              postal_code: data.postal_code,
+              country:     data.country ?? shippingInfo?.country ?? 'IT',
+            }
+          : null;
+
+      const sharedPayload = {
         items: items.map((i) => ({
           productId:    i.product.id,
           name:         i.product.name,
@@ -407,24 +443,48 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
           quantity:     i.quantity,
           storage_type: i.product.storage_type ?? 'dry',
         })),
-        shippingAddress:
-          fulfillmentType === 'delivery'
-            ? {
-                full_name:   `${data.firstName} ${data.lastName}`,
-                line1:       `${data.street} ${data.houseNumber}`.trim(),
-                city:        data.city,
-                postal_code: data.postal_code,
-                country:     data.country ?? shippingInfo?.country ?? 'IT',
-              }
-            : null,
+        shippingAddress,
         fulfillmentType,
         email:           data.email,
         phone:           data.phone ?? null,
         fullName:        `${data.firstName} ${data.lastName}`,
-        shippingTotal:   effectiveShippingTotal,
         shippingDetails: isPickup ? null : shippingDetails,
         quoteToken:      isPickup ? null : quoteToken,
-        paymentMethod:   isPickup ? paymentMode : 'stripe',
+      };
+
+      // ── Paiement via lien externe (PayPal/Revolut/autre) ──────────────────
+      // Route dédiée : aucune commande créée ici, seulement une demande de
+      // paiement en attente (checkout_session external_link).
+      if (selectedExternalMethodId) {
+        const res = await fetch('/api/checkout/external-link', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ ...sharedPayload, externalPaymentMethodId: selectedExternalMethodId }),
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+          setSubmitError(result.error ?? 'Une erreur est survenue.');
+          return;
+        }
+
+        sessionStorage.setItem('lepefy-pending-payment', JSON.stringify({
+          sessionId: result.sessionId,
+          link:      result.link,
+          amount:    result.amount,
+          currency:  result.currency,
+          isPaypal:  result.isPaypal,
+          label:     result.label,
+        }));
+
+        router.push(`/checkout/en-attente?ref=${result.sessionId}`);
+        return;
+      }
+
+      const payload = {
+        ...sharedPayload,
+        shippingTotal: effectiveShippingTotal,
+        paymentMethod: isPickup ? paymentMode : 'stripe',
       };
 
       const res = await fetch('/api/checkout', {
@@ -650,9 +710,9 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setPaymentMode('stripe')}
+                  onClick={() => { setPaymentMode('stripe'); setSelectedExternalMethodId(null); }}
                   className={`flex-1 py-3 px-3 rounded-xl border text-xs font-medium text-center transition-all ${
-                    paymentMode === 'stripe'
+                    paymentMode === 'stripe' && !selectedExternalMethodId
                       ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
@@ -662,9 +722,9 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentMode('in_store')}
+                  onClick={() => { setPaymentMode('in_store'); setSelectedExternalMethodId(null); }}
                   className={`flex-1 py-3 px-3 rounded-xl border text-xs font-medium text-center transition-all ${
-                    paymentMode === 'in_store'
+                    paymentMode === 'in_store' && !selectedExternalMethodId
                       ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
@@ -673,6 +733,50 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
                   Payer en boutique
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Paiement via lien externe (PayPal/Revolut/autre) — disponible en
+              delivery ET pickup (Décision 6), jamais codé en dur par tenant :
+              une entrée par ligne tenant_payment_methods éligible (Task 3). */}
+          {externalPaymentMethods.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Autres moyens de paiement</p>
+              <div className="space-y-2">
+                {externalPaymentMethods.map((pm) => {
+                  const meta  = PAYMENT_METHOD_REGISTRY[pm.method];
+                  const Icon  = PAYMENT_ICONS[meta.iconName];
+                  const color = methodColor(pm.method, 'var(--color-primary)');
+                  const selected = selectedExternalMethodId === pm.id;
+                  return (
+                    <button
+                      key={pm.id}
+                      type="button"
+                      onClick={() => setSelectedExternalMethodId(selected ? null : pm.id)}
+                      className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
+                        selected
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: color }}
+                      >
+                        <Icon size={16} stroke={1.8} className="text-white" />
+                      </span>
+                      <span className="flex-1 text-gray-700">{pm.label ?? meta.label}</span>
+                      <IconExternalLink size={15} className="text-gray-400 flex-shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedExternalMethodId && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Vous serez redirigé vers une page récapitulative avec le lien de paiement —
+                  votre commande sera confirmée dès réception du paiement par la boutique.
+                </p>
+              )}
             </div>
           )}
 
@@ -690,9 +794,11 @@ export default function CheckoutForm({ tenant }: { tenant: Tenant }) {
               ? 'Traitement…'
               : shippingRecalculating
                 ? 'Recalcul des frais de livraison…'
-                : paymentMode === 'in_store'
-                  ? `Confirmer la commande — ${formatPrice(total, tenant.currency)}`
-                  : 'Continuer vers le paiement'
+                : selectedExternalMethodId
+                  ? `Continuer — ${formatPrice(total, tenant.currency)}`
+                  : paymentMode === 'in_store' && isPickup
+                    ? `Confirmer la commande — ${formatPrice(total, tenant.currency)}`
+                    : 'Continuer vers le paiement'
             }
           </button>
         </form>
