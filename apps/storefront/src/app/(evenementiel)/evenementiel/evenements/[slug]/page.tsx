@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { IconCalendarEvent, IconMapPin, IconUsers } from '@tabler/icons-react';
@@ -58,8 +59,22 @@ export default async function EventDetailPage({ params }: PageProps) {
   const ticketTypes = (ticketTypesRaw ?? []) as EventTicketType[];
   const soldOut = eventRow.capacity_remaining <= 0;
 
+  // Palette scoped à CET événement — fallback tenant si l'évent n'a pas de
+  // thème dédié. Portée volontairement limitée à ce root div (hero + contenu
+  // + EventCheckoutClient) : EventsHeader/EventsFooter sont rendus par
+  // (evenementiel)/layout.tsx, en dehors de l'arbre de ce fichier, donc hors
+  // de portée de ce wrapper par construction — ils gardent toujours les
+  // couleurs du tenant.
+  const primaryColor   = eventRow.theme_primary_color   ?? tenant.primary_color;
+  const secondaryColor = eventRow.theme_secondary_color ?? tenant.secondary_color;
+  const eventThemeStyle: CSSProperties = {
+    '--color-primary': primaryColor,
+    '--color-primary-dark': `color-mix(in srgb, ${primaryColor} 75%, black)`,
+    '--color-secondary': secondaryColor,
+  } as CSSProperties;
+
   return (
-    <div className="min-h-screen bg-[#f7f9f8]">
+    <div className="min-h-screen bg-[#f7f9f8]" style={eventThemeStyle}>
       <div
         className="h-48 sm:h-64 bg-cover bg-center flex items-end"
         style={{

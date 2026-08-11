@@ -16,6 +16,10 @@ export interface EventRow {
   capacity_remaining: number;
   status: EventStatus;
   banner_image_url: string | null;
+  // Palette scoped à l'événement (056) — fallback tenant.primary_color /
+  // tenant.secondary_color si null, voir evenements/[slug]/page.tsx.
+  theme_primary_color: string | null;
+  theme_secondary_color: string | null;
   created_at: string;
   updated_at: string;
 }

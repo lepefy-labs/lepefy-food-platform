@@ -75,7 +75,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [step, setStep]   = useState<'select' | 'payment'>('select');
+  const [step, setStep]   = useState<'select' | 'info' | 'payment'>('select');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +109,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     });
   }
 
-  async function handleSubmit() {
+  function handleContinueToInfo() {
     setError(null);
     if (totalQuantity === 0) {
       setError('Sélectionnez au moins une formule.');
@@ -119,6 +119,16 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       setError('Il ne reste pas assez de places pour cette quantité.');
       return;
     }
+    setStep('info');
+  }
+
+  function handleBackToSelect() {
+    setError(null);
+    setStep('select');
+  }
+
+  async function handleSubmit() {
+    setError(null);
     if (!name.trim() || !email.trim()) {
       setError('Nom et email sont obligatoires.');
       return;
@@ -178,11 +188,55 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     );
   }
 
+  // Réutilisé tel quel dans 'select' et 'info' — même bloc que l'ancien
+  // step unique, affiché aux deux étapes désormais (voir spec Task 3).
+  const summary = totalQuantity > 0 && (
+    <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between">
+      <span className="text-sm font-semibold text-gray-700">Total ({totalQuantity} place{totalQuantity > 1 ? 's' : ''})</span>
+      <span className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
+    </div>
+  );
+
+  if (step === 'info') {
+    return (
+      <div className="space-y-5">
+        <button
+          type="button"
+          onClick={handleBackToSelect}
+          disabled={isSubmitting}
+          className="text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-50"
+        >
+          ← Retour
+        </button>
+
+        {summary}
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 space-y-3">
+          <p className="text-sm font-semibold text-gray-700">Vos informations</p>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={inputClass} />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
+        </div>
+
+        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+          style={{ backgroundColor: 'var(--color-primary)' }}
+        >
+          {isSubmitting ? 'Traitement…' : 'Continuer vers le paiement'}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
         <p className="text-sm font-semibold text-gray-700 mb-3">Choisissez vos formules</p>
-        <div className="space-y-3">
+        <div className="space-y-3 sm:space-y-4">
           {ticketTypes.map((ticket) => (
             <div key={ticket.id} className="flex items-center justify-between gap-3 py-1">
               <div className="min-w-0">
@@ -214,29 +268,17 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         </div>
       </div>
 
-      {totalQuantity > 0 && (
-        <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-gray-700">Total ({totalQuantity} place{totalQuantity > 1 ? 's' : ''})</span>
-          <span className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <p className="text-sm font-semibold text-gray-700">Vos informations</p>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={inputClass} />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
-      </div>
+      {summary}
 
       {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
 
       <button
-        onClick={handleSubmit}
-        disabled={isSubmitting || totalQuantity === 0}
+        onClick={handleContinueToInfo}
+        disabled={totalQuantity === 0}
         className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
         style={{ backgroundColor: 'var(--color-primary)' }}
       >
-        {isSubmitting ? 'Traitement…' : 'Continuer vers le paiement'}
+        Continuer
       </button>
     </div>
   );
