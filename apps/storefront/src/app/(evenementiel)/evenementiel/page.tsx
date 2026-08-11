@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { IconCalendarEvent, IconMapPin, IconChefHat, IconTools, IconArrowRight } from '@tabler/icons-react';
+import { IconCalendarEvent, IconMapPin, IconClock, IconUsers, IconChefHat, IconTools, IconArrowRight } from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { formatDate, formatPrice } from '@/lib/utils/format';
+import { formatEventDayDate, formatEventTime, formatPrice } from '@/lib/utils/format';
 import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import type { EventRow, ServiceOffering, EventGalleryPhoto } from '@lepefy/types';
 
@@ -160,39 +160,65 @@ export default async function EvenementielHubPage() {
                 Aucun événement à venir pour le moment — revenez bientôt !
               </p>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {events.map((event) => {
+              <div className="flex flex-wrap justify-center gap-4">
+                {events.map((event, index) => {
                   const eventImages = photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : []);
+                  // `events` arrive déjà trié par date_start ascendant (requête
+                  // server-side ci-dessus) — index 0 = événement le plus proche,
+                  // pas de re-tri nécessaire ici (voir Step 0, deviation report).
+                  const isNext = index === 0;
+                  const isSoldOut = event.capacity_remaining <= 0;
                   return (
                   <Link
                     key={event.id}
                     href={`/evenementiel/evenements/${event.slug}`}
-                    className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
+                    className="group flex basis-full sm:basis-[calc(50%-0.5rem)] bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
                   >
                     <EventImageFader
                       images={eventImages}
                       fallbackColor="var(--color-primary-light)"
-                      className="h-36 bg-gray-100 flex items-end p-3"
+                      className="w-[110px] sm:w-[130px] shrink-0 self-stretch bg-gray-100"
                     >
-                      {event.capacity_remaining <= 0 && (
-                        <span className="text-2xs font-semibold px-2 py-1 rounded-full bg-white/90 text-red-600">
+                      {isSoldOut ? (
+                        <span className="absolute top-2 left-2 text-2xs font-semibold px-2 py-1 rounded-full bg-white/90 text-red-600">
                           Complet
                         </span>
-                      )}
+                      ) : isNext ? (
+                        // Colonne image fixe (110/130px) trop étroite pour "PROCHAIN
+                        // ÉVÉNEMENT" en une ligne à une taille lisible — vérifié
+                        // empiriquement (mockup_hub_card.png ne montrait que le rendu
+                        // large) : wrap 2 lignes/rounded-lg sous sm, pill 1 ligne dès sm.
+                        <span
+                          className="absolute top-2 left-2 right-2 sm:right-auto whitespace-normal sm:whitespace-nowrap text-[9px] font-bold leading-tight px-1.5 py-1 rounded-lg sm:rounded-full"
+                          style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}
+                        >
+                          PROCHAIN ÉVÉNEMENT
+                        </span>
+                      ) : null}
                     </EventImageFader>
-                    <div className="p-4">
-                      <p
-                        className="text-2xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1"
-                        style={{ color: 'var(--color-primary)' }}
-                      >
-                        <IconCalendarEvent size={13} /> {formatDate(event.date_start)}
-                      </p>
-                      <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{event.title}</h3>
-                      {event.location && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                          <IconMapPin size={13} /> {event.location}
+                    <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <p
+                          className="text-2xs font-semibold uppercase tracking-wide flex items-center gap-1"
+                          style={{ color: 'var(--color-primary)' }}
+                        >
+                          <IconCalendarEvent size={13} /> {formatEventDayDate(event.date_start)}
                         </p>
-                      )}
+                        <h3 className="font-semibold text-gray-900 line-clamp-1">{event.title}</h3>
+                        {event.location && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <IconMapPin size={13} /> {event.location}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                          <IconClock size={13} /> {formatEventTime(event.date_start)}
+                        </p>
+                        {event.capacity_remaining > 0 && (
+                          <p className="text-xs text-green-600 flex items-center gap-1">
+                            <IconUsers size={13} /> {event.capacity_remaining} places disponibles
+                          </p>
+                        )}
+                      </div>
                       <span
                         className="text-[13px] font-semibold flex items-center justify-center gap-1.5 text-white rounded-[10px] mt-1 py-2.5 transition-colors group-hover:[background-color:var(--color-primary-dark)]"
                         style={{ backgroundColor: 'var(--color-primary)' }}
