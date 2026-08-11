@@ -49,6 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       price,
       sort_order:  nextSortOrder,
       active:      body.active === undefined ? true : Boolean(body.active),
+      badge:       body.badge ? String(body.badge).trim() : null,
     })
     .select('*')
     .single();

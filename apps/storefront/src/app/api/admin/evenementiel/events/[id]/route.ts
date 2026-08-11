@@ -9,8 +9,36 @@ const VALID_STATUSES: EventStatus[] = ['draft', 'published', 'closed', 'cancelle
 
 const EDITABLE_FIELDS = [
   'title', 'slug', 'description', 'date_start', 'location',
-  'capacity_total', 'status', 'banner_image_url',
+  'capacity_total', 'status', 'banner_image_url', 'subtitle', 'highlights',
 ] as const;
+
+const MAX_HIGHLIGHTS = 3;
+
+interface HighlightInput {
+  icon?: unknown;
+  title?: unknown;
+  text?: unknown;
+}
+
+// Défense en profondeur : l'éditeur admin envoie déjà des lignes propres
+// (titre/texte trim, vides omises, cap à 3 — voir EventDetailAdminClient),
+// mais highlights reste un jsonb libre en base, donc on revalide sa forme
+// ici avant d'écrire.
+function sanitizeHighlights(value: unknown): { data: unknown; error: string | null } {
+  if (value === null) return { data: null, error: null };
+  if (!Array.isArray(value)) return { data: null, error: 'highlights doit être un tableau ou null.' };
+
+  const cleaned = (value as HighlightInput[])
+    .slice(0, MAX_HIGHLIGHTS)
+    .map((h) => ({
+      icon: typeof h.icon === 'string' ? h.icon : 'sparkles',
+      title: typeof h.title === 'string' ? h.title.trim() : '',
+      text: typeof h.text === 'string' ? h.text.trim() : '',
+    }))
+    .filter((h) => h.title || h.text);
+
+  return { data: cleaned.length > 0 ? cleaned : null, error: null };
+}
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -62,6 +90,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const n = Number(body.capacity_total);
       if (!Number.isInteger(n) || n < 0) continue;
       patch.capacity_total = n;
+      continue;
+    }
+    if (field === 'highlights') {
+      const { data, error: highlightsError } = sanitizeHighlights(body.highlights);
+      if (highlightsError) return NextResponse.json({ error: highlightsError }, { status: 400 });
+      patch.highlights = data;
       continue;
     }
     patch[field] = body[field];

@@ -10,7 +10,7 @@ function revalidateEventPaths(eventSlug: string | undefined) {
   revalidatePath('/evenementiel');
 }
 
-const EDITABLE_FIELDS = ['label', 'description', 'price', 'sort_order', 'active'] as const;
+const EDITABLE_FIELDS = ['label', 'description', 'price', 'sort_order', 'active', 'badge'] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: { ticketId: string } }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

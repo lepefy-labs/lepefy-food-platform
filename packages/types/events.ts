@@ -4,6 +4,17 @@
 
 export type EventStatus = 'draft' | 'published' | 'closed' | 'cancelled';
 
+// Élément de la feature row hero (058) — `icon` référence une clé du
+// registre HIGHLIGHT_ICONS (src/lib/events/highlightIcons.tsx côté storefront)
+// et reste `string` (pas une union stricte) ici : le JSON en base peut
+// contenir une clé pas encore connue du registre (ajout futur), le fallback
+// vers une icône neutre se fait à l'exécution, jamais via le typage.
+export interface EventHighlight {
+  icon: string;
+  title: string;
+  text: string;
+}
+
 export interface EventRow {
   id: string;
   tenant_id: string;
@@ -16,10 +27,16 @@ export interface EventRow {
   capacity_remaining: number;
   status: EventStatus;
   banner_image_url: string | null;
-  // Palette scoped à l'événement (056) — fallback tenant.primary_color /
-  // tenant.secondary_color si null, voir evenements/[slug]/page.tsx.
+  // Palette scoped à l'événement (056) — le module Événementiel a désormais
+  // sa propre identité par défaut (058, EVENT_MODULE_DEFAULT_PRIMARY/SECONDARY
+  // dans evenements/[slug]/page.tsx), plus de fallback vers tenant.primary_color.
+  // Colonne conservée pour l'override futur par événement.
   theme_primary_color: string | null;
   theme_secondary_color: string | null;
+  // Sous-titre optionnel sous le titre hero (058, ex. "La Première").
+  subtitle: string | null;
+  // Feature row hero optionnelle (058) — 0 à 3 éléments, section absente si null/vide.
+  highlights: EventHighlight[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +50,8 @@ export interface EventTicketType {
   price: number;
   sort_order: number;
   active: boolean;
+  // Badge textuel optionnel sur la card formule (058, ex. "LA PLUS POPULAIRE").
+  badge: string | null;
 }
 
 export type EventReservationStatus = 'confirmed' | 'cancelled' | 'refunded';

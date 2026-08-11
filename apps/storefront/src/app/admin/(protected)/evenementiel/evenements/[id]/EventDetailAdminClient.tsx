@@ -2,11 +2,13 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload, IconStarFilled } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
-import type { EventRow, EventTicketType, EventReservation, EventStatus, EventReservationStatus } from '@lepefy/types';
+import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
+import type { EventRow, EventTicketType, EventReservation, EventStatus, EventReservationStatus, EventHighlight } from '@lepefy/types';
 
 const STATUS_OPTIONS: EventStatus[] = ['draft', 'published', 'closed', 'cancelled'];
+const MAX_HIGHLIGHTS = 3;
 
 const RESERVATION_STATUS_LABELS: Record<EventReservationStatus, string> = {
   confirmed: 'Confirmée',
@@ -30,12 +32,28 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
   const [newLabel, setNewLabel] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newBadge, setNewBadge] = useState('');
   const [addingTicket, setAddingTicket] = useState(false);
   const [refunding, setRefunding] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Badge par formule existante — pas de form d'édition dédié dans l'admin
+  // (seulement create/delete jusqu'ici), un éditeur inline minimal suffit ici
+  // (voir deviation report Fase 2).
+  const [badgeDrafts, setBadgeDrafts] = useState<Record<string, string>>(
+    Object.fromEntries(initialTicketTypes.map((t) => [t.id, t.badge ?? ''])),
+  );
+  const [savingBadge, setSavingBadge] = useState<string | null>(null);
+
+  // Sous-titre + feature row hero (058) — section distincte, sauvegarde propre,
+  // même pattern que la section Bannière ci-dessous.
+  const [subtitle, setSubtitle] = useState(initialEvent.subtitle ?? '');
+  const [highlights, setHighlights] = useState<EventHighlight[]>(initialEvent.highlights ?? []);
+  const [savingHighlights, setSavingHighlights] = useState(false);
+  const [highlightsError, setHighlightsError] = useState<string | null>(null);
 
   const inputClass = 'border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
 
@@ -95,6 +113,45 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
     }
   }
 
+  function addHighlightRow() {
+    setHighlights((prev) => (prev.length >= MAX_HIGHLIGHTS ? prev : [...prev, { icon: HIGHLIGHT_ICON_OPTIONS[0]?.key ?? 'flame', title: '', text: '' }]));
+  }
+
+  function updateHighlightRow(index: number, field: keyof EventHighlight, value: string) {
+    setHighlights((prev) => prev.map((h, i) => (i === index ? { ...h, [field]: value } : h)));
+  }
+
+  function removeHighlightRow(index: number) {
+    setHighlights((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function saveHighlights() {
+    setHighlightsError(null);
+    // Lignes vides (ni titre ni texte) omises à l'enregistrement.
+    const cleaned = highlights
+      .filter((h) => h.title.trim() || h.text.trim())
+      .slice(0, MAX_HIGHLIGHTS)
+      .map((h) => ({ icon: h.icon, title: h.title.trim(), text: h.text.trim() }));
+
+    setSavingHighlights(true);
+    try {
+      const res = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtitle: subtitle.trim() || null, highlights: cleaned.length > 0 ? cleaned : null }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setHighlightsError(result.error ?? 'Erreur lors de l\'enregistrement.');
+        return;
+      }
+      setEvent(result);
+      setHighlights(cleaned);
+    } finally {
+      setSavingHighlights(false);
+    }
+  }
+
   async function addTicketType(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -108,7 +165,12 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
       const res = await fetch(`/api/admin/evenementiel/events/${event.id}/ticket-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: newLabel.trim(), description: newDescription.trim() || null, price }),
+        body: JSON.stringify({
+          label: newLabel.trim(),
+          description: newDescription.trim() || null,
+          price,
+          badge: newBadge.trim() || null,
+        }),
       });
       const result = await res.json();
       if (!res.ok) {
@@ -116,9 +178,28 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         return;
       }
       setTicketTypes((prev) => [...prev, result]);
-      setNewLabel(''); setNewDescription(''); setNewPrice('');
+      setBadgeDrafts((prev) => ({ ...prev, [result.id]: result.badge ?? '' }));
+      setNewLabel(''); setNewDescription(''); setNewPrice(''); setNewBadge('');
     } finally {
       setAddingTicket(false);
+    }
+  }
+
+  async function saveBadge(ticketId: string) {
+    setSavingBadge(ticketId);
+    try {
+      const res = await fetch(`/api/admin/evenementiel/ticket-types/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ badge: (badgeDrafts[ticketId] ?? '').trim() || null }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTicketTypes((prev) => prev.map((t) => (t.id === ticketId ? { ...t, badge: updated.badge } : t)));
+        setBadgeDrafts((prev) => ({ ...prev, [ticketId]: updated.badge ?? '' }));
+      }
+    } finally {
+      setSavingBadge(null);
     }
   }
 
@@ -186,35 +267,136 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         </label>
       </section>
 
+      {/* Hero : sous-titre + points forts */}
+      <section className="bg-white rounded-2xl border border-gray-100 p-4">
+        <p className="text-sm font-semibold text-gray-700 mb-1">Sous-titre &amp; points forts</p>
+        <p className="text-xs text-gray-400 mb-3">Affichés dans le hero de la page événement. Optionnels.</p>
+
+        <div className="mb-4">
+          <label className="text-xs font-semibold text-gray-500 mb-1 block">Sous-titre</label>
+          <input
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="ex. La Première"
+            className={`${inputClass} w-full`}
+          />
+        </div>
+
+        <div className="space-y-3 mb-3">
+          {highlights.map((h, i) => (
+            <div key={i} className="border border-gray-100 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Point fort {i + 1}</p>
+                <button type="button" onClick={() => removeHighlightRow(i)} className="text-gray-400 hover:text-red-500">
+                  <IconTrash size={14} />
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {HIGHLIGHT_ICON_OPTIONS.map(({ key, Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => updateHighlightRow(i, 'icon', key)}
+                    title={key}
+                    aria-label={key}
+                    className="w-9 h-9 rounded-lg border flex items-center justify-center shrink-0"
+                    style={h.icon === key
+                      ? { borderColor: 'var(--color-primary)', backgroundColor: 'color-mix(in srgb, var(--color-primary) 10%, white)', color: 'var(--color-primary)' }
+                      : { borderColor: '#e5e7eb', color: '#9ca3af' }}
+                  >
+                    <Icon size={18} />
+                  </button>
+                ))}
+              </div>
+              <input
+                value={h.title}
+                onChange={(e) => updateHighlightRow(i, 'title', e.target.value)}
+                placeholder="Titre (ex. Braises authentiques)"
+                className={`${inputClass} w-full`}
+              />
+              <textarea
+                value={h.text}
+                onChange={(e) => updateHighlightRow(i, 'text', e.target.value)}
+                placeholder="Texte"
+                rows={2}
+                className={`${inputClass} w-full resize-none`}
+              />
+            </div>
+          ))}
+          {highlights.length === 0 && <p className="text-xs text-gray-400">Aucun point fort — section masquée sur la page événement.</p>}
+        </div>
+
+        {highlights.length < MAX_HIGHLIGHTS && (
+          <button type="button" onClick={addHighlightRow} className="flex items-center gap-1 text-xs font-semibold mb-3" style={{ color: 'var(--color-primary)' }}>
+            <IconPlus size={14} /> Ajouter un point fort
+          </button>
+        )}
+
+        {highlightsError && <p className="text-red-500 text-xs mb-2">{highlightsError}</p>}
+        <button
+          type="button"
+          onClick={saveHighlights}
+          disabled={savingHighlights}
+          className="text-xs font-semibold px-3 py-2 rounded-lg text-white disabled:opacity-50"
+          style={{ backgroundColor: 'var(--color-primary)' }}
+        >
+          {savingHighlights ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
+      </section>
+
       {/* Formules */}
       <section className="bg-white rounded-2xl border border-gray-100 p-4">
         <p className="text-sm font-semibold text-gray-700 mb-3">Formules</p>
         <div className="space-y-2 mb-3">
           {ticketTypes.map((t) => (
-            <div key={t.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-gray-50 last:border-0">
-              <div className="min-w-0">
-                <p className={`text-sm font-medium ${t.active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{t.label}</p>
-                <p className="text-xs text-gray-500">{formatPrice(t.price, currency)}</p>
+            <div key={t.id} className="py-1.5 border-b border-gray-50 last:border-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium ${t.active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{t.label}</p>
+                  <p className="text-xs text-gray-500">{formatPrice(t.price, currency)}</p>
+                </div>
+                <button type="button" onClick={() => removeTicketType(t.id)} className="text-gray-400 hover:text-red-500 shrink-0">
+                  <IconTrash size={15} />
+                </button>
               </div>
-              <button type="button" onClick={() => removeTicketType(t.id)} className="text-gray-400 hover:text-red-500">
-                <IconTrash size={15} />
-              </button>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <IconStarFilled size={13} className="text-gray-300 shrink-0" />
+                <input
+                  value={badgeDrafts[t.id] ?? ''}
+                  onChange={(e) => setBadgeDrafts((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                  placeholder="es. LA PLUS POPULAIRE"
+                  className={`${inputClass} flex-1 text-xs py-1.5`}
+                />
+                <button
+                  type="button"
+                  onClick={() => saveBadge(t.id)}
+                  disabled={savingBadge === t.id || (badgeDrafts[t.id] ?? '') === (t.badge ?? '')}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 shrink-0"
+                >
+                  {savingBadge === t.id ? '…' : 'OK'}
+                </button>
+              </div>
             </div>
           ))}
           {ticketTypes.length === 0 && <p className="text-xs text-gray-400">Aucune formule — ajoutez-en une ci-dessous.</p>}
         </div>
-        <form onSubmit={addTicketType} className="flex items-center gap-2">
-          <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Libellé (ex. Formule Repas)" className={`${inputClass} flex-1`} />
-          <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description (optionnel)" className={`${inputClass} flex-1`} />
-          <input value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="Prix" inputMode="decimal" className={`${inputClass} w-24`} />
-          <button
-            type="submit"
-            disabled={addingTicket}
-            className="p-2.5 rounded-lg text-white disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            <IconPlus size={16} />
-          </button>
+        <form onSubmit={addTicketType} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Libellé (ex. Formule Repas)" className={`${inputClass} flex-1`} />
+            <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description (optionnel)" className={`${inputClass} flex-1`} />
+            <input value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="Prix" inputMode="decimal" className={`${inputClass} w-24`} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input value={newBadge} onChange={(e) => setNewBadge(e.target.value)} placeholder="es. LA PLUS POPULAIRE" className={`${inputClass} flex-1`} />
+            <button
+              type="submit"
+              disabled={addingTicket}
+              className="p-2.5 rounded-lg text-white disabled:opacity-50 shrink-0"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              <IconPlus size={16} />
+            </button>
+          </div>
         </form>
         {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
       </section>
