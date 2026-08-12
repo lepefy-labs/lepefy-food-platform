@@ -4,10 +4,14 @@ import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { IconMinus, IconPlus, IconBasket, IconStarFilled } from '@tabler/icons-react';
+import { IconMinus, IconPlus, IconBasket, IconStarFilled, IconCreditCard } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
-import type { EventTicketType } from '@lepefy/types';
+import {
+  PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
+  externalPaymentCtaLabel, externalPaymentCtaColor,
+} from '@/components/payment/ExternalPaymentMethodPicker';
+import type { EventTicketType, TenantPaymentMethod } from '@lepefy/types';
 
 // Même pattern de chargement paresseux que (shop)/checkout/CheckoutForm.tsx —
 // singleton monté uniquement à l'étape de paiement.
@@ -19,7 +23,7 @@ function getStripe() {
   return stripePromise;
 }
 
-type Step = 'select' | 'info' | 'payment';
+type Step = 'select' | 'info' | 'select-payment' | 'payment';
 
 interface Props {
   event:       { id: string; slug: string; title: string; capacityRemaining: number };
@@ -31,17 +35,23 @@ interface Props {
   // du mockup. Affichée uniquement à l'étape 'select' (le mockup ne montre que
   // cet écran) ; `undefined`/`false` si l'événement n'a pas de highlights.
   featureRow?: ReactNode;
+  // Phase 2 — moyens de paiement via lien externe (PayPal/Revolut/autre)
+  // éligibles pour ce tenant, même filtre que le checkout boutique.
+  externalPaymentMethods?: TenantPaymentMethod[];
 }
 
-// Stepper 3 étapes (select → info → payment) — reflète le state `step` réel
-// du composant, pas un déroulé générique : pas de step "récapitulatif" séparé.
+// Stepper — reflète le state `step` réel du composant (pas de step
+// "récapitulatif" séparé). 'select-payment' partage le badge "Paiement" avec
+// 'payment' : ce sont deux écrans de la même étape logique (Phase 2, Fix 2
+// shop appliqué ici dès le départ — jamais mélangé aux coordonnées).
 function EventStepper({ current }: { current: Step }) {
   const steps: { key: Step; n: number; label: string }[] = [
     { key: 'select', n: 1, label: 'Choix des formules' },
     { key: 'info', n: 2, label: 'Vos coordonnées' },
     { key: 'payment', n: 3, label: 'Paiement' },
   ];
-  const activeIndex = steps.findIndex((s) => s.key === current);
+  const normalizedCurrent: Step = current === 'select-payment' ? 'payment' : current;
+  const activeIndex = steps.findIndex((s) => s.key === normalizedCurrent);
 
   return (
     <div className="flex items-center justify-center gap-1.5 pb-2" aria-hidden="true">
@@ -107,7 +117,8 @@ function EventPaymentStep({ total, currency, onError }: { total: number; currenc
   );
 }
 
-export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOut, featureRow }: Props) {
+export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOut, featureRow, externalPaymentMethods = [] }: Props) {
+  const router = useRouter();
   const { customer: sessionCustomer } = useSessionCustomer();
 
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -116,6 +127,10 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   const [phone, setPhone] = useState('');
   const [step, setStep]   = useState<Step>('select');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  // Pas de mode 'in_store' côté événementiel (contrairement au shop) — seul
+  // le choix stripe vs external_link existe, `selectedExternalMethodId ===
+  // null` signifie stripe.
+  const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,18 +181,63 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     setStep('select');
   }
 
-  async function handleSubmit() {
+  // ── Étape 'info' → 'select-payment' : validation des coordonnées uniquement,
+  // aucun appel API (le mode de paiement n'est pas encore choisi). ──────────
+  function handleContinueToPayment() {
     setError(null);
     if (!name.trim() || !email.trim()) {
       setError('Nom et email sont obligatoires.');
       return;
     }
+    setStep('select-payment');
+  }
 
+  function handleBackToInfo() {
+    setError(null);
+    setStep('info');
+  }
+
+  // ── Étape 'select-payment' : confirmation du mode de paiement choisi ─────
+  async function handleConfirmPayment() {
+    setError(null);
     setIsSubmitting(true);
     try {
       const items = ticketTypes
         .filter((t) => (quantities[t.id] ?? 0) > 0)
         .map((t) => ({ ticket_type_id: t.id, quantity: quantities[t.id] }));
+
+      // ── Paiement via lien externe (PayPal/Revolut/autre) ────────────────
+      if (selectedExternalMethodId) {
+        const res = await fetch(`/api/events/${event.id}/checkout-external-link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items,
+            customer_name:  name.trim(),
+            customer_email: email.trim(),
+            customer_phone: phone.trim() || null,
+            externalPaymentMethodId: selectedExternalMethodId,
+          }),
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+          setError(result.error ?? 'Une erreur est survenue.');
+          return;
+        }
+
+        sessionStorage.setItem('lepefy-pending-event-payment', JSON.stringify({
+          requestId: result.requestId,
+          link:      result.link,
+          amount:    result.amount,
+          currency:  result.currency,
+          isPaypal:  result.isPaypal,
+          label:     result.label,
+        }));
+
+        router.push(`${window.location.pathname}/en-attente?ref=${result.requestId}`);
+        return;
+      }
 
       const res = await fetch(`/api/events/${event.id}/checkout`, {
         method: 'POST',
@@ -279,12 +339,82 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
 
         <button
-          onClick={handleSubmit}
+          onClick={handleContinueToPayment}
           disabled={isSubmitting}
           className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
           style={{ backgroundColor: 'var(--color-primary)' }}
         >
-          {isSubmitting ? 'Traitement…' : 'Continuer vers le paiement'}
+          Continuer vers le paiement
+        </button>
+      </div>
+    );
+  }
+
+  // Choix du mode de paiement — jamais mélangé aux coordonnées (même
+  // correction que le shop, Phase 1 Fix 2, appliquée ici dès l'introduction
+  // du flux external_link) : stripe + un moyen par ligne tenant_payment_methods
+  // éligible, cartes radio partagées avec le checkout boutique.
+  if (step === 'select-payment') {
+    const selectedExternalMethod = externalPaymentMethods.find((pm) => pm.id === selectedExternalMethodId) ?? null;
+
+    const ctaLabel = selectedExternalMethod
+      ? externalPaymentCtaLabel(selectedExternalMethod, 'la réservation')
+      : 'Continuer vers le paiement';
+
+    const ctaColor = selectedExternalMethod
+      ? externalPaymentCtaColor(selectedExternalMethod)
+      : 'var(--color-primary)';
+
+    const options = [
+      {
+        key:      'stripe',
+        selected: !selectedExternalMethodId,
+        onSelect: () => setSelectedExternalMethodId(null),
+        icon:     <IconCreditCard size={16} stroke={1.8} className="text-white" />,
+        color:    'var(--color-primary)',
+        label:    'Carte bancaire',
+        sub:      'Paiement sécurisé, confirmation immédiate',
+      },
+      ...buildExternalPaymentOptions(externalPaymentMethods, selectedExternalMethodId, setSelectedExternalMethodId),
+    ];
+
+    return (
+      <div className="space-y-5">
+        <EventStepper current={step} />
+
+        <button
+          type="button"
+          onClick={handleBackToInfo}
+          disabled={isSubmitting}
+          className="text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-50"
+        >
+          ← Retour
+        </button>
+
+        {summary}
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
+          <PaymentOptionList options={options} />
+          {selectedExternalMethod && (
+            <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />
+          )}
+        </div>
+
+        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+
+        <button
+          onClick={handleConfirmPayment}
+          disabled={isSubmitting}
+          className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+          style={{ backgroundColor: ctaColor }}
+        >
+          {isSubmitting
+            ? 'Traitement…'
+            : selectedExternalMethod
+              ? `${ctaLabel} — ${formatPrice(total, tenant.currency)}`
+              : ctaLabel
+          }
         </button>
       </div>
     );

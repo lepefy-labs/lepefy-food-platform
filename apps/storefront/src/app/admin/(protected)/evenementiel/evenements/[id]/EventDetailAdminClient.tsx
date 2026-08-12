@@ -1,11 +1,13 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload, IconStarFilled } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload, IconStarFilled, IconClock } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
-import type { EventRow, EventTicketType, EventReservation, EventStatus, EventReservationStatus, EventHighlight } from '@lepefy/types';
+import ConfirmPaymentButton from '../../../../_components/ui/ConfirmPaymentButton';
+import type { EventRow, EventTicketType, EventReservation, EventReservationRequest, EventStatus, EventReservationStatus, EventHighlight } from '@lepefy/types';
 
 const STATUS_OPTIONS: EventStatus[] = ['draft', 'published', 'closed', 'cancelled'];
 const MAX_HIGHLIGHTS = 3;
@@ -20,13 +22,25 @@ interface Props {
   event: EventRow;
   initialTicketTypes: EventTicketType[];
   initialReservations: EventReservation[];
+  initialPendingRequests: EventReservationRequest[];
   currency: string;
 }
 
-export default function EventDetailAdminClient({ event: initialEvent, initialTicketTypes, initialReservations, currency }: Props) {
+function elapsedLabel(createdAt: string): string {
+  const minutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (minutes < 1)  return 'à l\'instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24)   return `il y a ${hours} h`;
+  return `il y a ${Math.floor(hours / 24)} j`;
+}
+
+export default function EventDetailAdminClient({ event: initialEvent, initialTicketTypes, initialReservations, initialPendingRequests, currency }: Props) {
+  const router = useRouter();
   const [event, setEvent] = useState(initialEvent);
   const [ticketTypes, setTicketTypes] = useState(initialTicketTypes);
   const [reservations, setReservations] = useState(initialReservations);
+  const [pendingRequests, setPendingRequests] = useState(initialPendingRequests);
   const [savingStatus, setSavingStatus] = useState(false);
 
   const [newLabel, setNewLabel] = useState('');
@@ -400,6 +414,65 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         </form>
         {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
       </section>
+
+      {/* Paiements en attente (Phase 2 — lien externe) — même structure
+          visuelle que le bandeau boutique (Phase 1, PendingPaymentsBanner.tsx),
+          adaptée aux formules/tickets plutôt qu'aux produits panier. */}
+      {pendingRequests.length > 0 && (
+        <section className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl p-4">
+          <h2 className="text-sm font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5 mb-1">
+            <IconClock size={16} /> Paiements en attente ({pendingRequests.length})
+          </h2>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+            Ces demandes ne sont pas encore des réservations — aucune place n&apos;est réservée.
+          </p>
+          <div className="space-y-2">
+            {pendingRequests.map((request) => {
+              const itemsSummary = request.items
+                .map((i) => `${i.quantity}× ${ticketTypes.find((t) => t.id === i.ticket_type_id)?.label ?? '—'}`)
+                .join(', ');
+              return (
+                <div
+                  key={request.id}
+                  className="bg-white dark:bg-gray-900 rounded-xl border border-amber-100 dark:border-amber-900/60 p-3 flex flex-col sm:flex-row sm:items-center gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {request.payment_method_label}
+                      </span>
+                      <span className="text-xs text-gray-400">·</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {request.customer_name || request.customer_email}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{itemsSummary}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{elapsedLabel(request.created_at)}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      {formatPrice(request.amount, currency)}
+                    </span>
+                    <ConfirmPaymentButton
+                      endpoint={`/api/admin/evenementiel/reservation-requests/${request.id}/confirm-payment`}
+                      label="Confirmer réception"
+                      confirmingLabel="Confirmation…"
+                      className="py-2 px-3 rounded-lg font-semibold text-white text-xs whitespace-nowrap transition-opacity disabled:opacity-50"
+                      style={{ backgroundColor: '#D97706' }}
+                      onSuccess={(warning) => {
+                        if (!warning) {
+                          setPendingRequests((prev) => prev.filter((r) => r.id !== request.id));
+                        }
+                        router.refresh();
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Réservations */}
       <section className="bg-white rounded-2xl border border-gray-100 p-4">

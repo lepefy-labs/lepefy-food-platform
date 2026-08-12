@@ -352,8 +352,9 @@ export default function OrderDetail({
             🏪 {t.pendingPaymentBanner}
           </p>
           <ConfirmPaymentButton
-            mode="in_store"
-            id={order.id}
+            endpoint={`/api/admin/orders/${order.id}`}
+            method="PATCH"
+            body={{ payment_status: 'paid' }}
             label={t.markAsPaid}
             confirmingLabel={t.markingAsPaid}
             onSuccess={() => {

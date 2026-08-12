@@ -104,8 +104,7 @@ export default function PendingPaymentsBanner({
                   {formatPrice(total, tenantCurrency)}
                 </span>
                 <ConfirmPaymentButton
-                  mode="external_link"
-                  id={session.id}
+                  endpoint={`/api/admin/checkout-sessions/${session.id}/confirm-payment`}
                   label="Confirmer réception"
                   confirmingLabel="Confirmation…"
                   className="py-2 px-3 rounded-lg font-semibold text-white text-xs whitespace-nowrap transition-opacity disabled:opacity-50"

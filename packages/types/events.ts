@@ -63,13 +63,37 @@ export interface EventReservation {
   customer_name: string;
   customer_email: string;
   customer_phone: string | null;
-  stripe_payment_intent_id: string;
+  /** null pour une réservation confirmée via paiement par lien externe (Phase 2). */
+  stripe_payment_intent_id: string | null;
   amount_paid: number;
   qr_token: string;
   quantity_total: number;
   quantity_remaining: number;
   status: EventReservationStatus;
   created_at: string;
+}
+
+// ─── Phase 2 — paiement via lien externe (billetterie) ─────────────────────
+
+export type EventReservationRequestStatus = 'pending' | 'confirmed' | 'stock_conflict';
+
+export interface EventReservationRequest {
+  id: string;
+  tenant_id: string;
+  event_id: string;
+  items: EventCheckoutItemInput[];
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  amount: number;
+  currency: string;
+  payment_method_type: string;
+  payment_method_label: string;
+  payment_link: string;
+  status: EventReservationRequestStatus;
+  created_at: string;
+  confirmed_at: string | null;
+  reservation_id: string | null;
 }
 
 export interface EventReservationItem {

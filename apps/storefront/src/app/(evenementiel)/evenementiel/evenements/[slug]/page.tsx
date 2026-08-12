@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { IconFlame, IconCalendar, IconMapPin, IconUsers, IconLock, IconCircleCheck } from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { formatEventDayDate, formatEventTime } from '@/lib/utils/format';
 import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { getHighlightIcon } from '@/lib/events/highlightIcons';
@@ -68,6 +69,14 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   const ticketTypes = (ticketTypesRaw ?? []) as EventTicketType[];
   const soldOut = eventRow.capacity_remaining <= 0;
+
+  // Même filtre que le checkout boutique (Phase 1, Décision 7) — n'importe
+  // quelle ligne tenant_payment_methods dont le type n'est ni bank_transfer
+  // ni cash et dont extra.link est renseigné devient une option de paiement.
+  const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
+  const externalPaymentMethods = allPaymentMethods.filter(
+    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link,
+  );
 
   const { data: eventPhotosRaw } = await supabase
     .from('event_gallery_photos')
@@ -219,6 +228,7 @@ export default async function EventDetailPage({ params }: PageProps) {
           tenant={{ currency: tenant.currency }}
           soldOut={soldOut}
           featureRow={featureRow}
+          externalPaymentMethods={externalPaymentMethods}
         />
 
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-5">

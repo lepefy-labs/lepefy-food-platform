@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { generateEventQrToken } from '@/lib/events/qrToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
-import { getTicketUrl } from '@/lib/events/ticketUrl';
 import { createOrderFromCheckoutSession, type CheckoutSessionRow } from '@/lib/orders/createOrderFromCheckoutSession';
+import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -50,126 +48,18 @@ async function handleEventReservationPaymentSucceeded(intent: Stripe.PaymentInte
     return NextResponse.json({ received: true });
   }
 
-  const totalQuantity = items.reduce((s, i) => s + i.quantity, 0);
-  if (totalQuantity <= 0) {
-    console.error('[webhook/events] No items to reserve — intent:', intent.id);
-    return NextResponse.json({ received: true });
-  }
-
-  const { data: ticketTypes } = await supabase
-    .from('event_ticket_types')
-    .select('id, price, label')
-    .eq('event_id', eventId)
-    .in('id', items.map((i) => i.ticket_type_id));
-
-  const typedTicketTypes = (ticketTypes ?? []) as { id: string; price: number; label: string }[];
-  const priceByTicketType = new Map<string, number>(typedTicketTypes.map((t) => [t.id, t.price]));
-  const labelByTicketType = new Map<string, string>(typedTicketTypes.map((t) => [t.id, t.label]));
-
-  // Données événement résolues ICI (pas déléguées à n8n) pour les payloads
-  // des deux webhooks (confirmé + conflit capacité) — templates email
-  // lisibles sans query supplémentaire côté n8n.
-  const { data: eventRow } = await supabase
-    .from('events')
-    .select('title, date_start, location')
-    .eq('id', eventId)
-    .maybeSingle();
-
-  const eventDetails = {
-    eventTitle:     eventRow?.title ?? null,
-    eventDateStart: eventRow?.date_start ?? null,
-    eventLocation:  eventRow?.location ?? null,
-  };
-
-  const reservationId = crypto.randomUUID();
-  const qrToken        = generateEventQrToken(reservationId, eventId);
-
-  const { data: capacityResult, error: capacityError } = await supabase
-    .rpc('reserve_event_capacity', { p_event_id: eventId, p_quantity: totalQuantity })
-    .single();
-
-  const capacity = capacityResult as { success: boolean; remaining: number } | null;
-
-  if (capacityError || !capacity?.success) {
-    console.error('[webhook/events] Capacity reservation failed — intent:', intent.id,
-      '— reason:', capacityError ?? 'insufficient capacity');
-
-    let refundSucceeded = false;
-    try {
-      await stripe.refunds.create({ payment_intent: intent.id });
-      refundSucceeded = true;
-      console.info('[webhook/events] Refund issued (capacity conflict) — intent:', intent.id);
-    } catch (refundErr) {
-      console.error('[webhook/events] Refund FAILED — intent:', intent.id, '— needs manual refund:', refundErr);
-    }
-
-    await notifyN8n('/webhook/event-reservation-capacity-conflict', {
-      eventId, intentId: intent.id, customerName, customerEmail, refundSucceeded,
-      ...eventDetails,
-      // Pas de ticketUrl ici : la réservation n'est pas créée, aucun billet
-      // valide à montrer.
-    });
-
-    return NextResponse.json({ received: true });
-  }
-
-  const { error: reservationError } = await supabase
-    .from('event_reservations')
-    .insert({
-      id:                        reservationId,
-      tenant_id:                 tenantId,
-      event_id:                  eventId,
-      customer_name:             customerName,
-      customer_email:            customerEmail,
-      customer_phone:            customerPhone || null,
-      stripe_payment_intent_id:  intent.id,
-      amount_paid:               intent.amount / 100,
-      qr_token:                  qrToken,
-      quantity_total:            totalQuantity,
-      quantity_remaining:        totalQuantity,
-      status:                    'confirmed',
-    });
-
-  if (reservationError) {
-    if ((reservationError as { code?: string }).code === '23505') {
-      console.info('[webhook/events] Reservation already created by concurrent retry — intent:', intent.id);
-      return NextResponse.json({ received: true });
-    }
-    console.error('[webhook/events] Failed to create reservation AFTER capacity decrement — needs manual review:',
-      reservationError, '— intent:', intent.id);
-    return NextResponse.json({ received: true });
-  }
-
-  const itemsPayload = items.map((i) => ({
-    reservation_id: reservationId,
-    ticket_type_id: i.ticket_type_id,
-    quantity:       i.quantity,
-    unit_price:     priceByTicketType.get(i.ticket_type_id) ?? 0,
-  }));
-
-  const { error: itemsError } = await supabase.from('event_reservation_items').insert(itemsPayload);
-  if (itemsError) {
-    console.error('[webhook/events] Failed to insert reservation items:', itemsError, '— reservation:', reservationId);
-  }
-
-  console.info('[webhook/events] Reservation created — id:', reservationId, '— event:', eventId, '— qty:', totalQuantity);
-
-  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-  await notifyN8n('/webhook/event-reservation-confirmed', {
-    reservationId, eventId, customerName, customerEmail, customerPhone,
-    amountPaid: intent.amount / 100,
-    ...eventDetails,
-    // ticketTypeLabel ajouté UNIQUEMENT dans le payload n8n — itemsPayload
-    // reste inchangé pour l'insert event_reservation_items (pas de colonne
-    // label dans cette table).
-    items: itemsPayload.map((i) => ({
-      ...i,
-      ticketTypeLabel: labelByTicketType.get(i.ticket_type_id) ?? null,
-    })),
-    ticketUrl:  getTicketUrl(qrToken),
-    adminLink:  `${storefrontUrl}/admin/evenementiel/evenements`,
+  const result = await createEventReservationFromRequest(supabase, {
+    eventId, tenantId, items, customerName, customerEmail, customerPhone,
+    amountPaid:             intent.amount / 100,
+    stripePaymentIntentId:  intent.id,
   });
 
+  if ('error' in result) {
+    console.error('[webhook/events] createEventReservationFromRequest failed:', result.error, '— intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  console.info('[webhook/events] Reservation resolved — id:', result.reservationId, '— intent:', intent.id);
   return NextResponse.json({ received: true });
 }
 

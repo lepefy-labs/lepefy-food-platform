@@ -24,9 +24,10 @@ import {
 interface AdminSidebarProps {
   categories: { id: string; name: string; slug: string }[];
   pendingPaymentsCount?: number;
+  pendingEventRequestsCount?: number;
 }
 
-export default function AdminSidebar({ categories, pendingPaymentsCount = 0 }: AdminSidebarProps) {
+export default function AdminSidebar({ categories, pendingPaymentsCount = 0, pendingEventRequestsCount = 0 }: AdminSidebarProps) {
   const pathname      = usePathname();
   const searchParams  = useSearchParams();
   const activeCategory = searchParams.get('category');
@@ -228,7 +229,7 @@ export default function AdminSidebar({ categories, pendingPaymentsCount = 0 }: A
       {evenementielOpen && (
         <div className="ml-5 border-l border-gray-100 dark:border-gray-800 pl-3 mb-1 space-y-0.5">
           {[
-            { href: '/admin/evenementiel/evenements', label: 'Événements' },
+            { href: '/admin/evenementiel/evenements', label: 'Événements', badge: pendingEventRequestsCount },
             { href: '/admin/evenementiel/scan', label: 'Scan' },
             { href: '/admin/evenementiel/services', label: 'Services' },
             { href: '/admin/evenementiel/devis', label: 'Demandes de devis' },
@@ -238,14 +239,20 @@ export default function AdminSidebar({ categories, pendingPaymentsCount = 0 }: A
             <Link
               key={item.href}
               href={item.href}
-              className={`block py-1.5 px-2 rounded-lg text-xs
+              className={`flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-xs
                           transition-colors ${
                 pathname === item.href || pathname.startsWith(`${item.href}/`)
                   ? 'text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] font-medium'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
               }`}
             >
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {!!item.badge && (
+                <span className="text-2xs font-semibold px-1.5 py-0.5 rounded-full
+                                 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           ))}
         </div>

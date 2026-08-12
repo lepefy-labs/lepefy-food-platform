@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import EventDetailAdminClient from './EventDetailAdminClient';
-import type { EventRow, EventTicketType, EventReservation } from '@lepefy/types';
+import type { EventRow, EventTicketType, EventReservation, EventReservationRequest } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,12 +33,21 @@ export default async function AdminEventDetailPage({ params }: { params: { id: s
     .eq('event_id', event.id)
     .order('created_at', { ascending: false });
 
+  // Paiements en attente (Phase 2 — lien externe) pour CET événement.
+  const { data: pendingRequests } = await supabase
+    .from('event_reservation_requests')
+    .select('*')
+    .eq('event_id', event.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
   return (
     <div className="max-w-4xl">
       <EventDetailAdminClient
         event={event as EventRow}
         initialTicketTypes={(ticketTypes ?? []) as EventTicketType[]}
         initialReservations={(reservations ?? []) as EventReservation[]}
+        initialPendingRequests={(pendingRequests ?? []) as EventReservationRequest[]}
         currency={tenant.currency}
       />
     </div>

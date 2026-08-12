@@ -2,18 +2,21 @@
 
 import { useState } from 'react';
 
-// Bouton de confirmation de paiement, partagé entre deux contextes :
-//  - mode "in_store": PATCH /api/admin/orders/[id] — commande déjà créée,
-//    on ne fait que passer payment_status à "paid" (comportement inchangé).
-//  - mode "external_link": POST /api/admin/checkout-sessions/[id]/confirm-payment
-//    — aucune commande n'existe encore, elle est créée à la confirmation
-//    (voir createOrderFromCheckoutSession). Un conflit de stock détecté à ce
-//    moment-là remonte comme `warning` (aucun remboursement automatique
-//    possible pour ce moyen de paiement).
+// Bouton de confirmation de paiement, générique — un seul point de vérité
+// pour tous les contextes "confirmer réception d'un paiement en attente"
+// (Phase 1 boutique, Phase 2 billetterie, et modules futurs) : le composant
+// ne connaît ni "commande" ni "réservation", seulement un endpoint HTTP à
+// appeler. Généralisé en Phase 2 (props `mode`/`id` figées trop shop-
+// spécifiques) plutôt que dupliqué pour la billetterie.
+//
+// Réponse attendue : { warning?: string } en cas de succès partiel (ex.
+// stock_conflict — aucun remboursement automatique possible pour ce moyen de
+// paiement, l'admin doit le gérer manuellement), { error: string } sinon.
 
 interface ConfirmPaymentButtonProps {
-  mode: 'in_store' | 'external_link';
-  id: string;
+  endpoint: string;
+  method?: 'POST' | 'PATCH';
+  body?: Record<string, unknown>;
   label: string;
   confirmingLabel: string;
   onSuccess?: (warning?: string) => void;
@@ -22,8 +25,9 @@ interface ConfirmPaymentButtonProps {
 }
 
 export default function ConfirmPaymentButton({
-  mode,
-  id,
+  endpoint,
+  method = 'POST',
+  body,
   label,
   confirmingLabel,
   onSuccess,
@@ -39,31 +43,25 @@ export default function ConfirmPaymentButton({
     setMessage(null);
     setIsError(false);
     try {
-      const res =
-        mode === 'in_store'
-          ? await fetch(`/api/admin/orders/${id}`, {
-              method:  'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ payment_status: 'paid' }),
-            })
-          : await fetch(`/api/admin/checkout-sessions/${id}/confirm-payment`, {
-              method: 'POST',
-            });
+      const res = await fetch(endpoint, {
+        method,
+        ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+      });
 
-      const body = await res.json().catch(() => null);
+      const responseBody = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setMessage(body?.error ?? 'Erreur lors de la mise à jour.');
+        setMessage(responseBody?.error ?? 'Erreur lors de la mise à jour.');
         setIsError(true);
         return;
       }
 
-      if (body?.warning) {
-        setMessage(body.warning);
+      if (responseBody?.warning) {
+        setMessage(responseBody.warning);
         setIsError(true);
       }
 
-      onSuccess?.(body?.warning);
+      onSuccess?.(responseBody?.warning);
     } catch {
       setMessage('Erreur lors de la mise à jour.');
       setIsError(true);

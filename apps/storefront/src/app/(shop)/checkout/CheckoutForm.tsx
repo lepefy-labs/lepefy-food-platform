@@ -13,28 +13,19 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import {
-  IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift,
-  IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconArrowLeft,
+  IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift, IconArrowLeft,
 } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
-import { methodColor } from '@/lib/card/methodColor';
+import {
+  PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
+  externalPaymentCtaLabel, externalPaymentCtaColor,
+} from '@/components/payment/ExternalPaymentMethodPicker';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
-import { PAYMENT_METHOD_REGISTRY, type Tenant, type TenantPaymentMethod } from '@lepefy/types';
-
-// Même registre d'icônes que DigitalCard/PosterTemplate — un moyen de
-// paiement de tenant_payment_methods peut apparaître aussi bien sur la carte
-// digitale qu'ici, jamais deux jeux d'icônes différents pour la même donnée.
-const PAYMENT_ICONS = {
-  IconBuildingBank,
-  IconCash,
-  IconBrandPaypal,
-  IconQrcode,
-  IconWallet,
-};
+import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
 
 // Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
 // Stripe (step === 'payment'), jamais pour un client qui choisit le retrait
@@ -741,16 +732,38 @@ export default function CheckoutForm({
         const selectedExternalMethod = externalPaymentMethods.find((pm) => pm.id === selectedExternalMethodId) ?? null;
 
         const ctaLabel = selectedExternalMethod
-          ? `Créer la commande et ouvrir ${selectedExternalMethod.label ?? PAYMENT_METHOD_REGISTRY[selectedExternalMethod.method].label}`
+          ? externalPaymentCtaLabel(selectedExternalMethod, 'la commande')
           : paymentMode === 'in_store'
             ? 'Confirmer le retrait en boutique'
             : 'Continuer vers le paiement';
 
         const ctaColor = selectedExternalMethod
-          ? methodColor(selectedExternalMethod.method, 'var(--color-primary)')
+          ? externalPaymentCtaColor(selectedExternalMethod)
           : paymentMode === 'in_store'
             ? '#8a8578'
             : 'var(--color-primary)';
+
+        const options = [
+          {
+            key:      'stripe',
+            selected: paymentMode === 'stripe' && !selectedExternalMethodId,
+            onSelect: () => { setPaymentMode('stripe'); setSelectedExternalMethodId(null); },
+            icon:     <IconCreditCard size={16} stroke={1.8} className="text-white" />,
+            color:    'var(--color-primary)',
+            label:    'Carte bancaire',
+            sub:      'Paiement sécurisé, confirmation immédiate',
+          },
+          ...buildExternalPaymentOptions(externalPaymentMethods, selectedExternalMethodId, (id) => setSelectedExternalMethodId(id)),
+          ...(isPickup ? [{
+            key:      'in_store',
+            selected: paymentMode === 'in_store' && !selectedExternalMethodId,
+            onSelect: () => { setPaymentMode('in_store'); setSelectedExternalMethodId(null); },
+            icon:     <IconBuildingStore size={16} stroke={1.8} className="text-white" />,
+            color:    '#8a8578',
+            label:    'Retrait boutique',
+            sub:      'Paiement sur place',
+          }] : []),
+        ];
 
         return (
           <div className="space-y-6">
@@ -764,109 +777,10 @@ export default function CheckoutForm({
 
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => { setPaymentMode('stripe'); setSelectedExternalMethodId(null); }}
-                  className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
-                    paymentMode === 'stripe' && !selectedExternalMethodId
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
-                      : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: 'var(--color-primary)' }}
-                  >
-                    <IconCreditCard size={16} stroke={1.8} className="text-white" />
-                  </span>
-                  <span className="flex-1">
-                    <span className="block text-gray-800">Carte bancaire</span>
-                    <span className="block text-xs text-gray-400 font-normal">Paiement sécurisé, confirmation immédiate</span>
-                  </span>
-                  <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
-                    paymentMode === 'stripe' && !selectedExternalMethodId
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding'
-                      : 'border-gray-300'
-                  }`} />
-                </button>
+              <PaymentOptionList options={options} />
 
-                {/* Paiement via lien externe (PayPal/Revolut/autre) — disponible en
-                    delivery ET pickup (Décision 6), jamais codé en dur par tenant :
-                    une entrée par ligne tenant_payment_methods éligible (Task 3). */}
-                {externalPaymentMethods.map((pm) => {
-                  const meta  = PAYMENT_METHOD_REGISTRY[pm.method];
-                  const Icon  = PAYMENT_ICONS[meta.iconName];
-                  const color = methodColor(pm.method, 'var(--color-primary)');
-                  const selected = selectedExternalMethodId === pm.id;
-                  return (
-                    <button
-                      key={pm.id}
-                      type="button"
-                      onClick={() => setSelectedExternalMethodId(pm.id)}
-                      className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
-                        selected
-                          ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span
-                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: color }}
-                      >
-                        <Icon size={16} stroke={1.8} className="text-white" />
-                      </span>
-                      <span className="flex-1">
-                        <span className="block text-gray-800">{pm.label ?? meta.label}</span>
-                        <span className="block text-xs text-gray-400 font-normal">
-                          {pm.method === 'paypal' ? 'Lien direct · montant pré-rempli' : 'Lien direct · montant à saisir'}
-                        </span>
-                      </span>
-                      <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
-                        selected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding' : 'border-gray-300'
-                      }`} />
-                    </button>
-                  );
-                })}
-
-                {isPickup && (
-                  <button
-                    type="button"
-                    onClick={() => { setPaymentMode('in_store'); setSelectedExternalMethodId(null); }}
-                    className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
-                      paymentMode === 'in_store' && !selectedExternalMethodId
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: '#8a8578' }}
-                    >
-                      <IconBuildingStore size={16} stroke={1.8} className="text-white" />
-                    </span>
-                    <span className="flex-1">
-                      <span className="block text-gray-800">Retrait boutique</span>
-                      <span className="block text-xs text-gray-400 font-normal">Paiement sur place</span>
-                    </span>
-                    <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
-                      paymentMode === 'in_store' && !selectedExternalMethodId
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding'
-                        : 'border-gray-300'
-                    }`} />
-                  </button>
-                )}
-              </div>
-
-              {/* Note dynamique — affichée uniquement une fois le moyen choisi,
-                  jamais avant (comportement mockup). */}
               {selectedExternalMethod && (
-                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 mt-3 leading-relaxed">
-                  {selectedExternalMethod.method === 'paypal'
-                    ? <>Sélectionnez « Amis et famille » lors du paiement pour éviter les frais. Le montant ({formatPrice(total, tenant.currency)}) sera pré-rempli dans le lien.</>
-                    : <>Le montant n&apos;est pas prérempli sur ce lien — saisissez-le manuellement : <strong>{formatPrice(total, tenant.currency)}</strong>.</>
-                  }
-                </p>
+                <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />
               )}
             </div>
 
