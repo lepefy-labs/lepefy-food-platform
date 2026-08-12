@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import DevisForm from './DevisForm';
 import RentalCheckoutClient from './RentalCheckoutClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
@@ -58,6 +59,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
     rentalItems = (data ?? []) as RentalItem[];
   }
 
+  const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
+  const externalPaymentMethods = allPaymentMethods.filter(
+    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link,
+  );
+
   return (
     <div className="min-h-screen bg-[#f7f9f8]">
       <div
@@ -81,6 +87,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
             service={{ id: serviceOffering.id, slug: serviceOffering.slug, title: serviceOffering.title }}
             rentalItems={rentalItems}
             tenant={{ currency: tenant.currency }}
+            externalPaymentMethods={externalPaymentMethods}
           />
         )}
       </div>

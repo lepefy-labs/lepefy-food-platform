@@ -93,6 +93,14 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .eq('tenant_id', tenant.id)
     .eq('status', 'pending');
 
+  // Badge sidebar "Réservations matériel" — Phase 3 lien externe, agrégé
+  // tous services (même mécanisme que les deux badges ci-dessus).
+  const { count: pendingRentalRequestsCount } = await adminClient
+    .from('rental_reservation_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenant.id)
+    .eq('status', 'pending');
+
   return (
     <AdminThemeProvider>
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
@@ -129,6 +137,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               categories={categories ?? []}
               pendingPaymentsCount={pendingPaymentsCount ?? 0}
               pendingEventRequestsCount={pendingEventRequestsCount ?? 0}
+              pendingRentalRequestsCount={pendingRentalRequestsCount ?? 0}
             />
           </Suspense>
         </aside>

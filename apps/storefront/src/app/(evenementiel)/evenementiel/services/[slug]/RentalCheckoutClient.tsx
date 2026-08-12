@@ -4,10 +4,14 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { IconMinus, IconPlus } from '@tabler/icons-react';
+import { IconMinus, IconPlus, IconCreditCard } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
-import type { RentalItem } from '@lepefy/types';
+import {
+  PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
+  externalPaymentCtaLabel, externalPaymentCtaColor,
+} from '@/components/payment/ExternalPaymentMethodPicker';
+import type { RentalItem, TenantPaymentMethod } from '@lepefy/types';
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
 function getStripe() {
@@ -21,6 +25,7 @@ interface Props {
   service:     { id: string; slug: string; title: string };
   rentalItems: RentalItem[];
   tenant:      { currency: string };
+  externalPaymentMethods?: TenantPaymentMethod[];
 }
 
 function RentalPaymentStep({ total, currency, onError }: { total: number; currency: string; onError: (msg: string) => void }) {
@@ -65,7 +70,8 @@ function RentalPaymentStep({ total, currency, onError }: { total: number; curren
   );
 }
 
-export default function RentalCheckoutClient({ service, rentalItems, tenant }: Props) {
+export default function RentalCheckoutClient({ service, rentalItems, tenant, externalPaymentMethods = [] }: Props) {
+  const router = useRouter();
   const { customer: sessionCustomer } = useSessionCustomer();
 
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -73,8 +79,14 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant }: P
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [step, setStep]   = useState<'select' | 'payment'>('select');
+  // 'select' → 'choose-payment' → 'payment' : même correction structurelle
+  // qu'en Phase 1 (shop) — le choix du moyen de paiement n'a jamais été mêlé
+  // au formulaire, jamais introduit comme option accolée dedans.
+  const [step, setStep]   = useState<'select' | 'choose-payment' | 'payment'>('select');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  // Pas de mode 'in_store' pour la location — seul le choix stripe vs
+  // external_link existe, `selectedExternalMethodId === null` signifie stripe.
+  const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,7 +119,9 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant }: P
     });
   }
 
-  async function handleSubmit() {
+  // ── Étape 'select' → 'choose-payment' : validation uniquement, aucun appel
+  // API (le mode de paiement n'est pas encore choisi). ─────────────────────
+  function handleContinueToPayment() {
     setError(null);
     if (totalQuantity === 0) {
       setError('Sélectionnez au moins un article.');
@@ -121,12 +135,57 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant }: P
       setError('Nom et email sont obligatoires.');
       return;
     }
+    setStep('choose-payment');
+  }
 
+  function handleBackToSelect() {
+    setError(null);
+    setStep('select');
+  }
+
+  // ── Étape 'choose-payment' : confirmation du mode de paiement choisi ─────
+  async function handleConfirmPayment() {
+    setError(null);
     setIsSubmitting(true);
     try {
       const items = rentalItems
         .filter((i) => (quantities[i.id] ?? 0) > 0)
         .map((i) => ({ rental_item_id: i.id, quantity: quantities[i.id] }));
+
+      // ── Paiement via lien externe (PayPal/Revolut/autre) ────────────────
+      if (selectedExternalMethodId) {
+        const res = await fetch('/api/rental/checkout-external-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service_offering_id: service.id,
+            items,
+            pickup_date: pickupDate,
+            customer_name: name.trim(),
+            customer_email: email.trim(),
+            customer_phone: phone.trim() || null,
+            externalPaymentMethodId: selectedExternalMethodId,
+          }),
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+          setError(result.error ?? 'Une erreur est survenue.');
+          return;
+        }
+
+        sessionStorage.setItem('lepefy-pending-rental-payment', JSON.stringify({
+          requestId: result.requestId,
+          link:      result.link,
+          amount:    result.amount,
+          currency:  result.currency,
+          isPaypal:  result.isPaypal,
+          label:     result.label,
+        }));
+
+        router.push(`${window.location.pathname}/en-attente?ref=${result.requestId}`);
+        return;
+      }
 
       const res = await fetch('/api/rental/checkout', {
         method: 'POST',
@@ -174,6 +233,79 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant }: P
         <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
           <RentalPaymentStep total={total} currency={tenant.currency} onError={setError} />
         </Elements>
+      </div>
+    );
+  }
+
+  // Choix du mode de paiement — jamais mélangé aux coordonnées (même
+  // correction structurelle que le shop, Phase 1 Fix 2, appliquée ici dès
+  // l'introduction du flux external_link) : stripe + un moyen par ligne
+  // tenant_payment_methods éligible, cartes radio partagées avec shop/billetterie.
+  if (step === 'choose-payment') {
+    const selectedExternalMethod = externalPaymentMethods.find((pm) => pm.id === selectedExternalMethodId) ?? null;
+
+    const ctaLabel = selectedExternalMethod
+      ? externalPaymentCtaLabel(selectedExternalMethod, 'la réservation')
+      : 'Continuer vers le paiement';
+
+    const ctaColor = selectedExternalMethod
+      ? externalPaymentCtaColor(selectedExternalMethod)
+      : 'var(--color-primary)';
+
+    const options = [
+      {
+        key:      'stripe',
+        selected: !selectedExternalMethodId,
+        onSelect: () => setSelectedExternalMethodId(null),
+        icon:     <IconCreditCard size={16} stroke={1.8} className="text-white" />,
+        color:    'var(--color-primary)',
+        label:    'Carte bancaire',
+        sub:      'Paiement sécurisé, confirmation immédiate',
+      },
+      ...buildExternalPaymentOptions(externalPaymentMethods, selectedExternalMethodId, setSelectedExternalMethodId),
+    ];
+
+    return (
+      <div className="space-y-5">
+        <button
+          type="button"
+          onClick={handleBackToSelect}
+          disabled={isSubmitting}
+          className="text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-50"
+        >
+          ← Retour
+        </button>
+
+        {totalQuantity > 0 && (
+          <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-700">Total ({totalQuantity} article{totalQuantity > 1 ? 's' : ''})</span>
+            <span className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
+          <PaymentOptionList options={options} />
+          {selectedExternalMethod && (
+            <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />
+          )}
+        </div>
+
+        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+
+        <button
+          onClick={handleConfirmPayment}
+          disabled={isSubmitting}
+          className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+          style={{ backgroundColor: ctaColor }}
+        >
+          {isSubmitting
+            ? 'Traitement…'
+            : selectedExternalMethod
+              ? `${ctaLabel} — ${formatPrice(total, tenant.currency)}`
+              : ctaLabel
+          }
+        </button>
       </div>
     );
   }
@@ -237,12 +369,12 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant }: P
       {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
 
       <button
-        onClick={handleSubmit}
-        disabled={isSubmitting || totalQuantity === 0}
+        onClick={handleContinueToPayment}
+        disabled={totalQuantity === 0}
         className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
         style={{ backgroundColor: 'var(--color-primary)' }}
       >
-        {isSubmitting ? 'Traitement…' : 'Continuer vers le paiement'}
+        Continuer vers le paiement
       </button>
     </div>
   );

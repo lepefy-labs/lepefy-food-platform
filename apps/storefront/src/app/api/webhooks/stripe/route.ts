@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { notifyN8n } from '@/lib/events/notifyN8n';
 import { createOrderFromCheckoutSession, type CheckoutSessionRow } from '@/lib/orders/createOrderFromCheckoutSession';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
+import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -99,109 +99,18 @@ async function handleRentalReservationPaymentSucceeded(intent: Stripe.PaymentInt
     return NextResponse.json({ received: true });
   }
 
-  if (items.length === 0) {
-    console.error('[webhook/rental] No items to reserve — intent:', intent.id);
-    return NextResponse.json({ received: true });
-  }
-
-  const { data: rentalItems } = await supabase
-    .from('rental_items')
-    .select('id, price_per_unit')
-    .in('id', items.map((i) => i.rental_item_id));
-
-  const priceByItem = new Map<string, number>(
-    ((rentalItems ?? []) as { id: string; price_per_unit: number }[]).map((r) => [r.id, r.price_per_unit]),
-  );
-
-  // Décrément atomique de chaque article, un par un — rollback (restore) de
-  // ce qui a déjà été décrémenté si un article échoue en cours de boucle.
-  const reservedSoFar: { rental_item_id: string; quantity: number }[] = [];
-  let stockConflict = false;
-
-  for (const item of items) {
-    const { data: result, error } = await supabase
-      .rpc('reserve_rental_stock', { p_rental_item_id: item.rental_item_id, p_quantity: item.quantity })
-      .single();
-
-    const typedResult = result as { success: boolean; remaining: number } | null;
-
-    if (error || !typedResult?.success) {
-      stockConflict = true;
-      console.error('[webhook/rental] Stock reservation failed — intent:', intent.id,
-        '— item:', item.rental_item_id, '— reason:', error ?? 'insufficient stock');
-      break;
-    }
-    reservedSoFar.push(item);
-  }
-
-  if (stockConflict) {
-    for (const item of reservedSoFar) {
-      await supabase.rpc('restore_rental_stock', { p_rental_item_id: item.rental_item_id, p_quantity: item.quantity });
-    }
-
-    let refundSucceeded = false;
-    try {
-      await stripe.refunds.create({ payment_intent: intent.id });
-      refundSucceeded = true;
-      console.info('[webhook/rental] Refund issued (stock conflict) — intent:', intent.id);
-    } catch (refundErr) {
-      console.error('[webhook/rental] Refund FAILED — intent:', intent.id, '— needs manual refund:', refundErr);
-    }
-
-    await notifyN8n('/webhook/rental-reservation-stock-conflict', {
-      serviceOfferingId, intentId: intent.id, customerName, customerEmail, refundSucceeded,
-    });
-
-    return NextResponse.json({ received: true });
-  }
-
-  const { data: reservation, error: reservationError } = await supabase
-    .from('rental_reservations')
-    .insert({
-      tenant_id:                 tenantId,
-      service_offering_id:       serviceOfferingId,
-      customer_name:             customerName,
-      customer_email:            customerEmail,
-      customer_phone:            customerPhone || null,
-      pickup_date:               pickupDate,
-      stripe_payment_intent_id:  intent.id,
-      amount_paid:               intent.amount / 100,
-      status:                    'confirmed',
-    })
-    .select('id')
-    .single();
-
-  if (reservationError || !reservation) {
-    if ((reservationError as { code?: string } | null)?.code === '23505') {
-      console.info('[webhook/rental] Reservation already created by concurrent retry — intent:', intent.id);
-      return NextResponse.json({ received: true });
-    }
-    console.error('[webhook/rental] Failed to create reservation AFTER stock decrement — needs manual review:',
-      reservationError, '— intent:', intent.id);
-    return NextResponse.json({ received: true });
-  }
-
-  const itemsPayload = items.map((i) => ({
-    reservation_id: reservation.id,
-    rental_item_id: i.rental_item_id,
-    quantity:       i.quantity,
-    unit_price:     priceByItem.get(i.rental_item_id) ?? 0,
-  }));
-
-  const { error: itemsError } = await supabase.from('rental_reservation_items').insert(itemsPayload);
-  if (itemsError) {
-    console.error('[webhook/rental] Failed to insert reservation items:', itemsError, '— reservation:', reservation.id);
-  }
-
-  console.info('[webhook/rental] Reservation created — id:', reservation.id, '— service:', serviceOfferingId);
-
-  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-  await notifyN8n('/webhook/rental-reservation-confirmed', {
-    reservationId: reservation.id, serviceOfferingId, customerName, customerEmail, customerPhone,
-    pickupDate, amountPaid: intent.amount / 100, items: itemsPayload,
-    adminLink: `${storefrontUrl}/admin/evenementiel/reservations-materiel`,
+  const result = await createRentalReservationFromRequest(supabase, {
+    serviceOfferingId, tenantId, items, pickupDate, customerName, customerEmail, customerPhone,
+    amountPaid:            intent.amount / 100,
+    stripePaymentIntentId: intent.id,
   });
 
+  if ('error' in result) {
+    console.error('[webhook/rental] createRentalReservationFromRequest failed:', result.error, '— intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  console.info('[webhook/rental] Reservation resolved — id:', result.reservationId, '— intent:', intent.id);
   return NextResponse.json({ received: true });
 }
 

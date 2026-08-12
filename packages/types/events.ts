@@ -182,7 +182,8 @@ export interface RentalReservation {
   customer_email: string;
   customer_phone: string | null;
   pickup_date: string;
-  stripe_payment_intent_id: string;
+  /** null pour une réservation confirmée via paiement par lien externe (Phase 3). */
+  stripe_payment_intent_id: string | null;
   amount_paid: number;
   status: RentalReservationStatus;
   created_at: string;
@@ -237,4 +238,28 @@ export interface RentalPaymentIntentMetadata {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+}
+
+// ─── Phase 3 — paiement via lien externe (location matériel) ───────────────
+
+export type RentalReservationRequestStatus = 'pending' | 'confirmed' | 'stock_conflict';
+
+export interface RentalReservationRequest {
+  id: string;
+  tenant_id: string;
+  service_offering_id: string;
+  items: RentalCheckoutItemInput[];
+  pickup_date: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  amount: number;
+  currency: string;
+  payment_method_type: string;
+  payment_method_label: string;
+  payment_link: string;
+  status: RentalReservationRequestStatus;
+  created_at: string;
+  confirmed_at: string | null;
+  reservation_id: string | null;
 }

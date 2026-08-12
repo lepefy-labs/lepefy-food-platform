@@ -25,9 +25,12 @@ interface AdminSidebarProps {
   categories: { id: string; name: string; slug: string }[];
   pendingPaymentsCount?: number;
   pendingEventRequestsCount?: number;
+  pendingRentalRequestsCount?: number;
 }
 
-export default function AdminSidebar({ categories, pendingPaymentsCount = 0, pendingEventRequestsCount = 0 }: AdminSidebarProps) {
+export default function AdminSidebar({
+  categories, pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0,
+}: AdminSidebarProps) {
   const pathname      = usePathname();
   const searchParams  = useSearchParams();
   const activeCategory = searchParams.get('category');
@@ -233,7 +236,7 @@ export default function AdminSidebar({ categories, pendingPaymentsCount = 0, pen
             { href: '/admin/evenementiel/scan', label: 'Scan' },
             { href: '/admin/evenementiel/services', label: 'Services' },
             { href: '/admin/evenementiel/devis', label: 'Demandes de devis' },
-            { href: '/admin/evenementiel/reservations-materiel', label: 'Réservations matériel' },
+            { href: '/admin/evenementiel/reservations-materiel', label: 'Réservations matériel', badge: pendingRentalRequestsCount },
             { href: '/admin/evenementiel/galerie', label: 'Galerie' },
           ].map((item) => (
             <Link
