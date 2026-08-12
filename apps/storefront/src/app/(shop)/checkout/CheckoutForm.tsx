@@ -14,7 +14,7 @@ import {
 } from '@stripe/react-stripe-js';
 import {
   IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift,
-  IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconExternalLink,
+  IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconArrowLeft,
 } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
@@ -183,13 +183,17 @@ export default function CheckoutForm({
   const { customer: sessionCustomer, refresh: refreshSessionCustomer } = useSessionCustomer();
   const [showLoginForm, setShowLoginForm] = useState(false);
 
+  // Trois étapes distinctes, comme le mockup (panier → livraison/coordonnées
+  // → paiement) : 'form' = coordonnées + adresse, 'select-payment' = choix du
+  // mode de paiement (stripe / lien externe / boutique — jamais mélangé avec
+  // l'adresse), 'payment' = Elements Stripe (uniquement si stripe choisi).
   const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(() => readStoredShipping());
-  const [step, setStep]                 = useState<'form' | 'payment'>('form');
+  const [step, setStep]                 = useState<'form' | 'select-payment' | 'payment'>('form');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentMode, setPaymentMode]   = useState<PaymentMode>('stripe');
-  // Décision 6 — disponible en delivery ET pickup, donc distinct de
-  // `paymentMode` (qui ne s'affiche qu'en pickup) : sélectionner un moyen
-  // externe prime sur `paymentMode` au submit, quel que soit fulfillmentType.
+  // Décision 6 — disponible en delivery ET pickup : sélectionner un moyen
+  // externe prime sur `paymentMode` à la confirmation, quel que soit
+  // fulfillmentType.
   const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError]   = useState<string | null>(null);
@@ -412,7 +416,11 @@ export default function CheckoutForm({
     isSubmitting ||
     (fulfillmentType === 'delivery' && (shippingRecalculating || quoteToken === null));
 
-  const onSubmit = async (data: FormValues) => {
+  // ── Étape 1 → 2 : validation des coordonnées/adresse uniquement ────────────
+  // Aucun appel API ici — le mode de paiement n'est pas encore choisi, donc
+  // ni /api/checkout ni /api/checkout/external-link ne peuvent être appelés
+  // avant l'étape 'select-payment'.
+  const onValidateForm = (data: FormValues) => {
     if (fulfillmentType === 'delivery' && (!data.street || !data.houseNumber || !data.city || !data.postal_code)) {
       setSubmitError('Veuillez compléter votre adresse de livraison.');
       return;
@@ -421,6 +429,13 @@ export default function CheckoutForm({
       setSubmitError('Veuillez corriger votre adresse pour recalculer les frais de livraison.');
       return;
     }
+    setSubmitError(null);
+    setStep('select-payment');
+  };
+
+  // ── Étape 2 : confirmation du mode de paiement choisi ───────────────────────
+  const handleConfirmPayment = async () => {
+    const data = getValues();
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -507,7 +522,7 @@ export default function CheckoutForm({
         return;
       }
 
-      // Stripe flow: proceed to payment step
+      // Stripe flow: proceed to Elements step
       setClientSecret(result.clientSecret);
       setStep('payment');
     } catch {
@@ -586,7 +601,7 @@ export default function CheckoutForm({
 
       {/* Step 1: Contact + address form */}
       {step === 'form' && (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+        <form onSubmit={handleSubmit(onValidateForm)} className="space-y-6" noValidate>
           {/* Guest → compte, optionnel — n'interrompt jamais le checkout guest */}
           {sessionCustomer ? (
             <p className="text-xs text-gray-400">
@@ -703,46 +718,82 @@ export default function CheckoutForm({
             </div>
           )}
 
-          {/* Payment method selector — pickup only */}
-          {isPickup && (
+          {submitError && (
+            <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{submitError}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitDisabled}
+            className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
+            {shippingRecalculating ? 'Recalcul des frais de livraison…' : 'Continuer vers le paiement'}
+          </button>
+        </form>
+      )}
+
+      {/* Step 2: Choix du mode de paiement — jamais mélangé à l'adresse
+          (Fix 2) : stripe, external_link (Décision 6 — delivery ET pickup)
+          et in_store (pickup uniquement) au même niveau, sous forme de cartes
+          sélectionnables, comme le mockup "Checkout boutique". */}
+      {step === 'select-payment' && (() => {
+        const selectedExternalMethod = externalPaymentMethods.find((pm) => pm.id === selectedExternalMethodId) ?? null;
+
+        const ctaLabel = selectedExternalMethod
+          ? `Créer la commande et ouvrir ${selectedExternalMethod.label ?? PAYMENT_METHOD_REGISTRY[selectedExternalMethod.method].label}`
+          : paymentMode === 'in_store'
+            ? 'Confirmer le retrait en boutique'
+            : 'Continuer vers le paiement';
+
+        const ctaColor = selectedExternalMethod
+          ? methodColor(selectedExternalMethod.method, 'var(--color-primary)')
+          : paymentMode === 'in_store'
+            ? '#8a8578'
+            : 'var(--color-primary)';
+
+        return (
+          <div className="space-y-6">
+            <button
+              type="button"
+              onClick={() => setStep('form')}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800"
+            >
+              <IconArrowLeft size={14} /> Retour
+            </button>
+
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
-              <div className="flex gap-2">
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => { setPaymentMode('stripe'); setSelectedExternalMethodId(null); }}
-                  className={`flex-1 py-3 px-3 rounded-xl border text-xs font-medium text-center transition-all ${
+                  className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
                     paymentMode === 'stripe' && !selectedExternalMethodId
-                      ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
+                      : 'border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  <IconCreditCard size={20} className="mx-auto mb-0.5" />
-                  Carte / Satispay
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                  >
+                    <IconCreditCard size={16} stroke={1.8} className="text-white" />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-gray-800">Carte bancaire</span>
+                    <span className="block text-xs text-gray-400 font-normal">Paiement sécurisé, confirmation immédiate</span>
+                  </span>
+                  <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
+                    paymentMode === 'stripe' && !selectedExternalMethodId
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding'
+                      : 'border-gray-300'
+                  }`} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setPaymentMode('in_store'); setSelectedExternalMethodId(null); }}
-                  className={`flex-1 py-3 px-3 rounded-xl border text-xs font-medium text-center transition-all ${
-                    paymentMode === 'in_store' && !selectedExternalMethodId
-                      ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <IconBuildingStore size={20} className="mx-auto mb-0.5" />
-                  Payer en boutique
-                </button>
-              </div>
-            </div>
-          )}
 
-          {/* Paiement via lien externe (PayPal/Revolut/autre) — disponible en
-              delivery ET pickup (Décision 6), jamais codé en dur par tenant :
-              une entrée par ligne tenant_payment_methods éligible (Task 3). */}
-          {externalPaymentMethods.length > 0 && (
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">Autres moyens de paiement</p>
-              <div className="space-y-2">
+                {/* Paiement via lien externe (PayPal/Revolut/autre) — disponible en
+                    delivery ET pickup (Décision 6), jamais codé en dur par tenant :
+                    une entrée par ligne tenant_payment_methods éligible (Task 3). */}
                 {externalPaymentMethods.map((pm) => {
                   const meta  = PAYMENT_METHOD_REGISTRY[pm.method];
                   const Icon  = PAYMENT_ICONS[meta.iconName];
@@ -752,7 +803,7 @@ export default function CheckoutForm({
                     <button
                       key={pm.id}
                       type="button"
-                      onClick={() => setSelectedExternalMethodId(selected ? null : pm.id)}
+                      onClick={() => setSelectedExternalMethodId(pm.id)}
                       className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
                         selected
                           ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
@@ -765,46 +816,83 @@ export default function CheckoutForm({
                       >
                         <Icon size={16} stroke={1.8} className="text-white" />
                       </span>
-                      <span className="flex-1 text-gray-700">{pm.label ?? meta.label}</span>
-                      <IconExternalLink size={15} className="text-gray-400 flex-shrink-0" />
+                      <span className="flex-1">
+                        <span className="block text-gray-800">{pm.label ?? meta.label}</span>
+                        <span className="block text-xs text-gray-400 font-normal">
+                          {pm.method === 'paypal' ? 'Lien direct · montant pré-rempli' : 'Lien direct · montant à saisir'}
+                        </span>
+                      </span>
+                      <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
+                        selected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding' : 'border-gray-300'
+                      }`} />
                     </button>
                   );
                 })}
+
+                {isPickup && (
+                  <button
+                    type="button"
+                    onClick={() => { setPaymentMode('in_store'); setSelectedExternalMethodId(null); }}
+                    className={`w-full flex items-center gap-3 py-3 px-3.5 rounded-xl border text-sm font-medium text-left transition-all ${
+                      paymentMode === 'in_store' && !selectedExternalMethodId
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light,#f0fdf4)]'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: '#8a8578' }}
+                    >
+                      <IconBuildingStore size={16} stroke={1.8} className="text-white" />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-gray-800">Retrait boutique</span>
+                      <span className="block text-xs text-gray-400 font-normal">Paiement sur place</span>
+                    </span>
+                    <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
+                      paymentMode === 'in_store' && !selectedExternalMethodId
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding'
+                        : 'border-gray-300'
+                    }`} />
+                  </button>
+                )}
               </div>
-              {selectedExternalMethodId && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Vous serez redirigé vers une page récapitulative avec le lien de paiement —
-                  votre commande sera confirmée dès réception du paiement par la boutique.
+
+              {/* Note dynamique — affichée uniquement une fois le moyen choisi,
+                  jamais avant (comportement mockup). */}
+              {selectedExternalMethod && (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 mt-3 leading-relaxed">
+                  {selectedExternalMethod.method === 'paypal'
+                    ? <>Sélectionnez « Amis et famille » lors du paiement pour éviter les frais. Le montant ({formatPrice(total, tenant.currency)}) sera pré-rempli dans le lien.</>
+                    : <>Le montant n&apos;est pas prérempli sur ce lien — saisissez-le manuellement : <strong>{formatPrice(total, tenant.currency)}</strong>.</>
+                  }
                 </p>
               )}
             </div>
-          )}
 
-          {submitError && (
-            <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{submitError}</p>
-          )}
+            {submitError && (
+              <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{submitError}</p>
+            )}
 
-          <button
-            type="submit"
-            disabled={isSubmitDisabled}
-            className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            {isSubmitting
-              ? 'Traitement…'
-              : shippingRecalculating
-                ? 'Recalcul des frais de livraison…'
-                : selectedExternalMethodId
-                  ? `Continuer — ${formatPrice(total, tenant.currency)}`
-                  : paymentMode === 'in_store' && isPickup
-                    ? `Confirmer la commande — ${formatPrice(total, tenant.currency)}`
-                    : 'Continuer vers le paiement'
-            }
-          </button>
-        </form>
-      )}
+            <button
+              type="button"
+              onClick={handleConfirmPayment}
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
+              style={{ backgroundColor: ctaColor }}
+            >
+              {isSubmitting
+                ? 'Traitement…'
+                : paymentMode === 'stripe' && !selectedExternalMethod
+                  ? ctaLabel
+                  : `${ctaLabel} — ${formatPrice(total, tenant.currency)}`
+              }
+            </button>
+          </div>
+        );
+      })()}
 
-      {/* Step 2: Stripe Payment */}
+      {/* Step 3: Stripe Payment */}
       {step === 'payment' && clientSecret && (
         <div>
           {submitError && (

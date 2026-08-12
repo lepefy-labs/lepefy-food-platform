@@ -82,7 +82,13 @@ export async function createOrderFromCheckoutSession(
       total,
       ambassador_discount_amount: ambassadorDiscount,
       payment_method:            isStripe ? 'stripe' : 'external_link',
-      payment_status:            isStripe ? 'paid' : 'pending',
+      // 'paid' dans les deux cas : cette fonction n'est appelée qu'après
+      // confirmation du paiement — payment_intent.succeeded pour Stripe, clic
+      // "Confirmer réception" côté admin pour external_link (l'équivalent
+      // manuel de payment_intent.succeeded, voir Fix 1). Le ramo stock_conflict
+      // plus bas peut ensuite repasser ce statut à 'pending' (external_link)
+      // ou 'refunded' (Stripe, remboursement automatique) — logique inchangée.
+      payment_status:            'paid',
       stripe_payment_intent_id:  opts.stripePaymentIntentId ?? null,
       external_payment_type:     isStripe ? null : session.external_payment_type ?? null,
       external_payment_label:    isStripe ? null : session.external_payment_label ?? null,
