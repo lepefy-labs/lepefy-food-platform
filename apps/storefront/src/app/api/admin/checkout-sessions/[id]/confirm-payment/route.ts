@@ -34,6 +34,18 @@ export async function POST(
   }
 
   if (!session) {
+    const { data: broad } = await supabase
+      .from('checkout_sessions')
+      .select('id, tenant_id, payment_method')
+      .eq('id', params.id)
+      .maybeSingle();
+
+    console.error(
+      '[admin/checkout-sessions/confirm-payment] session not found with filters —',
+      'requested tenant_id:', tenant.id,
+      '— found row:', broad ?? 'NESSUNA RIGA CON QUESTO ID',
+    );
+
     return NextResponse.json({ error: 'Demande de paiement introuvable — a-t-elle déjà été traitée ?' }, { status: 404 });
   }
 
