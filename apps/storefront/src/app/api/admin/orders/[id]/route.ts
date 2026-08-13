@@ -129,6 +129,7 @@ export async function PATCH(
 
         const n8nPayload = {
           orderId:          params.id,
+          orderNumber:      `#${params.id.slice(0, 8).toUpperCase()}`,
           email:            existing.email,
           fullName:         existing.full_name ?? '',
           trackingCode:     tracking_code    ?? null,
