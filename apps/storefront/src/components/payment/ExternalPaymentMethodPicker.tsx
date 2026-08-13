@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet } from '@tabler/icons-react';
+import { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconCreditCard } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod } from '@lepefy/types';
@@ -17,6 +17,7 @@ const PAYMENT_ICONS = {
   IconBrandPaypal,
   IconQrcode,
   IconWallet,
+  IconCreditCard,
 };
 
 export interface PaymentOption {

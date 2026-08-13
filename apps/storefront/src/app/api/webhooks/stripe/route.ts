@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
+import { notifyN8n } from '@/lib/events/notifyN8n';
 import type { ShippingAddress } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -73,6 +74,14 @@ export async function POST(req: NextRequest) {
   // ── payment_intent.succeeded — create order from checkout_session ──────────
   if (event.type === 'payment_intent.succeeded') {
     const intent    = event.data.object as Stripe.PaymentIntent;
+
+    // Paiement carte à montant libre depuis /card (scan QR) — domaine
+    // indépendant de orders/checkout_sessions, routé avant la logique
+    // commande existante, jamais mélangé avec elle.
+    if (intent.metadata?.type === 'card_quick_payment') {
+      return handleCardQuickPaymentSucceeded(intent);
+    }
+
     const sessionId = intent.metadata?.session_id;
     const tenantId  = intent.metadata?.tenant_id;
 
@@ -383,6 +392,72 @@ export async function POST(req: NextRequest) {
       console.warn('[webhook] Could not update failed order (may not exist yet):', error);
     }
   }
+
+  return NextResponse.json({ received: true });
+}
+
+// ─── card_quick_payment — paiement carte à montant libre depuis /card ────────
+// Domaine indépendant de orders/checkout_sessions (voir api/card/quick-pay).
+// Notification n8n destinée au tenant (Dalice) uniquement — pas de reçu
+// automatique au client, customer_email ne sert ici qu'à informer le tenant.
+async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Promise<NextResponse> {
+  const quickPaymentId = intent.metadata?.quick_payment_id;
+
+  console.info('[webhook] card_quick_payment succeeded — intent:', intent.id, '— quick_payment_id:', quickPaymentId);
+
+  if (!quickPaymentId) {
+    console.error('[webhook] No quick_payment_id in PaymentIntent metadata — intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: payment, error: fetchError } = await supabase
+    .from('tenant_card_payments')
+    .select('id, tenant_id, amount, currency, customer_name, customer_email, status')
+    .eq('id', quickPaymentId)
+    .maybeSingle();
+
+  if (fetchError || !payment) {
+    console.error('[webhook] tenant_card_payments row not found — id:', quickPaymentId, '— error:', fetchError);
+    return NextResponse.json({ received: true });
+  }
+
+  // Idempotence — un retry de Stripe ne doit pas renvoyer une seconde
+  // notification n8n pour le même paiement.
+  if (payment.status === 'paid') {
+    console.info('[webhook] card_quick_payment already marked paid — skipping — id:', quickPaymentId);
+    return NextResponse.json({ received: true });
+  }
+
+  const paidAt = new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from('tenant_card_payments')
+    .update({ status: 'paid', paid_at: paidAt })
+    .eq('id', quickPaymentId);
+
+  if (updateError) {
+    console.error('[webhook] Failed to mark card_quick_payment as paid:', updateError, '— id:', quickPaymentId);
+    return NextResponse.json({ received: true });
+  }
+
+  const { data: tenantRow } = await supabase
+    .from('tenants')
+    .select('name')
+    .eq('id', payment.tenant_id)
+    .maybeSingle();
+
+  await notifyN8n('/webhook/card-quick-payment', {
+    tenant_id:                payment.tenant_id,
+    tenant_name:               tenantRow?.name ?? null,
+    amount:                    payment.amount,
+    currency:                  payment.currency,
+    customer_name:             payment.customer_name,
+    customer_email:            payment.customer_email,
+    paid_at:                   paidAt,
+    stripe_payment_intent_id:  intent.id,
+  });
 
   return NextResponse.json({ received: true });
 }

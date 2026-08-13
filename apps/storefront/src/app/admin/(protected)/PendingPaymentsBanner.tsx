@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconClock, IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet } from '@tabler/icons-react';
+import { IconClock, IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconCreditCard } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
 import ConfirmPaymentButton from '../_components/ui/ConfirmPaymentButton';
@@ -14,6 +14,7 @@ const PAYMENT_ICONS = {
   IconBrandPaypal,
   IconQrcode,
   IconWallet,
+  IconCreditCard,
 };
 
 export interface PendingPaymentSession {

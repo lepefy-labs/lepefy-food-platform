@@ -8,7 +8,14 @@ const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
 const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
 
-const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other'];
+const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+
+// 'card' est un simple on/off — le montant est saisi par le client à chaque
+// paiement (checkout Stripe Elements sur /card), jamais de value/extra à
+// configurer ici, même traitement que 'cash'.
+function hasNoValueFields(method: PaymentMethodType): boolean {
+  return method === 'cash' || method === 'card';
+}
 
 interface FormState {
   method: PaymentMethodType;
@@ -43,7 +50,7 @@ function formToBody(form: FormState) {
     method: form.method,
     label: form.label || null,
     value: form.value || null,
-    extra: form.method === 'cash' ? null : {
+    extra: hasNoValueFields(form.method) ? null : {
       ...(form.method === 'bank_transfer' ? { beneficiary: form.beneficiary, bic: form.bic } : {}),
       link: form.link,
     },
@@ -127,7 +134,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
         method: form.method,
         label: form.label || null,
         value: form.value || null,
-        extra: form.method === 'cash' ? null : {
+        extra: hasNoValueFields(form.method) ? null : {
           ...(form.method === 'bank_transfer' ? { beneficiary: form.beneficiary, bic: form.bic } : {}),
           link: form.link,
         },
@@ -180,7 +187,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                 </div>
               </div>
 
-              {form.method !== 'cash' && (
+              {!hasNoValueFields(form.method) && (
                 <div className="mb-3">
                   <label className={LABEL_CLS}>Lien de paiement direct (optionnel)</label>
                   <input
@@ -193,7 +200,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                 </div>
               )}
 
-              {form.method !== 'cash' && (
+              {!hasNoValueFields(form.method) && (
                 <div className="mb-3">
                   <label className={LABEL_CLS}>Valeur (IBAN / lien)</label>
                   <input
@@ -299,7 +306,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           </div>
         </div>
 
-        {newForm.method !== 'cash' && (
+        {!hasNoValueFields(newForm.method) && (
           <div className="mb-3">
             <label className={LABEL_CLS}>Lien de paiement direct (optionnel)</label>
             <input
@@ -312,7 +319,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           </div>
         )}
 
-        {newForm.method !== 'cash' && (
+        {!hasNoValueFields(newForm.method) && (
           <div className="mb-3">
             <label className={LABEL_CLS}>Valeur (IBAN / lien)</label>
             <input

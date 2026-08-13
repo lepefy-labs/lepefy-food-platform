@@ -6,7 +6,14 @@ import type { PaymentMethodType } from '@lepefy/types';
 
 export const runtime = 'nodejs';
 
-const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other'];
+const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+
+// 'card' est un simple on/off (montant saisi par le client à chaque paiement,
+// cf. api/card/quick-pay) — jamais de value/extra à renseigner, même
+// traitement que 'cash'.
+function hasNoValueFields(method: PaymentMethodType): boolean {
+  return method === 'cash' || method === 'card';
+}
 
 function cleanExtra(raw: unknown): Record<string, string> | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -39,8 +46,8 @@ export async function PATCH(
 
     if (method !== undefined) updatePayload.method = method;
     if ('label'      in body) updatePayload.label      = body.label ? String(body.label).trim() : null;
-    if ('value'      in body) updatePayload.value      = (method ?? body.method) === 'cash' ? null : (body.value ? String(body.value).trim() : null);
-    if ('extra'      in body) updatePayload.extra      = (method ?? body.method) === 'cash' ? null : cleanExtra(body.extra);
+    if ('value'      in body) updatePayload.value      = hasNoValueFields((method ?? body.method) as PaymentMethodType) ? null : (body.value ? String(body.value).trim() : null);
+    if ('extra'      in body) updatePayload.extra      = hasNoValueFields((method ?? body.method) as PaymentMethodType) ? null : cleanExtra(body.extra);
     if ('sort_order' in body) updatePayload.sort_order = parseInt(String(body.sort_order), 10) || 0;
     if ('active'     in body) updatePayload.active     = Boolean(body.active);
 

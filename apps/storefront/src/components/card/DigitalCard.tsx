@@ -20,11 +20,13 @@ import {
   IconBrandPaypal,
   IconQrcode,
   IconWallet,
+  IconCreditCard,
   IconCopy,
   IconCheck,
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, PAYMENT_METHOD_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
+import { CardQuickPay } from './CardQuickPay';
 import { methodColor, hexToRgba, isEmailValue } from '@/lib/card/methodColor';
 
 const ICONS = {
@@ -42,6 +44,7 @@ const PAYMENT_ICONS = {
   IconBrandPaypal,
   IconQrcode,
   IconWallet,
+  IconCreditCard,
 };
 
 type Lang = 'fr' | 'it';
@@ -142,6 +145,7 @@ interface DigitalCardProps {
     click_collect_hours_it: string | null;
     whatsapp_number: string | null;
     storefront_ready: boolean;
+    currency: string;
   };
   socialLinks: TenantSocialLink[];
   paymentMethods: TenantPaymentMethod[];
@@ -162,6 +166,10 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
 
   const t = COPY[lang];
   const initials = tenant.name.slice(0, 2).toUpperCase();
+
+  // Seul le tuile 'card' ouvre un formulaire — les autres méthodes restent
+  // en simple affichage statique. Un seul repli ouvert à la fois.
+  const [expandedCardMethodId, setExpandedCardMethodId] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
@@ -260,7 +268,14 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
                         border: `1px solid ${hexToRgba(color, 0.25)}`,
                       }}
                     >
-                      <div className="flex items-center gap-2.5 mb-1.5">
+                      <div
+                        className={`flex items-center gap-2.5 mb-1.5 ${pm.method === 'card' ? 'cursor-pointer' : ''}`}
+                        onClick={
+                          pm.method === 'card'
+                            ? () => setExpandedCardMethodId((cur) => (cur === pm.id ? null : pm.id))
+                            : undefined
+                        }
+                      >
                         <div
                           className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                           style={{ backgroundColor: color }}
@@ -272,6 +287,10 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
 
                       {pm.method === 'cash' && (
                         <p className="text-xs text-gray-400 pl-[42px]">{t.cashNote}</p>
+                      )}
+
+                      {pm.method === 'card' && expandedCardMethodId === pm.id && (
+                        <CardQuickPay tenantColor={tenant.primary_color} currency={tenant.currency} lang={lang} />
                       )}
 
                       {pm.extra?.link && (

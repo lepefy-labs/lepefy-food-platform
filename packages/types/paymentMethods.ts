@@ -3,7 +3,8 @@ export type PaymentMethodType =
   | 'bank_transfer'
   | 'cash'
   | 'paypal'
-  | 'other';
+  | 'other'
+  | 'card';
 
 export interface PaymentMethodMeta {
   label: string;
@@ -12,7 +13,8 @@ export interface PaymentMethodMeta {
     | 'IconBuildingBank'
     | 'IconCash'
     | 'IconBrandPaypal'
-    | 'IconWallet';
+    | 'IconWallet'
+    | 'IconCreditCard';
 }
 
 // Registro condiviso a livello di piattaforma — stesso pattern di
@@ -24,6 +26,7 @@ export const PAYMENT_METHOD_REGISTRY: Record<PaymentMethodType, PaymentMethodMet
   cash:          { label: 'Espèces',             iconName: 'IconCash' },
   paypal:        { label: 'PayPal',              iconName: 'IconBrandPaypal' },
   other:         { label: 'Autre',               iconName: 'IconWallet' },
+  card:          { label: 'Carte bancaire',      iconName: 'IconCreditCard' },
 };
 
 export interface TenantPaymentMethod {
