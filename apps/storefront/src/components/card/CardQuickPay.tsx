@@ -183,7 +183,7 @@ export function CardQuickPay({
 
   if (paid) {
     return (
-      <div className="pl-[42px] flex items-center gap-2 text-sm font-medium" style={{ color: tenantColor }}>
+      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: tenantColor }}>
         <IconCheck size={16} stroke={2.2} />
         {copy.thanks}
       </div>
@@ -192,7 +192,7 @@ export function CardQuickPay({
 
   if (clientSecret) {
     return (
-      <div className="pl-[42px]">
+      <div>
         <Elements stripe={getStripe()} options={{ clientSecret, locale: lang === 'it' ? 'it' : 'fr' }}>
           <QuickPayPaymentStep
             amount={confirmedAmount}
@@ -209,7 +209,7 @@ export function CardQuickPay({
   }
 
   return (
-    <div className="pl-[42px] space-y-2">
+    <div className="space-y-2">
       <input
         type="number"
         inputMode="decimal"

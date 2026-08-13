@@ -15,19 +15,10 @@ import {
   IconBrandYoutube,
   IconBrandLinkedin,
   IconBrandX,
-  IconBuildingBank,
-  IconCash,
-  IconBrandPaypal,
-  IconQrcode,
-  IconWallet,
-  IconCreditCard,
-  IconCopy,
-  IconCheck,
 } from '@tabler/icons-react';
-import { SOCIAL_PLATFORM_REGISTRY, PAYMENT_METHOD_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
+import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
-import { CardQuickPay } from './CardQuickPay';
-import { methodColor, hexToRgba, isEmailValue } from '@/lib/card/methodColor';
+import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
 
 const ICONS = {
   IconBrandInstagram,
@@ -38,15 +29,6 @@ const ICONS = {
   IconBrandX,
 };
 
-const PAYMENT_ICONS = {
-  IconBuildingBank,
-  IconCash,
-  IconBrandPaypal,
-  IconQrcode,
-  IconWallet,
-  IconCreditCard,
-};
-
 type Lang = 'fr' | 'it';
 
 const COPY: Record<Lang, {
@@ -54,10 +36,6 @@ const COPY: Record<Lang, {
   whatsapp: string;
   products: string;
   addContact: string;
-  payTitle: string;
-  copy: string;
-  copied: string;
-  cashNote: string;
   comingSoon: string;
 }> = {
   fr: {
@@ -65,10 +43,6 @@ const COPY: Record<Lang, {
     whatsapp: 'Contacter sur WhatsApp',
     products: 'Voir nos produits',
     addContact: 'Ajouter aux contacts',
-    payTitle: 'Comment payer',
-    copy: 'Copier',
-    copied: 'Copié !',
-    cashNote: 'Espèces acceptées en boutique',
     comingSoon: 'Boutique en ligne bientôt disponible',
   },
   it: {
@@ -76,61 +50,9 @@ const COPY: Record<Lang, {
     whatsapp: 'Contatta su WhatsApp',
     products: 'Vedi i nostri prodotti',
     addContact: 'Aggiungi ai contatti',
-    payTitle: 'Come pagare',
-    copy: 'Copia',
-    copied: 'Copiato!',
-    cashNote: 'Contanti accettati in negozio',
     comingSoon: 'Negozio online in arrivo',
   },
 };
-
-function CopyableValue({ value, displayValue, color, copyLabel: _copyLabel, copiedLabel: _copiedLabel }: {
-  value: string; displayValue?: string; color: string; copyLabel: string; copiedLabel: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={() => {
-        navigator.clipboard.writeText(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-      className="flex items-center justify-between w-full gap-2 rounded-lg px-3 py-2 text-left border-2 transition-all active:scale-[0.98]"
-      style={{
-        backgroundColor: hexToRgba(color, copied ? 0.16 : 0.09),
-        borderColor: hexToRgba(color, copied ? 0.5 : 0.3),
-      }}
-    >
-      <span className="font-mono text-xs font-medium text-gray-800 truncate">{displayValue ?? value}</span>
-      {copied ? (
-        <IconCheck size={16} stroke={2.2} className="shrink-0" style={{ color }} />
-      ) : (
-        <IconCopy size={16} stroke={2} className="shrink-0" style={{ color }} />
-      )}
-    </button>
-  );
-}
-
-function CopyableLine({ label, value, className }: { label?: string; value: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={() => {
-        navigator.clipboard.writeText(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-      className={`flex items-center gap-1 ${className ?? ''}`}
-    >
-      <span>{label ? `${label}: ${value}` : value}</span>
-      {copied ? (
-        <IconCheck size={11} className="text-green-600 shrink-0" />
-      ) : (
-        <IconCopy size={11} className="text-gray-400 shrink-0" />
-      )}
-    </button>
-  );
-}
 
 interface DigitalCardProps {
   tenant: {
@@ -166,10 +88,6 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
 
   const t = COPY[lang];
   const initials = tenant.name.slice(0, 2).toUpperCase();
-
-  // Seul le tuile 'card' ouvre un formulaire — les autres méthodes restent
-  // en simple affichage statique. Un seul repli ouvert à la fois.
-  const [expandedCardMethodId, setExpandedCardMethodId] = useState<string | null>(null);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
@@ -248,120 +166,12 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: DigitalCard
             ) : null;
           })()}
 
-          {paymentMethods.length > 0 && (
-            <div className="mb-4">
-              <p className="text-xs text-gray-400 mb-2" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.payTitle}</p>
-              <div className="flex flex-col gap-2">
-                {paymentMethods.map((pm) => {
-                  const meta = PAYMENT_METHOD_REGISTRY[pm.method];
-                  const Icon = PAYMENT_ICONS[meta.iconName];
-                  const label = pm.label ?? meta.label;
-
-                  const color = methodColor(pm.method, tenant.primary_color);
-
-                  return (
-                    <div
-                      key={pm.id}
-                      className="rounded-2xl p-3.5"
-                      style={{
-                        background: hexToRgba(color, 0.08),
-                        border: `1px solid ${hexToRgba(color, 0.25)}`,
-                      }}
-                    >
-                      <div
-                        className={`flex items-center gap-2.5 mb-1.5 ${pm.method === 'card' ? 'cursor-pointer' : ''}`}
-                        onClick={
-                          pm.method === 'card'
-                            ? () => setExpandedCardMethodId((cur) => (cur === pm.id ? null : pm.id))
-                            : undefined
-                        }
-                      >
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: color }}
-                        >
-                          <Icon size={16} stroke={1.8} className="text-white" />
-                        </div>
-                        <span className="text-sm font-bold text-gray-800" style={{ fontFamily: 'var(--font-card-heading)' }}>{label}</span>
-                      </div>
-
-                      {pm.method === 'cash' && (
-                        <p className="text-xs text-gray-400 pl-[42px]">{t.cashNote}</p>
-                      )}
-
-                      {pm.method === 'card' && expandedCardMethodId === pm.id && (
-                        <CardQuickPay tenantColor={tenant.primary_color} currency={tenant.currency} lang={lang} />
-                      )}
-
-                      {pm.extra?.link && (
-                        <a
-                          href={pm.extra.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="pl-[42px] text-xs font-semibold underline block mb-1.5"
-                          style={{ color }}
-                        >
-                          {pm.extra.link}
-                        </a>
-                      )}
-
-                      {pm.method === 'bank_transfer' && pm.value && (
-                        <div className="pl-[42px] flex flex-col gap-1">
-                          {pm.extra?.beneficiary && (
-                            <CopyableLine value={pm.extra.beneficiary} className="text-xs text-gray-500" />
-                          )}
-                          <CopyableValue
-                            value={pm.value}
-                            displayValue={pm.value}
-                            color={color}
-                            copyLabel={t.copy}
-                            copiedLabel={t.copied}
-                          />
-                          {pm.extra?.bic && (
-                            <CopyableLine label="BIC" value={pm.extra.bic} className="text-[11px] text-gray-400" />
-                          )}
-                        </div>
-                      )}
-
-                      {pm.method === 'satispay' && pm.value && (
-                        <a
-                          href={pm.value}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="pl-[42px] text-xs font-medium underline"
-                          style={{ color: tenant.primary_color }}
-                        >
-                          {pm.value}
-                        </a>
-                      )}
-
-                      {pm.method === 'paypal' && pm.value && (
-                        isEmailValue(pm.value) ? (
-                          <div className="pl-[42px]">
-                            <CopyableValue value={pm.value} color={color} copyLabel={t.copy} copiedLabel={t.copied} />
-                          </div>
-                        ) : (
-                          <a
-                            href={pm.value}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="pl-[42px] text-xs font-medium underline"
-                            style={{ color: tenant.primary_color }}
-                          >
-                            {pm.value}
-                          </a>
-                        )
-                      )}
-
-                      {pm.method === 'other' && pm.value && (
-                        <p className="text-xs text-gray-500 pl-[42px]">{pm.value}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <PaymentMethodsAccordion
+            paymentMethods={paymentMethods}
+            primaryColor={tenant.primary_color}
+            currency={tenant.currency}
+            lang={lang}
+          />
 
           <div
             className="rounded-2xl p-3.5 mb-3"
