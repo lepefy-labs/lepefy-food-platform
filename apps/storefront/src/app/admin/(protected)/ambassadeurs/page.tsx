@@ -6,6 +6,7 @@ import { AmbassadorsListSection, type AmbassadorListRow } from './AmbassadorsLis
 import { CommissionsSection, type CommissionRow } from './CommissionsSection';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface AmbassadorCustomerRow {
   id: string;

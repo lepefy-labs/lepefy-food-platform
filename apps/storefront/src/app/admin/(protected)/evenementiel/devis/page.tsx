@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import InquiriesClient from './InquiriesClient';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface InquiryWithService {
   id: string;

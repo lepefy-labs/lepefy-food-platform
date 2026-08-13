@@ -8,6 +8,7 @@ import ProductEditClient from '../[id]/ProductEditClient';
 // cette page perdait son seul déclencheur dynamique implicite (elle-même
 // n'utilise que createServiceClient(), sans cookies()).
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AdminNouveauProduitPage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

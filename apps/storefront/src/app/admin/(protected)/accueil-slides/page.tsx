@@ -4,6 +4,7 @@ import { HeroSlidesSection } from './HeroSlidesSection';
 import type { TenantHeroSlide } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AccueilSlidesPage() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

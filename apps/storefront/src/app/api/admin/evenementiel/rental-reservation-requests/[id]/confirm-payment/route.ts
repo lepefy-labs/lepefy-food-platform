@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -85,6 +86,9 @@ export async function POST(
 
   console.info('[admin/evenementiel/rental-reservation-requests/confirm-payment] Reservation created — id:', result.reservationId,
     '— request:', request.id);
+
+  revalidatePath('/admin');
+  revalidatePath('/admin/evenementiel/reservations-materiel');
 
   return NextResponse.json({ reservationId: result.reservationId });
 }

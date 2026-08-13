@@ -10,6 +10,7 @@ import type { ListOrder } from './OrdersTable'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
 
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store';
 
 // ─── KPI card ─────────────────────────────────────────────────────────────────
 

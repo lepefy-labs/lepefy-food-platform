@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import ProductEditClient from './ProductEditClient';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AdminProductEditPage({
   params,

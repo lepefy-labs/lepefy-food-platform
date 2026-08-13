@@ -4,6 +4,7 @@ import GalleryClient, { type GalleryEventOption } from './GalleryClient';
 import type { EventGalleryPhoto } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AdminGalleryPage() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

@@ -4,6 +4,7 @@ import RentalReservationsClient from './RentalReservationsClient';
 import type { RentalReservationRequest } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface RentalReservationWithDetails {
   id: string;

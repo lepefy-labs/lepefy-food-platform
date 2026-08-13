@@ -5,6 +5,7 @@ import ServiceDetailAdminClient from './ServiceDetailAdminClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AdminServiceDetailPage({ params }: { params: { id: string } }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

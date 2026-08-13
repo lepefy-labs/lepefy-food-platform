@@ -5,6 +5,7 @@ import type { LabelPrintJob } from '@lepefy/types';
 import LabelJobEditorClient from './LabelJobEditorClient';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function LabelJobEditorPage({ params }: { params: { id: string; jobId: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

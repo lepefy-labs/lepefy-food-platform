@@ -6,6 +6,7 @@ import AutoPrint from '../AutoPrint';
 import type { Order, OrderItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   searchParams: { ids?: string };

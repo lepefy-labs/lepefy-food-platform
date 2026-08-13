@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import CatalogueTable from './CatalogueTable';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   searchParams: {

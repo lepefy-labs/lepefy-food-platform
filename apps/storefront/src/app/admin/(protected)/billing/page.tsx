@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { AiUsageMonthlyByTenant } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';

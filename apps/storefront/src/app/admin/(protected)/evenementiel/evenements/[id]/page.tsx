@@ -5,6 +5,7 @@ import EventDetailAdminClient from './EventDetailAdminClient';
 import type { EventRow, EventTicketType, EventReservation, EventReservationRequest } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AdminEventDetailPage({ params }: { params: { id: string } }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

@@ -8,6 +8,7 @@ import { LegalInfoSection } from './LegalInfoSection';
 import type { TenantPaymentMethod, TenantSocialLink } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function ParametresPage() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

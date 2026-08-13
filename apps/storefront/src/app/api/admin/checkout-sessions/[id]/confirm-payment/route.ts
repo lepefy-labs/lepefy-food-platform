@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -67,6 +68,8 @@ export async function POST(
   }
 
   console.info('[admin/checkout-sessions/confirm-payment] Order created — id:', result.order.id, '— session:', params.id);
+
+  revalidatePath('/admin');
 
   return NextResponse.json({ order: result.order });
 }

@@ -5,6 +5,7 @@ import ServicesListClient from './ServicesListClient';
 import type { ServiceOffering } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function AdminServicesPage() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

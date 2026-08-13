@@ -9,6 +9,7 @@ import PickingList from '../../../orders/[id]/PickingList';
 import type { Order, OrderItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   params: { id: string };
