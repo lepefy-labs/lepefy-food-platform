@@ -8,6 +8,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 const MAX_QUANTITY_PER_TICKET = 999;
 
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 interface EventCheckoutBody {
   items:          EventCheckoutItemInput[];
   customer_name:  string;
@@ -29,6 +33,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     if (!rawItems?.length || !customer_name?.trim() || !customer_email?.trim()) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
+    }
+
+    if (!isValidEmail(customer_email)) {
+      return NextResponse.json({ error: 'Adresse email invalide.' }, { status: 400 });
     }
 
     for (const i of rawItems) {

@@ -25,6 +25,10 @@ function getStripe() {
 
 type Step = 'select' | 'info' | 'select-payment' | 'payment';
 
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 interface Props {
   event:       { id: string; slug: string; title: string; capacityRemaining: number };
   ticketTypes: EventTicketType[];
@@ -124,6 +128,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [name, setName]   = useState('');
   const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
   const [phone, setPhone] = useState('');
   const [step, setStep]   = useState<Step>('select');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -187,6 +192,11 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     setError(null);
     if (!name.trim() || !email.trim()) {
       setError('Nom et email sont obligatoires.');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setEmailTouched(true);
+      setError('Adresse email invalide.');
       return;
     }
     setStep('select-payment');
@@ -314,6 +324,8 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   );
 
   if (step === 'info') {
+    const emailInvalid = emailTouched && email.trim().length > 0 && !isValidEmail(email);
+
     return (
       <div className="space-y-5">
         <EventStepper current={step} />
@@ -332,11 +344,24 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 space-y-3">
           <p className="text-sm font-semibold text-gray-700">Vos informations</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={inputClass} />
-          <p className="flex items-center gap-1.5 text-xs text-gray-500 -mt-1.5">
-            <IconInfoCircle size={13} className="shrink-0" />
-            Vérifiez bien votre adresse — c&apos;est ici que vous recevrez votre billet.
-          </p>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
+            type="email"
+            placeholder="Email"
+            className={`${inputClass} ${emailInvalid ? 'border-red-300 focus:border-red-400 focus:ring-red-300' : ''}`}
+          />
+          {emailInvalid ? (
+            <p className="text-xs text-red-500 -mt-1.5">
+              Adresse email invalide — vérifiez le format (ex : nom@domaine.com).
+            </p>
+          ) : (
+            <p className="flex items-center gap-1.5 text-xs text-gray-500 -mt-1.5">
+              <IconInfoCircle size={13} className="shrink-0" />
+              Vérifiez bien votre adresse — c&apos;est ici que vous recevrez votre billet.
+            </p>
+          )}
           <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
         </div>
 
