@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Image from 'next/image';
 import AdminMobileNav from './AdminMobileNav';
+import AdminGlobalSearch from './AdminGlobalSearch';
 import ThemeToggleButton from './ThemeToggleButton';
 import NotificationBell from './ui/NotificationBell';
 import LogoutButton from '../LogoutButton';
@@ -40,6 +41,7 @@ export default function AdminHeader({ tenantName, tenantLogoUrl, categories }: A
         </span>
       </div>
       <div className="ml-auto flex items-center gap-1">
+        <AdminGlobalSearch />
         <NotificationBell />
         <ThemeToggleButton />
         <LogoutButton />
