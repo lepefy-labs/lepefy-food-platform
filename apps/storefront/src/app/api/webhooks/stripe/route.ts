@@ -5,7 +5,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
-import type { ShippingAddress } from '@lepefy/types';
+import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
+import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -80,6 +81,13 @@ export async function POST(req: NextRequest) {
     // commande existante, jamais mélangé avec elle.
     if (intent.metadata?.type === 'card_quick_payment') {
       return handleCardQuickPaymentSucceeded(intent);
+    }
+
+    // Réservation billetterie événementiel payée par carte (Stripe Elements
+    // sur /evenements/[id]) — domaine indépendant de orders/checkout_sessions,
+    // routé avant la logique commande existante, jamais mélangé avec elle.
+    if (intent.metadata?.type === 'event_reservation') {
+      return handleEventReservationPaymentSucceeded(intent);
     }
 
     const sessionId = intent.metadata?.session_id;
@@ -458,6 +466,83 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     paid_at:                   paidAt,
     stripe_payment_intent_id:  intent.id,
   });
+
+  return NextResponse.json({ received: true });
+}
+
+// ─── event_reservation — billetterie événementiel payée par carte (Stripe) ───
+// Réutilise createEventReservationFromRequest, déjà utilisée telle quelle par
+// le flux Phase 2 (external_link, confirmation manuelle) — voir
+// api/admin/evenementiel/reservation-requests/[id]/confirm-payment. Toute la
+// logique métier (capacité, qr_token, remboursement, notification n8n avec
+// ticketUrl) vit dans cette fonction partagée ; ce handler ne fait que router
+// les metadata du PaymentIntent et gérer l'idempotence côté webhook.
+async function handleEventReservationPaymentSucceeded(intent: Stripe.PaymentIntent): Promise<NextResponse> {
+  const eventId       = intent.metadata?.event_id;
+  const tenantId       = intent.metadata?.tenant_id;
+  const rawItems       = intent.metadata?.items;
+  const customerName   = intent.metadata?.customer_name ?? '';
+  const customerEmail  = intent.metadata?.customer_email ?? '';
+  const customerPhone  = intent.metadata?.customer_phone ?? '';
+
+  console.info('[webhook] event_reservation succeeded — intent:', intent.id,
+    '— event_id:', eventId, '— tenant_id:', tenantId);
+
+  if (!eventId || !tenantId || !rawItems) {
+    console.error('[webhook] Missing event_id/tenant_id/items in PaymentIntent metadata — intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  let items: EventCheckoutItemInput[];
+  try {
+    items = JSON.parse(rawItems) as EventCheckoutItemInput[];
+  } catch (parseErr) {
+    console.error('[webhook] Failed to parse items JSON in PaymentIntent metadata — intent:', intent.id, '— error:', parseErr);
+    return NextResponse.json({ received: true });
+  }
+
+  const supabase = createServiceClient();
+
+  // ── Idempotency: check if reservation already exists ────────────────────
+  const { data: existing } = await supabase
+    .from('event_reservations')
+    .select('id')
+    .eq('stripe_payment_intent_id', intent.id)
+    .maybeSingle();
+
+  if (existing) {
+    console.info('[webhook] Event reservation already exists for intent:', intent.id, '— skipping');
+    return NextResponse.json({ received: true });
+  }
+
+  const result = await createEventReservationFromRequest(supabase, {
+    eventId,
+    tenantId,
+    items,
+    customerName,
+    customerEmail,
+    customerPhone,
+    amountPaid:             intent.amount / 100,
+    stripePaymentIntentId:  intent.id,
+  });
+
+  if ('reservationId' in result) {
+    console.info('[webhook] Event reservation created — id:', result.reservationId, '— intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  // stock_conflict et already_exists sont déjà entièrement gérés dans
+  // createEventReservationFromRequest (remboursement automatique + n8n pour
+  // stock_conflict ; simple no-op pour already_exists) — on se contente de
+  // logguer ici, jamais de faire réessayer Stripe indéfiniment pour une
+  // erreur applicative interne.
+  if (result.error === 'stock_conflict') {
+    console.info('[webhook] Event reservation stock conflict handled — intent:', intent.id);
+  } else if (result.error === 'already_exists') {
+    console.info('[webhook] Event reservation already created by concurrent retry — intent:', intent.id);
+  } else {
+    console.error('[webhook] Failed to create event reservation:', result.error, '— intent:', intent.id);
+  }
 
   return NextResponse.json({ received: true });
 }
