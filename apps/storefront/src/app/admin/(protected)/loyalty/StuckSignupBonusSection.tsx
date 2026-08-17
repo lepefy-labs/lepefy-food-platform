@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Button from '../../_components/ui/Button';
 import type { StuckSignupBonus } from '@/lib/loyalty/getStuckSignupBonuses';
 
 // Même panneau admin "en révision" que PendingReviewSection — section/onglet
@@ -70,13 +71,9 @@ export function StuckSignupBonusSection({ initialItems }: { initialItems: StuckS
                     )}
                   </td>
                   <td className="py-2">
-                    <button
-                      onClick={() => handleConfirm(item.customerId)}
-                      disabled={pendingId === item.customerId}
-                      className="px-2.5 py-1 rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-                    >
+                    <Button size="sm" onClick={() => handleConfirm(item.customerId)} loading={pendingId === item.customerId}>
                       Confirmer
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/utils/format';
+import Button from '../../_components/ui/Button';
 
 export interface AmbassadorListRow {
   id: string;
@@ -96,13 +97,9 @@ export function AmbassadorsListSection({ ambassadors, payoutThreshold, currency 
                     </td>
                     <td className="py-2 text-gray-500">{formatPrice(a.paidTotal, currency)}</td>
                     <td className="py-2">
-                      <button
-                        onClick={() => handleDemote(a.id)}
-                        disabled={pendingId === a.id}
-                        className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-700 disabled:opacity-50"
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleDemote(a.id)} loading={pendingId === a.id}>
                         Retirer le statut
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );

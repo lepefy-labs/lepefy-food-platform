@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Button from '../../_components/ui/Button';
 import type { PointsLedgerEntry } from '@lepefy/types';
 
 export function PendingReviewSection({ initialEntries }: { initialEntries: PointsLedgerEntry[] }) {
@@ -53,13 +54,9 @@ export function PendingReviewSection({ initialEntries }: { initialEntries: Point
                   <td className="py-2">{e.referral_level ?? '—'}</td>
                   <td className="py-2 font-medium">{e.amount} pts</td>
                   <td className="py-2">
-                    <button
-                      onClick={() => handleConfirm(e.id)}
-                      disabled={pendingId === e.id}
-                      className="px-2.5 py-1 rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-                    >
+                    <Button size="sm" onClick={() => handleConfirm(e.id)} loading={pendingId === e.id}>
                       Confirmer
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

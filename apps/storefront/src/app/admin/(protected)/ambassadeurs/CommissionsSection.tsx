@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { formatPrice } from '@/lib/utils/format';
+import Button from '../../_components/ui/Button';
 import type { AmbassadorCommissionStatus } from '@lepefy/types';
 
 interface JoinedCustomer {
@@ -147,13 +148,9 @@ export function CommissionsSection({ initialCommissions, currency }: { initialCo
                           onChange={(e) => setNotesById((prev) => ({ ...prev, [c.id]: e.target.value }))}
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs"
                         />
-                        <button
-                          onClick={() => handleMarkPaid(c.id)}
-                          disabled={pendingId === c.id}
-                          className="px-2.5 py-1 rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-                        >
+                        <Button size="sm" onClick={() => handleMarkPaid(c.id)} loading={pendingId === c.id}>
                           Marquer comme payé
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </td>

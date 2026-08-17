@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Button from '../../_components/ui/Button';
 
 interface CustomerRow {
   id: string;
@@ -79,13 +80,9 @@ export function PromoteAmbassadorSection() {
           placeholder="Nom ou email…"
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
-        <button
-          type="submit"
-          disabled={isSearching}
-          className="px-3 py-2 text-sm rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-        >
+        <Button type="submit" loading={isSearching}>
           Rechercher
-        </button>
+        </Button>
       </form>
 
       {results.length > 0 && (
@@ -112,21 +109,13 @@ export function PromoteAmbassadorSection() {
                   </td>
                   <td className="py-2">
                     {c.is_ambassador ? (
-                      <button
-                        onClick={() => handleDemote(c.id)}
-                        disabled={pendingId === c.id}
-                        className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-700 disabled:opacity-50"
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleDemote(c.id)} loading={pendingId === c.id}>
                         Retirer le statut
-                      </button>
+                      </Button>
                     ) : (
-                      <button
-                        onClick={() => handlePromote(c.id)}
-                        disabled={pendingId === c.id}
-                        className="px-2.5 py-1 rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-                      >
+                      <Button size="sm" onClick={() => handlePromote(c.id)} loading={pendingId === c.id}>
                         Promouvoir ambassadeur
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>

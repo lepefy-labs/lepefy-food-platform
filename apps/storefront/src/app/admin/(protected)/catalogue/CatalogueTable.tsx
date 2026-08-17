@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useState, useRef } from 'react';
 import { formatPrice } from '@/lib/utils/format';
+import Button from '../../_components/ui/Button';
 import {
   IconSelector,
   IconSortAscending,
@@ -167,14 +168,15 @@ export default function CatalogueTable({
                          focus:border-transparent bg-white"
             />
             {searchQuery && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2
-                           text-gray-400 hover:text-gray-600"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2"
                 aria-label="Effacer la recherche"
               >
                 <IconX size={14} />
-              </button>
+              </Button>
             )}
           </div>
         ) : (

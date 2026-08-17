@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { IconPlus, IconChefHat, IconTools } from '@tabler/icons-react';
 import { slugify } from '@/lib/utils/format';
+import Button from '../../../_components/ui/Button';
 import type { ServiceOffering, ServiceOfferingType, ServiceCtaType } from '@lepefy/types';
 
 const TYPE_OPTIONS: { value: ServiceOfferingType; label: string }[] = [
@@ -58,14 +59,9 @@ export default function ServicesListClient({ initialServices }: { initialService
 
   return (
     <div className="space-y-4">
-      <button
-        type="button"
-        onClick={() => setShowForm((v) => !v)}
-        className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
+      <Button type="button" onClick={() => setShowForm((v) => !v)}>
         <IconPlus size={16} /> Nouveau service
-      </button>
+      </Button>
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
@@ -77,14 +73,9 @@ export default function ServicesListClient({ initialServices }: { initialService
             {ctaType === 'devis' ? 'Ce service ouvrira un formulaire de demande de devis.' : 'Ce service ouvrira un catalogue de matériel à réserver et payer en ligne.'}
           </p>
           {error && <p className="text-red-500 text-xs">{error}</p>}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
+          <Button type="submit" loading={isSubmitting}>
             {isSubmitting ? 'Création…' : 'Créer'}
-          </button>
+          </Button>
         </form>
       )}
 

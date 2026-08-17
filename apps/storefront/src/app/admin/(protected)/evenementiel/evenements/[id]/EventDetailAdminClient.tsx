@@ -7,6 +7,7 @@ import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload, Icon
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
 import ConfirmPaymentButton from '../../../../_components/ui/ConfirmPaymentButton';
+import Button from '../../../../_components/ui/Button';
 import type { EventRow, EventTicketType, EventReservation, EventReservationRequest, EventStatus, EventReservationStatus, EventHighlight } from '@lepefy/types';
 
 const STATUS_OPTIONS: EventStatus[] = ['draft', 'published', 'closed', 'cancelled'];
@@ -301,9 +302,9 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
             <div key={i} className="border border-gray-100 rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-2xs font-semibold text-gray-400 uppercase tracking-wide">Point fort {i + 1}</p>
-                <button type="button" onClick={() => removeHighlightRow(i)} className="text-gray-400 hover:text-red-500">
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeHighlightRow(i)}>
                   <IconTrash size={14} />
-                </button>
+                </Button>
               </div>
               <div className="flex items-center gap-1.5">
                 {HIGHLIGHT_ICON_OPTIONS.map(({ key, Icon }) => (
@@ -341,21 +342,15 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         </div>
 
         {highlights.length < MAX_HIGHLIGHTS && (
-          <button type="button" onClick={addHighlightRow} className="flex items-center gap-1 text-xs font-semibold mb-3" style={{ color: 'var(--color-primary)' }}>
+          <Button type="button" variant="ghost" size="sm" onClick={addHighlightRow} className="mb-3">
             <IconPlus size={14} /> Ajouter un point fort
-          </button>
+          </Button>
         )}
 
         {highlightsError && <p className="text-red-500 text-xs mb-2">{highlightsError}</p>}
-        <button
-          type="button"
-          onClick={saveHighlights}
-          disabled={savingHighlights}
-          className="text-xs font-semibold px-3 py-2 rounded-lg text-white disabled:opacity-50"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
+        <Button type="button" onClick={saveHighlights} loading={savingHighlights}>
           {savingHighlights ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        </Button>
       </section>
 
       {/* Formules */}
@@ -369,9 +364,9 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
                   <p className={`text-sm font-medium ${t.active ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{t.label}</p>
                   <p className="text-xs text-gray-500">{formatPrice(t.price, currency)}</p>
                 </div>
-                <button type="button" onClick={() => removeTicketType(t.id)} className="text-gray-400 hover:text-red-500 shrink-0">
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeTicketType(t.id)} className="shrink-0">
                   <IconTrash size={15} />
-                </button>
+                </Button>
               </div>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <IconStarFilled size={13} className="text-gray-300 shrink-0" />
@@ -381,14 +376,17 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
                   placeholder="es. LA PLUS POPULAIRE"
                   className={`${inputClass} flex-1 text-xs py-1.5`}
                 />
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => saveBadge(t.id)}
-                  disabled={savingBadge === t.id || (badgeDrafts[t.id] ?? '') === (t.badge ?? '')}
-                  className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 shrink-0"
+                  disabled={(badgeDrafts[t.id] ?? '') === (t.badge ?? '')}
+                  loading={savingBadge === t.id}
+                  className="shrink-0"
                 >
-                  {savingBadge === t.id ? '…' : 'OK'}
-                </button>
+                  OK
+                </Button>
               </div>
             </div>
           ))}
@@ -402,14 +400,9 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
           </div>
           <div className="flex items-center gap-2">
             <input value={newBadge} onChange={(e) => setNewBadge(e.target.value)} placeholder="es. LA PLUS POPULAIRE" className={`${inputClass} flex-1`} />
-            <button
-              type="submit"
-              disabled={addingTicket}
-              className="p-2.5 rounded-lg text-white disabled:opacity-50 shrink-0"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
+            <Button type="submit" loading={addingTicket} className="shrink-0">
               <IconPlus size={16} />
-            </button>
+            </Button>
           </div>
         </form>
         {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
@@ -494,15 +487,16 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
                     {RESERVATION_STATUS_LABELS[r.status]}
                   </span>
                   {r.status === 'confirmed' && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => refundReservation(r.id)}
-                      disabled={refunding === r.id}
-                      className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                      loading={refunding === r.id}
                       title="Rembourser"
                     >
                       <IconReceiptRefund size={16} />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

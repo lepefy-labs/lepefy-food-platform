@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { IconPlus, IconCalendarEvent, IconUpload, IconTrash } from '@tabler/icons-react';
 import { slugify, formatDate } from '@/lib/utils/format';
+import Button from '../../../_components/ui/Button';
 import type { EventRow, EventStatus } from '@lepefy/types';
 
 interface DraftTicketType {
@@ -134,14 +135,9 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
 
   return (
     <div className="space-y-4">
-      <button
-        type="button"
-        onClick={() => setShowForm((v) => !v)}
-        className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
+      <Button type="button" onClick={() => setShowForm((v) => !v)}>
         <IconPlus size={16} /> Nouvel événement
-      </button>
+      </Button>
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
@@ -175,9 +171,9 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-semibold text-gray-600">Formules</p>
-              <button type="button" onClick={addTicketTypeRow} className="flex items-center gap-1 text-xs font-semibold text-[var(--color-primary)]">
+              <Button type="button" variant="ghost" size="sm" onClick={addTicketTypeRow}>
                 <IconPlus size={14} /> Ajouter une formule
-              </button>
+              </Button>
             </div>
             {ticketTypes.length === 0 && (
               <p className="text-xs text-gray-400">Aucune formule — un événement publié doit avoir au moins une formule.</p>
@@ -199,9 +195,9 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
                       inputMode="decimal"
                       className={`${flexInputClass} w-24 shrink-0`}
                     />
-                    <button type="button" onClick={() => removeTicketTypeRow(i)} className="p-2 text-gray-400 hover:text-red-500 shrink-0">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeTicketTypeRow(i)} className="shrink-0">
                       <IconTrash size={16} />
-                    </button>
+                    </Button>
                   </div>
                   <input
                     value={t.description}
@@ -215,14 +211,9 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
           </div>
 
           {error && <p className="text-red-500 text-xs">{error}</p>}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
+          <Button type="submit" loading={isSubmitting}>
             {isSubmitting ? 'Création…' : 'Créer'}
-          </button>
+          </Button>
         </form>
       )}
 

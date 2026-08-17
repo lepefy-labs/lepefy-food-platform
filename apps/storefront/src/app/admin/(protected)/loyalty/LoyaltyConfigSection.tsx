@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Button from '../../_components/ui/Button';
 import type { ReferralAvailabilityMode, ReferralFraudAction, TenantReferralTier } from '@lepefy/types';
 
 const INPUT_CLS =
@@ -202,13 +203,9 @@ export function LoyaltyConfigSection({
         </div>
       </div>
 
-      <button
-        onClick={handleSave}
-        disabled={isSaving}
-        className="px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-      >
+      <Button onClick={handleSave} loading={isSaving}>
         Enregistrer
-      </button>
+      </Button>
 
       <hr className="my-5 border-gray-100 dark:border-gray-800" />
 
@@ -237,13 +234,9 @@ export function LoyaltyConfigSection({
             className={`${INPUT_CLS} w-28`}
           />
         </div>
-        <button
-          onClick={handleAddTier}
-          disabled={isSavingTier}
-          className="px-3 py-2 text-xs rounded-lg border border-gray-200 text-gray-700 disabled:opacity-50"
-        >
+        <Button variant="outline" onClick={handleAddTier} loading={isSavingTier}>
           Ajouter une version
-        </button>
+        </Button>
       </div>
 
       <table className="w-full text-xs">

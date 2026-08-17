@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
+import Button from '../../_components/ui/Button';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType } from '@lepefy/types';
 
 const INPUT_CLS =
@@ -257,13 +258,9 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleUpdate(pm.id, toForm(pm))}
-                  disabled={isSaving === pm.id}
-                  className="px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-                >
+                <Button size="sm" onClick={() => handleUpdate(pm.id, toForm(pm))} loading={isSaving === pm.id}>
                   Enregistrer
-                </button>
+                </Button>
                 <button
                   onClick={() => handleDelete(pm.id)}
                   disabled={isSaving === pm.id}
@@ -354,14 +351,10 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           </div>
         )}
 
-        <button
-          onClick={handleCreate}
-          disabled={isSaving === 'new'}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-        >
-          <IconPlus size={14} stroke={1.5} />
+        <Button onClick={handleCreate} loading={isSaving === 'new'}>
+          {isSaving !== 'new' && <IconPlus size={14} stroke={1.5} />}
           Ajouter
-        </button>
+        </Button>
       </div>
     </section>
   );

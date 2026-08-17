@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { IconArrowLeft, IconPlus, IconTrash } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import Button from '../../../../_components/ui/Button';
 import type { ServiceOffering, RentalItem, ServiceCtaType } from '@lepefy/types';
 
 interface Props {
@@ -153,9 +154,9 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
                     {formatPrice(item.price_per_unit, currency)} · stock {item.stock_quantity}
                   </p>
                 </div>
-                <button type="button" onClick={() => removeRentalItem(item.id)} className="text-gray-400 hover:text-red-500">
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeRentalItem(item.id)}>
                   <IconTrash size={15} />
-                </button>
+                </Button>
               </div>
             ))}
             {rentalItems.length === 0 && <p className="text-xs text-gray-400">Aucun article — ajoutez-en un ci-dessous.</p>}
@@ -164,14 +165,9 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
             <input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Nom de l'article" className={`${inputClass} flex-1`} />
             <input value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} placeholder="Prix" inputMode="decimal" className={`${inputClass} w-20`} />
             <input value={itemStock} onChange={(e) => setItemStock(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Stock" inputMode="numeric" className={`${inputClass} w-20`} />
-            <button
-              type="submit"
-              disabled={addingItem}
-              className="p-2.5 rounded-lg text-white disabled:opacity-50"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
+            <Button type="submit" loading={addingItem}>
               <IconPlus size={16} />
-            </button>
+            </Button>
           </form>
           {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
         </section>

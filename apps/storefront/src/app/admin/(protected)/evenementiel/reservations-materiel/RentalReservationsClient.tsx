@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { IconReceiptRefund, IconCalendar, IconClock } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../../_components/ui/ConfirmPaymentButton';
+import Button from '../../../_components/ui/Button';
 import type { RentalReservationRequest } from '@lepefy/types';
 
 interface RentalReservationWithDetails {
@@ -141,15 +142,16 @@ export default function RentalReservationsClient({
                 {STATUS_LABELS[r.status]}
               </span>
               {r.status === 'confirmed' && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => refund(r.id)}
-                  disabled={refunding === r.id}
-                  className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+                  loading={refunding === r.id}
                   title="Rembourser"
                 >
                   <IconReceiptRefund size={16} />
-                </button>
+                </Button>
               )}
             </div>
           </div>

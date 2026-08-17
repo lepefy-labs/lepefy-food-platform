@@ -13,6 +13,7 @@ import {
 } from '@tabler/icons-react';
 import type { Producer, Importer, NutritionInfo, DurabilityType } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
+import Button from '../../../_components/ui/Button';
 
 interface ProductEditProps {
   product: {
@@ -524,14 +525,10 @@ export default function ProductEditClient({
               Étiquette
             </Link>
           )}
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <IconCheck size={16} />
+          <Button onClick={handleSave} loading={isSaving}>
+            {!isSaving && <IconCheck size={16} />}
             {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -639,14 +636,14 @@ export default function ProductEditClient({
             </div>
 
             {aiDescriptionsEnabled && (
-              <button
+              <Button
                 onClick={handleGenerateDescriptions}
-                disabled={isGeneratingDescriptions}
-                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                loading={isGeneratingDescriptions}
+                className="w-full mt-4"
               >
-                <IconSparkles size={16} stroke={2} />
+                {!isGeneratingDescriptions && <IconSparkles size={16} stroke={2} />}
                 {isGeneratingDescriptions ? 'Génération...' : 'Générer avec IA'}
-              </button>
+              </Button>
             )}
           </section>
 
@@ -709,15 +706,15 @@ export default function ProductEditClient({
                     Généré automatiquement en interne — jamais un vrai code GS1 fabricant.
                   </p>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={handleRegenerateBarcode}
-                  disabled={isRegeneratingBarcode}
-                  className="flex-shrink-0 text-xs font-medium px-3 py-2 rounded-lg border
-                             border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                  loading={isRegeneratingBarcode}
+                  className="flex-shrink-0"
                 >
                   {isRegeneratingBarcode ? 'Génération...' : displayBarcode ? 'Régénérer' : 'Générer'}
-                </button>
+                </Button>
               </div>
             </section>
           )}
@@ -819,14 +816,14 @@ export default function ProductEditClient({
             {/* AI button — only when feature-flagged */}
             {aiEnabled && (
               <>
-                <button
+                <Button
                   onClick={handleGenerateAI}
-                  disabled={isGenerating}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  loading={isGenerating}
+                  className="w-full"
                 >
-                  <IconSparkles size={16} stroke={2} />
+                  {!isGenerating && <IconSparkles size={16} stroke={2} />}
                   Générer avec l&apos;IA
-                </button>
+                </Button>
                 <p className="text-xs text-gray-400 text-center mt-2">
                   Photo générée automatiquement via IA
                 </p>

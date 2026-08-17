@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { IconUpload, IconPhoto } from '@tabler/icons-react';
+import Button from '../../_components/ui/Button';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -183,13 +184,9 @@ export function OriginSection({
         </div>
       </div>
 
-      <button
-        onClick={handleSave}
-        disabled={isSaving}
-        className="px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-      >
+      <Button onClick={handleSave} loading={isSaving}>
         Enregistrer
-      </button>
+      </Button>
     </section>
   );
 }

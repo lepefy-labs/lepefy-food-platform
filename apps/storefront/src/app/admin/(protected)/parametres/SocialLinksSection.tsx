@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
+import Button from '../../_components/ui/Button';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink, type SocialPlatform } from '@lepefy/types';
 
 const INPUT_CLS =
@@ -202,13 +203,9 @@ export function SocialLinksSection({ initialLinks }: SocialLinksSectionProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleUpdate(link.id, toForm(link))}
-                  disabled={isSaving === link.id}
-                  className="px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-                >
+                <Button size="sm" onClick={() => handleUpdate(link.id, toForm(link))} loading={isSaving === link.id}>
                   Enregistrer
-                </button>
+                </Button>
                 <button
                   onClick={() => handleDelete(link.id)}
                   disabled={isSaving === link.id}
@@ -264,14 +261,10 @@ export function SocialLinksSection({ initialLinks }: SocialLinksSectionProps) {
             />
           </div>
 
-          <button
-            onClick={handleCreate}
-            disabled={isSaving === 'new'}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-          >
-            <IconPlus size={14} stroke={1.5} />
+          <Button onClick={handleCreate} loading={isSaving === 'new'}>
+            {isSaving !== 'new' && <IconPlus size={14} stroke={1.5} />}
             Ajouter
-          </button>
+          </Button>
         </div>
       )}
     </section>

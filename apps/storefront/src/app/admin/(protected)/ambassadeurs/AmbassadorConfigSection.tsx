@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { calculateAmbassadorDiscount } from '@/lib/ambassador/calculateAmbassadorDiscount';
 import { calculateSplitPoolAmounts } from '@/lib/ambassador/calculateSplitPool';
 import { formatPrice } from '@/lib/utils/format';
+import Button from '../../_components/ui/Button';
 import type { AmbassadorCommissionMode, AmbassadorDiscountType } from '@lepefy/types';
 
 const INPUT_CLS =
@@ -276,13 +277,9 @@ export function AmbassadorConfigSection({
         </label>
       </div>
 
-      <button
-        onClick={handleSave}
-        disabled={isSaving}
-        className="px-3 py-1.5 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-      >
+      <Button onClick={handleSave} loading={isSaving}>
         Enregistrer
-      </button>
+      </Button>
     </section>
   );
 }
