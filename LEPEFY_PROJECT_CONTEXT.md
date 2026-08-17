@@ -2019,6 +2019,8 @@ Claude Code (sessione di generazione del fix) ha correttamente rifiutato di appl
 
 Il motivo per cui Robertin non notava differenze visive sulla dashboard dopo il deploy di §43 **non è quindi questo**. Ipotesi principale residua: le modifiche erano deliberatamente sottili (spaziatura/dimensione icone, non un redesign — l'admin era già stato ridisegnato a fondo a luglio, §8bis). Se il problema percepito persiste, serve uno screenshot/descrizione puntuale per individuare la causa reale — non ulteriori ipotesi da remoto senza riscontro visivo.
 
+**✅ Chiusa in v3.27 — vedi §45: non era un problema, la sidebar funziona correttamente.**
+
 ### Aggiornamenti in questo changelog
 
 - **§43** — paragrafo del bug barrato con nota di correzione, non cancellato, per tracciabilità.
@@ -2028,3 +2030,33 @@ Il motivo per cui Robertin non notava differenze visive sulla dashboard dopo il 
 ---
 
 *Lepefy Labs — Lepefy Food Platform — Context document v3.26 — 17 Agosto 2026 (base: v3.25; correzione di un falso positivo del changelog precedente — `--color-primary-dark` esiste in `globals.css` dal redesign storefront di luglio [già documentato in §12bis, mai incrociato prima di scrivere §43], verificato direttamente da Robertin; zero file toccati nel ciclo di fix [correttamente non eseguito su premessa falsa]; causa reale della percezione "nessuna differenza visibile" sulla sidebar resta da accertare — vedi §44 per il dettaglio completo)*
+
+---
+
+## 45. Changelog v3.27 (17 Agosto 2026) — Chiusura: la sidebar funziona correttamente, colore blu atteso e confermato via screenshot
+
+**Metodo di questa revisione:** screenshot reale di `shop.chloefood.com/admin` fornito da Robertin — prima verifica visiva diretta di questo intero filone (§43/§44/§45), dopo due cicli basati solo su report testuale/grep.
+
+### Cosa mostra lo screenshot
+
+La voce "Commandes" (attiva) mostra correttamente una pillola blu chiara con testo blu scuro — **non verde**. A un primo sguardo poteva sembrare un'anomalia (il micro-prompt di §43 aveva indicato "colore atteso: verde `#167758`"), ma è quel valore atteso a essere sbagliato, non il rendering:
+
+- `tenant.primary_color` di ChloeFood è **blu `#1267C7`** dal 17/07 (migrazione brand charter v2, già documentata in §2/§12bis di questo stesso documento) — non più il verde `#1D9E75` di default usato erroneamente come riferimento nel micro-prompt di fix di §43.
+- Il testo/pillola blu scuro visibile nello screenshot è quindi `color-mix(in srgb, #1267C7 75%, black)` — coerente, corretto, niente di rotto.
+- **Causa reale della percezione "nessuna differenza visibile"** (la domanda aperta fin da §43): l'admin era già in tema blu da un mese; questo ciclo ha cambiato solo spaziatura/dimensione icone (§43), non i colori — che erano già corretti. Nessun mistero da risolvere oltre a questo.
+
+### Catena di correzioni su questo filone (per traccia)
+
+1. **§43**: bug "attivo non visibile" ipotizzato per `--color-primary-dark` mancante.
+2. **§44**: smentito — la var esiste in `globals.css`, errore di verifica incompleta.
+3. **§45 (questa)**: chiusura — nessun bug in nessun punto della catena; il colore blu è quello corretto per ChloeFood da luglio, il mio riferimento al verde nel micro-prompt di §43 era il vero errore all'origine di tutta la confusione.
+
+### Aggiornamenti in questo changelog
+
+- **§44** — riga finale aggiornata con puntatore a questa chiusura.
+- Nuova sezione **§45** (questa).
+- **Nota di processo**: il valore "colore primario atteso" per ChloeFood scritto nei prompt/fix va sempre preso dalla sezione §2 di questo documento (tabella "Colori brand ChloeFood — valore DB attuale"), mai da un default hardcoded ricordato a memoria — è il secondo errore su questo filone causato dallo stesso tipo di svista (dato non incrociato con la fonte più recente nel documento stesso).
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.27 — 17 Agosto 2026 (base: v3.26; chiusura del filone `--color-primary-dark`/sidebar attiva — screenshot reale confermato: il blu visibile è il `tenant.primary_color` corretto di ChloeFood dal 17/07, non un bug; l'errore era nel valore "verde atteso" scritto nel micro-prompt di §43, non nel codice; nessuna azione ulteriore richiesta su questo filone — vedi §45 per il dettaglio completo)*
