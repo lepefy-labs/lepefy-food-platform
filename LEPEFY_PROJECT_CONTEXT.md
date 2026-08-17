@@ -1972,9 +1972,9 @@ Sostituita la sidebar admin visiva (non funzionale) con lo stile portato da Tail
 - **Preservazione redirect `tenant_cashier`**: dichiarata verificata via lettura codice/diff (non eseguibile live, stessa limitazione Supabase del ciclo §42) — il blocco di redirect a `/admin/loyalty/scan` riportato come assente dal diff, quindi invariato.
 - **Dark mode**: `AdminThemeProvider` esistente dichiarato non toccato; il `ThemeContext.tsx` portato nello staging (§42) confermato scartato, mai importato da codice reale.
 
-### ⚠️ Bug preesistente scoperto (non introdotto da questo ciclo, non corretto)
+### ⚠️❌ "Bug preesistente" — SMENTITO in v3.26, vedi §44
 
-`AdminSidebar.tsx` referenzia la CSS var `--color-primary-dark` per lo stato di navigazione attiva, ma **solo `--color-primary`/`--color-primary-light`/`--color-secondary` sono definite** in `src/app/layout.tsx` — `--color-primary-dark` non è mai stata dichiarata da nessuna parte. Difetto preesistente al di fuori dello scope di questo ciclo (avrebbe richiesto toccare `layout.tsx`, fuori dal perimetro "solo sidebar/header"), lasciato correttamente invariato. Effetto pratico presumibile: lo stato attivo della sidebar è sempre caduto su un colore non definito. **Da decidere con Robertin se pianificare un micro-fix dedicato** (proposta di Claude Code: `--color-primary-dark: color-mix(in srgb, var(--color-primary) 75%, black)` accanto alle altre CSS var tenant, oppure un campo tenant dedicato).
+Questo paragrafo affermava che `--color-primary-dark` non fosse mai definita. **Falso, corretto in §44**: la var è dichiarata in `globals.css` (non in `layout.tsx`, unico file controllato all'epoca) fin dal redesign storefront di luglio — vedi anche riga 798 di questo stesso documento (§12bis), che la documentava già come token introdotto allora. Errore nato da una verifica basata solo sul report testuale di Claude Code, senza accesso al codice reale in quella sessione (limite dichiarato esplicitamente in §43, rivelatosi concreto). Lasciato qui barrato per traccia, non cancellato, invece di riscrivere la storia.
 
 ### Deviazioni dichiarate
 
@@ -1990,4 +1990,41 @@ Sostituita la sidebar admin visiva (non funzionale) con lo stile portato da Tail
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.25 — 17 Agosto 2026 (base: v3.24; integrazione reale sidebar/header TailAdmin in `AdminSidebar.tsx`/nuovo `AdminHeader.tsx`, 13 voci di navigazione reali mappate, sidebar collassabile scartata deliberatamente, redirect `tenant_cashier` e dark mode dichiarati invariati — ⚠️ **verifica basata solo sul report testuale di Claude Code, nessun codice caricato per riscontro diretto in questa sessione**; bug preesistente scoperto e non corretto: `--color-primary-dark` mai definita — vedi §43 per il dettaglio completo)*
+*Lepefy Labs — Lepefy Food Platform — Context document v3.25 — 17 Agosto 2026 (base: v3.24; integrazione reale sidebar/header TailAdmin in `AdminSidebar.tsx`/nuovo `AdminHeader.tsx`, 13 voci di navigazione reali mappate, sidebar collassabile scartata deliberatamente, redirect `tenant_cashier` e dark mode dichiarati invariati — ⚠️ **verifica basata solo sul report testuale di Claude Code, nessun codice caricato per riscontro diretto in questa sessione**; bug segnalato in questa revisione [`--color-primary-dark` mai definita] risultato ❌ **falso positivo, smentito in v3.26** — vedi §44)*
+
+---
+
+## 44. Changelog v3.26 (17 Agosto 2026) — Correzione: `--color-primary-dark` esiste, il bug di §43 era un falso positivo
+
+**Metodo di questa revisione:** verifica diretta da parte di Robertin sul codice reale (`grep` mirato su `globals.css` + l'intero `src/`), non da Claude Code — la prima verifica indipendente su questo punto specifico dall'apertura del caso in §43.
+
+### Cosa era successo
+
+§43 aveva segnalato `--color-primary-dark` come "mai definita", basandosi su un controllo di quella stessa sessione limitato a `src/app/layout.tsx`. **Errore**: la var è dichiarata in `apps/storefront/src/app/globals.css`, non in `layout.tsx` — file mai controllato in quella sessione per mancanza di accesso al codice (limite già dichiarato esplicitamente in §43, ma non sufficiente a evitare la conclusione errata).
+
+**Ironia procedurale**: questo stesso context doc conteneva già, da §12bis (redesign storefront, fine luglio), la prova che il token esiste — riga 798: *"Nuovo token `--color-primary-dark` (`color-mix(in srgb, var(--color-primary) 75%, black)`) — varianti scure derivate senza bisogno di nuove colonne DB"*. Un controllo incrociato con le sezioni precedenti dello stesso documento avrebbe evitato l'errore prima ancora di guardare il codice.
+
+### Dettaglio tecnico corretto
+
+- Dichiarata in `globals.css`, non in `layout.tsx`: `--color-primary-dark: color-mix(in srgb, var(--color-primary) 75%, black)` in `:root` (riga ~8), ricalcolata in `.dark` come `color-mix(in srgb, var(--color-primary) 60%, white)` (riga ~63, schiarita invece di scurita per restare leggibile su sfondo scuro — coerente con quanto già documentato in §26/riga 577).
+- **Perché "funziona" comunque senza essere ridichiarata per-tenant in `layout.tsx`**: le CSS custom properties si risolvono live in cascata, non a compile-time — `layout.tsx` inietta solo `--color-primary: ${tenant.primary_color}` in uno `<style>` che vince la cascata su quella singola var; `color-mix(in srgb, var(--color-primary) ...)` in `globals.css` la referenzia dinamicamente, quindi eredita automaticamente il colore tenant-corretto pur essendo scritta una sola volta, mai duplicata per tenant. Multi-tenant-first rispettato, zero hex fissi.
+- Grep sull'intero `src/` (30+ occorrenze in shop/admin/événementiel): nessun altro uso orfano — tutti consumano questa stessa dichiarazione funzionante.
+- **Colore atteso per ChloeFood** (`primary_color` default `#1D9E75`, nessuna migration lo sovrascrive): `--color-primary-dark` (light) ≈ `#167758` (verde scuro/foresta) su `--color-primary-light` `#e1f5ee` (menta pallido) — contrasto testo/sfondo teoricamente ben leggibile per la voce attiva sidebar, non un caso di colore invisibile.
+
+### Il micro-prompt di fix generato in §43 non è stato eseguito
+
+Claude Code (sessione di generazione del fix) ha correttamente rifiutato di applicarlo dopo aver verificato di persona che la premessa era falsa — **zero file toccati**, nessuna duplicazione introdotta. Comportamento corretto: meglio un ciclo "sprecato" per un bug inesistente che un fix che duplica una dichiarazione già funzionante.
+
+### La domanda originale resta aperta
+
+Il motivo per cui Robertin non notava differenze visive sulla dashboard dopo il deploy di §43 **non è quindi questo**. Ipotesi principale residua: le modifiche erano deliberatamente sottili (spaziatura/dimensione icone, non un redesign — l'admin era già stato ridisegnato a fondo a luglio, §8bis). Se il problema percepito persiste, serve uno screenshot/descrizione puntuale per individuare la causa reale — non ulteriori ipotesi da remoto senza riscontro visivo.
+
+### Aggiornamenti in questo changelog
+
+- **§43** — paragrafo del bug barrato con nota di correzione, non cancellato, per tracciabilità.
+- Nuova sezione **§44** (questa).
+- **Nota di processo per le prossime sessioni**: quando una verifica si basa solo su un report testuale senza accesso al codice (come esplicitamente dichiarato in §43), qualunque conclusione "X non esiste/manca" andrebbe cross-referenziata con le sezioni precedenti di questo stesso documento prima di essere scritta come fatto accertato — non solo segnalata come "da verificare indipendentemente" a posteriori.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.26 — 17 Agosto 2026 (base: v3.25; correzione di un falso positivo del changelog precedente — `--color-primary-dark` esiste in `globals.css` dal redesign storefront di luglio [già documentato in §12bis, mai incrociato prima di scrivere §43], verificato direttamente da Robertin; zero file toccati nel ciclo di fix [correttamente non eseguito su premessa falsa]; causa reale della percezione "nessuna differenza visibile" sulla sidebar resta da accertare — vedi §44 per il dettaglio completo)*
