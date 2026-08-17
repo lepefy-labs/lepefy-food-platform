@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { IconClock, IconCircleCheck, IconCalendarEvent, IconMapPin, IconCalendarPlus, IconDownload } from '@tabler/icons-react';
+import { IconClock, IconCircleCheck, IconCalendarEvent, IconMapPin, IconCalendarPlus, IconDownload, IconAlertTriangle, IconBrandWhatsapp } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 
 const POLL_INTERVAL_MS = 2000;
@@ -13,6 +13,7 @@ interface StatusResponse {
   reservation?: {
     id: string;
     customer_name: string;
+    customer_email: string;
     amount_paid: number;
     qr_token: string;
     quantity_total: number;
@@ -25,7 +26,12 @@ interface StatusResponse {
   };
 }
 
-export default function EventConfirmationClient({ paymentIntentId }: { paymentIntentId: string | null }) {
+interface Props {
+  paymentIntentId: string | null;
+  whatsappNumber:  string | null;
+}
+
+export default function EventConfirmationClient({ paymentIntentId, whatsappNumber }: Props) {
   const [data, setData]         = useState<StatusResponse | null>(null);
   const [timedOut, setTimedOut] = useState(false);
 
@@ -184,7 +190,14 @@ export default function EventConfirmationClient({ paymentIntentId }: { paymentIn
         )}
       </div>
 
-      <div className="no-print flex flex-wrap gap-3 mt-6">
+      {reservation && (
+        <p className="no-print flex items-start gap-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mt-6">
+          <IconAlertTriangle size={18} className="text-red-500 shrink-0 mt-px" />
+          Téléchargez votre billet maintenant — vous en aurez besoin à l&apos;entrée, même si l&apos;email n&apos;arrive pas.
+        </p>
+      )}
+
+      <div className="no-print flex flex-wrap gap-3 mt-3">
         <a
           href={icsHref}
           className="flex-1 min-w-[190px] h-12 rounded-xl border-[1.5px] border-gray-300 bg-white text-sm font-semibold text-gray-900 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
@@ -200,9 +213,29 @@ export default function EventConfirmationClient({ paymentIntentId }: { paymentIn
         </a>
       </div>
 
-      <p className="no-print text-[13px] text-gray-500 text-center my-6">
-        Un email de confirmation avec votre billet a été envoyé.
-      </p>
+      <div className="no-print text-center my-6 space-y-1.5">
+        {reservation && (
+          <p className="text-[13px] text-gray-500">
+            Un email de confirmation a été envoyé à <span className="font-semibold text-gray-700">{reservation.customer_email}</span>.
+          </p>
+        )}
+        <p className="text-[13px] text-gray-500">
+          Votre billet est aussi disponible ci-dessus, même si cet email n&apos;arrive pas.
+        </p>
+        {whatsappNumber && (
+          <p className="text-[13px]">
+            <a
+              href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-semibold hover:underline"
+              style={{ color: 'var(--color-primary)' }}
+            >
+              <IconBrandWhatsapp size={14} /> Ce n&apos;est pas votre email ? Contactez-nous sur WhatsApp
+            </a>
+          </p>
+        )}
+      </div>
 
       <div className="no-print text-center">
         <Link

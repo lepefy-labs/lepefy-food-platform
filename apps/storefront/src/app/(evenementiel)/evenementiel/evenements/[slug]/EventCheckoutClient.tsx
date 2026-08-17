@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { IconMinus, IconPlus, IconBasket, IconStarFilled, IconCreditCard } from '@tabler/icons-react';
+import { IconMinus, IconPlus, IconBasket, IconStarFilled, IconCreditCard, IconInfoCircle } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import {
@@ -333,6 +333,10 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           <p className="text-sm font-semibold text-gray-700">Vos informations</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
           <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={inputClass} />
+          <p className="flex items-center gap-1.5 text-xs text-gray-500 -mt-1.5">
+            <IconInfoCircle size={13} className="shrink-0" />
+            Vérifiez bien votre adresse — c&apos;est ici que vous recevrez votre billet.
+          </p>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
         </div>
 
@@ -393,6 +397,22 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
 
         {summary}
 
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">Billet envoyé à</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">{email}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleBackToInfo}
+            disabled={isSubmitting}
+            className="text-xs font-semibold shrink-0 hover:underline disabled:opacity-50"
+            style={{ color: 'var(--color-primary)' }}
+          >
+            Modifier
+          </button>
+        </div>
+
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
           <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
           <PaymentOptionList options={options} />
@@ -402,6 +422,10 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         </div>
 
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+
+        <p className="text-xs text-gray-500 text-center">
+          Après le paiement, pensez à télécharger votre billet directement sur la page de confirmation.
+        </p>
 
         <button
           onClick={handleConfirmPayment}
