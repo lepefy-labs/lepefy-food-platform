@@ -2060,3 +2060,159 @@ La voce "Commandes" (attiva) mostra correttamente una pillola blu chiara con tes
 ---
 
 *Lepefy Labs — Lepefy Food Platform — Context document v3.27 — 17 Agosto 2026 (base: v3.26; chiusura del filone `--color-primary-dark`/sidebar attiva — screenshot reale confermato: il blu visibile è il `tenant.primary_color` corretto di ChloeFood dal 17/07, non un bug; l'errore era nel valore "verde atteso" scritto nel micro-prompt di §43, non nel codice; nessuna azione ulteriore richiesta su questo filone — vedi §45 per il dettaglio completo)*
+
+---
+
+## 46. Changelog v3.28 (17 Agosto 2026) — Chiarimento scope + Fase A del piano di integrazione stile TailAdmin
+
+**Metodo di questa revisione:** confronto diretto zip vs report (come §42), non solo lettura testuale — 2/2 file confermati.
+
+### Chiarimento scope (prima di questo ciclo)
+
+Il ciclo §43 (sidebar/header) non esauriva l'obiettivo di Robertin: l'intento era un restyling generale dell'admin nel linguaggio visivo TailAdmin — card, tabelle, badge, bottoni, ricerca — non solo il guscio di navigazione. Prodotto un documento di audit/piano a fasi (`Audit_Piano_IntegrazioneStileTailAdmin.md`, allegato di sessione, non versionato nel repo) con approccio esplicito: **adattare i componenti reali esistenti allo stile del template, non copiare i componenti-vetrina del template** (fatti per dati finti, incompatibili con la logica reale già costruita nell'audit admin di luglio, §8bis).
+
+**Piano a 4 fasi concordato**: A) design tokens/componenti condivisi → B) ricerca globale (gap concreto segnalato da Robertin: oggi solo client-side, solo su `/admin/catalogue`, si disabilita sopra soglia senza spiegazione, nessuna ricerca cross-entità) → C) dashboard/commandes come pilota → D) resto delle pagine (catalogue, événementiel, loyalty, ambassadeurs, paramètres, billing) una per una.
+
+**Requisiti Fase B confermati da Robertin** (da usare quando si scrive quel prompt): ricerca su **tutte** le entità (commandes, produits, événements, clienti quando esisteranno) con possibilità di limitare l'ambito; **nessuna** scorciatoia da tastiera (solo click sull'icona).
+
+### Fase A — design tokens e componenti condivisi (17/08, questo ciclo)
+
+Obiettivo: creare i building block (`KpiCard`, `Button`) usati dalle fasi successive, senza toccare ancora nessuna pagina reale.
+
+- **Scoperta Step 0 rilevante**: `_components/ui/` conteneva solo `StatusBadge.tsx`, `NotificationBell.tsx`, `BulkTrackingModal.tsx`, `ConfirmPaymentButton.tsx` — `KpiCard`/`Badge` generico/`Button`/`Toast`/`BulkBar` **non esistevano mai stati estratti**, nonostante l'audit di luglio (§4 di `AUDIT_ADMIN_UIUX.md`) li elencasse come pianificati. `KpiCard` esisteva solo come funzione locale dentro `(protected)/page.tsx` (righe 17-61, 5 istanze) — nessuna icona, delta come solo testo colorato, nessuna freccia trend.
+- **`StatusBadge.tsx` già conforme**: dot colorato + pillola + token semantici `--status-*` — pattern già identico al template, zero modifiche necessarie. Non scontato: sarebbe stato facile "sistemarlo" senza verificare prima.
+- **Creati 2 file, nessuna pagina toccata**: `KpiCard.tsx` (icona in badge tondo colorato per tono semantico/tenant, badge trend con freccia `IconArrowUpRight`/`IconArrowDownRight` di Tabler — non SVG del template, coerente con `CLAUDE.md`) e `Button.tsx` (varianti `primary`/`outline`/`ghost`, `--color-primary-dark` non `--color-primary` per il contrasto AA già misurato nell'audit di luglio — citato esplicitamente nel commento del codice). Entrambi già con supporto `dark:` per coerenza col dark mode admin esistente.
+- **Nessuna adozione in questo ciclo** (verificato via grep, zero import dei due nuovi file altrove) — `(protected)/page.tsx` resta con la sua `KpiCard` locale invariata, essendo nei file vietati di questo prompt. La sostituzione — primo cambiamento visivo reale sulla dashboard commandes — è compito della Fase C.
+- **Token spaziature/ombre/colori del template (scala grigi, `brand-*`, `theme-*`, breakpoint custom, `spacing['4.5']`, `ringWidth[3]`) deliberatamente NON applicati**: motivato punto per punto nel report — la scala grigi del template collide con quella Tailwind default usata in centinaia di classi in tutto l'app (rischio troppo alto); i colori `brand-*`/`blue-light` violerebbero la regola multi-tenant-first se applicati come hex fissi; il resto (ombre `theme-*`, z-index estesi, font size custom) non ha nessun consumatore reale oggi nei 2 componenti costruiti — introdurli "per il futuro" sarebbe stato scope-creep speculativo. Buona disciplina: nessun token aggiunto senza un consumatore reale nello stesso ciclo.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§46** (questa).
+- **§4 di `AUDIT_ADMIN_UIUX.md`** (documento esterno, non in questo file) — la lista "componenti condivisi da estrarre" risulta ora parzialmente evasa (`KpiCard`, `Button` fatti; `Badge` generico, `Toast`, `BulkBar` ancora da fare, non richiesti da questo ciclo).
+- **Prossimo passo**: Fase B (ricerca globale) — requisiti già raccolti sopra, pronti per il prompt.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.28 — 17 Agosto 2026 (base: v3.27; chiarito lo scope reale del progetto TailAdmin — restyling generale, non solo sidebar/header; piano a 4 fasi concordato [A tokens → B ricerca → C dashboard pilota → D resto pagine]; Fase A completata e verificata zip-vs-report [2/2 file] — `KpiCard.tsx`/`Button.tsx` creati, non ancora adottati da nessuna pagina, token template speculativi deliberatamente scartati con motivazione puntuale — vedi §46 per il dettaglio completo)*
+
+---
+
+## 47. Changelog v3.29 (17 Agosto 2026) — Fase B: ricerca globale nell'header admin
+
+**Metodo di questa revisione:** confronto diretto zip vs report (come §42/§46) — 3/3 file confermati, letti per intero (route API + componente + diff header).
+
+### Cosa è stato costruito
+
+Ricerca globale server-side raggiungibile dall'header admin (`AdminGlobalSearch.tsx`, innestato come primo elemento del cluster icone in `AdminHeader.tsx`), su 4 entità (Commandes, Produits, Événements, Clients) con selettore di ambito e **nessuna scorciatoia da tastiera** (solo `Escape` per chiudere) — coerente coi requisiti raccolti in §46.
+
+- **Correzione a un'assunzione del prompt**: esiste già una tabella `customers` dedicata (`id`, `tenant_id`, `email`, `full_name`, `phone` — da `001_initial_schema.sql`), già usata da `api/admin/loyalty/customers-search/route.ts`. Non era "solo un campo dentro `orders`" come il prompt ipotizzava. **Non esiste però una pagina admin di dettaglio cliente** (`/admin/clients/[id]`) — i risultati "Clients" puntano a `mailto:{email}` come unica azione reale disponibile, dichiarato esplicitamente invece di inventare un link verso una pagina inesistente.
+- **Pattern di query replicato da `customers-search/route.ts`** (non reinventato): query param sanificato via regex, due `.ilike()` tipizzate in parallelo + merge/dedup lato applicativo, **mai** un `.or()` in sintassi raw PostgREST — quel file documenta un bug 500 in produzione causato esattamente da quella sintassi, evitato qui a monte.
+- **Sicurezza/scoping**: `requireAdmin(tenant.id)` prima di ogni query; `tenant_id` filtrato su tutte le 4 entità (8 query totali, mai una senza scoping) — verificato riga per riga nel codice, non solo dichiarato.
+- **Buona pratica non richiesta esplicitamente dal prompt**: `export const dynamic = 'force-dynamic'` + `export const fetchCache = 'force-no-store'` applicati di iniziativa sulla nuova route — coerente con la regola permanente sulla Data Cache (§41), applicata correttamente senza doverlo specificare nel prompt.
+- **Ricerca ordini non cerca su `id`**: `orders.id` è uuid, `ilike` su colonna uuid non è garantito senza cast esplicito lato PostgREST/Postgres — stessa classe di fragilità già causa di un 500 altrove (vedi sopra). Deviazione dichiarata: ricerca ordini solo su `full_name`/`email`; ricerca per numero ordine breve rimandata a un fix dedicato se servirà.
+- **Mobile**: nessuna duplicazione in `AdminMobileNav.tsx` — l'header (dove vive la ricerca) è sempre visibile su ogni dispositivo (mai `hidden md:block`, a differenza della sidebar), quindi è bastato rendere il pannello risultati stesso responsive (overlay a piena larghezza sotto l'header su mobile, dropdown ancorato su desktop).
+- **Nessun indice proposto** (`pg_trgm` o simile): con `LIMIT 5` per entità e volumi attuali (~500 ordini secondo l'audit di luglio), `ilike` senza indice resta accettabile — da rivalutare insieme alla Fase 5 dell'audit generale se il volume cresce.
+- **Ricerca client-side esistente su `/admin/catalogue` invariata** — file nella lista dei non-toccabili, confermato non modificato.
+
+### Struttura route API (per riferimento futuro)
+
+`GET /api/admin/search?q=<string>&scope=orders,products,events,customers` — `q` minimo 2 caratteri, `scope` opzionale (CSV, default tutte e 4), risposta `{ query, results: { orders[], products[], events[], customers[] } }`, ogni entità limitata a 5 risultati con `label`/`sublabel`/`href` pronti per il rendering.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§47** (questa).
+- **§46** — correzione all'assunzione "Clients potrebbe non esistere come entità separata": esiste (`customers` table), annotato qui per non riproporre la stessa domanda in futuro.
+- **Prossimo passo**: Fase C — dashboard/commandes come pagina pilota, adozione reale di `KpiCard.tsx`/`Button.tsx` (Fase A) nella pagina esistente.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.29 — 17 Agosto 2026 (base: v3.28; Fase B completata e verificata zip-vs-report [3/3 file] — ricerca globale server-side su 4 entità, tenant-scoped su ogni query, nessuna scorciatoia da tastiera come richiesto, tabella `customers` dedicata scoperta e riusata correggendo un'assunzione del prompt, link `mailto:` per clienti in assenza di pagina dettaglio — vedi §47 per il dettaglio completo)*
+
+---
+
+## 48. Changelog v3.30 (17 Agosto 2026) — Fase C: dashboard/commandes come pagina pilota + addendum Fase B in coda
+
+**Metodo di questa revisione:** confronto diretto zip vs report (come §42/§46/§47) — 2/2 file confermati, letti per intero.
+
+### Chiarimento scope intervenuto durante Fase B
+
+Vedendo uno screenshot reale del template TailAdmin, Robertin ha chiesto di rivedere lo stile della ricerca (Fase B, §47): non un'icona che apre un dropdown, ma una **barra larga sempre visibile** nell'header, come nel template. **Decisione presa e confermata**: niente badge `⌘K` — mostrarlo senza la scorciatoia reale (esplicitamente esclusa in Fase B) sarebbe un'affordance ingannevole. Prompt scritto (`ClaudeCode_Prompt_FaseB_Addendum_BarraRicerca.md`, allegato di sessione) — **esito non ancora riportato**, da verificare al prossimo ciclo.
+
+### Fase C — dashboard/commandes (17/08, questo ciclo)
+
+Primo ciclo che cambia visivamente una pagina admin reale (non solo componenti isolati come in Fase A). `KpiCard.tsx`/`Button.tsx` (creati inerti in §46) finalmente adottati.
+
+- **Adozione pulita**: funzione locale `KpiCard` (49 righe) rimossa da `(protected)/page.tsx`, sostituita dal componente condiviso di Fase A sulle 5 KPI esistenti (Aujourd'hui, CA total, CA ce mois, À expédier, Expédiées ce mois). **Query/calcoli invariati** — fatturato, delta % mese/mese, conteggi: stessa logica esatta, solo la presentazione cambia. Verificato leggendo l'intero file, non solo il diff dichiarato.
+- **Icone Tabler scelte** (nessun indizio preesistente nel codice, decise ex novo in questo ciclo): `IconClock`/info (Aujourd'hui), `IconCurrencyEuro`/primary (CA total), `IconTrendingUp`/primary (CA ce mois), `IconTruck`/warn (À expédier — stessa icona già usata per "Livraison" in `AdminSidebar`, coerenza intenzionale con la nav), `IconTruckDelivery`/success (Expédiées ce mois — variante "consegnato" distinta da `IconTruck` "in attesa", evita ambiguità visiva tra i due stati).
+- **Bug latente di Fase A scoperto e corretto**: `KpiCard.tsx` tipizzava la prop `icon` con `size?: number` invece di `size?: string | number` (il vero tipo di `IconProps` di `@tabler/icons-react`, non esportato nominalmente dal pacchetto) — mai emerso in Fase A perché nessuna pagina reale aveva ancora passato un'icona vera al componente. Bloccava `pnpm typecheck`; corretto qui con una modifica di una riga, non rimandato (era necessario per completare lo scope dichiarato del ciclo).
+- **Bottoni**: nessuno trovato in `(protected)/page.tsx` (verificato: zero `<button>` nel file) — gli elementi interattivi vivono in `AdminFilters.tsx`/`OrdersTable.tsx`/`PendingPaymentsBanner.tsx`, tutti fuori scope di questo ciclo (i primi due nella lista dei file vietati, il terzo semplicemente non toccato).
+- **Tabella ordini invariata** — righe espandibili (decisione 17/07) non toccate, come da regola permanente ribadita nel prompt.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§48** (questa).
+- **§47** — nota: la revisione "barra di ricerca larga, niente `⌘K`" è in coda, prompt scritto ma esito non ancora ricevuto.
+- **Prossimo passo**: (a) esito dell'addendum Fase B (barra ricerca), (b) Fase D — resto delle pagine admin (catalogue, événementiel, loyalty, ambassadeurs, paramètres, billing), una alla volta, riusando ora `KpiCard`/`Button`/pattern validati in Fase C come riferimento.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.30 — 17 Agosto 2026 (base: v3.29; Fase C completata e verificata zip-vs-report [2/2 file] — dashboard commandes ora usa `KpiCard`/icone Tabler dedicate, query/calcoli invariati, bug latente di tipo in `KpiCard.tsx` scoperto e corretto; addendum Fase B [barra ricerca larga stile TailAdmin, niente badge ⌘K] scritto ma esito ancora da ricevere — vedi §48 per il dettaglio completo)*
+
+---
+
+## 49. Changelog v3.31 (17 Agosto 2026) — Addendum Fase B confermato (verbale) + Fase C-bis bottoni avviata
+
+**Metodo di questa revisione:** ⚠️ **addendum Fase B confermato solo verbalmente da Robertin** ("La ricerca ora è OK!") — nessun report/zip fornito, nessuna verifica indipendente sul codice possibile in questa sessione. Trattare come da confermare alla prossima occasione con accesso al codice, coerente con la disciplina già applicata altrove in questo documento quando manca il riscontro diretto.
+
+### Addendum Fase B — ricerca a barra larga
+
+Confermato funzionante da Robertin. Non verificato via codice in questa sessione.
+
+### Fase C-bis — bottoni nei componenti reali (avviata)
+
+Il punto 4 del report di Fase C (§48) — "nessun bottone in `(protected)/page.tsx`, sostituzione rimandata" — viene ora smarcato esplicitamente: i bottoni esistono, ma vivono in `AdminFilters.tsx`/`OrdersTable.tsx`/`PendingPaymentsBanner.tsx`, tutti fuori scope di Fase C. Prompt scritto (`ClaudeCode_Prompt_FaseC_bis_Bottoni.md`, allegato di sessione) per adottare `Button.tsx` (Fase A) in questi 3 file, con attenzione esplicita a:
+- Non forzare `Button.tsx` su elementi che non sono semanticamente bottoni-azione (chip/toggle filtro) o su bottoni-link (`<Link>` stilizzato — semantica HTML diversa da `<button>`)
+- Possibile estensione minima di `Button.tsx` con una prop `size` per bottoni icon-only (bulk bar, azioni riga), se necessaria — da dichiarare esplicitamente nel report, non fatta silenziosamente
+- Logica/comportamento (bulk actions, guardrail tracking, conferme) dichiarati invariati, solo il markup del bottone cambia
+
+**Esito non ancora ricevuto** — da verificare al prossimo report.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§49** (questa).
+- **§48** — punto 4 (bottoni rimandati) ora in lavorazione, non più aperto senza seguito.
+- **Prossimo passo**: (a) esito Fase C-bis (bottoni), (b) verifica indipendente addendum Fase B se/quando arriva codice, (c) Fase D — resto delle pagine admin.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.31 — 17 Agosto 2026 (base: v3.30; addendum Fase B [barra ricerca] confermato solo verbalmente, non verificato via codice in questa sessione; Fase C-bis [adozione `Button.tsx` in `AdminFilters`/`OrdersTable`/`PendingPaymentsBanner`] avviata, prompt scritto, esito da ricevere — vedi §49 per il dettaglio completo)*
+
+---
+
+## 50. Changelog v3.32 (17 Agosto 2026) — Fase C-bis completata e verificata: bottoni adottati con giudizio, non a tappeto
+
+**Metodo di questa revisione:** confronto diretto zip vs report — 2/2 file confermati, letti per intero, incluso il contesto CSS reale della bulk bar per verificare la motivazione tecnica dichiarata (non solo presa per buona).
+
+### Esito — ambito reale più piccolo di quanto ipotizzato, con buone motivazioni
+
+- **`AdminFilters.tsx`**: zero `<button>` reali (solo `<select>`/`<input type="date">`) — il "Effacer filtres" ipotizzato dal prompt non esiste nel codice. Correttamente non toccato.
+- **`PendingPaymentsBanner.tsx`**: il bottone di conferma è delegato a `ConfirmPaymentButton.tsx`, componente condiviso usato in **4 punti** (anche `OrderDetail.tsx`, `EventDetailAdminClient.tsx`, `RentalReservationsClient.tsx`, scoperto via grep) — toccarlo avrebbe esteso il ciclo ben oltre i 3 file dichiarati. Correttamente escluso, dichiarato invece di ignorato.
+- **`OrdersTable.tsx`**: 8 `<button>` totali, solo **2 convertiti** (`Effacer la recherche`, freccia espansione riga) a `Button variant="ghost" size="sm"` — verificato nel codice, `onClick` (`setSearchQuery('')`/`toggleRow`) identici a prima.
+- **Sort header colonna** (`<th><button>`): lasciato invariato — applicare lo stile `Button.tsx` avrebbe rotto l'allineamento dell'header, correttamente riconosciuto come un caso diverso da un "bottone" visivo.
+- **Bulk bar NON convertita — motivazione verificata nel codice, non solo dichiarata**: è una pillola `bg-gray-900 dark:bg-gray-800` con testo bianco fisso, non theme-aware come il resto dell'admin. La variante `ghost` di `Button.tsx` imposta `text-gray-700 dark:text-gray-300` — su quello sfondo scuro reale il contrasto sarebbe scarso, una regressione di accessibilità che la regola "non regredire" del prompt vietava esplicitamente. **Confermato leggendo entrambi i file**: la pillola è davvero scura, la classe `ghost` è davvero quella. Decisione corretta, non un'omissione mascherata da giustificazione.
+- **Bottoni-link** (`Voir →`, icona stampa picking-list): lasciati `<Link>`, non forzati in `Button.tsx` — sono navigazione, non azioni, distinzione semantica/accessibilità corretta.
+
+### Estensione di `Button.tsx`
+
+Aggiunta `size?: 'sm' | 'md'`, default `'md'` — **verificato che il default preserva esattamente il comportamento precedente** (nessun uso esistente in `(protected)/page.tsx` da Fase C, riconfermato qui). `sm` = `p-1.5 text-xs gap-1`, pensato per icon-only con target tattile ≥24×24px, commento nel codice cita esplicitamente §9 di `AUDIT_ADMIN_UIUX.md`.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§50** (questa).
+- **§49** — Fase C-bis chiusa, nessuna azione residua.
+- **Nota di pattern per le fasi successive (D)**: questo ciclo conferma che l'adozione dei componenti condivisi va fatta caso per caso, non a tappeto — è normale e corretto che una parte dei casi ipotizzati nel prompt non esista o vada esclusa per motivi tecnici concreti (contrasto, semantica, raggio d'azione condiviso). I prompt di Fase D dovrebbero aspettarsi lo stesso pattern, non trattarlo come deviazione da correggere.
+- **Prossimo passo**: Fase D — resto delle pagine admin (catalogue, événementiel, loyalty, ambassadeurs, paramètres, billing), una alla volta.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.32 — 17 Agosto 2026 (base: v3.31; Fase C-bis completata e verificata zip-vs-report [2/2 file] — solo 2/8 bottoni di `OrdersTable.tsx` convertiti a `Button.tsx`, resto correttamente escluso con motivazioni tecniche verificate nel codice [bulk bar contrasto, `ConfirmPaymentButton` condiviso su 4 moduli, sort header, bottoni-link]; `Button.tsx` esteso con `size` opzionale, default invariato — vedi §50 per il dettaglio completo)*
