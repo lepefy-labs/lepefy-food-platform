@@ -1,16 +1,12 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import Image from 'next/image';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
-import LogoutButton from '../LogoutButton';
 import AdminSidebar from '../_components/AdminSidebar';
-import AdminMobileNav from '../_components/AdminMobileNav';
+import AdminHeader from '../_components/AdminHeader';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
-import ThemeToggleButton from '../_components/ThemeToggleButton';
-import NotificationBell from '../_components/ui/NotificationBell';
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
@@ -103,32 +99,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <Suspense fallback={<div className="w-9 h-9 md:hidden" />}>
-          <AdminMobileNav categories={categories ?? []} />
-        </Suspense>
-        {tenant.logo_url && (
-          <Image
-            src={tenant.logo_url}
-            alt={tenant.name}
-            width={140}
-            height={32}
-            className="h-8 w-auto object-contain"
-            priority
-          />
-        )}
-        <div>
-          <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{tenant.name}</span>
-          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
-            Administration
-          </span>
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          <NotificationBell />
-          <ThemeToggleButton />
-          <LogoutButton />
-        </div>
-      </header>
+      <AdminHeader tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} />
 
       <div className="flex min-h-[calc(100vh-57px)] bg-gray-50 dark:bg-gray-950">
         <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 px-3 py-2 shrink-0 hidden md:block">

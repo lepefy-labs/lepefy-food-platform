@@ -43,30 +43,35 @@ export default function AdminSidebar({
     pathname.startsWith('/admin/evenementiel')
   );
 
+  // Style des items de nav repris du porting TailAdmin (voir
+  // _tailadmin-staging/components/layout/AppSidebar.tsx : classes
+  // `menu-item`/`menu-item-active`/`menu-item-inactive`) — mêmes rythmes
+  // d'espacement (gap-3, py-2.5) et de police (font-medium text-sm), mais
+  // couleurs tenant (--color-primary-*) au lieu de `brand-*` du template.
   function navClass(active: boolean) {
     return active
       ? 'bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] font-medium'
-      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800';
+      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5';
   }
 
   return (
     <nav className="flex flex-col h-full">
 
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
-                    tracking-widest px-3 mb-1 mt-4">
+                    tracking-widest px-3 mb-2 mt-4">
         Gestion
       </p>
 
       <Link
         href="/admin"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin' ? navClass(true) : navClass(false)
         }`}
       >
         <IconShoppingBag
-          size={16}
-          stroke={pathname === '/admin' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin' ? 1.75 : 1.5}
         />
         <span className="flex-1">Commandes</span>
         {pendingPaymentsCount > 0 && (
@@ -79,7 +84,7 @@ export default function AdminSidebar({
 
       <button
         onClick={() => setCatalogueOpen(!catalogueOpen)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 w-full text-left ${
           pathname.startsWith('/admin/catalogue')
             ? navClass(true)
@@ -87,13 +92,13 @@ export default function AdminSidebar({
         }`}
       >
         <IconPackage
-          size={16}
-          stroke={pathname.startsWith('/admin/catalogue') ? 2 : 1.5}
+          size={20}
+          stroke={pathname.startsWith('/admin/catalogue') ? 1.75 : 1.5}
         />
         <span className="flex-1">Catalogue</span>
         {catalogueOpen
-          ? <IconChevronDown size={13} stroke={1.5} />
-          : <IconChevronRight size={13} stroke={1.5} />
+          ? <IconChevronDown size={14} stroke={1.5} />
+          : <IconChevronRight size={14} stroke={1.5} />
         }
       </button>
 
@@ -128,9 +133,9 @@ export default function AdminSidebar({
         </div>
       )}
 
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg
                       text-sm mx-1 text-gray-300 dark:text-gray-600 cursor-not-allowed">
-        <IconUsers size={16} stroke={1.5} />
+        <IconUsers size={20} stroke={1.5} />
         <span className="flex-1">Clients</span>
         <span className="text-xs font-medium px-1.5 py-0.5 rounded-full
                          bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
@@ -139,13 +144,13 @@ export default function AdminSidebar({
       </div>
 
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
-                    tracking-widest px-3 mb-1 mt-5">
+                    tracking-widest px-3 mb-2 mt-5">
         Boutique
       </p>
 
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg
                       text-sm mx-1 text-gray-300 dark:text-gray-600 cursor-not-allowed">
-        <IconTag size={16} stroke={1.5} />
+        <IconTag size={20} stroke={1.5} />
         <span className="flex-1">Promotions</span>
         <span className="text-xs font-medium px-1.5 py-0.5 rounded-full
                          bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
@@ -155,63 +160,63 @@ export default function AdminSidebar({
 
       <Link
         href="/admin/accueil-slides"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/accueil-slides' ? navClass(true) : navClass(false)
         }`}
       >
         <IconPhoto
-          size={16}
-          stroke={pathname === '/admin/accueil-slides' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/accueil-slides' ? 1.75 : 1.5}
         />
         Slides d&apos;accueil
       </Link>
 
       <Link
         href="/admin/loyalty"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/loyalty' ? navClass(true) : navClass(false)
         }`}
       >
         <IconGift
-          size={16}
-          stroke={pathname === '/admin/loyalty' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/loyalty' ? 1.75 : 1.5}
         />
         Fidélité & parrainage
       </Link>
 
       <Link
         href="/admin/loyalty/scan"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/loyalty/scan' ? navClass(true) : navClass(false)
         }`}
       >
         <IconScan
-          size={16}
-          stroke={pathname === '/admin/loyalty/scan' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/loyalty/scan' ? 1.75 : 1.5}
         />
         Scan fidélité
       </Link>
 
       <Link
         href="/admin/livraison"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/livraison' ? navClass(true) : navClass(false)
         }`}
       >
         <IconTruck
-          size={16}
-          stroke={pathname === '/admin/livraison' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/livraison' ? 1.75 : 1.5}
         />
         Livraison
       </Link>
 
       <button
         onClick={() => setEvenementielOpen(!evenementielOpen)}
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 w-full text-left ${
           pathname.startsWith('/admin/evenementiel')
             ? navClass(true)
@@ -219,8 +224,8 @@ export default function AdminSidebar({
         }`}
       >
         <IconCalendarEvent
-          size={16}
-          stroke={pathname.startsWith('/admin/evenementiel') ? 2 : 1.5}
+          size={20}
+          stroke={pathname.startsWith('/admin/evenementiel') ? 1.75 : 1.5}
         />
         <span className="flex-1">Événementiel</span>
         {evenementielOpen
@@ -263,61 +268,61 @@ export default function AdminSidebar({
 
       <Link
         href="/admin/ambassadeurs"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/ambassadeurs' ? navClass(true) : navClass(false)
         }`}
       >
         <IconStar
-          size={16}
-          stroke={pathname === '/admin/ambassadeurs' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/ambassadeurs' ? 1.75 : 1.5}
         />
         Ambassadeurs
       </Link>
 
       <Link
         href="/admin/parametres"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/parametres' ? navClass(true) : navClass(false)
         }`}
       >
         <IconSettings
-          size={16}
-          stroke={pathname === '/admin/parametres' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/parametres' ? 1.75 : 1.5}
         />
         Paramètres
       </Link>
 
       <Link
         href="/admin/ai-lab"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/ai-lab' ? navClass(true) : navClass(false)
         }`}
       >
         <IconSparkles
-          size={16}
-          stroke={pathname === '/admin/ai-lab' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/ai-lab' ? 1.75 : 1.5}
         />
         IA — Base de connaissance
       </Link>
 
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
-                    tracking-widest px-3 mb-1 mt-5">
+                    tracking-widest px-3 mb-2 mt-5">
         Compte
       </p>
 
       <Link
         href="/admin/billing"
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
                     text-sm transition-colors mx-1 ${
           pathname === '/admin/billing' ? navClass(true) : navClass(false)
         }`}
       >
         <IconCreditCard
-          size={16}
-          stroke={pathname === '/admin/billing' ? 2 : 1.5}
+          size={20}
+          stroke={pathname === '/admin/billing' ? 1.75 : 1.5}
         />
         Abonnement
       </Link>
