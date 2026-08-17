@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload, IconStarFilled, IconClock } from '@tabler/icons-react';
+import { IconArrowLeft, IconPlus, IconTrash, IconReceiptRefund, IconUpload, IconStarFilled, IconClock, IconPencil, IconCheck, IconX, IconSend } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
 import ConfirmPaymentButton from '../../../../_components/ui/ConfirmPaymentButton';
@@ -50,6 +50,10 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
   const [newBadge, setNewBadge] = useState('');
   const [addingTicket, setAddingTicket] = useState(false);
   const [refunding, setRefunding] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [resendFeedbackId, setResendFeedbackId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -240,6 +244,55 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
       }
     } finally {
       setRefunding(null);
+    }
+  }
+
+  function startEditingEmail(id: string, currentEmail: string) {
+    setEditingEmailId(id);
+    setEmailDraft(currentEmail);
+  }
+
+  function cancelEditingEmail() {
+    setEditingEmailId(null);
+    setEmailDraft('');
+  }
+
+  async function confirmEmailEdit(id: string) {
+    setResendingId(id);
+    try {
+      const res = await fetch(`/api/admin/evenementiel/reservations/${id}/resend-email`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailDraft }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error ?? 'Erreur lors du renvoi du billet.');
+        return;
+      }
+      setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, customer_email: result.email } : r)));
+      setEditingEmailId(null);
+      setEmailDraft('');
+      setResendFeedbackId(id);
+      setTimeout(() => setResendFeedbackId((prev) => (prev === id ? null : prev)), 3000);
+    } finally {
+      setResendingId(null);
+    }
+  }
+
+  async function resendReservation(id: string) {
+    setResendingId(id);
+    try {
+      const res = await fetch(`/api/admin/evenementiel/reservations/${id}/resend-email`, { method: 'PATCH' });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error ?? 'Erreur lors du renvoi du billet.');
+        return;
+      }
+      setResendFeedbackId(id);
+      setTimeout(() => setResendFeedbackId((prev) => (prev === id ? null : prev)), 3000);
+    } finally {
+      setResendingId(null);
     }
   }
 
@@ -478,14 +531,70 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
               <div key={r.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">{r.customer_name}</p>
-                  <p className="text-xs text-gray-500">
-                    {r.customer_email} · {r.quantity_remaining}/{r.quantity_total} places · {formatPrice(r.amount_paid, currency)}
-                  </p>
+                  {editingEmailId === r.id ? (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <input
+                        type="email"
+                        value={emailDraft}
+                        onChange={(e) => setEmailDraft(e.target.value)}
+                        className={`${inputClass} text-xs py-1 flex-1 min-w-0`}
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => confirmEmailEdit(r.id)}
+                        loading={resendingId === r.id}
+                        title="Confirmer"
+                      >
+                        <IconCheck size={15} />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelEditingEmail}
+                        disabled={resendingId === r.id}
+                        title="Annuler"
+                      >
+                        <IconX size={15} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      {r.customer_email}
+                      {r.status === 'confirmed' && (
+                        <button
+                          type="button"
+                          onClick={() => startEditingEmail(r.id, r.customer_email)}
+                          className="text-gray-400 hover:text-gray-600"
+                          title="Modifier l'email"
+                        >
+                          <IconPencil size={12} />
+                        </button>
+                      )}
+                      {' '}· {r.quantity_remaining}/{r.quantity_total} places · {formatPrice(r.amount_paid, currency)}
+                      {resendFeedbackId === r.id && <span className="text-green-600 font-semibold">· Billet renvoyé</span>}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-2xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-600">
                     {RESERVATION_STATUS_LABELS[r.status]}
                   </span>
+                  {r.status === 'confirmed' && editingEmailId !== r.id && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => resendReservation(r.id)}
+                      loading={resendingId === r.id}
+                      title="Renvoyer le billet"
+                    >
+                      <IconSend size={16} />
+                    </Button>
+                  )}
                   {r.status === 'confirmed' && (
                     <Button
                       type="button"
