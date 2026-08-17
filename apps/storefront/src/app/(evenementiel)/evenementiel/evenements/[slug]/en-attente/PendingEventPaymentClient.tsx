@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { IconExternalLink, IconClock, IconBrandWhatsapp } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 
@@ -19,6 +20,7 @@ interface PendingEventPaymentData {
   isPaypal:      boolean;
   label:         string;
   customerEmail: string;
+  eventSlug:     string;
 }
 
 interface Props {
@@ -27,8 +29,11 @@ interface Props {
 }
 
 export default function PendingEventPaymentClient({ requestId, whatsappNumber }: Props) {
+  const router = useRouter();
   const [data, setData] = useState<PendingEventPaymentData | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [changingMethod, setChangingMethod] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('lepefy-pending-event-payment');
@@ -42,6 +47,26 @@ export default function PendingEventPaymentClient({ requestId, whatsappNumber }:
     }
     setHydrated(true);
   }, [requestId]);
+
+  async function handleChangePaymentMethod() {
+    if (!data) return;
+    setChangingMethod(true);
+    setChangeError(null);
+    try {
+      const res = await fetch(`/api/events/reservation-requests/${data.requestId}`, { method: 'DELETE' });
+      if (res.status === 409) {
+        setChangeError('Votre paiement a déjà été confirmé entre-temps. Vérifiez vos emails.');
+        return;
+      }
+      if (!res.ok) {
+        setChangeError('Une erreur est survenue. Réessayez.');
+        return;
+      }
+      router.push(`/evenementiel/evenements/${data.eventSlug}`);
+    } finally {
+      setChangingMethod(false);
+    }
+  }
 
   if (!hydrated) return null;
 
@@ -77,6 +102,17 @@ export default function PendingEventPaymentClient({ requestId, whatsappNumber }:
           >
             Ouvrir {data.label} <IconExternalLink size={16} />
           </a>
+
+          <button
+            type="button"
+            onClick={handleChangePaymentMethod}
+            disabled={changingMethod}
+            className="w-full text-sm font-semibold text-gray-500 hover:text-gray-800 disabled:opacity-50"
+          >
+            {changingMethod ? 'Changement en cours…' : 'Changer de moyen de paiement'}
+          </button>
+
+          {changeError && <p className="text-xs text-red-500">{changeError}</p>}
 
           {data.isPaypal ? (
             <p className="text-xs text-gray-500">

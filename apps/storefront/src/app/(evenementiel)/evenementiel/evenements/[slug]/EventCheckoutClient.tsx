@@ -139,6 +139,37 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Restauration du draft laissé par 'select-payment' — le client qui revient
+  // depuis /en-attente après avoir choisi "Changer de moyen de paiement"
+  // retrouve directement ses formules/coordonnées, sans tout ressaisir.
+  // Prioritaire sur la précompilation /api/customers/me ci-dessous (elle ne
+  // reste effective que sur les champs vides, donc n'écrase rien ici).
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem('lepefy-event-checkout-draft');
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        eventId:    string;
+        quantities: Record<string, number>;
+        name:       string;
+        email:      string;
+        phone:      string;
+      };
+      if (draft.eventId !== event.id) return;
+      setQuantities(draft.quantities);
+      setName(draft.name);
+      setEmail(draft.email);
+      setPhone(draft.phone);
+      setStep('select-payment');
+    } catch {
+      // Draft corrompu — comportement normal depuis 'select'.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const prefilledRef = useRef(false);
   useEffect(() => {
     if (!sessionCustomer || prefilledRef.current) return;
@@ -199,6 +230,13 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       setError('Adresse email invalide.');
       return;
     }
+    sessionStorage.setItem('lepefy-event-checkout-draft', JSON.stringify({
+      eventId: event.id,
+      quantities,
+      name:    name.trim(),
+      email:   email.trim(),
+      phone:   phone.trim(),
+    }));
     setStep('select-payment');
   }
 
@@ -244,6 +282,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           isPaypal:     result.isPaypal,
           label:        result.label,
           customerEmail: email.trim(),
+          eventSlug:    event.slug,
         }));
 
         router.push(`${window.location.pathname}/en-attente?ref=${result.requestId}`);
@@ -268,6 +307,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       }
 
       setClientSecret(result.clientSecret);
+      sessionStorage.removeItem('lepefy-event-checkout-draft');
       setStep('payment');
     } catch {
       setError('Une erreur est survenue. Veuillez réessayer.');
