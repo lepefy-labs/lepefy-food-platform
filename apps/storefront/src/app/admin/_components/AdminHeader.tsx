@@ -34,14 +34,23 @@ export default function AdminHeader({ tenantName, tenantLogoUrl, categories }: A
           priority
         />
       )}
-      <div>
+      <div className="flex-shrink-0">
         <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{tenantName}</span>
         <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
           Administration
         </span>
       </div>
-      <div className="ml-auto flex items-center gap-1">
+
+      {/* Zone flexible entre le bloc tenant et le cluster d'icônes : sur
+          desktop la barre de recherche s'y étale (plafonnée à max-w-lg) ;
+          sur mobile le composant ne rend qu'une icône compacte (voir
+          AdminGlobalSearch), qu'on colle au cluster d'icônes via
+          justify-end plutôt que de la laisser flotter à gauche de la zone. */}
+      <div className="flex-1 min-w-0 flex justify-end md:justify-start md:max-w-lg md:mx-4">
         <AdminGlobalSearch />
+      </div>
+
+      <div className="ml-auto flex items-center gap-1">
         <NotificationBell />
         <ThemeToggleButton />
         <LogoutButton />
