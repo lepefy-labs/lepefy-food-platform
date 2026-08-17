@@ -79,7 +79,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
   async function updateStatus(status: EventStatus) {
     setStatusError(null);
     if (status === 'published' && ticketTypes.filter((t) => t.active).length === 0) {
-      setStatusError('Impossible de publier un événement sans au moins une formule active — ajoutez-en une ci-dessous.');
+      setStatusError('Impossible de publier un événement sans au moins une formule active : ajoutez-en une ci-dessous.');
       return;
     }
     setSavingStatus(true);
@@ -391,7 +391,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
               />
             </div>
           ))}
-          {highlights.length === 0 && <p className="text-xs text-gray-400">Aucun point fort — section masquée sur la page événement.</p>}
+          {highlights.length === 0 && <p className="text-xs text-gray-400">Aucun point fort, section masquée sur la page événement.</p>}
         </div>
 
         {highlights.length < MAX_HIGHLIGHTS && (
@@ -443,7 +443,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
               </div>
             </div>
           ))}
-          {ticketTypes.length === 0 && <p className="text-xs text-gray-400">Aucune formule — ajoutez-en une ci-dessous.</p>}
+          {ticketTypes.length === 0 && <p className="text-xs text-gray-400">Aucune formule, ajoutez-en une ci-dessous.</p>}
         </div>
         <form onSubmit={addTicketType} className="space-y-2">
           <div className="flex items-center gap-2">
@@ -470,12 +470,12 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
             <IconClock size={16} /> Paiements en attente ({pendingRequests.length})
           </h2>
           <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
-            Ces demandes ne sont pas encore des réservations — aucune place n&apos;est réservée.
+            Ces demandes ne sont pas encore des réservations : aucune place n&apos;est réservée.
           </p>
           <div className="space-y-2">
             {pendingRequests.map((request) => {
               const itemsSummary = request.items
-                .map((i) => `${i.quantity}× ${ticketTypes.find((t) => t.id === i.ticket_type_id)?.label ?? '—'}`)
+                .map((i) => `${i.quantity}× ${ticketTypes.find((t) => t.id === i.ticket_type_id)?.label ?? '-'}`)
                 .join(', ');
               return (
                 <div

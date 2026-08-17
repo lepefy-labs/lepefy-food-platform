@@ -237,12 +237,13 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         }
 
         sessionStorage.setItem('lepefy-pending-event-payment', JSON.stringify({
-          requestId: result.requestId,
-          link:      result.link,
-          amount:    result.amount,
-          currency:  result.currency,
-          isPaypal:  result.isPaypal,
-          label:     result.label,
+          requestId:    result.requestId,
+          link:         result.link,
+          amount:       result.amount,
+          currency:     result.currency,
+          isPaypal:     result.isPaypal,
+          label:        result.label,
+          customerEmail: email.trim(),
         }));
 
         router.push(`${window.location.pathname}/en-attente?ref=${result.requestId}`);
@@ -354,12 +355,12 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           />
           {emailInvalid ? (
             <p className="text-xs text-red-500 -mt-1.5">
-              Adresse email invalide — vérifiez le format (ex : nom@domaine.com).
+              Adresse email invalide : vérifiez le format (ex : nom@domaine.com).
             </p>
           ) : (
             <p className="flex items-center gap-1.5 text-xs text-gray-500 -mt-1.5">
               <IconInfoCircle size={13} className="shrink-0" />
-              Vérifiez bien votre adresse — c&apos;est ici que vous recevrez votre billet.
+              Vérifiez bien votre adresse : c&apos;est ici que vous recevrez votre billet.
             </p>
           )}
           <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
@@ -461,7 +462,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           {isSubmitting
             ? 'Traitement…'
             : selectedExternalMethod
-              ? `${ctaLabel} — ${formatPrice(total, tenant.currency)}`
+              ? `${ctaLabel} · ${formatPrice(total, tenant.currency)}`
               : ctaLabel
           }
         </button>

@@ -204,7 +204,7 @@ export default async function EventDetailPage({ params }: PageProps) {
                   </a>
                 </>
               ) : (
-                <div className="text-[#a9a49d]">—</div>
+                <div className="text-[#a9a49d]">-</div>
               )}
             </div>
           </div>
@@ -234,11 +234,11 @@ export default async function EventDetailPage({ params }: PageProps) {
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-5">
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <IconLock size={18} style={{ color: 'var(--color-primary)' }} />
-            Paiement 100% sécurisé — Stripe &amp; Carte
+            Paiement 100% sécurisé · Stripe &amp; Carte
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <IconCircleCheck size={18} style={{ color: 'var(--color-primary)' }} />
-            Réservation confirmée — Places garanties
+            Réservation confirmée · Places garanties
           </div>
         </div>
       </div>

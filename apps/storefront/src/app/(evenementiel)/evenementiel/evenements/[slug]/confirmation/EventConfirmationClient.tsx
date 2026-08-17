@@ -96,7 +96,7 @@ export default function EventConfirmationClient({ paymentIntentId, whatsappNumbe
         <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 animate-pulse">
           <IconClock size={28} className="text-yellow-700" />
         </div>
-        <h1 className="text-xl font-bold mb-2">Paiement reçu — réservation en cours</h1>
+        <h1 className="text-xl font-bold mb-2">Paiement reçu, réservation en cours</h1>
         <p className="text-sm text-gray-500">Votre billet est en cours de génération…</p>
       </div>
     );
@@ -181,7 +181,7 @@ export default function EventConfirmationClient({ paymentIntentId, whatsappNumbe
             </div>
             <p className="text-[15px] font-bold text-gray-900 mb-1">{reservation.customer_name}</p>
             <p className="text-[13px] text-gray-500 mb-4">
-              {reservation.quantity_total} place{reservation.quantity_total > 1 ? 's' : ''} — {formatPrice(reservation.amount_paid, 'EUR')}
+              {reservation.quantity_total} place{reservation.quantity_total > 1 ? 's' : ''} · {formatPrice(reservation.amount_paid, 'EUR')}
             </p>
             <p className="text-[11px] font-mono tracking-wide text-gray-500">
               RÉF. #{reservation.id.slice(0, 8).toUpperCase()}
@@ -193,7 +193,7 @@ export default function EventConfirmationClient({ paymentIntentId, whatsappNumbe
       {reservation && (
         <p className="no-print flex items-start gap-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mt-6">
           <IconAlertTriangle size={18} className="text-red-500 shrink-0 mt-px" />
-          Téléchargez votre billet maintenant — vous en aurez besoin à l&apos;entrée, même si l&apos;email n&apos;arrive pas.
+          Téléchargez votre billet maintenant : vous en aurez besoin à l&apos;entrée, même si l&apos;email n&apos;arrive pas.
         </p>
       )}
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { IconExternalLink, IconClock } from '@tabler/icons-react';
+import { IconExternalLink, IconClock, IconBrandWhatsapp } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 
 // Même comportement que (shop)/checkout/en-attente (Phase 1) : aucune
@@ -12,15 +12,21 @@ import { formatPrice } from '@/lib/utils/format';
 // event_reservation_requests, pas de policy publique sur cette table).
 
 interface PendingEventPaymentData {
-  requestId: string;
-  link:      string;
-  amount:    number;
-  currency:  string;
-  isPaypal:  boolean;
-  label:     string;
+  requestId:     string;
+  link:          string;
+  amount:        number;
+  currency:      string;
+  isPaypal:      boolean;
+  label:         string;
+  customerEmail: string;
 }
 
-export default function PendingEventPaymentClient({ requestId }: { requestId: string | null }) {
+interface Props {
+  requestId:      string | null;
+  whatsappNumber: string | null;
+}
+
+export default function PendingEventPaymentClient({ requestId, whatsappNumber }: Props) {
   const [data, setData] = useState<PendingEventPaymentData | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -47,7 +53,7 @@ export default function PendingEventPaymentClient({ requestId }: { requestId: st
 
       <h1 className="text-xl font-bold mb-2">Demande de paiement envoyée</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Ceci n&apos;est pas encore une réservation confirmée — elle le sera dès que
+        Ceci n&apos;est pas encore une réservation confirmée : elle le sera dès que
         votre paiement aura été vérifié.
       </p>
 
@@ -78,15 +84,35 @@ export default function PendingEventPaymentClient({ requestId }: { requestId: st
             </p>
           ) : (
             <p className="text-xs text-gray-500">
-              Le montant n&apos;est pas prérempli sur ce lien — saisissez-le
+              Le montant n&apos;est pas prérempli sur ce lien, saisissez-le
               manuellement : <strong>{formatPrice(data.amount, data.currency)}</strong>.
             </p>
           )}
 
-          <p className="text-xs text-gray-400 border-t border-gray-200 pt-3">
-            Une fois votre paiement reçu et vérifié, l&apos;organisateur confirmera
-            votre réservation — vous recevrez un email avec votre billet.
-          </p>
+          <div className="text-xs text-gray-500 border-t border-gray-200 pt-3 space-y-2 text-left">
+            <p>
+              Votre billet vous sera envoyé par email à{' '}
+              <strong className="text-gray-700">{data.customerEmail}</strong> dès que
+              votre paiement sera vérifié par l&apos;organisateur.
+            </p>
+            <p>
+              Pour ce moyen de paiement, l&apos;email est le seul moyen de recevoir
+              votre billet : il n&apos;y a pas de page de téléchargement, contrairement
+              au paiement par carte. Vérifiez que l&apos;adresse ci-dessus est correcte
+              avant d&apos;effectuer le paiement.
+            </p>
+            {whatsappNumber && (
+              <a
+                href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold hover:underline"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                <IconBrandWhatsapp size={14} /> Une erreur dans votre email ? Contactez-nous avant d&apos;effectuer le paiement.
+              </a>
+            )}
+          </div>
         </div>
       ) : (
         <p className="text-sm text-gray-500 bg-gray-50 rounded-2xl p-5">
