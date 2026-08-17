@@ -1954,3 +1954,40 @@ Obiettivo: rendere compilabile/visivabile il layout base del template (sidebar +
 ---
 
 *Lepefy Labs — Lepefy Food Platform — Context document v3.24 — 17 Agosto 2026 (base: v3.23; ciclo di valutazione template esterni concluso con decisione: solo admin, TailAdmin v2.3.0, Tabler mantenuto come convenzione icone; primo ciclo di porting isolato Next 16→14 verificato via zip di consegna e confronto puntuale col report — nessuna discrepanza rilevata, 24/24 file confermati; deviazione tecnica nota da non ripetere in produzione: `translateZ(0)`+altezza fissa per contenere `fixed`/`sticky` nello staging — vedi §42 per il dettaglio completo)*
+
+---
+
+## 43. Changelog v3.25 (17 Agosto 2026) — Integrazione reale sidebar/header TailAdmin in `AdminSidebar.tsx`
+
+**Metodo di questa revisione:** ⚠️ **basata solo sul report testuale di Claude Code, nessun file/zip caricato in questa sessione per riscontro diretto** — a differenza di §42, qui non è stato possibile confrontare le affermazioni del report con il codice reale. Trattare i punti sotto come non ancora verificati indipendentemente fino alla prossima passata con accesso a git/filesystem o a un deliverable scaricabile.
+
+### Cosa riporta il ciclo
+
+Sostituita la sidebar admin visiva (non funzionale) con lo stile portato da TailAdmin nel ciclo precedente (§42), collegata alla navigazione reale:
+
+- **Voci di navigazione reali mappate** (13 voci, mappatura Tabler preservata 1:1, solo dimensione icone 16→20px e stroke attivo 2→1.75 cambiati): Commandes, Catalogue (con sottomenu categorie), Clients/Promotions (disabilitate, "Bientôt"), Slides d'accueil, Fidélité & parrainage, Scan fidélité, Livraison, Événementiel (collassabile, 6 sotto-voci: événements/scan/services/devis/reservations-materiel/galerie), Ambassadeurs, Paramètres, IA (`/admin/ai-lab` — non documentato prima d'ora in questo context doc), Abonnement.
+- **Correzione a un'assunzione del prompt precedente**: la sidebar oggi **non** è `position: fixed` come ipotizzato nel prompt — è un `<aside>` in flusso normale dentro una riga flex (solo l'header è `sticky top-0`). Claude Code ha preservato questo comportamento reale invece di introdurre `fixed` per assecondare l'assunzione errata del prompt — comportamento corretto, da tenere a mente per correggere il prompt template dei prossimi cicli sidebar.
+- **Sidebar collassabile del template**: scartata deliberatamente, come da Step 0.4 del prompt — non esiste oggi, non richiesta esplicitamente, e in conflitto con la regola cross-device di questo ciclo (niente stato/logica portata dallo staging che non rispecchi il comportamento reale attuale).
+- **File toccati**: `(protected)/layout.tsx` (solo JSX header estratto in nuovo `AdminHeader.tsx`, logica auth/redirect dichiarata bit-per-bit identica), `AdminSidebar.tsx` (solo classi di stile). Nessun file eliminato. `AdminMobileNav.tsx` dichiarato non toccato (stessa interfaccia `<AdminSidebar categories={categories} />`).
+- **Preservazione redirect `tenant_cashier`**: dichiarata verificata via lettura codice/diff (non eseguibile live, stessa limitazione Supabase del ciclo §42) — il blocco di redirect a `/admin/loyalty/scan` riportato come assente dal diff, quindi invariato.
+- **Dark mode**: `AdminThemeProvider` esistente dichiarato non toccato; il `ThemeContext.tsx` portato nello staging (§42) confermato scartato, mai importato da codice reale.
+
+### ⚠️ Bug preesistente scoperto (non introdotto da questo ciclo, non corretto)
+
+`AdminSidebar.tsx` referenzia la CSS var `--color-primary-dark` per lo stato di navigazione attiva, ma **solo `--color-primary`/`--color-primary-light`/`--color-secondary` sono definite** in `src/app/layout.tsx` — `--color-primary-dark` non è mai stata dichiarata da nessuna parte. Difetto preesistente al di fuori dello scope di questo ciclo (avrebbe richiesto toccare `layout.tsx`, fuori dal perimetro "solo sidebar/header"), lasciato correttamente invariato. Effetto pratico presumibile: lo stato attivo della sidebar è sempre caduto su un colore non definito. **Da decidere con Robertin se pianificare un micro-fix dedicato** (proposta di Claude Code: `--color-primary-dark: color-mix(in srgb, var(--color-primary) 75%, black)` accanto alle altre CSS var tenant, oppure un campo tenant dedicato).
+
+### Deviazioni dichiarate
+
+- Header estratto in nuovo componente `AdminHeader.tsx` invece di restare inline nel layout (motivazione: separare presentazione da dati, rispecchia il pattern già esistente per la sidebar) — dimensioni/padding lasciati pixel-identici perché il layout sottostante assume un'altezza header precisa (`min-h-[calc(100vh-57px)]`).
+- Consegna di nuovo come zip anziché push diretto, continuando il pattern del ciclo §42 senza richiederlo esplicitamente questa volta — segnalato da Claude Code stesso, da confermare con Robertin se preferisce il push diretto d'ora in poi.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§43** (questa).
+- **§8bis** — da integrare alla prossima passata con accesso diretto al codice: la sidebar reale ha 13 voci (elenco sopra), inclusa una voce `/admin/ai-lab` non ancora documentata nella sezione struttura repository/AdminSidebar prima d'ora.
+- **§1–§42** non modificati oltre al pointer inline.
+- **Promemoria per il prossimo ciclo con accesso a git/zip**: verificare indipendentemente (a) l'assenza reale di `--color-primary-dark`, (b) che il redirect `tenant_cashier` sia davvero bit-per-bit identico, (c) che `AdminMobileNav.tsx` non abbia richiesto modifiche.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.25 — 17 Agosto 2026 (base: v3.24; integrazione reale sidebar/header TailAdmin in `AdminSidebar.tsx`/nuovo `AdminHeader.tsx`, 13 voci di navigazione reali mappate, sidebar collassabile scartata deliberatamente, redirect `tenant_cashier` e dark mode dichiarati invariati — ⚠️ **verifica basata solo sul report testuale di Claude Code, nessun codice caricato per riscontro diretto in questa sessione**; bug preesistente scoperto e non corretto: `--color-primary-dark` mai definita — vedi §43 per il dettaglio completo)*
