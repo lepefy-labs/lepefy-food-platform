@@ -1,64 +1,23 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { formatPrice } from '@/lib/utils/format'
+import {
+  IconClock,
+  IconCurrencyEuro,
+  IconTrendingUp,
+  IconTruck,
+  IconTruckDelivery,
+} from '@tabler/icons-react'
 import AdminFilters from './AdminFilters'
 import OrdersTable from './OrdersTable'
 import PendingPaymentsBanner from './PendingPaymentsBanner'
+import KpiCard from '../_components/ui/KpiCard'
 import type { ListOrder } from './OrdersTable'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store';
-
-// ─── KPI card ─────────────────────────────────────────────────────────────────
-
-function KpiCard({
-  label,
-  value,
-  sub,
-  href,
-  delta,
-}: {
-  label:  string
-  value:  string
-  sub?:   string
-  href?:  string
-  delta?: number | null
-}) {
-  const inner = (
-    <>
-      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
-      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>}
-      {delta != null && (
-        <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-          {delta >= 0 ? '+' : ''}{delta}%
-        </p>
-      )}
-      {href && (
-        <p className="text-xs mt-1" style={{ color: 'var(--color-primary-dark)' }}>
-          Voir →
-        </p>
-      )}
-    </>
-  )
-
-  if (href) {
-    return (
-      <Link href={href} className="block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 hover:shadow-md transition-shadow">
-        {inner}
-      </Link>
-    )
-  }
-
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-      {inner}
-    </div>
-  )
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -217,20 +176,28 @@ export default async function AdminPage({ searchParams }: PageProps) {
             label="Aujourd'hui"
             value={String(todayCount)}
             sub={`${totalCount} au total`}
+            icon={IconClock}
+            tone="info"
           />
           <KpiCard
             label="CA total"
             value={formatPrice(totalRevenue, tenant.currency)}
+            icon={IconCurrencyEuro}
+            tone="primary"
           />
           <KpiCard
             label="CA ce mois"
             value={formatPrice(thisMonthRevenue, tenant.currency)}
             delta={delta}
+            icon={IconTrendingUp}
+            tone="primary"
           />
           <KpiCard
             label="À expédier"
             value={String(toShip)}
             href="/admin?status=preparing"
+            icon={IconTruck}
+            tone="warn"
           />
           <KpiCard
             label="Expédiées ce mois"
@@ -244,6 +211,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
                 )
               }).length
             )}
+            icon={IconTruckDelivery}
+            tone="success"
           />
         </div>
 

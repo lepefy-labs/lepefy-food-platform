@@ -20,8 +20,13 @@ interface KpiCardProps {
   href?: string;
   /** Variation % mois/mois — badge coloré avec flèche si fourni. */
   delta?: number | null;
-  /** Icône Tabler (composant, pas élément) affichée dans le badge rond en haut de la card. */
-  icon?: ComponentType<{ size?: number; stroke?: number; className?: string }>;
+  /**
+   * Icône Tabler (composant, pas élément) affichée dans le badge rond en haut
+   * de la card. `size`/`stroke` en `string | number` — pas juste `number` —
+   * pour matcher `IconProps` réel du package (`@tabler/icons-react` ne
+   * l'exporte pas nommément, sinon on l'utiliserait directement).
+   */
+  icon?: ComponentType<{ size?: string | number; stroke?: string | number; className?: string }>;
   /** Teinte du badge icône — 'primary' (couleur tenant) par défaut, ou un ton sémantique --status-*. */
   tone?: Tone;
 }
