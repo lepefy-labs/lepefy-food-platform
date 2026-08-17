@@ -14,6 +14,7 @@ import {
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import StatusBadge from '../_components/ui/StatusBadge';
+import Button from '../_components/ui/Button';
 import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/BulkTrackingModal';
 import AdminOrdersPoller from './AdminOrdersPoller';
 import type { OrderStatus } from '@lepefy/types';
@@ -386,15 +387,15 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
                        focus:border-transparent"
           />
           {searchQuery && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2
-                         p-1.5 -m-1.5 text-gray-400 hover:text-gray-600
-                         dark:text-gray-500 dark:hover:text-gray-300"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2"
               aria-label="Effacer"
             >
               <IconX size={13} />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -497,11 +498,10 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
                         {/* Freccia espansione */}
                         <td className="px-3 py-3 w-8">
                           {items.length > 0 && (
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => toggleRow(order.id)}
-                              className="p-2 rounded text-gray-400 dark:text-gray-500
-                                         hover:text-gray-600 dark:hover:text-gray-300
-                                         hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                               aria-label={isExpanded ? 'Réduire' : 'Développer'}
                               aria-expanded={isExpanded}
                             >
@@ -509,7 +509,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
                                 ? <IconChevronDown size={14} stroke={2} />
                                 : <IconChevronRight size={14} stroke={1.5} />
                               }
-                            </button>
+                            </Button>
                           )}
                         </td>
 

@@ -1,10 +1,19 @@
 import type { ButtonHTMLAttributes } from 'react';
 
 type Variant = 'primary' | 'outline' | 'ghost';
+type Size = 'md' | 'sm';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   loading?: boolean;
+  /**
+   * 'md' (défaut, inchangé) pour un bouton texte normal ; 'sm' pour les cas
+   * icon-only (Fase C-bis — sans ça, le padding px-4/py-2 par défaut rendait
+   * les boutons d'action de ligne disproportionnés). 'sm' garde un padding
+   * de 6px autour d'une icône ~14-16px, soit une cible tactile ≥24×24px
+   * (audit accessibilité 17/07, §9 AUDIT_ADMIN_UIUX.md).
+   */
+  size?: Size;
 }
 
 const VARIANT_CLASS: Record<Variant, string> = {
@@ -17,13 +26,19 @@ const VARIANT_CLASS: Record<Variant, string> = {
   ghost: 'text-gray-700 dark:text-gray-300 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800',
 };
 
+const SIZE_CLASS: Record<Size, string> = {
+  md: 'px-4 py-2 text-sm gap-2',
+  sm: 'p-1.5 text-xs gap-1',
+};
+
 /**
  * Bottone condiviso (stile ispirato a TailAdmin — solo riferimento visivo,
- * nessun codice riusato da `_tailadmin-staging/`). Non ancora adottato nelle
- * pagine esistenti: crea solo il componente, pronto per le fasi successive.
+ * nessun codice riusato da `_tailadmin-staging/`). Adottato per la prima
+ * volta in Fase C-bis (dashboard commandes — vedi OrdersTable.tsx).
  */
 export default function Button({
   variant = 'primary',
+  size = 'md',
   loading = false,
   disabled,
   className = '',
@@ -34,10 +49,10 @@ export default function Button({
     <button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2
-                  text-sm font-medium transition-colors
+      className={`inline-flex items-center justify-center rounded-lg
+                  font-medium transition-colors
                   disabled:opacity-50 disabled:cursor-not-allowed
-                  ${VARIANT_CLASS[variant]} ${className}`}
+                  ${SIZE_CLASS[size]} ${VARIANT_CLASS[variant]} ${className}`}
       {...rest}
     >
       {loading && (
