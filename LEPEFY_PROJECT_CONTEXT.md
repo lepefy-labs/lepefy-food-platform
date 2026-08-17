@@ -1918,3 +1918,39 @@ Nuovo metodo `card` per `tenant_payment_methods` (estende il CHECK esistente da 
 ---
 
 *Lepefy Labs — Lepefy Food Platform — Context document v3.23 — 14 Agosto 2026 (base: v3.22; verifica di coerenza contro filesystem/git reale — gap `main` vs branch di lavoro, segnalato ininterrottamente da v3.7, risulta chiuso [`main` = punta di questo branch meno 1 commit cosmetico]; dieci migration nuove `053`–`062` [Événementiel Fase 2, paiements via lien externe su 3 moduli, paiement carte montant libre su `/card`] verificate sul filesystem; `pnpm install`+`pnpm typecheck` eseguiti in questa sessione, esito pulito — vedi §41 per il dettaglio completo)*
+
+---
+
+## 42. Changelog v3.24 (17 Agosto 2026) — Porting TailAdmin v2.3.0 → Next.js 14.2.35, staging isolato
+
+**Metodo di questa revisione:** verifica diretta dello zip di consegna (`tailadminstagingport.zip`) contro il report di fine ciclo fornito da Claude Code — non un audit git/filesystem sul repo reale come §27/§34/§36/§38/§40/§41 (il lavoro vive su un branch di lavoro non fornito in questa sessione, solo lo zip isolato). Confronto file-per-file tra l'elenco dichiarato nel report e il contenuto reale dello zip: nessuna discrepanza — 24 file dichiarati, 24 trovati, nessun file di produzione tra questi.
+
+### Contesto della decisione
+
+Valutazione template esterni per tre aree (frontend, admin, événementiel) conclusa con decisione di procedere **solo sull'admin**, con **TailAdmin v2.3.0** (`free-nextjs-admin-dashboard`, MIT license) — non la vecchia V1.3 ipotizzata inizialmente (verificata assente/non più rilevante), ma la versione corrente del template, nativa Next.js 16 + React 19 + Tailwind v4. Decisione esplicita di **non** comprare/integrare template per frontend storefront ed événementiel (aree già hardenate con pattern testati in produzione — sticky/overflow mobile, checkout esterno, QR redemption).
+
+**Discussione icone risolta**: mantenere Tabler come convenzione di piattaforma (non passare a Lucide) — le icone del template TailAdmin si sono rivelate 58 SVG proprietari (non Lucide come ipotizzato), quindi la sostituzione futura è un mapping 1:1 nome-icona, non un conflitto tra due librerie esterne.
+
+### Ciclo 1 — Porting isolato (17/08, questa sessione)
+
+Obiettivo: rendere compilabile/visivabile il layout base del template (sidebar + topbar + card statistiche + una tabella) sotto Next 14.2.35/React 18/Tailwind v3, **senza collegarlo a dati reali né a route admin esistenti** — ciclo di solo porting tecnico, non di integrazione funzionale.
+
+- **Isolamento totale rispettato**: tutti i 24 file nuovi vivono sotto `apps/storefront/src/_tailadmin-staging/` + una pagina di anteprima `admin/(protected)/_staging-preview/page.tsx` (protetta dallo stesso `requireAdmin()`/check inline del layout esistente, nessuna nuova logica di auth) + un `tailwind.staging.config.ts` separato da quello di produzione. Verificato: zero file esistenti modificati.
+- **Conversione token Tailwind v4 → v3** completa: tutti i valori estratti da `@theme` (colori `brand-*`/`gray-*`, dimensioni testo custom, breakpoint `2xsm`/`xsm`/`3xl`, ombre, z-index, spacing `4.5`, `ring-3`) portati in `theme.extend` del config isolato; sintassi v4-only (`@utility`, `outline-hidden`, `max-w-(--breakpoint-2xl)`) convertita esplicitamente, non lasciata residua.
+- **Nessuna API React 19** nei componenti portati (verificato: nessun uso di `use()`, `useActionState`, `useFormStatus`, Server Actions). Tutte le dipendenze esterne del template (`@fullcalendar/*`, `apexcharts`, `react-dnd`, `@react-jvectormap/*`) verificate compatibili con React 18 via `npm view peerDependencies`, ma **non installate** in questo ciclo perché i moduli che le usano (calendario, grafici, mappa, drag&drop) sono stati deliberatamente esclusi dallo scope.
+- **Icone**: solo 15 dei 58 SVG del template inlineati a mano in `icons/index.tsx` (quelli effettivamente usati dai componenti portati) — evita la dipendenza `@svgr/webpack` che avrebbe richiesto toccare `next.config.mjs` di produzione, vietato dal prompt.
+- **Deviazione tecnica principale**: il layout del template usa `position: fixed`/`sticky` per sidebar/header, pensato per occupare l'intero viewport. Per contenerlo dentro il frame isolato della pagina di anteprima (senza sovrapporsi al chrome admin reale) è stato usato `transform: translateZ(0)` + altezza fissa `h-[900px]` sul contenitore — soluzione accettabile *solo* per questo staging temporaneo; **da non riportare così nel ciclo di integrazione reale**, dove vale la regola permanente cross-device (preferire document flow nativo, non calcoli di viewport/altezza fissa).
+- **Dark mode isolata**: il `ThemeContext` di staging applica `.dark` solo al contenitore `StagingShell`, non a `document.documentElement` come l'originale del template — evita conflitto con `AdminThemeProvider` esistente che già gestisce lo stesso meccanismo sull'intero `<html>`.
+- **Verifica automatica limitata**: `pnpm dev`/`pnpm build` non esprimibili in sandbox (falliscono già su `getTenant()` per assenza di credenziali Supabase nell'ambiente di test, condizione preesistente non legata a questo lavoro) — solo `pnpm typecheck` eseguito (pulito) più lettura manuale del JSX per fedeltà al template. **Verifica visiva reale ancora da fare da Robertin in locale/branch.**
+- **Non portato in questo ciclo** (per riferimento futuro, esplicitamente rimandato): calendario, grafici ApexCharts, mappa jVectorMap, drag&drop, pagine auth/profile/blank/error/UI-showcase del template, i restanti 43 SVG non referenziati, sostituzione icone → Tabler.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§42** (questa) con il dettaglio del ciclo di porting.
+- **§21** — da aggiungere alla prossima passata: `ClaudeCode_Prompt_TailAdminPorting.md` (prompt di questo ciclo) e `tailadminstagingport.zip` (deliverable) come documenti di riferimento esterni, non versionati nel repo.
+- **§1–§41** non modificati oltre al pointer inline — nessuna verifica specifica fatta in questa sessione su altre aree del progetto (chatbox, loyalty, événementiel, ecc.); presumere invariato rispetto a v3.23.
+- **Nota metodologica**: a differenza delle revisioni v3.7/v3.16/v3.18/v3.20/v3.22/v3.23, questa verifica **non** ha avuto accesso diretto al branch/repo — si basa sullo zip isolato fornito e sul confronto puntuale con il report di Claude Code. Il codice del branch di lavoro reale (`claude/tailadmin-nextjs-14-port-kiyafi`, non pushato per scelta esplicita) resta da confermare via git alla prossima passata di audit.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.24 — 17 Agosto 2026 (base: v3.23; ciclo di valutazione template esterni concluso con decisione: solo admin, TailAdmin v2.3.0, Tabler mantenuto come convenzione icone; primo ciclo di porting isolato Next 16→14 verificato via zip di consegna e confronto puntuale col report — nessuna discrepanza rilevata, 24/24 file confermati; deviazione tecnica nota da non ripetere in produzione: `translateZ(0)`+altezza fissa per contenere `fixed`/`sticky` nello staging — vedi §42 per il dettaglio completo)*
