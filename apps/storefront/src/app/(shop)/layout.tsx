@@ -3,6 +3,7 @@ import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { ChatWidget } from '@/components/chat/ChatWidget';
+import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 
@@ -90,6 +91,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
         tenantName={tenant.name}
         whatsappNumber={tenant.whatsapp_number ?? null}
       />
+      <CookieConsentBanner />
     </div>
   );
 }

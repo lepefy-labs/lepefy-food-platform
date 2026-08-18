@@ -2394,4 +2394,34 @@ File toccati: nuovo `apps/storefront/src/app/(shop)/conditions-generales-vente/p
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.37 — 18 Agosto 2026 (base: v3.36; Ciclo 2/6 gestione consensi — pagina `/conditions-generales-vente` multi-tenant con lettura `tenant_legal_documents` via `createPublicClient()`, rendering Markdown con `react-markdown` e mapping stile esplicito (no plugin typography), link footer aggiunto in entrambi i punti esistenti, verifica visiva reale non eseguibile per assenza di credenziali/CLI in sessione — vedi §55 per il dettaglio completo)*
+## 56. Changelog v3.38 (18 Agosto 2026) — Ciclo 3/6 gestione consensi: cookie consent banner multi-tenant — **verified against filesystem**
+
+Nuovo componente Client `apps/storefront/src/components/consent/CookieConsentBanner.tsx`, innestato in `apps/storefront/src/app/(shop)/layout.tsx` dopo `<ChatWidget />` (globale su tutte le pagine shop, nessuna logica per-tenant hardcoded).
+
+**Cookie `lepefy_cookie_consent`**: JSON `{ necessary, analytics, marketing, version, consented_at }`, scritto via `document.cookie` (`path=/`, `max-age` 1 anno, `SameSite=Lax`), `version` hardcoded a `1` nel componente — un bump futuro riapre il banner per tutti. Tre azioni: "Accepter tout", "Refuser non essentiels", "Personnaliser" (espande due toggle Analytics/Marketing, "Nécessaires" sempre attivo e disabilitato, bottone "Enregistrer mes choix").
+
+**Colori tema**: nessun colore hardcoded — riusato il pattern esistente `style={{ backgroundColor: 'var(--color-primary)' }}` (già in uso in `ChatWidget.tsx`, `layout.tsx` root) per i bottoni primari del banner.
+
+**Sync server**: nuova Route Handler `POST /api/consent/cookies` (`apps/storefront/src/app/api/consent/cookies/route.ts`). Determina la sessione via `getSessionCustomer(tenant.id)` (`src/lib/auth/getSessionCustomer.ts`, stesso pattern di `/api/customers/me`) — **nessun hook/context client-side per la sessione non esisteva ed è stato confermato non necessario**: il banner chiama la route fire-and-forget, è il server a decidere se scrivere. Se loggato: due INSERT in `user_consents` (`consent_type = 'cookies_analytics'` / `'cookies_marketing'`, `granted` dal valore ricevuto, `source = 'cookie_banner'`, `doc_version = null`) via `createServiceClient()` (bypassa RLS, stesso pattern di `PATCH /api/customers/me`). Se guest: `200 { success: true }` senza scritture — nessuna riga orfana, il cookie client resta l'unica fonte per i guest.
+
+**Cookie parrainage esistente**: confermato **`referral_code`** (`apps/storefront/src/app/(shop)/invite/[code]/route.ts`), `httpOnly`, 30 giorni, `SameSite=Lax`. Categoria "necessari", **invariato**, nessuna sovrapposizione con `lepefy_cookie_consent`.
+
+**Cross-device / viewport overlay ban**: confermato **nessun uso di `vh`/`dvh`, resize listener, `window.innerWidth`, `translateZ`** (verificato via grep sul file). Il banner è `position: fixed; bottom: 0; left: 0; right: 0` ad altezza automatica (contenuto), `paddingBottom: env(safe-area-inset-bottom)` — stesso pattern già in uso in `BottomNav.tsx`.
+
+**z-index**: `z-[60]`, sopra `Header` (`z-40`), `BottomNav` e `ChatWidget` (entrambi `z-50`) — scelta deliberata: il banner deve restare sopra la bottom nav mobile fino alla scelta dell'utente, essendo un gate di consenso temporaneo, non un elemento di navigazione permanente.
+
+**Verifica reale non eseguita**: come nei cicli precedenti, nessuna credenziale Supabase/CLI disponibile in sessione — non è stato possibile avviare il dev server e verificare visivamente comparsa/scomparsa del banner, il flusso "Personnaliser", o l'assenza di overflow su viewport stretti con dati reali. Verificata solo staticamente: assenza dei pattern vietati (grep), coerenza dei pattern Tailwind/z-index con i file esistenti, logica del componente (stato `visible`/`expanded`, valori inviati per ciascuna delle tre azioni).
+
+`pnpm typecheck`: pulito (un errore iniziale di narrowing su `match[1]` corretto con `match?.[1]`).
+
+File toccati: nuovo `apps/storefront/src/components/consent/CookieConsentBanner.tsx`, nuovo `apps/storefront/src/app/api/consent/cookies/route.ts`, `apps/storefront/src/app/(shop)/layout.tsx`. **Nessuno pushato su richiesta esplicita di Robertin**, consegna via zip.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§56** (questa).
+- Nessuna nuova dipendenza npm in questo ciclo.
+- Verifica visiva reale **non eseguita** — stesso limite noto (nessuna credenziale/CLI Supabase in sessione) di §54/§55.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.38 — 18 Agosto 2026 (base: v3.37; Ciclo 3/6 gestione consensi — cookie consent banner multi-tenant (`lepefy_cookie_consent`, versione 1) con sync server-side opzionale su `user_consents` via `/api/consent/cookies`, nessun colore hardcoded, nessun pattern vietato per il bug Android cross-device, verifica visiva reale non eseguibile per assenza di credenziali/CLI in sessione — vedi §56 per il dettaglio completo)*
