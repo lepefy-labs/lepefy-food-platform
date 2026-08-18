@@ -1,5 +1,7 @@
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
+import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
+import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import CheckoutForm from './CheckoutForm';
 
 export const dynamic = 'force-dynamic';
@@ -15,5 +17,17 @@ export default async function CheckoutPage() {
     (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link,
   );
 
-  return <CheckoutForm tenant={tenant} externalPaymentMethods={externalPaymentMethods} />;
+  // Ciclo 5 — déterminé côté serveur pour ne jamais redemander un consentement
+  // déjà valide : un utilisateur loggé avec sessionCustomer=null ici (guest)
+  // voit toujours les deux cases, comme au premier signup.
+  const sessionCustomer = await getSessionCustomer(tenant.id);
+  const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
+
+  return (
+    <CheckoutForm
+      tenant={tenant}
+      externalPaymentMethods={externalPaymentMethods}
+      consentState={consentState}
+    />
+  );
 }

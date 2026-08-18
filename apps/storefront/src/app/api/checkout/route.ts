@@ -6,6 +6,8 @@ import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
+import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
+import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -38,6 +40,8 @@ interface CheckoutBody {
   shippingDetails: Record<string, unknown> | null;
   quoteToken?:     string | null;
   paymentMethod?:  'stripe' | 'in_store';
+  termsAccepted?:     boolean;
+  marketingOptIn?:    boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -47,6 +51,7 @@ export async function POST(req: NextRequest) {
       items: rawItems, shippingAddress, fulfillmentType, email,
       phone, fullName, shippingDetails, quoteToken,
       paymentMethod = 'stripe',
+      termsAccepted, marketingOptIn,
     } = body;
 
     if (!rawItems?.length || !email) {
@@ -60,6 +65,18 @@ export async function POST(req: NextRequest) {
     // ── Session client optionnelle ───────────────────────────────────────────
     // null pour un guest : le parcours guest reste identique à aujourd'hui.
     const sessionCustomer = await getSessionCustomer(tenant.id);
+
+    // ── Consentement (Ciclo 5) — la décision "faut-il montrer la case" reste
+    // recalculée ici, jamais fournie par le client : seul son choix effectif
+    // (case cochée ou non) est transmis. Si la case CGV était obligatoire et
+    // n'a pas été cochée, on rejette avant toute création de PaymentIntent.
+    const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
+    if (consentState.showTermsCheckbox && termsAccepted !== true) {
+      return NextResponse.json(
+        { error: 'Merci d\'accepter les Conditions Générales de Vente pour continuer.' },
+        { status: 400 },
+      );
+    }
 
     // ── Ricalcolo prezzi server-side ─────────────────────────────────────────
     // Il client invia solo productId + quantity come dati fidati: prezzo, nome
@@ -207,6 +224,13 @@ export async function POST(req: NextRequest) {
 
     const total = parseFloat((subtotal + shippingTotal - ambassadorDiscount).toFixed(2));
 
+    // ── Valeurs de consentement à transporter (Ciclo 5) — null quand la case
+    // correspondante n'était pas affichée (déjà à jour), jamais depuis le
+    // choix brut du client sur le "faut-il montrer" (recalculé plus haut).
+    const consentTermsAccepted     = consentState.showTermsCheckbox ? true : null;
+    const consentTermsDocVersion   = consentState.showTermsCheckbox ? consentState.termsDocVersion : null;
+    const consentMarketingAccepted = consentState.showMarketingCheckbox ? marketingOptIn === true : null;
+
     // ── In-store payment: create order directly, no Stripe ──────────────────
     if (paymentMethod === 'in_store') {
       // Décrément atomique AVANT la création de la commande : aucun paiement
@@ -298,6 +322,22 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // ── Consentement (Ciclo 5) — in_store crée order_id immédiatement
+      // (aucun PaymentIntent/webhook pour ce flux) : c'est donc ici, pas
+      // ailleurs, que le consentement doit être enregistré. Best-effort.
+      try {
+        await registerCheckoutConsent(supabase, {
+          tenantId:   tenant.id,
+          orderId:    order.id,
+          customerId: sessionCustomer?.id ?? null,
+          termsAccepted:     consentTermsAccepted,
+          termsDocVersion:   consentTermsDocVersion,
+          marketingAccepted: consentMarketingAccepted,
+        });
+      } catch (consentErr) {
+        console.error('[checkout] registerCheckoutConsent (in_store) failed:', consentErr, '— order_id:', order.id);
+      }
+
       return NextResponse.json({ orderId: order.id });
     }
 
@@ -316,6 +356,9 @@ export async function POST(req: NextRequest) {
         shipping_total:   shippingTotal,
         ambassador_discount_amount: ambassadorDiscount,
         items,
+        consent_terms_accepted:    consentTermsAccepted,
+        consent_terms_doc_version: consentTermsDocVersion,
+        consent_marketing_accepted: consentMarketingAccepted,
       })
       .select('id')
       .single();

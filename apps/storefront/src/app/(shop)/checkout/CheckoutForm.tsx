@@ -17,8 +17,10 @@ import {
 } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
+import Link from 'next/link';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
+import type { CheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
   externalPaymentCtaLabel, externalPaymentCtaColor,
@@ -164,15 +166,19 @@ function StripePaymentStep({
 export default function CheckoutForm({
   tenant,
   externalPaymentMethods = [],
+  consentState,
 }: {
   tenant: Tenant;
   externalPaymentMethods?: TenantPaymentMethod[];
+  consentState: CheckoutConsentState;
 }) {
   const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
 
   const { customer: sessionCustomer, refresh: refreshSessionCustomer } = useSessionCustomer();
   const [showLoginForm, setShowLoginForm] = useState(false);
+  const [termsAccepted, setTermsAccepted]   = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   // Trois étapes distinctes, comme le mockup (panier → livraison/coordonnées
   // → paiement) : 'form' = coordonnées + adresse, 'select-payment' = choix du
@@ -426,6 +432,10 @@ export default function CheckoutForm({
 
   // ── Étape 2 : confirmation du mode de paiement choisi ───────────────────────
   const handleConfirmPayment = async () => {
+    if (consentState.showTermsCheckbox && !termsAccepted) {
+      setSubmitError('Merci d\'accepter les Conditions Générales de Vente pour continuer.');
+      return;
+    }
     const data = getValues();
     setIsSubmitting(true);
     setSubmitError(null);
@@ -456,6 +466,8 @@ export default function CheckoutForm({
         fullName:        `${data.firstName} ${data.lastName}`,
         shippingDetails: isPickup ? null : shippingDetails,
         quoteToken:      isPickup ? null : quoteToken,
+        termsAccepted:   consentState.showTermsCheckbox ? termsAccepted : undefined,
+        marketingOptIn:  consentState.showMarketingCheckbox ? marketingOptIn : undefined,
       };
 
       // ── Paiement via lien externe (PayPal/Revolut/autre) ──────────────────
@@ -784,6 +796,43 @@ export default function CheckoutForm({
               )}
             </div>
 
+            {(consentState.showTermsCheckbox || consentState.showMarketingCheckbox) && (
+              <div className="space-y-2 border-t border-gray-100 pt-4">
+                {consentState.showTermsCheckbox && (
+                  <label className="flex items-start gap-2 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0"
+                    />
+                    <span>
+                      J&apos;accepte les{' '}
+                      <Link href="/conditions-generales-vente" target="_blank" className="underline">
+                        Conditions Générales de Vente
+                      </Link>{' '}
+                      et la{' '}
+                      <Link href="/politique-confidentialite" target="_blank" className="underline">
+                        Politique de confidentialité
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                )}
+                {consentState.showMarketingCheckbox && (
+                  <label className="flex items-start gap-2 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={marketingOptIn}
+                      onChange={(e) => setMarketingOptIn(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0"
+                    />
+                    <span>Je souhaite recevoir les offres et actualités de {tenant.name} par email.</span>
+                  </label>
+                )}
+              </div>
+            )}
+
             {submitError && (
               <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{submitError}</p>
             )}
@@ -791,7 +840,7 @@ export default function CheckoutForm({
             <button
               type="button"
               onClick={handleConfirmPayment}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (consentState.showTermsCheckbox && !termsAccepted)}
               className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
               style={{ backgroundColor: ctaColor }}
             >

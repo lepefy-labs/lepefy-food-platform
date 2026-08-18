@@ -6,6 +6,7 @@ import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
+import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -133,6 +134,9 @@ export async function POST(req: NextRequest) {
           shipping_details: Record<string, unknown> | null;
           shipping_total:   number;
           ambassador_discount_amount: number | null;
+          consent_terms_accepted:     boolean | null;
+          consent_terms_doc_version:  number  | null;
+          consent_marketing_accepted: boolean | null;
           items: {
             productId:    string | null;
             name:         string;
@@ -214,6 +218,22 @@ export async function POST(req: NextRequest) {
     }
 
     console.info('[webhook] Order created — id:', order.id);
+
+    // ── Consentement (Ciclo 5) — order_id existe désormais, c'est le seul
+    // moment où l'écrire. Best-effort, jamais bloquant pour la commande déjà
+    // payée et créée.
+    try {
+      await registerCheckoutConsent(supabase, {
+        tenantId:   resolvedTenantId,
+        orderId:    order.id,
+        customerId: checkoutSession.customer_id ?? null,
+        termsAccepted:     checkoutSession.consent_terms_accepted ?? null,
+        termsDocVersion:   checkoutSession.consent_terms_doc_version ?? null,
+        marketingAccepted: checkoutSession.consent_marketing_accepted ?? null,
+      });
+    } catch (consentErr) {
+      console.error('[webhook] registerCheckoutConsent failed:', consentErr, '— order_id:', order.id);
+    }
 
     // ── Décrément atomique du stock (confirmation définitive du paiement) ────
     // Le paiement Stripe est déjà capturé à ce stade — en cas d'échec on ne

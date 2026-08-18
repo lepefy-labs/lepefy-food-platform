@@ -5,6 +5,7 @@ import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
+import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 // Phase 1 — paiement via lien externe (PayPal/Revolut/autre), boutique
@@ -47,6 +48,8 @@ interface CheckoutBody {
   shippingDetails:        Record<string, unknown> | null;
   quoteToken?:            string | null;
   externalPaymentMethodId: string;
+  termsAccepted?:  boolean;
+  marketingOptIn?: boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -55,6 +58,7 @@ export async function POST(req: NextRequest) {
     const {
       items: rawItems, shippingAddress, fulfillmentType, email,
       phone, fullName, shippingDetails, quoteToken, externalPaymentMethodId,
+      termsAccepted, marketingOptIn,
     } = body;
 
     if (!rawItems?.length || !email || !externalPaymentMethodId) {
@@ -82,6 +86,16 @@ export async function POST(req: NextRequest) {
     }
 
     const sessionCustomer = await getSessionCustomer(tenant.id);
+
+    // ── Consentement (Ciclo 5) — même garde que /api/checkout : la décision
+    // "faut-il montrer" est recalculée ici, jamais fournie par le client.
+    const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
+    if (consentState.showTermsCheckbox && termsAccepted !== true) {
+      return NextResponse.json(
+        { error: 'Merci d\'accepter les Conditions Générales de Vente pour continuer.' },
+        { status: 400 },
+      );
+    }
 
     // ── Ricalcolo prezzi server-side ─────────────────────────────────────────
     for (const i of rawItems) {
@@ -242,6 +256,9 @@ export async function POST(req: NextRequest) {
         external_payment_type:   method.method,
         external_payment_label:  method.label ?? method.method,
         external_payment_link:   finalLink,
+        consent_terms_accepted:    consentState.showTermsCheckbox ? true : null,
+        consent_terms_doc_version: consentState.showTermsCheckbox ? consentState.termsDocVersion : null,
+        consent_marketing_accepted: consentState.showMarketingCheckbox ? marketingOptIn === true : null,
       })
       .select('id')
       .single();

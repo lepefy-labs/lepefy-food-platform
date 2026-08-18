@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import type { Order } from '@lepefy/types';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -29,6 +30,9 @@ export interface CheckoutSessionRow {
   payment_method?:  'stripe' | 'external_link';
   external_payment_type?:  string | null;
   external_payment_label?: string | null;
+  consent_terms_accepted?:     boolean | null;
+  consent_terms_doc_version?:  number  | null;
+  consent_marketing_accepted?: boolean | null;
   items: {
     productId:    string | null;
     name:         string;
@@ -110,6 +114,23 @@ export async function createOrderFromCheckoutSession(
   }
 
   console.info('[createOrderFromCheckoutSession] Order created — id:', order.id);
+
+  // ── Consentement (Ciclo 5) — order_id existe désormais, c'est le seul
+  // moment où l'écrire. Best-effort, jamais bloquant pour la commande déjà
+  // créée (même principe que le reste de cette fonction).
+  try {
+    await registerCheckoutConsent(supabase, {
+      tenantId:   session.tenant_id,
+      orderId:    order.id,
+      customerId: session.customer_id ?? null,
+      termsAccepted:     session.consent_terms_accepted ?? null,
+      termsDocVersion:   session.consent_terms_doc_version ?? null,
+      marketingAccepted: session.consent_marketing_accepted ?? null,
+    });
+  } catch (consentErr) {
+    console.error('[createOrderFromCheckoutSession] registerCheckoutConsent failed:', consentErr,
+      '— order_id:', order.id);
+  }
 
   // ── Décrément atomique du stock (confirmation définitive du paiement) ────
   const stockByProduct = new Map<string, number>();
