@@ -2368,4 +2368,30 @@ File toccati: nuovo `supabase/migrations/063_legal_documents_and_consents.sql`.
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.36 — 18 Agosto 2026 (base: v3.35; Ciclo 1/6 gestione consensi — migration `tenant_legal_documents` + `user_consents` con RLS e GRANT, seed CGV v1.0 in sospeso per contenuto mancante, verifica live non eseguibile in sessione — vedi §54 per il dettaglio completo)*
+## 55. Changelog v3.37 (18 Agosto 2026) — Ciclo 2/6 gestione consensi: pagina CGV multi-tenant + link footer — **verified against filesystem**
+
+Nuova pagina `apps/storefront/src/app/(shop)/conditions-generales-vente/page.tsx` (Server Component, stesso pattern di `politique-confidentialite/page.tsx`, nessun layout legale condiviso esistente da estrarre — verificato allo Step 0, ognuna resta un file standalone sotto `(shop)/`, header/footer forniti dal layout `(shop)/layout.tsx`).
+
+**Lettura tenant + documento**: `getTenant(tenantSlug)` (pattern esistente, `NEXT_PUBLIC_TENANT_SLUG`) per risolvere `tenant.id`, poi query diretta su `tenant_legal_documents` (`doc_type = 'terms'`, `order('version', {ascending:false}).limit(1).maybeSingle()`) tramite `createPublicClient()` da `src/lib/supabase/public.ts` — stesso client usato internamente da `getTenant()` per letture pubbliche non legate a una sessione utente (preferito a `createClient()`/cookies di `server.ts`, riservato ai dati per-utente autenticato). Nessuna riga trovata → `maybeSingle()` restituisce `null` → fallback "Document non disponible pour le moment." invece di errore.
+
+**`dynamic = 'force-dynamic'` + `fetchCache = 'force-no-store'`** impostati insieme, come da regola permanente (Next.js 14.2.x, `force-dynamic` da solo non basta).
+
+**Rendering Markdown**: nessun renderer Markdown presente nel monorepo (verificato — solo dipendenze transitive di `eslint`/`html5-qrcode`, non utilizzabili). Chiesta conferma a Robertin prima di installare: scelta **`react-markdown`** (standard Next.js App Router, Server Component friendly, nessuna config webpack). Aggiunta come dipendenza in `apps/storefront/package.json` (+`pnpm-lock.yaml`). **Nessun plugin `@tailwindcss/typography`** (non presente, non installato per restare a una sola nuova dipendenza) — mapping esplicito dei componenti Markdown (`h1`/`h2`/`h3`→stile `h2` della pagina Politique de confidentialité, `ul`/`li`/`a`/`strong`) tramite la prop `components` di `react-markdown`, per riprodurre esattamente lo stesso trattamento tipografico Tailwind già in uso (`text-base font-bold text-gray-900 mb-2`, `list-disc pl-5 space-y-1`, `underline`) senza duplicare markup HTML statico.
+
+**Footer**: `apps/storefront/src/components/layout/Footer.tsx` — link "Conditions générales de vente" aggiunto accanto a "Politique de confidentialité" in **entrambi** i punti dove questo appare (footer minimale non-home e footer esteso home), stesso stile (`text-gray-400 hover:text-gray-600 underline`), wrapper `<p>` reso `space-x-3` per accogliere i due link sulla stessa riga. Href statico `/conditions-generales-vente`, nessun hardcoding di slug tenant.
+
+**Verifica visiva reale non eseguita**: nessuna variabile d'ambiente Supabase disponibile in questa sessione (nessun `.env.local`), oltre all'assenza di CLI/Docker già segnalata in §54 — non è stato possibile avviare il dev server con dati reali né confermare visivamente il rendering del Markdown seedato per `chloefood` (il seed stesso resta non eseguito, vedi §54 punto 5). Verificata solo la logica: percorso "nessuna riga" già testabile a livello di codice (`maybeSingle()` → `null` → fallback), come esplicitamente ammesso dal prompt di questo ciclo in assenza di un secondo tenant reale.
+
+`pnpm typecheck`: pulito.
+
+File toccati: nuovo `apps/storefront/src/app/(shop)/conditions-generales-vente/page.tsx`, `apps/storefront/src/components/layout/Footer.tsx`, `apps/storefront/package.json` + `pnpm-lock.yaml` (nuova dipendenza `react-markdown`). **Nessuno pushato su richiesta esplicita di Robertin**, consegna via zip.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§55** (questa).
+- Nuova dipendenza registrata: `react-markdown` (motivazione sopra), unica libreria Markdown nel monorepo storefront.
+- Verifica visiva reale **non eseguita** — nessuna credenziale Supabase disponibile in sessione, oltre al limite CLI/Docker già noto da §54.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.37 — 18 Agosto 2026 (base: v3.36; Ciclo 2/6 gestione consensi — pagina `/conditions-generales-vente` multi-tenant con lettura `tenant_legal_documents` via `createPublicClient()`, rendering Markdown con `react-markdown` e mapping stile esplicito (no plugin typography), link footer aggiunto in entrambi i punti esistenti, verifica visiva reale non eseguibile per assenza di credenziali/CLI in sessione — vedi §55 per il dettaglio completo)*
