@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
+import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { Order } from '@lepefy/types';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = getStripeClient('shop');
 
 // Extrait de api/webhooks/stripe/route.ts (payment_intent.succeeded) —
 // même logique bit-à-bit pour le flux stripe, réutilisée telle quelle par

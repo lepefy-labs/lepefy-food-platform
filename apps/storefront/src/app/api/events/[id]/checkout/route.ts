@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventPaymentIntentMetadata } from '@lepefy/types';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = getStripeClient('event');
 
 const MAX_QUANTITY_PER_TICKET = 999;
 

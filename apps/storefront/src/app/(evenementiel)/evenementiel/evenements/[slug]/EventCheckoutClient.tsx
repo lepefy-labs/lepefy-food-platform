@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { IconMinus, IconPlus, IconBasket, IconStarFilled, IconCreditCard, IconInfoCircle } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
@@ -11,18 +9,9 @@ import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
   externalPaymentCtaLabel, externalPaymentCtaColor,
 } from '@/components/payment/ExternalPaymentMethodPicker';
+import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
+import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
 import type { EventTicketType, TenantPaymentMethod } from '@lepefy/types';
-import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
-
-// Même pattern de chargement paresseux que (shop)/checkout/CheckoutForm.tsx —
-// singleton monté uniquement à l'étape de paiement.
-let stripePromise: ReturnType<typeof loadStripe> | null = null;
-function getStripe() {
-  if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-  }
-  return stripePromise;
-}
 
 type Step = 'select' | 'info' | 'select-payment' | 'payment';
 
@@ -80,67 +69,6 @@ function EventStepper({ current }: { current: Step }) {
   );
 }
 
-function EventPaymentStep({ total, currency, eventId, onError }: { total: number; currency: string; eventId: string; onError: (msg: string) => void }) {
-  const stripe   = useStripe();
-  const elements = useElements();
-  const router   = useRouter();
-  const [isConfirming, setIsConfirming] = useState(false);
-  const hasSucceededRef = useRef(false);
-
-  useEffect(() => {
-    return registerAbandonmentListener({
-      module:       'event',
-      reference_id: eventId,
-      hasSucceededRef,
-    });
-  }, [eventId]);
-
-  const handleConfirm = async () => {
-    if (!stripe || !elements) return;
-    setIsConfirming(true);
-
-    logFunnelEvent({ module: 'event', event_type: 'confirm_attempted', reference_id: eventId });
-
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: { return_url: `${window.location.origin}/evenementiel` },
-      redirect: 'if_required',
-    });
-
-    if (error) {
-      logFunnelEvent({
-        module: 'event',
-        event_type: 'confirm_error',
-        reference_id: eventId,
-        detail: { code: error.code ?? null, type: error.type ?? null },
-      });
-      onError(error.message ?? 'Erreur lors du paiement.');
-      setIsConfirming(false);
-    } else {
-      hasSucceededRef.current = true;
-      logFunnelEvent({ module: 'event', event_type: 'confirm_succeeded_client', reference_id: eventId });
-      router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-        <p className="text-sm font-semibold text-gray-700 mb-4">Paiement sécurisé</p>
-        <PaymentElement />
-      </div>
-      <button
-        onClick={handleConfirm}
-        disabled={isConfirming || !stripe || !elements}
-        className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
-        {isConfirming ? 'Traitement en cours…' : `Payer ${formatPrice(total, currency)}`}
-      </button>
-    </div>
-  );
-}
-
 export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOut, featureRow, externalPaymentMethods = [] }: Props) {
   const router = useRouter();
   const { customer: sessionCustomer } = useSessionCustomer();
@@ -151,7 +79,11 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   const [emailTouched, setEmailTouched] = useState(false);
   const [phone, setPhone] = useState('');
   const [step, setStep]   = useState<Step>('select');
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [showPaymentStep, setShowPaymentStep] = useState(false);
+
+  usePaymentRedirectRecovery('event', () => {
+    router.push(`${window.location.pathname}/confirmation`);
+  });
   // Pas de mode 'in_store' côté événementiel (contrairement au shop) — seul
   // le choix stripe vs external_link existe, `selectedExternalMethodId ===
   // null` signifie stripe.
@@ -265,6 +197,31 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     setStep('info');
   }
 
+  // Business logic identique à l'ancienne route appelée depuis
+  // 'select-payment' — validation capacité/formules + création du
+  // PaymentIntent — seul le moment de l'appel change (clic "Payer" dans
+  // StripePaymentStep, plus au clic "Continuer vers le paiement" ici).
+  async function createIntent() {
+    const items = ticketTypes
+      .filter((t) => (quantities[t.id] ?? 0) > 0)
+      .map((t) => ({ ticket_type_id: t.id, quantity: quantities[t.id] }));
+
+    const res = await fetch(`/api/events/${event.id}/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items,
+        customer_name: name.trim(),
+        customer_email: email.trim(),
+        customer_phone: phone.trim() || null,
+      }),
+    });
+
+    const result = await res.json();
+    if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
+    return { clientSecret: result.clientSecret };
+  }
+
   // ── Étape 'select-payment' : confirmation du mode de paiement choisi ─────
   async function handleConfirmPayment() {
     setError(null);
@@ -309,27 +266,12 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         return;
       }
 
-      const res = await fetch(`/api/events/${event.id}/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          customer_name: name.trim(),
-          customer_email: email.trim(),
-          customer_phone: phone.trim() || null,
-        }),
-      });
-
-      const result = await res.json();
-      if (!res.ok) {
-        setError(result.error ?? 'Une erreur est survenue.');
-        return;
-      }
-
-      setClientSecret(result.clientSecret);
+      // ── Paiement Stripe : aucun appel réseau ici (deferred intent
+      // creation) — le PaymentIntent n'est créé que dans createIntent, au
+      // clic sur "Payer" dans StripePaymentStep. ──────────────────────────
       sessionStorage.removeItem('lepefy-event-checkout-draft');
+      setShowPaymentStep(true);
       setStep('payment');
-      logFunnelEvent({ module: 'event', event_type: 'elements_mounted', reference_id: event.id, detail: { amount: total } });
     } catch {
       setError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
@@ -348,14 +290,26 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   const inputClass =
     'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
 
-  if (step === 'payment' && clientSecret) {
+  if (step === 'payment' && showPaymentStep) {
     return (
       <div>
         <EventStepper current={step} />
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>}
-        <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
-          <EventPaymentStep total={total} currency={tenant.currency} eventId={event.id} onError={setError} />
-        </Elements>
+        <StripePaymentStep
+          module="event"
+          amount={total}
+          currency={tenant.currency}
+          color="var(--color-primary)"
+          returnUrl={`${window.location.origin}/evenementiel`}
+          referenceId={event.id}
+          payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
+          processingLabel="Traitement en cours…"
+          createIntent={createIntent}
+          onError={setError}
+          onSucceeded={(paymentIntentId) => {
+            router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntentId ?? ''}`);
+          }}
+        />
       </div>
     );
   }

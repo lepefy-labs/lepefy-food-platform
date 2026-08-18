@@ -5,13 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { loadStripe } from '@stripe/stripe-js';
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from '@stripe/react-stripe-js';
 import {
   IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift, IconArrowLeft,
 } from '@tabler/icons-react';
@@ -26,22 +19,11 @@ import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
   externalPaymentCtaLabel, externalPaymentCtaColor,
 } from '@/components/payment/ExternalPaymentMethodPicker';
+import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
+import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
-import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
-
-// Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
-// Stripe (step === 'payment'), jamais pour un client qui choisit le retrait
-// en boutique : ce module est importé/monté pour CHAQUE checkout, delivery
-// ou pickup, in_store ou stripe.
-let stripePromise: ReturnType<typeof loadStripe> | null = null;
-function getStripe() {
-  if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-  }
-  return stripePromise;
-}
 
 const formSchema = z.object({
   firstName:   z.string().min(1, 'Prénom requis'),
@@ -107,83 +89,6 @@ function splitLine1(line1: string): { street: string; houseNumber: string } {
   return { street: parts.join(' '), houseNumber: '' };
 }
 
-// ─── Stripe payment step ──────────────────────────────────────────────────────
-
-function StripePaymentStep({
-  total,
-  tenant,
-  sessionId,
-  onError,
-}: {
-  total:   number;
-  tenant:  Tenant;
-  sessionId: string | null;
-  onError: (msg: string) => void;
-}) {
-  const stripe   = useStripe();
-  const elements = useElements();
-  const router   = useRouter();
-  const { clearCart } = useCartStore();
-  const [isConfirming, setIsConfirming] = useState(false);
-  const hasSucceededRef = useRef(false);
-
-  useEffect(() => {
-    return registerAbandonmentListener({
-      module:       'shop',
-      reference_id: sessionId,
-      hasSucceededRef,
-    });
-  }, [sessionId]);
-
-  const handleConfirm = async () => {
-    if (!stripe || !elements) return;
-    setIsConfirming(true);
-
-    logFunnelEvent({ module: 'shop', event_type: 'confirm_attempted', reference_id: sessionId });
-
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/order-confirmation`,
-      },
-      redirect: 'if_required',
-    });
-
-    if (error) {
-      logFunnelEvent({
-        module: 'shop',
-        event_type: 'confirm_error',
-        reference_id: sessionId,
-        detail: { code: error.code ?? null, type: error.type ?? null },
-      });
-      onError(error.message ?? 'Erreur lors du paiement.');
-      setIsConfirming(false);
-    } else {
-      hasSucceededRef.current = true;
-      logFunnelEvent({ module: 'shop', event_type: 'confirm_succeeded_client', reference_id: sessionId });
-      clearCart();
-      router.push(`/order-confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-        <p className="text-sm font-semibold text-gray-700 mb-4">Paiement sécurisé</p>
-        <PaymentElement />
-      </div>
-      <button
-        onClick={handleConfirm}
-        disabled={isConfirming || !stripe || !elements}
-        className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
-        {isConfirming ? 'Traitement en cours…' : `Payer ${formatPrice(total, tenant.currency)}`}
-      </button>
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CheckoutForm({
@@ -209,9 +114,13 @@ export default function CheckoutForm({
   // l'adresse), 'payment' = Elements Stripe (uniquement si stripe choisi).
   const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(() => readStoredShipping());
   const [step, setStep]                 = useState<'form' | 'select-payment' | 'payment'>('form');
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [sessionId, setSessionId]       = useState<string | null>(null);
+  const [showPaymentStep, setShowPaymentStep] = useState(false);
   const [paymentMode, setPaymentMode]   = useState<PaymentMode>('stripe');
+
+  usePaymentRedirectRecovery('shop', () => {
+    useCartStore.getState().clearCart();
+    router.push('/order-confirmation');
+  });
   // Décision 6 — disponible en delivery ET pickup : sélectionner un moyen
   // externe prime sur `paymentMode` à la confirmation, quel que soit
   // fulfillmentType.
@@ -455,44 +364,74 @@ export default function CheckoutForm({
   };
 
   // ── Étape 2 : confirmation du mode de paiement choisi ───────────────────────
+  // Construit le payload partagé entre external_link, in_store et stripe —
+  // identique à avant, seulement extrait pour être réutilisable par
+  // createIntent (appelé plus tard, au clic "Payer") sans dupliquer cette
+  // logique.
+  function buildSharedPayload() {
+    const data = getValues();
+    const shippingAddress =
+      fulfillmentType === 'delivery'
+        ? {
+            full_name:   `${data.firstName} ${data.lastName}`,
+            line1:       `${data.street} ${data.houseNumber}`.trim(),
+            city:        data.city,
+            postal_code: data.postal_code,
+            country:     data.country ?? shippingInfo?.country ?? 'IT',
+          }
+        : null;
+
+    return {
+      items: items.map((i) => ({
+        productId:    i.product.id,
+        name:         i.product.name,
+        price:        i.product.price,
+        quantity:     i.quantity,
+        storage_type: i.product.storage_type ?? 'dry',
+      })),
+      shippingAddress,
+      fulfillmentType,
+      email:           data.email,
+      phone:           data.phone ?? null,
+      fullName:        `${data.firstName} ${data.lastName}`,
+      shippingDetails: isPickup ? null : shippingDetails,
+      quoteToken:      isPickup ? null : quoteToken,
+      termsAccepted:   consentState.showTermsCheckbox ? termsAccepted : undefined,
+      marketingOptIn:  consentState.showMarketingCheckbox ? marketingOptIn : undefined,
+    };
+  }
+
+  // Business logic identique à l'ancienne branche stripe de /api/checkout —
+  // validation stock/prix, création checkout_session + PaymentIntent — seul
+  // le moment de l'appel change (clic "Payer" dans StripePaymentStep, plus
+  // au clic "Continuer vers le paiement" ici).
+  async function createIntent() {
+    const payload = {
+      ...buildSharedPayload(),
+      shippingTotal: effectiveShippingTotal,
+      paymentMethod: 'stripe' as const,
+    };
+
+    const res = await fetch('/api/checkout', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+
+    const result = await res.json();
+    if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
+    return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
+  }
+
   const handleConfirmPayment = async () => {
     if (consentState.showTermsCheckbox && !termsAccepted) {
       setSubmitError('Merci d\'accepter les Conditions Générales de Vente pour continuer.');
       return;
     }
-    const data = getValues();
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const shippingAddress =
-        fulfillmentType === 'delivery'
-          ? {
-              full_name:   `${data.firstName} ${data.lastName}`,
-              line1:       `${data.street} ${data.houseNumber}`.trim(),
-              city:        data.city,
-              postal_code: data.postal_code,
-              country:     data.country ?? shippingInfo?.country ?? 'IT',
-            }
-          : null;
-
-      const sharedPayload = {
-        items: items.map((i) => ({
-          productId:    i.product.id,
-          name:         i.product.name,
-          price:        i.product.price,
-          quantity:     i.quantity,
-          storage_type: i.product.storage_type ?? 'dry',
-        })),
-        shippingAddress,
-        fulfillmentType,
-        email:           data.email,
-        phone:           data.phone ?? null,
-        fullName:        `${data.firstName} ${data.lastName}`,
-        shippingDetails: isPickup ? null : shippingDetails,
-        quoteToken:      isPickup ? null : quoteToken,
-        termsAccepted:   consentState.showTermsCheckbox ? termsAccepted : undefined,
-        marketingOptIn:  consentState.showMarketingCheckbox ? marketingOptIn : undefined,
-      };
+      const sharedPayload = buildSharedPayload();
 
       // ── Paiement via lien externe (PayPal/Revolut/autre) ──────────────────
       // Route dédiée : aucune commande créée ici, seulement une demande de
@@ -523,37 +462,38 @@ export default function CheckoutForm({
         return;
       }
 
-      const payload = {
-        ...sharedPayload,
-        shippingTotal: effectiveShippingTotal,
-        paymentMethod: isPickup ? paymentMode : 'stripe',
-      };
+      // ── Retrait en boutique payé sur place : aucun PaymentIntent, la
+      // commande est créée directement — flux inchangé, jamais différé. ────
+      if (isPickup && paymentMode === 'in_store') {
+        const payload = {
+          ...sharedPayload,
+          shippingTotal: effectiveShippingTotal,
+          paymentMethod: 'in_store' as const,
+        };
 
-      const res = await fetch('/api/checkout', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
-      });
+        const res = await fetch('/api/checkout', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        });
 
-      const result = await res.json();
-      if (!res.ok) {
-        setSubmitError(result.error ?? 'Une erreur est survenue.');
-        return;
-      }
+        const result = await res.json();
+        if (!res.ok) {
+          setSubmitError(result.error ?? 'Une erreur est survenue.');
+          return;
+        }
 
-      // In-store flow: order created directly, redirect immediately
-      if (paymentMode === 'in_store') {
         const { clearCart } = useCartStore.getState();
         clearCart();
         router.push(`/order-confirmation?order_id=${result.orderId}`);
         return;
       }
 
-      // Stripe flow: proceed to Elements step
-      setClientSecret(result.clientSecret);
-      setSessionId(result.sessionId ?? null);
+      // ── Paiement Stripe : aucun appel réseau ici (deferred intent
+      // creation) — le PaymentIntent n'est créé que dans createIntent, au
+      // clic sur "Payer" dans StripePaymentStep. ──────────────────────────
+      setShowPaymentStep(true);
       setStep('payment');
-      logFunnelEvent({ module: 'shop', event_type: 'elements_mounted', reference_id: result.sessionId ?? null, detail: { amount: total } });
     } catch {
       setSubmitError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
@@ -882,21 +822,29 @@ export default function CheckoutForm({
       })()}
 
       {/* Step 3: Stripe Payment */}
-      {step === 'payment' && clientSecret && (
+      {step === 'payment' && showPaymentStep && (
         <div>
           {submitError && (
             <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">
               {submitError}
             </p>
           )}
-          <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
-            <StripePaymentStep
-              total={total}
-              tenant={tenant}
-              sessionId={sessionId}
-              onError={(msg) => setSubmitError(msg)}
-            />
-          </Elements>
+          <StripePaymentStep
+            module="shop"
+            amount={total}
+            currency={tenant.currency}
+            color="var(--color-primary)"
+            returnUrl={`${window.location.origin}/order-confirmation`}
+            referenceId={null}
+            payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
+            processingLabel="Traitement en cours…"
+            createIntent={createIntent}
+            onError={(msg) => setSubmitError(msg)}
+            onSucceeded={(paymentIntentId) => {
+              useCartStore.getState().clearCart();
+              router.push(`/order-confirmation?payment_intent=${paymentIntentId ?? ''}`);
+            }}
+          />
         </div>
       )}
     </div>

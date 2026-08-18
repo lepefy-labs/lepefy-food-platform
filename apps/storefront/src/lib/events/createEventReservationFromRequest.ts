@@ -1,12 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
-import Stripe from 'stripe';
 import { generateEventQrToken } from '@/lib/events/qrToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
+import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput } from '@lepefy/types';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = getStripeClient('event');
 
 // Extrait de handleEventReservationPaymentSucceeded (api/webhooks/stripe/route.ts)
 // — même logique bit-à-bit pour le flux stripe, réutilisée telle quelle par

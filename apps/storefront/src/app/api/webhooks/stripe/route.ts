@@ -7,9 +7,8 @@ import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
+import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
 import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
@@ -22,15 +21,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing stripe-signature header.' }, { status: 400 });
   }
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
-  } catch (err) {
-    console.error('[webhook] Signature verification failed:', err);
+  // Vérification multi-compte : on essaie chaque webhook secret configuré
+  // (un par module, dédupliqué) jusqu'à ce qu'un matche — nécessaire car
+  // Dalice pourra bientôt avoir un compte Stripe distinct pour événements/
+  // location, avec sa propre signature. stripe.webhooks.constructEvent ne
+  // dépend pas de la secret key de l'instance (calcul HMAC pur), donc
+  // n'importe quel client Stripe fait l'affaire pour cette étape.
+  let event: Stripe.Event | null = null;
+  let verifiedModule: PaymentModule | null = null;
+
+  for (const { module, secret } of getConfiguredWebhookSecrets()) {
+    try {
+      event = getStripeClient('shop').webhooks.constructEvent(body, sig, secret);
+      verifiedModule = module;
+      break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (!event) {
+    console.error('[webhook] Signature verification failed against all configured secrets.');
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 });
   }
 
-  console.info('[webhook] Received event:', event.type, '— id:', event.id);
+  const stripe = getStripeClient(verifiedModule ?? 'shop');
+
+  console.info('[webhook] Received event:', event.type, '— id:', event.id, '— verified against module:', verifiedModule);
 
   // ─── ABBONAMENTO SAAS ──────────────────────────────────────────────────────
   if (event.type === 'checkout.session.completed') {

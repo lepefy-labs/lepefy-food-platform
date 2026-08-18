@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = getStripeClient('card');
 
 // Route publique — pas de requireAdmin : le client scanne le QR sur /card et
 // paie sans compte. Aucun panier/produit derrière, montant saisi librement

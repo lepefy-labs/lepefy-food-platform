@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { verifyQuote } from '@/lib/shipping/quoteToken';
@@ -8,8 +7,9 @@ import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
+import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = getStripeClient('shop');
 
 const MAX_QUANTITY_PER_ITEM = 999;
 

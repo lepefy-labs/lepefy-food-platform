@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 
 // Endpoint unique pour les deux types de réservation (événement BBQ ou
 // location matériel) — l'id est cherché successivement dans les deux
@@ -36,7 +34,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     try {
-      await stripe.refunds.create({ payment_intent: eventReservation.stripe_payment_intent_id });
+      await getStripeClient('event').refunds.create({ payment_intent: eventReservation.stripe_payment_intent_id });
     } catch (err) {
       console.error('[evenementiel/refund] Stripe refund failed — reservation:', eventReservation.id, err);
       return NextResponse.json({ error: 'Échec du remboursement Stripe.' }, { status: 500 });
@@ -71,7 +69,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     try {
-      await stripe.refunds.create({ payment_intent: rentalReservation.stripe_payment_intent_id });
+      await getStripeClient('rental').refunds.create({ payment_intent: rentalReservation.stripe_payment_intent_id });
     } catch (err) {
       console.error('[evenementiel/refund] Stripe refund failed — reservation:', rentalReservation.id, err);
       return NextResponse.json({ error: 'Échec du remboursement Stripe.' }, { status: 500 });
