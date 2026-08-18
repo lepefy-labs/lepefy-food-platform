@@ -80,20 +80,20 @@ export default async function PolitiqueConfidentialitePage() {
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-2">5. Destinataires et sous-traitants</h2>
           <p className="mb-2">
-            Vos données peuvent être transmises aux prestataires suivants, dans la stricte mesure
-            nécessaire à leur mission :
+            Vos données peuvent être transmises aux catégories de prestataires suivantes, dans la
+            stricte mesure nécessaire à leur mission :
           </p>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Supabase (hébergement de la base de données)</li>
-            <li>Stripe et Satispay (traitement des paiements)</li>
-            <li>Packlink PRO (organisation de la livraison — nom, adresse de livraison)</li>
-            <li>Brevo (envoi d&apos;emails transactionnels)</li>
+            <li>Hébergement et infrastructure technique (base de données et stockage sécurisé)</li>
+            <li>Prestataires de traitement des paiements</li>
+            <li>Prestataires logistiques (organisation de la livraison — nom, adresse de livraison)</li>
+            <li>Prestataire d&apos;envoi d&apos;emails transactionnels</li>
             <li>
-              Google (fonctionnalités d&apos;intelligence artificielle : suggestions produits,
-              assistant conversationnel — traitement de vos messages de chat si vous utilisez
-              cette fonctionnalité)
+              Services d&apos;intelligence artificielle (suggestions produits, assistant
+              conversationnel — traitement de vos messages de chat si vous utilisez cette
+              fonctionnalité)
             </li>
-            <li>Lepefy Labs, opérateur technique de la plateforme sur laquelle repose cette boutique</li>
+            <li>L&apos;opérateur technique de la plateforme sur laquelle repose cette boutique</li>
           </ul>
         </section>
 

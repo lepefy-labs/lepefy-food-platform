@@ -2330,4 +2330,12 @@ File toccati: `EventCheckoutClient.tsx`, `PendingEventPaymentClient.tsx`, nuovo 
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.34 — 17 Agosto 2026 (base: v3.33; due cicli ulteriori sul percorso di prenotazione evento — chiarimento del canale email su `/en-attente` (link esterno) con CTA WhatsApp + pulizia trattini lunghi in tutto il percorso Événementiel (nuova regola permanente) + "Changer de moyen de paiement" con precompilazione via draft sessionStorage e cancellazione atomica della richiesta abbandonata — **nessuno pushato su richiesta esplicita di Robertin**, consegna via zip ad ogni ciclo, `pnpm typecheck` pulito dopo ciascuno, limite noto (pulizia abbandono silenzioso) segnalato per ciclo futuro — vedi §52 per il dettaglio completo)*
+## 53. Changelog v3.35 (18 Agosto 2026) — Politique de confidentialité: anonimizzazione §5 "Destinataires et sous-traitants"
+
+Contenuto legale, non funzionale. Sezione 5 della pagina `/politique-confidentialite` (`apps/storefront/src/app/(shop)/politique-confidentialite/page.tsx`, hardcoded nel componente, nessun file di contenuto separato, nessuna variante linguistica trovata) riscritta per elencare categorie funzionali di prestatori invece dei nomi commerciali espliciti (Supabase, Stripe, Satispay, Packlink PRO, Brevo, Google, Lepefy Labs). Nessun'altra sezione toccata. `pnpm typecheck` pulito. **Nessuno pushato su richiesta esplicita di Robertin**, consegna via zip.
+
+File toccati: `apps/storefront/src/app/(shop)/politique-confidentialite/page.tsx`.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.35 — 18 Agosto 2026 (base: v3.34; ciclo di solo contenuto legale — anonimizzazione dei nomi di prestatori in §5 della Politique de confidentialité con categorie funzionali — vedi §53 per il dettaglio completo)*
