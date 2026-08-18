@@ -22,10 +22,14 @@ export async function GET(req: NextRequest) {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const [paymentMethods, socialLinks] = await Promise.all([
+  const [allPaymentMethods, socialLinks] = await Promise.all([
     getTenantPaymentMethods(tenant.id),
     getTenantSocialLinks(tenant.id),
   ]);
+  // Même filtre que app/card/page.tsx (Fase B) — le poster imprimable doit
+  // rester cohérent avec ce que /card affiche réellement au client qui
+  // scanne le QR code.
+  const paymentMethods = allPaymentMethods.filter((m) => m.enabled_modules.includes('card'));
 
   const qrUrl = `${req.nextUrl.origin}/api/card/qr-code?format=png&size=900`;
 

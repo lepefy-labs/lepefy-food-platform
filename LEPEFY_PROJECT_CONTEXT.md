@@ -2691,4 +2691,14 @@ File modificati: `packages/types/paymentMethods.ts`, `lib/payments/stripeServerC
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.46 — 18 Agosto 2026 (base: v3.45; scoping `enabled_modules` per modulo su `tenant_payment_methods`, `PaymentModule` consolidato in `packages/types`, filtro applicato ai 3 checkout + `/card` (nuovo), sottovoce "Moyens de paiement" sotto "Paramètres" ora a tendina — vedi §64 per il dettaglio completo, chiude la Fase B dell'HUB pagamenti)*
+## 65. Changelog v3.47 (18 Agosto 2026) — Fix poster PDF: rispetta `enabled_modules('card')` — **verified against filesystem**
+
+Chiude la deviazione segnalata al §64: `api/admin/card/poster/route.ts` chiamava `getTenantPaymentMethods` senza applicare il filtro `enabled_modules`, mostrando sul poster PDF stampabile anche metodi disattivati per il modulo `card` — incoerente con `/card`, che li nasconde correttamente. Stesso filtro di `app/card/page.tsx` ora applicato subito dopo il fetch (`allPaymentMethods.filter((m) => m.enabled_modules.includes('card'))`), unico punto di consumo di `getTenantPaymentMethods` nel file; nessuna modifica alla generazione PDF/Gotenberg né al template HTML. Comportamento invariato per ogni tenant che non ha ancora ristretto nulla (default = tutti e 4 i moduli).
+
+`pnpm typecheck`: pulito.
+
+File modificato: `apps/storefront/src/app/api/admin/card/poster/route.ts`.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.47 — 18 Agosto 2026 (base: v3.46; poster PDF `/api/admin/card/poster` ora coerente con `/card` sullo scoping `enabled_modules` — vedi §65, chiude la deviazione aperta al §64)*
