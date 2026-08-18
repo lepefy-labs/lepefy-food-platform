@@ -1,10 +1,11 @@
 import Stripe from 'stripe';
+import type { PaymentModule } from '@lepefy/types';
 
 // Fichier server-only (secret key + webhook secret) — jamais importé par un
 // composant client. Séparé volontairement de stripeClientConfig.ts (qui ne
 // lit que la publishable key) pour éviter toute ambiguïté/erreur d'import.
 
-export type PaymentModule = 'shop' | 'card' | 'event' | 'rental';
+export type { PaymentModule };
 
 const MODULE_ENV_SUFFIX: Record<PaymentModule, string> = {
   shop:   'SHOP',

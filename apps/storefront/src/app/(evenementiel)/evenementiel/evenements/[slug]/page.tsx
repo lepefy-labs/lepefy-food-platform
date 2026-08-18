@@ -75,7 +75,8 @@ export default async function EventDetailPage({ params }: PageProps) {
   // ni cash et dont extra.link est renseigné devient une option de paiement.
   const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
   const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link,
+    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+      && m.enabled_modules.includes('event'),
   );
 
   const { data: eventPhotosRaw } = await supabase

@@ -61,7 +61,8 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
   const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
   const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link,
+    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+      && m.enabled_modules.includes('rental'),
   );
 
   return (

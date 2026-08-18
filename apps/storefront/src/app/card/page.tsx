@@ -24,10 +24,11 @@ export const metadata: Metadata = {
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const [socialLinks, paymentMethods] = await Promise.all([
+  const [socialLinks, allPaymentMethods] = await Promise.all([
     getTenantSocialLinks(tenant.id),
     getTenantPaymentMethods(tenant.id),
   ]);
+  const paymentMethods = allPaymentMethods.filter((m) => m.enabled_modules.includes('card'));
 
   return (
     <div className={`${manrope.variable} ${dmSans.variable}`}>

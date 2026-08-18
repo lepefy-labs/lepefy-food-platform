@@ -1,3 +1,9 @@
+// Modules de paiement de la plateforme — définition unique, importée par
+// lib/payments/stripeServerConfig.ts et stripeClientConfig.ts (Phase A) et
+// par le scoping enabled_modules ci-dessous (Phase B), pour éviter que deux
+// unions divergent si un cinquième module est ajouté un jour.
+export type PaymentModule = 'shop' | 'card' | 'event' | 'rental';
+
 export type PaymentMethodType =
   | 'satispay'
   | 'bank_transfer'
@@ -38,4 +44,5 @@ export interface TenantPaymentMethod {
   extra: { beneficiary?: string; bic?: string; link?: string } | null;
   sort_order: number;
   active: boolean;
+  enabled_modules: PaymentModule[];
 }

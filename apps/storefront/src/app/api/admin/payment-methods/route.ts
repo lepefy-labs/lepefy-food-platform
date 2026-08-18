@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import type { PaymentMethodType } from '@lepefy/types';
+import type { PaymentMethodType, PaymentModule } from '@lepefy/types';
 
 export const runtime = 'nodejs';
 
 const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+const VALID_MODULES: PaymentModule[] = ['shop', 'card', 'event', 'rental'];
+
+// Même vérification que le constraint DB
+// (enabled_modules <@ {...} and array_length(...) > 0) — non vide, valeurs
+// toutes dans l'ensemble autorisé.
+function isValidEnabledModules(value: unknown): value is PaymentModule[] {
+  return Array.isArray(value) && value.length > 0
+    && value.every((m) => VALID_MODULES.includes(m as PaymentModule));
+}
 
 // 'card' est un simple on/off (montant saisi par le client à chaque paiement,
 // cf. api/card/quick-pay) — jamais de value/extra à renseigner, même
@@ -36,6 +45,16 @@ export async function POST(req: NextRequest) {
 
     const method = VALID_METHODS.includes(body.method) ? body.method : 'other';
 
+    // Rétro-compatibilité : absent → on ne le précise pas dans l'insert, le
+    // DEFAULT de la colonne (tous les 4 modules) s'applique. Présent mais
+    // invalide → 400, même contrainte que le constraint DB.
+    if ('enabled_modules' in body && !isValidEnabledModules(body.enabled_modules)) {
+      return NextResponse.json(
+        { error: 'enabled_modules doit être un tableau non vide parmi shop, card, event, rental.' },
+        { status: 400 },
+      );
+    }
+
     const { data, error } = await supabase
       .from('tenant_payment_methods')
       .insert({
@@ -46,6 +65,7 @@ export async function POST(req: NextRequest) {
         extra:      hasNoValueFields(method) ? null : cleanExtra(body.extra),
         sort_order: parseInt(body.sort_order, 10) || 0,
         active:     Boolean(body.active),
+        ...('enabled_modules' in body ? { enabled_modules: body.enabled_modules } : {}),
       })
       .select('*')
       .single();

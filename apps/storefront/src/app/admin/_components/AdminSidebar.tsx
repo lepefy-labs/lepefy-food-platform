@@ -43,6 +43,10 @@ export default function AdminSidebar({
     pathname.startsWith('/admin/evenementiel')
   );
 
+  const [parametresOpen, setParametresOpen] = useState(
+    pathname.startsWith('/admin/parametres')
+  );
+
   // Style des items de nav repris du porting TailAdmin (voir
   // _tailadmin-staging/components/layout/AppSidebar.tsx : classes
   // `menu-item`/`menu-item-active`/`menu-item-inactive`) — mêmes rythmes
@@ -280,19 +284,47 @@ export default function AdminSidebar({
         Ambassadeurs
       </Link>
 
-      <Link
-        href="/admin/parametres"
+      <button
+        onClick={() => setParametresOpen(!parametresOpen)}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
-                    text-sm transition-colors mx-1 ${
-          pathname === '/admin/parametres' ? navClass(true) : navClass(false)
+                    text-sm transition-colors mx-1 w-full text-left ${
+          pathname.startsWith('/admin/parametres')
+            ? navClass(true)
+            : navClass(false)
         }`}
       >
         <IconSettings
           size={20}
-          stroke={pathname === '/admin/parametres' ? 1.75 : 1.5}
+          stroke={pathname.startsWith('/admin/parametres') ? 1.75 : 1.5}
         />
-        Paramètres
-      </Link>
+        <span className="flex-1">Paramètres</span>
+        {parametresOpen
+          ? <IconChevronDown size={14} stroke={1.5} />
+          : <IconChevronRight size={14} stroke={1.5} />
+        }
+      </button>
+
+      {parametresOpen && (
+        <div className="ml-5 border-l border-gray-100 dark:border-gray-800 pl-3 mb-1 space-y-0.5">
+          {[
+            { href: '/admin/parametres', label: 'Général' },
+            { href: '/admin/parametres/paiements', label: 'Moyens de paiement' },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`block py-1.5 px-2 rounded-lg text-xs
+                          transition-colors ${
+                pathname === item.href
+                  ? 'text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] font-medium'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <Link
         href="/admin/ai-lab"

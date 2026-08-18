@@ -1,11 +1,10 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { PaymentMethodsSection } from './PaymentMethodsSection';
 import { SocialLinksSection } from './SocialLinksSection';
 import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
-import type { TenantPaymentMethod, TenantSocialLink } from '@lepefy/types';
+import type { TenantSocialLink } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -15,18 +14,11 @@ export default async function ParametresPage() {
   const tenant = await getTenant(slug);
 
   const supabase = createServiceClient();
-  const [{ data: paymentMethods }, { data: socialLinks }] = await Promise.all([
-    supabase
-      .from('tenant_payment_methods')
-      .select('*')
-      .eq('tenant_id', tenant.id)
-      .order('sort_order', { ascending: true }),
-    supabase
-      .from('tenant_social_links')
-      .select('*')
-      .eq('tenant_id', tenant.id)
-      .order('sort_order', { ascending: true }),
-  ]);
+  const { data: socialLinks } = await supabase
+    .from('tenant_social_links')
+    .select('*')
+    .eq('tenant_id', tenant.id)
+    .order('sort_order', { ascending: true });
 
   return (
     <div className="max-w-2xl">
@@ -53,8 +45,6 @@ export default async function ParametresPage() {
         />
 
         <SocialLinksSection initialLinks={(socialLinks ?? []) as TenantSocialLink[]} />
-
-        <PaymentMethodsSection initialMethods={(paymentMethods ?? []) as TenantPaymentMethod[]} />
 
         <LegalInfoSection
           legal_name={tenant.legal_name}

@@ -3,13 +3,20 @@
 import { useState } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
-import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType } from '@lepefy/types';
+import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType, type PaymentModule } from '@lepefy/types';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
 const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
 
 const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+
+const MODULE_OPTIONS: { value: PaymentModule; label: string }[] = [
+  { value: 'shop',   label: 'Boutique' },
+  { value: 'card',   label: 'Carte /card' },
+  { value: 'event',  label: 'Événements' },
+  { value: 'rental', label: 'Location' },
+];
 
 // 'card' est un simple on/off — le montant est saisi par le client à chaque
 // paiement (checkout Stripe Elements sur /card), jamais de value/extra à
@@ -27,10 +34,15 @@ interface FormState {
   link: string;
   sort_order: string;
   active: boolean;
+  enabled_modules: PaymentModule[];
 }
 
 function emptyForm(sortOrder: number): FormState {
-  return { method: 'bank_transfer', label: '', value: '', beneficiary: '', bic: '', link: '', sort_order: String(sortOrder), active: true };
+  return {
+    method: 'bank_transfer', label: '', value: '', beneficiary: '', bic: '', link: '',
+    sort_order: String(sortOrder), active: true,
+    enabled_modules: ['shop', 'card', 'event', 'rental'],
+  };
 }
 
 function toForm(pm: TenantPaymentMethod): FormState {
@@ -43,6 +55,7 @@ function toForm(pm: TenantPaymentMethod): FormState {
     link: pm.extra?.link ?? '',
     sort_order: String(pm.sort_order),
     active: pm.active,
+    enabled_modules: pm.enabled_modules,
   };
 }
 
@@ -57,7 +70,49 @@ function formToBody(form: FormState) {
     },
     sort_order: form.sort_order,
     active: form.active,
+    enabled_modules: form.enabled_modules,
   };
+}
+
+// Toggle un module dans la liste sélectionnée — jamais vide côté client, en
+// miroir du constraint DB array_length(enabled_modules, 1) > 0.
+function toggleModule(current: PaymentModule[], module: PaymentModule): PaymentModule[] {
+  return current.includes(module)
+    ? current.filter((m) => m !== module)
+    : [...current, module];
+}
+
+function ModulesCheckboxGroup({
+  idPrefix, selected, onChange,
+}: {
+  idPrefix: string;
+  selected: PaymentModule[];
+  onChange: (next: PaymentModule[]) => void;
+}) {
+  return (
+    <div className="mb-3">
+      <label className={LABEL_CLS}>Modules où ce moyen est proposé</label>
+      <div className="grid grid-cols-2 gap-2">
+        {MODULE_OPTIONS.map((opt) => {
+          const checkboxId = `${idPrefix}-module-${opt.value}`;
+          return (
+            <div key={opt.value} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id={checkboxId}
+                checked={selected.includes(opt.value)}
+                onChange={() => onChange(toggleModule(selected, opt.value))}
+              />
+              <label htmlFor={checkboxId} className="text-sm text-gray-600">{opt.label}</label>
+            </div>
+          );
+        })}
+      </div>
+      {selected.length === 0 && (
+        <p className="text-xs text-red-500 mt-1">Sélectionnez au moins un module.</p>
+      )}
+    </div>
+  );
 }
 
 interface PaymentMethodsSectionProps {
@@ -126,7 +181,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
     }
   }
 
-  function updateMethodField(id: string, field: keyof FormState, value: string | boolean) {
+  function updateMethodField(id: string, field: keyof FormState, value: string | boolean | PaymentModule[]) {
     setMethods((prev) => prev.map((m) => {
       if (m.id !== id) return m;
       const form = { ...toForm(m), [field]: value };
@@ -141,6 +196,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
         },
         sort_order: parseInt(form.sort_order, 10) || 0,
         active: form.active,
+        enabled_modules: form.enabled_modules,
       };
     }));
   }
@@ -236,6 +292,12 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                 </div>
               )}
 
+              <ModulesCheckboxGroup
+                idPrefix={pm.id}
+                selected={form.enabled_modules}
+                onChange={(next) => updateMethodField(pm.id, 'enabled_modules', next)}
+              />
+
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className={LABEL_CLS}>Ordre</label>
@@ -258,7 +320,12 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
               </div>
 
               <div className="flex items-center gap-2">
-                <Button size="sm" onClick={() => handleUpdate(pm.id, toForm(pm))} loading={isSaving === pm.id}>
+                <Button
+                  size="sm"
+                  onClick={() => handleUpdate(pm.id, toForm(pm))}
+                  loading={isSaving === pm.id}
+                  disabled={form.enabled_modules.length === 0}
+                >
                   Enregistrer
                 </Button>
                 <button
@@ -351,7 +418,17 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           </div>
         )}
 
-        <Button onClick={handleCreate} loading={isSaving === 'new'}>
+        <ModulesCheckboxGroup
+          idPrefix="new"
+          selected={newForm.enabled_modules}
+          onChange={(next) => setNewForm({ ...newForm, enabled_modules: next })}
+        />
+
+        <Button
+          onClick={handleCreate}
+          loading={isSaving === 'new'}
+          disabled={newForm.enabled_modules.length === 0}
+        >
           {isSaving !== 'new' && <IconPlus size={14} stroke={1.5} />}
           Ajouter
         </Button>

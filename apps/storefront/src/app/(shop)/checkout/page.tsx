@@ -14,7 +14,8 @@ export default async function CheckoutPage() {
   // ni cash et dont extra.link est renseigné devient automatiquement une
   // option de paiement au checkout, sans rien coder en dur par tenant.
   const externalPaymentMethods = allMethods.filter(
-    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link,
+    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+      && m.enabled_modules.includes('shop'),
   );
 
   // Ciclo 5 — déterminé côté serveur pour ne jamais redemander un consentement

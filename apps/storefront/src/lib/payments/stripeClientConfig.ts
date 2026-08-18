@@ -1,12 +1,13 @@
 'use client';
 
 import { loadStripe, type Stripe as StripeJs } from '@stripe/stripe-js';
+import type { PaymentModule } from '@lepefy/types';
 
 // Fichier client-safe (publishable key uniquement) — jamais de secret key ni
 // de webhook secret ici. Séparé volontairement de stripeServerConfig.ts pour
 // éviter toute ambiguïté/erreur d'import.
 
-export type PaymentModule = 'shop' | 'card' | 'event' | 'rental';
+export type { PaymentModule };
 
 // IMPORTANT : chaque référence à process.env.NEXT_PUBLIC_* doit être écrite
 // en toutes lettres, littéralement — Next.js ne remplace ces variables au
