@@ -17,9 +17,8 @@ select
 
 Les présentes Conditions Générales de Vente (« CGV ») régissent l'ensemble des ventes de produits et de services conclues à distance sur le site shop.chloefood.com (le « Site »), exploité par :
 
-**Chloé Food** — *[forme juridique]*, ayant son siège à Via Angelo Zanti, 1C — 42122 Reggio Emilia (RE), Italia
-P.IVA / numéro d'immatriculation : *[à compléter]*
-Capital social : *[à compléter, le cas échéant]*
+**Chloé Food**, ayant son siège à Via Angelo Zanti, 1C — 42122 Reggio Emilia (RE), Italia
+P.IVA: *03104260355*
 Email : chloefood.ets@gmail.com
 
 Le Site est édité sur la plateforme technique Lepefy, opérée par Lepefy Labs (« l'Opérateur technique »), prestataire de Chloé Food agissant en qualité de sous-traitant technique au sens de l'article 28 du RGPD.
