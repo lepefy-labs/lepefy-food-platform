@@ -2338,4 +2338,34 @@ File toccati: `apps/storefront/src/app/(shop)/politique-confidentialite/page.tsx
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.35 — 18 Agosto 2026 (base: v3.34; ciclo di solo contenuto legale — anonimizzazione dei nomi di prestatori in §5 della Politique de confidentialité con categorie funzionali — vedi §53 per il dettaglio completo)*
+## 54. Changelog v3.36 (18 Agosto 2026) — Ciclo 1/6 gestione consensi: migration `tenant_legal_documents` + `user_consents` — **verified against filesystem**
+
+Solo schema DB, nessuna UI toccata. Nuova migration `supabase/migrations/063_legal_documents_and_consents.sql` (numero verificato via `ls supabase/migrations/` — ultima esistente `062_tenant_card_payments.sql`).
+
+**`tenant_legal_documents`**: versionamento documenti legali per tenant. `id uuid PK`, `tenant_id uuid NOT NULL references tenants(id)`, `doc_type text NOT NULL CHECK IN ('terms','privacy')` (solo `'terms'` usato in questo ciclo — `'privacy'` predisposto per il futuro, la Politique de confidentialité resta statica, vedi §53), `version integer NOT NULL`, `content text NOT NULL`, `effective_date timestamptz default now()`, `created_at timestamptz default now()`, UNIQUE (`tenant_id`, `doc_type`, `version`), indice su (`tenant_id`, `doc_type`, `version DESC`).
+
+**`user_consents`**: audit trail immutabile. `id uuid PK`, `tenant_id uuid NOT NULL`, `user_id uuid NULL references customers(id)` (tabella utenti reale — **non `profiles`**, `customers.id` referenzia `auth.users(id)`), `order_id uuid NULL references orders(id)` (PK `orders.id` è `uuid`, nessun adattamento necessario), `consent_type text NOT NULL CHECK IN ('terms','marketing','cookies_analytics','cookies_marketing')`, `doc_version integer NULL`, `granted boolean NOT NULL`, `source text NOT NULL CHECK IN ('signup','checkout','reconsent_gate','cookie_banner','account_settings')`, `ip_address text NULL`, `user_agent text NULL`, `created_at timestamptz default now()`, CHECK `user_id IS NOT NULL OR order_id IS NOT NULL`. Indici: (`tenant_id`,`user_id`,`consent_type`,`created_at DESC`) e (`order_id`) parziale `WHERE order_id IS NOT NULL`.
+
+**RLS**: entrambe abilitate. `tenant_legal_documents` — SELECT pubblico (`using (true)`), INSERT/UPDATE solo `service_role` (via GRANT, nessuna policy INSERT/UPDATE per `authenticated`/`anon`, quindi RLS le blocca comunque per default-deny). `user_consents` — SELECT solo righe proprie (`user_id = auth.uid()`), INSERT solo proprie righe per `authenticated`; `service_role` bypassa RLS di default per i consensi guest lato server. Nessun UPDATE/DELETE concesso da client su `user_consents` (record immutabile).
+
+**GRANT**: `tenant_legal_documents` → SELECT a `anon, authenticated, service_role`; INSERT/UPDATE solo `service_role`. `user_consents` → SELECT, INSERT a `authenticated` e `service_role`; nessun UPDATE/DELETE lato client.
+
+**Sync Brevo**: cercato nel codice storefront — nessuna integrazione di sync liste/newsletter trovata. Unico riferimento è un commento in `resendReservationConfirmation.ts` relativo all'invio email transazionali via Brevo/n8n, non sync consensi. **Confermato: da fare in un ciclo futuro**, non toccato qui.
+
+**Seed CGV v1.0 per `chloefood`**: **NON eseguito in questo ciclo** — il prompt di esecuzione dichiarava che il contenuto CGV sarebbe stato incollato ma il testo non è stato fornito. Nessun contenuto legale è stato inventato; lo Step 5 resta da completare in un ciclo successivo con il testo reale.
+
+**Verifica su ambiente reale**: non eseguita — nessun Supabase CLI/Docker disponibile in questa sessione (`supabase: command not found`, nessun daemon Docker). La migration non è stata applicata né verificata con `\d+`; verificata solo per coerenza sintattica e di pattern contro le migration esistenti (`002_rls_policies.sql`, `038_customers_grants.sql`, `060_event_reservation_requests.sql`).
+
+`pnpm typecheck`: pulito (nessuna modifica TypeScript in questo ciclo). **Nessuno pushato su richiesta esplicita di Robertin**, consegna via zip.
+
+File toccati: nuovo `supabase/migrations/063_legal_documents_and_consents.sql`.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§54** (questa).
+- Step 5 (seed CGV v1.0) **non completato** — contenuto non fornito nel prompt, in attesa per ciclo successivo.
+- Verifica live su Supabase **non eseguita** — CLI/Docker non disponibili in sessione.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.36 — 18 Agosto 2026 (base: v3.35; Ciclo 1/6 gestione consensi — migration `tenant_legal_documents` + `user_consents` con RLS e GRANT, seed CGV v1.0 in sospeso per contenuto mancante, verifica live non eseguibile in sessione — vedi §54 per il dettaglio completo)*
