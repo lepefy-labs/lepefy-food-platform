@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { insertConsentRows, type ConsentRow } from './insertConsentRows';
 
 // Enregistre le(s) consentement(s) recueillis au checkout (Ciclo 5), au
 // moment exact où order_id existe (payment_intent.succeeded / confirmation
@@ -18,7 +19,7 @@ export async function registerCheckoutConsent(
 ): Promise<void> {
   const { tenantId, orderId, customerId, termsAccepted, termsDocVersion, marketingAccepted } = params;
 
-  const rows: Record<string, unknown>[] = [];
+  const rows: ConsentRow[] = [];
 
   if (termsAccepted !== null) {
     rows.push({
@@ -46,8 +47,5 @@ export async function registerCheckoutConsent(
 
   // Aucune case n'était affichée (consentement déjà valide) — rien à
   // insérer, comportement normal, pas une erreur.
-  if (rows.length === 0) return;
-
-  const { error } = await supabase.from('user_consents').insert(rows);
-  if (error) throw error;
+  await insertConsentRows(supabase, rows);
 }

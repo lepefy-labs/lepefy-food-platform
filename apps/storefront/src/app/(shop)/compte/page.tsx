@@ -5,12 +5,15 @@ import { getCustomerProfile } from '@/lib/customers/getCustomerProfile';
 import { createServiceClient } from '@/lib/supabase/server';
 import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
 import { contrastRatio } from '@/lib/utils/color';
+import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import type { Address } from '@lepefy/types';
 import { AccountDashboard } from './AccountDashboard';
 
 // Tableau de bord "Mon compte" — lit la session à chaque requête (comme
-// connexion/page.tsx et parrainage/page.tsx), jamais statique/ISR.
+// connexion/page.tsx et parrainage/page.tsx), jamais statique/ISR. Le check
+// de consentement (Ciclo 6) peut aussi changer entre deux requêtes.
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function ComptePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -18,6 +21,7 @@ export default async function ComptePage() {
   const customer   = await getSessionCustomer(tenant.id);
 
   if (!customer) redirect('/compte/connexion');
+  await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte');
 
   const profile = await getCustomerProfile(customer.id, tenant.id);
 

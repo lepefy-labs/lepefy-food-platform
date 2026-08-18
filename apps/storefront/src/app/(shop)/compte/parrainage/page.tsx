@@ -4,11 +4,13 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { generateReferralCode } from '@/lib/loyalty/generateReferralCode';
 import { resolveReferralDownline } from '@/lib/loyalty/resolveReferralDownline';
+import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import { ParrainageClient } from './ParrainageClient';
 
 // Session obligatoire — même garde que /compte/connexion (getSessionCustomer
 // passe par cookies(), la page est de toute façon dynamique).
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function ParrainagePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -16,6 +18,7 @@ export default async function ParrainagePage() {
   const customer   = await getSessionCustomer(tenant.id);
 
   if (!customer) redirect('/compte/connexion');
+  await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte/parrainage');
 
   const supabase = createServiceClient();
 

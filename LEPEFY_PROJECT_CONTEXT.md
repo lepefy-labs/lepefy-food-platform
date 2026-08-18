@@ -2482,4 +2482,53 @@ File toccati: nuovo `supabase/migrations/064_checkout_consent_columns.sql`, nuov
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.40 — 18 Agosto 2026 (base: v3.39; Ciclo 5/6 gestione consensi — checkbox CGV/marketing condizionale al checkout via `resolveCheckoutConsentState`, trasporto tramite tre nuove colonne nullable su `checkout_sessions` (eccezione migration concordata, `064_checkout_consent_columns.sql`), registrazione consenso in `user_consents` su tre punti di creazione ordine (in_store, webhook Stripe, `createOrderFromCheckoutSession`), scoperta di duplicazione della logica ordine tra webhook e funzione condivisa segnalata per ciclo futuro — vedi §58 per il dettaglio completo)*
+## 59. Changelog v3.41 (18 Agosto 2026) — Ciclo 6/6 gestione consensi: gate di re-consenso — **verified against filesystem** — feature "Consenso CGV + cookie + marketing" COMPLETATA (6 cicli)
+
+**Deviazione architetturale rilevata allo Step 0**: **nessun `(shop)/compte/layout.tsx` esiste** — ogni pagina sotto `/compte/**` (7 in totale: `page.tsx`, `modifier`, `parrainage`, `ambassadeur`, `carte-fidelite`, `adresses/nouvelle`, `adresses/[id]`) fa già, in modo duplicato, il proprio `const customer = await getSessionCustomer(tenant.id); if (!customer) redirect('/compte/connexion')`. Nessun middleware nel progetto (confermato in `CLAUDE.md`) — un layout Server Component n'a de toute façon aucun moyen fiable de connaître le chemin courant sans lui, ce qui aurait rendu impossible la garde "sauf si déjà sur /compte/consentement" décrite dans le prompt. Scelta presa senza nuova conferma (constraint tecnico oggettivo, non una preferenza di design): **stesso pattern già in uso** — un nuovo `requireTermsConsentOrRedirect(tenantId, customerId, currentPath)` (`src/lib/legal/requireTermsConsentOrRedirect.ts`) chiamato esplicitamente in ciascuna delle 7 pagine, subito dopo la guardia di sessione esistente, con il proprio path statico passato in chiaro (mai un valore letto dinamicamente — nessun rischio open-redirect a questo punto).
+
+**Separazione area admin confermata**: `admin/(protected)/layout.tsx` (dove vive il redirect `tenant_cashier` → `/admin/loyalty/scan`) usa `admin_users` + Supabase Auth via `createServerClient` dedicato, **zero import/componente condiviso** con `(shop)/compte/**` — verificato leggendo l'intero file. Nessuna modifica in quest'area.
+
+**`hasValidTermsConsent(tenantId, customerId)`** — nuovo `src/lib/legal/hasValidTermsConsent.ts`: nessun documento CGV pubblicato → `true` (nessun gate possibile); altrimenti verifica una riga `user_consents` (`consent_type='terms'`, `doc_version` = versione corrente da `getLatestLegalDocument`, riusata invariata dal ciclo 4).
+
+**Riuso, non duplicazione** (regola esplicita di questo ciclo): estratto `insertConsentRows(supabase, rows)` in nuovo `src/lib/legal/insertConsentRows.ts` — base condivisa per l'insert finale in `user_consents`, con tipo `ConsentRow` comune. `registerSignupConsent` (ciclo 4) e `registerCheckoutConsent` (ciclo 5) refattorizzati per usarla (**comportamento identico, solo l'ultimo blocco insert+throw centralizzato** — nessuna riga o campo cambiato), e la registrazione del gate (dentro `POST /api/consent/reconsent-gate`) la usa direttamente. Non è stata creata una quarta funzione `registerReconsentGateConsent` separata: la logica di costruzione righe per il gate è abbastanza diversa (nessun `order_id`, ricontrollo se la riga marketing esiste già prima di deciderne l'inserimento) da non giustificare un ulteriore livello di wrapper — la sola parte davvero comune (`insert` + `throw`) è quella estratta.
+
+**Pagina gate** `apps/storefront/src/app/(shop)/compte/consentement/page.tsx` + `ConsentementClient.tsx`: redirect immediato a `returnPath` se il consenso è già valido (nessuno schermo, anche per accesso diretto all'URL) o se nessun documento CGV è pubblicato; altrimenti titolo, link a `/conditions-generales-vente` (nuova scheda), checkbox marketing opzionale **solo se nessuna riga `consent_type='marketing'` esiste ancora** per quel customer, bottone "J'accepte" obbligatorio (nessun "plus tard"). `dynamic='force-dynamic'` + `fetchCache='force-no-store'` (stessa regola del ciclo 2).
+
+**Redirect con `return` — pattern nuovo, non esisteva nel progetto** (verificato via grep, nessuna occorrenza di `return=`/`next=`/`redirect_to=` altrove): nuovo `src/lib/legal/safeReturnPath.ts`, valida che il valore inizi con un singolo `/` e non con `//` (blocca redirect protocollo-relativi tipo `//evil.com`, interpretati dal browser come URL assoluta) — usato sia nella pagina gate (lettura `searchParams.return`) sia nella route `POST /api/consent/reconsent-gate` (corpo `returnPath`) prima di restituirlo come destinazione.
+
+**Registrazione al click "J'accepte"**: nuova `POST /api/consent/reconsent-gate` (`apps/storefront/src/app/api/consent/reconsent-gate/route.ts`) — 401 se non autenticato; inserisce sempre la riga `terms` (`granted=true`, `doc_version` corrente, `source='reconsent_gate'`); la riga `marketing` solo se nessuna esiste già (ricontrollato server-side, mai fidandosi del client sul "va mostrata"); **non best-effort** (a differenza dei cicli 4/5) — un fallimento dell'insert propaga un 500 al client, che mostra l'errore senza navigare via, per evitare che l'utente venga rimandato a `/compte` senza che il consenso sia realmente stato registrato (altrimenti nuovo redirect verso il gate al giro successivo).
+
+**Verifica loop**: nessun loop possibile — la pagina gate non richiama mai `requireTermsConsentOrRedirect` su se stessa, fa il proprio check diretto con redirect immediato solo se valido (mai verso se stessa). Un utente `tenant_cashier` non attraversa mai `(shop)/compte/**` (nessun customer, area completamente separata).
+
+**Verifica reale non eseguita**: stesso limite noto di tutti i cicli precedenti (nessuna credenziale Supabase/CLI in sessione) — non è stato possibile testare live i tre scenari (consenso valido/mancante/obsoleto) né il redirect round-trip. Verificata solo staticamente: presenza della guardia nelle 7 pagine, assenza di guardia su `/compte/connexion` e sulla pagina gate stessa, validazione `safeReturnPath` contro input tipo `//evil.com`.
+
+`pnpm typecheck`: pulito.
+
+File toccati: nuovi `src/lib/legal/hasValidTermsConsent.ts`, `requireTermsConsentOrRedirect.ts`, `insertConsentRows.ts`, `safeReturnPath.ts`, `apps/storefront/src/app/(shop)/compte/consentement/page.tsx` + `ConsentementClient.tsx`, nuovo `apps/storefront/src/app/api/consent/reconsent-gate/route.ts`; refactor (comportamento invariato) `registerSignupConsent.ts`, `registerCheckoutConsent.ts`; aggiunta guardia + `fetchCache` alle 7 pagine `/compte/**` esistenti. **Nessuno pushato su richiesta esplicita di Robertin**, consegna via zip.
+
+### Stato finale della feature "Consenso CGV + cookie + marketing" (6 cicli, §54–§59)
+
+| Ciclo | Contenuto | Stato |
+|---|---|---|
+| 1 | Schema DB (`tenant_legal_documents`, `user_consents`, RLS, GRANT) | Fatto — seed CGV v1.0 **mai eseguito** (contenuto non fornito) |
+| 2 | Pagina `/conditions-generales-vente` + link footer | Fatto |
+| 3 | Cookie consent banner (`lepefy_cookie_consent`) | Fatto |
+| 4 | Checkbox signup (OTP, pre-check `isNewCustomer`) | Fatto |
+| 5 | Checkbox checkout condizionale + migration trasporto | Fatto |
+| 6 | Gate di re-consenso `/compte/consentement` | Fatto |
+
+**Debito tecnico tracciato per un ciclo futuro dedicato** (scoperto nel ciclo 5, non risolto per essere fuori scope): la creazione ordine è duplicata in due punti — logica inline in `POST /api/webhooks/stripe` (`payment_intent.succeeded`) e `createOrderFromCheckoutSession()` (usata solo da `POST /api/admin/checkout-sessions/[id]/confirm-payment`) — nonostante un commento nel codice dichiari (erroneamente) un riuso completo. Un refactoring che unifichi i due punti eliminerebbe il rischio strutturale di far divergere in futuro logica che oggi è mantenuta manualmente sincronizzata in due file (già capitato per il consenso in questo stesso ciclo 5/6).
+
+**Punto ancora aperto, non di competenza di un ciclo di sviluppo**: il seed CGV v1.0 per `chloefood` (§54) non è mai stato eseguito — nessun contenuto legale reale è mai stato inventato in nessuno dei 6 cicli. `tenant_legal_documents` resta vuota finché Robertin non fornisce il testo reale; fino ad allora `hasValidTermsConsent` ritorna sempre `true` (nessun documento → nessun gate) e le pagine `/conditions-generales-vente` e `/compte/consentement` mostrano correttamente i rispettivi fallback ("Document non disponible" / redirect immediato) invece di comportarsi in modo scorretto.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§59** (questa) — chiude la feature a 6 cicli.
+- Deviazione architetturale documentata: nessun layout `/compte` condiviso, guardia applicata per-pagina (pattern già esistente nel progetto).
+- Refactor "riuso non duplicazione" applicato (`insertConsentRows`) — comportamento invariato per i cicli 4/5.
+- Verifica reale **non eseguita** in nessuno dei 6 cicli — limite costante di questa sessione (nessuna credenziale/CLI Supabase disponibile).
+- Nessun push in nessuno dei 6 cicli — consegna via zip su richiesta esplicita di Robertin.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.41 — 18 Agosto 2026 (base: v3.40; Ciclo 6/6 gestione consensi — gate di re-consenso `/compte/consentement`, guardia per-pagina `requireTermsConsentOrRedirect` su tutte le 7 pagine `/compte/**` esistenti (nessun layout condiviso nel progetto), redirect `return` con validazione anti-open-redirect (`safeReturnPath`, pattern nuovo), `insertConsentRows` estratta per riuso tra i tre punti di scrittura consenso, area admin/`tenant_cashier` confermata del tutto separata — **feature "Consenso CGV + cookie + marketing" completata in 6 cicli**, seed CGV v1.0 ancora in sospeso per contenuto mancante, debito tecnico sulla duplicazione creazione ordine tracciato per ciclo futuro — vedi §59 per il dettaglio completo)*

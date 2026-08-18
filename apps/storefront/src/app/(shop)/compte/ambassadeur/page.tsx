@@ -4,9 +4,11 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { resolveReferralDownline } from '@/lib/loyalty/resolveReferralDownline';
 import { generateReferralCode } from '@/lib/loyalty/generateReferralCode';
+import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import { AmbassadorClient } from './AmbassadorClient';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 interface InviteeRow {
   customerId: string;
@@ -22,6 +24,7 @@ export default async function AmbassadeurPage() {
   const customer   = await getSessionCustomer(tenant.id);
 
   if (!customer) redirect('/compte/connexion');
+  await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte/ambassadeur');
 
   const supabase = createServiceClient();
 

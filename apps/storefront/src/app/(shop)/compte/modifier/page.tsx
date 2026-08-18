@@ -3,6 +3,7 @@ import { getCountries, type CountryCode } from 'libphonenumber-js';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { getCustomerProfile } from '@/lib/customers/getCustomerProfile';
+import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import { ModifierProfilClient } from './ModifierProfilClient';
 
 // Repli neutre (jamais une décision de branding) pour les rares cas où
@@ -21,6 +22,7 @@ function normalizeCountryCode(raw: string): CountryCode {
 
 // Page pleine (pas de modale) — même garde de session que /compte.
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function ModifierProfilPage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -28,6 +30,7 @@ export default async function ModifierProfilPage() {
   const customer   = await getSessionCustomer(tenant.id);
 
   if (!customer) redirect('/compte/connexion');
+  await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte/modifier');
 
   const profile = await getCustomerProfile(customer.id, tenant.id);
 

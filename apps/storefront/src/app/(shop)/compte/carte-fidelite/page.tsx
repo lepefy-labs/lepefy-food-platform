@@ -4,10 +4,12 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
+import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import { LoyaltyCardClient } from './LoyaltyCardClient';
 
 // Session obligatoire — même garde que /compte/parrainage.
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default async function CarteFideliteePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -15,6 +17,7 @@ export default async function CarteFideliteePage() {
   const customer   = await getSessionCustomer(tenant.id);
 
   if (!customer) redirect('/compte/connexion');
+  await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte/carte-fidelite');
   // La carte affiche un solde de points — sans programme actif pour ce
   // tenant, rien de pertinent à montrer (même principe que le bandeau points
   // conditionnel de AccountDashboard, cf. tenant.loyaltyEnabled).

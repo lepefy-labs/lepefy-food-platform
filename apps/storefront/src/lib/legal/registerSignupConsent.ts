@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getLatestLegalDocument } from './getLatestLegalDocument';
+import { insertConsentRows } from './insertConsentRows';
 
 // Enregistre les deux lignes de consentement au signup (Ciclo 4) : 'terms'
 // (toujours accordé — condition du submit côté client, revérifiée par
@@ -15,8 +16,7 @@ export async function registerSignupConsent(params: {
 
   const terms = await getLatestLegalDocument(tenantId, 'terms');
 
-  const supabase = createServiceClient();
-  const { error } = await supabase.from('user_consents').insert([
+  await insertConsentRows(createServiceClient(), [
     {
       tenant_id: tenantId,
       user_id: customerId,
@@ -34,6 +34,4 @@ export async function registerSignupConsent(params: {
       source: 'signup',
     },
   ]);
-
-  if (error) throw error;
 }
