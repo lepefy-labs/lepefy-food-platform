@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import type { Components } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { createPublicClient } from '@/lib/supabase/public';
+import { getLatestLegalDocument } from '@/lib/legal/getLatestLegalDocument';
 
 // Même traitement typographique que politique-confidentialite/page.tsx
 // (h2/p/ul en Tailwind natif) — pas de plugin @tailwindcss/typography
@@ -38,30 +38,10 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-interface TenantLegalDocument {
-  content: string;
-  version: number;
-  effective_date: string;
-}
-
-async function getLatestTerms(tenantId: string): Promise<TenantLegalDocument | null> {
-  const supabase = createPublicClient();
-  const { data } = await supabase
-    .from('tenant_legal_documents')
-    .select('content, version, effective_date')
-    .eq('tenant_id', tenantId)
-    .eq('doc_type', 'terms')
-    .order('version', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return data as TenantLegalDocument | null;
-}
-
 export default async function ConditionsGeneralesVentePage() {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
-  const terms = await getLatestTerms(tenant.id);
+  const terms = await getLatestLegalDocument(tenant.id, 'terms');
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">

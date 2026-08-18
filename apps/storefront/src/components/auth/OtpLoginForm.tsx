@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { useTenant } from '@/providers/TenantProvider';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent';
@@ -12,6 +14,7 @@ interface OtpLoginFormProps {
 }
 
 export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
+  const tenant = useTenant();
   const [step, setStep]           = useState<'email' | 'code'>('email');
   const [email, setEmail]         = useState('');
   const [code, setCode]           = useState<string[]>(Array(6).fill(''));
@@ -19,6 +22,12 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError]         = useState<string | null>(null);
   const [resendIn, setResendIn]   = useState(0);
+  // Connu seulement après l'envoi du code (pré-check côté /api/auth/request-otp,
+  // Ciclo 4) — détermine si la case CGV doit apparaître à l'étape code : un
+  // signup, pas un simple login, ne doit la demander qu'une fois.
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const cellRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -43,6 +52,9 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
         setError(data.error ?? 'Erreur lors de l\'envoi du code.');
         return;
       }
+      setIsNewCustomer(data.isNewCustomer === true);
+      setTermsAccepted(false);
+      setMarketingOptIn(false);
       setStep('code');
       setCode(Array(6).fill(''));
       setResendIn(RESEND_DELAY_S);
@@ -56,13 +68,17 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
 
   async function submitCode(fullCode: string) {
     if (isVerifying) return;
+    if (isNewCustomer && !termsAccepted) {
+      setError('Merci d\'accepter les Conditions Générales de Vente pour continuer.');
+      return;
+    }
     setIsVerifying(true);
     setError(null);
     try {
       const res  = await fetch('/api/auth/verify-otp', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email, token: fullCode }),
+        body:    JSON.stringify({ email, token: fullCode, marketingOptIn }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -148,6 +164,39 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
           <p className="text-sm text-gray-600">
             Code envoyé à <span className="font-medium text-gray-800">{email}</span>
           </p>
+          {isNewCustomer && (
+            <div className="space-y-2 border-t border-gray-100 pt-3">
+              <label className="flex items-start gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span>
+                  J&apos;accepte les{' '}
+                  <Link href="/conditions-generales-vente" target="_blank" className="underline">
+                    Conditions Générales de Vente
+                  </Link>{' '}
+                  et la{' '}
+                  <Link href="/politique-confidentialite" target="_blank" className="underline">
+                    Politique de confidentialité
+                  </Link>
+                  .
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={marketingOptIn}
+                  onChange={(e) => setMarketingOptIn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span>Je souhaite recevoir les offres et actualités de {tenant.name} par email.</span>
+              </label>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-between" onPaste={handlePaste}>
             {code.map((digit, i) => (
               <input
@@ -159,8 +208,8 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
                 value={digit}
                 onChange={(e) => handleCellChange(i, e.target.value)}
                 onKeyDown={(e) => handleCellKeyDown(i, e)}
-                className="w-10 h-12 text-center text-lg font-semibold border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                disabled={isVerifying}
+                className="w-10 h-12 text-center text-lg font-semibold border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent disabled:opacity-50"
+                disabled={isVerifying || (isNewCustomer && !termsAccepted)}
               />
             ))}
           </div>

@@ -3,10 +3,11 @@ import { createRouteClient } from '@/lib/supabase/server';
 import { verifyOtp } from '@/lib/auth/verifyOtp';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { registerWithReferral } from '@/lib/loyalty/registerWithReferral';
+import { registerSignupConsent } from '@/lib/legal/registerSignupConsent';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, token } = await req.json();
+    const { email, token, marketingOptIn } = await req.json();
 
     if (!email || !token) {
       return NextResponse.json({ error: 'Email et code requis.' }, { status: 400 });
@@ -23,6 +24,22 @@ export async function POST(req: NextRequest) {
     }
 
     const response = applyCookies(NextResponse.json({ authenticated: true }));
+
+    // ── Consentement CGV/marketing : uniquement au premier signup (Ciclo 4).
+    // Best-effort — un échec ici ne doit jamais invalider un compte déjà
+    // créé avec succès (cf. règle permanente du prompt).
+    if (result.isNewCustomer) {
+      try {
+        await registerSignupConsent({
+          tenantId: tenant.id,
+          customerId: result.session.user.id,
+          marketingOptIn: marketingOptIn === true,
+        });
+      } catch (consentErr) {
+        console.error('[api/auth/verify-otp] registerSignupConsent failed:', consentErr,
+          '— customer_id:', result.session.user.id);
+      }
+    }
 
     // ── Attribution referral: solo al primo login/creazione di questo customer
     // (isNewCustomer, vedi verifyOtp.ts) — mai su un re-login successivo, e mai

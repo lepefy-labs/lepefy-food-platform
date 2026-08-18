@@ -2424,4 +2424,31 @@ File toccati: nuovo `apps/storefront/src/components/consent/CookieConsentBanner.
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.38 — 18 Agosto 2026 (base: v3.37; Ciclo 3/6 gestione consensi — cookie consent banner multi-tenant (`lepefy_cookie_consent`, versione 1) con sync server-side opzionale su `user_consents` via `/api/consent/cookies`, nessun colore hardcoded, nessun pattern vietato per il bug Android cross-device, verifica visiva reale non eseguibile per assenza di credenziali/CLI in sessione — vedi §56 per il dettaglio completo)*
+## 57. Changelog v3.39 (18 Agosto 2026) — Ciclo 4/6 gestione consensi: checkbox signup + registrazione consenso — **verified against filesystem**
+
+**Deviazione architetturale rilevata allo Step 0, confermata con Robertin prima di scrivere codice**: il progetto **non ha un form di signup separato dal login** — l'autenticazione è OTP passwordless condivisa (`OtpLoginForm.tsx`, usato sia in `/compte/connexion` sia inline nel checkout), stesso componente per utenti nuovi ed esistenti, nessuna password, nessun campo nome/altro raccolto in questa fase (il profilo si arricchisce dopo via `/compte/modifier`). La creazione della riga `customers` è **sincrona**, dentro `verifyOtp.ts`, nella stessa richiesta che verifica il codice — nessuna conferma email differita (l'OTP stesso prova il possesso dell'email). Questo determina dove va la logica di consenso: nella Route Handler `POST /api/auth/verify-otp`, subito dopo la creazione riuscita del customer.
+
+**Soluzione concordata con Robertin** (per evitare che la checkbox CGV ricompaia ad ogni login per utenti già registrati, violando la regola "nessuna richiesta ridondante"): **pre-check in `POST /api/auth/request-otp`** — la route (già nel flusso signup/login, nessun nuovo endpoint) ora risolve il tenant e restituisce anche `isNewCustomer: boolean`, calcolato con una lettura `customers` tenant-scoped via `createServiceClient()` in `src/lib/auth/requestOtp.ts` (stesso client già usato per l'upsert in `verifyOtp.ts`, nessuna sessione garantita a questo punto). `OtpLoginForm.tsx` mostra le due checkbox **solo nello step "code" e solo se `isNewCustomer === true`** — un utente esistente non le vede mai.
+
+**Checkbox**: obbligatoria CGV+Privacy (`termsAccepted`) — le celle del codice OTP restano `disabled` finché non è spuntata (nessun bottone "submit" esplicito in questo step: la sottomissione è automatica al 6° carattere, quindi il gate è sulla possibilità di digitare); guardia duplicata anche dentro `submitCode()` (blocca e mostra errore anche via incolla di 6 cifre, che bypassa il disabled degli input). Checkbox opzionale marketing, non pre-spuntata, testo con `tenant.name` dinamico via `useTenant()` (stesso context provider già usato in `Footer.tsx`) — nessun nome tenant hardcoded. Link CGV/Privacy relativi (`/conditions-generales-vente`, `/politique-confidentialite`), `target="_blank"`.
+
+**Funzione riutilizzabile estratta**: `getLatestLegalDocument(tenantId, docType)` in nuovo `apps/storefront/src/lib/legal/getLatestLegalDocument.ts` — la logica era duplicata solo nella pagina CGV (Ciclo 2), ora estratta e riusata sia da `conditions-generales-vente/page.tsx` (refactor **senza cambio di comportamento/contenuto visibile** — solo lettura, nessuna modifica al testo o alla pagina Politique de confidentialité) sia dal nuovo `registerSignupConsent`.
+
+**Registrazione consenso**: nuovo `apps/storefront/src/lib/legal/registerSignupConsent.ts`, chiamato da `verify-otp/route.ts` **solo se `result.isNewCustomer`** (già calcolato in `verifyOtp.ts` per l'attribuzione referral, riusato). Inserisce sempre due righe in `user_consents` via `createServiceClient()`: `consent_type='terms'` (`granted=true`, `doc_version=` versione corrente letta da `getLatestLegalDocument`, `source='signup'`) e `consent_type='marketing'` (`granted=` valore checkbox, **sempre scritta anche a `false`**, `doc_version=null`, `source='signup'`). Se la creazione del customer fallisce, `verifyOtp()` lancia prima di arrivare qui → nessuna riga orfana. Se l'insert dei consensi fallisce dopo un signup riuscito: **try/catch dedicato, `console.error` con prefisso `[api/auth/verify-otp]` e `customer_id`** (stesso pattern già in uso per `registerWithReferral` nello stesso file), **non blocca la risposta** — l'utente resta autenticato.
+
+**Verifica reale non eseguita**: stesso limite noto (nessuna credenziale Supabase/CLI in sessione) — non è stato possibile testare un signup end-to-end. Verificata solo staticamente: il gate lato client (celle disabilitate + guardia in `submitCode`), l'assenza di scrittura consensi quando `isNewCustomer` è `false`, la non-orfanità delle righe consenso rispetto alla creazione customer.
+
+`pnpm typecheck`: pulito.
+
+File toccati: `apps/storefront/src/lib/auth/requestOtp.ts`, `apps/storefront/src/app/api/auth/request-otp/route.ts`, `apps/storefront/src/app/api/auth/verify-otp/route.ts`, `apps/storefront/src/components/auth/OtpLoginForm.tsx`, nuovo `apps/storefront/src/lib/legal/getLatestLegalDocument.ts`, nuovo `apps/storefront/src/lib/legal/registerSignupConsent.ts`, refactor (solo estrazione, nessun cambio visibile) `apps/storefront/src/app/(shop)/conditions-generales-vente/page.tsx`. **Nessuno pushato su richiesta esplicita di Robertin**, consegna via zip.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§57** (questa).
+- Deviazione architetturale documentata: nessun form di signup separato — soluzione del pre-check `isNewCustomer` concordata esplicitamente con Robertin prima di procedere.
+- Nessuna nuova dipendenza npm in questo ciclo.
+- Verifica reale **non eseguita** — stesso limite noto (nessuna credenziale/CLI Supabase in sessione).
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.39 — 18 Agosto 2026 (base: v3.38; Ciclo 4/6 gestione consensi — checkbox CGV/marketing nel form OTP condiviso login/signup, mostrate solo ai nuovi utenti via pre-check `isNewCustomer` in `/api/auth/request-otp`, registrazione in `user_consents` da `/api/auth/verify-otp` solo al primo signup, `getLatestLegalDocument` estratta e riusata, nessuna riga orfana, fallimento consenso non bloccante — vedi §57 per il dettaglio completo)*
