@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { marketingConsentLabel } from '@/lib/legal/consentCopy';
 
 interface ConsentementClientProps {
   tenantName: string;
@@ -63,7 +64,7 @@ export function ConsentementClient({ tenantName, showMarketingCheckbox, returnPa
             onChange={(e) => setMarketingOptIn(e.target.checked)}
             className="mt-0.5 h-4 w-4 shrink-0"
           />
-          <span>Je souhaite recevoir les offres et actualités de {tenantName} par email.</span>
+          <span>{marketingConsentLabel(tenantName)}</span>
         </label>
       )}
 

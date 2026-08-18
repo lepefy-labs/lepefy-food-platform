@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
 import type { CheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
+import { marketingConsentLabel } from '@/lib/legal/consentCopy';
 import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
   externalPaymentCtaLabel, externalPaymentCtaColor,
@@ -827,7 +828,7 @@ export default function CheckoutForm({
                       onChange={(e) => setMarketingOptIn(e.target.checked)}
                       className="mt-0.5 h-4 w-4 shrink-0"
                     />
-                    <span>Je souhaite recevoir les offres et actualités de {tenant.name} par email.</span>
+                    <span>{marketingConsentLabel(tenant.name)}</span>
                   </label>
                 )}
               </div>

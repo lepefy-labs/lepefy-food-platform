@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useTenant } from '@/providers/TenantProvider';
+import { marketingConsentLabel } from '@/lib/legal/consentCopy';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent';
@@ -192,7 +193,7 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
                   onChange={(e) => setMarketingOptIn(e.target.checked)}
                   className="mt-0.5 h-4 w-4 shrink-0"
                 />
-                <span>Je souhaite recevoir les offres et actualités de {tenant.name} par email.</span>
+                <span>{marketingConsentLabel(tenant.name)}</span>
               </label>
             </div>
           )}

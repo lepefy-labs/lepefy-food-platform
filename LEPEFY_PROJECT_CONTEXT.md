@@ -2553,4 +2553,34 @@ File toccati: nuovi `src/lib/legal/hasValidTermsConsent.ts`, `requireTermsConsen
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.42 — 18 Agosto 2026 (base: v3.41; riconciliazione con lo stato reale di `origin/main` — Robertin ha caricato manualmente via GitHub web UI tutti i file consegnati nei Cicli 1–6, verificati byte-per-byte identici; la seed CGV v1.0 (`supabase/064_seed_cgv_chloefood.sql`, fuori da `supabase/migrations/`) è stata scritta ed eseguita da Robertin, contrariamente a quanto riportato come debito aperto in §54/§59 — la feature "Consenso CGV + cookie + marketing" è ora interamente live e funzionalmente attiva, non solo su disco — vedi §60 per il dettaglio completo)*
+## 61. Changelog v3.43 (18 Agosto 2026) — Ciclo 7: consenso marketing esteso a email + SMS + WhatsApp — **verified against filesystem**
+
+**`customers.phone`**: già esistente (`text`, nullable, `001_initial_schema.sql`), gestito in `/compte/modifier` (`ModifierProfilClient.tsx` → `PATCH /api/customers/me`), validato in formato E.164 via `libphonenumber-js`. **Nessuna verifica del numero** (nessun OTP telefonico, nessuna conferma SMS) — solo controllo di formato. Vedi roadmap sotto.
+
+**Testo centralizzato**: era duplicato in 3 file (nessuna costante condivisa prima di questo ciclo). Nuovo `apps/storefront/src/lib/legal/consentCopy.ts` → `marketingConsentLabel(tenantName)`, testo: *"Je souhaite recevoir les offres et actualités de {tenant} par email, SMS et WhatsApp."* — importata da tutti e tre i punti, nessun testo hardcoded rimasto:
+- `apps/storefront/src/components/auth/OtpLoginForm.tsx` (signup, ciclo 4)
+- `apps/storefront/src/app/(shop)/checkout/CheckoutForm.tsx` (checkout, ciclo 5)
+- `apps/storefront/src/app/(shop)/compte/consentement/ConsentementClient.tsx` (gate, ciclo 6)
+
+**Cutoff documentato**: commento in `apps/storefront/src/lib/legal/insertConsentRows.ts` (nessuna logica di lettura per invii non esiste ancora nel progetto — commento posizionato lato scrittura, come da istruzioni in alternativa) — righe `consent_type='marketing'` create **prima del 2026-08-18** vanno considerate valide solo per email, non per SMS/WhatsApp, finché l'utente non riesprime il consenso con il nuovo testo. Nessuna riga esistente in `user_consents` è stata toccata, letta o reinterpretata da questo ciclo — solo copy futura.
+
+`pnpm typecheck`: pulito.
+
+File toccati: nuovo `apps/storefront/src/lib/legal/consentCopy.ts`; modificati `OtpLoginForm.tsx`, `CheckoutForm.tsx`, `ConsentementClient.tsx`, `insertConsentRows.ts` (solo commento, nessuna modifica di comportamento).
+
+### Roadmap — raccolta/verifica telefono prima dell'invio SMS/WhatsApp
+
+Non implementata in questo ciclo (fuori scope, "nessuna infrastruttura di invio esiste ancora"). Prima di poter costruire un invio SMS/WhatsApp reale, mancano:
+- Un momento esplicito di raccolta del telefono al signup/checkout (oggi opzionale, raccolto solo su `/compte/modifier` o come campo checkout non obbligatorio) — un utente può aver accettato "email, SMS e WhatsApp" senza aver mai fornito un numero.
+- Una verifica del numero (OTP SMS o equivalente) — il formato E.164 valido non garantisce che il numero sia realmente raggiungibile dal titolare dell'account.
+- Il filtro `created_at >= '2026-08-18'` documentato sopra, da applicare nel punto di lettura quando quella logica verrà scritta.
+
+### Aggiornamenti in questo changelog
+
+- Nuova sezione **§61** (questa).
+- Nessuna migration, nessuna modifica alla logica di consenso CGV (`consent_type='terms'`), nessuna riga `user_consents` esistente toccata.
+- Nuova voce di roadmap (raccolta/verifica telefono) registrata sopra.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.43 — 18 Agosto 2026 (base: v3.42; Ciclo 7 — testo consenso marketing centralizzato in `consentCopy.ts` ed esteso a email/SMS/WhatsApp nei tre punti (signup/checkout/gate), cutoff 2026-08-18 documentato in `insertConsentRows.ts` per non reinterpretare i consensi email-only pre-esistenti, roadmap aperta su raccolta/verifica telefono prima dell'invio SMS/WhatsApp reale — vedi §61 per il dettaglio completo)*
