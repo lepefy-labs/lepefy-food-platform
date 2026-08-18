@@ -119,6 +119,14 @@ export async function POST(req: NextRequest) {
 
     console.info('[rental/checkout] PaymentIntent created — id:', paymentIntent.id, '— service:', offering.id, '— amount:', paymentIntent.amount);
 
+    await supabase.from('payment_funnel_logs').insert({
+      tenant_id:    tenant.id,
+      module:       'rental',
+      event_type:   'intent_created',
+      reference_id: offering.id,
+      detail:       { amount: total },
+    });
+
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
     console.error('[rental/checkout] unhandled error:', err);

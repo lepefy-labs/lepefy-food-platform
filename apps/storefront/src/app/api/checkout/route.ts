@@ -396,7 +396,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ clientSecret: paymentIntent.client_secret });
+    return NextResponse.json({ clientSecret: paymentIntent.client_secret, sessionId: session.id });
   } catch (err) {
     console.error('[checkout] unhandled error:', err);
     return NextResponse.json(

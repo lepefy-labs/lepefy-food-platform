@@ -29,6 +29,7 @@ import {
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
+import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
 
 // Chargement paresseux — appelé uniquement au rendu de l'étape de paiement
 // Stripe (step === 'payment'), jamais pour un client qui choisit le retrait
@@ -111,10 +112,12 @@ function splitLine1(line1: string): { street: string; houseNumber: string } {
 function StripePaymentStep({
   total,
   tenant,
+  sessionId,
   onError,
 }: {
   total:   number;
   tenant:  Tenant;
+  sessionId: string | null;
   onError: (msg: string) => void;
 }) {
   const stripe   = useStripe();
@@ -122,10 +125,21 @@ function StripePaymentStep({
   const router   = useRouter();
   const { clearCart } = useCartStore();
   const [isConfirming, setIsConfirming] = useState(false);
+  const hasSucceededRef = useRef(false);
+
+  useEffect(() => {
+    return registerAbandonmentListener({
+      module:       'shop',
+      reference_id: sessionId,
+      hasSucceededRef,
+    });
+  }, [sessionId]);
 
   const handleConfirm = async () => {
     if (!stripe || !elements) return;
     setIsConfirming(true);
+
+    logFunnelEvent({ module: 'shop', event_type: 'confirm_attempted', reference_id: sessionId });
 
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
@@ -136,9 +150,17 @@ function StripePaymentStep({
     });
 
     if (error) {
+      logFunnelEvent({
+        module: 'shop',
+        event_type: 'confirm_error',
+        reference_id: sessionId,
+        detail: { code: error.code ?? null, type: error.type ?? null },
+      });
       onError(error.message ?? 'Erreur lors du paiement.');
       setIsConfirming(false);
     } else {
+      hasSucceededRef.current = true;
+      logFunnelEvent({ module: 'shop', event_type: 'confirm_succeeded_client', reference_id: sessionId });
       clearCart();
       router.push(`/order-confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
     }
@@ -188,6 +210,7 @@ export default function CheckoutForm({
   const [shippingInfo, setShippingInfo] = useState<CheckoutShipping | null>(() => readStoredShipping());
   const [step, setStep]                 = useState<'form' | 'select-payment' | 'payment'>('form');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [sessionId, setSessionId]       = useState<string | null>(null);
   const [paymentMode, setPaymentMode]   = useState<PaymentMode>('stripe');
   // Décision 6 — disponible en delivery ET pickup : sélectionner un moyen
   // externe prime sur `paymentMode` à la confirmation, quel que soit
@@ -528,7 +551,9 @@ export default function CheckoutForm({
 
       // Stripe flow: proceed to Elements step
       setClientSecret(result.clientSecret);
+      setSessionId(result.sessionId ?? null);
       setStep('payment');
+      logFunnelEvent({ module: 'shop', event_type: 'elements_mounted', reference_id: result.sessionId ?? null, detail: { amount: total } });
     } catch {
       setSubmitError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
@@ -868,6 +893,7 @@ export default function CheckoutForm({
             <StripePaymentStep
               total={total}
               tenant={tenant}
+              sessionId={sessionId}
               onError={(msg) => setSubmitError(msg)}
             />
           </Elements>

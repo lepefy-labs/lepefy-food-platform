@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
@@ -10,6 +10,7 @@ import {
 } from '@stripe/react-stripe-js';
 import { IconCheck } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
 
 // Chargement paresseux, même pattern que (shop)/checkout/CheckoutForm.tsx —
 // appelé uniquement une fois le montant validé côté serveur (clientSecret
@@ -76,6 +77,7 @@ function QuickPayPaymentStep({
   currency,
   color,
   copy,
+  quickPaymentId,
   onError,
   onSucceeded,
 }: {
@@ -83,27 +85,49 @@ function QuickPayPaymentStep({
   currency:    string;
   color:       string;
   copy:        QuickPayCopy;
+  quickPaymentId: string | null;
   onError:     (msg: string) => void;
   onSucceeded: () => void;
 }) {
   const stripe   = useStripe();
   const elements = useElements();
   const [isConfirming, setIsConfirming] = useState(false);
+  const hasSucceededRef = useRef(false);
+
+  useEffect(() => {
+    return registerAbandonmentListener({
+      module:       'card',
+      reference_id: quickPaymentId,
+      hasSucceededRef,
+    });
+  }, [quickPaymentId]);
 
   async function handleConfirm() {
     if (!stripe || !elements) return;
     setIsConfirming(true);
 
+    logFunnelEvent({ module: 'card', event_type: 'confirm_attempted', reference_id: quickPaymentId });
+
     const { error } = await stripe.confirmPayment({
       elements,
-      confirmParams: {},
+      confirmParams: {
+        return_url: `${window.location.origin}/card`,
+      },
       redirect: 'if_required',
     });
 
     if (error) {
+      logFunnelEvent({
+        module: 'card',
+        event_type: 'confirm_error',
+        reference_id: quickPaymentId,
+        detail: { code: error.code ?? null, type: error.type ?? null },
+      });
       onError(error.message ?? copy.genericError);
       setIsConfirming(false);
     } else {
+      hasSucceededRef.current = true;
+      logFunnelEvent({ module: 'card', event_type: 'confirm_succeeded_client', reference_id: quickPaymentId });
       onSucceeded();
     }
   }
@@ -140,9 +164,34 @@ export function CardQuickPay({
   const [customerEmail, setCustomerEmail]   = useState('');
   const [clientSecret, setClientSecret]     = useState<string | null>(null);
   const [confirmedAmount, setConfirmedAmount] = useState(0);
+  const [quickPaymentId, setQuickPaymentId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting]     = useState(false);
   const [error, setError]                   = useState<string | null>(null);
   const [paid, setPaid]                     = useState(false);
+
+  // Retrieve au montage — si Stripe a redirigé vers /card en plein écran
+  // (3D Secure), le state React (clientSecret, paid) est perdu au retour :
+  // on relit le statut du PaymentIntent depuis les query params ajoutés
+  // automatiquement par Stripe (payment_intent_client_secret).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const secretFromUrl = params.get('payment_intent_client_secret');
+    if (!secretFromUrl) return;
+
+    getStripe()!.then((stripeInstance) => {
+      if (!stripeInstance) return;
+      stripeInstance.retrievePaymentIntent(secretFromUrl).then(({ paymentIntent }) => {
+        if (paymentIntent?.status === 'succeeded') {
+          setPaid(true);
+        } else if (paymentIntent?.status === 'requires_action') {
+          logFunnelEvent({ module: 'card', event_type: 'requires_action', reference_id: quickPaymentId });
+        }
+        // Pulizia URL — evita che un refresh rilegga lo stesso client_secret.
+        window.history.replaceState({}, '', window.location.pathname);
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit() {
     const parsed = parseFloat(amount.replace(',', '.'));
@@ -173,7 +222,14 @@ export function CardQuickPay({
         return;
       }
       setConfirmedAmount(parsed);
+      setQuickPaymentId(data.quickPaymentId);
       setClientSecret(data.clientSecret);
+      logFunnelEvent({
+        module:       'card',
+        event_type:   'elements_mounted',
+        reference_id: data.quickPaymentId,
+        detail:       { amount: parsed },
+      });
     } catch {
       setError(copy.genericError);
     } finally {
@@ -199,6 +255,7 @@ export function CardQuickPay({
             currency={currency}
             color={tenantColor}
             copy={copy}
+            quickPaymentId={quickPaymentId}
             onError={setError}
             onSucceeded={() => setPaid(true)}
           />

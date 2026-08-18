@@ -12,6 +12,7 @@ import {
   externalPaymentCtaLabel, externalPaymentCtaColor,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import type { EventTicketType, TenantPaymentMethod } from '@lepefy/types';
+import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
 
 // Même pattern de chargement paresseux que (shop)/checkout/CheckoutForm.tsx —
 // singleton monté uniquement à l'étape de paiement.
@@ -79,15 +80,26 @@ function EventStepper({ current }: { current: Step }) {
   );
 }
 
-function EventPaymentStep({ total, currency, onError }: { total: number; currency: string; onError: (msg: string) => void }) {
+function EventPaymentStep({ total, currency, eventId, onError }: { total: number; currency: string; eventId: string; onError: (msg: string) => void }) {
   const stripe   = useStripe();
   const elements = useElements();
   const router   = useRouter();
   const [isConfirming, setIsConfirming] = useState(false);
+  const hasSucceededRef = useRef(false);
+
+  useEffect(() => {
+    return registerAbandonmentListener({
+      module:       'event',
+      reference_id: eventId,
+      hasSucceededRef,
+    });
+  }, [eventId]);
 
   const handleConfirm = async () => {
     if (!stripe || !elements) return;
     setIsConfirming(true);
+
+    logFunnelEvent({ module: 'event', event_type: 'confirm_attempted', reference_id: eventId });
 
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
@@ -96,9 +108,17 @@ function EventPaymentStep({ total, currency, onError }: { total: number; currenc
     });
 
     if (error) {
+      logFunnelEvent({
+        module: 'event',
+        event_type: 'confirm_error',
+        reference_id: eventId,
+        detail: { code: error.code ?? null, type: error.type ?? null },
+      });
       onError(error.message ?? 'Erreur lors du paiement.');
       setIsConfirming(false);
     } else {
+      hasSucceededRef.current = true;
+      logFunnelEvent({ module: 'event', event_type: 'confirm_succeeded_client', reference_id: eventId });
       router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
     }
   };
@@ -309,6 +329,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       setClientSecret(result.clientSecret);
       sessionStorage.removeItem('lepefy-event-checkout-draft');
       setStep('payment');
+      logFunnelEvent({ module: 'event', event_type: 'elements_mounted', reference_id: event.id, detail: { amount: total } });
     } catch {
       setError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
@@ -333,7 +354,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         <EventStepper current={step} />
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>}
         <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
-          <EventPaymentStep total={total} currency={tenant.currency} onError={setError} />
+          <EventPaymentStep total={total} currency={tenant.currency} eventId={event.id} onError={setError} />
         </Elements>
       </div>
     );

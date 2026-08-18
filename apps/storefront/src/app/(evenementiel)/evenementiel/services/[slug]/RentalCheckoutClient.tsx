@@ -12,6 +12,7 @@ import {
   externalPaymentCtaLabel, externalPaymentCtaColor,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import type { RentalItem, TenantPaymentMethod } from '@lepefy/types';
+import { logFunnelEvent, registerAbandonmentListener } from '@/lib/funnelLog';
 
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
 function getStripe() {
@@ -28,15 +29,26 @@ interface Props {
   externalPaymentMethods?: TenantPaymentMethod[];
 }
 
-function RentalPaymentStep({ total, currency, onError }: { total: number; currency: string; onError: (msg: string) => void }) {
+function RentalPaymentStep({ total, currency, serviceId, onError }: { total: number; currency: string; serviceId: string; onError: (msg: string) => void }) {
   const stripe   = useStripe();
   const elements = useElements();
   const router   = useRouter();
   const [isConfirming, setIsConfirming] = useState(false);
+  const hasSucceededRef = useRef(false);
+
+  useEffect(() => {
+    return registerAbandonmentListener({
+      module:       'rental',
+      reference_id: serviceId,
+      hasSucceededRef,
+    });
+  }, [serviceId]);
 
   const handleConfirm = async () => {
     if (!stripe || !elements) return;
     setIsConfirming(true);
+
+    logFunnelEvent({ module: 'rental', event_type: 'confirm_attempted', reference_id: serviceId });
 
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
@@ -45,9 +57,17 @@ function RentalPaymentStep({ total, currency, onError }: { total: number; curren
     });
 
     if (error) {
+      logFunnelEvent({
+        module: 'rental',
+        event_type: 'confirm_error',
+        reference_id: serviceId,
+        detail: { code: error.code ?? null, type: error.type ?? null },
+      });
       onError(error.message ?? 'Erreur lors du paiement.');
       setIsConfirming(false);
     } else {
+      hasSucceededRef.current = true;
+      logFunnelEvent({ module: 'rental', event_type: 'confirm_succeeded_client', reference_id: serviceId });
       router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntent?.id ?? ''}`);
     }
   };
@@ -208,6 +228,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
 
       setClientSecret(result.clientSecret);
       setStep('payment');
+      logFunnelEvent({ module: 'rental', event_type: 'elements_mounted', reference_id: service.id, detail: { amount: total } });
     } catch {
       setError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
@@ -231,7 +252,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
       <div>
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>}
         <Elements stripe={getStripe()} options={{ clientSecret, locale: 'fr' }}>
-          <RentalPaymentStep total={total} currency={tenant.currency} onError={setError} />
+          <RentalPaymentStep total={total} currency={tenant.currency} serviceId={service.id} onError={setError} />
         </Elements>
       </div>
     );

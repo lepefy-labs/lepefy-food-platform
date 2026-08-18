@@ -80,7 +80,17 @@ export async function POST(req: NextRequest) {
       console.error('[card/quick-pay] failed to store payment_intent_id:', updateError, '— row:', row.id);
     }
 
-    return NextResponse.json({ clientSecret: paymentIntent.client_secret });
+    console.info('[card/quick-pay] PaymentIntent created — id:', paymentIntent.id, '— amount:', paymentIntent.amount);
+
+    await supabase.from('payment_funnel_logs').insert({
+      tenant_id:    tenant.id,
+      module:       'card',
+      event_type:   'intent_created',
+      reference_id: row.id,
+      detail:       { amount: roundedAmount },
+    });
+
+    return NextResponse.json({ clientSecret: paymentIntent.client_secret, quickPaymentId: row.id });
   } catch (err) {
     console.error('[card/quick-pay] unhandled error:', err);
     return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
