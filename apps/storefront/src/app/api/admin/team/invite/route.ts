@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
+import { notifyAdminInvited } from '@/lib/notifications/notifyAdminInvited';
 import type { AdminRole } from '@/lib/auth/requireAdmin';
 
 export const runtime = 'nodejs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_ROLES: AdminRole[] = ['platform_owner', 'tenant_admin', 'tenant_cashier'];
+
+const ROLE_LABELS: Record<AdminRole, string> = {
+  platform_owner: 'Propriétaire plateforme',
+  tenant_admin: 'Administrateur tenant',
+  tenant_cashier: 'Caissier',
+};
 
 // Recherche un utilisateur auth.users existant par email, via le SDK admin
 // (pagination — même principe que listAuthUsers() dans
@@ -70,57 +77,50 @@ export async function POST(req: NextRequest) {
 
   const adminClient = createServiceClient();
 
+  let tenantName = 'Plateforme';
   if (tenantId) {
     const { data: tenant } = await adminClient
       .from('tenants')
-      .select('id')
+      .select('id, name')
       .eq('id', tenantId)
       .single();
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant introuvable.' }, { status: 400 });
     }
+    tenantName = tenant.name;
   }
 
-  // Invitation Supabase Auth — aucune ligne admin_users écrite avant que
-  // cette étape (ou la résolution de l'utilisateur existant ci-dessous)
-  // n'ait abouti.
+  const { data: currentAdmin } = await adminClient
+    .from('admin_users')
+    .select('email')
+    .eq('id', currentAdminId)
+    .single();
+
+  // Plus d'email Supabase (inviteUserByEmail / resetPasswordForEmail) : le
+  // login admin passe désormais par OTP email (requestAdminOtp.ts), qui ne
+  // requiert aucun mot de passe ni lien — le compte est créé directement
+  // côté serveur, sans email de système Supabase. Aucune ligne admin_users
+  // écrite avant que cette étape (ou la résolution de l'utilisateur
+  // existant ci-dessous) n'ait abouti.
   let userId: string;
   let existingUser = false;
-  const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-    email,
-    { redirectTo: `${req.nextUrl.origin}/admin/accept-invite` },
-  );
 
-  if (inviteError) {
-    // Utilisateur auth déjà existant (ex. client storefront inscrit via OTP) :
-    // on réutilise son id plutôt que d'échouer — permet de promouvoir un
-    // utilisateur existant en admin, ou de changer le rôle/tenant d'un admin
-    // déjà présent via ce même formulaire. Vérifie d'abord `error.code`
-    // ('email_exists', exposé par @supabase/auth-js — bien plus fiable que le
-    // texte du message, qui dépend de la version GoTrue) ; le message
-    // ("A user with this email address has already been registered") reste
-    // en filet de sécurité — bug corrigé ici : le pattern précédent
-    // (`already registered`) ne matchait pas "already **been** registered".
-    const alreadyRegistered =
-      inviteError.code === 'email_exists'
-      || /already\s+(been\s+)?registered|already exists/i.test(inviteError.message);
-    if (!alreadyRegistered) {
-      return NextResponse.json({ error: `Échec de l'invitation : ${inviteError.message}` }, { status: 400 });
-    }
-
-    const found = await findAuthUserByEmail(adminClient, email);
-    if (!found) {
-      // Cas limite anormal : GoTrue affirme que l'email existe déjà mais
-      // listUsers() ne le retrouve pas — on ne procède pas à l'aveugle.
-      return NextResponse.json(
-        { error: `Échec de l'invitation : ${inviteError.message}` },
-        { status: 500 },
-      );
-    }
+  const found = await findAuthUserByEmail(adminClient, email);
+  if (found) {
     userId = found.id;
     existingUser = true;
   } else {
-    userId = inviteData.user.id;
+    const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      email_confirm: true,
+    });
+    if (createError || !createData.user) {
+      return NextResponse.json(
+        { error: `Échec de la création du compte : ${createError?.message ?? 'erreur inconnue'}` },
+        { status: 500 },
+      );
+    }
+    userId = createData.user.id;
   }
 
   // Upsert manuel (pas de .upsert() avec onConflict : idx_admin_users_email
@@ -155,26 +155,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!existingUser) {
-    return NextResponse.json({ ok: true, existingUser: false });
+  // Best-effort — un échec ici ne doit jamais faire échouer la réponse : le
+  // compte admin est déjà créé/actif à ce point.
+  try {
+    await notifyAdminInvited({
+      email,
+      role: ROLE_LABELS[role],
+      tenantName,
+      invitedByEmail: currentAdmin?.email ?? '',
+      loginUrl: `${req.nextUrl.origin}/admin/login`,
+    });
+  } catch (err) {
+    console.error('[team/invite] notifyAdminInvited failed:', err);
   }
 
-  // Utilisateur existant promu admin : il n'a jamais eu de mot de passe s'il
-  // s'est inscrit via OTP côté storefront (`/admin/login` utilise
-  // signInWithPassword) — un email de récupération de mot de passe standard
-  // Supabase le renvoie vers /admin/accept-invite, qui gère déjà aussi bien
-  // un lien de type "recovery" que "invite" (elle ne fait qu'échanger la
-  // session déposée dans l'URL puis appeler updateUser({ password })).
-  const { error: resetError } = await adminClient.auth.resetPasswordForEmail(email, {
-    redirectTo: `${req.nextUrl.origin}/admin/accept-invite`,
-  });
-
-  if (resetError) {
-    // La ligne admin_users est déjà écrite : pas de rollback, l'accès est
-    // bien accordé. On signale seulement que l'email peut ne pas être parti.
-    console.error('[team/invite] resetPasswordForEmail failed for existing user promotion:', resetError);
-    return NextResponse.json({ ok: true, existingUser: true, warning: 'admin_created_but_email_failed' });
-  }
-
-  return NextResponse.json({ ok: true, existingUser: true });
+  return NextResponse.json({ ok: true, existingUser });
 }

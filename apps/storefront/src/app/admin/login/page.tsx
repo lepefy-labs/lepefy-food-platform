@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import AdminOtpForm from './AdminOtpForm';
 
 // Surface admin — reste dynamique (cf. audit Prompt 4, classification
 // "/admin/**"). Explicite depuis que getTenant() n'utilise plus cookies() :
 // cette page perdait son seul déclencheur dynamique implicite.
 export const dynamic = 'force-dynamic';
 
+type LoginMode = 'otp' | 'password';
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mode, setMode] = useState<LoginMode>('otp');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -54,50 +58,75 @@ export default function AdminLoginPage() {
           <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">Administration</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600" htmlFor="email">
-              Adresse e-mail
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600" htmlFor="password">
-              Mot de passe
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          {errorMsg && (
-            <p className="text-xs text-red-500 text-center">{errorMsg}</p>
-          )}
-
+        <div className="flex gap-1 mb-6 p-1 rounded-lg bg-gray-100 text-sm font-medium">
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-            style={{ backgroundColor: 'var(--color-primary)' }}
+            type="button"
+            onClick={() => setMode('otp')}
+            className={`flex-1 py-1.5 rounded-md transition-colors ${
+              mode === 'otp' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
           >
-            {loading ? 'Connexion…' : 'Se connecter'}
+            Code par email
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setMode('password')}
+            className={`flex-1 py-1.5 rounded-md transition-colors ${
+              mode === 'password' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            Mot de passe
+          </button>
+        </div>
+
+        {errorMsg && (
+          <p className="text-xs text-red-500 text-center mb-4">{errorMsg}</p>
+        )}
+
+        {mode === 'otp' ? (
+          <AdminOtpForm />
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600" htmlFor="email">
+                Adresse e-mail
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600" htmlFor="password">
+                Mot de passe
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              {loading ? 'Connexion…' : 'Se connecter'}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
