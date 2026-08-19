@@ -81,19 +81,25 @@ Two separate clients exist — use the right one:
 
 **Route structure** (`src/app/admin/`):
 - `layout.tsx` — HTML shell only (CSS vars from tenant, no auth check); wraps all admin routes including login
-- `(protected)/layout.tsx` — auth check via `createServerClient` + `cookies()`; also checks `ADMIN_EMAILS` env var whitelist; wraps dashboard and orders only
+- `(protected)/layout.tsx` — auth check via `createServerClient` + `cookies()`; looks up the caller in `admin_users` (`id`, `role`, `tenant_id`, `active`); wraps dashboard, orders, and every other route in the group. Passes `isPlatformOwner={admin.role === 'platform_owner'}` to `AdminHeader`/`AdminSidebar` so platform-only nav items (e.g. "Équipe") only render for that role.
 - `(protected)/page.tsx` — order management dashboard (`/admin`)
 - `(protected)/orders/[id]/page.tsx` — per-order detail/picking list (`/admin/orders/:id`)
+- `(protected)/team/page.tsx` + `TeamClient.tsx` — platform-only admin user management (`/admin/team`): lists every `admin_users` row across all tenants, invites new admins, activates/deactivates existing ones. The page does its own extra `role !== 'platform_owner'` check (`redirect('/admin')`) on top of the group's auth check — never accessible to `tenant_admin`/`tenant_cashier`.
 - `login/page.tsx` — login form, Client Component; calls `POST /api/admin/login` (server-side) then `router.refresh()` + `router.push('/admin')`; reads `?error=unauthorized` to show access-denied message
+- `accept-invite/page.tsx` — Client Component, **outside** the `(protected)` group (same reason as `loyalty/scan`/`evenementiel/scan`: reachable before the user has a verifiable `admin_users` row). Landing page for the Supabase invite email link; waits for `detectSessionInUrl` to exchange the link's token, then lets the invited user set a password via `supabase.auth.updateUser({ password })`, then redirects to `/admin/login`.
 - `LogoutButton.tsx` — logout button (Client Component) rendered in `(protected)/layout.tsx`
 
-**Auth flow**: unauthenticated → `redirect('/admin/login')`; authenticated but not in whitelist → `redirect('/admin/login?error=unauthorized')`.
+**Auth flow**: unauthenticated → `redirect('/admin/login')`; authenticated but not an active row in `admin_users` → `redirect('/admin/login?error=unauthorized')`.
 
-**Cookie API**: `@supabase/ssr@0.3.x` uses `get(name)`/`set(name,value,options)` internally (old API). Both `createServerClient` instances (API route + protected layout) must provide `get + set + remove + getAll + setAll` — providing only `getAll/setAll` causes session read/write to silently fail.
+**Roles & `admin_users`** (`supabase/migrations/039_admin_users.sql`, extended by `047_loyalty_card_system.sql`): `role` is one of `platform_owner` (global access, `tenant_id` null), `tenant_admin` (full access scoped to one tenant), `tenant_cashier` (scoped like `tenant_admin` but redirected to `/admin/loyalty/scan` only). `lib/auth/requireAdmin.ts` is the guard every admin API route must call: `platform_owner` always passes; other roles need both to be in the route's `allowedRoles` list (default `['tenant_admin']`) **and** to match the route's `tenantId`. Passing `allowedRoles: []` restricts a route to `platform_owner` only, regardless of `tenantId` — used by `api/admin/team/*` since team management is platform-only. `admin_users` has no public RLS policy; only `service_role` (via `createServiceClient()`) can read/write it.
+
+**Inviting admins** (`/admin/team`, platform_owner only): `POST /api/admin/team/invite` calls `createServiceClient().auth.admin.inviteUserByEmail(email, { redirectTo: '.../admin/accept-invite' })`, then upserts the corresponding `admin_users` row (manual `select` + `insert`/`update`, never `.upsert()` with `onConflict` — the email uniqueness index is on `lower(email)`, an expression index, not a plain column). If the invite fails because the auth user already exists, the route looks it up via `auth.admin.listUsers()` (paginated) and reuses that id — this also doubles as the path to re-invite someone or change an existing admin's role/tenant. `PATCH /api/admin/team/[id]` only ever toggles `active` (deactivate/reactivate) — there is no delete; both routes reject an admin trying to act on their own id where relevant (self-deactivation).
+
+**Cookie API**: `@supabase/ssr@0.3.x` uses `get(name)`/`set(name,value,options)` internally (old API). Every `createServerClient` instance (API routes, protected layout, `team/page.tsx`) must provide `get + set + remove + getAll + setAll` — providing only `getAll/setAll` causes session read/write to silently fail.
 
 **Login flow**: `POST /api/admin/login/route.ts` calls `signInWithPassword` server-side and sets session cookies explicitly on the `NextResponse`. This ensures cookies are available to Server Components on the next request.
 
-Admin accounts are created manually via **Supabase Dashboard → Authentication → Users**. No registration flow exists in the app.
+Beyond the `/admin/team` invite flow above, there is still no self-service registration; the very first `platform_owner` account is created manually via **Supabase Dashboard → Authentication → Users** + a row in `admin_users`.
 
 ## Key Environment Variables
 
