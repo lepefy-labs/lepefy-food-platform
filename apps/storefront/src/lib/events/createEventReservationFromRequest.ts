@@ -26,6 +26,10 @@ export interface CreateEventReservationInput {
   amountPaid:     number;
   /** intent.id — présent uniquement pour le flux Stripe. undefined pour external_link. */
   stripePaymentIntentId?: string;
+  /** Agente e2e Fase 0 — true uniquement quand appelé depuis le webhook pour
+   *  un événement vérifié contre le compte Stripe séparé dédié aux tests e2e.
+   *  Absent (donc false) pour tous les autres appelants (external_link). */
+  isTest?: boolean;
 }
 
 export type CreateEventReservationResult =
@@ -125,6 +129,7 @@ export async function createEventReservationFromRequest(
       quantity_total:            totalQuantity,
       quantity_remaining:        totalQuantity,
       status:                    'confirmed',
+      is_test:                   input.isTest ?? false,
     });
 
   if (reservationError) {

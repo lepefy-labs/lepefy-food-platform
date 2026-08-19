@@ -32,6 +32,8 @@ interface Props {
   // Phase 2 — moyens de paiement via lien externe (PayPal/Revolut/autre)
   // éligibles pour ce tenant, même filtre que le checkout boutique.
   externalPaymentMethods?: TenantPaymentMethod[];
+  // Agente e2e Fase 0 — calculé côté serveur (page.tsx) via isE2ERequest().
+  isE2ETest?: boolean;
 }
 
 // Stepper — reflète le state `step` réel du composant (pas de step
@@ -69,7 +71,7 @@ function EventStepper({ current }: { current: Step }) {
   );
 }
 
-export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOut, featureRow, externalPaymentMethods = [] }: Props) {
+export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOut, featureRow, externalPaymentMethods = [], isE2ETest = false }: Props) {
   const router = useRouter();
   const { customer: sessionCustomer } = useSessionCustomer();
 
@@ -297,6 +299,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>}
         <StripePaymentStep
           module="event"
+          isTest={isE2ETest}
           amount={total}
           currency={tenant.currency}
           color="var(--color-primary)"

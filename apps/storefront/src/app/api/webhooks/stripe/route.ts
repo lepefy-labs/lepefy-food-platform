@@ -8,6 +8,7 @@ import { notifyN8n } from '@/lib/events/notifyN8n';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
+import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
 import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
@@ -40,12 +41,30 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Agente e2e Fase 0 — se nessuno dei secret "live" per modulo ha verificato
+  // la firma, prova il secret dell'account Stripe SEPARATO dedicato ai test
+  // e2e. Necessario perché quell'account non è "un modulo in più" ma un
+  // account interamente distinto, con la propria firma.
+  let isE2EEvent = false;
+  if (!event) {
+    const e2eEvent = verifyE2EStripeWebhookSignature(getStripeClient('shop'), body, sig);
+    if (e2eEvent) {
+      event = e2eEvent;
+      isE2EEvent = true;
+    }
+  }
+
   if (!event) {
     console.error('[webhook] Signature verification failed against all configured secrets.');
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 });
   }
 
-  const stripe = getStripeClient(verifiedModule ?? 'shop');
+  // Le compte e2e est un compte Stripe séparé, pas "un module de plus" : les
+  // appels Stripe ultérieurs (ex. remboursement) doivent utiliser sa propre
+  // secret key, jamais un client résolu par module.
+  const stripe = isE2EEvent
+    ? new Stripe(process.env.STRIPE_SECRET_KEY_TEST ?? '')
+    : getStripeClient(verifiedModule ?? 'shop');
 
   console.info('[webhook] Received event:', event.type, '— id:', event.id, '— verified against module:', verifiedModule);
 
@@ -105,7 +124,7 @@ export async function POST(req: NextRequest) {
     // sur /evenements/[id]) — domaine indépendant de orders/checkout_sessions,
     // routé avant la logique commande existante, jamais mélangé avec elle.
     if (intent.metadata?.type === 'event_reservation') {
-      return handleEventReservationPaymentSucceeded(intent);
+      return handleEventReservationPaymentSucceeded(intent, isE2EEvent);
     }
 
     const sessionId = intent.metadata?.session_id;
@@ -219,6 +238,7 @@ export async function POST(req: NextRequest) {
         stripe_payment_intent_id:  intent.id,
         status:                    'preparing',
         notes:                     checkoutSession.phone ? `Téléphone: ${checkoutSession.phone}` : null,
+        is_test:                   isE2EEvent,
       })
       .select('id')
       .single();
@@ -514,7 +534,7 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
 // logique métier (capacité, qr_token, remboursement, notification n8n avec
 // ticketUrl) vit dans cette fonction partagée ; ce handler ne fait que router
 // les metadata du PaymentIntent et gérer l'idempotence côté webhook.
-async function handleEventReservationPaymentSucceeded(intent: Stripe.PaymentIntent): Promise<NextResponse> {
+async function handleEventReservationPaymentSucceeded(intent: Stripe.PaymentIntent, isE2EEvent: boolean): Promise<NextResponse> {
   const eventId       = intent.metadata?.event_id;
   const tenantId       = intent.metadata?.tenant_id;
   const rawItems       = intent.metadata?.items;
@@ -561,6 +581,7 @@ async function handleEventReservationPaymentSucceeded(intent: Stripe.PaymentInte
     customerPhone,
     amountPaid:             intent.amount / 100,
     stripePaymentIntentId:  intent.id,
+    isTest:                 isE2EEvent,
   });
 
   if ('reservationId' in result) {

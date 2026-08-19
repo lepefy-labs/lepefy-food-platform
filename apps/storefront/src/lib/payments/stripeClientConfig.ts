@@ -14,7 +14,18 @@ export type { PaymentModule };
 // build QUE dans ce cas. Construire le nom dynamiquement (ex.
 // process.env[`NEXT_PUBLIC_X_${module}`]) donnerait toujours `undefined`
 // dans le bundle client.
-function resolvePublishableKey(module: PaymentModule): string {
+// Agente e2e Fase 0 — isTest vient d'une prop calculée côté serveur
+// (isE2ERequest(), via next/headers()) : ce fichier est 'use client', donc
+// il ne peut jamais lire lui-même le header x-e2e-test-token. Le compte
+// Stripe e2e est un compte séparé, pas "un module de plus" — une seule
+// publishable key test, indépendante du module.
+function resolvePublishableKey(module: PaymentModule, isTest?: boolean): string {
+  if (isTest) {
+    const testKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST;
+    if (!testKey) throw new Error('E2E test mode richiesto ma NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST non configurata');
+    return testKey;
+  }
+
   switch (module) {
     case 'card':
       return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_CARD || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!;
@@ -31,12 +42,13 @@ function resolvePublishableKey(module: PaymentModule): string {
 // Cache par module — pas un singleton global unique comme dans le pattern
 // précédent, car deux modules peuvent désormais avoir des publishable key
 // différentes.
-const promiseCache = new Map<PaymentModule, Promise<StripeJs | null>>();
+const promiseCache = new Map<string, Promise<StripeJs | null>>();
 
-export function getStripeForModule(module: PaymentModule): Promise<StripeJs | null> {
-  const cached = promiseCache.get(module);
+export function getStripeForModule(module: PaymentModule, isTest?: boolean): Promise<StripeJs | null> {
+  const cacheKey = isTest ? `${module}:e2e` : module;
+  const cached = promiseCache.get(cacheKey);
   if (cached) return cached;
-  const promise = loadStripe(resolvePublishableKey(module));
-  promiseCache.set(module, promise);
+  const promise = loadStripe(resolvePublishableKey(module, isTest));
+  promiseCache.set(cacheKey, promise);
   return promise;
 }

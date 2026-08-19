@@ -8,6 +8,7 @@ import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { formatEventDayDate, formatEventTime } from '@/lib/utils/format';
 import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { getHighlightIcon } from '@/lib/events/highlightIcons';
+import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import EventCheckoutClient from './EventCheckoutClient';
 import type { EventRow, EventTicketType } from '@lepefy/types';
 
@@ -230,6 +231,7 @@ export default async function EventDetailPage({ params }: PageProps) {
           soldOut={soldOut}
           featureRow={featureRow}
           externalPaymentMethods={externalPaymentMethods}
+          isE2ETest={isE2ERequest()}
         />
 
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-5">

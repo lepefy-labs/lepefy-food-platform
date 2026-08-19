@@ -4,8 +4,9 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventPaymentIntentMetadata } from '@lepefy/types';
 
-const stripe = getStripeClient('event');
-
+// Agente e2e Fase 0 — voir api/checkout/route.ts : getStripeClient() ne peut
+// plus être instancié au scope module, la résolution de clé dépend désormais
+// de la requête en cours (next/headers()).
 const MAX_QUANTITY_PER_TICKET = 999;
 
 function isValidEmail(value: string): boolean {
@@ -21,6 +22,7 @@ interface EventCheckoutBody {
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const stripe = getStripeClient('event');
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);
 

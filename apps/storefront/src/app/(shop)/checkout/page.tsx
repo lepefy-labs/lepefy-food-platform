@@ -2,6 +2,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
+import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import CheckoutForm from './CheckoutForm';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,7 @@ export default async function CheckoutPage() {
       tenant={tenant}
       externalPaymentMethods={externalPaymentMethods}
       consentState={consentState}
+      isE2ETest={isE2ERequest()}
     />
   );
 }

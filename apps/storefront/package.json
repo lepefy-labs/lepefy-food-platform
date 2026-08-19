@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
+    "test:e2e:report": "playwright show-report ../../playwright-report"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
@@ -37,6 +39,7 @@
   },
   "devDependencies": {
     "@fontsource/inter": "^5.3.0",
+    "@playwright/test": "^1.48.0",
     "@types/node": "^20.12.7",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.1",

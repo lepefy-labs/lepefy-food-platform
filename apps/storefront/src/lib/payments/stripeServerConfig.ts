@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import type { PaymentModule } from '@lepefy/types';
+import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 
 // Fichier server-only (secret key + webhook secret) — jamais importé par un
 // composant client. Séparé volontairement de stripeClientConfig.ts (qui ne
@@ -17,7 +18,21 @@ const MODULE_ENV_SUFFIX: Record<PaymentModule, string> = {
 // Résout la secret key par module : STRIPE_SECRET_KEY_<MODULE> si présente,
 // sinon STRIPE_SECRET_KEY (comportement actuel, inchangé tant que Dalice n'a
 // pas configuré de compte séparé).
+//
+// Agente e2e Fase 0 — quand la requête porte le token e2e signé
+// (x-e2e-test-token, vérifié par isE2ERequest()), on bascule TOUJOURS vers
+// STRIPE_SECRET_KEY_TEST, quel que soit le module : ce compte Stripe séparé,
+// dédié aux tests e2e, ne connaît pas la distinction par module — c'est un
+// compte de test unique. Aucun risque pour les clients réels : sans le token
+// (ou sans E2E_TEST_SECRET configuré côté serveur), ce chemin n'est jamais
+// emprunté.
 export function getStripeSecretKey(module: PaymentModule): string {
+  if (isE2ERequest()) {
+    const testKey = process.env.STRIPE_SECRET_KEY_TEST;
+    if (!testKey) throw new Error('E2E test mode richiesto ma STRIPE_SECRET_KEY_TEST non configurata');
+    return testKey;
+  }
+
   const specific = process.env[`STRIPE_SECRET_KEY_${MODULE_ENV_SUFFIX[module]}`];
   const key = specific || process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error(`[stripeServerConfig] Nessuna secret key configurata per il modulo "${module}".`);

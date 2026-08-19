@@ -8,9 +8,12 @@ import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheck
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
+import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 
-const stripe = getStripeClient('shop');
-
+// Agente e2e Fase 0 — NON instancié au scope module (comme avant) : la
+// résolution de la clé dépend désormais de la requête en cours (token e2e
+// éventuel), donc getStripeClient() doit être appelé DANS le handler, où
+// next/headers() a un contexte de requête valide.
 const MAX_QUANTITY_PER_ITEM = 999;
 
 interface CartItemPayload {
@@ -46,6 +49,8 @@ interface CheckoutBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const stripe = getStripeClient('shop');
+    const isTestRequest = isE2ERequest();
     const body: CheckoutBody = await req.json();
     const {
       items: rawItems, shippingAddress, fulfillmentType, email,
@@ -271,6 +276,7 @@ export async function POST(req: NextRequest) {
           payment_status:   'pending',
           status:           'preparing',
           notes:            phone ? `Téléphone: ${phone}` : null,
+          is_test:          isTestRequest,
         })
         .select('id')
         .single();

@@ -114,10 +114,13 @@ export default function CheckoutForm({
   tenant,
   externalPaymentMethods = [],
   consentState,
+  isE2ETest = false,
 }: {
   tenant: Tenant;
   externalPaymentMethods?: TenantPaymentMethod[];
   consentState: CheckoutConsentState;
+  // Agente e2e Fase 0 — calculé côté serveur (page.tsx) via isE2ERequest().
+  isE2ETest?: boolean;
 }) {
   const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
@@ -935,6 +938,7 @@ export default function CheckoutForm({
           )}
           <StripePaymentStep
             module="shop"
+            isTest={isE2ETest}
             amount={total}
             currency={tenant.currency}
             color="var(--color-primary)"

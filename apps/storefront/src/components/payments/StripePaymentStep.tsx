@@ -27,6 +27,11 @@ interface StripePaymentStepProps {
   // l'authentification Link pour un client qui a déjà un compte) quand
   // l'appelant le connaît déjà avant cette étape. Aucun impact si absent.
   customerEmail?: string;
+  // Agente e2e Fase 0 — calculé côté serveur (isE2ERequest()) par la page
+  // appelante et transmis en prop jusqu'ici : bascule la publishable key
+  // vers le compte Stripe séparé dédié aux tests e2e. Absent (donc false)
+  // pour tous les appelants non encore migrés (card, rental).
+  isTest?: boolean;
 }
 
 function InnerPaymentStep({
@@ -130,7 +135,7 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
 
   return (
     <Elements
-      stripe={getStripeForModule(props.module)}
+      stripe={getStripeForModule(props.module, props.isTest)}
       options={{
         mode: 'payment',
         amount: Math.round(props.amount * 100),
