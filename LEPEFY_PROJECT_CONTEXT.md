@@ -2789,4 +2789,77 @@ File toccati in questo changelog:
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.50 — 19 Agosto 2026 (base: v3.49; UI creazione utenti admin `/admin/team` + invito via email, riservata a platform_owner — vedi §68; nessuno pushato su main)*
+## 69. Changelog v3.51 (19 Agosto 2026) — Fix `POST /api/admin/team/invite` : gestione utente déjà registrato + promotion client storefront → admin — ⚠️ nessuno pushato
+
+Bug osservato in test manuale su §68 : inviter l'email d'un client storefront déjà inscrit via OTP faisait remonter l'erreur Supabase brute jusqu'à l'UI (`"A user with this email address has already been registered"`) — le fallback prévu ("récupérer l'utilisateur existant et upserter quand même") ne se déclenchait jamais.
+
+**Cause racine** : la regex `/already registered|already exists/i` ne matchait pas `"...has already **been** registered"` — le mot `been` cassait la séquence contiguë attendue.
+
+**Fix appliqué** :
+- Contrôle prioritaire sur `inviteError.code === 'email_exists'` (confirmé disponible sur `@supabase/auth-js` résolu à `2.110.0` via le lockfile `^2.43.0` — bien plus fiable que le texte, qui dépend de la version GoTrue). Le message reste en filet de sécurité, avec la regex corrigée.
+- Utilisateur existant introuvable via `listUsers()` malgré l'erreur "already registered" (cas limite anormal) → 500 explicite, pas de progression à l'aveugle.
+- **Nouveau besoin (demandé par Robertin, hors bug initial)** : promotion d'un client storefront existant en admin. Après l'upsert `admin_users` réussi, `resetPasswordForEmail(email, { redirectTo: '.../admin/accept-invite' })` — nécessaire car un client inscrit via OTP n'a jamais eu de mot de passe, or `/admin/login` utilisait alors `signInWithPassword`. Réponses distinctes `{ ok: true, existingUser: false }` (nouvel utilisateur) vs `{ ok: true, existingUser: true }` (promu), plus `warning: 'admin_created_but_email_failed'` si `resetPasswordForEmail` échoue (jamais de rollback : la ligne `admin_users` est déjà écrite, l'accès est bien accordé).
+
+**Statut** : ce fix a été entièrement remplacé au cycle suivant (§70) — `inviteUserByEmail`/`resetPasswordForEmail` ont été retirés en faveur d'un login admin par OTP email, sans plus aucun email système Supabase dans le flux d'invitation. Section conservée pour l'historique du raisonnement (le bug de regex et sa correction restent pertinents en tant que tels), mais le code décrit ici n'existe plus dans `invite/route.ts` — voir §70.
+
+`pnpm typecheck` vert, `pnpm lint` jamais exécuté. Fichiers touchés : `apps/storefront/src/app/api/admin/team/invite/route.ts`, `apps/storefront/src/app/admin/(protected)/team/TeamClient.tsx`.
+
+---
+
+## 70. Changelog v3.52 (19 Agosto 2026) — Login admin via OTP email + invito team senza link — ⚠️ nessuno pushato
+
+**Décision prise avec Robertin** : le flux à lien (invitation/reset password Supabase, §68/§69) s'est révélé inutilisable en test réel (lien non exploitable) et structurellement incompatible avec plusieurs tenants/domaines (le Site URL est une valeur unique par projet Supabase). Passage à un login admin par OTP email à 6 chiffres — même principe déjà en production côté client storefront (`OtpLoginForm.tsx`, §9bis) — sans lien, sans domaine à configurer, identique pour tout futur tenant.
+
+Le login à mot de passe **reste disponible** (toggle dans la page de login, "Code par email" par défaut / "Mot de passe" en option) — non supprimé : le rate limit email par défaut de Supabase est bas, une voie OTP unique risquerait de bloquer l'accès admin justement aux pics de trafic email. Le mot de passe reste un filet de sécurité toujours fonctionnel.
+
+### Cosa è stato costruito
+
+- **`lib/auth/requestAdminOtp.ts`** : cherche une ligne `admin_users` active pour l'email (`.ilike('email', ...)`, insensible à la casse — l'index unique est sur `lower(email)`), puis `signInWithOtp({ shouldCreateUser: false })` si trouvée. `shouldCreateUser: false` est délibéré : un admin doit toujours déjà exister dans `auth.users` (créé par le flux d'invitation) avant de pouvoir demander un code — aucune requête OTP ne doit pouvoir créer un compte fantôme. Si l'email n'est pas admin (ou est inactif) : réponse `{ sent: true }` quand même, **aucun appel Supabase réel** — anti-énumération, seul un `console.warn` serveur trace le cas. Ajout non demandé explicitement mais nécessaire : `escapeIlike()` échappe `%`/`_` avant le filtre `ilike` — un email peut légitimement contenir un underscore (wildcard ILIKE), qui aurait sinon produit des faux positifs.
+- **`lib/auth/verifyAdminOtp.ts`** : `verifyOtp({ type: 'email' })` + même retry défensif `type: 'signup'` que `verifyOtp.ts` (client). Recontrôle après coup qu'une ligne `admin_users` active existe toujours (cas limite : désactivé entre la demande du code et sa vérification) → `{ session: null, error: 'Accès refusé.' }` sinon.
+- **`api/admin/login/request-otp/route.ts`** / **`verify-otp/route.ts`** : la seconde réutilise `createRouteClient()` (`{ supabase, applyCookies }`, déjà présent dans `lib/supabase/server.ts`) plutôt que de dupliquer le pattern `pendingCookies` manuel de `api/admin/login/route.ts` (mot de passe, inchangé).
+- **`admin/login/AdminOtpForm.tsx`** : composant admin dédié, inspiré du style d'`OtpLoginForm.tsx` (cellules à auto-submit, collage, cooldown de renvoi 60s) mais sans la logique CGV/consentement, hors scope pour un login admin.
+- **`admin/login/page.tsx`** : toggle "Code par email" / "Mot de passe" en haut du formulaire — logique du tab mot de passe strictement inchangée, seulement encadrée dans le toggle.
+- **`lib/notifications/notifyAdminInvited.ts`** : réutilise **tel quel** `notifyN8n()` (`lib/events/notifyN8n.ts`, canal `N8N_WEBHOOK_URL` déjà en usage pour les notifications Événementiel) — best-effort, aucun échec ne remonte à l'appelant. Le webhook n8n `/webhook/admin-invited` n'existe pas encore côté n8n : à créer manuellement (trigger + template email Brevo) — noté comme point bloquant non automatisable par Claude Code.
+- **`api/admin/team/invite/route.ts`, réécrit** : plus aucun email système Supabase. `listUsers()` paginé (pattern déjà écrit, réutilisé) pour chercher l'utilisateur ; si absent, `auth.admin.createUser({ email, email_confirm: true })` — **aucun email envoyé par Supabase à ce stade**, comportement attendu. Puis upsert `admin_users` (logique inchangée) et appel best-effort à `notifyAdminInvited`. Réponse simplifiée `{ ok: true, existingUser }`, le champ `warning` de §69 disparaît (plus pertinent, aucun email Supabase ne peut plus échouer à ce point du flux).
+- **`admin/accept-invite/page.tsx` supprimée** : plus aucun flux (ni invitation ni reset password Supabase) ne l'atteint.
+
+### Deviazioni
+
+- `error.code === 'email_exists'` confirmé disponible sur le SDK résolu (`@supabase/auth-js@2.110.0`).
+- `resetPasswordForEmail`/`inviteUserByEmail` totalement retirés — plus de dépendance à ces deux endpoints.
+- Nessuna migration, nessuna dipendenza npm nuova.
+
+### Stato
+
+`pnpm typecheck` verde, `pnpm lint` mai eseguito. Nessun commit pushato — zip fornito su richiesta esplicita. Non testato end-to-end (nessun ambiente Supabase disponibile in sessione) — i 6 test manuali del prompt (toggle OTP/password, invito senza email Supabase, ricezione OTP standard, login completo, anti-enumerazione, admin disattivato) restano da eseguire dopo il deploy. **Punto bloccante per Robertin** : webhook n8n `/webhook/admin-invited` da creare manualmente prima che le notifiche di benvenuto partano.
+
+File toccati : `apps/storefront/src/lib/auth/requestAdminOtp.ts`, `verifyAdminOtp.ts` · `apps/storefront/src/app/api/admin/login/request-otp/route.ts`, `verify-otp/route.ts` · `apps/storefront/src/app/admin/login/AdminOtpForm.tsx`, `page.tsx` · `apps/storefront/src/lib/notifications/notifyAdminInvited.ts` · `apps/storefront/src/app/api/admin/team/invite/route.ts` · `apps/storefront/src/app/admin/(protected)/team/TeamClient.tsx` · `apps/storefront/src/app/admin/accept-invite/page.tsx` (supprimé).
+
+---
+
+## 71. Changelog v3.53 (19 Agosto 2026) — Menu account nell'header + pagina Sécurité — ⚠️ nessuno pushato
+
+**Décision prise avec Robertin** : plus de liens épars en sidebar pour les éléments liés au compte personnel — un menu déroulant en haut à droite du header (avatar admin), dans le style de l'exemple TailAdmin (`_tailadmin-staging/components/header/UserDropdown.tsx`), avec l'email de l'admin courant, "Sécurité" et "Se déconnecter". Ce prompt remplaçait la partie "AdminSidebar.tsx" d'un prompt antérieur (`ClaudeCode_Prompt_AdminSetPassword.md`) — vérifié à l'étape 0 : ce prompt antérieur n'avait en réalité jamais été exécuté dans cette session (aucune trace de `/admin/securite` ni de lien "Sécurité" en sidebar), donc rien à retirer de `AdminSidebar.tsx`.
+
+### Cosa è stato costruito
+
+- **`admin/_components/AdminUserMenu.tsx`** : reconstruit à partir du style d'`UserDropdown.tsx` du staging (déclencheur avatar + panneau, click-outside) mais avec des classes de production — le staging dépend d'une config Tailwind isolée (`brand-*`) non réutilisable, d'où `var(--color-primary-light)`/`-dark)` comme dans `AdminSidebar.tsx`. Avatar = initiale de l'email en majuscule (pas de photo réelle, aucun champ avatar n'existe pour les admins), chevron `IconChevronDown` qui pivote à l'ouverture. Panneau : email en haut, séparateur, "Sécurité" (`IconLock`, `Link` vers `/admin/securite`, ferme le menu au clic) et "Se déconnecter" (`IconLogout`, même logique exacte que `LogoutButton.tsx` — `signOut()` → `push('/admin/login')` → `refresh()` — non dupliquée différemment). Fermeture au clic extérieur **et** à `Escape` (`NotificationBell.tsx` vérifié sans pattern dropdown réutilisable — juste un bouton toggle sans panneau ; repris à la place le pattern `useEffect`+`ref`+listener de `Dropdown.tsx` du staging, avec ajout d'`Escape` non présent dans le staging).
+- **`admin/(protected)/securite/page.tsx` + `SecuriteClient.tsx`** : form minimal, `supabase.auth.updateUser({ password })` côté client, validation 8 caractères minimum + confirmation, message d'erreur avec lien vers `/admin/login` si la session a expiré.
+- **`AdminHeader.tsx`** : nouvelle prop `adminEmail`, `<LogoutButton />` remplacé par `<AdminUserMenu adminEmail={adminEmail} />` au même endroit du cluster d'icônes (à côté de `NotificationBell`/`ThemeToggleButton`, inchangés).
+- **`(protected)/layout.tsx`** : passe `adminEmail={user.email ?? ''}` — `user.email` déjà disponible depuis `supabase.auth.getUser()` lu plus haut dans ce même fichier, aucune modification à la requête `admin_users`.
+
+### Deviazioni
+
+- `AdminSidebar.tsx` **non touché** : contrairement à ce que le prompt anticipait ("si le prompt précédent a déjà été exécuté, retirer le lien Sécurité"), aucune trace n'existait — condition non remplie, rien à faire.
+- `LogoutButton.tsx` **conservé tel quel**, non supprimé : toujours importé par `admin/loyalty/scan/page.tsx` et `admin/evenementiel/scan/page.tsx` (hors du groupe `(protected)`, pour `tenant_cashier`) — vérifié par grep avant toute décision, comme demandé.
+- `IconLock`/`IconLogout` confirmées présentes dans `@tabler/icons-react@3.44.0` déjà installé — aucun remplacement nécessaire.
+
+### Stato
+
+`pnpm typecheck` verde. Nessun commit pushato — zip fornito su richiesta esplicita. Test manuali (affichage desktop/mobile, navigation Sécurité, logout, click-outside, Escape) restano da eseguire dopo il deploy.
+
+File toccati : `apps/storefront/src/app/admin/_components/AdminUserMenu.tsx` (nuovo) · `apps/storefront/src/app/admin/(protected)/securite/page.tsx`, `SecuriteClient.tsx` (nuovi) · `apps/storefront/src/app/admin/_components/AdminHeader.tsx` · `apps/storefront/src/app/admin/(protected)/layout.tsx`.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.53 — 19 Agosto 2026 (base: v3.50; fix invito utente esistente §69 (superato da §70), login admin via OTP email + invito senza link §70, menu account header + pagina Sécurité §71; nessuno pushato su main)*
