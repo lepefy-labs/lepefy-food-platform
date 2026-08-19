@@ -4,13 +4,14 @@ import AdminMobileNav from './AdminMobileNav';
 import AdminGlobalSearch from './AdminGlobalSearch';
 import ThemeToggleButton from './ThemeToggleButton';
 import NotificationBell from './ui/NotificationBell';
-import LogoutButton from '../LogoutButton';
+import AdminUserMenu from './AdminUserMenu';
 
 interface AdminHeaderProps {
   tenantName: string;
   tenantLogoUrl: string | null;
   categories: { id: string; name: string; slug: string }[];
   isPlatformOwner?: boolean;
+  adminEmail: string;
 }
 
 /**
@@ -19,7 +20,7 @@ interface AdminHeaderProps {
  * pouvoir en retravailler la présentation (espacement, typo) sans alourdir
  * le layout qui porte la logique d'auth/données.
  */
-export default function AdminHeader({ tenantName, tenantLogoUrl, categories, isPlatformOwner = false }: AdminHeaderProps) {
+export default function AdminHeader({ tenantName, tenantLogoUrl, categories, isPlatformOwner = false, adminEmail }: AdminHeaderProps) {
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
       <Suspense fallback={<div className="w-9 h-9 md:hidden" />}>
@@ -54,7 +55,7 @@ export default function AdminHeader({ tenantName, tenantLogoUrl, categories, isP
       <div className="ml-auto flex items-center gap-1">
         <NotificationBell />
         <ThemeToggleButton />
-        <LogoutButton />
+        <AdminUserMenu adminEmail={adminEmail} />
       </div>
     </header>
   );

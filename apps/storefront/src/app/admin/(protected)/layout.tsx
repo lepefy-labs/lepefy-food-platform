@@ -104,6 +104,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
         tenantLogoUrl={tenant.logo_url}
         categories={categories ?? []}
         isPlatformOwner={admin.role === 'platform_owner'}
+        adminEmail={user.email ?? ''}
       />
 
       <div className="flex min-h-[calc(100vh-57px)] bg-gray-50 dark:bg-gray-950">
