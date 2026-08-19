@@ -201,6 +201,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           color="var(--color-primary)"
           returnUrl={`${window.location.origin}/evenementiel`}
           referenceId={service.id}
+          customerEmail={email.trim() || undefined}
           payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
           processingLabel="Traitement en cours…"
           createIntent={createIntent}

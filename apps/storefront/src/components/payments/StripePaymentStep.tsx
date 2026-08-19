@@ -23,11 +23,15 @@ interface StripePaymentStepProps {
   createIntent:  () => Promise<CreateIntentResult>;   // logique de domaine spécifique au module — validation métier + création du PaymentIntent côté serveur
   onError:       (msg: string) => void;
   onSucceeded:   (paymentIntentId?: string) => void;
+  // Optionnel — préremplit l'email du Payment Element (accélère
+  // l'authentification Link pour un client qui a déjà un compte) quand
+  // l'appelant le connaît déjà avant cette étape. Aucun impact si absent.
+  customerEmail?: string;
 }
 
 function InnerPaymentStep({
   module, color, returnUrl, payLabel, processingLabel,
-  createIntent, onError, onSucceeded, referenceIdRef,
+  createIntent, onError, onSucceeded, referenceIdRef, customerEmail,
 }: Omit<StripePaymentStepProps, 'referenceId' | 'amount' | 'currency'> & { referenceIdRef: React.MutableRefObject<string | null> }) {
   const stripe   = useStripe();
   const elements = useElements();
@@ -98,7 +102,16 @@ function InnerPaymentStep({
     <div className="space-y-4">
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
         <p className="text-sm font-semibold text-gray-700 mb-4">Paiement sécurisé</p>
-        <PaymentElement />
+        <PaymentElement
+          options={{
+            layout: 'accordion',
+            // Aucun confirmParams/createIntent de ce fichier ni des 4
+            // appelants n'attend une adresse de facturation collectée par le
+            // Payment Element (vérifié Step 0) — sûr de la désactiver partout.
+            fields: { billingDetails: { address: 'never' } },
+            defaultValues: customerEmail ? { billingDetails: { email: customerEmail } } : undefined,
+          }}
+        />
       </div>
       <button
         onClick={handleConfirm}
@@ -118,7 +131,19 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
   return (
     <Elements
       stripe={getStripeForModule(props.module)}
-      options={{ mode: 'payment', amount: Math.round(props.amount * 100), currency: props.currency.toLowerCase() }}
+      options={{
+        mode: 'payment',
+        amount: Math.round(props.amount * 100),
+        currency: props.currency.toLowerCase(),
+        appearance: {
+          theme: 'stripe',
+          variables: {
+            colorPrimary: props.color,
+            borderRadius: '12px',
+            fontFamily: 'inherit',
+          },
+        },
+      }}
     >
       <InnerPaymentStep {...props} referenceIdRef={referenceIdRef} />
     </Elements>

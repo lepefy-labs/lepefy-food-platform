@@ -836,6 +836,7 @@ export default function CheckoutForm({
             color="var(--color-primary)"
             returnUrl={`${window.location.origin}/order-confirmation`}
             referenceId={null}
+            customerEmail={getValues().email || undefined}
             payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
             processingLabel="Traitement en cours…"
             createIntent={createIntent}

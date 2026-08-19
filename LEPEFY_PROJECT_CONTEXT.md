@@ -2701,4 +2701,16 @@ File modificato: `apps/storefront/src/app/api/admin/card/poster/route.ts`.
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.47 — 18 Agosto 2026 (base: v3.46; poster PDF `/api/admin/card/poster` ora coerente con `/card` sullo scoping `enabled_modules` — vedi §65, chiude la deviazione aperta al §64)*
+## 66. Changelog v3.48 (18 Agosto 2026) — Checkout Stripe compattato (layout accordion, billing address 'never', appearance API) — **verified against filesystem**
+
+Compattato il `PaymentElement`/`Elements` condiviso (`components/payments/StripePaymentStep.tsx`, unico punto pour i 4 moduli) con le sole opzioni ufficiali Stripe — nessuna modifica alla logica di pagamento (`createIntent`, `elements.submit()`, `confirmPayment`, `return_url`, `logFunnelEvent`, ecc.). `layout: 'accordion'` riduce lo spazio quando compaiono più metodi selezionabili. `fields: { billingDetails: { address: 'never' } }` disattiva la raccolta dell'indirizzo di fatturazione — verificato allo Step 0 che nessun `confirmParams`/`createIntent` dei 4 moduli si aspetta un indirizzo dal Payment Element, applicato senza eccezioni. Nuovo prop opzionale `customerEmail` su `StripePaymentStep`, propagato a `defaultValues.billingDetails.email` per velocizzare l'autenticazione Link — passato da `EventCheckoutClient`/`RentalCheckoutClient`/`CheckoutForm` (email già raccolta e validata prima dello step di pagamento) e da `CardQuickPay` solo se non vuota (campo lì opzionale). Aggiunta `appearance: { theme: 'stripe', variables: { colorPrimary: props.color, borderRadius: '12px', fontFamily: 'inherit' } }` su `<Elements>` (assente prima) — `colorPrimary` resta il prop `color` del tenant, mai un hex fisso.
+
+**Nota permanente — Accelerated Sign-up di Link**: il blocco "Enregistrer mes informations pour un paiement plus rapide" NON è controllabile da codice/API (`PaymentElement`/`Elements` non espone alcuna opzione per disattivarlo) — è un'impostazione esclusivamente Dashboard Stripe, per-account (Settings → Payment Methods → Link → "Enable accelerated sign-up"). Da disattivare manualmente da Robertin su ogni account Stripe attivo — oggi quello unico, e separatamente sul secondo account di Dalice quando sarà configurato (Fase A, multi-account per modulo).
+
+`pnpm typecheck`: pulito.
+
+File modificati: `components/payments/StripePaymentStep.tsx`, `components/card/CardQuickPay.tsx`, `EventCheckoutClient.tsx`, `RentalCheckoutClient.tsx`, `(shop)/checkout/CheckoutForm.tsx`.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.48 — 18 Agosto 2026 (base: v3.47; Payment Element compattato — layout accordion, billing address disattivato, appearance API, email prefill Link opzionale — vedi §66; Accelerated Sign-up resta impostazione Dashboard per-account, non gestibile da codice)*

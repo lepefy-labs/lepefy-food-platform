@@ -131,6 +131,7 @@ export function CardQuickPay({
           color={tenantColor}
           returnUrl={`${window.location.origin}/card`}
           referenceId={null}
+          customerEmail={customerEmail.trim() || undefined}
           payLabel={`${copy.payButton} ${formatPrice(confirmedAmount, currency)}`}
           processingLabel={copy.processing}
           createIntent={createIntent}

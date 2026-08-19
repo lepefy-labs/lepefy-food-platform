@@ -302,6 +302,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           color="var(--color-primary)"
           returnUrl={`${window.location.origin}/evenementiel`}
           referenceId={event.id}
+          customerEmail={email.trim() || undefined}
           payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
           processingLabel="Traitement en cours…"
           createIntent={createIntent}
