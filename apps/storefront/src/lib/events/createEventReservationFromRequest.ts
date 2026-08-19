@@ -1,12 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import Stripe from 'stripe';
 import { generateEventQrToken } from '@/lib/events/qrToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput } from '@lepefy/types';
 
-const stripe = getStripeClient('event');
+// Agente e2e Fase 0b — plus de client Stripe au scope module ici : le compte
+// à utiliser dépend de `input.isTest` (connu seulement à l'appel), pas de
+// isE2ERequest() côté requête entrante (le webhook Stripe n'a jamais le
+// header x-e2e-test-token — ce n'est pas le test harness qui l'appelle).
+// Voir le point d'usage ci-dessous (refund sur conflit de capacité).
 
 // Extrait de handleEventReservationPaymentSucceeded (api/webhooks/stripe/route.ts)
 // — même logique bit-à-bit pour le flux stripe, réutilisée telle quelle par
@@ -93,7 +98,13 @@ export async function createEventReservationFromRequest(
     let refundSucceeded = false;
     if (isStripe && input.stripePaymentIntentId) {
       try {
-        await stripe.refunds.create({ payment_intent: input.stripePaymentIntentId });
+        // Le PaymentIntent à rembourser a été créé sur le compte Stripe
+        // correspondant à input.isTest — le refund doit utiliser le même
+        // compte, sinon Stripe répond "no such payment_intent".
+        const refundStripe = input.isTest
+          ? new Stripe(process.env.STRIPE_SECRET_KEY_TEST ?? '')
+          : getStripeClient('event');
+        await refundStripe.refunds.create({ payment_intent: input.stripePaymentIntentId });
         refundSucceeded = true;
         console.info('[createEventReservationFromRequest] Refund issued (capacity conflict) — intent:', input.stripePaymentIntentId);
       } catch (refundErr) {
