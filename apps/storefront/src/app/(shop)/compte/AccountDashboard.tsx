@@ -57,6 +57,7 @@ export function AccountDashboard({
     setIsLoggingOut(true);
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      window.dispatchEvent(new Event('lepefy:customer-logged-out'));
       router.push('/');
     } finally {
       setIsLoggingOut(false);

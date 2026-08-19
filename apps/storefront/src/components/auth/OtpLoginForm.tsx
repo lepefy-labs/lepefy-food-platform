@@ -88,6 +88,11 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
         cellRefs.current[0]?.focus();
         return;
       }
+      // Signal global — CartSyncProvider (ShopLayout) est monté une seule
+      // fois et persistant entre navigations client-side : il ne se
+      // remonte pas au retour depuis /compte/connexion, donc ne peut pas
+      // découvrir le login sans cet événement explicite.
+      window.dispatchEvent(new Event('lepefy:customer-authenticated'));
       onAuthenticated?.();
     } catch {
       setError('Erreur lors de la vérification du code.');
