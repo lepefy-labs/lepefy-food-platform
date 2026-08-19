@@ -110,7 +110,18 @@ export default function TeamClient({ admins, tenants, currentAdminId }: TeamClie
         setInviteError(data.error ?? 'Erreur lors de l\'invitation.');
         return;
       }
-      setInviteSuccess('Invitation envoyée.');
+
+      if (data.warning === 'admin_created_but_email_failed') {
+        setInviteSuccess(
+          'Accès admin activé, mais l\'envoi de l\'email pour définir le mot de passe a échoué. À vérifier manuellement.',
+        );
+      } else if (data.existingUser) {
+        setInviteSuccess(
+          'Cet utilisateur existait déjà : accès admin activé, un email pour définir son mot de passe lui a été envoyé.',
+        );
+      } else {
+        setInviteSuccess('Invitation envoyée.');
+      }
       setForm(emptyForm(tenants[0]?.id ?? ''));
       setFormOpen(false);
       router.refresh();

@@ -85,26 +85,40 @@ export async function POST(req: NextRequest) {
   // cette étape (ou la résolution de l'utilisateur existant ci-dessous)
   // n'ait abouti.
   let userId: string;
+  let existingUser = false;
   const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email,
     { redirectTo: `${req.nextUrl.origin}/admin/accept-invite` },
   );
 
   if (inviteError) {
-    // Utilisateur auth déjà existant : on réutilise son id plutôt que
-    // d'échouer — permet de réinviter quelqu'un ayant déjà un compte auth
-    // sans ligne admin_users, ou de changer son rôle/tenant via ce même
-    // formulaire.
-    const alreadyRegistered = /already registered|already exists/i.test(inviteError.message);
+    // Utilisateur auth déjà existant (ex. client storefront inscrit via OTP) :
+    // on réutilise son id plutôt que d'échouer — permet de promouvoir un
+    // utilisateur existant en admin, ou de changer le rôle/tenant d'un admin
+    // déjà présent via ce même formulaire. Vérifie d'abord `error.code`
+    // ('email_exists', exposé par @supabase/auth-js — bien plus fiable que le
+    // texte du message, qui dépend de la version GoTrue) ; le message
+    // ("A user with this email address has already been registered") reste
+    // en filet de sécurité — bug corrigé ici : le pattern précédent
+    // (`already registered`) ne matchait pas "already **been** registered".
+    const alreadyRegistered =
+      inviteError.code === 'email_exists'
+      || /already\s+(been\s+)?registered|already exists/i.test(inviteError.message);
     if (!alreadyRegistered) {
       return NextResponse.json({ error: `Échec de l'invitation : ${inviteError.message}` }, { status: 400 });
     }
 
-    const existingUser = await findAuthUserByEmail(adminClient, email);
-    if (!existingUser) {
-      return NextResponse.json({ error: `Échec de l'invitation : ${inviteError.message}` }, { status: 400 });
+    const found = await findAuthUserByEmail(adminClient, email);
+    if (!found) {
+      // Cas limite anormal : GoTrue affirme que l'email existe déjà mais
+      // listUsers() ne le retrouve pas — on ne procède pas à l'aveugle.
+      return NextResponse.json(
+        { error: `Échec de l'invitation : ${inviteError.message}` },
+        { status: 500 },
+      );
     }
-    userId = existingUser.id;
+    userId = found.id;
+    existingUser = true;
   } else {
     userId = inviteData.user.id;
   }
@@ -141,5 +155,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true });
+  if (!existingUser) {
+    return NextResponse.json({ ok: true, existingUser: false });
+  }
+
+  // Utilisateur existant promu admin : il n'a jamais eu de mot de passe s'il
+  // s'est inscrit via OTP côté storefront (`/admin/login` utilise
+  // signInWithPassword) — un email de récupération de mot de passe standard
+  // Supabase le renvoie vers /admin/accept-invite, qui gère déjà aussi bien
+  // un lien de type "recovery" que "invite" (elle ne fait qu'échanger la
+  // session déposée dans l'URL puis appeler updateUser({ password })).
+  const { error: resetError } = await adminClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${req.nextUrl.origin}/admin/accept-invite`,
+  });
+
+  if (resetError) {
+    // La ligne admin_users est déjà écrite : pas de rollback, l'accès est
+    // bien accordé. On signale seulement que l'email peut ne pas être parti.
+    console.error('[team/invite] resetPasswordForEmail failed for existing user promotion:', resetError);
+    return NextResponse.json({ ok: true, existingUser: true, warning: 'admin_created_but_email_failed' });
+  }
+
+  return NextResponse.json({ ok: true, existingUser: true });
 }
