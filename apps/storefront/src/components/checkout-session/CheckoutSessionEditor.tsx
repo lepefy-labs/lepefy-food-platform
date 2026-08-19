@@ -367,6 +367,10 @@ export function CheckoutSessionEditor({
               Le montant n&apos;est pas prérempli : saisissez-le manuellement.
             </p>
           )}
+          <p className="text-xs text-gray-400 text-center">
+            Généralement vérifié en quelques heures, parfois jusqu&apos;à 24-48h selon les jours.
+            Merci de votre patience, vous recevrez un email dès la confirmation.
+          </p>
         </div>
       )}
 
