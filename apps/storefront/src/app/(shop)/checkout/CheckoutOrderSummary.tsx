@@ -22,12 +22,11 @@ interface CheckoutOrderSummaryProps {
   isPickup:                boolean;
   ambassadorDiscount:      number;
   total:                   number;
-  shippingRecalcError:     string | null;
 }
 
 function SummaryBody({
   items, currency, subtotal, effectiveShippingTotal, shippingRecalculating,
-  freeShipping, isPickup, ambassadorDiscount, total, shippingRecalcError,
+  freeShipping, isPickup, ambassadorDiscount, total,
 }: CheckoutOrderSummaryProps) {
   return (
     <>
@@ -80,9 +79,6 @@ function SummaryBody({
           <span>Total</span>
           <span>{formatPrice(total, currency)}</span>
         </div>
-        {!isPickup && shippingRecalcError && (
-          <p className="text-red-500 text-xs text-right">{shippingRecalcError}</p>
-        )}
       </div>
     </>
   );

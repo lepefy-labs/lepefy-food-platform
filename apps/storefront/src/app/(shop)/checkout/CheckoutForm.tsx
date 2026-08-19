@@ -85,6 +85,17 @@ function splitFullName(fullName: string | null): { firstName: string; lastName: 
   return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
 }
 
+// Pré-check de format purement visuel, jamais bloquant ni spécifique à un
+// pays (plateforme multi-tenant/multi-pays, Packlink PRO gère déjà plusieurs
+// pays) : juste un signal immédiat pour les cas les plus évidents (trop
+// court, caractères manifestement invalides) avant que la vérification
+// réseau debounced ne réponde. La vérification réseau reste la seule
+// autorité réelle sur la faisabilité de la livraison.
+function isPlausiblePostalCode(value: string): boolean {
+  const v = value.trim();
+  return v.length >= 3 && /^[A-Za-z0-9\s-]+$/.test(v);
+}
+
 function splitLine1(line1: string): { street: string; houseNumber: string } {
   const parts = line1.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return { street: line1.trim(), houseNumber: '' };
@@ -283,6 +294,14 @@ export default function CheckoutForm({
   // ── Recalcul live si le code postal / pays change en checkout ──────────────
   const watchedPostalCode = watch('postal_code');
   const watchedCountry    = watch('country');
+
+  // Signal immédiat (Task 1) : seulement quand l'utilisateur a déjà saisi
+  // quelque chose de non-vide mais que ça ne ressemble pas à un code postal
+  // plausible — jamais sur un champ encore vide (pas encore une erreur).
+  const postalCodeFormatSuspect =
+    fulfillmentType === 'delivery' &&
+    (watchedPostalCode ?? '').trim().length > 0 &&
+    !isPlausiblePostalCode(watchedPostalCode ?? '');
 
   const requoteShipping = useCallback(async (c: string, zip: string) => {
     setShippingRecalculating(true);
@@ -644,7 +663,6 @@ export default function CheckoutForm({
         isPickup={isPickup}
         ambassadorDiscount={ambassadorDiscount}
         total={total}
-        shippingRecalcError={shippingRecalcError}
       />
 
       {/* Step 1: Contact + address form */}
@@ -744,6 +762,13 @@ export default function CheckoutForm({
                   <input {...register('city')} placeholder="Ville" className={inputClass} />
                 </div>
                 <input {...register('country')} placeholder="Pays" className={inputClass} />
+                {shippingRecalculating ? (
+                  <p className="text-gray-400 text-xs mt-1">Recalcul en cours…</p>
+                ) : shippingRecalcError ? (
+                  <p className="text-red-500 text-xs mt-1">{shippingRecalcError}</p>
+                ) : postalCodeFormatSuspect ? (
+                  <p className="text-amber-600 text-xs mt-1">Le format ne semble pas correct.</p>
+                ) : null}
               </div>
             </div>
           )}

@@ -2750,6 +2750,7 @@ Ciclo di 4 prompt, eseguiti in sequenza (`pnpm typecheck` verde su ognuno, mai e
 - **Indicatore di progresso checkout**: `CheckoutProgressIndicator` (colocato con `CheckoutForm.tsx`) mostra le 3 tappe (`form`/`select-payment`/`payment`), nessuna modifica allo state machine esistente.
 - **Autosalvataggio checkout**: `sessionStorage['lepefy-checkout-shipping']` ora include anche contatti (nome/email/telefono) oltre all'indirizzo, aggiornato live via `watch()` debounced (non solo allo snapshot iniziale da `CartClient.tsx`) — sopravvive a reload/retry nella stessa tab, azzerato alla chiusura tab (scelta privacy-conscious deliberata, non `localStorage`) e alla fine di un checkout riuscito.
 - **Riepilogo carrello mobile**: su schermi stretti (`<md`) il riepilogo checkout diventa una barra compatta `position: sticky` in alto (totale + espandi/riduci inline), invariato su desktop. Nessun `vh`/`dvh`, nessun overlay.
+- **Validazione indirizzo inline**: feedback su CAP/paese (formato generico lato client + stato/errore della verifica Packlink reale) ora mostrato vicino ai campi in `CheckoutForm.tsx`, non solo nel riepilogo. Nessuna regola specifica per paese (piattaforma multi-tenant/multi-paese).
 
 ### Stato
 
