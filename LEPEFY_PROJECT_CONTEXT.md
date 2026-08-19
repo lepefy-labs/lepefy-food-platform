@@ -2761,4 +2761,32 @@ File toccati in questo changelog (4 prompt):
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.49 — 19 Agosto 2026 (base: v3.48; checkout_sessions modificabili in-place, due entry point guest/loggato, carrello cross-device — vedi §67; nessuno pushato su main)*
+## 68. Changelog v3.50 (19 Agosto 2026) — UI creazione utenti admin `/admin/team` + invito via email — ⚠️ nessuno pushato
+
+Prompt unico, eseguito con esplorazione filesystem obbligatoria prima di scrivere codice (13 file letti per intero, come richiesto dal prompt). Colma il gap segnalato da tempo in questo documento (§9bis punto 2, §47bis): `admin_users` esiste dal 31/07 con ruoli `platform_owner`/`tenant_admin`/`tenant_cashier`, ma la creazione di nuovi admin restava un'operazione manuale via Supabase Dashboard — nessuna UI. Questo ciclo aggiunge la UI, riservata a `platform_owner`.
+
+### Cosa è stato costruito
+
+- **`/admin/team`** (`(protected)/team/page.tsx` + `TeamClient.tsx`): Server Component che aggiunge, sopra al controllo già fatto dal layout `(protected)`, un controllo esplicito `role !== 'platform_owner' → redirect('/admin')` (nessun accesso nemmeno in lettura per `tenant_admin`/`tenant_cashier`). Lista tutti gli `admin_users` di tutti i tenant (email, rôle en badge, tenant o "Global", statut Actif/Inactif, invité par), con bouton Désactiver/Réactiver **disabilitato lato UI** se la riga è l'admin stesso connesso — mai un delete, solo `active` toggle, pattern già in uso nella tabella. Form "Inviter un admin" **inline con bordo tratteggiato**, non modale — riuso deliberato del pattern già visto in `PaymentMethodsSection.tsx` (§8) per coerenza visiva con il resto del pannello, invece di introdurre un secondo linguaggio UI (modale) per un solo form.
+- **`POST /api/admin/team/invite`**: guard ristretto a `platform_owner` **puro** via `requireAdmin('', [])` — `allowedRoles` vuoto rifiuta qualunque `tenant_admin`/`tenant_cashier` a monte del controllo `tenantId` (comportamento già presente in `requireAdmin.ts`, mai usato altrove nel repo prima di questo ciclo). Valida email/rôle/coerenza rôle↔tenantId **prima** di toccare Supabase (stesso invariante del constraint DB `tenant_admin_requires_tenant`, duplicato lato applicazione per un errore leggibile in francese invece di un errore Postgres grezzo). Chiama `auth.admin.inviteUserByEmail(email, { redirectTo: '.../admin/accept-invite' })`; se l'utente auth esiste già, lo ritrova via `auth.admin.listUsers()` paginato (stesso principio di `scripts/backfill-admin-users.mjs`, ma via SDK già istanziato invece di fetch REST grezzo) e riusa il suo id — path che serve anche a "ripromuovere"/cambiare ruolo a un admin già esistente. Upsert manuale (`select` poi `insert`/`update`) su `admin_users`, mai `.upsert({onConflict})`: l'indice di unicità email è su `lower(email)`, espressione, non colonna diretta.
+- **`PATCH /api/admin/team/[id]`**: stesso guard, cambia solo `active`; 400 esplicito se l'id coincide con l'admin corrente (doppia sicurezza oltre al disable lato UI); 404 se l'id non esiste.
+- **`/admin/accept-invite`**: pagina Client Component **fuori** dal gruppo `(protected)` — stesso motivo strutturale di `loyalty/scan`/`evenementiel/scan` (§9bis/§9ter): va raggiunta prima che esista una riga `admin_users` attiva verificabile dal layout condiviso. Verifica la sessione scambiata da `detectSessionInUrl` (attivo di default su `createBrowserClient`, nessuna configurazione aggiuntiva necessaria), poi `supabase.auth.updateUser({ password })`, poi redirect a `/admin/login`.
+- **Sidebar/header**: `isPlatformOwner` propagato da `(protected)/layout.tsx` (già calcolato lì, `admin.role === 'platform_owner'`, semplicemente non ancora passato a valle) fino ad `AdminSidebar`/`AdminMobileNav`/`AdminHeader`. Voce "Équipe" in una sezione sidebar dedicata "Plateforme", separata da "Gestion"/"Boutique"/"Compte" per non mescolare una voce platform-wide con le voci scoped-tenant — visibile solo se `isPlatformOwner`.
+
+### Deviazioni rispetto al prompt originale (verificate allo Step 0, filesystem prevale sulla spec)
+
+- Nessun pattern preesistente di join Supabase embedded (`tenants(name)`) nel repo: seguito invece il pattern "query separata + mappa client-side" già in uso in `scripts/backfill-admin-users.mjs`.
+- `detectSessionInUrl` non è impostato esplicitamente in `lib/supabase/client.ts` — è `true` di default su `createBrowserClient` di `@supabase/ssr`, quindi nessuna modifica a quel file (che restava comunque nella lista "da non toccare").
+- Card `/admin/accept-invite` usa branding "Lepefy Food" (non "Chloé Food" come `login/page.tsx`): pagina platform-level, non tenant-scoped — coerente con la regola "nessun valore hardcoded per un tenant specifico" imposta per questa feature specifica.
+- Icona sidebar "Équipe": riusata `IconUsers` (già importata, usata anche dalla voce disabilitata "Clients") invece di importarne una nuova, come indicato esplicitamente dal prompt.
+
+### Stato
+
+Un solo prompt, `pnpm typecheck` verde (dopo `pnpm install` — `node_modules` risultava assente in sessione), `pnpm lint` mai eseguito (vietato dalla regola permanente del progetto). **Nessun commit pushato**: lavoro fornito come zip su richiesta esplicita ("non fare push ma fornire zip con file toccati mantenendo la struttura della repo"), poi ri-fornito con `CLAUDE.md` aggiornato incluso. Non testato end-to-end (nessun ambiente Supabase disponibile in questa sessione) — i 6 test manuali richiesti dal prompt (login platform_owner vs altri ruoli, invito reale, atterraggio `/admin/accept-invite`, disattivazione/riattivazione, auto-disattivazione bloccata) restano da eseguire manualmente dopo il deploy.
+
+File toccati in questo changelog:
+`apps/storefront/src/app/admin/(protected)/team/page.tsx`, `TeamClient.tsx` · `apps/storefront/src/app/api/admin/team/invite/route.ts`, `[id]/route.ts` · `apps/storefront/src/app/admin/accept-invite/page.tsx` · `apps/storefront/src/app/admin/_components/AdminSidebar.tsx`, `AdminMobileNav.tsx`, `AdminHeader.tsx` · `apps/storefront/src/app/admin/(protected)/layout.tsx` · `CLAUDE.md` (sezione Admin estesa in parallelo, stesso ciclo).
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.50 — 19 Agosto 2026 (base: v3.49; UI creazione utenti admin `/admin/team` + invito via email, riservata a platform_owner — vedi §68; nessuno pushato su main)*
