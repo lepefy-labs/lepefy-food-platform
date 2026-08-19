@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import {
-  IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconGift, IconArrowLeft,
+  IconMapPin, IconClock, IconCreditCard, IconBuildingStore, IconChevronDown, IconArrowLeft,
 } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
@@ -21,6 +21,7 @@ import {
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
+import { CheckoutOrderSummary } from './CheckoutOrderSummary';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
@@ -631,63 +632,20 @@ export default function CheckoutForm({
 
       <CheckoutProgressIndicator currentStep={step} />
 
-      {/* Order summary */}
-      <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-        <p className="text-sm font-semibold text-gray-700 mb-3">Récapitulatif</p>
-        <div className="space-y-1.5">
-          {items.map((item) => (
-            <div key={item.product.id} className="flex justify-between text-sm">
-              <span className="text-gray-600 line-clamp-1 mr-2">
-                {item.product.name} × {item.quantity}
-              </span>
-              <span className="font-medium flex-shrink-0">
-                {formatPrice(item.product.price * item.quantity, tenant.currency)}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="border-t border-gray-200 mt-3 pt-3 space-y-1.5">
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>Sous-total</span>
-            <span>{formatPrice(subtotal, tenant.currency)}</span>
-          </div>
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>Livraison</span>
-            <span>
-              {shippingRecalculating ? (
-                <span className="text-gray-400 text-xs animate-pulse">Recalcul en cours…</span>
-              ) : effectiveShippingTotal === 0 ? (
-                <span className="text-green-600 font-medium">Gratuit</span>
-              ) : (
-                formatPrice(effectiveShippingTotal, tenant.currency)
-              )}
-            </span>
-          </div>
-          {!isPickup && !shippingRecalculating && freeShipping !== null && (
-            <div className="flex items-center gap-1.5 text-green-600 text-xs font-medium">
-              <IconGift size={14} className="flex-shrink-0" />
-              <span>
-                {freeShipping.reason === 'threshold'
-                  ? `🎉 Livraison offerte — votre commande dépasse ${formatPrice(freeShipping.thresholdAmount, tenant.currency)}`
-                  : '🎉 Livraison offerte pour ce pays'}
-              </span>
-            </div>
-          )}
-          {ambassadorDiscount > 0 && (
-            <div className="flex justify-between text-sm text-green-600 font-medium">
-              <span>Réduction parrainage</span>
-              <span>−{formatPrice(ambassadorDiscount, tenant.currency)}</span>
-            </div>
-          )}
-          <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-2 mt-1">
-            <span>Total</span>
-            <span>{formatPrice(total, tenant.currency)}</span>
-          </div>
-          {!isPickup && shippingRecalcError && (
-            <p className="text-red-500 text-xs text-right">{shippingRecalcError}</p>
-          )}
-        </div>
-      </div>
+      {/* Order summary — desktop statique + barre compacte sticky mobile,
+          même source de calcul (props ci-dessous), cf. CheckoutOrderSummary. */}
+      <CheckoutOrderSummary
+        items={items}
+        currency={tenant.currency}
+        subtotal={subtotal}
+        effectiveShippingTotal={effectiveShippingTotal}
+        shippingRecalculating={shippingRecalculating}
+        freeShipping={freeShipping}
+        isPickup={isPickup}
+        ambassadorDiscount={ambassadorDiscount}
+        total={total}
+        shippingRecalcError={shippingRecalcError}
+      />
 
       {/* Step 1: Contact + address form */}
       {step === 'form' && (
