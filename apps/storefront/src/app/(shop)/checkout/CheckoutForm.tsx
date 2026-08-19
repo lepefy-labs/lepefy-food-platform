@@ -128,6 +128,13 @@ export default function CheckoutForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError]   = useState<string | null>(null);
 
+  // Id de la checkout_session Stripe créée au premier clic « Payer » de ce
+  // tentat de checkout — réutilisé par createIntent() sur les retries
+  // (carte rifiutée, etc.) au lieu d'en recréer une à chaque appel. Reset au
+  // démontage du composant (nouveau tentat de checkout = nouvelle session).
+  const stripeSessionIdRef       = useRef<string | null>(null);
+  const stripeSessionSnapshotRef = useRef<string | null>(null);
+
   // Ces trois valeurs peuvent changer pendant le checkout si l'utilisateur
   // modifie le code postal ou le pays : le quoteToken doit toujours
   // correspondre exactement à l'adresse envoyée à /api/checkout.
@@ -405,9 +412,54 @@ export default function CheckoutForm({
   // validation stock/prix, création checkout_session + PaymentIntent — seul
   // le moment de l'appel change (clic "Payer" dans StripePaymentStep, plus
   // au clic "Continuer vers le paiement" ici).
+  //
+  // Retry (carte rifiutée, etc.) : réutilise la checkout_session déjà créée
+  // au premier clic via POST /api/checkout-sessions/[id]/create-intent
+  // plutôt que d'en créer une nouvelle à chaque tentative — évite les lignes
+  // orphelines et les PaymentIntent Stripe multiples pour un seul tentat
+  // d'achat. Aucun changement de comportement visible : StripePaymentStep ne
+  // sait pas distinguer les deux chemins, le contrat createIntent() reste
+  // identique.
   async function createIntent() {
+    const sharedPayload = buildSharedPayload();
+    // Snapshot des données qui déterminent le contenu de la session — si
+    // elles changent entre deux tentatives (ex. panier synchronisé depuis un
+    // autre appareil pendant que le client est resté sur cette page), la
+    // session réutilisée serait périmée par rapport à ce qui est affiché :
+    // on force alors une session fraîche plutôt que de réutiliser des
+    // données obsolètes.
+    const snapshot = JSON.stringify({ ...sharedPayload, shippingTotal: effectiveShippingTotal });
+
+    if (stripeSessionIdRef.current && stripeSessionSnapshotRef.current !== snapshot) {
+      stripeSessionIdRef.current = null;
+    }
+
+    if (stripeSessionIdRef.current) {
+      const retryRes = await fetch(`/api/checkout-sessions/${stripeSessionIdRef.current}/create-intent`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({}),
+      });
+
+      if (retryRes.ok) {
+        const retryResult = await retryRes.json();
+        return { clientSecret: retryResult.clientSecret, reference_id: stripeSessionIdRef.current };
+      }
+
+      if (retryRes.status === 404) {
+        // Session non résumable (annulée entre-temps depuis un autre
+        // appareil via « En attente », ou simplement introuvable) : fallback
+        // silencieux vers une nouvelle session ci-dessous, jamais une
+        // erreur bloquante pour un cas que le client ne peut pas comprendre.
+        stripeSessionIdRef.current = null;
+      } else {
+        const retryResult = await retryRes.json().catch(() => ({}));
+        return { error: retryResult.error ?? 'Une erreur est survenue.' };
+      }
+    }
+
     const payload = {
-      ...buildSharedPayload(),
+      ...sharedPayload,
       shippingTotal: effectiveShippingTotal,
       paymentMethod: 'stripe' as const,
     };
@@ -420,6 +472,10 @@ export default function CheckoutForm({
 
     const result = await res.json();
     if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
+
+    stripeSessionIdRef.current       = result.sessionId ?? null;
+    stripeSessionSnapshotRef.current = snapshot;
+
     return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
   }
 

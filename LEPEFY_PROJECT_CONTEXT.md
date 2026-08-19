@@ -2746,6 +2746,7 @@ Ciclo di 4 prompt, eseguiti in sequenza (`pnpm typecheck` verde su ognuno, mai e
 - **Eventi `window`**: `lepefy:customer-authenticated` (aggiunto in `OtpLoginForm.tsx`, subito dopo la verifica OTP riuscita) e `lepefy:customer-logged-out` (aggiunto in `AccountDashboard.tsx`, dopo `/api/auth/logout`) — necessari perché `CartSyncProvider` è montato una sola volta nello `ShopLayout` e non si rimonta navigando verso/da `/compte/connexion`.
 - **Limite noto (v1, accettato)**: il carrello locale NON viene svuotato al logout — resta come carrello guest sul dispositivo. Compromesso noto su device condivisi, non risolto in questo ciclo.
 - **Nota tipi**: `CartItem['product']` (`@lepefy/types`) richiede anche `slug`, non solo i campi elencati nel prompt originale (`id, name, price, storage_type, stock, image_url, weight_grams`) — aggiunto alla `select` di `GET /api/customers/me/cart`.
+- **Retry pagamento Stripe**: `CheckoutForm.tsx` riusa la `checkout_sessions` esistente sui retry (via `POST /api/checkout-sessions/[id]/create-intent`) invece di crearne una nuova ad ogni click "Payer" — riduce le righe orfane. Fallback automatico a una nuova sessione se quella riusata non è più valida (es. annullata da un altro dispositivo).
 
 ### Stato
 
