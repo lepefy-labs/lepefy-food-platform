@@ -204,7 +204,6 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           customerEmail={email.trim() || undefined}
           payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
           processingLabel="Traitement en cours…"
-          timeoutMessage="Le paiement met trop de temps à répondre. Veuillez réessayer."
           createIntent={createIntent}
           onError={setError}
           onSucceeded={(paymentIntentId) => {
