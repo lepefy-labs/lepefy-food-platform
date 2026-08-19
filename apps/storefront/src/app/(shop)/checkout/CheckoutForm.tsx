@@ -947,6 +947,7 @@ export default function CheckoutForm({
             customerEmail={getValues().email || undefined}
             payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
             processingLabel="Traitement en cours…"
+            timeoutMessage="Le paiement met trop de temps à répondre. Veuillez réessayer."
             createIntent={createIntent}
             onError={(msg) => setSubmitError(msg)}
             onSucceeded={(paymentIntentId) => {

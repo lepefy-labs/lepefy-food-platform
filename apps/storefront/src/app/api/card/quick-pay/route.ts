@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(roundedAmount * 100),
       currency: tenant.currency ?? 'eur',
+      // Voir api/checkout/route.ts : liste explicite pour exclure Link.
+      payment_method_types: ['card'],
       metadata: {
         type:             'card_quick_payment',
         tenant_id:        tenant.id,

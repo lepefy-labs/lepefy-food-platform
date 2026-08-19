@@ -11,6 +11,15 @@ interface CreateIntentResult {
   error?: string;
 }
 
+// 28s : au-delà de ce délai, confirmPayment() n'a manifestement pas abouti
+// (ex. blocage sur l'écran Link, redirect 3DS qui ne revient jamais, requête
+// réseau silencieusement perdue) — on considère la tentative en échec plutôt
+// que de laisser le bouton bloqué sur "Traitement en cours…" indéfiniment.
+// Fenêtre 25-30s : large marge au-dessus d'une confirmation carte normale
+// (quelques secondes) ou d'un défi 3DS in-page, sans faire attendre
+// inutilement un utilisateur dont la tentative est réellement bloquée.
+const CONFIRM_TIMEOUT_MS = 28_000;
+
 interface StripePaymentStepProps {
   module:        PaymentModule;
   amount:        number;   // total en unités de devise (pas en centimes) — sert uniquement de hint pour Elements et pour le bouton
@@ -32,20 +41,37 @@ interface StripePaymentStepProps {
   // vers le compte Stripe séparé dédié aux tests e2e. Absent (donc false)
   // pour tous les appelants non encore migrés (card, rental).
   isTest?: boolean;
+  // Message affiché via onError si la confirmation ne répond pas dans le
+  // délai CONFIRM_TIMEOUT_MS — fourni par l'appelant pour rester dans son
+  // propre schéma de traduction (COPY[lang] pour card, littéral FR pour les
+  // 3 autres modules), jamais codé en dur ici.
+  timeoutMessage: string;
 }
 
 function InnerPaymentStep({
-  module, color, returnUrl, payLabel, processingLabel,
+  module, color, returnUrl, payLabel, processingLabel, timeoutMessage,
   createIntent, onError, onSucceeded, referenceIdRef, customerEmail,
 }: Omit<StripePaymentStepProps, 'referenceId' | 'amount' | 'currency'> & { referenceIdRef: React.MutableRefObject<string | null> }) {
   const stripe   = useStripe();
   const elements = useElements();
   const [isConfirming, setIsConfirming] = useState(false);
   const hasSucceededRef = useRef(false);
+  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearConfirmTimeout() {
+    if (confirmTimeoutRef.current) {
+      clearTimeout(confirmTimeoutRef.current);
+      confirmTimeoutRef.current = null;
+    }
+  }
 
   useEffect(() => {
     logFunnelEvent({ module, event_type: 'elements_mounted', reference_id: referenceIdRef.current });
-    return registerAbandonmentListener({ module, reference_id: referenceIdRef.current, hasSucceededRef });
+    const cleanupAbandonment = registerAbandonmentListener({ module, reference_id: referenceIdRef.current, hasSucceededRef });
+    return () => {
+      clearConfirmTimeout();
+      cleanupAbandonment();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -53,11 +79,23 @@ function InnerPaymentStep({
     if (!stripe || !elements) return;
     setIsConfirming(true);
 
+    // Fallback de sécurité : si confirmPayment() ne répond jamais (écran
+    // Link bloqué, redirect 3DS qui ne revient pas, etc.), on ne laisse pas
+    // le bouton figé sur "Traitement en cours…" indéfiniment.
+    clearConfirmTimeout();
+    confirmTimeoutRef.current = setTimeout(() => {
+      confirmTimeoutRef.current = null;
+      setIsConfirming(false);
+      logFunnelEvent({ module, event_type: 'confirm_timeout', reference_id: referenceIdRef.current });
+      onError(timeoutMessage);
+    }, CONFIRM_TIMEOUT_MS);
+
     // Validation + collecte des données carte/wallet — étape requise par le
     // pattern "deferred intent creation" : elements.submit() valide le
     // PaymentElement AVANT que le PaymentIntent existe côté Stripe.
     const { error: submitError } = await elements.submit();
     if (submitError) {
+      clearConfirmTimeout();
       onError(submitError.message ?? 'Erreur lors du paiement.');
       setIsConfirming(false);
       return;
@@ -67,6 +105,7 @@ function InnerPaymentStep({
 
     const result = await createIntent();
     if (result.error || !result.clientSecret) {
+      clearConfirmTimeout();
       onError(result.error ?? 'Erreur lors du paiement.');
       logFunnelEvent({ module, event_type: 'confirm_error', reference_id: referenceIdRef.current, detail: { stage: 'create_intent', message: result.error ?? null } });
       setIsConfirming(false);
@@ -82,6 +121,7 @@ function InnerPaymentStep({
     });
 
     if (error) {
+      clearConfirmTimeout();
       onError(error.message ?? 'Erreur lors du paiement.');
       logFunnelEvent({
         module, event_type: 'confirm_error', reference_id: referenceIdRef.current,
@@ -92,12 +132,14 @@ function InnerPaymentStep({
     }
 
     if (paymentIntent?.status === 'requires_action') {
+      clearConfirmTimeout();
       logFunnelEvent({ module, event_type: 'requires_action', reference_id: referenceIdRef.current });
       // La redirection est déjà en cours à ce stade pour les méthodes qui la
       // requièrent — aucune action supplémentaire côté client.
       return;
     }
 
+    clearConfirmTimeout();
     hasSucceededRef.current = true;
     logFunnelEvent({ module, event_type: 'confirm_succeeded_client', reference_id: referenceIdRef.current });
     onSucceeded(paymentIntent?.id);
@@ -140,6 +182,13 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
         mode: 'payment',
         amount: Math.round(props.amount * 100),
         currency: props.currency.toLowerCase(),
+        // Élements est initialisé en mode "deferred" (mode/amount/currency,
+        // sans clientSecret) : sans ce champ, les méthodes affichées dans le
+        // Payment Element viennent des réglages par défaut du Dashboard,
+        // indépendamment de payment_method_types côté PaymentIntent (voir
+        // les 5 endpoints create-intent). On restreint donc aussi ici, pour
+        // ne pas dépendre du toggle Dashboard Link — défense en profondeur.
+        paymentMethodTypes: ['card'],
         appearance: {
           theme: 'stripe',
           variables: {

@@ -22,6 +22,7 @@ interface QuickPayCopy {
   thanks:            string;
   genericError:      string;
   invalidAmount:     string;
+  timeoutError:      string;
 }
 
 const COPY: Record<Lang, QuickPayCopy> = {
@@ -36,6 +37,7 @@ const COPY: Record<Lang, QuickPayCopy> = {
     thanks:            'Merci ! Paiement reçu.',
     genericError:      'Une erreur est survenue. Veuillez réessayer.',
     invalidAmount:     `Le montant doit être compris entre ${MIN_AMOUNT} et ${MAX_AMOUNT} €.`,
+    timeoutError:      'Le paiement met trop de temps à répondre. Veuillez réessayer.',
   },
   it: {
     amountLabel:       'Importo da pagare',
@@ -48,6 +50,7 @@ const COPY: Record<Lang, QuickPayCopy> = {
     thanks:            'Grazie! Pagamento ricevuto.',
     genericError:      'Si è verificato un errore. Riprova.',
     invalidAmount:     `L'importo deve essere compreso tra ${MIN_AMOUNT} e ${MAX_AMOUNT} €.`,
+    timeoutError:      'Il pagamento sta impiegando troppo tempo a rispondere. Riprova.',
   },
 };
 
@@ -134,6 +137,7 @@ export function CardQuickPay({
           customerEmail={customerEmail.trim() || undefined}
           payLabel={`${copy.payButton} ${formatPrice(confirmedAmount, currency)}`}
           processingLabel={copy.processing}
+          timeoutMessage={copy.timeoutError}
           createIntent={createIntent}
           onError={setError}
           onSucceeded={() => setPaid(true)}

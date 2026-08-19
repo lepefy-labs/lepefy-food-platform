@@ -401,6 +401,7 @@ export function CheckoutSessionEditor({
             customerEmail={data.email}
             payLabel={`Payer ${formatPrice(editTotal || 0, tenant.currency)}`}
             processingLabel="Traitement en cours…"
+            timeoutMessage="Le paiement met trop de temps à répondre. Veuillez réessayer."
             createIntent={createIntent}
             onError={(msg) => setPayError(msg)}
             onSucceeded={() => {

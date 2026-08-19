@@ -114,6 +114,8 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(total * 100),
       currency: tenant.currency ?? 'eur',
+      // Voir api/checkout/route.ts : liste explicite pour exclure Link.
+      payment_method_types: ['card'],
       metadata: metadata as unknown as Record<string, string>,
     });
 

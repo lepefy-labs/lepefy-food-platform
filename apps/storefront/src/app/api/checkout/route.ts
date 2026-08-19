@@ -382,6 +382,11 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(total * 100),
       currency: tenant.currency ?? 'eur',
+      // Liste explicite (plutôt que automatic_payment_methods) pour exclure
+      // Link : Stripe ne permet pas de l'exclure via excluded_payment_method_types
+      // (limitation documentée), donc seule une liste positive fonctionne.
+      // 'card' couvre aussi Apple Pay/Google Pay (wallets du type 'card').
+      payment_method_types: ['card'],
       metadata: {
         session_id: session.id,
         tenant_id:  tenant.id,
