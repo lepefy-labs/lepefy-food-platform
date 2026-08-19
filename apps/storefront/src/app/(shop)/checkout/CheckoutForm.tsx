@@ -450,12 +450,13 @@ export default function CheckoutForm({
         }
 
         sessionStorage.setItem('lepefy-pending-payment', JSON.stringify({
-          sessionId: result.sessionId,
-          link:      result.link,
-          amount:    result.amount,
-          currency:  result.currency,
-          isPaypal:  result.isPaypal,
-          label:     result.label,
+          sessionId:   result.sessionId,
+          link:        result.link,
+          amount:      result.amount,
+          currency:    result.currency,
+          isPaypal:    result.isPaypal,
+          label:       result.label,
+          accessToken: result.accessToken,
         }));
 
         router.push(`/checkout/en-attente?ref=${result.sessionId}`);

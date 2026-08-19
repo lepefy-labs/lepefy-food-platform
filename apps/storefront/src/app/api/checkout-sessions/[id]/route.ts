@@ -155,6 +155,11 @@ interface PatchBody {
   paymentMethod?:            'stripe' | 'external_link';
   externalPaymentMethodId?:  string;
   accessToken?:              string;
+  // Extension (Entry Point A) — seule valeur acceptée ici : annulation
+  // explicite par le client depuis /checkout/en-attente ("Annuler cette
+  // demande"). Une session 'cancelled' n'est plus jamais réanimable (cf.
+  // loadAndAuthorizeSession, filtre status='open').
+  status?:                   'cancelled';
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -175,6 +180,38 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const session = auth.session;
+
+    // ── Annulation explicite (Entry Point A — "Annuler cette demande") ──────
+    // Court-circuite tout le reste : aucune re-lecture produits/quote
+    // nécessaire pour annuler. Même principe que le changement stripe →
+    // external_link ci-dessous — aucun paiement n'a jamais été capturé pour
+    // une ligne encore présente dans checkout_sessions, donc annuler
+    // l'intent est toujours sûr.
+    if (body.status === 'cancelled') {
+      if (session.payment_method === 'stripe' && session.stripe_payment_intent_id) {
+        try {
+          await stripe.paymentIntents.cancel(session.stripe_payment_intent_id);
+          console.info('[checkout-sessions][PATCH] PaymentIntent cancelled (session cancellation) — id:', session.stripe_payment_intent_id);
+        } catch (cancelErr) {
+          console.warn('[checkout-sessions][PATCH] PaymentIntent cancel failed (non-blocking):', cancelErr,
+            '— id:', session.stripe_payment_intent_id);
+        }
+      }
+
+      const { error: cancelError } = await supabase
+        .from('checkout_sessions')
+        .update({ status: 'cancelled', stripe_payment_intent_id: null })
+        .eq('id', session.id)
+        .eq('tenant_id', tenant.id);
+
+      if (cancelError) {
+        console.error('[checkout-sessions][PATCH] cancel error:', cancelError, '— session:', session.id);
+        return NextResponse.json({ error: 'Erreur lors de l\'annulation de la session.' }, { status: 500 });
+      }
+
+      console.info('[checkout-sessions][PATCH] session cancelled — id:', session.id, '— tenant:', tenant.id);
+      return NextResponse.json({ id: session.id, status: 'cancelled' as const });
+    }
 
     // ── Items : ricalcolo prezzo/nome/storage_type dal DB, mai dal client ────
     let items = session.items;

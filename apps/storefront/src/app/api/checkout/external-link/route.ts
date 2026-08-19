@@ -6,6 +6,7 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
+import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 // Phase 1 — paiement via lien externe (PayPal/Revolut/autre), boutique
@@ -284,6 +285,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Autorise le client (guest ou connecté) à revenir sur cette session plus
+    // tard depuis /checkout/en-attente (modification/annulation avant
+    // confirmation) sans exiger de login — même principe que le lien de suivi
+    // commande, cf. checkoutSessionAccessToken.ts.
+    const accessToken = generateCheckoutSessionAccessToken(session.id, email);
+
     return NextResponse.json({
       sessionId: session.id,
       link:      finalLink,
@@ -291,6 +298,7 @@ export async function POST(req: NextRequest) {
       currency,
       isPaypal:  method.method === 'paypal',
       label:     method.label ?? method.method,
+      accessToken,
     });
   } catch (err) {
     console.error('[checkout/external-link] unhandled error:', err);
