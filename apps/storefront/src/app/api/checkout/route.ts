@@ -384,6 +384,21 @@ export async function POST(req: NextRequest) {
 
     console.info('[checkout] PaymentIntent created — id:', paymentIntent.id, '— amount:', paymentIntent.amount);
 
+    // Persistance du PaymentIntent id sur la session — nécessaire pour
+    // pouvoir l'annuler/le mettre à jour plus tard (PATCH /api/checkout-sessions/[id]).
+    // Best-effort, même principe que saveCheckoutProfile ci-dessous : un
+    // échec ici ne doit jamais bloquer la réponse au client, le paiement
+    // reste possible même sans cette persistance.
+    const { error: intentIdUpdateError } = await supabase
+      .from('checkout_sessions')
+      .update({ stripe_payment_intent_id: paymentIntent.id })
+      .eq('id', session.id);
+
+    if (intentIdUpdateError) {
+      console.error('[checkout] Failed to persist stripe_payment_intent_id on session:', intentIdUpdateError,
+        '— session:', session.id, '— intent:', paymentIntent.id);
+    }
+
     // Idem branche Stripe — après la création du PaymentIntent, jamais avant :
     // aucun échec de cette mémorisation ne peut empêcher le client de payer.
     if (sessionCustomer) {
