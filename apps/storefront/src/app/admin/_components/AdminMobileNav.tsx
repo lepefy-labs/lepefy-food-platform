@@ -7,9 +7,10 @@ import AdminSidebar from './AdminSidebar';
 
 interface AdminMobileNavProps {
   categories: { id: string; name: string; slug: string }[];
+  isPlatformOwner?: boolean;
 }
 
-export default function AdminMobileNav({ categories }: AdminMobileNavProps) {
+export default function AdminMobileNav({ categories, isPlatformOwner = false }: AdminMobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -58,7 +59,7 @@ export default function AdminMobileNav({ categories }: AdminMobileNavProps) {
                 <IconX size={16} />
               </button>
             </div>
-            <AdminSidebar categories={categories} />
+            <AdminSidebar categories={categories} isPlatformOwner={isPlatformOwner} />
           </div>
         </div>
       )}

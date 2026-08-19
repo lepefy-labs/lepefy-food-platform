@@ -26,10 +26,12 @@ interface AdminSidebarProps {
   pendingPaymentsCount?: number;
   pendingEventRequestsCount?: number;
   pendingRentalRequestsCount?: number;
+  isPlatformOwner?: boolean;
 }
 
 export default function AdminSidebar({
   categories, pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0,
+  isPlatformOwner = false,
 }: AdminSidebarProps) {
   const pathname      = usePathname();
   const searchParams  = useSearchParams();
@@ -358,6 +360,29 @@ export default function AdminSidebar({
         />
         Abonnement
       </Link>
+
+      {isPlatformOwner && (
+        <>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase
+                        tracking-widest px-3 mb-2 mt-5">
+            Plateforme
+          </p>
+
+          <Link
+            href="/admin/team"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg
+                        text-sm transition-colors mx-1 ${
+              pathname === '/admin/team' ? navClass(true) : navClass(false)
+            }`}
+          >
+            <IconUsers
+              size={20}
+              stroke={pathname === '/admin/team' ? 1.75 : 1.5}
+            />
+            Équipe
+          </Link>
+        </>
+      )}
 
     </nav>
   );

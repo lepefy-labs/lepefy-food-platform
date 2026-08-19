@@ -99,7 +99,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
-      <AdminHeader tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} />
+      <AdminHeader
+        tenantName={tenant.name}
+        tenantLogoUrl={tenant.logo_url}
+        categories={categories ?? []}
+        isPlatformOwner={admin.role === 'platform_owner'}
+      />
 
       <div className="flex min-h-[calc(100vh-57px)] bg-gray-50 dark:bg-gray-950">
         <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 px-3 py-2 shrink-0 hidden md:block">
@@ -109,6 +114,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
               pendingPaymentsCount={pendingPaymentsCount ?? 0}
               pendingEventRequestsCount={pendingEventRequestsCount ?? 0}
               pendingRentalRequestsCount={pendingRentalRequestsCount ?? 0}
+              isPlatformOwner={admin.role === 'platform_owner'}
             />
           </Suspense>
         </aside>

@@ -10,6 +10,7 @@ interface AdminHeaderProps {
   tenantName: string;
   tenantLogoUrl: string | null;
   categories: { id: string; name: string; slug: string }[];
+  isPlatformOwner?: boolean;
 }
 
 /**
@@ -18,11 +19,11 @@ interface AdminHeaderProps {
  * pouvoir en retravailler la présentation (espacement, typo) sans alourdir
  * le layout qui porte la logique d'auth/données.
  */
-export default function AdminHeader({ tenantName, tenantLogoUrl, categories }: AdminHeaderProps) {
+export default function AdminHeader({ tenantName, tenantLogoUrl, categories, isPlatformOwner = false }: AdminHeaderProps) {
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
       <Suspense fallback={<div className="w-9 h-9 md:hidden" />}>
-        <AdminMobileNav categories={categories} />
+        <AdminMobileNav categories={categories} isPlatformOwner={isPlatformOwner} />
       </Suspense>
       {tenantLogoUrl && (
         <Image
