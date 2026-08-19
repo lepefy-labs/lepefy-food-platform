@@ -51,6 +51,12 @@ interface CheckoutShipping {
   street:          string | null;
   houseNumber:     string | null;
   city:            string | null;
+  // Optionnels : absents des objets écrits par CartClient.tsx (qui ne
+  // collecte pas les coordonnées) — rétrocompatibilité avec un draft déjà en
+  // sessionStorage avant cette modification, jamais un champ requis.
+  fullName?:       string;
+  email?:          string;
+  phone?:          string;
 }
 
 function readStoredShipping(): CheckoutShipping | null {
@@ -120,6 +126,7 @@ export default function CheckoutForm({
 
   usePaymentRedirectRecovery('shop', () => {
     useCartStore.getState().clearCart();
+    sessionStorage.removeItem('lepefy-checkout-shipping');
     router.push('/order-confirmation');
   });
   // Décision 6 — disponible en delivery ET pickup : sélectionner un moyen
@@ -159,6 +166,10 @@ export default function CheckoutForm({
   const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      firstName:   splitFullName(shippingInfo?.fullName ?? null).firstName,
+      lastName:    splitFullName(shippingInfo?.fullName ?? null).lastName,
+      email:       shippingInfo?.email ?? '',
+      phone:       shippingInfo?.phone ?? '',
       street:      shippingInfo?.street ?? '',
       houseNumber: shippingInfo?.houseNumber ?? '',
       city:        shippingInfo?.city ?? '',
@@ -349,6 +360,55 @@ export default function CheckoutForm({
     // valeurs (adresse, dernier devis) ne servent qu'aux guards.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shippingPayloadKey]);
+
+  // ── Autosave contacts + adresse (Task 2) ────────────────────────────────────
+  // Réécrit 'lepefy-checkout-shipping' (même clé, même sessionStorage — choix
+  // délibéré préservé, cf. contexte du prompt) à chaque frappe utilisateur,
+  // débouncé ~500ms, même style que recalcDebounceRef ci-dessus. `type ===
+  // 'change'` filtre les mises à jour programmatiques (prefill profil via
+  // setValue({shouldDirty:false}), ou readStoredShipping au mount) : on ne
+  // persiste que ce que l'utilisateur a réellement modifié, jamais au premier
+  // rendu avec les seules valeurs par défaut. Les valeurs de spedizione
+  // (recalculées ailleurs dans ce fichier, hors formulaire) sont lues via un
+  // ref tenu à jour séparément, pour ne pas resouscrire à chaque recalcul.
+  const shippingCalcRef = useRef({ fulfillmentType, shippingTotal, shippingDetails, freeShipping, quoteToken });
+  useEffect(() => {
+    shippingCalcRef.current = { fulfillmentType, shippingTotal, shippingDetails, freeShipping, quoteToken };
+  }, [fulfillmentType, shippingTotal, shippingDetails, freeShipping, quoteToken]);
+
+  const autosaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const subscription = watch((values, { type }) => {
+      if (type !== 'change') return;
+
+      if (autosaveDebounceRef.current) clearTimeout(autosaveDebounceRef.current);
+      autosaveDebounceRef.current = setTimeout(() => {
+        const calc = shippingCalcRef.current;
+        const isDelivery = calc.fulfillmentType === 'delivery';
+        sessionStorage.setItem('lepefy-checkout-shipping', JSON.stringify({
+          shippingTotal:   isDelivery ? calc.shippingTotal : 0,
+          shippingDetails: isDelivery ? calc.shippingDetails : null,
+          freeShipping:    isDelivery ? calc.freeShipping : null,
+          quoteToken:      isDelivery ? calc.quoteToken : null,
+          fulfillmentType: calc.fulfillmentType,
+          country:         isDelivery ? values.country ?? null : null,
+          postalCode:      isDelivery ? values.postal_code ?? null : null,
+          street:          isDelivery ? values.street ?? null : null,
+          houseNumber:     isDelivery ? values.houseNumber ?? null : null,
+          city:            isDelivery ? values.city ?? null : null,
+          fullName:        `${values.firstName ?? ''} ${values.lastName ?? ''}`.trim(),
+          email:           values.email ?? '',
+          phone:           values.phone ?? '',
+        }));
+      }, 500);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (autosaveDebounceRef.current) clearTimeout(autosaveDebounceRef.current);
+    };
+  }, [watch]);
 
   const isSubmitDisabled =
     isSubmitting ||
@@ -543,6 +603,7 @@ export default function CheckoutForm({
 
         const { clearCart } = useCartStore.getState();
         clearCart();
+        sessionStorage.removeItem('lepefy-checkout-shipping');
         router.push(`/order-confirmation?order_id=${result.orderId}`);
         return;
       }
@@ -903,6 +964,7 @@ export default function CheckoutForm({
             onError={(msg) => setSubmitError(msg)}
             onSucceeded={(paymentIntentId) => {
               useCartStore.getState().clearCart();
+              sessionStorage.removeItem('lepefy-checkout-shipping');
               router.push(`/order-confirmation?payment_intent=${paymentIntentId ?? ''}`);
             }}
           />

@@ -2748,6 +2748,7 @@ Ciclo di 4 prompt, eseguiti in sequenza (`pnpm typecheck` verde su ognuno, mai e
 - **Nota tipi**: `CartItem['product']` (`@lepefy/types`) richiede anche `slug`, non solo i campi elencati nel prompt originale (`id, name, price, storage_type, stock, image_url, weight_grams`) — aggiunto alla `select` di `GET /api/customers/me/cart`.
 - **Retry pagamento Stripe**: `CheckoutForm.tsx` riusa la `checkout_sessions` esistente sui retry (via `POST /api/checkout-sessions/[id]/create-intent`) invece di crearne una nuova ad ogni click "Payer" — riduce le righe orfane. Fallback automatico a una nuova sessione se quella riusata non è più valida (es. annullata da un altro dispositivo).
 - **Indicatore di progresso checkout**: `CheckoutProgressIndicator` (colocato con `CheckoutForm.tsx`) mostra le 3 tappe (`form`/`select-payment`/`payment`), nessuna modifica allo state machine esistente.
+- **Autosalvataggio checkout**: `sessionStorage['lepefy-checkout-shipping']` ora include anche contatti (nome/email/telefono) oltre all'indirizzo, aggiornato live via `watch()` debounced (non solo allo snapshot iniziale da `CartClient.tsx`) — sopravvive a reload/retry nella stessa tab, azzerato alla chiusura tab (scelta privacy-conscious deliberata, non `localStorage`) e alla fine di un checkout riuscito.
 
 ### Stato
 
