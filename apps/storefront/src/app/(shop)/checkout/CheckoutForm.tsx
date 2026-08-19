@@ -20,6 +20,7 @@ import {
   externalPaymentCtaLabel, externalPaymentCtaColor,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
+import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
@@ -566,6 +567,8 @@ export default function CheckoutForm({
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-8">
       <h1 className="text-2xl font-bold mb-6">Finaliser la commande</h1>
+
+      <CheckoutProgressIndicator currentStep={step} />
 
       {/* Order summary */}
       <div className="bg-gray-50 rounded-2xl p-4 mb-6">
