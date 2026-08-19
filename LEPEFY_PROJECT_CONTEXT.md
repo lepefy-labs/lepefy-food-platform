@@ -2898,7 +2898,7 @@ File toccati (**après annulation du timeout en §73**, il ne reste de ce cycle 
 
 ---
 
-## 73. Changelog v3.55 (19 Agosto 2026) — Rimozione timeout + analisi del blocco Link — ⚠️ nessuno pushato
+## 73. Changelog v3.55 (19-20 Agosto 2026) — Rimozione timeout + causa radice del blocco "Traitement en cours…" identificata (`IntegrationError` da §66, **non** Link) — ⚠️ nessuno pushato
 
 Ciclo in due parti : **suppression pure** du timeout de §72 (sans remplacement, décision de Robertin : comprendre la cause avant de décider du traitement UI) + **analyse en lecture seule** du blocage observé sur `/card`. Aucune solution implémentée pour la partie 2.
 
@@ -2934,9 +2934,34 @@ Historique complet de `components/payments/StripePaymentStep.tsx` sur `origin/ma
 
 **Le suspect réel du même commit est `fields: { billingDetails: { address: 'never' } }`** (ligne 158), pour deux raisons : il s'applique **inconditionnellement** — y compris dans le cas qui échoue, contrairement à `defaultValues` — et il viole une règle d'intégration documentée par Stripe : mettre un champ de `billingDetails` à `'never'` oblige à fournir cette valeur dans `confirmParams.payment_method_data.billing_details` lors de la confirmation. Or `confirmParams` ne contient que `return_url` (ligne 80). Stripe traite ce cas en `IntegrationError` **levée** (exception), pas retournée dans `{ error }` — et `handleConfirm` n'a aucun `try/catch` : l'exception sort de la fonction, `setIsConfirming(false)` n'est jamais atteint, le bouton reste figé sans message. La chaîne causale est cohérente de bout en bout avec le symptôme. **Non confirmée** faute d'accès à `docs.stripe.com` (bloqué par le proxy réseau de la session) — c'est l'hypothèse principale, pas un fait établi.
 
-**Expérience décisive proposée** (5 min, sans déploiement) : ouvrir `/card` sans email, cliquer "Payer", et lire la **console du navigateur**. Une `IntegrationError` Stripe y sera visible et tranchera immédiatement entre les deux causes candidates — exception levée (cause n°3, notre code) vs promesse légitimement pendante sur l'étape Link (cause n°2, contrat de l'API). Le funnel `payment_funnel_logs` tranche aussi : si `confirm_attempted` est présent **sans** `confirm_error` ni `confirm_succeeded_client`, la promesse n'a jamais rendu la main.
+### ✅ CAUSE RACINE CONFIRMÉE (console navigateur, Robertin, 20/08)
 
-**Conclusion** : §72 étant déjà déployé sans avoir supprimé le bandeau Link, l'option « déployer §72 » n'existe plus — elle a été essayée et n'a pas suffi. Restent, par ordre de coût croissant (aucune implémentée dans ce cycle) : (a) **désactiver Link côté Dashboard** — seul levier qui agisse sur l'UI d'inscription Link, et le seul qui traite la cause n°2 ; (b) **`try/catch` + `finally { setIsConfirming(false) }`** autour de `handleConfirm`, plus un `try/catch` dans les 3 `createIntent` — correctif de robustesse ciblé, sans timeout ni nouvelle UI, qui traite la cause n°3 sur les 5 flux ; (c) **retirer `fields: { billingDetails: { address: 'never' } }`** (retour au comportement d'avant §66) ou, à l'inverse, fournir `billing_details` dans `confirmParams` — à décider seulement après l'expérience décisive ci-dessus ; (d) rendre l'email obligatoire sur `/card` — écarté d'office comme régression produit (le caractère facultatif est un choix assumé du paiement par QR en boutique). (a) et (b) sont complémentaires, pas alternatifs : (a) supprime le déclencheur observé, (b) garantit qu'aucune autre cause ne puisse re-figer le bouton.
+L'expérience décisive a été menée et **confirme l'hypothèse mot pour mot**. Erreur relevée en console sur `/card` :
+
+```
+Uncaught (in promise) IntegrationError: You specified "never" for
+fields.billing_details.address when creating the payment Element, but did not pass
+confirmParams.payment_method_data.billing_details.address.country when calling
+stripe.confirmPayment(). If you opt out of collecting data via the payment Element
+using the fields option, the data must be passed in when calling stripe.confirmPayment().
+```
+
+**Le dossier est clos, et Link n'y est pour rien.** Chaîne causale complète, entièrement dans notre code :
+
+1. §66 (`917b3db`) ajoute `fields: { billingDetails: { address: 'never' } }` (`StripePaymentStep.tsx:158`) **sans** ajouter le `billing_details` correspondant dans `confirmParams`, qui ne contient que `return_url` (ligne 80). Stripe exige au minimum `address.country` dès qu'on opte pour `'never'`.
+2. `stripe.confirmPayment()` **lève** une `IntegrationError` au lieu de la retourner dans `{ error }`.
+3. `handleConfirm` n'a **aucun `try/catch`** et `onClick={handleConfirm}` (ligne 122) ignore la promesse retournée ⇒ `Uncaught (in promise)`, visible dans le préfixe même du message d'erreur.
+4. Aucun `setIsConfirming(false)` n'est jamais atteint ⇒ bouton figé sur "Traitement en cours…" **définitivement**, sans aucun message à l'utilisateur.
+
+**Hypothèses définitivement écartées** : (a) le préremplissage de l'email — inerte dans le scénario qui échoue, comme démontré ci-dessus ; (b) Link et son écran d'inscription — aucun rôle causal, le bandeau observé n'était qu'un **symptôme concomitant** du même commit §66 (Element vidé de ses champs ⇒ Link occupe l'espace), jamais la cause du blocage ; (c) le timeout de 28s de §72 — il ne faisait que masquer l'exception derrière un message générique.
+
+**Portée réelle : les 5 flux, pas seulement `/card`.** `fields.billingDetails.address: 'never'` est dans le composant partagé et s'applique inconditionnellement : shop, card, event, rental et checkout-session lèvent tous la même `IntegrationError`. Si les 3 autres modules « semblaient » fonctionner, c'est une observation à re-tester — rien dans le code ne les en protège. Cela réconcilie aussi les PaymentIntent "incomplete" qui traînaient sur Stripe : ce sont des confirmations avortées par cette exception, sur tous les modules.
+
+**Correctifs identifiés (non implémentés — Robertin a choisi de clore ce cycle sur l'analyse seule)** :
+- **Cause racine, deux variantes exclusives.** (A) garder `address: 'never'` et fournir `confirmParams.payment_method_data.billing_details.address.country` — conserve la compaction voulue par §66, nécessite une source de pays : `tenants.country` (`packages/types/tenant.ts:17`) existe pour les 5 modules, et le shop dispose en plus du pays réellement saisi (`CheckoutForm.tsx:767`) ; ou (B) retirer `fields.billingDetails.address: 'never'` — retour au comportement d'avant §66, zéro plomberie, mais réapparition des champs pays/code postal dans le formulaire carte.
+- **Durcissement orthogonal, à faire quelle que soit la variante retenue** : `try/catch` autour de `handleConfirm` avec `setIsConfirming(false)` dans un `finally`, plus un `try/catch` dans les 3 `createIntent` (aucune ne protège son `fetch`/`res.json()`). Sans cela, **toute** future exception levée re-figera le bouton de la même manière — c'est ce défaut structurel, et non `address: 'never'` en particulier, qui a transformé une erreur d'intégration triviale en blocage silencieux et permanent.
+
+**Conclusion (réécrite après confirmation en console)** : la cause est une erreur d'intégration Stripe introduite par §66, pas Link. Désactiver Link côté Dashboard reste souhaitable pour d'autres raisons (friction, risque de blocage de compte OTP — décision déjà prise en §72) mais **ne corrigerait pas ce bug**. De même, `payment_method_types: ['card']` (§72, déployé) n'y change rien : l'exception est levée avant toute considération de méthode de paiement. Le correctif est celui décrit ci-dessus — variante (A) ou (B) pour la cause racine, plus le durcissement `try/catch` dans tous les cas. Écarté d'office : rendre l'email obligatoire sur `/card` (régression produit — le caractère facultatif est un choix assumé du paiement par QR en boutique) — d'autant plus inutile maintenant que l'email est hors de cause. (a) et (b) sont complémentaires, pas alternatifs : (a) supprime le déclencheur observé, (b) garantit qu'aucune autre cause ne puisse re-figer le bouton.
 
 ### Deviazioni
 
@@ -2952,4 +2977,4 @@ File toccati : `apps/storefront/src/components/payments/StripePaymentStep.tsx` �
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.55 — 19 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (timeout annullato), rimozione timeout + analisi blocco Link §73; nessuno pushato su main)*
+*Lepefy Labs — Lepefy Food Platform — Context document v3.55 — 20 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (deployato, timeout poi annullato), rimozione timeout + causa radice `IntegrationError` da §66 identificata e confermata §73; §73 non ancora pushato)*
