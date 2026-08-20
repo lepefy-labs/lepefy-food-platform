@@ -35,9 +35,8 @@ export function LoyaltyCardWidget({
     <Link
       href="/compte/carte-fidelite"
       aria-label={`Voir ma carte de fidélité ${tenantName} en grand`}
-      className="group block w-full rounded-3xl overflow-hidden relative transition-all duration-150 ease-out hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.98] active:shadow-md"
+      className="group relative block aspect-[1.66] w-full overflow-hidden rounded-3xl transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] active:shadow-md sm:aspect-[1.586]"
       style={{
-        aspectRatio: '1.586',
         background: `
           linear-gradient(115deg,
             color-mix(in srgb, white 25%, transparent) 0%,
@@ -53,7 +52,7 @@ export function LoyaltyCardWidget({
         color: textColor,
       }}
     >
-      <div className="relative h-full flex flex-col p-3.5 sm:p-4">
+      <div className="relative flex h-full flex-col p-3 sm:p-4">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider" style={{ opacity: mutedOpacity }}>
             {tenantName}
@@ -67,7 +66,7 @@ export function LoyaltyCardWidget({
           </span>
         </div>
 
-        <div className="mt-auto flex items-end justify-between gap-2 pb-2.5">
+        <div className="mt-auto flex items-end justify-between gap-2 pb-2 sm:pb-2.5">
           <div className="min-w-0">
             <div className="text-[9px] uppercase tracking-wide mb-0.5" style={{ opacity: mutedOpacity }}>
               Membre

@@ -52,7 +52,7 @@ function NavigationRow({ href, icon: Icon, label, description }: NavigationRowPr
   return (
     <Link
       href={href}
-      className="group flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 active:bg-gray-100"
+      className="group flex min-h-14 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 active:bg-gray-100"
     >
       <span
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
@@ -73,7 +73,7 @@ function AddressRow({ address }: { address: Address }) {
   return (
     <Link
       href={`/compte/adresses/${address.id}`}
-      className="group flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 active:bg-gray-100"
+      className="group flex min-h-14 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 active:bg-gray-100"
     >
       <IconMapPin size={20} stroke={1.7} aria-hidden="true" className="shrink-0" style={{ color: 'var(--account-accent-fg)' }} />
       <span className="min-w-0 flex-1">
@@ -92,8 +92,8 @@ function AddressesSection({ addresses }: { addresses: Address[] }) {
   const [primaryAddress, ...otherAddresses] = addresses;
 
   return (
-    <section className="mt-7" aria-labelledby="addresses-heading">
-      <div className="mb-3 flex min-h-11 items-center justify-between gap-4">
+    <section className="mt-6" aria-labelledby="addresses-heading">
+      <div className="mb-2 flex min-h-11 items-center justify-between gap-4">
         <h2 id="addresses-heading" className="font-display text-lg font-bold text-gray-900">Mes adresses</h2>
         <Link href="/compte/adresses/nouvelle" className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-gray-700 hover:text-gray-900">
           <IconPlus size={18} stroke={1.8} aria-hidden="true" />
@@ -129,16 +129,12 @@ function AddressesSection({ addresses }: { addresses: Address[] }) {
 }
 
 export function AccountDashboard({
-  tenant, email, fullName, phone, confirmedPoints, addresses,
+  tenant, email, fullName, confirmedPoints, addresses,
   isAmbassador, ambassadorProfileCompleted,
   loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyCardTextColor, accountAccentForeground,
 }: AccountDashboardProps) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const profileDescription = fullName || phone
-    ? [fullName, phone].filter(Boolean).join(' · ')
-    : 'Ajouter votre nom et votre téléphone';
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -162,7 +158,7 @@ export function AccountDashboard({
           outline-offset: 2px;
         }
       `}</style>
-      <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-10">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-5 sm:px-6 sm:pb-14 sm:pt-10">
         <header className="flex items-center gap-3">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--account-accent-fg)' }}>
             <IconUserCircle size={32} stroke={1.5} aria-hidden="true" />
@@ -177,10 +173,10 @@ export function AccountDashboard({
           </Link>
         </header>
 
-        <div className={`mt-6 grid items-start gap-8 ${tenant.loyaltyEnabled ? 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : ''}`}>
+        <div className={`mt-5 grid items-start gap-5 lg:gap-8 ${tenant.loyaltyEnabled ? 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : ''}`}>
           {tenant.loyaltyEnabled && (
             <section aria-labelledby="loyalty-heading">
-              <div className="mb-3">
+              <div className="mb-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mes avantages</p>
                 <h2 id="loyalty-heading" className="font-display text-lg font-bold text-gray-900">
                   Carte de fidélité
@@ -194,8 +190,8 @@ export function AccountDashboard({
 
           <div>
             {isAmbassador && !ambassadorProfileCompleted && (
-              <Link href="/compte/ambassadeur" className={`flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 transition-colors hover:bg-amber-100 active:bg-amber-100 ${tenant.loyaltyEnabled ? 'mb-5 mt-7 lg:mt-0' : 'mb-5'}`}>
-                <IconAlertCircle size={20} stroke={1.8} className="mt-0.5 shrink-0 text-amber-600" />
+              <Link href="/compte/ambassadeur" className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-100 bg-amber-50/60 px-3.5 py-2.5 text-amber-900 transition-colors hover:bg-amber-50 active:bg-amber-100">
+                <IconAlertCircle size={18} stroke={1.7} className="mt-0.5 shrink-0 text-amber-500" />
                 <span className="flex-1 text-sm leading-5">
                   <strong className="block font-semibold">Profil ambassadeur à compléter</strong>
                   Ajoutez vos informations pour pouvoir recevoir vos paiements.
@@ -205,10 +201,10 @@ export function AccountDashboard({
             )}
 
             <section aria-labelledby="account-navigation-heading">
-              <h2 id="account-navigation-heading" className="mb-3 font-display text-lg font-bold text-gray-900">Mon espace</h2>
+              <h2 id="account-navigation-heading" className="mb-2 font-display text-lg font-bold text-gray-900">Mon espace</h2>
               <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-card">
                 <NavigationRow href="/orders" icon={IconReceipt} label="Mes commandes" description="Suivre et retrouver mes achats" />
-                <NavigationRow href="/compte/modifier" icon={IconUser} label="Mes informations" description={profileDescription} />
+                <NavigationRow href="/compte/modifier" icon={IconUser} label="Mes informations" description="Profil et coordonnées" />
                 <NavigationRow href="/compte/parrainage" icon={IconGift} label="Inviter un ami" description="Partager mon lien de parrainage" />
                 {isAmbassador && <NavigationRow href="/compte/ambassadeur" icon={IconStar} label="Espace Ambassadeur" description="Mes invitations, commissions et paiements" />}
               </div>
@@ -221,7 +217,7 @@ export function AccountDashboard({
               onClick={handleLogout}
               disabled={isLoggingOut}
               aria-label={isLoggingOut ? 'Déconnexion en cours' : 'Se déconnecter'}
-              className="mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-white hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <IconLogout size={19} stroke={1.7} aria-hidden="true" />
               {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
