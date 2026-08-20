@@ -56,7 +56,7 @@ export function CategoryBlock({
         type="button"
         onClick={onSelect}
         aria-pressed={active}
-        className={`group relative flex-[0_0_31%] sm:flex-[0_0_23%] md:flex-[0_0_168px] aspect-[4/5] snap-start overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${active ? 'ring-2 ring-offset-2' : ''}`}
+        className={`group relative flex-[0_0_31%] sm:flex-[0_0_23%] md:w-full md:flex-none aspect-[4/5] snap-start md:snap-none overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${active ? 'ring-2 ring-offset-2' : ''}`}
         style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
       >
         {previewImage ? (
