@@ -25,7 +25,7 @@ interface ProductGridProps {
 export function ProductGrid({ products, loading = false }: ProductGridProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
       </div>
     );
@@ -33,14 +33,14 @@ export function ProductGrid({ products, loading = false }: ProductGridProps) {
   if (products.length === 0) {
     return (
       <div className="min-h-[40vh] flex flex-col items-center justify-center px-4 py-16 text-center">
-        <div className="text-6xl mb-4">🔍</div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Aucun produit disponible</h2>
-        <p className="text-gray-500 text-sm">Essayez une autre catégorie ou modifiez votre recherche.</p>
+        <svg className="mb-4 h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <h2 className="text-lg font-bold text-gray-900 mb-2">Aucun produit trouvé</h2>
+        <p className="text-gray-500 text-sm">Effacez la recherche ou choisissez un autre univers.</p>
       </div>
     );
   }
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
       {products.map((product) => <ProductCard key={product.id} product={product} />)}
     </div>
   );

@@ -17,6 +17,7 @@ export interface ProductCardProduct {
   name: string;
   slug: string;
   price: number;
+  compare_at_price?: number | null;
   image_url: string | null;
   weight_grams: number | null;
   stock: number | null;
@@ -70,6 +71,10 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
   const [added, setAdded] = useState(false);
   const tagLabel = getTagLabel(product);
   const detailLine = getDetailLine(product);
+  const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
+  const discountPercent = hasDiscount
+    ? Math.round((1 - product.price / (product.compare_at_price as number)) * 100)
+    : null;
 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
@@ -116,6 +121,9 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
         }
       >
         <div className="aspect-square bg-primary-light relative overflow-hidden">
+          {variant === 'grid' && discountPercent != null && (
+            <span className="absolute right-2 top-2 z-10 rounded-md bg-white/95 px-1.5 py-1 text-xs font-bold text-gray-900 shadow-sm">−{discountPercent}%</span>
+          )}
           {product.image_url ? (
             <Image
               src={product.image_url}
@@ -144,8 +152,11 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
           <div className="p-3">
             <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">{product.name}</p>
             {detailLine && <p className="text-xs text-gray-400 mb-2">{detailLine}</p>}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-base font-bold" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <span className="block text-base font-bold leading-tight" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
+                {hasDiscount && <span className="block text-xs text-gray-400 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>}
+              </div>
               <button
                 onClick={handleAddToCart}
                 aria-label="Ajouter au panier"

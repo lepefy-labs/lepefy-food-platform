@@ -18,6 +18,11 @@ interface CategoryBlockProps {
    *  (CategoryBlocksRow) — masquée des lecteurs d'écran et retirée du tab
    *  order, jamais cliquable, pour ne pas doubler la navigation clavier. */
   hiddenFromA11y?: boolean;
+  /** Compact, manually navigated Catalogue rendering. Home remains default. */
+  variant?: 'home' | 'catalog';
+  imageUrl?: string | null;
+  active?: boolean;
+  onSelect?: () => void;
 }
 
 // Rotation de teinte appliquée au gradient brand — dérivée des vrais tokens
@@ -39,6 +44,10 @@ export function CategoryBlock({
   primaryColor,
   secondaryColor,
   hiddenFromA11y = false,
+  variant = 'home',
+  imageUrl,
+  active = false,
+  onSelect,
 }: CategoryBlockProps) {
   const cyclePos = index % 4;
   const isSolidSecondary = cyclePos === 3;
@@ -51,6 +60,27 @@ export function CategoryBlock({
   const textColor = isSolidSecondary
     ? (primaryDarkIsReadable ? 'var(--color-primary-dark)' : '#1a1a1a')
     : '#ffffff';
+
+  if (variant === 'catalog') {
+    const previewImage = imageUrl ?? products[0]?.image_url ?? null;
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={active}
+        className={`group relative flex-[0_0_31%] sm:flex-[0_0_23%] md:flex-[0_0_168px] aspect-[4/5] snap-start overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${active ? 'ring-2 ring-offset-2' : ''}`}
+        style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
+      >
+        {previewImage ? (
+          <Image src={previewImage} alt="" fill className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" sizes="(max-width: 640px) 31vw, (max-width: 768px) 23vw, 168px" />
+        ) : (
+          <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(145deg, var(--color-primary), var(--color-primary-dark))' }} />
+        )}
+        <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+        <span className="absolute inset-x-0 bottom-0 z-10 p-3 text-sm font-bold leading-tight text-white drop-shadow-sm">{name}</span>
+      </button>
+    );
+  }
 
   return (
     <Link

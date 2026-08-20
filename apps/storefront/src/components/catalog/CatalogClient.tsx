@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { ProductGrid } from '@/components/catalog/ProductGrid';
 import { SemanticProductCard } from '@/components/catalog/SemanticProductCard';
+import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 
 interface Props {
@@ -158,17 +159,25 @@ export function CatalogClient({
   }
 
   const hasActiveSearch = initialQuery.trim().length > 0;
+  const activeCategory = categories.find(category => category.slug === activeSlug);
+  const productHeading = hasActiveSearch
+    ? `Résultats pour “${initialQuery}”`
+    : activeCategory?.name ?? 'Tous les produits';
+  const availableLabel = `${totalCount} produit${totalCount === 1 ? '' : 's'} disponible${totalCount === 1 ? '' : 's'}`;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <main className="max-w-6xl mx-auto px-4 py-5 md:py-8">
+      <header className="mb-5">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Catalogue</h1>
+        <p className="mt-1 text-sm text-gray-500">{availableLabel}</p>
+      </header>
       {/* Search bar */}
-      <div className="flex items-center gap-2 bg-white rounded-full
-                      border border-gray-200 shadow-sm px-4 py-3 mb-4">
+      <div className="flex h-[52px] max-w-2xl items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 shadow-sm transition-shadow focus-within:border-gray-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)]/20">
         {isPending ? (
           <svg
             className="shrink-0 animate-spin"
             xmlns="http://www.w3.org/2000/svg"
-            width="16" height="16" viewBox="0 0 24 24"
+            width="20" height="20" viewBox="0 0 24 24"
             fill="none" stroke="#9ca3af" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
             aria-hidden="true"
@@ -180,7 +189,7 @@ export function CatalogClient({
           <svg
             className="shrink-0"
             xmlns="http://www.w3.org/2000/svg"
-            width="16" height="16" viewBox="0 0 24 24"
+            width="20" height="20" viewBox="0 0 24 24"
             fill="none" stroke="#9ca3af" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
             aria-hidden="true"
@@ -194,8 +203,8 @@ export function CatalogClient({
           type="search"
           value={query}
           onChange={e => handleQueryChange(e.target.value)}
-          placeholder="Rechercher dans le catalogue..."
-          className="flex-1 bg-transparent text-sm text-gray-700
+          placeholder="Rechercher un produit..."
+          className="min-w-0 flex-1 bg-transparent text-base text-gray-700
                      placeholder:text-gray-400 outline-none border-none"
           aria-label="Rechercher un produit"
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
@@ -204,7 +213,7 @@ export function CatalogClient({
           <button
             type="button"
             onClick={() => handleQueryChange('')}
-            className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2"
             aria-label="Effacer la recherche"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
@@ -218,58 +227,24 @@ export function CatalogClient({
         )}
       </div>
 
-      {/* Filtri categoria — nascosti durante ricerca testuale */}
+      {/* Visual category navigation — hidden during textual search. */}
       {!hasActiveSearch && (
-        <div className="flex gap-2 flex-wrap mb-5">
-          <button
-            onClick={() => handleCategorySelect(null)}
-            className="px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
-            style={!activeSlug
-              ? { backgroundColor: 'var(--color-primary)', color: 'white', borderColor: 'var(--color-primary)' }
-              : { borderColor: '#d1d5db', color: '#374151' }
-            }
-          >
-            Tout
-          </button>
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategorySelect(cat.slug)}
-              className="px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
-              style={activeSlug === cat.slug
-                ? { backgroundColor: 'var(--color-primary)', color: 'white', borderColor: 'var(--color-primary)' }
-                : { borderColor: '#d1d5db', color: '#374151' }
-              }
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
+        <CatalogCategoryRow categories={categories} activeSlug={activeSlug} onSelect={handleCategorySelect} />
       )}
 
       {/* Header risultati */}
-      <div className="flex items-center justify-between mb-4">
-        {hasActiveSearch ? (
-          <p className="text-sm text-gray-500">
-            <span className="font-medium text-gray-900">{totalCount}</span>
-            {totalCount === 1 ? ' résultat' : ' résultats'} pour{' '}
-            <span className="font-medium text-gray-900">&ldquo;{initialQuery}&rdquo;</span>
-          </p>
-        ) : (
-          <h1 className="font-display text-lg font-bold text-gray-900">
-            {activeSlug
-              ? (categories.find(c => c.slug === activeSlug)?.name ?? 'Sélection de la boutique')
-              : 'Sélection de la boutique'
-            }
-          </h1>
-        )}
+      <div className="mt-6 mb-4 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="font-display text-xl font-bold text-gray-900">{productHeading}</h2>
+          {hasActiveSearch && <p className="mt-1 text-sm text-gray-500">{availableLabel}</p>}
+        </div>
         {hasActiveSearch && (
           <button
             onClick={() => handleQueryChange('')}
             className="text-sm font-medium"
             style={{ color: 'var(--color-primary)' }}
           >
-            ← Tout voir
+            Effacer
           </button>
         )}
       </div>
@@ -311,6 +286,6 @@ export function CatalogClient({
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

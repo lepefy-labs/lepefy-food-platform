@@ -44,7 +44,7 @@ export function buildProductsQuery(
     .from('products')
     .select(
       `
-      id, name, slug, price, image_url,
+      id, name, slug, price, compare_at_price, image_url,
       weight_grams, stock, storage_type,
       category:categories(name)
     `,
