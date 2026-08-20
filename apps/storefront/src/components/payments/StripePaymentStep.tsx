@@ -23,10 +23,6 @@ interface StripePaymentStepProps {
   createIntent:  () => Promise<CreateIntentResult>;   // logique de domaine spécifique au module — validation métier + création du PaymentIntent côté serveur
   onError:       (msg: string) => void;
   onSucceeded:   (paymentIntentId?: string) => void;
-  // Optionnel — préremplit l'email du Payment Element (accélère
-  // l'authentification Link pour un client qui a déjà un compte) quand
-  // l'appelant le connaît déjà avant cette étape. Aucun impact si absent.
-  customerEmail?: string;
   // Agente e2e Fase 0 — calculé côté serveur (isE2ERequest()) par la page
   // appelante et transmis en prop jusqu'ici : bascule la publishable key
   // vers le compte Stripe séparé dédié aux tests e2e. Absent (donc false)
@@ -36,7 +32,7 @@ interface StripePaymentStepProps {
 
 function InnerPaymentStep({
   module, color, returnUrl, payLabel, processingLabel,
-  createIntent, onError, onSucceeded, referenceIdRef, customerEmail,
+  createIntent, onError, onSucceeded, referenceIdRef,
 }: Omit<StripePaymentStepProps, 'referenceId' | 'amount' | 'currency'> & { referenceIdRef: React.MutableRefObject<string | null> }) {
   const stripe   = useStripe();
   const elements = useElements();
@@ -53,54 +49,70 @@ function InnerPaymentStep({
     if (!stripe || !elements) return;
     setIsConfirming(true);
 
-    // Validation + collecte des données carte/wallet — étape requise par le
-    // pattern "deferred intent creation" : elements.submit() valide le
-    // PaymentElement AVANT que le PaymentIntent existe côté Stripe.
-    const { error: submitError } = await elements.submit();
-    if (submitError) {
-      onError(submitError.message ?? 'Erreur lors du paiement.');
-      setIsConfirming(false);
-      return;
-    }
+    // Filet de sécurité : Stripe.js *lève* certaines erreurs (IntegrationError
+    // notamment) au lieu de les retourner dans { error }. Sans ce try/catch,
+    // une exception ressortait de handleConfirm sans jamais atteindre un
+    // setIsConfirming(false) — le bouton restait figé sur "Traitement en
+    // cours…" définitivement et sans message. Vaut pour toute exception
+    // future, pas seulement celle déjà diagnostiquée.
+    try {
+      // Validation + collecte des données carte/wallet — étape requise par le
+      // pattern "deferred intent creation" : elements.submit() valide le
+      // PaymentElement AVANT que le PaymentIntent existe côté Stripe.
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        onError(submitError.message ?? 'Erreur lors du paiement.');
+        setIsConfirming(false);
+        return;
+      }
 
-    logFunnelEvent({ module, event_type: 'confirm_attempted', reference_id: referenceIdRef.current });
+      logFunnelEvent({ module, event_type: 'confirm_attempted', reference_id: referenceIdRef.current });
 
-    const result = await createIntent();
-    if (result.error || !result.clientSecret) {
-      onError(result.error ?? 'Erreur lors du paiement.');
-      logFunnelEvent({ module, event_type: 'confirm_error', reference_id: referenceIdRef.current, detail: { stage: 'create_intent', message: result.error ?? null } });
-      setIsConfirming(false);
-      return;
-    }
-    if (result.reference_id) referenceIdRef.current = result.reference_id;
+      const result = await createIntent();
+      if (result.error || !result.clientSecret) {
+        onError(result.error ?? 'Erreur lors du paiement.');
+        logFunnelEvent({ module, event_type: 'confirm_error', reference_id: referenceIdRef.current, detail: { stage: 'create_intent', message: result.error ?? null } });
+        setIsConfirming(false);
+        return;
+      }
+      if (result.reference_id) referenceIdRef.current = result.reference_id;
 
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      clientSecret: result.clientSecret,
-      confirmParams: { return_url: returnUrl },
-      redirect: 'if_required',
-    });
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        clientSecret: result.clientSecret,
+        confirmParams: { return_url: returnUrl },
+        redirect: 'if_required',
+      });
 
-    if (error) {
-      onError(error.message ?? 'Erreur lors du paiement.');
+      if (error) {
+        onError(error.message ?? 'Erreur lors du paiement.');
+        logFunnelEvent({
+          module, event_type: 'confirm_error', reference_id: referenceIdRef.current,
+          detail: { code: error.code ?? null, type: error.type ?? null },
+        });
+        setIsConfirming(false);
+        return;
+      }
+
+      if (paymentIntent?.status === 'requires_action') {
+        logFunnelEvent({ module, event_type: 'requires_action', reference_id: referenceIdRef.current });
+        // La redirection est déjà en cours à ce stade pour les méthodes qui la
+        // requièrent — aucune action supplémentaire côté client, et le bouton
+        // reste volontairement désactivé pour éviter un double envoi.
+        return;
+      }
+
+      hasSucceededRef.current = true;
+      logFunnelEvent({ module, event_type: 'confirm_succeeded_client', reference_id: referenceIdRef.current });
+      onSucceeded(paymentIntent?.id);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Erreur lors du paiement.');
       logFunnelEvent({
         module, event_type: 'confirm_error', reference_id: referenceIdRef.current,
-        detail: { code: error.code ?? null, type: error.type ?? null },
+        detail: { stage: 'unexpected', message: err instanceof Error ? err.message : String(err) },
       });
       setIsConfirming(false);
-      return;
     }
-
-    if (paymentIntent?.status === 'requires_action') {
-      logFunnelEvent({ module, event_type: 'requires_action', reference_id: referenceIdRef.current });
-      // La redirection est déjà en cours à ce stade pour les méthodes qui la
-      // requièrent — aucune action supplémentaire côté client.
-      return;
-    }
-
-    hasSucceededRef.current = true;
-    logFunnelEvent({ module, event_type: 'confirm_succeeded_client', reference_id: referenceIdRef.current });
-    onSucceeded(paymentIntent?.id);
   }
 
   return (
@@ -110,11 +122,18 @@ function InnerPaymentStep({
         <PaymentElement
           options={{
             layout: 'accordion',
-            // Aucun confirmParams/createIntent de ce fichier ni des 4
-            // appelants n'attend une adresse de facturation collectée par le
-            // Payment Element (vérifié Step 0) — sûr de la désactiver partout.
-            fields: { billingDetails: { address: 'never' } },
-            defaultValues: customerEmail ? { billingDetails: { email: customerEmail } } : undefined,
+            // NE PAS réintroduire `fields: { billingDetails: { address: 'never' } }`.
+            // Opter pour 'never' oblige à fournir soi-même les champs omis
+            // (au minimum address.country) dans confirmParams lors de
+            // confirmPayment ; sans cela Stripe *lève* une IntegrationError
+            // (et non un { error } retourné), ce qui a figé le bouton de
+            // paiement sur les 5 flux. Le défaut 'auto' laisse Stripe décider
+            // au cas par cas des champs réellement nécessaires — aucun
+            // plumbing de données requis de notre côté.
+            //
+            // Pas de defaultValues.billingDetails.email non plus : préremplir
+            // une email connue déclenche le processus d'authentification Link,
+            // à l'origine des blocages "trop de tentatives de connexion".
           }}
         />
       </div>
@@ -140,13 +159,14 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
         mode: 'payment',
         amount: Math.round(props.amount * 100),
         currency: props.currency.toLowerCase(),
-        // Élements est initialisé en mode "deferred" (mode/amount/currency,
-        // sans clientSecret) : sans ce champ, les méthodes affichées dans le
-        // Payment Element viennent des réglages par défaut du Dashboard,
-        // indépendamment de payment_method_types côté PaymentIntent (voir
-        // les 5 endpoints create-intent). On restreint donc aussi ici, pour
-        // ne pas dépendre du toggle Dashboard Link — défense en profondeur.
-        paymentMethodTypes: ['card'],
+        // Pas de paymentMethodTypes ici : les méthodes proposées suivent les
+        // réglages du Dashboard, en cohérence avec automatic_payment_methods
+        // côté serveur (voir les 5 endpoints de création de PaymentIntent).
+        //
+        // RAPPEL — Link doit être désactivé manuellement depuis Stripe
+        // Dashboard (Settings → Payment Methods → Link) pour supprimer
+        // l'écran Accelerated Sign-up : action en attente côté compte, non
+        // pilotable depuis ce code.
         appearance: {
           theme: 'stripe',
           variables: {

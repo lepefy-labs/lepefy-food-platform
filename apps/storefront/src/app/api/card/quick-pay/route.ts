@@ -64,8 +64,9 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(roundedAmount * 100),
       currency: tenant.currency ?? 'eur',
-      // Voir api/checkout/route.ts : liste explicite pour exclure Link.
-      payment_method_types: ['card'],
+      // Voir api/checkout/route.ts — RAPPEL : Link à désactiver manuellement
+      // depuis Stripe Dashboard (Settings → Payment Methods → Link).
+      automatic_payment_methods: { enabled: true },
       metadata: {
         type:             'card_quick_payment',
         tenant_id:        tenant.id,

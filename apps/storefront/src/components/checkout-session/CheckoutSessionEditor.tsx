@@ -257,15 +257,21 @@ export function CheckoutSessionEditor({
   }
 
   async function createIntent() {
-    const res = await fetch(`/api/checkout-sessions/${sessionId}/create-intent`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ accessToken }),
-    });
-    const json = await res.json();
-    if (!res.ok) return { error: json.error ?? 'Une erreur est survenue.' };
-    setStripeClientSecret(json.clientSecret ?? null);
-    return { clientSecret: json.clientSecret, reference_id: sessionId };
+    try {
+      const res = await fetch(`/api/checkout-sessions/${sessionId}/create-intent`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ accessToken }),
+      });
+      const json = await res.json();
+      if (!res.ok) return { error: json.error ?? 'Une erreur est survenue.' };
+      setStripeClientSecret(json.clientSecret ?? null);
+      return { clientSecret: json.clientSecret, reference_id: sessionId };
+    } catch {
+      // Réseau coupé ou réponse illisible : erreur gérée plutôt qu'exception
+      // non catturée, qui figerait le bouton de paiement.
+      return { error: 'Une erreur est survenue.' };
+    }
   }
 
   async function handleCancel() {
@@ -398,7 +404,6 @@ export function CheckoutSessionEditor({
             color="var(--color-primary)"
             returnUrl={typeof window !== 'undefined' ? `${window.location.origin}/order-confirmation` : ''}
             referenceId={sessionId}
-            customerEmail={data.email}
             payLabel={`Payer ${formatPrice(editTotal || 0, tenant.currency)}`}
             processingLabel="Traitement en cours…"
             createIntent={createIntent}

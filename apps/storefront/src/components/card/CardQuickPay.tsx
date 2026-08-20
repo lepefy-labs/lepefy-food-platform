@@ -98,18 +98,24 @@ export function CardQuickPay({
   // validation serveur + insert tenant_card_payments + création du
   // PaymentIntent — seul le moment de l'appel change (clic "Payer").
   async function createIntent() {
-    const res = await fetch('/api/card/quick-pay', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        amount:        confirmedAmount,
-        customerName:  customerName.trim() || null,
-        customerEmail: customerEmail.trim() || null,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { error: data.error ?? copy.genericError };
-    return { clientSecret: data.clientSecret, reference_id: data.quickPaymentId as string };
+    try {
+      const res = await fetch('/api/card/quick-pay', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          amount:        confirmedAmount,
+          customerName:  customerName.trim() || null,
+          customerEmail: customerEmail.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error ?? copy.genericError };
+      return { clientSecret: data.clientSecret, reference_id: data.quickPaymentId as string };
+    } catch {
+      // Réseau coupé ou réponse illisible : on retourne une erreur gérée
+      // plutôt que de laisser l'exception remonter et figer le bouton.
+      return { error: copy.genericError };
+    }
   }
 
   if (paid) {
@@ -131,7 +137,6 @@ export function CardQuickPay({
           color={tenantColor}
           returnUrl={`${window.location.origin}/card`}
           referenceId={null}
-          customerEmail={customerEmail.trim() || undefined}
           payLabel={`${copy.payButton} ${formatPrice(confirmedAmount, currency)}`}
           processingLabel={copy.processing}
           createIntent={createIntent}

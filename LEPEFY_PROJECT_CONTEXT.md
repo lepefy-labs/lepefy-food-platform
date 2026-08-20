@@ -2977,4 +2977,39 @@ File toccati : `apps/storefront/src/components/payments/StripePaymentStep.tsx` �
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.55 — 20 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (deployato, timeout poi annullato), rimozione timeout + causa radice `IntegrationError` da §66 identificata e confermata §73; §73 non ancora pushato)*
+## 74. Changelog v3.56 (20 Agosto 2026) — Fix definitivo del blocco pagamento : `address:'never'` rimosso, rollback a `automatic_payment_methods`, robustezza, stop prefill email verso Link — ⚠️ nessuno pushato
+
+Ciclo d'implémentation qui clôt le filone ouvert en §72 et diagnostiqué en §73. Quatre modifications décidées par Robertin, appliquées ensemble.
+
+### Step 0 — deux corrections à la diagnosi précédente
+
+- **La config d'avant le fix Link n'était pas `automatic_payment_methods`, mais *rien du tout***. Vérifié sur `5346f27` : les 5 `paymentIntents.create` ne passaient **ni** `automatic_payment_methods` **ni** `payment_method_types`, s'en remettant au défaut implicite de Stripe. Le prompt laissait le choix ; retenu `automatic_payment_methods: { enabled: true }` comme demandé — équivalent fonctionnel au défaut, mais explicite dans le code plutôt qu'implicite.
+- **Les `createIntent` sans `try/catch` sont 5, pas 3.** §73 n'en avait inspecté que 3 ; le contrôle exhaustif demandé par ce prompt ajoute `CheckoutForm.tsx` (2 `fetch` : reprise de session + création) et `CheckoutSessionEditor.tsx`. Les 5 sont désormais protégés.
+- **`customerEmail` n'avait qu'un seul usage dans `StripePaymentStep.tsx`** : la ligne `defaultValues.billingDetails.email`. Aucun `receipt_email` nulle part dans le dépôt — l'email n'a jamais été transmise au PaymentIntent. Les variables locales `customerEmail`/`email` des appelants (state de formulaire, corps des `fetch` vers nos propres API — ex. `CardQuickPay.tsx:107`, `EventCheckoutClient.tsx:263`) sont **sans rapport avec la prop** et restent intactes.
+
+### Les 4 modifications
+
+1. **`fields: { billingDetails: { address: 'never' } }` supprimé** de `StripePaymentStep.tsx`, sans remplacement — retour au défaut `'auto'`, où Stripe décide au cas par cas des champs nécessaires et n'exige rien dans `confirmParams`. Un commentaire d'avertissement explicite reste en place pour empêcher la réintroduction. Vérifié qu'aucun code serveur n'assume `billing_details` peuplé (`grep billing_details` → zéro occurrence hors commentaires).
+2. **Rollback à `automatic_payment_methods: { enabled: true }`** sur les 5 endpoints, et suppression de `paymentMethodTypes: ['card']` sur `<Elements>`. Chaque emplacement porte le rappel « Link à désactiver manuellement depuis Stripe Dashboard ».
+3. **Robustesse** : `handleConfirm` entièrement enveloppé dans un `try/catch` ; les 5 `createIntent` protègent leur `fetch`/`res.json()` et retournent `{ error }` au lieu de laisser remonter une exception.
+4. **Prefill email vers Link supprimé** : `defaultValues.billingDetails.email` retiré, et avec lui la prop `customerEmail` — devenue morte, elle est supprimée de la signature et des 5 sites d'appel (voir Deviazioni).
+
+### Deviazioni
+
+- **`catch` plutôt que `finally { setIsConfirming(false) }`** dans `handleConfirm`. Le prompt disait « `finally` (o equivalente) per garantire che il bottone si sblocchi... **qualunque eccezione venga lanciata** » : un `catch` couvre exactement ce périmètre. Un `finally` s'exécuterait **aussi** sur les deux sorties où le bouton reste désactivé à dessein — `requires_action` (redirection en cours) et le succès (navigation en cours) — rouvrant une fenêtre de double soumission pendant une redirection lente. Garantie identique sur les exceptions, sans régression sur ces deux chemins.
+- **Prop `customerEmail` entièrement supprimée** (6 fichiers) plutôt que laissée inutilisée. Le prompt demandait de « valutare » et de le signaler : une prop nommée `customerEmail`, documentée comme « accélère l'authentification Link », qui ne fait plus rien, invite mécaniquement à réintroduire le prefill qu'on vient de retirer. Suppression franche, toutes les suppressions sont des retraits d'une ligne.
+- **Rappel Dashboard placé à 6 endroits** (les 5 endpoints + `<Elements>`) et non à un seul, pour qu'il soit visible depuis n'importe lequel des points de configuration concernés.
+
+### ⚠️ Action manuelle en attente — Robertin
+
+`automatic_payment_methods` étant rétabli, **l'écran Accelerated Sign-up de Link peut réapparaître** tant que Link n'est pas désactivé côté compte : **Stripe Dashboard → Settings → Payment Methods → Link → toggle off**. Choix assumé de ce cycle, pas une régression. Non automatisable depuis le code.
+
+### Stato
+
+`pnpm typecheck` verde. Nessun commit pushato — zip fornito su richiesta esplicita. Non testato end-to-end (nessun ambiente Stripe/browser in sessione) — da verificare dopo il deploy : disparition de l'`IntegrationError` en console et déblocage du bouton sur les 5 flux.
+
+File toccati : `apps/storefront/src/components/payments/StripePaymentStep.tsx` · `apps/storefront/src/components/card/CardQuickPay.tsx` · `apps/storefront/src/app/(shop)/checkout/CheckoutForm.tsx` · `apps/storefront/src/app/(evenementiel)/evenementiel/evenements/[slug]/EventCheckoutClient.tsx` · `apps/storefront/src/app/(evenementiel)/evenementiel/services/[slug]/RentalCheckoutClient.tsx` · `apps/storefront/src/components/checkout-session/CheckoutSessionEditor.tsx` · `apps/storefront/src/app/api/checkout/route.ts` · `apps/storefront/src/app/api/checkout-sessions/[id]/create-intent/route.ts` · `apps/storefront/src/app/api/card/quick-pay/route.ts` · `apps/storefront/src/app/api/events/[id]/checkout/route.ts` · `apps/storefront/src/app/api/rental/checkout/route.ts` · `LEPEFY_PROJECT_CONTEXT.md`.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.56 — 20 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (deployato, poi in gran parte annullato da §74), rimozione timeout + causa radice `IntegrationError` da §66 identificata e confermata §73, fix definitivo del blocco pagamento §74; §73 e §74 non ancora pushati)*

@@ -382,11 +382,11 @@ export async function POST(req: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(total * 100),
       currency: tenant.currency ?? 'eur',
-      // Liste explicite (plutôt que automatic_payment_methods) pour exclure
-      // Link : Stripe ne permet pas de l'exclure via excluded_payment_method_types
-      // (limitation documentée), donc seule une liste positive fonctionne.
-      // 'card' couvre aussi Apple Pay/Google Pay (wallets du type 'card').
-      payment_method_types: ['card'],
+      // Méthodes pilotées par les réglages du Dashboard.
+      // RAPPEL — Link doit être désactivé manuellement depuis Stripe Dashboard
+      // (Settings → Payment Methods → Link) pour éviter l'écran Accelerated
+      // Sign-up : action en attente côté compte, non pilotable depuis ce code.
+      automatic_payment_methods: { enabled: true },
       metadata: {
         session_id: session.id,
         tenant_id:  tenant.id,

@@ -208,20 +208,26 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       .filter((t) => (quantities[t.id] ?? 0) > 0)
       .map((t) => ({ ticket_type_id: t.id, quantity: quantities[t.id] }));
 
-    const res = await fetch(`/api/events/${event.id}/checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items,
-        customer_name: name.trim(),
-        customer_email: email.trim(),
-        customer_phone: phone.trim() || null,
-      }),
-    });
+    try {
+      const res = await fetch(`/api/events/${event.id}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          customer_name: name.trim(),
+          customer_email: email.trim(),
+          customer_phone: phone.trim() || null,
+        }),
+      });
 
-    const result = await res.json();
-    if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
-    return { clientSecret: result.clientSecret };
+      const result = await res.json();
+      if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
+      return { clientSecret: result.clientSecret };
+    } catch {
+      // Réseau coupé ou réponse illisible : erreur gérée plutôt qu'exception
+      // non catturée, qui figerait le bouton de paiement.
+      return { error: 'Une erreur est survenue.' };
+    }
   }
 
   // ── Étape 'select-payment' : confirmation du mode de paiement choisi ─────
@@ -305,7 +311,6 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           color="var(--color-primary)"
           returnUrl={`${window.location.origin}/evenementiel`}
           referenceId={event.id}
-          customerEmail={email.trim() || undefined}
           payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
           processingLabel="Traitement en cours…"
           createIntent={createIntent}

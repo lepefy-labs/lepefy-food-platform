@@ -105,22 +105,28 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
       .filter((i) => (quantities[i.id] ?? 0) > 0)
       .map((i) => ({ rental_item_id: i.id, quantity: quantities[i.id] }));
 
-    const res = await fetch('/api/rental/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service_offering_id: service.id,
-        items,
-        pickup_date: pickupDate,
-        customer_name: name.trim(),
-        customer_email: email.trim(),
-        customer_phone: phone.trim() || null,
-      }),
-    });
+    try {
+      const res = await fetch('/api/rental/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_offering_id: service.id,
+          items,
+          pickup_date: pickupDate,
+          customer_name: name.trim(),
+          customer_email: email.trim(),
+          customer_phone: phone.trim() || null,
+        }),
+      });
 
-    const result = await res.json();
-    if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
-    return { clientSecret: result.clientSecret };
+      const result = await res.json();
+      if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
+      return { clientSecret: result.clientSecret };
+    } catch {
+      // Réseau coupé ou réponse illisible : erreur gérée plutôt qu'exception
+      // non catturée, qui figerait le bouton de paiement.
+      return { error: 'Une erreur est survenue.' };
+    }
   }
 
   // ── Étape 'choose-payment' : confirmation du mode de paiement choisi ─────
@@ -201,7 +207,6 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           color="var(--color-primary)"
           returnUrl={`${window.location.origin}/evenementiel`}
           referenceId={service.id}
-          customerEmail={email.trim() || undefined}
           payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
           processingLabel="Traitement en cours…"
           createIntent={createIntent}

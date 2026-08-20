@@ -505,62 +505,68 @@ export default function CheckoutForm({
   // sait pas distinguer les deux chemins, le contrat createIntent() reste
   // identique.
   async function createIntent() {
-    const sharedPayload = buildSharedPayload();
-    // Snapshot des données qui déterminent le contenu de la session — si
-    // elles changent entre deux tentatives (ex. panier synchronisé depuis un
-    // autre appareil pendant que le client est resté sur cette page), la
-    // session réutilisée serait périmée par rapport à ce qui est affiché :
-    // on force alors une session fraîche plutôt que de réutiliser des
-    // données obsolètes.
-    const snapshot = JSON.stringify({ ...sharedPayload, shippingTotal: effectiveShippingTotal });
+    try {
+      const sharedPayload = buildSharedPayload();
+      // Snapshot des données qui déterminent le contenu de la session — si
+      // elles changent entre deux tentatives (ex. panier synchronisé depuis un
+      // autre appareil pendant que le client est resté sur cette page), la
+      // session réutilisée serait périmée par rapport à ce qui est affiché :
+      // on force alors une session fraîche plutôt que de réutiliser des
+      // données obsolètes.
+      const snapshot = JSON.stringify({ ...sharedPayload, shippingTotal: effectiveShippingTotal });
 
-    if (stripeSessionIdRef.current && stripeSessionSnapshotRef.current !== snapshot) {
-      stripeSessionIdRef.current = null;
-    }
+      if (stripeSessionIdRef.current && stripeSessionSnapshotRef.current !== snapshot) {
+        stripeSessionIdRef.current = null;
+      }
 
-    if (stripeSessionIdRef.current) {
-      const retryRes = await fetch(`/api/checkout-sessions/${stripeSessionIdRef.current}/create-intent`, {
+      if (stripeSessionIdRef.current) {
+        const retryRes = await fetch(`/api/checkout-sessions/${stripeSessionIdRef.current}/create-intent`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({}),
+        });
+
+        if (retryRes.ok) {
+          const retryResult = await retryRes.json();
+          return { clientSecret: retryResult.clientSecret, reference_id: stripeSessionIdRef.current };
+        }
+
+        if (retryRes.status === 404) {
+          // Session non résumable (annulée entre-temps depuis un autre
+          // appareil via « En attente », ou simplement introuvable) : fallback
+          // silencieux vers une nouvelle session ci-dessous, jamais une
+          // erreur bloquante pour un cas que le client ne peut pas comprendre.
+          stripeSessionIdRef.current = null;
+        } else {
+          const retryResult = await retryRes.json().catch(() => ({}));
+          return { error: retryResult.error ?? 'Une erreur est survenue.' };
+        }
+      }
+
+      const payload = {
+        ...sharedPayload,
+        shippingTotal: effectiveShippingTotal,
+        paymentMethod: 'stripe' as const,
+      };
+
+      const res = await fetch('/api/checkout', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({}),
+        body:    JSON.stringify(payload),
       });
 
-      if (retryRes.ok) {
-        const retryResult = await retryRes.json();
-        return { clientSecret: retryResult.clientSecret, reference_id: stripeSessionIdRef.current };
-      }
+      const result = await res.json();
+      if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
 
-      if (retryRes.status === 404) {
-        // Session non résumable (annulée entre-temps depuis un autre
-        // appareil via « En attente », ou simplement introuvable) : fallback
-        // silencieux vers une nouvelle session ci-dessous, jamais une
-        // erreur bloquante pour un cas que le client ne peut pas comprendre.
-        stripeSessionIdRef.current = null;
-      } else {
-        const retryResult = await retryRes.json().catch(() => ({}));
-        return { error: retryResult.error ?? 'Une erreur est survenue.' };
-      }
+      stripeSessionIdRef.current       = result.sessionId ?? null;
+      stripeSessionSnapshotRef.current = snapshot;
+
+      return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
+    } catch {
+      // Réseau coupé ou réponse illisible : erreur gérée plutôt qu'exception
+      // non catturée, qui figerait le bouton de paiement.
+      return { error: 'Une erreur est survenue.' };
     }
-
-    const payload = {
-      ...sharedPayload,
-      shippingTotal: effectiveShippingTotal,
-      paymentMethod: 'stripe' as const,
-    };
-
-    const res = await fetch('/api/checkout', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-    });
-
-    const result = await res.json();
-    if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
-
-    stripeSessionIdRef.current       = result.sessionId ?? null;
-    stripeSessionSnapshotRef.current = snapshot;
-
-    return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
   }
 
   const handleConfirmPayment = async () => {
@@ -944,7 +950,6 @@ export default function CheckoutForm({
             color="var(--color-primary)"
             returnUrl={`${window.location.origin}/order-confirmation`}
             referenceId={null}
-            customerEmail={getValues().email || undefined}
             payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
             processingLabel="Traitement en cours…"
             createIntent={createIntent}
