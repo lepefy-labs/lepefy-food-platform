@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -152,7 +152,16 @@ export function AccountDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f9f8]" style={{ '--account-accent-fg': accountAccentForeground } as React.CSSProperties}>
+    <div
+      className="account-dashboard min-h-screen bg-[#f7f9f8]"
+      style={{ '--account-accent-fg': accountAccentForeground } as CSSProperties}
+    >
+      <style>{`
+        .account-dashboard :is(a, button, summary):focus-visible {
+          outline: 2px solid var(--account-accent-fg);
+          outline-offset: 2px;
+        }
+      `}</style>
       <div className="mx-auto w-full max-w-5xl px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-10">
         <header className="flex items-center gap-3">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--account-accent-fg)' }}>
@@ -207,15 +216,15 @@ export function AccountDashboard({
 
             <AddressesSection addresses={addresses} />
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          aria-label={isLoggingOut ? 'Déconnexion en cours' : 'Se déconnecter'}
-          className="mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <IconLogout size={19} stroke={1.7} aria-hidden="true" />
-          {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              aria-label={isLoggingOut ? 'Déconnexion en cours' : 'Se déconnecter'}
+              className="mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <IconLogout size={19} stroke={1.7} aria-hidden="true" />
+              {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
             </button>
           </div>
         </div>
