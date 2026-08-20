@@ -22,6 +22,7 @@ interface QuickPayCopy {
   thanks:            string;
   genericError:      string;
   invalidAmount:     string;
+  billingCountryHint: string;
 }
 
 const COPY: Record<Lang, QuickPayCopy> = {
@@ -36,6 +37,7 @@ const COPY: Record<Lang, QuickPayCopy> = {
     thanks:            'Merci ! Paiement reçu.',
     genericError:      'Une erreur est survenue. Veuillez réessayer.',
     invalidAmount:     `Le montant doit être compris entre ${MIN_AMOUNT} et ${MAX_AMOUNT} €.`,
+    billingCountryHint: 'Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle.',
   },
   it: {
     amountLabel:       'Importo da pagare',
@@ -48,6 +50,7 @@ const COPY: Record<Lang, QuickPayCopy> = {
     thanks:            'Grazie! Pagamento ricevuto.',
     genericError:      'Si è verificato un errore. Riprova.',
     invalidAmount:     `L'importo deve essere compreso tra ${MIN_AMOUNT} e ${MAX_AMOUNT} €.`,
+    billingCountryHint: 'Se viene richiesto un paese qui sotto, indica quello associato alla tua carta (fatturazione), non la tua posizione attuale.',
   },
 };
 
@@ -139,6 +142,7 @@ export function CardQuickPay({
           referenceId={null}
           payLabel={`${copy.payButton} ${formatPrice(confirmedAmount, currency)}`}
           processingLabel={copy.processing}
+          billingCountryHint={copy.billingCountryHint}
           createIntent={createIntent}
           onError={setError}
           onSucceeded={() => setPaid(true)}

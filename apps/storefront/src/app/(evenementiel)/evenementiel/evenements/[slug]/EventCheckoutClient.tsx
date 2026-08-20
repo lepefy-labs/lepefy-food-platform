@@ -313,6 +313,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           referenceId={event.id}
           payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
           processingLabel="Traitement en cours…"
+          billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
           createIntent={createIntent}
           onError={setError}
           onSucceeded={(paymentIntentId) => {

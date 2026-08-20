@@ -20,6 +20,14 @@ interface StripePaymentStepProps {
   referenceId:   string | null;   // connu avant le clic Payer (ex. event.id) ; sinon null, mis à jour par createIntent
   payLabel:      string;   // ex. "Payer 12,00 €" — texte déjà formaté par l'appelant, prix inclus
   processingLabel: string;
+  // Légende affichée au-dessus du Payment Element. Stripe peut demander un
+  // champ "Pays" (mode 'auto') sans préciser s'il s'agit du pays de
+  // facturation de la carte ou de la position du client — ambigu pour un
+  // touriste ou un expatrié. L'étiquette native est dans l'iframe Stripe
+  // (PCI), donc non modifiable : on lève l'ambiguïté juste à côté.
+  // Fournie par l'appelant, comme payLabel/processingLabel, pour rester dans
+  // son propre schéma de traduction — jamais codée en dur ici.
+  billingCountryHint: string;
   createIntent:  () => Promise<CreateIntentResult>;   // logique de domaine spécifique au module — validation métier + création du PaymentIntent côté serveur
   onError:       (msg: string) => void;
   onSucceeded:   (paymentIntentId?: string) => void;
@@ -31,7 +39,7 @@ interface StripePaymentStepProps {
 }
 
 function InnerPaymentStep({
-  module, color, returnUrl, payLabel, processingLabel,
+  module, color, returnUrl, payLabel, processingLabel, billingCountryHint,
   createIntent, onError, onSucceeded, referenceIdRef,
 }: Omit<StripePaymentStepProps, 'referenceId' | 'amount' | 'currency'> & { referenceIdRef: React.MutableRefObject<string | null> }) {
   const stripe   = useStripe();
@@ -118,7 +126,14 @@ function InnerPaymentStep({
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-        <p className="text-sm font-semibold text-gray-700 mb-4">Paiement sécurisé</p>
+        <p className="text-sm font-semibold text-gray-700 mb-1">Paiement sécurisé</p>
+        {/* Placée entre le titre et le Payment Element : le texte parle des
+            champs « ci-dessous », il doit donc les précéder immédiatement, et
+            rester dans la même carte blanche pour se lire comme une note du
+            bloc de paiement. Toujours visible — impossible de détecter de
+            façon fiable si Stripe affiche réellement le champ Pays, et la
+            note reste inoffensive quand il est absent. */}
+        <p className="text-xs text-gray-500 leading-relaxed mb-4">{billingCountryHint}</p>
         <PaymentElement
           options={{
             layout: 'accordion',

@@ -952,6 +952,7 @@ export default function CheckoutForm({
             referenceId={null}
             payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
             processingLabel="Traitement en cours…"
+            billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
             createIntent={createIntent}
             onError={(msg) => setSubmitError(msg)}
             onSucceeded={(paymentIntentId) => {

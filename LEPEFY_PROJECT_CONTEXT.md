@@ -3012,4 +3012,36 @@ File toccati : `apps/storefront/src/components/payments/StripePaymentStep.tsx` �
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.56 — 20 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (deployato, poi in gran parte annullato da §74), rimozione timeout + causa radice `IntegrationError` da §66 identificata e confermata §73, fix definitivo del blocco pagamento §74; §73 e §74 non ancora pushati)*
+## 75. Changelog v3.57 (20 Agosto 2026) — Didascalia "Paese" = paese della carta, non posizione del cliente — ⚠️ nessuno pushato
+
+Conseguenza diretta di §74 : `automatic_payment_methods` rétabli, Stripe peut de nouveau afficher un champ "Pays" dans le Payment Element (mode `'auto'`, où il décide au cas par cas). L'étiquette native ne dit pas s'il s'agit du pays de facturation de la carte ou de la position du client — ambiguïté réelle pour un touriste, un expatrié ou un habitant d'une zone frontalière. L'étiquette est rendue par Stripe dans une iframe (PCI), donc non modifiable : la levée d'ambiguïté se fait par une légende écrite par nous, hors iframe.
+
+### Step 0
+
+- **`/card` est bien le seul des 5 appelants avec support IT.** `CardQuickPay.tsx` est le seul à porter un type `Lang`/`COPY` ; `CheckoutForm.tsx`, `EventCheckoutClient.tsx`, `RentalCheckoutClient.tsx` et `CheckoutSessionEditor.tsx` sont FR-only (zéro occurrence de `Lang`/`COPY`). Les autres `COPY` du dépôt (`DigitalCard.tsx`, `PaymentMethodsAccordion.tsx`, `AddToHomeScreen.tsx`) ne sont pas des appelants de `StripePaymentStep`.
+- **Le mécanisme de localisation existe déjà** : `payLabel`/`processingLabel` sont des chaînes fournies par l'appelant. La légende réutilise exactement ce pattern, aucun mécanisme nouveau.
+
+### Cosa è stato costruito
+
+Nouvelle prop **obligatoire** `billingCountryHint` sur `StripePaymentStep`, rendue en `text-xs text-gray-500 leading-relaxed mb-4` **entre le titre "Paiement sécurisé" et le `PaymentElement`** — le texte parle des champs « ci-dessous », il doit donc les précéder immédiatement, et rester dans la même carte blanche pour se lire comme une note du bloc de paiement. Le `mb-4` du titre passe à `mb-1` : l'espacement total avant le Payment Element est inchangé. Toujours affichée, jamais conditionnée à la présence réelle du champ Pays (indétectable de façon fiable, et la note reste inoffensive quand il est absent).
+
+Prop obligatoire et non optionnelle : `tsc` garantit ainsi qu'aucun des 5 appelants ne l'oublie. FR pour les 5 ; IT en plus pour `/card` via `COPY.it.billingCountryHint`.
+
+### Verifica visiva
+
+Rendu réel mesuré au navigateur (Chromium/Playwright, maquette statique reprenant les classes Tailwind exactes du composant) en **320 px de large** — le plus étroit des mobiles courants : FR ≈ 4 lignes (78 px de haut), IT ≈ 3 lignes (59 px), `scrollWidth == clientWidth` ⇒ **aucun débordement horizontal**. La légende se lit comme une note secondaire sous le titre, sans repousser le bouton hors de l'écran.
+
+### Deviazioni
+
+- **Vérification faite sur une maquette statique, pas sur l'app réelle** : lancer le storefront Next.js demanderait les variables d'environnement Supabase/Stripe absentes de la session. La maquette reprend les classes Tailwind exactes du bloc (`p-4`, `text-xs`, `leading-relaxed`, `text-sm font-semibold`), donc les mesures de retour à la ligne sont fidèles — mais ce n'est pas une capture du vrai Payment Element.
+- **Prop obligatoire plutôt qu'optionnelle** : un défaut FR interne aurait été plus permissif, mais aurait aussi permis à un futur appelant d'hériter silencieusement du français. Choix assumé, cohérent avec `payLabel`/`processingLabel`.
+
+### Stato
+
+`pnpm typecheck` verde. Nessun commit pushato — zip fornito su richiesta esplicita.
+
+File toccati : `apps/storefront/src/components/payments/StripePaymentStep.tsx` · `apps/storefront/src/components/card/CardQuickPay.tsx` · `apps/storefront/src/app/(shop)/checkout/CheckoutForm.tsx` · `apps/storefront/src/app/(evenementiel)/evenementiel/evenements/[slug]/EventCheckoutClient.tsx` · `apps/storefront/src/app/(evenementiel)/evenementiel/services/[slug]/RentalCheckoutClient.tsx` · `apps/storefront/src/components/checkout-session/CheckoutSessionEditor.tsx` · `LEPEFY_PROJECT_CONTEXT.md`.
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.57 — 20 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (deployato, poi in gran parte annullato da §74), rimozione timeout + causa radice `IntegrationError` da §66 identificata e confermata §73, fix definitivo del blocco pagamento §74, didascalia paese di fatturazione §75; §73, §74 e §75 non ancora pushati)*
