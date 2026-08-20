@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { calculateCartTotal, canProceedToCheckout } from '@/lib/cart/cartPagePresentation';
+import { calculateCartTotal, canProceedToCheckout, shouldShowMobileCartStickyCta } from '@/lib/cart/cartPagePresentation';
 
 test('le total additionne la livraison au sous-total', () => {
   expect(calculateCartTotal(42.5, 7.5)).toBe(50);
@@ -17,4 +17,13 @@ test('la livraison exige un devis avant le checkout', () => {
 test('le retrait peut continuer sans devis mais jamais avec un panier vide', () => {
   expect(canProceedToCheckout(2, 'pickup', null)).toBe(true);
   expect(canProceedToCheckout(0, 'pickup', null)).toBe(false);
+});
+
+test('la CTA mobile est masquée pour un panier vide', () => {
+  expect(shouldShowMobileCartStickyCta(0)).toBe(false);
+});
+
+test('la CTA mobile est visible dès que le panier contient une unité', () => {
+  expect(shouldShowMobileCartStickyCta(1)).toBe(true);
+  expect(shouldShowMobileCartStickyCta(12)).toBe(true);
 });

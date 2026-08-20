@@ -15,6 +15,7 @@ interface CartOrderSummaryProps {
   freeShippingThreshold?: number | null;
   onCheckout: () => void;
   children?: React.ReactNode;
+  hideActionsOnMobile?: boolean;
 }
 
 function SyncMessage({ status }: { status: CartSyncStatus }) {
@@ -37,6 +38,7 @@ export function CartOrderSummary({
   freeShippingThreshold = null,
   onCheckout,
   children,
+  hideActionsOnMobile = false,
 }: CartOrderSummaryProps) {
   return (
     <section aria-labelledby="cart-summary-title" className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
@@ -65,20 +67,22 @@ export function CartOrderSummary({
         <FreeShippingProgress subtotal={subtotal} threshold={freeShippingThreshold} currency={currency} />
       </div>
 
-      <button
-        type="button"
-        onClick={onCheckout}
-        disabled={!canProceed}
-        className="mt-6 w-full rounded-2xl py-4 text-base font-bold text-white transition-opacity active:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)]"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
-        Continuer vers le paiement
-      </button>
-      {checkoutHint && <p className="mt-2 text-center text-xs text-gray-500">{checkoutHint}</p>}
+      <div className={hideActionsOnMobile ? 'hidden md:block' : undefined}>
+        <button
+          type="button"
+          onClick={onCheckout}
+          disabled={!canProceed}
+          className="mt-6 w-full rounded-2xl py-4 text-base font-bold text-white transition-opacity active:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)]"
+          style={{ backgroundColor: 'var(--color-primary)' }}
+        >
+          Continuer vers le paiement
+        </button>
+        {checkoutHint && <p className="mt-2 text-center text-xs text-gray-500">{checkoutHint}</p>}
 
-      <Link href="/products" className="mt-4 block text-center text-sm font-semibold text-gray-600 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
-        Continuer mes achats
-      </Link>
+        <Link href="/products" className="mt-4 block text-center text-sm font-semibold text-gray-600 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
+          Continuer mes achats
+        </Link>
+      </div>
 
       <div className="mt-3 min-h-4 text-center text-xs text-amber-700" aria-live="polite">
         <SyncMessage status={syncStatus} />

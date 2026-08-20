@@ -9,3 +9,7 @@ export function canProceedToCheckout(
 ): boolean {
   return itemCount > 0 && (fulfillmentType === 'pickup' || shippingCost !== null);
 }
+
+export function shouldShowMobileCartStickyCta(itemCount: number): boolean {
+  return itemCount > 0;
+}

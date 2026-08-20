@@ -8,14 +8,14 @@ import { CartEmpty } from '@/components/cart/CartEmpty';
 import { CartItem } from '@/components/cart/CartItem';
 import { CartOrderSummary } from '@/components/cart/CartOrderSummary';
 import { CartUndoToast } from '@/components/cart/CartUndoToast';
+import { MobileCartStickyCTA } from '@/components/cart/MobileCartStickyCTA';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
-import { calculateCartTotal, canProceedToCheckout } from '@/lib/cart/cartPagePresentation';
+import { calculateCartTotal, canProceedToCheckout, shouldShowMobileCartStickyCta } from '@/lib/cart/cartPagePresentation';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { useCartStore } from '@/stores/cartStore';
-import { formatPrice } from '@/lib/utils/format';
 import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
 
 const COUNTRIES = [
@@ -210,22 +210,20 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   );
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 pb-28 sm:px-6 sm:py-8 md:pb-10 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-5 pb-52 sm:px-6 sm:py-8 md:pb-10 lg:px-8">
       <nav aria-label="Fil d’Ariane" className="mb-4 text-sm text-gray-500"><a href="/products" className="hover:text-gray-800">Catalogue</a><span aria-hidden="true"> / </span><span aria-current="page">Panier</span></nav>
       <header className="mb-7"><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Votre panier</h1><p className="mt-1 text-sm text-gray-500" aria-live="polite">{formatProductCount(itemCount)}</p></header>
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)] xl:gap-12">
-        <section aria-labelledby="cart-items-title" className="min-w-0 rounded-3xl border border-gray-100 bg-white px-4 shadow-sm sm:px-6">
+        <section aria-labelledby="cart-items-title" className="min-w-0 bg-white sm:px-2 lg:rounded-3xl lg:border lg:border-gray-100 lg:px-6 lg:shadow-sm">
           <h2 id="cart-items-title" className="sr-only">Produits dans votre panier</h2>
           <ul>{items.map((item) => <CartItem key={item.product.id} item={item} variant="page" currency={tenant.currency} unavailableProductIds={unavailableProductIds} pendingProductIds={pendingProductIds} onIncrement={handleIncrement} onDecrement={handleDecrement} onRemove={handleRemove} />)}</ul>
           {undo && <div className="pb-4"><CartUndoToast productName={undo.item.product.name} onUndo={handleUndo} /></div>}
         </section>
         <aside className="lg:sticky lg:top-6">
-          <CartOrderSummary subtotal={subtotal} shippingCost={effectiveShipping} total={total} currency={tenant.currency} canProceed={canProceed} checkoutHint={!canProceed && fulfillmentType === 'delivery' ? 'Indiquez votre adresse pour calculer les frais de livraison.' : null} syncStatus={syncStatus} onCheckout={handleProceed}>{shippingControls}</CartOrderSummary>
+          <CartOrderSummary subtotal={subtotal} shippingCost={effectiveShipping} total={total} currency={tenant.currency} canProceed={canProceed} checkoutHint={!canProceed && fulfillmentType === 'delivery' ? 'Indiquez votre adresse pour calculer les frais de livraison.' : null} syncStatus={syncStatus} onCheckout={handleProceed} hideActionsOnMobile>{shippingControls}</CartOrderSummary>
         </aside>
       </div>
-      <div className="fixed inset-x-0 bottom-16 z-40 border-t border-gray-100 bg-white/95 p-3 backdrop-blur md:hidden" style={{ paddingBottom: 'calc(.75rem + env(safe-area-inset-bottom))' }}>
-        <div className="mx-auto flex max-w-md items-center gap-3"><div className="min-w-24"><p className="text-xs text-gray-500">Total</p><p className="font-bold tabular-nums">{formatPrice(total, tenant.currency)}</p></div><button type="button" onClick={handleProceed} disabled={!canProceed} className="flex-1 rounded-2xl py-3.5 text-sm font-bold text-white disabled:opacity-40" style={{ backgroundColor: 'var(--color-primary)' }}>Continuer vers le paiement</button></div>
-      </div>
+      {shouldShowMobileCartStickyCta(itemCount) && <MobileCartStickyCTA total={total} currency={tenant.currency} disabled={!canProceed} onCheckout={handleProceed} />}
     </div>
   );
 }

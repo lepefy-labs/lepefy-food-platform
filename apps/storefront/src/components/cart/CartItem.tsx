@@ -122,7 +122,7 @@ export function CartItem({
         <button
           type="button"
           onClick={() => onRemove(product.id)}
-          className="text-xs text-gray-500 hover:text-red-600 transition-colors mt-2 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded"
+          className="-ml-2 mt-1 inline-flex min-h-11 items-center rounded px-2 text-xs text-gray-500 underline underline-offset-2 transition-colors hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
         >
           Retirer
         </button>
