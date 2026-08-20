@@ -16,7 +16,7 @@ export async function GET() {
       return new NextResponse(null, { status: 404 });
     }
 
-    const logoSize = Math.round(HEIGHT * 0.55);
+    const logoSize = Math.round(HEIGHT * 0.85);
     const logoBuffer = await generateIconBuffer({ logoUrl: tenant.logo_url, size: logoSize });
     const left = Math.round((WIDTH - logoSize) / 2);
     const top = Math.round((HEIGHT - logoSize) / 2);
