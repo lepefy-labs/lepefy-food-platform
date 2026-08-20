@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       // Safe-zone ~62% (même proportion que card/pwa-icon), logo centré sur
       // un fond plein à la couleur du tenant — une icône maskable transparente
       // hors safe-zone rend mal sur les launchers qui masquent sans gérer l'alpha.
-      const logoSize = Math.round(size * 0.62);
+      const logoSize = Math.round(size * 0.80);
       const logoBuffer = await generateIconBuffer({ logoUrl: tenant.logo_url, size: logoSize });
       const logoOffset = Math.round((size - logoSize) / 2);
 
