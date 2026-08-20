@@ -20,7 +20,7 @@ export function CatalogCategoryRow({ categories, activeSlug, onSelect }: Catalog
           </button>
         )}
       </div>
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-0.5 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Catégories de produits">
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-0.5 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-4 md:overflow-visible md:snap-none md:pb-0 lg:grid-cols-6" aria-label="Catégories de produits">
         {categories.map((category, index) => (
           <CategoryBlock key={category.id} variant="catalog" index={index} name={category.name} slug={category.slug} count={0} products={[]} imageUrl={category.image_url} primaryColor="var(--color-primary)" secondaryColor="var(--color-secondary)" active={activeSlug === category.slug} onSelect={() => onSelect(category.slug)} />
         ))}
