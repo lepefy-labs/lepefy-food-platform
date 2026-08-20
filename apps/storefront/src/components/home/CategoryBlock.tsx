@@ -49,18 +49,6 @@ export function CategoryBlock({
   active = false,
   onSelect,
 }: CategoryBlockProps) {
-  const cyclePos = index % 4;
-  const isSolidSecondary = cyclePos === 3;
-
-  // Sur fond secondary solide, on vérifie le contraste réel avant de choisir
-  // le texte : primary-dark si suffisant, sinon un neutre sombre (même
-  // raisonnement que ShopTag pour le badge sur --color-secondary).
-  const primaryDarkApprox = mixWithBlack(primaryColor, 75);
-  const primaryDarkIsReadable = isSolidSecondary && contrastRatio(secondaryColor, primaryDarkApprox) >= 4.5;
-  const textColor = isSolidSecondary
-    ? (primaryDarkIsReadable ? 'var(--color-primary-dark)' : '#1a1a1a')
-    : '#ffffff';
-
   if (variant === 'catalog') {
     const previewImage = imageUrl ?? products[0]?.image_url ?? null;
     return (
@@ -81,6 +69,18 @@ export function CategoryBlock({
       </button>
     );
   }
+
+  const cyclePos = index % 4;
+  const isSolidSecondary = cyclePos === 3;
+
+  // Sur fond secondary solide, on vérifie le contraste réel avant de choisir
+  // le texte : primary-dark si suffisant, sinon un neutre sombre (même
+  // raisonnement que ShopTag pour le badge sur --color-secondary).
+  const primaryDarkApprox = mixWithBlack(primaryColor, 75);
+  const primaryDarkIsReadable = isSolidSecondary && contrastRatio(secondaryColor, primaryDarkApprox) >= 4.5;
+  const textColor = isSolidSecondary
+    ? (primaryDarkIsReadable ? 'var(--color-primary-dark)' : '#1a1a1a')
+    : '#ffffff';
 
   return (
     <Link

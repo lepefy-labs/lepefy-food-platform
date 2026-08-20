@@ -166,13 +166,14 @@ export function CatalogClient({
   const availableLabel = `${totalCount} produit${totalCount === 1 ? '' : 's'} disponible${totalCount === 1 ? '' : 's'}`;
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-5 md:py-8">
+    <div className="max-w-6xl mx-auto px-4 py-5 md:py-8">
       <header className="mb-5">
         <h1 className="font-display text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Catalogue</h1>
         <p className="mt-1 text-sm text-gray-500">{availableLabel}</p>
       </header>
       {/* Search bar */}
-      <div className="flex h-[52px] max-w-2xl items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 shadow-sm transition-shadow focus-within:border-gray-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)]/20">
+      <div className="sticky top-16 z-30 -mx-4 bg-white/95 px-4 py-2 backdrop-blur">
+        <div className="flex h-[52px] max-w-2xl items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 shadow-sm transition-shadow focus-within:border-gray-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)]/20">
         {isPending ? (
           <svg
             className="shrink-0 animate-spin"
@@ -225,6 +226,7 @@ export function CatalogClient({
             </svg>
           </button>
         )}
+        </div>
       </div>
 
       {/* Visual category navigation — hidden during textual search. */}
@@ -286,6 +288,6 @@ export function CatalogClient({
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
