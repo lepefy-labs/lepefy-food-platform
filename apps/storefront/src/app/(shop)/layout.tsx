@@ -5,6 +5,7 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { ChatWidget } from '@/components/chat/ChatWidget';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { CartSyncProvider } from '@/components/cart/CartSyncProvider';
+import { CartDrawer } from '@/components/cart/CartDrawer';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 
@@ -94,6 +95,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
         whatsappNumber={tenant.whatsapp_number ?? null}
       />
       <CookieConsentBanner />
+      <CartDrawer />
       </CartSyncProvider>
     </div>
   );
