@@ -12,6 +12,7 @@ interface CartItemProps {
   onIncrement: (productId: string) => void;
   onDecrement: (productId: string) => void;
   onRemove: (productId: string) => void;
+  variant?: 'drawer' | 'page';
 }
 
 // Même petite fonction que ProductCard.tsx (non exportée là-bas) — dupliquée
@@ -36,6 +37,7 @@ export function CartItem({
   onIncrement,
   onDecrement,
   onRemove,
+  variant = 'drawer',
 }: CartItemProps) {
   const { product, quantity } = item;
   const state = deriveCartItemState({
@@ -48,15 +50,17 @@ export function CartItem({
   const weightLabel = formatWeightLabel(product.weight_grams);
   const lineTotal = product.price * quantity;
 
+  const isPage = variant === 'page';
+
   return (
-    <li className="flex gap-3 py-4 border-b border-gray-100 last:border-0">
-      <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-50 relative">
+    <li className={`flex gap-4 border-b border-gray-100 last:border-0 ${isPage ? 'py-5 sm:py-6' : 'py-4'}`}>
+      <div className={`${isPage ? 'w-20 h-20 sm:w-24 sm:h-24' : 'w-16 h-16'} rounded-2xl overflow-hidden flex-shrink-0 bg-gray-50 relative`}>
         {product.image_url ? (
           <Image
             src={product.image_url}
             alt={product.name}
             fill
-            sizes="64px"
+            sizes={isPage ? '(min-width: 640px) 96px, 80px' : '64px'}
             className="object-cover"
           />
         ) : (
@@ -70,14 +74,14 @@ export function CartItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-sm leading-snug line-clamp-2">{product.name}</p>
+          <p className={`${isPage ? 'text-base' : 'text-sm'} font-semibold leading-snug line-clamp-2`}>{product.name}</p>
         </div>
 
         <div className="flex items-center gap-1.5 mt-0.5">
           {weightLabel && <span className="text-xs text-gray-400">{weightLabel}</span>}
           {(state === 'unavailable' || state === 'out_of_stock') && (
-            <span className="text-2xs font-medium text-red-600 bg-red-50 rounded-full px-1.5 py-0.5">
-              {STATE_BADGE[state]}
+            <span className="text-xs font-medium text-red-700 bg-red-50 rounded-full px-2 py-0.5">
+              {isPage ? 'Produit actuellement indisponible' : STATE_BADGE[state]}
             </span>
           )}
         </div>
@@ -86,7 +90,7 @@ export function CartItem({
           {formatPrice(product.price, currency)} / unité
         </p>
 
-        <div className="flex items-center justify-between mt-2 gap-2">
+        <div className={`flex items-center justify-between gap-3 ${isPage ? 'mt-3 flex-wrap' : 'mt-2'}`}>
           <div className="flex items-center gap-1.5">
             <CartQuantityControl
               quantity={quantity}
@@ -110,7 +114,7 @@ export function CartItem({
           {/* aria-live discret : le total de ligne change avec la quantité,
               utile en lecteur d'écran sans devenir bavard (pas de "syncing"
               ni de jargon interne, cf. §9/§19). */}
-          <span className="font-semibold text-sm tabular-nums" aria-live="polite">
+          <span className={`${isPage ? 'text-base sm:text-lg' : 'text-sm'} font-bold tabular-nums`} aria-live="polite">
             {formatPrice(lineTotal, currency)}
           </span>
         </div>
@@ -118,7 +122,7 @@ export function CartItem({
         <button
           type="button"
           onClick={() => onRemove(product.id)}
-          className="text-xs text-gray-400 hover:text-red-500 transition-colors mt-1.5 underline-offset-2 hover:underline"
+          className="text-xs text-gray-500 hover:text-red-600 transition-colors mt-2 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded"
         >
           Retirer
         </button>
