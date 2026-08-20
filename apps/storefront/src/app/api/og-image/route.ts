@@ -19,19 +19,29 @@ export async function GET() {
       return new NextResponse(null, { status: 404 });
     }
 
+    const primary = tenant.primary_color ?? '#1D9E75';
+    const secondary = tenant.secondary_color ?? primary;
+
+    // Fond en dégradé diagonal primary -> secondary (au lieu d'un aplat) —
+    // toujours dérivé du tenant, jamais de couleur fixe.
+    const gradientSvg = `
+      <svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${primary}" />
+            <stop offset="100%" stop-color="${secondary}" />
+          </linearGradient>
+        </defs>
+        <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bg)" />
+      </svg>
+    `;
+
     const logoSize = Math.round(HEIGHT * 0.95);
     const logoBuffer = await generateIconBuffer({ logoUrl: tenant.logo_url, size: logoSize });
     const left = Math.round((WIDTH - logoSize) / 2);
     const top = Math.round((HEIGHT - logoSize) / 2);
 
-    const output = await sharp({
-      create: {
-        width: WIDTH,
-        height: HEIGHT,
-        channels: 4,
-        background: tenant.primary_color ?? '#1D9E75',
-      },
-    })
+    const output = await sharp(Buffer.from(gradientSvg))
       .composite([{ input: logoBuffer, left, top }])
       .png()
       .toBuffer();
@@ -40,7 +50,12 @@ export async function GET() {
       status: 200,
       headers: {
         'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+        // Le CDN Vercel garde la réponse en cache (utile pour les scrapers
+        // sociaux), mais le navigateur ne met JAMAIS en cache : sinon on
+        // revoit une ancienne version pendant les tests, même après un vrai
+        // changement de code — cause probable du "0.85 -> 0.95 rien ne change".
+        'Cache-Control': 'public, max-age=0, must-revalidate',
+        'CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
       },
     });
   } catch (err) {
