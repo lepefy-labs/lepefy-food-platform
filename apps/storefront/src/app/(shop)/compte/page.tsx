@@ -4,7 +4,7 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { getCustomerProfile } from '@/lib/customers/getCustomerProfile';
 import { createServiceClient } from '@/lib/supabase/server';
 import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
-import { contrastRatio } from '@/lib/utils/color';
+import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
 import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import type { Address } from '@lepefy/types';
 import { AccountDashboard } from './AccountDashboard';
@@ -84,6 +84,10 @@ export default async function ComptePage() {
   // ici (valeurs hex réelles disponibles côté serveur) et transmis déjà
   // résolu, pas de recalcul côté client.
   const loyaltyCardTextColor = contrastRatio(tenant.primary_color, '#ffffff') >= 4.5 ? '#ffffff' : '#1a1a1a';
+  const primaryDarkApprox = mixWithBlack(tenant.primary_color, 75);
+  const accountAccentForeground = contrastRatio(tenant.accent_light, primaryDarkApprox) >= 3
+    ? primaryDarkApprox
+    : '#374151';
 
   return (
     <AccountDashboard
@@ -101,6 +105,7 @@ export default async function ComptePage() {
       loyaltyCardNumberDisplay={loyaltyCardNumberDisplay}
       loyaltyCardBarcodeSvg={loyaltyCardBarcodeSvg}
       loyaltyCardTextColor={loyaltyCardTextColor}
+      accountAccentForeground={accountAccentForeground}
     />
   );
 }
