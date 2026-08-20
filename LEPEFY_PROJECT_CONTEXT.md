@@ -1,6 +1,7 @@
 # Lepefy Food Platform — Project Context
 
 > Documento di riferimento per Claude Code, onboarding sviluppatori, e continuità tra sessioni.
+> Aggiornato: 20 Agosto 2026 (v3.58) — **carrello cross-device reso production-ready**, chiude il limite noto segnalato in §67 (v3.49): il vecchio `PUT` full-state last-write-wins è sostituito da una sincronizzazione **operation-based** (mutation tipizzate `add` relativa/`set_quantity` assoluta/`remove`/`clear`) con **optimistic concurrency control** lato server (`carts.version`, nuova migration `070_cart_versioning.sql`, funzione atomica `apply_cart_mutations()` con `SELECT ... FOR UPDATE` — nessuna finestra tra controllo versione e scrittura). Due device che modificano il carrello in concorrenza non si sovrascrivono più: gli `add` si sommano, i `set_quantity` non si sommano mai (deterministico, mai un 7 da 2+5), un 409 riconcilia invece di perdere lavoro. Il merge al login passa da **somma** (v3.49, raddoppiava ad ogni ripetizione) a **`max(locale, server)`** (idempotente). Il logout ora **svuota** il carrello locale invece di lasciarlo come carrello guest (limite v1 esplicitamente accettato in §67, ora risolto), isolando la coda pendente per `customerId` così il carrello del cliente A non finisce mai sulla sessione del cliente B. Perimetro rispettato alla lettera: nessuna modifica a UI carrello, checkout, Stripe, catalogo, o authentication. Nuovo `src/lib/cart/` (6 moduli, sync engine + funzioni pure testabili), `cartStore.ts` esteso con API pubbliche invariate, `CartSyncProvider.tsx` ridotto al solo lifecycle. **67 test unitari** (runner Playwright esistente, zero nuove dipendenze) + **14 test SQL su PostgreSQL 16 reale** (incluso uno stress test a 20 connessioni concorrenti, zero lost update) eseguiti in questa sessione, non solo scritti. `pnpm typecheck` pulito (unico comando la cui esecuzione è stata richiesta per la verifica). Nuovo `docs/CART_SYNC.md` (architettura, API, strategia di conflict-resolution, procedura di verifica manuale a 13 passi). **Scoperto in questa sessione, verificando `git diff` contro `origin/main`, che lo zip di consegna è già stato applicato da Robertin direttamente su `main`** (commit `fe8c804`+`458f77c`, 20/08 03:53) — stesso pattern già osservato in v3.12/v3.18/v3.20/v3.23, qui verificato puntualmente e non solo dedotto: diff vuoto su tutto il codice. Dettaglio completo in §76 (nuova sezione). Revisione precedente (v3.44) sotto.
 > Aggiornato: 18 Agosto 2026 (v3.44) — **fix `return_url` mancante su `/card` + Payment Funnel Logs**: bug corretto su `CardQuickPay.tsx` (nessun `return_url` verso il retour 3D Secure, rischio aggravato dal fatto che `/card` è tipicamente aperto da QR scansionato in negozio, spesso in WebView) con retrieve del PaymentIntent al mount per non perdere lo stato dopo un redirect completo; nuova tabella condivisa `payment_funnel_logs` (migration `065`, 7 `event_type`, RLS insert pubblico + grant `service_role`) strumentata sui 4 moduli di pagamento (card/event/rental/shop), ciascuno con un `reference_id` coerente per l'intero funnel di un tentativo (`quickPaymentId`/`event.id`/`service.id`/`sessionId` — quest'ultimi due, `quickPaymentId` e `sessionId`, non tornavano al client prima di questo ciclo, ora propagati dalle rispettive route). Nessuna modifica alla logica `confirmPayment`/`return_url` già corretta di shop/event/rental, solo aggiunta dei log attorno. `pnpm typecheck` pulito. Dettaglio completo in §62 (nuova sezione). Revisione precedente (v3.43) sotto.
 > Aggiornato: 17 Agosto 2026 (v3.34) — **due cicli ulteriori sullo stesso branch di lavoro** (`claude/stripe-webhook-event-reservations-iba64o`), sempre sul percorso di prenotazione evento, in continuità coi quattro cicli di v3.33: (5) **chiarimento del canale email sulla pagina `/en-attente`** (pagamento evento via link esterno PayPal/Revolut) — l'utente ora vede l'email inserita e viene informato onestamente che per questo mezzo di pagamento l'email è l'unico canale di recupero del biglietto (nessuna pagina QR di fallback, a differenza di Stripe), con CTA WhatsApp condizionale per correggere l'indirizzo prima di pagare; contestualmente, **pulizia dei trattini lunghi (`—`) da tutti i testi utente** del percorso Événementiel (nuova regola permanente, dettagliata in §52) — i commenti di codice non sono toccati; (6) **"Changer de moyen de paiement" da `/en-attente`** — il cliente che ha scelto PayPal/Revolut e vuole ripensarci può tornare al checkout con formule/nome/email/telefono già precompilati (draft salvato in sessionStorage) invece di reinserire tutto da zero, e la richiesta `pending` abbandonata viene cancellata (non solo marcata) così sparisce anche dal bandeau admin. **Nessuno dei due cicli è stato pushato** — stessa regola dei precedenti, consegna via zip. `pnpm typecheck` pulito dopo ciascuno, nessuna migration SQL. Dettaglio completo in §52 (nuova sezione). Revisione precedente (v3.33) sotto.
 > Aggiornato: 17 Agosto 2026 (v3.33) — **quattro cicli sequenziali sullo stesso branch di lavoro** (`claude/stripe-webhook-event-reservations-iba64o`), tutti sul percorso di prenotazione evento (billetterie Événementiel, §41): (1) **fix critico** — il webhook Stripe non gestiva `payment_intent.succeeded` con `metadata.type === 'event_reservation'`, quindi i pagamenti biglietto evento venivano incassati ma nessuna riga `event_reservations`/QR/email veniva mai generata (varco isolato al percorso Stripe diretto, il flusso Phase 2 `external_link` non era toccato perché passa da `confirm-payment/route.ts`); (2) nuova funzionalità admin di **correzione email + reinvio biglietto** per prenotazioni già confermate; (3) **messaggistica evidente sull'email** in tre punti del percorso di checkout/conferma (rilettura email, non correzione automatica del dominio — quella è stata scartata come non pertinente al problema reale, errori nella mailbox non nel dominio); (4) **validazione di formato email** (client + server) per chiudere il varco residuo su chiamate dirette all'API. **Nessuno dei quattro cicli è stato pushato** — consegna via zip ad ogni ciclo su richiesta esplicita di Robertin, modifiche presenti solo su disco in questa sessione (`git status` mostra 6 file modificati + 2 nuovi non committati al momento di questa revisione). `pnpm typecheck` pulito dopo ciascun ciclo. Nessuna migration SQL in nessuno dei quattro cicli. Dettaglio completo in §51 (nuova sezione). Revisione precedente (v3.32) sotto.
@@ -137,6 +138,7 @@ lepefy-food-platform/
 │       │   │       ├── webhooks/stripe/              # Crea ordine dopo payment_intent.succeeded (idempotente)
 │       │   │       ├── health/                       # Health check ({ ok, tenant, ts })
 │       │   │       ├── pwa-icon/                     # Icona PWA dinamica per tenant (sharp resize)
+│       │   │       ├── og-image/                     # Nuovo (§76) — banner Open Graph 1200×630 dinamico per tenant (sharp), logo+primary_color
 │       │   │       ├── card/qr-code/                 # QR code biglietto digitale con logo overlay
 │       │   │       ├── card/vcard/                   # Download vCard biglietto digitale
 │       │   │       ├── chat/                         # Nuovo (23/07) — POST pubblica del chatbox, gated su ai_chatbox_enabled, vedi §13ter
@@ -211,7 +213,7 @@ lepefy-food-platform/
 │       │       └── cartStore.ts       # Zustand cart store
 │       └── public/
 │           ├── sw.js                  # Service worker PWA
-│           └── favicon.ico, icons/apple-touch-icon.png  # ⚠️ eccezione statica mono-tenant, da rimediare al 2° tenant
+│           └── favicon.ico, icons/apple-touch-icon.png  # ⚠️ favicon.ico ancora eccezione statica; apple-touch-icon.png non più referenziato da `layout.tsx` (§76, → `/api/pwa-icon?size=180`) ma il file resta su disco, candidato a rimozione
 ├── packages/
 │   └── types/                         # Shared TypeScript interfaces (@lepefy/types)
 │       ├── index.ts                   # Ri-esporta tutti i moduli sottostanti
@@ -416,8 +418,8 @@ GRANT UPDATE ON public.[tabella] TO service_role;  -- richiesto per ogni tabella
 - **✅ Audit dedicato eseguito su questa regola per lo storefront pubblico (Fase 1–3, §12bis), ⚠️ ma solo su questo branch di lavoro, non su `main`.** Prima dell'audit la regola era violata in più punti concreti (colori hardcoded in BottomNav/PWABanner/AddToCartButton/HeroBanner/tracking ordine, nome tenant hardcoded `"Chloé Food"` in PWABanner). Tutti corretti su questo branch; il pattern qui è: solo `var(--color-*)` o classi Tailwind mappate nei componenti storefront, mai hex literal — ma `main` risulta ancora con gli hex hardcoded originali (verificato v3.7, vedi §12bis). Vedi §12bis per il dettaglio e per il lavoro analogo ancora da fare fuori da `apps/storefront` se in futuro si aggiungerà un secondo tenant con branding diverso
 - La logica del corriere è **switch-based** su `tenants.shipping_provider` (`packlink` / `flat_rate` / `pickup_only`)
 - RLS attivo su tutte le tabelle — il `service_role` bypassa RLS nelle API routes admin (ora tutte protette anche a livello applicativo da `requireAdmin()`, vedi §2.1)
-- **Eccezioni statiche note (da rimediare prima del 2° tenant):** `favicon.ico` e `apple-touch-icon.png` in `public/` sono file statici mono-tenant, accettabili temporaneamente con un solo tenant attivo
-- **Regola per asset dinamici:** trasformazioni immagine (icone, QR) sempre via API route (es. `/api/pwa-icon?size=192`, `/api/card/qr-code`) che legge `tenant.logo_url` / `tenant.primary_color` a runtime — mai file statici pre-generati
+- **Eccezioni statiche note (da rimediare prima del 2° tenant):** `favicon.ico` in `public/` resta file statico mono-tenant, accettabile temporaneamente con un solo tenant attivo. `apple-touch-icon.png` non è più referenziato da codice (§76: `layout.tsx` punta ora a `/api/pwa-icon?size=180`) ma il file fisico non è stato rimosso — candidato a pulizia in un prompt successivo.
+- **Regola per asset dinamici:** trasformazioni immagine (icone, QR, OG banner) sempre via API route (es. `/api/pwa-icon?size=192`, `/api/card/qr-code`, `/api/og-image`) che legge `tenant.logo_url` / `tenant.primary_color` a runtime — mai file statici pre-generati
 - **Limite architetturale noto (§18/§19):** il tenant è risolto da `NEXT_PUBLIC_TENANT_SLUG` a build time → ogni nuovo negozio richiede un deployment Vercel dedicato. Regge fino a ~5 tenant; evoluzione naturale è risolvere il tenant dal dominio (header `Host`) prima di onboardare il terzo cliente.
 
 ---
@@ -3044,4 +3046,97 @@ File toccati : `apps/storefront/src/components/payments/StripePaymentStep.tsx` �
 
 ---
 
+## 76. Changelog v3.58 (20 Agosto 2026) — Carrello cross-device production-ready: versioning + mutation queue, sostituisce il PUT full-state di v3.49 — **✅ già su `main`, applicato da Robertin**
+
+Ciclo mirato esclusivamente alla logica di sincronizzazione del carrello (nessuna modifica a UI carrello, checkout, Stripe, catalogo, o authentication, come da perimetro esplicito del prompt). Chiude il limite noto segnalato in §67 (v3.49): niente più last-write-wins silenzioso, niente più somma indiscriminata delle quantità al merge, niente più carrello guest "contaminato" al logout su device condiviso.
+
+### Step 0 — audit del `068_carts.sql`/`CartSyncProvider` esistenti (§67)
+
+Confermati due problemi strutturali nell'implementazione v3.49: (1) il client faceva sempre `PUT` dell'intero carrello, senza alcun controllo di versione — due device che scrivevano nello stesso istante producevano last-write-wins con perdita silenziosa; (2) il merge al login sommava le quantità per prodotto in comune (`Math.min(existing.quantity + item.quantity, stock)`), quindi rieseguire il merge o avere lo stesso prodotto su due device raddoppiava/triplicava la quantità invece di convergere a un valore stabile.
+
+### Database — `070_cart_versioning.sql` (nuova, estende `068` senza riscrivere dati)
+
+- `carts.version` (bigint, default `1`) — optimistic concurrency control.
+- `carts.applied_mutation_ids` (jsonb, ring buffer ultimi 100) — idempotenza: un retry dopo timeout di rete non riapplica due volte lo stesso `+1`.
+- **`apply_cart_mutations(tenant_id, customer_id, expected_version, mutations)`** — funzione PL/pgSQL, quindi transazionale; blocca la riga con `SELECT ... FOR UPDATE` **prima** di leggere la versione (nessuna finestra tra controllo e scrittura, stesso principio di `decrement_stock_for_order` in `029`). Mutation supportate: `add` (relativa), `set_quantity` (assoluta), `remove`, `clear`, `replace` (percorso legacy per il vecchio `PUT`). Valida ogni prodotto (esiste/attivo/tenant corretto) e normalizza la quantità sullo stock, senza mai riservarlo.
+- **Retrocompatibile**: nessuna colonna rimossa, nessun dato riscritto — i carrelli `068` esistenti partono da `version = 1` grazie al `DEFAULT`.
+- **Testata su PostgreSQL 16 reale** in questa sessione (non solo scritta): 14 test SQL (`supabase/tests/070_cart_versioning.test.sql` + fixture) coprono idempotenza, conflitto di versione, isolamento tenant, prodotto disattivato, retrocompatibilità con un carrello creato in forma pre-`070`. Stress test aggiuntivo: 20 connessioni concorrenti con `add +1` sullo stesso prodotto → quantità finale esattamente 20, zero lost update.
+
+### API — `GET`/`POST`/`PUT /api/customers/me/cart`
+
+- `GET` → `{ items, version }` (`items` invariato rispetto a `068`, `version` additivo — nessuna rottura per consumer esistenti).
+- **`POST`** (nuovo verbo, sostituisce il `PUT` come percorso primario) → `{ expectedVersion, mutations[] }` → `{ items, version, appliedMutationIds, unavailableProductIds }`, oppure **409** con lo stato canonical incluso nella risposta (evita una `GET` supplementare per la riconciliazione).
+- `PUT` **mantenuto** per retrocompatibilità (nessun consumer noto lo usa più), passa ora dalla stessa funzione atomica (mutation `replace`).
+- Identità (`tenant_id`/`customer_id`) sempre derivata dalla sessione server (`getTenant`+`getSessionCustomer`) — `parseSyncRequest` ignora esplicitamente qualunque `tenantId`/`customerId` presente nel corpo della richiesta, verificato con un test dedicato.
+
+### Client — `cartStore.ts` esteso, non riscritto
+
+- Nuovi campi: `syncStatus` (`idle`/`syncing`/`synced`/`offline`/`error`/`conflict`), `serverVersion`, `lastSyncedAt`, `pendingMutations` (coda persistita nello stesso `localStorage['lepefy-cart']`, sopravvive a refresh/chiusura tab senza dipendere da `beforeunload`), `ownerCustomerId` (isolamento coda per cliente, vedi logout sotto). **API pubbliche invariate** (`addItem`/`removeItem`/`updateQuantity`/`clearCart`/`totalItems`/`totalPrice`/`totalWeightG`/`shippingPayload`) — zero componenti da toccare.
+- **Nuovo `src/lib/cart/`** (6 moduli): `cartSyncEngine.ts` (flush debouncato 700ms con coalescing — cinque `+` sullo stesso prodotto → una sola richiesta HTTP —, retry con backoff esponenziale 1s→2s→4s→8s, gestione offline/online, riconciliazione 409, merge al login, logout), `cartApi.ts` (unico punto di contatto con l'endpoint), `cartErrors.ts` (`CartSyncError` con 6 codici strutturati: `CART_CONFLICT`/`CART_UNAUTHORIZED`/`PRODUCT_UNAVAILABLE`/`INVALID_QUANTITY`/`NETWORK_ERROR`/`SERVER_ERROR`), `cartQueue.ts`/`reconcile.ts`/`mergeCarts.ts` (funzioni pure, zero I/O, interamente testabili in isolamento), `cartRequest.ts` (validazione payload, riusata sia dalla route sia dai test).
+- **`CartSyncProvider.tsx` ridotto al solo lifecycle** (auth/online/offline/visibility/pagehide) — tutta la logica di business è stata spostata nel sync engine, come richiesto esplicitamente dal prompt.
+
+### Strategia di risoluzione conflitti (sostituisce il "somma sempre" di v3.49)
+
+- **`add` è relativa, `set_quantity` è assoluta** — distinzione semantica esplicita mai presente in `068`/v3.49 (che trattava ogni mutazione come un nuovo stato assoluto da sommare). Due `add` concorrenti da device diversi si sommano correttamente; due `set_quantity` concorrenti **non si sommano mai** — l'ultimo a sincronizzarsi con successo vince, l'altro lo apprende al ritorno sulla tab, deterministico e senza silenzio.
+- **409** → `reconcileCart(serverState, localState, pendingMutations)`: lo stato server è la base (contiene le modifiche di altri device), le mutation locali ancora pendenti si riapplicano sopra. Né "server wins" né "local wins" incondizionato — principio esplicitamente richiesto dal prompt e prima assente.
+- **Merge al login** (`mergeGuestCartWithServerCart`) cambia da **somma** a **`max(locale, server)`** per prodotto in comune — deterministico e idempotente (`max(max(a,b),b) = max(a,b)`, mentre la somma di v3.49 raddoppiava ad ogni ripetizione del merge). Info prodotto sempre prese dal server (più fresche).
+- **Logout**: cambia deliberatamente il comportamento v1 documentato come "limite noto, non risolto" in §67 — il carrello locale viene ora **svuotato** dopo un ultimo flush best-effort (`keepalive`), invece di restare come carrello guest sul device. La copia server resta intatta, ripristinata al login successivo. Se la coda non è stata svuotata (offline), resta legata al suo `ownerCustomerId`: riparte se lo stesso cliente si riautentica, viene scartata se si autentica un cliente diverso — mai inviata sulla sessione di un altro (stesso principio di isolamento richiesto esplicitamente dal prompt).
+
+### Test e validazione — risultati reali, non dichiarati
+
+- `pnpm typecheck` — **pulito** (unico comando la cui esecuzione è stata esplicitamente richiesta per la verifica di questo ciclo).
+- **67 test unitari** nuovi (`apps/storefront/tests/unit/`, runner Playwright già presente come devDependency — **zero nuove librerie**, coerente con la regola permanente del prompt) coprono store, guest cart, login merge (3 casi + idempotenza), sync (successo/retry/offline/reconnect), conflitto di versione, **scenario multi-device esplicito** (due device che aggiungono prodotti diversi in concorrenza → entrambi preservati; due `set_quantity` concorrenti sullo stesso prodotto → mai la somma, risoluzione deterministica), logout/isolamento coda, tenant isolation.
+- **14 test SQL** su PostgreSQL 16 reale (non un mock) per la migration — dettaglio sopra.
+- Eseguiti una sola volta in questa sessione per non consegnare test rotti; non rieseguiti automaticamente ad ogni turno successivo.
+
+### Deviazioni dichiarate rispetto al prompt originale
+
+- Il prompt chiedeva di valutare IndexedDB per la coda pendente — **scartata**, `localStorage` (stesso storage già usato dal cart store) è sufficiente per la complessità attuale, motivazione esplicita nel codice.
+- Il prompt lasciava la scelta tra operation-based sync e full-state versioning — **operation-based scelta**, con motivazione scritta in `docs/CART_SYNC.md`: il full-state non può soddisfare né "due add concorrenti entrambi preservati" né la distinzione `add`/`set_quantity`, qualunque sia lo schema di versioning.
+
+### Documentazione
+
+Nuovo `docs/CART_SYNC.md` (versionato, non un allegato di sessione) — architettura, formato API completo (`GET`/`POST`/409/`PUT` legacy), tabella di risoluzione conflitti, procedura di verifica manuale a 13 passi (device A/B, login, add/remove/quantity concorrenti, offline/online, refresh, logout, secondo account). Referenziato da `CLAUDE.md` (sezione "Cross-device cart sync" aggiunta).
+
+### Stato
+
+Consegnato via zip su richiesta esplicita ("non fare push"), commit locale sul branch di lavoro `claude/new-session-2evnvx`. **Scoperta in questa stessa sessione, verificando `git diff` contro `origin/main`**: Robertin ha già applicato lo zip direttamente su `main` (commit `fe8c804` "Add files via upload" + `458f77c` "Update .gitignore", 20/08 03:53) — `git diff` tra il commit locale di questa sessione e `origin/main` risulta **vuoto su tutti i file di codice** (unica differenza: questo stesso documento, non ancora incluso nello zip consegnato). Stesso pattern già osservato altre volte nel progetto (v3.12, v3.18, v3.20, v3.23) — verificato qui puntualmente con `git diff HEAD origin/main`, non solo dedotto.
+
+File toccati/aggiunti (tutti confermati identici su `origin/main`):
+`supabase/migrations/070_cart_versioning.sql` · `supabase/tests/070_cart_versioning.{fixture,test}.sql` · `apps/storefront/src/app/api/customers/me/cart/route.ts` · `apps/storefront/src/components/cart/CartSyncProvider.tsx` · `apps/storefront/src/stores/cartStore.ts` · `apps/storefront/src/lib/cart/{cartTypes,cartErrors,cartApi,cartQueue,reconcile,mergeCarts,cartRequest,cartLog,cartSyncEngine}.ts` · `apps/storefront/tests/unit/**` (7 spec + 4 helper) · `apps/storefront/package.json` (script `test:unit`) · `docs/CART_SYNC.md` · `CLAUDE.md` · `.gitignore`.
+
+---
+
 *Lepefy Labs — Lepefy Food Platform — Context document v3.57 — 20 Agosto 2026 (base: v3.53; disattivazione Link su tutti i pagamenti §72 (deployato, poi in gran parte annullato da §74), rimozione timeout + causa radice `IntegrationError` da §66 identificata e confermata §73, fix definitivo del blocco pagamento §74, didascalia paese di fatturazione §75; §73, §74 e §75 non ancora pushati)*
+
+## 77. Changelog v3.58 (20 Agosto 2026) — Logo obsoleto nell'anteprima WhatsApp/social: og:image + apple-touch-icon dinamici — ⚠️ nessuno pushato
+
+Diagnosi (data nel prompt, non ripetuta qui): nessun `openGraph.images`/`twitter.images` in `generateMetadata()`, quindi WhatsApp fa fallback sul favicon/apple-touch-icon statico hardcoded (`public/icons/apple-touch-icon.png`, vecchio logo), violando la regola multi-tenant (icona non derivata da `tenant.logo_url`). La PWA (manifest Android) faceva già la cosa giusta via `/api/pwa-icon`.
+
+### Cosa è stato costruito
+
+1. **Nuova route `apps/storefront/src/app/api/og-image/route.ts`** — genera un PNG 1200×630 (standard Open Graph): sfondo pieno `tenant.primary_color ?? '#1D9E75'`, logo del tenant al ~55% dell'altezza (346px) ottenuto con `generateIconBuffer({ logoUrl, size })` (riusata, non modificata) e centrato con `sharp({ create }).composite([...])` — stesso pattern del branch `purpose === 'maskable'` di `/api/pwa-icon`. `404` se `tenant.logo_url` assente, `Cache-Control` identica a `pwa-icon` (`public, max-age=86400, stale-while-revalidate=604800`), try/catch con `console.error('[og-image] Error:', err)` → 500.
+2. **`apps/storefront/src/app/layout.tsx`**:
+   - `generateMetadata()`: aggiunti `openGraph` (`title`, `description`, `images: [{ url: '/api/og-image', width: 1200, height: 630, alt: tenant.name }]`, `type: 'website'`) e `twitter` (`card: 'summary_large_image'`, `images: ['/api/og-image']`) — tutti i valori derivati da `tenant`, nessun hardcode ChloeFood.
+   - `<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />` → `href="/api/pwa-icon?size=180"` (route esistente riusata, `purpose=any` di default).
+   - `metadataBase` aggiunto condizionalmente da `NEXT_PUBLIC_APP_URL` (`new URL(appUrl)`) quando la env var è presente — non esisteva prima nel progetto (grep confermato); senza di essa Next risolverebbe `/api/og-image` come URL relativo nei tag OG, che alcuni scraper (incluso WhatsApp) non seguono in modo affidabile.
+
+Copre automaticamente tutte le pagine del sito **comprese le pagine evento** (`(evenementiel)/evenementiel/evenements/[slug]/page.tsx`), che non hanno un `generateMetadata` completo e quindi ereditano l'OG image del layout radice — nessuna modifica alle pagine evento in questo giro (fuori scope esplicito del prompt).
+
+### Step 0 (grep di verifica)
+
+`grep -rn "apple-touch-icon" apps/storefront/src apps/storefront/public` → un solo hit, `layout.tsx` (ora aggiornato). Nessun riferimento in `manifest.ts`, `admin/layout.tsx`, `card/layout.tsx` o altrove — nulla da segnalare come deviazione su questo fronte.
+
+### Deviazioni
+
+- **`metadataBase` aggiunto** (non esisteva) usando `NEXT_PUBLIC_APP_URL`, già env var consolidata nel repo per URL assoluti (usata in `ticketUrl.ts`, `qr-code/route.tsx`, `card/vcard/route.ts`, `EventsFooter.tsx`, pagine ambassadeur/parrainage) — coerente con il pattern esistente, non un nuovo meccanismo. Se la env var non è settata in produzione, `metadataBase` resta `undefined` e Next userà URL relativi per gli OG tag (comportamento esistente, invariato).
+- **`public/icons/apple-touch-icon.png` non toccato fisicamente**, come richiesto — non più referenziato da codice dopo questo cambio (unico hit del grep, ora aggiornato), quindi candidato a rimozione in un prompt successivo.
+- `pnpm install` eseguito in sessione (node_modules assente all'apertura del container) — necessario solo per far girare `pnpm typecheck`, nessun file di lock modificato.
+
+### Stato
+
+`pnpm typecheck` verde (0 errori, root e storefront). Non testabile in locale l'anteprima WhatsApp/Facebook: da verificare dopo il deploy con [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) + "Scrape Again" sull'URL di produzione (WhatsApp cache le anteprime già condivise). Nessun commit pushato — zip fornito su richiesta esplicita.
+
+File toccati : `apps/storefront/src/app/api/og-image/route.ts` (nuovo) · `apps/storefront/src/app/layout.tsx` · `LEPEFY_PROJECT_CONTEXT.md`.
+
+---

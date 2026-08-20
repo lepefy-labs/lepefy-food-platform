@@ -18,7 +18,9 @@ const bricolage = Bricolage_Grotesque({
 export async function generateMetadata(): Promise<Metadata> {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   return {
+    ...(appUrl ? { metadataBase: new URL(appUrl) } : {}),
     title:           { default: tenant.name, template: `%s | ${tenant.name}` },
     description:     tenant.tagline ?? undefined,
     manifest:        '/manifest.webmanifest',
@@ -30,6 +32,16 @@ export async function generateMetadata(): Promise<Metadata> {
     formatDetection: { telephone: false },
     other: {
       'mobile-web-app-capable': 'yes',
+    },
+    openGraph: {
+      title:       tenant.name,
+      description: tenant.tagline ?? undefined,
+      images:      [{ url: '/api/og-image', width: 1200, height: 630, alt: tenant.name }],
+      type:        'website',
+    },
+    twitter: {
+      card:   'summary_large_image',
+      images: ['/api/og-image'],
     },
   };
 }
@@ -48,7 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             --color-secondary: ${tenant.secondary_color};
           }
         `}</style>
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/api/pwa-icon?size=180" />
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
       <body className={`${inter.variable} ${bricolage.variable}`}>
