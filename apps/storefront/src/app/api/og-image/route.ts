@@ -3,6 +3,9 @@ import sharp from 'sharp';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateIconBuffer } from '@/lib/tenant/generateIconBuffer';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 const WIDTH = 1200;
 const HEIGHT = 630;
 
