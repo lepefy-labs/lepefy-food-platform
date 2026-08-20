@@ -1,45 +1,61 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconBuildingStore, IconUserCircle, IconGift, IconMapPin, IconStar, IconAlertCircle } from '@tabler/icons-react';
+import { IconAlertCircle, IconChevronRight, IconGift, IconLogout, IconMapPin, IconPencil, IconReceipt, IconStar, IconUser, IconUserCircle } from '@tabler/icons-react';
+import type { Icon as TablerIcon } from '@tabler/icons-react';
 import type { Address } from '@lepefy/types';
 import { LoyaltyCardWidget } from './LoyaltyCardWidget';
 
-interface AccountTenant {
-  name:            string;
-  logoUrl:         string | null;
-  countriesServed: number | null;
-  loyaltyEnabled:  boolean;
-  country:         string;
-}
-
 interface AccountDashboardProps {
-  tenant:          AccountTenant;
-  email:           string;
-  fullName:        string | null;
-  phone:           string | null;
+  tenant: { name: string; loyaltyEnabled: boolean };
+  email: string;
+  fullName: string | null;
+  phone: string | null;
   confirmedPoints: number;
-  addresses:       Address[];
-  isAmbassador:              boolean;
+  addresses: Address[];
+  isAmbassador: boolean;
   ambassadorProfileCompleted: boolean;
-  loyaltyCardNumberDisplay:  string | null;
-  loyaltyCardBarcodeSvg:     string | null;
-  loyaltyCardTextColor:      string;
+  loyaltyCardNumberDisplay: string | null;
+  loyaltyCardBarcodeSvg: string | null;
+  loyaltyCardTextColor: string;
 }
 
-function sortAddresses(list: Address[]): Address[] {
-  return [...list].sort((a, b) => {
-    if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
-    return b.created_at.localeCompare(a.created_at);
-  });
+interface NavigationRowProps {
+  href: string;
+  icon: TablerIcon;
+  label: string;
+  description: string;
+  accent?: boolean;
 }
 
 function formatAddressLine(address: Address): string {
-  const line1 = address.line2 ? `${address.line1}, ${address.line2}` : address.line1;
-  return `${line1}, ${address.postal_code} ${address.city}`;
+  const street = address.line2 ? `${address.line1}, ${address.line2}` : address.line1;
+  return `${street}, ${address.postal_code} ${address.city}`;
+}
+
+function NavigationRow({ href, icon: Icon, label, description, accent = false }: NavigationRowProps) {
+  return (
+    <Link
+      href={href}
+      className={`group flex min-h-16 items-center gap-3 px-4 py-3 transition-colors active:bg-gray-100 ${
+        accent ? 'bg-primary-light/60 hover:bg-primary-light' : 'hover:bg-gray-50'
+      }`}
+    >
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+        style={{ color: 'var(--color-primary-dark)', backgroundColor: accent ? 'white' : 'var(--color-primary-light)' }}
+      >
+        <Icon size={21} stroke={1.7} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-gray-900">{label}</span>
+        <span className="mt-0.5 block truncate text-xs leading-5 text-gray-500">{description}</span>
+      </span>
+      <IconChevronRight size={19} stroke={1.7} aria-hidden="true" className="shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  );
 }
 
 export function AccountDashboard({
@@ -48,10 +64,16 @@ export function AccountDashboard({
   loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyCardTextColor,
 }: AccountDashboardProps) {
   const router = useRouter();
-
-  const [profile, setProfile]           = useState({ fullName, phone });
-  const [addressList, setAddressList]   = useState(() => sortAddresses(addresses));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const defaultAddress = addresses.find((address) => address.is_default) ?? addresses[0] ?? null;
+  const addressHref = defaultAddress ? `/compte/adresses/${defaultAddress.id}` : '/compte/adresses/nouvelle';
+  const addressDescription = defaultAddress
+    ? `${formatAddressLine(defaultAddress)}${addresses.length > 1 ? ` · ${addresses.length} adresses` : ''}`
+    : 'Ajouter une adresse de livraison';
+  const profileDescription = fullName || phone
+    ? [fullName, phone].filter(Boolean).join(' · ')
+    : 'Ajouter votre nom et votre téléphone';
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -65,198 +87,66 @@ export function AccountDashboard({
   }
 
   return (
-    <div className="min-h-screen flex justify-center px-4 py-8 sm:py-10" style={{ backgroundColor: '#f7f8f6' }}>
-      <div
-        className="w-full flex flex-col overflow-hidden rounded-[20px]"
-        style={{ maxWidth: 430, boxShadow: '0 8px 30px rgba(20, 40, 30, 0.12)', backgroundColor: 'white' }}
-      >
-        <div style={{ height: 6, backgroundColor: 'var(--color-primary)' }} />
-
-        {/* Header brand */}
-        <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-gray-100">
-          <div
-            className="flex items-center justify-center shrink-0 overflow-hidden rounded-full"
-            style={{ width: 32, height: 32, backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, white)' }}
-          >
-            {tenant.logoUrl ? (
-              <Image src={tenant.logoUrl} alt={tenant.name} width={32} height={32} className="h-full w-full object-cover" />
-            ) : (
-              <IconBuildingStore size={16} stroke={1.8} color="var(--color-primary)" />
-            )}
+    <div className="min-h-screen bg-[#f7f9f8]">
+      <div className="mx-auto w-full max-w-3xl px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-10">
+        <header className="flex items-center gap-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-dark)' }}>
+            <IconUserCircle size={32} stroke={1.5} aria-hidden="true" />
           </div>
-          <span className="font-bold" style={{ fontSize: 14, color: 'var(--color-primary-dark)' }}>{tenant.name}</span>
-        </div>
-
-        {/* Identité */}
-        <div className="text-center px-5 pt-6 pb-2">
-          <div
-            className="mx-auto mb-3 flex items-center justify-center rounded-full"
-            style={{ width: 56, height: 56, backgroundColor: 'color-mix(in srgb, var(--color-primary) 10%, white)' }}
-          >
-            <IconUserCircle size={28} stroke={1.5} color="var(--color-primary)" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mon compte</p>
+            <h1 className="truncate font-display text-xl font-bold text-gray-900 sm:text-2xl">{fullName || 'Bienvenue !'}</h1>
+            <p className="truncate text-sm text-gray-500">{email}</p>
           </div>
-          <div className="font-extrabold text-gray-900" style={{ fontSize: 20 }}>Mon compte</div>
-          <div className="text-gray-500 mt-1" style={{ fontSize: 13, lineHeight: 1.5 }}>
-            Connecté(e) en tant que<br />
-            <strong className="text-gray-700">{email}</strong>
-          </div>
-        </div>
+          <Link href="/compte/modifier" aria-label="Modifier mes informations" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 active:bg-gray-100">
+            <IconPencil size={19} stroke={1.7} aria-hidden="true" />
+          </Link>
+        </header>
 
-        {/* Bannière ambassadeur — profil incomplet, ne bloque jamais la
-            navigation (voir 046) : juste un rappel visible tant que le
-            paiement des commissions n'est pas configurable. */}
         {isAmbassador && !ambassadorProfileCompleted && (
-          <div className="mx-5 mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 flex items-start gap-2">
-            <IconAlertCircle size={16} stroke={1.8} className="text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-amber-800" style={{ fontSize: 12, lineHeight: 1.4 }}>
-              Complète ton profil pour recevoir tes paiements —{' '}
-              <Link href="/compte/ambassadeur" className="font-bold underline">
-                c&apos;est ici
-              </Link>
-            </div>
-          </div>
+          <Link href="/compte/ambassadeur" className="mt-5 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 transition-colors hover:bg-amber-100 active:bg-amber-100">
+            <IconAlertCircle size={20} stroke={1.8} className="mt-0.5 shrink-0 text-amber-600" />
+            <span className="flex-1 text-sm leading-5"><strong className="block font-semibold">Profil ambassadeur à compléter</strong>Ajoutez vos informations pour pouvoir recevoir vos paiements.</span>
+            <IconChevronRight size={18} stroke={1.7} className="mt-1 shrink-0" aria-hidden="true" />
+          </Link>
         )}
 
-        {/* Tessera fedeltà — widget "carta fisica" cliccabile verso
-            /compte/carte-fidelite (vue agrandie, QR + barcode plein format,
-            construite au cycle précédent — non dupliquée ici). Pas de badge
-            de niveau ni de barre de progression : aucun système de palier par
-            points n'existe côté données (ledger + solde uniquement), voir le
-            rapport final. */}
         {tenant.loyaltyEnabled && (
-          <div className="px-5 pt-4">
-            <LoyaltyCardWidget
-              tenantName={tenant.name}
-              fullName={profile.fullName}
-              confirmedPoints={confirmedPoints}
-              cardNumberDisplay={loyaltyCardNumberDisplay}
-              barcodeSvg={loyaltyCardBarcodeSvg}
-              textColor={loyaltyCardTextColor}
-            />
-          </div>
+          <section className="mt-6" aria-labelledby="loyalty-heading">
+            <div className="mb-3 flex items-end justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Mes avantages</p>
+                <h2 id="loyalty-heading" className="font-display text-lg font-bold text-gray-900">Carte de fidélité</h2>
+              </div>
+              <span className="text-xs font-medium" style={{ color: 'var(--color-primary-dark)' }}>Voir la carte</span>
+            </div>
+            <div className="max-w-lg">
+              <LoyaltyCardWidget tenantName={tenant.name} fullName={fullName} confirmedPoints={confirmedPoints} cardNumberDisplay={loyaltyCardNumberDisplay} barcodeSvg={loyaltyCardBarcodeSvg} textColor={loyaltyCardTextColor} />
+            </div>
+          </section>
         )}
 
-        {/* Informations personnelles */}
-        <div className="px-5 pt-[18px]">
-          <div className="font-bold text-gray-500 uppercase mb-2" style={{ fontSize: 12, letterSpacing: '0.04em' }}>
-            Informations personnelles
+        <section className="mt-7" aria-labelledby="account-navigation-heading">
+          <h2 id="account-navigation-heading" className="mb-3 font-display text-lg font-bold text-gray-900">Mon espace</h2>
+          <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-card">
+            <NavigationRow href="/orders" icon={IconReceipt} label="Mes commandes" description="Suivre et retrouver mes achats" />
+            <NavigationRow href="/compte/modifier" icon={IconUser} label="Mes informations" description={profileDescription} />
+            <NavigationRow href={addressHref} icon={IconMapPin} label="Mes adresses" description={addressDescription} />
+            <NavigationRow href="/compte/parrainage" icon={IconGift} label="Inviter un ami" description="Partager mon lien de parrainage" accent />
+            {isAmbassador && <NavigationRow href="/compte/ambassadeur" icon={IconStar} label="Espace Ambassadeur" description="Mes invitations, commissions et paiements" />}
           </div>
-          <div className="border border-gray-200 rounded-[14px] overflow-hidden">
-            <div className="flex justify-between items-center px-3.5 py-[13px] border-b border-gray-100">
-              <div>
-                <div className="text-gray-500" style={{ fontSize: 11 }}>Nom</div>
-                <div className="font-semibold text-gray-800" style={{ fontSize: 14 }}>
-                  {profile.fullName || 'Non renseigné'}
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-between items-center px-3.5 py-[13px]">
-              <div>
-                <div className="text-gray-500" style={{ fontSize: 11 }}>Téléphone</div>
-                <div className="font-semibold text-gray-800" style={{ fontSize: 14 }}>
-                  {profile.phone || 'Non renseigné'}
-                </div>
-              </div>
-            </div>
-          </div>
-          <Link
-            href="/compte/modifier"
-            className="w-full mt-2.5 flex items-center justify-center font-semibold text-gray-700 border border-gray-200 rounded-xl"
-            style={{ fontSize: 13, padding: '10px' }}
-          >
-            Modifier mes informations
-          </Link>
-        </div>
+        </section>
 
-        {/* Adresses de livraison */}
-        <div className="px-5 pt-[18px]">
-          <div className="flex justify-between items-center mb-2">
-            <div className="font-bold text-gray-500 uppercase" style={{ fontSize: 12, letterSpacing: '0.04em' }}>
-              Adresses de livraison
-            </div>
-            <Link
-              href="/compte/adresses/nouvelle"
-              className="font-bold shrink-0"
-              style={{ fontSize: 12, color: 'var(--color-primary)' }}
-            >
-              + Ajouter
-            </Link>
-          </div>
-
-          {addressList.length === 0 ? (
-            <p className="text-gray-400 text-center py-4" style={{ fontSize: 13 }}>
-              Aucune adresse enregistrée pour l&apos;instant.
-            </p>
-          ) : (
-            <div className="border border-gray-200 rounded-[14px] overflow-hidden">
-              {addressList.map((address, i) => (
-                <Link
-                  key={address.id}
-                  href={`/compte/adresses/${address.id}`}
-                  className={`w-full flex justify-between items-start gap-2 px-3.5 py-[13px] text-left hover:bg-gray-50 ${
-                    i < addressList.length - 1 ? 'border-b border-gray-100' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-2 min-w-0">
-                    <IconMapPin size={16} stroke={1.8} className="text-gray-400 shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-gray-800 truncate" style={{ fontSize: 14 }}>
-                        {address.full_name}
-                      </div>
-                      <div className="text-gray-500 mt-0.5" style={{ fontSize: 12 }}>
-                        {formatAddressLine(address)}
-                      </div>
-                    </div>
-                  </div>
-                  {address.is_default && (
-                    <span
-                      className="font-bold shrink-0 whitespace-nowrap rounded-md"
-                      style={{
-                        fontSize: 11,
-                        padding: '3px 8px',
-                        color: 'var(--color-primary)',
-                        backgroundColor: 'color-mix(in srgb, var(--color-primary) 10%, white)',
-                      }}
-                    >
-                      Par défaut
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* CTA */}
-        <div className="p-5 space-y-2.5">
-          {isAmbassador && (
-            <Link
-              href="/compte/ambassadeur"
-              className="w-full flex items-center justify-center gap-2 text-white font-bold rounded-xl"
-              style={{ backgroundColor: 'var(--color-primary-dark)', fontSize: 15, padding: '14px' }}
-            >
-              <IconStar size={18} stroke={1.8} />
-              Espace Ambassadeur
-            </Link>
-          )}
-          <Link
-            href="/compte/parrainage"
-            className="w-full flex items-center justify-center gap-2 text-white font-bold rounded-xl"
-            style={{ backgroundColor: 'var(--color-primary)', fontSize: 15, padding: '14px' }}
-          >
-            <IconGift size={18} stroke={1.8} />
-            Invite un ami
-          </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full font-semibold text-gray-700 border border-gray-200 rounded-xl disabled:opacity-50"
-            style={{ fontSize: 15, padding: '14px' }}
-          >
-            {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          aria-label={isLoggingOut ? 'Déconnexion en cours' : 'Se déconnecter'}
+          className="mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white hover:text-gray-900 active:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <IconLogout size={19} stroke={1.7} aria-hidden="true" />
+          {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
+        </button>
       </div>
     </div>
   );

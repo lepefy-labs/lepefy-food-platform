@@ -88,11 +88,8 @@ export default async function ComptePage() {
   return (
     <AccountDashboard
       tenant={{
-        name:             tenant.name,
-        logoUrl:          tenant.logo_url,
-        countriesServed:  tenant.countries_served,
-        loyaltyEnabled:   tenant.loyalty_enabled,
-        country:          tenant.country,
+        name:            tenant.name,
+        loyaltyEnabled:  tenant.loyalty_enabled,
       }}
       email={customer.email}
       fullName={profile?.fullName ?? customer.full_name}
