@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:unit": "playwright test --config=tests/unit/playwright.unit.config.ts",
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "test:e2e:report": "playwright show-report ../../playwright-report"
   },

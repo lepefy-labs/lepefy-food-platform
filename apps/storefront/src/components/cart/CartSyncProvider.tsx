@@ -2,107 +2,52 @@
 
 import { useEffect, useRef } from 'react';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
-import { useCartStore } from '@/stores/cartStore';
-import type { CartItem } from '@lepefy/types';
+import {
+  flushCart,
+  handleCartOffline,
+  handleCartOnline,
+  handleCartVisible,
+  hydrateCartForCustomer,
+  resetCartForLogout,
+} from '@/lib/cart/cartSyncEngine';
 
-// Synchronise le panier Zustand/localStorage avec le panier serveur
-// (carts table) pour un client authentifié — continuité cross-device.
-// Aucun impact visuel : wrapper transparent, monté une seule fois dans
-// ShopLayout. Le panier guest (non authentifié) reste strictement
-// localStorage, zéro appel réseau depuis ce composant (règle permanente 6).
-
-const SYNC_DEBOUNCE_MS = 900;
-
-// Fusion "somme les quantités, clampe au stock" — même principe que
-// addItem() de cartStore.ts, mais appliqué en un seul setState atomique
-// plutôt qu'en boucle d'appels addItem : évite plusieurs écritures
-// persist/localStorage successives et plusieurs re-renders pour un seul
-// événement logique (le merge au login). Les infos produit du panier serveur
-// sont préférées (rihydratées à l'instant via /api/customers/me/cart, donc
-// plus fraîches que celles potentiellement stockées depuis longtemps dans le
-// panier local) : seule la quantité locale est reportée, jamais son prix/stock.
-function mergeCartItems(localItems: CartItem[], serverItems: CartItem[]): CartItem[] {
-  const merged = new Map<string, CartItem>();
-  for (const item of serverItems) merged.set(item.product.id, item);
-
-  for (const item of localItems) {
-    const existing = merged.get(item.product.id);
-    if (existing) {
-      merged.set(item.product.id, {
-        product:  existing.product,
-        quantity: Math.min(existing.quantity + item.quantity, existing.product.stock),
-      });
-    } else {
-      merged.set(item.product.id, item);
-    }
-  }
-
-  return Array.from(merged.values());
-}
-
-async function pushCartToServer(items: CartItem[]) {
-  try {
-    await fetch('/api/customers/me/cart', {
-      method:  'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
-      }),
-    });
-  } catch {
-    // Best-effort — un échec de sync ne doit jamais bloquer l'usage local du
-    // panier ; le prochain changement (ou le prochain login) retentera.
-  }
-}
+// Sincronizza il carrello Zustand/localStorage con il carrello server
+// (tabella carts) per un cliente autenticato — continuità cross-device.
+// Nessun impatto visivo: wrapper trasparente, montato una sola volta in
+// ShopLayout. Il carrello guest (non autenticato) resta strettamente
+// localStorage, zero chiamate di rete da questo componente (regola
+// permanente 6).
+//
+// Questo componente si occupa SOLO del lifecycle. Tutta la logica di
+// sincronizzazione (queue, versioning, retry, riconciliazione, merge) vive in
+// lib/cart/cartSyncEngine.ts, testabile senza React.
 
 export function CartSyncProvider({ children }: { children: React.ReactNode }) {
   const { customer, refresh } = useSessionCustomer();
 
-  // Une seule fusion par "session de login" — se réinitialise au logout
-  // (cf. Task 3/4 du prompt) pour permettre un nouveau merge si un autre
-  // client se logue sur le même appareil.
-  const hasMergedRef = useRef(false);
-  const isAuthedRef   = useRef(false);
-  const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cliente per cui l'idratazione è già stata eseguita — evita di rieseguirla
+  // ad ogni re-render, e permette di rieseguirla se cambia il cliente.
+  const hydratedForRef = useRef<string | null>(null);
 
-  async function mergeCart() {
-    if (hasMergedRef.current) return;
-    hasMergedRef.current = true;
-    try {
-      const res = await fetch('/api/customers/me/cart');
-      if (!res.ok) return;
-      const data = await res.json();
-      const serverItems: CartItem[] = data.items ?? [];
-      const localItems = useCartStore.getState().items;
-      const merged = mergeCartItems(localItems, serverItems);
-      useCartStore.setState({ items: merged });
-      await pushCartToServer(merged);
-    } catch {
-      // best-effort — laisse hasMergedRef à true : un échec réseau ponctuel
-      // ne doit pas redéclencher un merge en boucle à chaque re-render.
-    }
-  }
-
-  // 1. Cas "page rechargée alors que déjà connecté".
+  // ─── 1. Idratazione : login, oppure pagina ricaricata già autenticati ────
   useEffect(() => {
-    if (customer && !hasMergedRef.current) mergeCart();
-    isAuthedRef.current = !!customer;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!customer) return;
+    if (hydratedForRef.current === customer.id) return;
+    hydratedForRef.current = customer.id;
+    void hydrateCartForCustomer(customer.id);
   }, [customer]);
 
-  // 2/3. Événements login/logout — CartSyncProvider est persistant entre
-  // navigations client-side, il ne se remonte pas au retour de
-  // /compte/connexion et ne peut donc pas découvrir le login autrement.
+  // ─── 2/3. Eventi login/logout ───────────────────────────────────────────
+  // CartSyncProvider è persistente tra le navigazioni client-side: non viene
+  // rimontato al ritorno da /compte/connexion e non potrebbe scoprire il login
+  // in altro modo.
   useEffect(() => {
     function onAuthenticated() {
-      refresh().then(() => mergeCart());
+      void refresh();
     }
     function onLoggedOut() {
-      // Le panier local n'est volontairement PAS vidé ici (reste comme
-      // panier guest sur l'appareil) — compromis connu pour un appareil
-      // partagé, accepté pour cette v1, cf. deviation report.
-      hasMergedRef.current = false;
-      isAuthedRef.current  = false;
+      hydratedForRef.current = null;
+      void resetCartForLogout();
     }
 
     window.addEventListener('lepefy:customer-authenticated', onAuthenticated);
@@ -111,22 +56,41 @@ export function CartSyncProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('lepefy:customer-authenticated', onAuthenticated);
       window.removeEventListener('lepefy:customer-logged-out', onLoggedOut);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh]);
+
+  // ─── 4. Connettività ────────────────────────────────────────────────────
+  useEffect(() => {
+    function onOnline()  { void handleCartOnline(); }
+    function onOffline() { handleCartOffline(); }
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
   }, []);
 
-  // 5. Sync continue, débouncée — uniquement si authentifié à l'instant du
-  // changement (guard isAuthedRef, jamais un appel réseau pour un guest).
+  // ─── 5. Visibilità e uscita dalla pagina ────────────────────────────────
+  // Al ritorno sulla tab si riconcilia solo se l'ultimo sync è abbastanza
+  // vecchio (nessun polling aggressivo). Quando la pagina sta per sparire si
+  // forza un flush con keepalive: le mutation sono comunque già persistite in
+  // localStorage, quindi anche se il browser tronca la richiesta nulla va
+  // perso — non ci si affida a beforeunload.
   useEffect(() => {
-    const unsubscribe = useCartStore.subscribe((state) => {
-      if (!isAuthedRef.current) return;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        pushCartToServer(state.items);
-      }, SYNC_DEBOUNCE_MS);
-    });
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') void handleCartVisible();
+      else void flushCart({ keepalive: true });
+    }
+    function onPageHide() {
+      void flushCart({ keepalive: true });
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
     return () => {
-      unsubscribe();
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
     };
   }, []);
 

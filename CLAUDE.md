@@ -69,6 +69,15 @@ The shipping logic is the most complex part of the codebase:
 
 Cart state lives in Zustand (`src/stores/cartStore.ts`), persisted to `localStorage` under key `lepefy-cart`. No other global client state.
 
+### Cross-device cart sync
+
+For **authenticated** customers the cart is mirrored server-side (`carts` table) with optimistic concurrency control. Guest carts stay purely in `localStorage` — zero network calls.
+
+- Store actions enqueue **typed mutations** (`add` relative / `set_quantity` absolute / `remove` / `clear`) into `cartStore.pendingMutations`, persisted alongside the items. The UI never waits for the network.
+- `src/lib/cart/cartSyncEngine.ts` owns all sync logic (debounced flush, retry/backoff, offline queueing, 409 reconciliation, login merge). `CartSyncProvider` only wires lifecycle events (auth, online/offline, visibility, pagehide).
+- `POST /api/customers/me/cart` sends `{ expectedVersion, mutations }`; the server applies them atomically via the `apply_cart_mutations` RPC (migration `070_cart_versioning.sql`) and returns the canonical `{ items, version }`. A stale version yields **409** with the canonical state, never an overwrite.
+- Full details, conflict-resolution strategy and manual test procedure: `docs/CART_SYNC.md`.
+
 ### Supabase Clients
 
 Two separate clients exist — use the right one:
