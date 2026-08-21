@@ -2,7 +2,7 @@
 insert into tenants (
   slug, name, tagline, primary_color, secondary_color, accent_light,
   city, country, currency, locale, click_collect_enabled,
-  click_collect_address
+  click_collect_address, google_maps_url
 ) values (
   'chloefood',
   'Chloé Food ETS',
@@ -15,7 +15,8 @@ insert into tenants (
   'EUR',
   'fr-FR',
   true,
-  'Via Angelo Zanti 1, 42122 Reggio Emilia, Italia'
+  'Via Angelo Zanti 1, 42122 Reggio Emilia, Italia',
+  'https://maps.app.goo.gl/7HBG12pWuHpUXH4DA'
 );
 
 -- ─── CATEGORIES ───────────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ insert into categories (tenant_id, name, slug, position) values
   ((select id from tenants where slug = 'chloefood'), 'Épices',          'epices',         1),
   ((select id from tenants where slug = 'chloefood'), 'Légumes',         'legumes',        2),
   ((select id from tenants where slug = 'chloefood'), 'Snacks',          'snacks',         3),
-  ((select id from tenants where slug = 'chloefood'), 'Sauces & Huiles', 'sauces-huiles',  4),
+  ((select id from tenants where slug = 'chloefood'), 'Sauces & Huiles', 'sauces-huiles', 4),
   ((select id from tenants where slug = 'chloefood'), 'Farines',         'farines',        5),
   ((select id from tenants where slug = 'chloefood'), 'Poissons',        'poissons',       6),
   ((select id from tenants where slug = 'chloefood'), 'Viandes séchées', 'viandes-sechees',7);
@@ -88,29 +89,16 @@ join (values
   ('Italie',         1001,     2000,   7.50),
   ('Italie',         2001,     5000,  10.50),
   ('Italie',         5001,    10000,  14.00),
-  ('Italie',        10001,    20000,  20.00),
-  ('Italie',        20001,     null,  28.00),
-  ('France & Belux',    0,      500,   8.50),
-  ('France & Belux',  501,     1000,  10.50),
-  ('France & Belux', 1001,     2000,  13.50),
-  ('France & Belux', 2001,     5000,  18.50),
-  ('France & Belux', 5001,    10000,  26.00),
-  ('France & Belux',10001,    20000,  38.00),
-  ('France & Belux',20001,     null,  52.00),
-  ('Europe proche',     0,      500,  10.50),
-  ('Europe proche',   501,     1000,  13.00),
-  ('Europe proche',  1001,     2000,  16.50),
-  ('Europe proche',  2001,     5000,  23.00),
-  ('Europe proche',  5001,    10000,  33.00),
-  ('Europe proche', 10001,    20000,  48.00),
-  ('Europe proche', 20001,     null,  65.00),
-  ('Europe éloignée',   0,      500,  12.50),
-  ('Europe éloignée', 501,     1000,  15.50),
-  ('Europe éloignée',1001,     2000,  20.00),
-  ('Europe éloignée',2001,     5000,  28.00),
-  ('Europe éloignée',5001,    10000,  40.00),
-  ('Europe éloignée',10001,   20000,  58.00),
-  ('Europe éloignée',20001,    null,  78.00)
-) as r(zone_name, min_g, max_g, rate)
-  on z.name = r.zone_name
-where z.tenant_id = (select id from tenants where slug = 'chloefood');
+  ('France & Belux',   0,      500,    6.90),
+  ('France & Belux', 501,     1000,    8.90),
+  ('France & Belux',1001,     2000,   11.90),
+  ('France & Belux',2001,     5000,   16.90),
+  ('Europe proche',    0,      500,    8.90),
+  ('Europe proche',  501,     1000,   10.90),
+  ('Europe proche', 1001,     2000,   14.90),
+  ('Europe proche', 2001,     5000,   19.90),
+  ('Europe éloignée',  0,      500,   10.90),
+  ('Europe éloignée',501,     1000,   13.90),
+  ('Europe éloignée',1001,    2000,   17.90),
+  ('Europe éloignée',2001,    5000,   23.90)
+) as r(zone_name, min_g, max_g, rate) on r.zone_name = z.name;
