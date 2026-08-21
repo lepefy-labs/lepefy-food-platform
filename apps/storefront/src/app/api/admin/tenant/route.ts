@@ -9,6 +9,7 @@ const EDITABLE_TENANT_FIELDS = [
   'tagline',
   'whatsapp_number',
   'click_collect_address',
+  'google_maps_url',
   'click_collect_hours',
   'click_collect_hours_it',
   'legal_name',
@@ -37,23 +38,14 @@ const EDITABLE_TENANT_FIELDS = [
   'ambassador_split_pool_ambassador_percent',
 ] as const;
 
-// Champs numériques de la whitelist — jamais forcés à un minimum, une valeur
-// vide reste `null` (ex. countries_served : pas de chiffre tant qu'il n'est
-// pas confirmé par le tenant, jamais une valeur par défaut inventée).
 const NUMERIC_FIELDS = new Set<string>([
   'countries_served',
   'referral_max_depth',
   'referral_fraud_period_days',
 ]);
 
-// Champs booléens — le parsing générique de la whitelist (string trim/parseInt)
-// ne convient ni aux nombres décimaux (purchase_points_rate, taux type 1.25)
-// ni aux booléens ; whitelist séparée pour éviter de stocker "false" comme
-// chaîne truthy.
 const BOOLEAN_FIELDS = new Set<string>(['loyalty_enabled', 'ambassador_loyalty_from_second_order']);
 
-// Champs numériques pouvant être décimaux (contrairement à NUMERIC_FIELDS
-// existant, qui utilise parseInt — inadapté à un taux ou un montant en euros).
 const DECIMAL_FIELDS = new Set<string>([
   'purchase_points_rate',
   'referral_unlock_spending_threshold',
@@ -67,6 +59,22 @@ const DECIMAL_FIELDS = new Set<string>([
   'ambassador_split_pool_ambassador_percent',
 ]);
 
+const GOOGLE_MAPS_HOSTS = new Set([
+  'maps.app.goo.gl',
+  'www.google.com',
+  'google.com',
+  'maps.google.com',
+]);
+
+function isAllowedGoogleMapsUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && GOOGLE_MAPS_HOSTS.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -74,7 +82,17 @@ export async function PATCH(req: NextRequest) {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const body   = await req.json() as Record<string, unknown>;
+  const body = await req.json() as Record<string, unknown>;
+  if ('google_maps_url' in body) {
+    const rawMapsUrl = body.google_maps_url;
+    if (rawMapsUrl != null && typeof rawMapsUrl !== 'string') {
+      return NextResponse.json({ error: 'Le lien Google Maps doit être une URL HTTPS valide.' }, { status: 400 });
+    }
+    const mapsUrl = typeof rawMapsUrl === 'string' ? rawMapsUrl.trim() : '';
+    if (mapsUrl && !isAllowedGoogleMapsUrl(mapsUrl)) {
+      return NextResponse.json({ error: 'Le lien doit être une URL HTTPS Google Maps valide.' }, { status: 400 });
+    }
+  }
 
   const updatePayload = EDITABLE_TENANT_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
     if (field in body) {
