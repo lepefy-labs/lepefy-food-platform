@@ -68,7 +68,7 @@ export function CatalogCategoryRow({ categories, previewImagesByCategory, active
   }, []);
 
   return (
-    <section aria-labelledby="catalog-univers-heading" className="mt-6">
+    <section aria-labelledby="catalog-univers-heading" className="mt-4 md:mt-6">
       <div className="mb-3 flex items-center justify-between">
         <h2 id="catalog-univers-heading" className="font-display text-lg font-bold text-gray-900">Nos univers</h2>
         {activeSlug && (

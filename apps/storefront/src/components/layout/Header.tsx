@@ -40,14 +40,16 @@ export function Header() {
 
         <Link href="/" className="absolute left-1/2 -translate-x-1/2 font-display font-bold text-xl md:static md:translate-x-0" style={{ color: 'var(--color-primary)' }}>
           {tenant.logo_url ? (
-            <Image
-              src={tenant.logo_url}
-              alt={tenant.name}
-              width={120}
-              height={48}
-              className="h-11 w-auto max-w-[120px] object-contain object-left"
-              priority
-            />
+            <span className="relative block h-12 w-[140px] max-w-[40vw] md:h-11 md:w-[120px]">
+              <Image
+                src={tenant.logo_url}
+                alt={tenant.name}
+                fill
+                sizes="(max-width: 767px) 140px, 120px"
+                className="object-contain"
+                priority
+              />
+            </span>
           ) : tenant.name}
         </Link>
         <div className="ml-auto flex items-center gap-4">

@@ -234,7 +234,7 @@ export function CatalogClient({
       )}
 
       {/* Header risultati */}
-      <div className="mt-6 mb-4 flex items-end justify-between gap-3">
+      <div className="mt-4 mb-4 flex items-end justify-between gap-3 md:mt-6">
         <div>
           <h2 className="font-display text-xl font-bold text-gray-900">{productHeading}</h2>
           {hasActiveSearch && <p className="mt-1 text-sm text-gray-500">{availableLabel}</p>}
