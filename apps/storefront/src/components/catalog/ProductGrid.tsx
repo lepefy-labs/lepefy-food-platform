@@ -7,10 +7,17 @@ import { ProductCard } from './ProductCard';
 function ProductCardSkeleton() {
   return (
     <div className="rounded-lg overflow-hidden border border-gray-200 animate-pulse">
-      <div className="aspect-square bg-gray-100" />
-      <div className="p-3 space-y-2">
-        <div className="h-3.5 bg-gray-100 rounded-sm w-full" />
-        <div className="h-3.5 bg-gray-100 rounded-sm w-2/3" />
+      <div className="aspect-[4/3] bg-gray-100 sm:aspect-square" />
+      <div className="p-2.5 sm:p-3">
+        <div className="space-y-1">
+          <div className="h-3.5 bg-gray-100 rounded-sm w-full" />
+          <div className="h-3.5 bg-gray-100 rounded-sm w-2/3" />
+        </div>
+        <div className="mt-1.5 h-3 w-1/2 rounded-sm bg-gray-100 sm:mt-2" />
+        <div className="mt-1.5 flex items-end justify-between gap-2 sm:mt-2">
+          <div className="h-4 w-16 rounded-sm bg-gray-100" />
+          <div className="h-11 w-11 rounded-full bg-gray-100" />
+        </div>
       </div>
     </div>
   );
@@ -41,7 +48,7 @@ export function ProductGrid({ products, loading = false }: ProductGridProps) {
   }
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
-      {products.map((product) => <ProductCard key={product.id} product={product} />)}
+      {products.map((product) => <ProductCard key={product.id} product={product} compactMobile />)}
     </div>
   );
 }

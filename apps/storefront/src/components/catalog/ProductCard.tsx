@@ -30,6 +30,8 @@ interface ProductCardProps {
   /** `grid` = grille catalogue (bouton "+" circulaire, catégorie/poids visibles).
    *  `shelf` = shelf horizontale home (carte étroite, bouton "+" flottant). */
   variant?: 'grid' | 'shelf';
+  /** Densité mobile réservée à la grille Catalogue ; Home conserve ses proportions. */
+  compactMobile?: boolean;
 }
 
 const STORAGE_TAG_LABELS: Record<'dry' | 'fresh' | 'frozen', string> = {
@@ -64,13 +66,14 @@ function getDetailLine(product: ProductCardProduct): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
+export function ProductCard({ product, variant = 'grid', compactMobile = false }: ProductCardProps) {
   const { currency } = useTenant();
   const addItem = useCartStore((s) => s.addItem);
   const outOfStock = product.stock === 0;
   const [added, setAdded] = useState(false);
   const tagLabel = getTagLabel(product);
   const detailLine = getDetailLine(product);
+  const compactGrid = variant === 'grid' && compactMobile;
   const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
   const discountPercent = hasDiscount
     ? Math.round((1 - product.price / (product.compare_at_price as number)) * 100)
@@ -120,9 +123,9 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
             : 'rounded-lg overflow-hidden border border-gray-100 bg-white'
         }
       >
-        <div className="aspect-square bg-primary-light relative overflow-hidden">
+        <div className={`${compactGrid ? 'aspect-[4/3] sm:aspect-square' : 'aspect-square'} bg-primary-light relative overflow-hidden`}>
           {variant === 'grid' && discountPercent != null && (
-            <span className="absolute right-2 top-2 z-10 rounded-md bg-white/95 px-1.5 py-1 text-xs font-bold text-gray-900 shadow-sm">−{discountPercent}%</span>
+            <span className={`absolute z-10 rounded-md bg-white/95 font-bold text-gray-900 shadow-sm ${compactGrid ? 'right-1.5 top-1.5 px-1 py-0.5 text-[11px] sm:right-2 sm:top-2 sm:px-1.5 sm:py-1 sm:text-xs' : 'right-2 top-2 px-1.5 py-1 text-xs'}`}>−{discountPercent}%</span>
           )}
           {product.image_url ? (
             <Image
@@ -149,9 +152,9 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
         </div>
 
         {variant === 'grid' ? (
-          <div className="p-3">
-            <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">{product.name}</p>
-            {detailLine && <p className="text-xs text-gray-400 mb-2">{detailLine}</p>}
+          <div className={compactGrid ? 'p-2.5 sm:p-3' : 'p-3'}>
+            <p className={`font-medium text-gray-900 line-clamp-2 mb-1 ${compactGrid ? 'min-h-[2.05rem] text-[13px] leading-[1.25] sm:min-h-0 sm:text-sm sm:leading-normal' : 'text-sm'}`}>{product.name}</p>
+            {detailLine && <p className={`truncate text-xs text-gray-400 ${compactGrid ? 'mb-1.5 leading-tight sm:mb-2 sm:leading-normal' : 'mb-2'}`}>{detailLine}</p>}
             <div className="flex items-end justify-between gap-2">
               <div className="min-w-0">
                 <span className="block text-base font-bold leading-tight" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
@@ -161,7 +164,7 @@ export function ProductCard({ product, variant = 'grid' }: ProductCardProps) {
                 onClick={handleAddToCart}
                 aria-label="Ajouter au panier"
                 disabled={outOfStock}
-                className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 disabled:opacity-40"
+                className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 disabled:opacity-40"
                 style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
               >
                 {added ? '✓' : '+'}
