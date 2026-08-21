@@ -9,23 +9,21 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
       <div className="mx-auto flex h-[68px] max-w-[1180px] items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href="/evenementiel"
-          className="flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
-          aria-label={`${tenant.name} Events — accueil`}
+          className="flex min-h-11 min-w-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
+          aria-label={`${tenant.name} — accueil événementiel`}
         >
           {tenant.logo_url ? (
             <Image
               src={tenant.logo_url}
-              alt=""
-              width={80}
-              height={48}
-              className="h-9 w-auto max-w-[58px] shrink-0 object-contain brightness-0 invert sm:h-10 sm:max-w-[66px]"
+              alt={tenant.name}
+              width={220}
+              height={64}
+              className="h-10 w-auto max-w-[180px] object-contain sm:h-11 sm:max-w-[210px]"
               priority
             />
-          ) : null}
-          <span className="min-w-0 leading-none">
-            <span className="block truncate font-display text-[17px] font-semibold sm:text-lg">{tenant.name}</span>
-            <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-[0.18em] text-white/65 sm:text-[10px]">Food Events</span>
-          </span>
+          ) : (
+            <span className="font-display text-lg font-semibold leading-tight">{tenant.name}</span>
+          )}
         </Link>
 
         <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Navigation événementielle">
