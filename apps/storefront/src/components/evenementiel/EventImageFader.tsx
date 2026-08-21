@@ -13,9 +13,12 @@ interface EventImageFaderProps {
 /**
  * Rotation auto-fade (crossfade) entre plusieurs images d'événement, sans
  * aucune interaction utilisateur (pas de swipe, pas de puces cliquables).
- * `images.length` pilote le rendu : 0 → couleur unie, 1 → image statique
- * (pas de setInterval), >1 → stack crossfade — comportement identique à
- * l'ancien `banner_image_url` unique pour les deux premiers cas.
+ *
+ * Le fallback reste toujours peint derrière les images : ainsi une URL
+ * distante invalide ou qui ne charge pas ne laisse jamais apparaître un
+ * panneau transparent/illisible. Pour 0 image, le résultat reste simplement
+ * la couleur de fallback. Pour 1 ou plusieurs images, celles-ci se peignent
+ * par-dessus dès qu'elles sont effectivement disponibles.
  *
  * Dimensions toujours fournies par l'appelant via `className` (jamais de
  * vh/dvh ni de hauteur calculée en JS ici) pour rester cross-device par
@@ -35,13 +38,16 @@ export function EventImageFader({ images, fallbackColor, intervalMs = 5000, clas
   }, [images.length, intervalMs]);
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
-      {images.length === 0 && (
-        <div className="absolute inset-0" style={{ backgroundColor: fallbackColor }} aria-hidden="true" />
-      )}
-
+    <div
+      className={`relative overflow-hidden ${className}`}
+      style={{ backgroundColor: fallbackColor }}
+    >
       {images.length === 1 && (
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${images[0]})` }} aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${images[0]})` }}
+          aria-hidden="true"
+        />
       )}
 
       {images.length > 1 && images.map((src, i) => (
