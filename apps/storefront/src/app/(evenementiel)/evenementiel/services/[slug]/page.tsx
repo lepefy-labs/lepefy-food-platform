@@ -22,6 +22,13 @@ interface PageProps {
   params: { slug: string };
 }
 
+const cateringBenefits = [
+  { Icon: IconUsers, title: 'Sur mesure', text: 'Une proposition adaptée au format et aux besoins de votre événement.' },
+  { Icon: IconLeaf, title: 'Produits frais', text: 'Une approche simple et soignée, pensée autour du plaisir de recevoir.' },
+  { Icon: IconSparkles, title: 'Service soigné', text: 'Une expérience claire, de la demande initiale jusqu’au jour J.' },
+  { Icon: IconCalendarEvent, title: 'Privé & professionnel', text: 'Des formats flexibles pour vos réceptions et événements.' },
+];
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -100,16 +107,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
         <main className="mx-auto max-w-[1180px] px-4 py-12 sm:px-6 sm:py-16">
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              [IconUsers, 'Sur mesure', 'Une proposition adaptée au format et aux besoins de votre événement.'],
-              [IconLeaf, 'Produits frais', 'Une approche simple et soignée, pensée autour du plaisir de recevoir.'],
-              [IconSparkles, 'Service soigné', 'Une expérience claire, de la demande initiale jusqu’au jour J.'],
-              [IconCalendarEvent, 'Privé & professionnel', 'Des formats flexibles pour vos réceptions et événements.'],
-            ].map(([Icon, title, text]) => (
-              <div key={String(title)} className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm">
+            {cateringBenefits.map(({ Icon, title, text }) => (
+              <div key={title} className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm">
                 <Icon size={24} className="text-[var(--color-primary)]" />
-                <h2 className="mt-4 font-display text-xl font-semibold">{String(title)}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">{String(text)}</p>
+                <h2 className="mt-4 font-display text-xl font-semibold">{title}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{text}</p>
               </div>
             ))}
           </section>
