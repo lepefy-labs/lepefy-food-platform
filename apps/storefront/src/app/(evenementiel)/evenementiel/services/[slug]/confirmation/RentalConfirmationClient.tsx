@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { IconClock, IconCircleCheck, IconCalendar } from '@tabler/icons-react';
+import { IconCalendar, IconCircleCheck, IconClock } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 
 const POLL_INTERVAL_MS = 2000;
-const POLL_TIMEOUT_MS  = 30000;
+const POLL_TIMEOUT_MS = 30000;
 
 interface StatusResponse {
   found: boolean;
@@ -16,12 +16,11 @@ interface StatusResponse {
 }
 
 export default function RentalConfirmationClient({ paymentIntentId }: { paymentIntentId: string | null }) {
-  const [data, setData]         = useState<StatusResponse | null>(null);
+  const [data, setData] = useState<StatusResponse | null>(null);
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     if (!paymentIntentId) return;
-
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/rental/reservation-status?payment_intent=${paymentIntentId}`);
@@ -31,15 +30,13 @@ export default function RentalConfirmationClient({ paymentIntentId }: { paymentI
           clearInterval(interval);
         }
       } catch {
-        // Confort — on retente au prochain intervalle.
+        // Retry at next interval.
       }
     }, POLL_INTERVAL_MS);
-
     const timeout = setTimeout(() => {
       clearInterval(interval);
       setTimedOut(true);
     }, POLL_TIMEOUT_MS);
-
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
@@ -48,80 +45,69 @@ export default function RentalConfirmationClient({ paymentIntentId }: { paymentI
 
   if (!paymentIntentId) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-xl font-bold mb-2">Réservation en cours de traitement</h1>
-        <Link href="/evenementiel" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
-          ← Retour
-        </Link>
-      </div>
+      <main className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-700"><IconClock size={28} /></div>
+        <h1 className="mt-5 font-display text-3xl font-semibold text-gray-900">Réservation en cours de traitement</h1>
+        <Link href="/evenementiel" className="mt-6 inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-[var(--color-primary)]">← Retour</Link>
+      </main>
     );
   }
 
   if (timedOut && !data?.found) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <IconCircleCheck size={28} className="text-green-600" />
-        </div>
-        <h1 className="text-xl font-bold mb-2">Merci pour votre réservation !</h1>
-        <p className="text-sm text-gray-500 mb-6">Vérifiez votre email pour la confirmation.</p>
-        <Link href="/evenementiel" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
-          ← Retour
-        </Link>
-      </div>
+      <main className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-green-100 text-green-700"><IconCircleCheck size={30} /></div>
+        <h1 className="mt-5 font-display text-3xl font-semibold text-gray-900">Merci pour votre réservation.</h1>
+        <p className="mt-3 text-sm text-gray-600">Votre paiement a été reçu. Vérifiez votre email pour la confirmation.</p>
+        <Link href="/evenementiel" className="mt-6 inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-[var(--color-primary)]">← Retour</Link>
+      </main>
     );
   }
 
   if (!data?.found) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <IconClock size={28} className="text-yellow-700" />
-        </div>
-        <h1 className="text-xl font-bold mb-2">Paiement reçu — réservation en cours</h1>
-      </div>
+      <main className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6" aria-live="polite">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-700 motion-safe:animate-pulse"><IconClock size={28} /></div>
+        <h1 className="mt-5 font-display text-3xl font-semibold text-gray-900">Paiement reçu, réservation en cours</h1>
+        <p className="mt-3 text-sm text-gray-600">Nous finalisons votre confirmation.</p>
+      </main>
     );
   }
 
   const { reservation, offering, items } = data;
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-10">
-      <div className="text-center mb-6">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <IconCircleCheck size={28} className="text-green-600" />
-        </div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Réservation confirmée !</h1>
-        {offering && <p className="text-sm text-gray-500">{offering.title}</p>}
+    <main className="mx-auto max-w-xl px-4 py-12 sm:px-6 sm:py-16">
+      <div className="text-center">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-green-100 text-green-700"><IconCircleCheck size={30} /></div>
+        <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-green-700">Réservation confirmée</p>
+        <h1 className="mt-2 font-display text-3xl font-semibold text-gray-900 sm:text-4xl">Votre matériel est réservé.</h1>
+        {offering && <p className="mt-2 text-sm text-gray-500">{offering.title}</p>}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+      <section className="mt-8 rounded-3xl border border-black/[0.06] bg-white p-5 shadow-[0_18px_45px_rgba(50,37,20,.08)] sm:p-6">
         {reservation && (
-          <p className="text-sm text-gray-700 flex items-center gap-1.5 mb-3">
-            <IconCalendar size={14} /> Retrait le {new Date(reservation.pickup_date).toLocaleDateString('fr-FR')}
-          </p>
+          <div className="flex items-start gap-3 rounded-2xl bg-[#f7f3eb] p-4">
+            <IconCalendar size={18} className="mt-0.5 shrink-0 text-[var(--color-primary)]" />
+            <div><p className="text-xs text-gray-500">Date de retrait</p><p className="mt-1 text-sm font-semibold text-gray-900">{new Date(reservation.pickup_date).toLocaleDateString('fr-FR')}</p></div>
+          </div>
         )}
-        <div className="space-y-1.5">
-          {(items ?? []).map((item, i) => (
-            <div key={i} className="flex justify-between text-sm">
-              <span className="text-gray-600">{item.rental_items?.name ?? 'Article'} × {item.quantity}</span>
-              <span className="font-medium">{formatPrice(item.unit_price * item.quantity, 'EUR')}</span>
+
+        <div className="mt-5 divide-y divide-black/[0.06]">
+          {(items ?? []).map((item, index) => (
+            <div key={index} className="flex justify-between gap-4 py-3 text-sm">
+              <span className="min-w-0 text-gray-600">{item.rental_items?.name ?? 'Article'} × {item.quantity}</span>
+              <span className="shrink-0 font-semibold text-gray-900">{formatPrice(item.unit_price * item.quantity, 'EUR')}</span>
             </div>
           ))}
         </div>
         {reservation && (
-          <div className="flex justify-between font-bold text-base border-t border-gray-100 pt-2 mt-2">
-            <span>Total</span>
-            <span>{formatPrice(reservation.amount_paid, 'EUR')}</span>
-          </div>
+          <div className="mt-3 flex justify-between border-t border-black/[0.08] pt-4 text-base font-bold"><span>Total</span><span>{formatPrice(reservation.amount_paid, 'EUR')}</span></div>
         )}
-      </div>
+        {reservation && <p className="mt-4 text-xs text-gray-400">Réf. #{reservation.id.slice(0, 8).toUpperCase()}</p>}
+      </section>
 
-      <div className="text-center">
-        <Link href="/evenementiel" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
-          ← Retour
-        </Link>
-      </div>
-    </div>
+      <div className="mt-7 text-center"><Link href="/evenementiel" className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-[var(--color-primary)] hover:bg-white">← Retour aux services</Link></div>
+    </main>
   );
 }
