@@ -15,7 +15,8 @@ interface ChatTurn {
 }
 
 const MAX_HISTORY_TURNS = 6;
-const MOBILE_COMPACT_SCROLL_Y = 160;
+const MOBILE_COMPACT_SCROLL_Y = 64;
+const MOBILE_ONBOARDING_TIMEOUT_MS = 5000;
 const NALA_PRIMARY = '#6D5AF6';
 const NALA_DARK = '#4B3CC4';
 const SUGGESTED_PROMPTS = [
@@ -37,6 +38,7 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
   const [failed, setFailed] = useState(false);
   const [compactLauncher, setCompactLauncher] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -44,19 +46,33 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
   }, [turns, loading]);
 
   useEffect(() => {
-    function updateLauncher() {
-      const isMobile = window.matchMedia('(max-width: 767px)').matches;
-      setCompactLauncher(isMobile && window.scrollY > MOBILE_COMPACT_SCROLL_Y);
+    if (open || compactLauncher) return;
+
+    const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+    const compactOnMobile = () => {
+      if (isMobile()) setCompactLauncher(true);
+    };
+
+    function handleScroll() {
+      if (window.scrollY >= MOBILE_COMPACT_SCROLL_Y) compactOnMobile();
     }
 
-    updateLauncher();
-    window.addEventListener('scroll', updateLauncher, { passive: true });
-    window.addEventListener('resize', updateLauncher);
+    function handlePointerDown(event: PointerEvent) {
+      if (!isMobile() || launcherRef.current?.contains(event.target as Node)) return;
+      setCompactLauncher(true);
+    }
+
+    handleScroll();
+    const timeoutId = window.setTimeout(compactOnMobile, MOBILE_ONBOARDING_TIMEOUT_MS);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('pointerdown', handlePointerDown);
+
     return () => {
-      window.removeEventListener('scroll', updateLauncher);
-      window.removeEventListener('resize', updateLauncher);
+      window.clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('pointerdown', handlePointerDown);
     };
-  }, []);
+  }, [open, compactLauncher]);
 
   if (!enabled) return null;
 
@@ -108,8 +124,12 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
     <>
       {!open && (
         <button
+          ref={launcherRef}
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setCompactLauncher(true);
+            setOpen(true);
+          }}
           aria-label="Ouvrir Nala, assistant shopping"
           className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex h-12 items-center justify-center gap-2 overflow-hidden rounded-full bg-[#6D5AF6] px-4 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(109,90,246,0.35)] transition-[width,padding,background-color] duration-200 hover:bg-[#4B3CC4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5AF6] focus-visible:ring-offset-2 active:bg-[#4B3CC4] motion-reduce:transition-none md:bottom-6 md:right-6 ${compactLauncher ? 'w-12 px-0' : 'w-[164px]'}`}
         >
@@ -139,7 +159,10 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
             </div>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setCompactLauncher(true);
+                setOpen(false);
+              }}
               aria-label="Fermer Nala"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/90 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
