@@ -20,6 +20,7 @@ export interface Tenant {
   stripe_account_id: string | null;
   click_collect_enabled: boolean;
   click_collect_address: string | null;
+  google_maps_url: string | null;
   click_collect_hours: string | null;
   click_collect_hours_it: string | null;
   whatsapp_number: string | null;
