@@ -77,12 +77,12 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
         <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
 
         {!inPayment && (
-          <header className="relative overflow-hidden px-6 pb-7 pt-4 text-center" style={{ backgroundColor: tenant.primary_color }}>
-            <div aria-hidden className="absolute -left-12 top-12 h-32 w-32 rounded-full opacity-[0.05]" style={{ backgroundColor: tenant.secondary_color }} />
-            <div aria-hidden className="absolute -right-16 -top-12 h-40 w-40 rounded-full opacity-[0.055]" style={{ backgroundColor: tenant.secondary_color }} />
+          <header className="relative overflow-hidden px-5 pb-5 pt-3 text-center" style={{ backgroundColor: tenant.primary_color }}>
+            <div aria-hidden className="absolute -left-12 top-10 h-28 w-28 rounded-full opacity-[0.045]" style={{ backgroundColor: tenant.secondary_color }} />
+            <div aria-hidden className="absolute -right-14 -top-12 h-36 w-36 rounded-full opacity-[0.045]" style={{ backgroundColor: tenant.secondary_color }} />
 
-            <div className="relative -mb-7 flex justify-end">
-              <div className="inline-flex rounded-lg border border-white/15 bg-black/[0.06] p-px backdrop-blur-sm" aria-label="Language">
+            <div className="absolute right-3 top-2 z-10">
+              <div className="inline-flex rounded-lg border border-white/15 bg-black/[0.05] p-px backdrop-blur-sm" aria-label="Language">
                 {(['fr', 'it'] as Lang[]).map((l) => (
                   <button
                     key={l}
@@ -90,7 +90,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
                     onClick={() => changeLang(l)}
                     aria-pressed={lang === l}
                     className="min-h-11 min-w-11 rounded-[7px] px-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-                    style={lang === l ? { backgroundColor: tenant.secondary_color, color: secondaryForeground } : { color: 'rgba(255,255,255,.68)' }}
+                    style={lang === l ? { backgroundColor: tenant.secondary_color, color: secondaryForeground } : { color: 'rgba(255,255,255,.66)' }}
                   >
                     {l.toUpperCase()}
                   </button>
@@ -98,17 +98,29 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
               </div>
             </div>
 
-            <div className="relative mx-auto mb-2.5 flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl bg-white/95 p-1 shadow-sm ring-1 ring-white/35">
+            <div className="relative mx-auto flex h-24 w-40 items-center justify-center">
               {tenant.logo_url ? (
-                <Image src={tenant.logo_url} alt={tenant.name} width={104} height={104} className="h-full w-full object-contain" priority />
+                <Image
+                  src={tenant.logo_url}
+                  alt={tenant.name}
+                  width={160}
+                  height={96}
+                  className="h-full w-full object-contain"
+                  priority
+                />
               ) : (
-                <span className="text-2xl font-extrabold" style={{ color: tenant.primary_color }}>{initials}</span>
+                <span
+                  className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 text-2xl font-extrabold text-white ring-1 ring-white/20"
+                  style={{ fontFamily: 'var(--font-card-heading)' }}
+                >
+                  {initials}
+                </span>
               )}
             </div>
-            <h1 className="relative text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-card-heading)' }}>{tenant.name}</h1>
-            <p className="relative mt-1 text-sm font-bold text-white/95" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.descriptor}</p>
-            <p className="relative mx-auto mt-1 max-w-xs text-[13px] leading-relaxed text-white/75">{t.heroSupport}</p>
-            <div className="relative mx-auto mt-2.5 h-0.5 w-8 rounded-full" style={{ backgroundColor: tenant.secondary_color }} />
+            <h1 className="relative mt-0.5 text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-card-heading)' }}>{tenant.name}</h1>
+            <p className="relative mt-0.5 text-sm font-bold text-white/95" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.descriptor}</p>
+            <p className="relative mx-auto mt-0.5 max-w-xs text-[13px] leading-snug text-white/75">{t.heroSupport}</p>
+            <div className="relative mx-auto mt-2 h-0.5 w-8 rounded-full" style={{ backgroundColor: tenant.secondary_color }} />
           </header>
         )}
 
