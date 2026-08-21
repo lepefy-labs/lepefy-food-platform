@@ -9,23 +9,26 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
       <div className="mx-auto flex h-[68px] max-w-[1180px] items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href="/evenementiel"
-          className="flex min-h-11 min-w-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
+          className="flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
+          aria-label={`${tenant.name} Events — accueil`}
         >
           {tenant.logo_url ? (
             <Image
               src={tenant.logo_url}
-              alt={tenant.name}
-              width={170}
-              height={52}
-              className="h-10 w-auto max-w-[145px] object-contain brightness-0 invert sm:max-w-[170px]"
+              alt=""
+              width={80}
+              height={48}
+              className="h-9 w-auto max-w-[58px] shrink-0 object-contain brightness-0 invert sm:h-10 sm:max-w-[66px]"
               priority
             />
-          ) : (
-            <span className="font-display text-lg font-semibold leading-tight">{tenant.name}</span>
-          )}
+          ) : null}
+          <span className="min-w-0 leading-none">
+            <span className="block truncate font-display text-[17px] font-semibold sm:text-lg">{tenant.name}</span>
+            <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-[0.18em] text-white/65 sm:text-[10px]">Food Events</span>
+          </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Navigation événementielle">
+        <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Navigation événementielle">
           {[
             ['Événements', '/evenementiel#evenements'],
             ['Traiteur', '/evenementiel#traiteur'],
@@ -35,7 +38,7 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
             <a
               key={label}
               href={href}
-              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)]"
+              className="inline-flex min-h-11 items-center rounded-lg px-3 text-[13px] font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)]"
             >
               {label}
             </a>
