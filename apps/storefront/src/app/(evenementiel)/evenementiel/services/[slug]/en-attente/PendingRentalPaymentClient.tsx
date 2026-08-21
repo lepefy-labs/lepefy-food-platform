@@ -2,22 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { IconExternalLink, IconClock } from '@tabler/icons-react';
+import { IconClock, IconExternalLink } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
-
-// Même comportement que (shop)/checkout/en-attente (Phase 1) et
-// evenements/[slug]/en-attente (Phase 2) : aucune réservation confirmée ici,
-// seulement une demande rental_reservation_requests en attente — les
-// détails viennent de sessionStorage, écrits par RentalCheckoutClient juste
-// avant la redirection.
 
 interface PendingRentalPaymentData {
   requestId: string;
-  link:      string;
-  amount:    number;
-  currency:  string;
-  isPaypal:  boolean;
-  label:     string;
+  link: string;
+  amount: number;
+  currency: string;
+  isPaypal: boolean;
+  label: string;
 }
 
 export default function PendingRentalPaymentClient({ requestId }: { requestId: string | null }) {
@@ -31,7 +25,7 @@ export default function PendingRentalPaymentClient({ requestId }: { requestId: s
         const parsed = JSON.parse(raw) as PendingRentalPaymentData;
         if (!requestId || parsed.requestId === requestId) setData(parsed);
       } catch {
-        // ignore — fallback générique ci-dessous
+        // Invalid local data: generic state below remains available.
       }
     }
     setHydrated(true);
@@ -40,64 +34,36 @@ export default function PendingRentalPaymentClient({ requestId }: { requestId: s
   if (!hydrated) return null;
 
   return (
-    <div className="max-w-md mx-auto px-4 py-10 text-center">
-      <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
-        <IconClock size={28} />
+    <main className="mx-auto max-w-xl px-4 py-12 sm:px-6 sm:py-16">
+      <div className="text-center">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-700"><IconClock size={30} /></div>
+        <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Paiement en attente</p>
+        <h1 className="mt-2 font-display text-3xl font-semibold text-gray-900 sm:text-4xl">Votre demande de location est enregistrée.</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-gray-600">La réservation sera confirmée après vérification du paiement par l’équipe.</p>
       </div>
 
-      <h1 className="text-xl font-bold mb-2">Demande de paiement envoyée</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Ceci n&apos;est pas encore une réservation confirmée — elle le sera dès que
-        votre paiement aura été vérifié.
-      </p>
-
       {data ? (
-        <div className="bg-gray-50 rounded-2xl p-5 text-left space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Moyen choisi</span>
-            <span className="text-sm font-semibold">{data.label}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Montant à envoyer</span>
-            <span className="text-lg font-bold">{formatPrice(data.amount, data.currency)}</span>
-          </div>
+        <section className="mt-8 rounded-3xl border border-black/[0.06] bg-white p-5 shadow-[0_18px_45px_rgba(50,37,20,.08)] sm:p-6">
+          <dl className="space-y-4">
+            <div className="flex items-center justify-between gap-4"><dt className="text-sm text-gray-500">Moyen choisi</dt><dd className="text-sm font-semibold text-gray-900">{data.label}</dd></div>
+            <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] pt-4"><dt className="text-sm text-gray-500">Montant à envoyer</dt><dd className="text-xl font-bold text-gray-900">{formatPrice(data.amount, data.currency)}</dd></div>
+            <div className="flex items-start justify-between gap-4 border-t border-black/[0.06] pt-4"><dt className="text-sm text-gray-500">Référence</dt><dd className="max-w-[65%] break-all text-right font-mono text-xs text-gray-700">{data.requestId}</dd></div>
+          </dl>
 
-          <a
-            href={data.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white text-sm"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
+          <a href={data.link} target="_blank" rel="noopener noreferrer" className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">
             Ouvrir {data.label} <IconExternalLink size={16} />
           </a>
 
-          {data.isPaypal ? (
-            <p className="text-xs text-gray-500">
-              Sélectionnez « Amis et famille » lors du paiement pour éviter les frais.
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500">
-              Le montant n&apos;est pas prérempli sur ce lien — saisissez-le
-              manuellement : <strong>{formatPrice(data.amount, data.currency)}</strong>.
-            </p>
-          )}
-
-          <p className="text-xs text-gray-400 border-t border-gray-200 pt-3">
-            Une fois votre paiement reçu et vérifié, la boutique confirmera
-            votre réservation — vous recevrez un email de confirmation.
-          </p>
-        </div>
+          <div className="mt-5 rounded-2xl bg-[#f7f3eb] p-4 text-xs leading-relaxed text-gray-600">
+            {data.isPaypal ? <p>Sélectionnez « Amis et famille » lors du paiement pour éviter les frais.</p> : <p>Le montant n’est pas prérempli sur ce lien. Saisissez manuellement <strong>{formatPrice(data.amount, data.currency)}</strong>.</p>}
+            <p className="mt-3">Une fois le paiement reçu et vérifié, vous recevrez un email de confirmation.</p>
+          </div>
+        </section>
       ) : (
-        <p className="text-sm text-gray-500 bg-gray-50 rounded-2xl p-5">
-          Votre demande a bien été enregistrée. Consultez vos emails pour le
-          récapitulatif, ou contactez la boutique si besoin.
-        </p>
+        <p className="mt-8 rounded-3xl border border-black/[0.06] bg-white p-6 text-center text-sm text-gray-600 shadow-sm">Votre demande a bien été enregistrée. Consultez vos emails pour le récapitulatif.</p>
       )}
 
-      <Link href="/evenementiel" className="inline-block mt-8 text-sm text-gray-500 hover:text-gray-800">
-        ← Retour aux services
-      </Link>
-    </div>
+      <div className="mt-7 text-center"><Link href="/evenementiel" className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-[var(--color-primary)] hover:bg-white">← Retour aux services</Link></div>
+    </main>
   );
 }
