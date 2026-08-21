@@ -12,3 +12,4 @@ export * from './heroSlides';
 export * from './ambassador';
 export * from './shippingCountryRule';
 export * from './events';
+export * from './notificationRecipients';

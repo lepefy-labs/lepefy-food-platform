@@ -4,7 +4,8 @@ import { SocialLinksSection } from './SocialLinksSection';
 import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
-import type { TenantSocialLink } from '@lepefy/types';
+import { NotificationRecipientsSection } from './NotificationRecipientsSection';
+import type { TenantSocialLink, TenantNotificationRecipient } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -19,6 +20,12 @@ export default async function ParametresPage() {
     .select('*')
     .eq('tenant_id', tenant.id)
     .order('sort_order', { ascending: true });
+
+  const { data: notificationRecipients } = await supabase
+    .from('tenant_notification_recipients')
+    .select('*')
+    .eq('tenant_id', tenant.id)
+    .order('created_at', { ascending: true });
 
   return (
     <div className="max-w-2xl">
@@ -50,6 +57,10 @@ export default async function ParametresPage() {
           legal_name={tenant.legal_name}
           legal_address={tenant.legal_address}
           legal_email={tenant.legal_email}
+        />
+
+        <NotificationRecipientsSection
+          initialRecipients={(notificationRecipients ?? []) as TenantNotificationRecipient[]}
         />
 
         <section className="bg-white rounded-xl border border-gray-200 p-5">

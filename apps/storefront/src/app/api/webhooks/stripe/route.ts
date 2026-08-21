@@ -5,6 +5,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
@@ -513,6 +514,12 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     .eq('id', payment.tenant_id)
     .maybeSingle();
 
+  const recipients = await getNotificationRecipients(supabase, payment.tenant_id, 'notify_card_payment');
+
+  if (recipients.length === 0) {
+    console.warn('[webhook] Nessun destinatario notify_card_payment configurato per tenant:', payment.tenant_id, '— email non verrà inviata');
+  }
+
   await notifyN8n('/webhook/card-quick-payment', {
     tenant_id:                payment.tenant_id,
     tenant_name:               tenantRow?.name ?? null,
@@ -522,6 +529,7 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     customer_email:            payment.customer_email,
     paid_at:                   paidAt,
     stripe_payment_intent_id:  intent.id,
+    recipients,
   });
 
   return NextResponse.json({ received: true });

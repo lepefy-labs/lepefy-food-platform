@@ -3185,4 +3185,43 @@ File modificati: `apps/storefront/src/components/layout/Header.tsx` (link "Panie
 
 ---
 
-*Lepefy Labs — Lepefy Food Platform — Context document v3.59 — 20 Agosto 2026 (base: v3.58; nuovo Cart Drawer/Mini Cart — side drawer desktop + bottom sheet mobile-ready, CartItem/CartQuantityControl/CartUndoToast/FreeShippingProgress nuovi, `/cart` e `BottomNav` deliberatamente non toccati (fuori perimetro), sync integration a sole API pubbliche del cart store (nessun accesso diretto al sync engine v3.58), Undo funzionante via addItem/removeItem, focus trap + ESC + aria-live, 17 nuovi test unitari puri (84/84 totali verdi), `pnpm typecheck` pulito, anteprima browser reale impossibile (niente credenziali Supabase, confermato con `pnpm dev` → 500) sostituita da una verifica statica con CSS Tailwind realmente compilato su 7 breakpoint via Playwright/Chromium, che ha scoperto e fatto correggere una sovrapposizione reale toast/footer — vedi §77 per il dettaglio completo)*
+## 78. Changelog v3.60 (21 Agosto 2026) — Destinatari notifiche interne al tenant + wiring email su paiement Card réussi — ⚠️ non ancora pushato
+
+Ciclo mirato a un problème concret: le workflow n8n `card-quick-payment` (paiement Digital Card, `/card`) ne dispose d'aucun email de destinataire fiable côté tenant, contrairement à `order-confirmed`/`order-shipped`/`admin-invited`. Ce cycle construit le mécanisme générique multi-tenant pour gérer ces destinataires "back office" (staff/propriétaire, jamais les clients) et le câble sur ce seul webhook — le workflow n8n lui-même (nœud Webhook + Send Email) reste à créer/vérifier manuellement par Robertin, hors périmètre filesystem.
+
+### Step 0 — audit avant code
+
+Migration : dernier fichier existant `070_cart_versioning.sql` → nouveau numéro **`071`** (aucune collision). Fonction lue en entier : `handleCardQuickPaymentSucceeded` (`apps/storefront/src/app/api/webhooks/stripe/route.ts`) — appel `notifyN8n('/webhook/card-quick-payment', {...})` juste avant le `return`, après le `update` idempotent du statut `paid`. Pattern de notification existant confirmé via `notifyAdminInvited.ts` (simple wrapper autour de `notifyN8n`, best-effort, échec jamais bloquant). Pattern de section admin `/admin/parametres` confirmé via `PaymentMethodsSection.tsx` (en réalité montée sur la sous-page `parametres/paiements/page.tsx`, pas `parametres/page.tsx` — la nouvelle section a été montée sur `parametres/page.tsx` directement, après `LegalInfoSection`, car elle ne concerne pas les paiements). Pattern `requireAdmin(tenant.id)` + `createServiceClient()` confirmé sur `api/admin/payment-methods/route.ts` et `api/admin/team/[id]/route.ts`, répliqué à l'identique. Aucun fichier `getNotificationRecipients.ts` préexistant.
+
+### Table `tenant_notification_recipients` (migration 071)
+
+Table générique et multi-tenant, un flag booléen par type de notification (`notify_card_payment`, `notify_order_stock_conflict`) plutôt qu'une table par module : décision explicite car le destinataire ici est conceptuellement "le tenant" (staff/propriétaire), partagé entre plusieurs types d'alertes internes, à la différence de domaines comme `orders`/`event_reservations` qui restent séparés par module dans le reste du schéma. RLS activée sans policy publique — lecture/écriture uniquement via `service_role`, même pattern que `tenant_card_payments` (062) ; l'autorisation réelle passe par `requireAdmin(tenant.id)` dans les routes admin.
+
+`notify_order_stock_conflict` existe dans le schéma et dans la UI mais **n'est câblé sur aucun webhook** — champ préparé pour un cycle futur, conformément au prompt.
+
+### Wiring webhook Card (`handleCardQuickPaymentSucceeded`)
+
+Nouveau helper `apps/storefront/src/lib/notifications/getNotificationRecipients.ts` (best-effort : erreur Supabase loggée via `console.error`, retourne toujours `[]`, ne lève jamais — une notification manquante ne doit jamais bloquer le flux de paiement). Appelé juste avant `notifyN8n`, résultat ajouté au payload existant sous `recipients: string[]` (tous les champs déjà présents inchangés : `tenant_id`, `tenant_name`, `amount`, `currency`, `customer_name`, `customer_email`, `paid_at`, `stripe_payment_intent_id`). Si `recipients` est vide, `console.warn` explicite mais **l'appel à `notifyN8n` a toujours lieu** avec `recipients: []` — aucune logique conditionnelle qui saute l'appel, pour ne pas dépendre d'un éventuel futur fallback côté n8n. Aucune autre modification de la fonction (idempotence, `status`/`paid_at` inchangés).
+
+### Routes admin + UI
+
+`GET/POST /api/admin/notification-recipients` et `PATCH/DELETE /api/admin/notification-recipients/[id]`, même structure que `payment-methods` (`requireAdmin(tenant.id)`, `createServiceClient()`, `revalidatePath('/admin/parametres')` après chaque écriture). Validation email via la même regex que `isValidEmail` de `api/card/quick-pay/route.ts`. `POST` retourne 409 sur email dupliqué pour le tenant (contrainte `unique(tenant_id, email)`, code Postgres `23505`). `PATCH`/`DELETE` retournent 404 si la ligne n'existe pas pour ce tenant.
+
+`NotificationRecipientsSection.tsx` (nouveau, `apps/storefront/src/app/admin/(protected)/parametres/`) : liste des destinataires (email, étiquette éditable, trois toggles `notify_card_payment`/`notify_order_stock_conflict`/`active`, suppression), formulaire d'ajout avec les mêmes deux flags par défaut (`notify_card_payment: true`, `notify_order_stock_conflict: false`). Montée dans `parametres/page.tsx` juste après `LegalInfoSection`. Type partagé `TenantNotificationRecipient` ajouté à `packages/types/notificationRecipients.ts` (même pattern que `TenantSocialLink`), exporté depuis `packages/types/index.ts`.
+
+### Hors périmètre (rappel explicite)
+
+Workflow n8n `card-quick-payment` (nœud Webhook + Send Email, champ "To" attendu en `{{$json.body.recipients.join(',')}}`) : **pas créé/vérifié ici**, à faire manuellement par Robertin dans le dashboard n8n, même pattern que `admin-invited` (§69/70). `notify_order_stock_conflict` : champ prêt, non câblé, TODO futur. Aucune modification de `CardQuickPay.tsx`/`api/card/quick-pay/route.ts` (création du PaymentIntent) ni des domaines `orders`/`checkout_sessions`/`event_reservation*`/`rental_reservation*`.
+
+### Validation
+
+`pnpm install` nécessaire au démarrage de la session (`node_modules` absent). `pnpm typecheck` — **pulito** après install. Vérification manuelle (grep) : aucun em-dash introduit dans les nouveaux fichiers JSX (celui trouvé dans `parametres/page.tsx` ligne 108 est préexistant, section "QR Shop", non touché par ce cycle) ; aucune couleur hardcodée dans `NotificationRecipientsSection.tsx`. `tenant_id` toujours résolu via `getTenant(slug)`/`requireAdmin(tenant.id)`, jamais codé en dur.
+
+Consegnato via zip su richiesta esplicita ("non fare push, ma fornire zip con file toccati mantenendo la struttura della repo").
+
+File aggiunti: `supabase/migrations/071_tenant_notification_recipients.sql` · `apps/storefront/src/lib/notifications/getNotificationRecipients.ts` · `apps/storefront/src/app/api/admin/notification-recipients/route.ts` · `apps/storefront/src/app/api/admin/notification-recipients/[id]/route.ts` · `apps/storefront/src/app/admin/(protected)/parametres/NotificationRecipientsSection.tsx` · `packages/types/notificationRecipients.ts`.
+File modificati: `apps/storefront/src/app/api/webhooks/stripe/route.ts` (wiring `getNotificationRecipients` + champ `recipients` dans le payload `card-quick-payment`) · `apps/storefront/src/app/admin/(protected)/parametres/page.tsx` (fetch + montage de `NotificationRecipientsSection`) · `packages/types/index.ts` (export du nouveau module de types).
+
+---
+
+*Lepefy Labs — Lepefy Food Platform — Context document v3.60 — 21 Agosto 2026 (base: v3.59; nouvelle table `tenant_notification_recipients` (migration 071, générique/multi-tenant, un flag booléen par type de notification, RLS service_role uniquement), helper `getNotificationRecipients` best-effort câblé sur `handleCardQuickPaymentSucceeded` (champ `recipients` ajouté au payload n8n `card-quick-payment`, jamais de skip conditionnel de l'appel), nouvelle section admin `/admin/parametres` (`NotificationRecipientsSection`, CRUD complet via `/api/admin/notification-recipients`), `notify_order_stock_conflict` préparé mais non câblé (TODO futur), workflow n8n réel hors périmètre (à faire par Robertin), `pnpm typecheck` pulito — vedi §78 per il dettaglio completo)*
