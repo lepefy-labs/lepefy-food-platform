@@ -53,7 +53,7 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['shipping_zones']['Row']>;
       };
       shipping_rates: {
-        Row: { id: string; tenant_id: string; zone_id: string; min_weight_g: number; max_weight_g: number | null; rate: number; active: boolean; position: number; created_at: string };
+        Row: { id: string; tenant_id: string; zone_id: string; min_weight_g: number; max_weight_g: number | null; rate: number; active: boolean; created_at: string };
         Insert: Omit<Database['public']['Tables']['shipping_rates']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['shipping_rates']['Row']>;
       };
