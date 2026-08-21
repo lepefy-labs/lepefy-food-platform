@@ -9,6 +9,7 @@ import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types
 
 interface Props {
   categories:      Category[];
+  previewImagesByCategory: Record<string, string[]>;
   products:        ProductWithCategory[];
   activeSlug?:     string;
   initialQuery:    string;
@@ -20,6 +21,7 @@ interface Props {
 
 export function CatalogClient({
   categories,
+  previewImagesByCategory,
   products,
   activeSlug,
   initialQuery,
@@ -231,7 +233,7 @@ export function CatalogClient({
 
       {/* Visual category navigation — hidden during textual search. */}
       {!hasActiveSearch && (
-        <CatalogCategoryRow categories={categories} activeSlug={activeSlug} onSelect={handleCategorySelect} />
+        <CatalogCategoryRow categories={categories} previewImagesByCategory={previewImagesByCategory} activeSlug={activeSlug} onSelect={handleCategorySelect} />
       )}
 
       {/* Header risultati */}

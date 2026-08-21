@@ -22,6 +22,11 @@ interface ProductsPageProps {
   searchParams: { category?: string; q?: string; page?: string };
 }
 
+type CategoryPreviewRow = {
+  category_id: string | null;
+  image_url: string | null;
+};
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
@@ -33,19 +38,48 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     .eq('tenant_id', tenant.id)
     .order('position');
   const categories: Category[] = categoriesRaw ?? [];
-
   const searchQuery = searchParams.q?.trim() ?? '';
   const page = parsePageParam(searchParams.page);
 
-  // Range cumulatif (0 → page*PAGE_SIZE-1), pas la seule tranche de `page` :
-  // un accès direct/partagé à /products?page=3 doit afficher le même
-  // ensemble cumulé (72 produits) que 2 clics sur "Charger plus" depuis la
-  // page 1, pas seulement les produits 49-72. Pour page=1 les deux formules
-  // coïncident, donc le SSR de la première page reste inchangé.
-  const { data: productsRaw, count } = await buildProductsQuery(supabase, tenant.id, categories, {
-    q: searchQuery,
-    category: searchParams.category,
-  }).range(0, page * PRODUCTS_PAGE_SIZE - 1);
+  // Une seule requête pour toutes les catégories sans visuel configuré :
+  // le regroupement et la limite de 3 images restent côté serveur.
+  const previewCategoryIds = categories.filter(category => !category.image_url).map(category => category.id);
+  const previewRowsPromise = (async (): Promise<CategoryPreviewRow[]> => {
+    if (searchQuery || previewCategoryIds.length === 0) return [];
+    const previewQueryLimit = Math.min(Math.max(previewCategoryIds.length * 25, 75), 1000);
+    const { data } = await supabase
+      .from('products')
+      .select('category_id, image_url')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .in('category_id', previewCategoryIds)
+      .not('image_url', 'is', null)
+      .order('position', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(previewQueryLimit);
+    return (data as CategoryPreviewRow[] | null) ?? [];
+  })();
+
+  // Range cumulatif (0 → page*PAGE_SIZE-1) pour préserver les liens directs
+  // ?page=N. Le catalogue et ses visuels décoratifs sont indépendants après la lecture
+  // des catégories : les deux requêtes partent ensemble pour limiter la latence.
+  const [previewRows, { data: productsRaw, count }] = await Promise.all([
+    previewRowsPromise,
+    buildProductsQuery(supabase, tenant.id, categories, {
+      q: searchQuery,
+      category: searchParams.category,
+    }).range(0, page * PRODUCTS_PAGE_SIZE - 1),
+  ]);
+
+  const previewImagesByCategory: Record<string, string[]> = {};
+  for (const row of previewRows) {
+    const imageUrl = row.image_url?.trim();
+    if (!row.category_id || !imageUrl) continue;
+    const images = previewImagesByCategory[row.category_id] ?? [];
+    if (images.length < 3 && !images.includes(imageUrl)) {
+      previewImagesByCategory[row.category_id] = [...images, imageUrl];
+    }
+  }
 
   const products: ProductWithCategory[] = (productsRaw as unknown as ProductWithCategory[] | null) ?? [];
   const totalCount = count ?? products.length;
@@ -54,6 +88,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   return (
     <CatalogClient
       categories={categories}
+      previewImagesByCategory={previewImagesByCategory}
       products={products}
       activeSlug={searchQuery ? undefined : searchParams.category}
       initialQuery={searchQuery}

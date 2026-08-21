@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { CatalogCategoryImage } from '@/components/catalog/CatalogCategoryImage';
 import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
 import type { HomeProduct } from '@/app/(shop)/page';
 
@@ -21,6 +22,8 @@ interface CategoryBlockProps {
   /** Compact, manually navigated Catalogue rendering. Home remains default. */
   variant?: 'home' | 'catalog';
   imageUrl?: string | null;
+  previewImages?: string[];
+  animatePreviewImages?: boolean;
   active?: boolean;
   onSelect?: () => void;
 }
@@ -46,20 +49,26 @@ export function CategoryBlock({
   hiddenFromA11y = false,
   variant = 'home',
   imageUrl,
+  previewImages = [],
+  animatePreviewImages = false,
   active = false,
   onSelect,
 }: CategoryBlockProps) {
   if (variant === 'catalog') {
-    const previewImage = imageUrl ?? products[0]?.image_url ?? null;
+    const previewImage = imageUrl ?? previewImages[0] ?? products[0]?.image_url ?? null;
     return (
       <button
         type="button"
         onClick={onSelect}
         aria-pressed={active}
-        className={`group relative flex-[0_0_31%] sm:flex-[0_0_23%] md:flex-[0_0_168px] aspect-[4/5] snap-start overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${active ? 'ring-2 ring-offset-2' : ''}`}
+        className={`group relative flex-[0_0_31%] sm:flex-[0_0_23%] md:w-full md:flex-none aspect-[4/5] snap-start md:snap-none overflow-hidden rounded-[18px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${active ? 'ring-2 ring-offset-2' : ''}`}
         style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
       >
-        {previewImage ? (
+        {imageUrl ? (
+          <Image src={imageUrl} alt="" fill className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" sizes="(max-width: 640px) 31vw, (max-width: 768px) 23vw, 168px" />
+        ) : previewImages.length > 0 ? (
+          <CatalogCategoryImage images={previewImages} categoryIndex={index} animate={animatePreviewImages} />
+        ) : previewImage ? (
           <Image src={previewImage} alt="" fill className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" sizes="(max-width: 640px) 31vw, (max-width: 768px) 23vw, 168px" />
         ) : (
           <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(145deg, var(--color-primary), var(--color-primary-dark))' }} />
