@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { IconSnowflake } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
 import { useTenant } from '@/providers/TenantProvider';
@@ -40,13 +41,21 @@ const STORAGE_TAG_LABELS: Record<'dry' | 'fresh' | 'frozen', string> = {
   dry:    'Épicerie',
 };
 
-/** Contenu du cartellino — dérivé d'un champ produit réel, jamais une chaîne
- *  fixe identique pour tous les produits. Priorité au type de conservation
- *  (le plus proche du concept "étiquette de fraîcheur"), repli sur le nom de
- *  catégorie, aucun tag affiché si ni l'un ni l'autre n'est disponible. */
+/** Contenu du cartellino Home — dérivé d'un champ produit réel, jamais une chaîne
+ *  fixe identique pour tous les produits. Priorité au type de conservation,
+ *  repli sur le nom de catégorie, aucun tag affiché si ni l'un ni l'autre
+ *  n'est disponible. */
 function getTagLabel(product: ProductCardProduct): string | null {
   if (product.storage_type) return STORAGE_TAG_LABELS[product.storage_type];
   if (product.category?.name) return product.category.name;
+  return null;
+}
+
+/** Badge Catalogue : uniquement les états de conservation qui influencent
+ *  réellement l'achat. `dry` et les catégories ne sont jamais badgés. */
+function getGridStorageLabel(product: ProductCardProduct): 'Frais' | 'Surgelé' | null {
+  if (product.storage_type === 'fresh') return 'Frais';
+  if (product.storage_type === 'frozen') return 'Surgelé';
   return null;
 }
 
@@ -72,6 +81,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
   const outOfStock = product.stock === 0;
   const [added, setAdded] = useState(false);
   const tagLabel = getTagLabel(product);
+  const gridStorageLabel = getGridStorageLabel(product);
   const detailLine = getDetailLine(product);
   const compactGrid = variant === 'grid' && compactMobile;
   const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
@@ -110,8 +120,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
           : 'group relative block flex-shrink-0 w-36 md:w-full md:flex-shrink'
       }
     >
-      {tagLabel && (
-        <ShopTag className={variant === 'grid' ? 'absolute -top-2.5 left-3 z-10' : 'absolute -top-2 left-3 z-10'}>
+      {variant === 'shelf' && tagLabel && (
+        <ShopTag className="absolute -top-2 left-3 z-10">
           {tagLabel}
         </ShopTag>
       )}
@@ -124,9 +134,19 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
         }
       >
         <div className={`${compactGrid ? 'aspect-[4/3] sm:aspect-square' : 'aspect-square'} bg-primary-light relative overflow-hidden`}>
+          {variant === 'grid' && gridStorageLabel && (
+            <span className={`absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-gray-200/90 bg-white/95 font-semibold text-gray-800 shadow-sm ${compactGrid ? 'px-2 py-1 text-[11px] sm:text-xs' : 'px-2 py-1 text-xs'}`}>
+              {gridStorageLabel === 'Surgelé' && (
+                <IconSnowflake size={13} aria-hidden="true" className="shrink-0" />
+              )}
+              {gridStorageLabel}
+            </span>
+          )}
+
           {variant === 'grid' && discountPercent != null && (
             <span className={`absolute z-10 rounded-md bg-white/95 font-bold text-gray-900 shadow-sm ${compactGrid ? 'right-1.5 top-1.5 px-1 py-0.5 text-[11px] sm:right-2 sm:top-2 sm:px-1.5 sm:py-1 sm:text-xs' : 'right-2 top-2 px-1.5 py-1 text-xs'}`}>−{discountPercent}%</span>
           )}
+
           {product.image_url ? (
             <Image
               src={product.image_url}
