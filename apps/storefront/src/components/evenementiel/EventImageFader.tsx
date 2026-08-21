@@ -20,12 +20,14 @@ interface EventImageFaderProps {
  * la couleur de fallback. Pour 1 ou plusieurs images, celles-ci se peignent
  * par-dessus dès qu'elles sont effectivement disponibles.
  *
- * Dimensions toujours fournies par l'appelant via `className` (jamais de
- * vh/dvh ni de hauteur calculée en JS ici) pour rester cross-device par
- * construction, comme le reste du projet.
+ * L'appelant peut fournir sa propre utility de positionnement (`absolute`,
+ * `relative`, etc.). On n'ajoute `relative` que lorsqu'aucune position n'est
+ * déjà présente afin d'éviter le conflit Tailwind qui faisait perdre
+ * `absolute inset-0` au hero.
  */
 export function EventImageFader({ images, fallbackColor, intervalMs = 5000, className = '', children }: EventImageFaderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const hasPositionClass = /(^|\s)(static|fixed|absolute|relative|sticky)(\s|$)/.test(className);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -39,7 +41,7 @@ export function EventImageFader({ images, fallbackColor, intervalMs = 5000, clas
 
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      className={`${hasPositionClass ? '' : 'relative '}overflow-hidden ${className}`}
       style={{ backgroundColor: fallbackColor }}
     >
       {images.length === 1 && (
