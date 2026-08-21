@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconMinus, IconPlus, IconBasket, IconStarFilled, IconCreditCard, IconInfoCircle } from '@tabler/icons-react';
+import { IconBasket, IconCreditCard, IconInfoCircle, IconMinus, IconPlus, IconStarFilled } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import {
-  PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
-  externalPaymentCtaLabel, externalPaymentCtaColor,
+  PaymentOptionList,
+  buildExternalPaymentOptions,
+  ExternalPaymentNote,
+  externalPaymentCtaColor,
+  externalPaymentCtaLabel,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
@@ -15,89 +18,60 @@ import type { EventTicketType, TenantPaymentMethod } from '@lepefy/types';
 
 type Step = 'select' | 'info' | 'select-payment' | 'payment';
 
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 interface Props {
-  event:       { id: string; slug: string; title: string; capacityRemaining: number };
+  event: { id: string; slug: string; title: string; capacityRemaining: number };
   ticketTypes: EventTicketType[];
-  tenant:      { currency: string };
-  soldOut:     boolean;
-  // Feature row hero (highlights) — propriété/données de page.tsx (voir Task 2),
-  // rendue ici entre les cards formule et le récapitulatif pour matcher l'ordre
-  // du mockup. Affichée uniquement à l'étape 'select' (le mockup ne montre que
-  // cet écran) ; `undefined`/`false` si l'événement n'a pas de highlights.
+  tenant: { currency: string };
+  soldOut: boolean;
   featureRow?: ReactNode;
-  // Phase 2 — moyens de paiement via lien externe (PayPal/Revolut/autre)
-  // éligibles pour ce tenant, même filtre que le checkout boutique.
   externalPaymentMethods?: TenantPaymentMethod[];
-  // Agente e2e Fase 0 — calculé côté serveur (page.tsx) via isE2ERequest().
   isE2ETest?: boolean;
 }
 
-// Stepper — reflète le state `step` réel du composant (pas de step
-// "récapitulatif" séparé). 'select-payment' partage le badge "Paiement" avec
-// 'payment' : ce sont deux écrans de la même étape logique (Phase 2, Fix 2
-// shop appliqué ici dès le départ — jamais mélangé aux coordonnées).
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 function EventStepper({ current }: { current: Step }) {
-  const steps: { key: Step; n: number; label: string }[] = [
-    { key: 'select', n: 1, label: 'Choix des formules' },
-    { key: 'info', n: 2, label: 'Vos coordonnées' },
-    { key: 'payment', n: 3, label: 'Paiement' },
+  const normalized = current === 'select-payment' ? 'payment' : current;
+  const steps: Array<{ key: Step; label: string }> = [
+    { key: 'select', label: 'Formules' },
+    { key: 'info', label: 'Coordonnées' },
+    { key: 'payment', label: 'Paiement' },
   ];
-  const normalizedCurrent: Step = current === 'select-payment' ? 'payment' : current;
-  const activeIndex = steps.findIndex((s) => s.key === normalizedCurrent);
+  const activeIndex = steps.findIndex((step) => step.key === normalized);
 
   return (
-    <div className="flex items-center justify-center gap-1.5 pb-2" aria-hidden="true">
-      {steps.map((s, i) => (
-        <div key={s.key} className="flex items-center gap-1.5">
-          {i > 0 && <div className="h-px w-6 sm:w-9 bg-gray-200 shrink-0" />}
-          <div className="flex flex-col items-center gap-1.5 w-[74px] sm:w-[110px]">
-            <div
-              className="w-[26px] h-[26px] rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-              style={i === activeIndex ? { backgroundColor: 'var(--color-primary)', color: '#fff' } : { backgroundColor: '#e4e0d9', color: '#8a8578' }}
-            >
-              {s.n}
-            </div>
-            <div className={`text-[11px] text-center leading-tight ${i === activeIndex ? 'text-gray-900 font-semibold' : 'text-gray-400'}`}>
-              {s.label}
-            </div>
-          </div>
-        </div>
+    <ol className="grid grid-cols-3 gap-2" aria-label="Étapes de réservation">
+      {steps.map((step, index) => (
+        <li key={step.key} className="relative flex flex-col items-center text-center">
+          {index > 0 && <span className="absolute right-1/2 top-4 -z-0 h-px w-full bg-black/10" aria-hidden="true" />}
+          <span className={`relative z-[1] flex size-8 items-center justify-center rounded-full text-xs font-bold ${index <= activeIndex ? 'bg-[var(--color-primary)] text-white' : 'bg-[#e9e3d8] text-gray-500'}`}>{index + 1}</span>
+          <span className={`mt-2 text-[11px] sm:text-xs ${index === activeIndex ? 'font-bold text-gray-900' : 'text-gray-500'}`}>{step.label}</span>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
 export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOut, featureRow, externalPaymentMethods = [], isE2ETest = false }: Props) {
   const router = useRouter();
   const { customer: sessionCustomer } = useSessionCustomer();
-
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [name, setName]   = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
   const [phone, setPhone] = useState('');
-  const [step, setStep]   = useState<Step>('select');
+  const [step, setStep] = useState<Step>('select');
   const [showPaymentStep, setShowPaymentStep] = useState(false);
-
-  usePaymentRedirectRecovery('event', () => {
-    router.push(`${window.location.pathname}/confirmation`);
-  });
-  // Pas de mode 'in_store' côté événementiel (contrairement au shop) — seul
-  // le choix stripe vs external_link existe, `selectedExternalMethodId ===
-  // null` signifie stripe.
   const [selectedExternalMethodId, setSelectedExternalMethodId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Restauration du draft laissé par 'select-payment' — le client qui revient
-  // depuis /en-attente après avoir choisi "Changer de moyen de paiement"
-  // retrouve directement ses formules/coordonnées, sans tout ressaisir.
-  // Prioritaire sur la précompilation /api/customers/me ci-dessous (elle ne
-  // reste effective que sur les champs vides, donc n'écrase rien ici).
+  usePaymentRedirectRecovery('event', () => {
+    router.push(`${window.location.pathname}/confirmation`);
+  });
+
   const draftRestoredRef = useRef(false);
   useEffect(() => {
     if (draftRestoredRef.current) return;
@@ -105,13 +79,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     try {
       const raw = sessionStorage.getItem('lepefy-event-checkout-draft');
       if (!raw) return;
-      const draft = JSON.parse(raw) as {
-        eventId:    string;
-        quantities: Record<string, number>;
-        name:       string;
-        email:      string;
-        phone:      string;
-      };
+      const draft = JSON.parse(raw) as { eventId: string; quantities: Record<string, number>; name: string; email: string; phone: string };
       if (draft.eventId !== event.id) return;
       setQuantities(draft.quantities);
       setName(draft.name);
@@ -119,7 +87,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       setPhone(draft.phone);
       setStep('select-payment');
     } catch {
-      // Draft corrompu — comportement normal depuis 'select'.
+      // Corrupt draft: start normally.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -137,77 +105,46 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         if (!email && profile.email) setEmail(profile.email);
         if (!phone && profile.phone) setPhone(profile.phone);
       } catch {
-        // Confort — le formulaire reste vide en cas d'échec, checkout guest continue.
+        // Guest checkout remains available.
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionCustomer]);
 
-  const totalQuantity = Object.values(quantities).reduce((s, q) => s + q, 0);
-  const total = ticketTypes.reduce((s, t) => s + (quantities[t.id] ?? 0) * t.price, 0);
+  const totalQuantity = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
+  const total = ticketTypes.reduce((sum, ticket) => sum + (quantities[ticket.id] ?? 0) * ticket.price, 0);
+  const selectedTickets = ticketTypes.filter((ticket) => (quantities[ticket.id] ?? 0) > 0);
 
   function setQuantity(ticketId: string, delta: number) {
-    setQuantities((prev) => {
-      const next = Math.max(0, (prev[ticketId] ?? 0) + delta);
-      return { ...prev, [ticketId]: next };
-    });
+    setQuantities((previous) => ({ ...previous, [ticketId]: Math.max(0, (previous[ticketId] ?? 0) + delta) }));
   }
 
   function handleContinueToInfo() {
     setError(null);
-    if (totalQuantity === 0) {
-      setError('Sélectionnez au moins une formule.');
-      return;
-    }
-    if (totalQuantity > event.capacityRemaining) {
-      setError('Il ne reste pas assez de places pour cette quantité.');
-      return;
-    }
+    if (totalQuantity === 0) return setError('Sélectionnez au moins une formule.');
+    if (totalQuantity > event.capacityRemaining) return setError('Il ne reste pas assez de places pour cette quantité.');
     setStep('info');
   }
 
-  function handleBackToSelect() {
-    setError(null);
-    setStep('select');
-  }
-
-  // ── Étape 'info' → 'select-payment' : validation des coordonnées uniquement,
-  // aucun appel API (le mode de paiement n'est pas encore choisi). ──────────
   function handleContinueToPayment() {
     setError(null);
-    if (!name.trim() || !email.trim()) {
-      setError('Nom et email sont obligatoires.');
-      return;
-    }
+    if (!name.trim() || !email.trim()) return setError('Nom et email sont obligatoires.');
     if (!isValidEmail(email)) {
       setEmailTouched(true);
-      setError('Adresse email invalide.');
-      return;
+      return setError('Adresse email invalide.');
     }
     sessionStorage.setItem('lepefy-event-checkout-draft', JSON.stringify({
       eventId: event.id,
       quantities,
-      name:    name.trim(),
-      email:   email.trim(),
-      phone:   phone.trim(),
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
     }));
     setStep('select-payment');
   }
 
-  function handleBackToInfo() {
-    setError(null);
-    setStep('info');
-  }
-
-  // Business logic identique à l'ancienne route appelée depuis
-  // 'select-payment' — validation capacité/formules + création du
-  // PaymentIntent — seul le moment de l'appel change (clic "Payer" dans
-  // StripePaymentStep, plus au clic "Continuer vers le paiement" ici).
   async function createIntent() {
-    const items = ticketTypes
-      .filter((t) => (quantities[t.id] ?? 0) > 0)
-      .map((t) => ({ ticket_type_id: t.id, quantity: quantities[t.id] }));
-
+    const items = selectedTickets.map((ticket) => ({ ticket_type_id: ticket.id, quantity: quantities[ticket.id] }));
     try {
       const res = await fetch(`/api/events/${event.id}/checkout`, {
         method: 'POST',
@@ -219,64 +156,49 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           customer_phone: phone.trim() || null,
         }),
       });
-
       const result = await res.json();
       if (!res.ok) return { error: result.error ?? 'Une erreur est survenue.' };
       return { clientSecret: result.clientSecret };
     } catch {
-      // Réseau coupé ou réponse illisible : erreur gérée plutôt qu'exception
-      // non catturée, qui figerait le bouton de paiement.
       return { error: 'Une erreur est survenue.' };
     }
   }
 
-  // ── Étape 'select-payment' : confirmation du mode de paiement choisi ─────
   async function handleConfirmPayment() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const items = ticketTypes
-        .filter((t) => (quantities[t.id] ?? 0) > 0)
-        .map((t) => ({ ticket_type_id: t.id, quantity: quantities[t.id] }));
-
-      // ── Paiement via lien externe (PayPal/Revolut/autre) ────────────────
+      const items = selectedTickets.map((ticket) => ({ ticket_type_id: ticket.id, quantity: quantities[ticket.id] }));
       if (selectedExternalMethodId) {
         const res = await fetch(`/api/events/${event.id}/checkout-external-link`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             items,
-            customer_name:  name.trim(),
+            customer_name: name.trim(),
             customer_email: email.trim(),
             customer_phone: phone.trim() || null,
             externalPaymentMethodId: selectedExternalMethodId,
           }),
         });
-
         const result = await res.json();
         if (!res.ok) {
           setError(result.error ?? 'Une erreur est survenue.');
           return;
         }
-
         sessionStorage.setItem('lepefy-pending-event-payment', JSON.stringify({
-          requestId:    result.requestId,
-          link:         result.link,
-          amount:       result.amount,
-          currency:     result.currency,
-          isPaypal:     result.isPaypal,
-          label:        result.label,
+          requestId: result.requestId,
+          link: result.link,
+          amount: result.amount,
+          currency: result.currency,
+          isPaypal: result.isPaypal,
+          label: result.label,
           customerEmail: email.trim(),
-          eventSlug:    event.slug,
+          eventSlug: event.slug,
         }));
-
         router.push(`${window.location.pathname}/en-attente?ref=${result.requestId}`);
         return;
       }
-
-      // ── Paiement Stripe : aucun appel réseau ici (deferred intent
-      // creation) — le PaymentIntent n'est créé que dans createIntent, au
-      // clic sur "Payer" dans StripePaymentStep. ──────────────────────────
       sessionStorage.removeItem('lepefy-event-checkout-draft');
       setShowPaymentStep(true);
       setStep('payment');
@@ -287,282 +209,155 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     }
   }
 
+  const inputClass = 'min-h-11 w-full rounded-xl border border-black/10 bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_18%,transparent)]';
+
   if (soldOut) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
-        <p className="text-sm font-semibold text-gray-700">Cet événement est complet.</p>
-      </div>
-    );
+    return <div className="rounded-3xl border border-red-100 bg-white p-7 text-center shadow-sm"><p className="font-display text-2xl font-semibold text-gray-900">Cet événement est complet.</p><p className="mt-2 text-sm text-gray-500">Aucune réservation supplémentaire n’est disponible pour le moment.</p></div>;
   }
 
-  const inputClass =
-    'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
-
-  if (step === 'payment' && showPaymentStep) {
-    return (
-      <div>
-        <EventStepper current={step} />
-        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>}
-        <StripePaymentStep
-          module="event"
-          isTest={isE2ETest}
-          amount={total}
-          currency={tenant.currency}
-          color="var(--color-primary)"
-          returnUrl={`${window.location.origin}/evenementiel`}
-          referenceId={event.id}
-          payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
-          processingLabel="Traitement en cours…"
-          billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
-          createIntent={createIntent}
-          onError={setError}
-          onSucceeded={(paymentIntentId) => {
-            router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntentId ?? ''}`);
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Récapitulatif réutilisé tel quel dans 'select' et 'info' — une ligne par
-  // formule sélectionnée (quantité > 0) + total, même logique de calcul
-  // qu'avant (quantities/total), seul le markup change (Task 3).
-  const selectedTickets = ticketTypes.filter((t) => (quantities[t.id] ?? 0) > 0);
-  const summary = totalQuantity > 0 && (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-[18px]">
-      <p className="font-display flex items-center gap-2 text-[15px] font-bold text-gray-900 mb-3">
-        <IconBasket size={19} style={{ color: 'var(--color-primary)' }} stroke={1.8} />
-        Votre réservation
-      </p>
-      <div>
-        {selectedTickets.map((t) => (
-          <div key={t.id} className="flex items-center justify-between gap-3 text-[13px] text-gray-600 py-1">
-            <span className="min-w-0 truncate">{quantities[t.id]} × {t.label}</span>
-            <span className="shrink-0">{formatPrice((quantities[t.id] ?? 0) * t.price, tenant.currency)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center justify-between mt-2.5 pt-3 border-t border-gray-100">
-        <span className="text-sm font-semibold text-gray-700">Total</span>
-        <span className="text-xl font-extrabold" style={{ color: 'var(--color-primary)' }}>{formatPrice(total, tenant.currency)}</span>
-      </div>
+  const summary = (
+    <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2"><IconBasket size={19} className="text-[var(--color-primary)]" /><h3 className="font-display text-xl font-semibold">Votre réservation</h3></div>
+      {selectedTickets.length === 0 ? <p className="mt-4 text-sm text-gray-500">Aucune formule sélectionnée.</p> : (
+        <div className="mt-4 divide-y divide-black/[0.06]">
+          {selectedTickets.map((ticket) => (
+            <div key={ticket.id} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="min-w-0 truncate">{quantities[ticket.id]} × {ticket.label}</span><span className="shrink-0 font-semibold">{formatPrice((quantities[ticket.id] ?? 0) * ticket.price, tenant.currency)}</span></div>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 flex items-center justify-between border-t border-black/[0.08] pt-4"><span className="text-sm font-semibold">Total</span><span className="text-xl font-bold">{formatPrice(total, tenant.currency)}</span></div>
     </div>
   );
 
-  if (step === 'info') {
-    const emailInvalid = emailTouched && email.trim().length > 0 && !isValidEmail(email);
-
+  if (step === 'payment' && showPaymentStep) {
     return (
-      <div className="space-y-5">
+      <div className="mx-auto max-w-xl space-y-5">
         <EventStepper current={step} />
-
-        <button
-          type="button"
-          onClick={handleBackToSelect}
-          disabled={isSubmitting}
-          className="text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-50"
-        >
-          ← Retour
-        </button>
-
-        {summary}
-
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 space-y-3">
-          <p className="text-sm font-semibold text-gray-700">Vos informations</p>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => setEmailTouched(true)}
-            type="email"
-            placeholder="Email"
-            className={`${inputClass} ${emailInvalid ? 'border-red-300 focus:border-red-400 focus:ring-red-300' : ''}`}
+        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+        <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
+          <StripePaymentStep
+            module="event"
+            isTest={isE2ETest}
+            amount={total}
+            currency={tenant.currency}
+            color="var(--color-primary)"
+            returnUrl={`${window.location.origin}/evenementiel`}
+            referenceId={event.id}
+            payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
+            processingLabel="Traitement en cours…"
+            billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
+            createIntent={createIntent}
+            onError={setError}
+            onSucceeded={(paymentIntentId) => router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntentId ?? ''}`)}
           />
-          {emailInvalid ? (
-            <p className="text-xs text-red-500 -mt-1.5">
-              Adresse email invalide : vérifiez le format (ex : nom@domaine.com).
-            </p>
-          ) : (
-            <p className="flex items-center gap-1.5 text-xs text-gray-500 -mt-1.5">
-              <IconInfoCircle size={13} className="shrink-0" />
-              Vérifiez bien votre adresse : c&apos;est ici que vous recevrez votre billet.
-            </p>
-          )}
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
         </div>
-
-        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
-
-        <button
-          onClick={handleContinueToPayment}
-          disabled={isSubmitting}
-          className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          Continuer vers le paiement
-        </button>
       </div>
     );
   }
 
-  // Choix du mode de paiement — jamais mélangé aux coordonnées (même
-  // correction que le shop, Phase 1 Fix 2, appliquée ici dès l'introduction
-  // du flux external_link) : stripe + un moyen par ligne tenant_payment_methods
-  // éligible, cartes radio partagées avec le checkout boutique.
+  if (step === 'info') {
+    const emailInvalid = emailTouched && email.trim().length > 0 && !isValidEmail(email);
+    return (
+      <div className="space-y-6">
+        <EventStepper current={step} />
+        <button type="button" onClick={() => { setError(null); setStep('select'); }} className="min-h-11 rounded-xl px-2 text-sm font-semibold text-gray-600">← Retour</button>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="font-display text-2xl font-semibold">Vos coordonnées</h2>
+            <div className="mt-5 space-y-3">
+              <label className="block text-xs font-medium text-gray-600">Nom complet *<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-xs font-medium text-gray-600">Email *<input value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} type="email" autoComplete="email" className={`${inputClass} mt-1.5 ${emailInvalid ? 'border-red-300' : ''}`} /></label>
+              {emailInvalid ? <p className="text-xs text-red-600">Adresse email invalide : vérifiez le format.</p> : <p className="flex items-center gap-1.5 text-xs text-gray-500"><IconInfoCircle size={14} />Votre billet sera envoyé à cette adresse.</p>}
+              <label className="block text-xs font-medium text-gray-600">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
+            </div>
+            {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+            <button onClick={handleContinueToPayment} className="mt-5 min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white">Continuer</button>
+          </div>
+          <aside className="lg:sticky lg:top-[92px]">{summary}</aside>
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'select-payment') {
-    const selectedExternalMethod = externalPaymentMethods.find((pm) => pm.id === selectedExternalMethodId) ?? null;
-
-    const ctaLabel = selectedExternalMethod
-      ? externalPaymentCtaLabel(selectedExternalMethod, 'la réservation')
-      : 'Continuer vers le paiement';
-
-    const ctaColor = selectedExternalMethod
-      ? externalPaymentCtaColor(selectedExternalMethod)
-      : 'var(--color-primary)';
-
+    const selectedExternalMethod = externalPaymentMethods.find((method) => method.id === selectedExternalMethodId) ?? null;
+    const ctaLabel = selectedExternalMethod ? externalPaymentCtaLabel(selectedExternalMethod, 'la réservation') : 'Continuer vers le paiement';
+    const ctaColor = selectedExternalMethod ? externalPaymentCtaColor(selectedExternalMethod) : 'var(--color-primary)';
     const options = [
       {
-        key:      'stripe',
+        key: 'stripe',
         selected: !selectedExternalMethodId,
         onSelect: () => setSelectedExternalMethodId(null),
-        icon:     <IconCreditCard size={16} stroke={1.8} className="text-white" />,
-        color:    'var(--color-primary)',
-        label:    'Carte bancaire',
-        sub:      'Paiement sécurisé, confirmation immédiate',
+        icon: <IconCreditCard size={16} stroke={1.8} className="text-white" />,
+        color: 'var(--color-primary)',
+        label: 'Carte bancaire',
+        sub: 'Paiement sécurisé, confirmation immédiate',
       },
       ...buildExternalPaymentOptions(externalPaymentMethods, selectedExternalMethodId, setSelectedExternalMethodId),
     ];
 
     return (
-      <div className="space-y-5">
+      <div className="space-y-6">
         <EventStepper current={step} />
-
-        <button
-          type="button"
-          onClick={handleBackToInfo}
-          disabled={isSubmitting}
-          className="text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-50"
-        >
-          ← Retour
-        </button>
-
-        {summary}
-
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-gray-500">Billet envoyé à</p>
-            <p className="text-sm font-semibold text-gray-900 truncate">{email}</p>
+        <button type="button" onClick={() => { setError(null); setStep('info'); }} disabled={isSubmitting} className="min-h-11 rounded-xl px-2 text-sm font-semibold text-gray-600">← Retour</button>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="font-display text-2xl font-semibold">Méthode de paiement</h2>
+            <div className="mt-5"><PaymentOptionList options={options} /></div>
+            {selectedExternalMethod && <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />}
+            <div className="mt-5 rounded-2xl bg-[#f8f4ec] p-4"><p className="text-xs text-gray-500">Billet envoyé à</p><p className="mt-1 truncate text-sm font-semibold text-gray-900">{email}</p><button type="button" onClick={() => setStep('info')} className="mt-2 min-h-11 text-xs font-bold text-[var(--color-primary)]">Modifier les coordonnées</button></div>
+            {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+            <button onClick={handleConfirmPayment} disabled={isSubmitting} className="mt-5 min-h-12 w-full rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: ctaColor }}>{isSubmitting ? 'Traitement…' : selectedExternalMethod ? `${ctaLabel} · ${formatPrice(total, tenant.currency)}` : ctaLabel}</button>
           </div>
-          <button
-            type="button"
-            onClick={handleBackToInfo}
-            disabled={isSubmitting}
-            className="text-xs font-semibold shrink-0 hover:underline disabled:opacity-50"
-            style={{ color: 'var(--color-primary)' }}
-          >
-            Modifier
-          </button>
+          <aside className="lg:sticky lg:top-[92px]">{summary}</aside>
         </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
-          <PaymentOptionList options={options} />
-          {selectedExternalMethod && (
-            <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />
-          )}
-        </div>
-
-        {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
-
-        <p className="text-xs text-gray-500 text-center">
-          Après le paiement, pensez à télécharger votre billet directement sur la page de confirmation.
-        </p>
-
-        <button
-          onClick={handleConfirmPayment}
-          disabled={isSubmitting}
-          className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
-          style={{ backgroundColor: ctaColor }}
-        >
-          {isSubmitting
-            ? 'Traitement…'
-            : selectedExternalMethod
-              ? `${ctaLabel} · ${formatPrice(total, tenant.currency)}`
-              : ctaLabel
-          }
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="pb-[104px] lg:pb-0">
       <EventStepper current={step} />
-
-      <h2 className="font-display text-xl font-bold text-gray-900 text-center">Choisissez vos formules</h2>
-
-      <div className="flex flex-col gap-3.5">
-        {ticketTypes.map((ticket) => {
-          const hasBadge = Boolean(ticket.badge);
-          return (
-            <div
-              key={ticket.id}
-              className={`relative bg-white rounded-2xl shadow-sm p-4 sm:p-[18px] ${hasBadge ? 'border-2' : 'border border-gray-100'}`}
-              style={hasBadge ? { borderColor: 'var(--color-primary)' } : undefined}
-            >
-              {hasBadge && (
-                <span
-                  className="absolute top-0 left-4 -translate-y-1/2 inline-flex items-center gap-1 text-[11px] font-bold text-white px-3 py-1.5 rounded-full"
-                  style={{ backgroundColor: 'var(--color-primary)' }}
-                >
-                  <IconStarFilled size={12} /> {ticket.badge}
-                </span>
-              )}
-              <div className={hasBadge ? 'pt-2' : ''}>
-                <p className="text-sm font-semibold text-gray-900">{ticket.label}</p>
-                {ticket.description && <p className="text-xs text-gray-500 mt-0.5">{ticket.description}</p>}
-                <div className="flex items-center justify-between mt-2.5">
-                  <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                    {formatPrice(ticket.price, tenant.currency)}
-                  </span>
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setQuantity(ticket.id, -1)}
-                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500"
-                    >
-                      <IconMinus size={14} />
-                    </button>
-                    <span className="w-5 text-center text-sm font-semibold">{quantities[ticket.id] ?? 0}</span>
-                    <button
-                      type="button"
-                      onClick={() => setQuantity(ticket.id, 1)}
-                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500"
-                    >
-                      <IconPlus size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <div>
+          {featureRow}
+          <section className={featureRow ? 'mt-6' : ''}>
+            <h2 className="font-display text-3xl font-semibold text-gray-900">Choisissez vos formules</h2>
+            <div className="mt-5 space-y-3">
+              {ticketTypes.map((ticket) => {
+                const quantity = quantities[ticket.id] ?? 0;
+                return (
+                  <article key={ticket.id} className={`relative rounded-3xl bg-white p-5 shadow-sm ${ticket.badge ? 'border-2 border-[var(--color-primary)]' : 'border border-black/[0.06]'}`}>
+                    {ticket.badge && <span className="absolute -top-3 left-5 inline-flex items-center gap-1 rounded-full bg-[var(--color-primary)] px-3 py-1.5 text-[10px] font-bold text-white"><IconStarFilled size={11} />{ticket.badge}</span>}
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-gray-900">{ticket.label}</h3>
+                        {ticket.description && <p className="mt-1 text-sm leading-relaxed text-gray-500">{ticket.description}</p>}
+                        <p className="mt-3 text-xl font-bold text-[var(--color-primary)]">{formatPrice(ticket.price, tenant.currency)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 self-end sm:self-center" aria-label={`Quantité pour ${ticket.label}`}>
+                        <button type="button" aria-label={`Retirer une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, -1)} disabled={quantity === 0} className="flex size-11 items-center justify-center rounded-xl border border-black/10 text-gray-700 disabled:opacity-35"><IconMinus size={16} /></button>
+                        <span className="w-8 text-center text-base font-bold">{quantity}</span>
+                        <button type="button" aria-label={`Ajouter une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, 1)} className="flex size-11 items-center justify-center rounded-xl border border-black/10 text-gray-700"><IconPlus size={16} /></button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          );
-        })}
+          </section>
+          {error && <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+          <button onClick={handleContinueToInfo} disabled={totalQuantity === 0} className="mt-5 hidden min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white disabled:opacity-50 lg:block">Continuer</button>
+        </div>
+        <aside className="sticky top-[92px] hidden lg:block">{summary}</aside>
       </div>
 
-      {featureRow}
-
-      {summary}
-
-      {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
-
-      <button
-        onClick={handleContinueToInfo}
-        disabled={totalQuantity === 0}
-        className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
-        style={{ backgroundColor: 'var(--color-primary)' }}
-      >
-        Continuer
-      </button>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-[620px] items-center gap-3">
+          <div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div>
+          <button onClick={handleContinueToInfo} disabled={totalQuantity === 0} className="min-h-12 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white disabled:opacity-50">Continuer</button>
+        </div>
+      </div>
     </div>
   );
 }
