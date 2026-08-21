@@ -9,7 +9,7 @@ export interface Database {
           logo_url: string | null; primary_color: string; secondary_color: string;
           accent_light: string; city: string | null; country: string; currency: string;
           locale: string; stripe_account_id: string | null; click_collect_enabled: boolean;
-          click_collect_address: string | null; click_collect_hours_it: string | null; active: boolean; storefront_ready: boolean; show_powered_by: boolean; created_at: string; updated_at: string;
+          click_collect_address: string | null; google_maps_url: string | null; click_collect_hours_it: string | null; active: boolean; storefront_ready: boolean; show_powered_by: boolean; created_at: string; updated_at: string;
           subscription_status: 'active' | 'expired';
           subscription_paid_until: string | null;
           stripe_payment_link: string | null;
@@ -53,7 +53,7 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['shipping_zones']['Row']>;
       };
       shipping_rates: {
-        Row: { id: string; tenant_id: string; zone_id: string; min_weight_g: number; max_weight_g: number | null; rate: number; active: boolean; created_at: string };
+        Row: { id: string; tenant_id: string; zone_id: string; min_weight_g: number; max_weight_g: number | null; rate: number; active: boolean; position: number; created_at: string };
         Insert: Omit<Database['public']['Tables']['shipping_rates']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['shipping_rates']['Row']>;
       };
