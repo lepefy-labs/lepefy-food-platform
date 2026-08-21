@@ -28,9 +28,9 @@ export function Header() {
             <Image
               src={tenant.logo_url}
               alt={tenant.name}
-              width={48}
+              width={120}
               height={48}
-              className="h-12 w-12 object-contain"
+              className="h-11 w-auto max-w-[120px] object-contain object-left"
               priority
             />
           ) : tenant.name}
