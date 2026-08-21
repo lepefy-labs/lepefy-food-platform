@@ -3,28 +3,22 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconExternalLink, IconClock, IconBrandWhatsapp } from '@tabler/icons-react';
+import { IconBrandWhatsapp, IconClock, IconExternalLink } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 
-// Même comportement que (shop)/checkout/en-attente (Phase 1) : aucune
-// réservation confirmée ici, seulement une demande event_reservation_requests
-// en attente — les détails viennent de sessionStorage, écrits par
-// EventCheckoutClient juste avant la redirection (la page ne relit jamais
-// event_reservation_requests, pas de policy publique sur cette table).
-
 interface PendingEventPaymentData {
-  requestId:     string;
-  link:          string;
-  amount:        number;
-  currency:      string;
-  isPaypal:      boolean;
-  label:         string;
+  requestId: string;
+  link: string;
+  amount: number;
+  currency: string;
+  isPaypal: boolean;
+  label: string;
   customerEmail: string;
-  eventSlug:     string;
+  eventSlug: string;
 }
 
 interface Props {
-  requestId:      string | null;
+  requestId: string | null;
   whatsappNumber: string | null;
 }
 
@@ -42,7 +36,7 @@ export default function PendingEventPaymentClient({ requestId, whatsappNumber }:
         const parsed = JSON.parse(raw) as PendingEventPaymentData;
         if (!requestId || parsed.requestId === requestId) setData(parsed);
       } catch {
-        // ignore — fallback générique ci-dessous
+        // Invalid local data: generic state below remains available.
       }
     }
     setHydrated(true);
@@ -71,95 +65,54 @@ export default function PendingEventPaymentClient({ requestId, whatsappNumber }:
   if (!hydrated) return null;
 
   return (
-    <div className="max-w-md mx-auto px-4 py-10 text-center">
-      <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
-        <IconClock size={28} />
+    <main className="mx-auto max-w-xl px-4 py-12 sm:px-6 sm:py-16">
+      <div className="text-center">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+          <IconClock size={30} />
+        </div>
+        <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Paiement en attente</p>
+        <h1 className="mt-2 font-display text-3xl font-semibold text-gray-900 sm:text-4xl">Votre réservation attend la validation du paiement.</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-gray-600">
+          La demande est enregistrée, mais la réservation ne sera confirmée qu’après vérification du paiement.
+        </p>
       </div>
 
-      <h1 className="text-xl font-bold mb-2">Demande de paiement envoyée</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Ceci n&apos;est pas encore une réservation confirmée : elle le sera dès que
-        votre paiement aura été vérifié.
-      </p>
-
       {data ? (
-        <div className="bg-gray-50 rounded-2xl p-5 text-left space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Moyen choisi</span>
-            <span className="text-sm font-semibold">{data.label}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Montant à envoyer</span>
-            <span className="text-lg font-bold">{formatPrice(data.amount, data.currency)}</span>
-          </div>
+        <section className="mt-8 rounded-3xl border border-black/[0.06] bg-white p-5 shadow-[0_18px_45px_rgba(50,37,20,.08)] sm:p-6">
+          <dl className="space-y-4">
+            <div className="flex items-center justify-between gap-4"><dt className="text-sm text-gray-500">Moyen choisi</dt><dd className="text-sm font-semibold text-gray-900">{data.label}</dd></div>
+            <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] pt-4"><dt className="text-sm text-gray-500">Montant à envoyer</dt><dd className="text-xl font-bold text-gray-900">{formatPrice(data.amount, data.currency)}</dd></div>
+            <div className="flex items-start justify-between gap-4 border-t border-black/[0.06] pt-4"><dt className="text-sm text-gray-500">Référence</dt><dd className="max-w-[65%] break-all text-right font-mono text-xs text-gray-700">{data.requestId}</dd></div>
+          </dl>
 
-          <a
-            href={data.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white text-sm"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
+          <a href={data.link} target="_blank" rel="noopener noreferrer" className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">
             Ouvrir {data.label} <IconExternalLink size={16} />
           </a>
 
-          <button
-            type="button"
-            onClick={handleChangePaymentMethod}
-            disabled={changingMethod}
-            className="w-full text-sm font-semibold text-gray-500 hover:text-gray-800 disabled:opacity-50"
-          >
+          <button type="button" onClick={handleChangePaymentMethod} disabled={changingMethod} className="mt-2 min-h-11 w-full rounded-xl px-4 text-sm font-semibold text-gray-600 hover:bg-[#f7f3eb] disabled:opacity-50">
             {changingMethod ? 'Changement en cours…' : 'Changer de moyen de paiement'}
           </button>
+          {changeError && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700" role="alert">{changeError}</p>}
 
-          {changeError && <p className="text-xs text-red-500">{changeError}</p>}
-
-          {data.isPaypal ? (
-            <p className="text-xs text-gray-500">
-              Sélectionnez « Amis et famille » lors du paiement pour éviter les frais.
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500">
-              Le montant n&apos;est pas prérempli sur ce lien, saisissez-le
-              manuellement : <strong>{formatPrice(data.amount, data.currency)}</strong>.
-            </p>
-          )}
-
-          <div className="text-xs text-gray-500 border-t border-gray-200 pt-3 space-y-2 text-left">
-            <p>
-              Votre billet vous sera envoyé par email à{' '}
-              <strong className="text-gray-700">{data.customerEmail}</strong> dès que
-              votre paiement sera vérifié par l&apos;organisateur.
-            </p>
-            <p>
-              Pour ce moyen de paiement, l&apos;email est le seul moyen de recevoir
-              votre billet : il n&apos;y a pas de page de téléchargement, contrairement
-              au paiement par carte. Vérifiez que l&apos;adresse ci-dessus est correcte
-              avant d&apos;effectuer le paiement.
-            </p>
+          <div className="mt-5 rounded-2xl bg-[#f7f3eb] p-4 text-xs leading-relaxed text-gray-600">
+            {data.isPaypal ? (
+              <p>Sélectionnez « Amis et famille » lors du paiement pour éviter les frais.</p>
+            ) : (
+              <p>Le montant n’est pas prérempli sur ce lien. Saisissez manuellement <strong>{formatPrice(data.amount, data.currency)}</strong>.</p>
+            )}
+            <p className="mt-3">Le billet sera envoyé à <strong className="text-gray-800">{data.customerEmail}</strong> après validation du paiement.</p>
             {whatsappNumber && (
-              <a
-                href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-semibold hover:underline"
-                style={{ color: 'var(--color-primary)' }}
-              >
-                <IconBrandWhatsapp size={14} /> Une erreur dans votre email ? Contactez-nous avant d&apos;effectuer le paiement.
+              <a href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-1.5 font-semibold text-[var(--color-primary)]">
+                <IconBrandWhatsapp size={15} /> Une erreur dans votre email ? Contactez-nous.
               </a>
             )}
           </div>
-        </div>
+        </section>
       ) : (
-        <p className="text-sm text-gray-500 bg-gray-50 rounded-2xl p-5">
-          Votre demande a bien été enregistrée. Consultez vos emails pour le
-          récapitulatif, ou contactez l&apos;organisateur si besoin.
-        </p>
+        <p className="mt-8 rounded-3xl border border-black/[0.06] bg-white p-6 text-center text-sm text-gray-600 shadow-sm">Votre demande a bien été enregistrée. Consultez vos emails pour le récapitulatif.</p>
       )}
 
-      <Link href="/evenementiel" className="inline-block mt-8 text-sm text-gray-500 hover:text-gray-800">
-        ← Retour aux événements
-      </Link>
-    </div>
+      <div className="mt-7 text-center"><Link href="/evenementiel" className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-[var(--color-primary)] hover:bg-white">← Retour aux événements</Link></div>
+    </main>
   );
 }
