@@ -17,7 +17,7 @@ type Lang = 'fr' | 'it';
 
 const COPY = {
   fr: {
-    descriptor: (name: string) => `Carte digitale ${name}`,
+    descriptor: 'Carte digitale',
     heroSupport: 'Toutes nos infos, services et paiements à portée de main.',
     followUs: 'Suivez-nous', whatsapp: 'Contacter sur WhatsApp', products: 'Découvrir notre boutique',
     addContact: 'Ajouter aux contacts', comingSoon: 'Boutique en ligne bientôt disponible',
@@ -26,7 +26,7 @@ const COPY = {
     payCta: 'Voir les moyens de paiement',
   },
   it: {
-    descriptor: (name: string) => `Card digitale ${name}`,
+    descriptor: 'Card digitale',
     heroSupport: 'Tutte le informazioni, i servizi e i pagamenti sempre a portata di mano.',
     followUs: 'Seguici', whatsapp: 'Contatta su WhatsApp', products: 'Scopri il nostro negozio',
     addContact: 'Aggiungi ai contatti', comingSoon: 'Negozio online in arrivo',
@@ -77,20 +77,20 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
         <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
 
         {!inPayment && (
-          <header className="relative overflow-hidden px-6 pb-8 pt-6 text-center" style={{ backgroundColor: tenant.primary_color }}>
-            <div aria-hidden className="absolute -left-12 top-14 h-36 w-36 rounded-full opacity-[0.08]" style={{ backgroundColor: tenant.secondary_color }} />
-            <div aria-hidden className="absolute -right-16 -top-12 h-44 w-44 rounded-full opacity-[0.10]" style={{ backgroundColor: tenant.secondary_color }} />
+          <header className="relative overflow-hidden px-6 pb-7 pt-4 text-center" style={{ backgroundColor: tenant.primary_color }}>
+            <div aria-hidden className="absolute -left-12 top-12 h-32 w-32 rounded-full opacity-[0.05]" style={{ backgroundColor: tenant.secondary_color }} />
+            <div aria-hidden className="absolute -right-16 -top-12 h-40 w-40 rounded-full opacity-[0.055]" style={{ backgroundColor: tenant.secondary_color }} />
 
-            <div className="relative mb-2 flex justify-end">
-              <div className="inline-flex rounded-xl border border-white/20 bg-black/10 p-0.5 backdrop-blur-sm" aria-label="Language">
+            <div className="relative -mb-7 flex justify-end">
+              <div className="inline-flex rounded-lg border border-white/15 bg-black/[0.06] p-px backdrop-blur-sm" aria-label="Language">
                 {(['fr', 'it'] as Lang[]).map((l) => (
                   <button
                     key={l}
                     type="button"
                     onClick={() => changeLang(l)}
                     aria-pressed={lang === l}
-                    className="min-h-11 min-w-11 rounded-[10px] px-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-                    style={lang === l ? { backgroundColor: tenant.secondary_color, color: secondaryForeground } : { color: 'rgba(255,255,255,.82)' }}
+                    className="min-h-11 min-w-11 rounded-[7px] px-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+                    style={lang === l ? { backgroundColor: tenant.secondary_color, color: secondaryForeground } : { color: 'rgba(255,255,255,.68)' }}
                   >
                     {l.toUpperCase()}
                   </button>
@@ -98,70 +98,70 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
               </div>
             </div>
 
-            <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl bg-white/95 p-2 shadow-sm ring-1 ring-white/40">
+            <div className="relative mx-auto mb-2.5 flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl bg-white/95 p-1 shadow-sm ring-1 ring-white/35">
               {tenant.logo_url ? (
                 <Image src={tenant.logo_url} alt={tenant.name} width={104} height={104} className="h-full w-full object-contain" priority />
               ) : (
                 <span className="text-2xl font-extrabold" style={{ color: tenant.primary_color }}>{initials}</span>
               )}
             </div>
-            <p className="relative text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-card-heading)' }}>{tenant.name}</p>
-            <h1 className="relative mt-3 text-lg font-bold text-white" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.descriptor(tenant.name)}</h1>
-            <p className="relative mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-white/80">{t.heroSupport}</p>
-            <div className="relative mx-auto mt-4 h-0.5 w-10 rounded-full" style={{ backgroundColor: tenant.secondary_color }} />
+            <h1 className="relative text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-card-heading)' }}>{tenant.name}</h1>
+            <p className="relative mt-1 text-sm font-bold text-white/95" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.descriptor}</p>
+            <p className="relative mx-auto mt-1 max-w-xs text-[13px] leading-relaxed text-white/75">{t.heroSupport}</p>
+            <div className="relative mx-auto mt-2.5 h-0.5 w-8 rounded-full" style={{ backgroundColor: tenant.secondary_color }} />
           </header>
         )}
 
-        <div className={inPayment ? 'p-5 sm:p-7' : 'px-4 pb-32 pt-5 sm:px-5'}>
+        <div className={inPayment ? 'p-5 sm:p-7' : 'relative -mt-4 rounded-t-[1.75rem] bg-white px-4 pb-28 pt-5 sm:px-5'}>
           {inPayment ? (
             <PaymentMethodsAccordion paymentMethods={paymentMethods} primaryColor={tenant.primary_color} currency={tenant.currency} lang={lang} onClose={() => setInPayment(false)} />
           ) : (
             <>
-              <section className="mb-5 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              <section className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.035)]">
                 {tenant.whatsapp_number && (
-                  <div className="p-3">
+                  <div className="p-2.5">
                     <a
                       href={`https://wa.me/${tenant.whatsapp_number}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl px-4 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                      className="flex min-h-12 w-full items-center justify-center gap-2.5 rounded-[11px] px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                       style={{ backgroundColor: tenant.secondary_color, color: secondaryForeground, '--tw-ring-color': tenant.primary_color } as React.CSSProperties}
                     >
-                      <IconBrandWhatsapp size={21} stroke={2} />
+                      <IconBrandWhatsapp size={20} stroke={2} />
                       {t.whatsapp}
                     </a>
                   </div>
                 )}
                 {tenant.click_collect_address && (
-                  <div className="flex items-start gap-3 border-t border-gray-100 px-4 py-4">
-                    <IconMapPin size={19} className="mt-0.5 shrink-0" style={{ color: tenant.primary_color }} />
-                    <span className="text-sm leading-relaxed text-gray-700">{tenant.click_collect_address}</span>
+                  <div className="flex items-start gap-3 border-t border-gray-100 px-4 py-3.5">
+                    <IconMapPin size={18} className="mt-0.5 shrink-0" style={{ color: tenant.primary_color }} />
+                    <span className="text-sm leading-5 text-gray-700">{tenant.click_collect_address}</span>
                   </div>
                 )}
                 {hours && (
-                  <div className="flex items-start gap-3 border-t border-gray-100 px-4 py-4">
-                    <IconClock size={19} className="mt-0.5 shrink-0" style={{ color: tenant.primary_color }} />
-                    <span className="text-sm leading-relaxed text-gray-700">{hours}</span>
+                  <div className="flex items-start gap-3 border-t border-gray-100 px-4 py-3.5">
+                    <IconClock size={18} className="mt-0.5 shrink-0" style={{ color: tenant.primary_color }} />
+                    <span className="text-sm leading-5 text-gray-700">{hours}</span>
                   </div>
                 )}
               </section>
 
               {paymentMethods.length > 0 && (
-                <section className="relative mb-5 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                  <div className="absolute left-4 top-0 h-0.5 w-8 rounded-full" style={{ backgroundColor: tenant.secondary_color }} />
+                <section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.035)]">
                   <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: tenant.primary_color }}>
-                      <IconCreditCard size={20} />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" style={{ backgroundColor: tenant.primary_color }}>
+                      <IconCreditCard size={18} />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <h2 className="font-bold text-gray-900" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.payTitle}</h2>
-                      <p className="mt-1 text-sm leading-relaxed text-gray-500">{t.payText}</p>
+                      <div className="mt-1 h-0.5 w-7 rounded-full" style={{ backgroundColor: tenant.secondary_color }} />
+                      <p className="mt-2 text-sm leading-relaxed text-gray-500">{t.payText}</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setInPayment(true)}
-                    className="mt-4 min-h-12 w-full rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    className="mt-3.5 min-h-12 w-full rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ backgroundColor: tenant.primary_color, '--tw-ring-color': tenant.primary_color } as React.CSSProperties}
                   >
                     {t.payCta}
@@ -169,28 +169,28 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
                 </section>
               )}
 
-              <section className="mb-5">
+              <section className="mb-4">
                 {tenant.storefront_ready ? (
                   <Link
                     href="/"
-                    className="flex min-h-[52px] items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.03)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    className="flex min-h-12 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.025)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ '--tw-ring-color': tenant.primary_color } as React.CSSProperties}
                   >
-                    <IconShoppingBag size={19} style={{ color: tenant.primary_color }} />
+                    <IconShoppingBag size={18} style={{ color: tenant.primary_color }} />
                     <span className="flex-1">{t.products}</span>
-                    <IconExternalLink size={17} className="text-gray-400" />
+                    <IconExternalLink size={16} className="text-gray-400" />
                   </Link>
                 ) : (
-                  <div className="flex min-h-[52px] items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-sm italic text-gray-500">
-                    <IconShoppingBag size={19} style={{ color: tenant.primary_color }} />
+                  <div className="flex min-h-12 items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-sm italic text-gray-500">
+                    <IconShoppingBag size={18} style={{ color: tenant.primary_color }} />
                     {t.comingSoon}
                   </div>
                 )}
               </section>
 
               {socialLinks.length > 0 && (
-                <section className="mb-2 px-1">
-                  <h2 className="mb-3 text-sm font-bold text-gray-800" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.followUs}</h2>
+                <section className="mb-1 px-1">
+                  <h2 className="mb-2.5 text-sm font-bold text-gray-800" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.followUs}</h2>
                   <div className="flex flex-wrap gap-3">
                     {socialLinks.map((link) => {
                       const meta = SOCIAL_PLATFORM_REGISTRY[link.platform];
@@ -218,7 +218,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
       </div>
 
       {!inPayment && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center border-t border-gray-200/80 bg-white/90 px-4 pt-3 backdrop-blur-md" style={{ paddingBottom: 'calc(.75rem + env(safe-area-inset-bottom))' }}>
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center border-t border-gray-200/70 bg-white/90 px-4 pt-2 backdrop-blur-md" style={{ paddingBottom: 'calc(.5rem + env(safe-area-inset-bottom))' }}>
           <a
             href="/api/card/vcard"
             download
