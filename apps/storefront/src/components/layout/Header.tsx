@@ -1,12 +1,15 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { IconMenu2, IconShoppingCart, IconX } from '@tabler/icons-react';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 
 export function Header() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const tenant = useTenant();
   const totalItems = useCartStore((s) => s.totalItems());
   const openCartDrawer = useCartUiStore((s) => s.openDrawer);
@@ -18,12 +21,24 @@ export function Header() {
   function handleCartClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
+    setMobileMenuOpen(false);
     openCartDrawer();
   }
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-        <Link href="/" className="font-display font-bold text-xl" style={{ color: 'var(--color-primary)' }}>
+      <div className="relative max-w-7xl mx-auto px-4 h-16 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(open => !open)}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-shop-menu"
+          aria-label={mobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+          className="md:hidden absolute left-4 flex h-11 w-11 items-center justify-center rounded-lg text-gray-700 focus-visible:outline-none focus-visible:ring-2"
+        >
+          {mobileMenuOpen ? <IconX size={24} /> : <IconMenu2 size={24} />}
+        </button>
+
+        <Link href="/" className="absolute left-1/2 -translate-x-1/2 font-display font-bold text-xl md:static md:translate-x-0" style={{ color: 'var(--color-primary)' }}>
           {tenant.logo_url ? (
             <Image
               src={tenant.logo_url}
@@ -35,7 +50,22 @@ export function Header() {
             />
           ) : tenant.name}
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-4">
+          <Link
+            href="/cart"
+            onClick={handleCartClick}
+            aria-haspopup="dialog"
+            aria-label={`Ouvrir le panier${totalItems > 0 ? `, ${totalItems} article${totalItems > 1 ? 's' : ''}` : ''}`}
+            className="md:hidden absolute right-4 flex h-11 w-11 items-center justify-center rounded-lg text-gray-700 focus-visible:outline-none focus-visible:ring-2"
+          >
+            <IconShoppingCart size={24} />
+            {totalItems > 0 && (
+              <span className="absolute right-0.5 top-0.5 min-w-[16px] h-4 px-0.5 rounded-full text-2xs font-bold flex items-center justify-center" style={{ background: 'var(--color-secondary)', color: '#1a1a1a' }}>
+                {totalItems > 99 ? '99+' : totalItems}
+              </span>
+            )}
+          </Link>
+
           {/* Nav desktop — hidden on mobile, bottom bar handles navigation */}
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-gray-900">Catalogue</Link>
@@ -64,6 +94,24 @@ export function Header() {
           </nav>
         </div>
       </div>
+
+      {mobileMenuOpen && (
+        <nav id="mobile-shop-menu" className="md:hidden absolute inset-x-0 top-16 border-b border-gray-200 bg-white px-4 py-3 shadow-lg" aria-label="Navigation principale mobile">
+          <div className="mx-auto grid max-w-7xl gap-1">
+            {([
+              ['Accueil', '/'],
+              ['Catalogue', '/products'],
+              ['Panier', '/cart'],
+              ['Commandes', '/orders'],
+              ['Compte', '/compte/connexion'],
+            ] as const).map(([label, href]) => (
+              <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2">
+                {label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+      )}
     </header>
   );
 }
