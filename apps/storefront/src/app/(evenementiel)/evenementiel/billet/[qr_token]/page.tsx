@@ -1,22 +1,17 @@
 import {
+  IconAlertCircle,
   IconCalendarEvent,
+  IconCircleCheck,
+  IconClock,
   IconMapPin,
   IconTicket,
-  IconCircleCheck,
-  IconAlertCircle,
   IconUser,
 } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { formatDate } from '@/lib/utils/format';
+import { formatDate, formatEventTime } from '@/lib/utils/format';
 import type { EventReservationStatus } from '@lepefy/types';
 
-// Page publique du billet — cible de l'URL encodée dans le QR
-// (cf. lib/events/ticketUrl.ts). Aucune authentification : le qr_token
-// (HMAC opaque, non devinable) sert de capability de lecture, même principe
-// que le lien /orders/[id]?token= (token de suivi commande). LECTURE SEULE :
-// aucune redemption ici — celle-ci reste exclusivement dans le scanner admin
-// authentifié (/admin/evenementiel/scan → RPC redeem_event_reservation).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -36,19 +31,13 @@ interface StatusBadge {
   ok: boolean;
 }
 
-function statusBadge(r: ReservationRow): StatusBadge {
-  if (r.status === 'cancelled') {
-    return { label: 'Réservation annulée', className: 'bg-red-50 text-red-700 border-red-200', ok: false };
-  }
-  if (r.status === 'refunded') {
-    return { label: 'Réservation remboursée', className: 'bg-red-50 text-red-700 border-red-200', ok: false };
-  }
-  if (r.quantity_remaining === 0) {
-    return { label: 'Billet entièrement utilisé', className: 'bg-gray-100 text-gray-600 border-gray-200', ok: false };
-  }
-  if (r.quantity_remaining < r.quantity_total) {
+function statusBadge(reservation: ReservationRow): StatusBadge {
+  if (reservation.status === 'cancelled') return { label: 'Réservation annulée', className: 'bg-red-50 text-red-700 border-red-200', ok: false };
+  if (reservation.status === 'refunded') return { label: 'Réservation remboursée', className: 'bg-red-50 text-red-700 border-red-200', ok: false };
+  if (reservation.quantity_remaining === 0) return { label: 'Billet entièrement utilisé', className: 'bg-gray-100 text-gray-600 border-gray-200', ok: false };
+  if (reservation.quantity_remaining < reservation.quantity_total) {
     return {
-      label: `Billet partiellement utilisé — ${r.quantity_remaining}/${r.quantity_total} place${r.quantity_total > 1 ? 's' : ''} restante${r.quantity_remaining > 1 ? 's' : ''}`,
+      label: `Billet partiellement utilisé — ${reservation.quantity_remaining}/${reservation.quantity_total} place${reservation.quantity_total > 1 ? 's' : ''} restante${reservation.quantity_remaining > 1 ? 's' : ''}`,
       className: 'bg-amber-50 text-amber-800 border-amber-200',
       ok: true,
     };
@@ -57,10 +46,9 @@ function statusBadge(r: ReservationRow): StatusBadge {
 }
 
 export default async function BilletPage({ params }: { params: { qr_token: string } }) {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-
-  const qrToken  = params.qr_token;
+  const qrToken = params.qr_token;
   const supabase = createServiceClient();
 
   const { data: reservation } = await supabase
@@ -71,87 +59,65 @@ export default async function BilletPage({ params }: { params: { qr_token: strin
 
   if (!reservation || (reservation as ReservationRow).tenant_id !== tenant.id) {
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-          <IconAlertCircle size={28} className="text-red-500" />
-        </div>
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Billet introuvable</h1>
-        <p className="text-sm text-gray-500">
-          Ce lien ne correspond à aucune réservation. Vérifiez l&apos;URL de votre billet.
-        </p>
-      </div>
+      <main className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-red-50 text-red-600"><IconAlertCircle size={30} /></div>
+        <h1 className="mt-5 font-display text-3xl font-semibold text-gray-900">Billet introuvable</h1>
+        <p className="mt-3 text-sm leading-relaxed text-gray-600">Ce lien ne correspond à aucune réservation. Vérifiez l’URL de votre billet.</p>
+      </main>
     );
   }
 
   const row = reservation as ReservationRow;
-
   const { data: event } = await supabase
     .from('events')
     .select('title, date_start, location')
     .eq('id', row.event_id)
     .maybeSingle();
-
   const badge = statusBadge(row);
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-10">
-      <div className="text-center mb-6">
-        <div
-          className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary) 12%, white)' }}
-        >
-          <IconTicket size={28} stroke={1.6} color="var(--color-primary)" />
-        </div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Votre billet</h1>
-        <p className="text-sm text-gray-500">Présentez ce billet à l&apos;entrée de l&apos;événement.</p>
+    <main className="mx-auto max-w-xl px-4 py-10 sm:px-6 sm:py-14">
+      <div className="text-center">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] text-[var(--color-primary)]"><IconTicket size={27} stroke={1.7} /></div>
+        <p className="mt-4 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Billet numérique</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold text-gray-900">Votre billet</h1>
+        <p className="mt-2 text-sm text-gray-500">Présentez le QR code à l’entrée de l’événement.</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center mb-4">
+      <section className="mt-7 overflow-hidden rounded-[28px] border border-black/[0.06] bg-white shadow-[0_18px_45px_rgba(50,37,20,.1)]">
         {event && (
-          <>
-            <p className="font-bold text-gray-900 mb-1">{event.title}</p>
-            <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5 mb-1">
-              <IconCalendarEvent size={13} /> {formatDate(event.date_start)}
-            </p>
-            {event.location && (
-              <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5">
-                <IconMapPin size={13} /> {event.location}
-              </p>
-            )}
-          </>
+          <div className="bg-[#f7f3eb] px-5 py-6 text-center sm:px-7">
+            <h2 className="font-display text-2xl font-semibold text-gray-900">{event.title}</h2>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium text-gray-600">
+              <span className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatDate(event.date_start)}</span>
+              <span className="flex items-center gap-1.5"><IconClock size={14} />{formatEventTime(event.date_start)}</span>
+              {event.location && <span className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="max-w-[260px] truncate">{event.location}</span></span>}
+            </div>
+          </div>
         )}
 
-        <div
-          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold mt-4 ${badge.className}`}
-        >
-          {badge.ok
-            ? <IconCircleCheck size={14} stroke={2} />
-            : <IconAlertCircle size={14} stroke={2} />}
-          {badge.label}
+        <div className="px-5 py-7 text-center sm:px-7">
+          <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${badge.className}`}>
+            {badge.ok ? <IconCircleCheck size={14} stroke={2} /> : <IconAlertCircle size={14} stroke={2} />}
+            {badge.label}
+          </div>
+
+          {badge.ok && (
+            <div className="mx-auto mt-5 w-fit rounded-3xl border border-black/[0.06] bg-white p-3 shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/events/reservation-qr?token=${encodeURIComponent(qrToken)}`} alt="QR code d'entrée" className="size-60 max-w-full object-contain" />
+            </div>
+          )}
+
+          <div className="mt-5 flex items-center justify-center gap-2 text-sm font-semibold text-gray-900"><IconUser size={16} className="text-gray-400" />{row.customer_name}</div>
+          <p className="mt-1 text-xs text-gray-500">{row.quantity_total} place{row.quantity_total > 1 ? 's' : ''} réservée{row.quantity_total > 1 ? 's' : ''}</p>
+          <p className="mt-4 font-mono text-[11px] tracking-wide text-gray-400">RÉF. #{row.id.slice(0, 8).toUpperCase()}</p>
         </div>
+      </section>
 
-        {badge.ok && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/events/reservation-qr?token=${encodeURIComponent(qrToken)}`}
-              alt="QR code d'entrée"
-              className="mx-auto w-56 h-56 mt-4"
-            />
-          </>
-        )}
-
-        <p className="text-sm font-semibold text-gray-900 mt-4 flex items-center justify-center gap-1.5">
-          <IconUser size={15} stroke={1.8} className="text-gray-400" /> {row.customer_name}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          {row.quantity_total} place{row.quantity_total > 1 ? 's' : ''} réservée{row.quantity_total > 1 ? 's' : ''}
-        </p>
+      <div className="mt-5 rounded-2xl bg-[#f7f3eb] p-4 text-center text-xs leading-relaxed text-gray-500">
+        Gardez ce billet accessible sur votre téléphone. La validation des entrées se fait uniquement sur place par l’équipe de {tenant.name}.
       </div>
-
-      <p className="text-xs text-gray-400 text-center">
-        La validation des entrées se fait uniquement sur place par l&apos;équipe de {tenant.name}.
-      </p>
-    </div>
+    </main>
   );
 }
