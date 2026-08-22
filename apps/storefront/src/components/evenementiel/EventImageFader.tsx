@@ -24,6 +24,10 @@ interface EventImageFaderProps {
  * `relative`, etc.). On n'ajoute `relative` que lorsqu'aucune position n'est
  * déjà présente afin d'éviter le conflit Tailwind qui faisait perdre
  * `absolute inset-0` au hero.
+ *
+ * `isolate` crée un stacking context local : les overlays internes en z-10
+ * restent confinés dans le fader et ne passent pas au-dessus des CTA / textes
+ * frères du hero.
  */
 export function EventImageFader({ images, fallbackColor, intervalMs = 5000, className = '', children }: EventImageFaderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -41,7 +45,7 @@ export function EventImageFader({ images, fallbackColor, intervalMs = 5000, clas
 
   return (
     <div
-      className={`${hasPositionClass ? '' : 'relative '}overflow-hidden ${className}`}
+      className={`${hasPositionClass ? '' : 'relative '}isolate overflow-hidden ${className}`}
       style={{ backgroundColor: fallbackColor }}
     >
       {images.length === 1 && (
