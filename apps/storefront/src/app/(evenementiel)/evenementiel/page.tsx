@@ -127,18 +127,18 @@ export default async function EvenementielHubPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f3eb] text-[#20231f]">
-      <section className="relative isolate min-h-[520px] overflow-hidden lg:min-h-[570px]">
+      <section className="relative isolate min-h-[380px] overflow-hidden lg:min-h-[430px]">
         <EventImageFader images={heroImages} fallbackColor="var(--color-primary-dark)" className="absolute inset-0 h-full w-full">
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,24,15,.92)_0%,rgba(7,24,15,.68)_46%,rgba(7,24,15,.18)_76%,rgba(7,24,15,.28)_100%)]" aria-hidden="true" />
         </EventImageFader>
-        <div className="relative z-[2] mx-auto flex min-h-[520px] max-w-[1180px] items-center px-4 py-14 sm:px-6 lg:min-h-[570px]">
+        <div className="relative z-[2] mx-auto flex min-h-[380px] max-w-[1180px] items-center px-4 py-10 sm:px-6 lg:min-h-[430px]">
           <div className="max-w-[620px] text-white">
-            <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-secondary)]">Chloe Food Events</p>
-            <h1 className="font-display text-[2.65rem] font-semibold leading-[0.98] sm:text-6xl">Des événements<br />qui ont du goût.</h1>
-            <p className="mt-6 max-w-lg text-base leading-relaxed text-white/82 sm:text-lg">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-secondary)]">Chloe Food Events</p>
+            <h1 className="font-display text-[2.45rem] font-semibold leading-[0.98] sm:text-[3.4rem]">Des événements<br />qui ont du goût.</h1>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/82 sm:text-base">
               Soirées conviviales, service traiteur et location de matériel : une expérience pensée pour recevoir avec style et simplicité.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <a href="#evenements" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}>
                 Découvrir les événements <IconArrowRight size={17} />
               </a>
@@ -150,7 +150,7 @@ export default async function EvenementielHubPage() {
 
       <main className="mx-auto max-w-[1180px] px-4 sm:px-6">
         {tenant.events_enabled && (
-          <section id="evenements" className="scroll-mt-24 py-12 sm:py-16">
+          <section id="evenements" className="scroll-mt-24 py-10 sm:py-12">
             <div className="mb-7 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">À venir</p>
@@ -224,7 +224,13 @@ export default async function EvenementielHubPage() {
           <section id="galerie" className="scroll-mt-24 pb-16 sm:pb-20">
             <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Inspiration</p><h2 className="mt-1 font-display text-3xl font-semibold sm:text-4xl">Ambiances &amp; inspirations</h2></div><span className="hidden text-sm text-gray-500 sm:inline">Un aperçu de nos univers</span></div>
             <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0">
-              {gallery.map((photo, index) => <figure key={photo.id} className={`relative min-w-[68vw] snap-start overflow-hidden rounded-2xl bg-gray-100 sm:min-w-0 ${index % 5 === 0 ? 'sm:col-span-2 sm:row-span-2' : ''}`}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={photo.image_url} alt={photo.caption ?? ''} className="aspect-[4/3] h-full min-h-[210px] w-full object-cover sm:aspect-auto" />{photo.caption && <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10 text-xs text-white">{photo.caption}</figcaption>}</figure>)}
+              {gallery.map((photo, index) => (
+                <figure key={photo.id} className={`relative min-w-[68vw] snap-start overflow-hidden rounded-2xl bg-gray-100 sm:min-w-0 ${index % 5 === 0 ? 'sm:col-span-2 sm:row-span-2' : ''}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.image_url} alt={photo.caption ?? ''} className="aspect-[4/3] h-full min-h-[210px] w-full object-cover sm:aspect-auto" />
+                  {photo.caption && <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10 text-xs text-white">{photo.caption}</figcaption>}
+                </figure>
+              ))}
             </div>
           </section>
         )}
