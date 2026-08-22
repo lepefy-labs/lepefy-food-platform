@@ -103,9 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(total * 100),
       currency: tenant.currency ?? 'eur',
-      // Voir api/checkout/route.ts — RAPPEL : Link à désactiver manuellement
-      // depuis Stripe Dashboard (Settings → Payment Methods → Link).
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       metadata: metadata as unknown as Record<string, string>,
     });
 
