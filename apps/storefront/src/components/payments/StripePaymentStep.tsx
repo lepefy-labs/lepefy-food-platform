@@ -36,7 +36,6 @@ function InnerPaymentStep({
   const [isConfirming, setIsConfirming] = useState(false);
   const hasSucceededRef = useRef(false);
   const paymentSectionRef = useRef<HTMLDivElement>(null);
-  const isEventPayment = module === 'event';
 
   useEffect(() => {
     logFunnelEvent({ module, event_type: 'elements_mounted', reference_id: referenceIdRef.current });
@@ -45,7 +44,7 @@ function InnerPaymentStep({
   }, []);
 
   useEffect(() => {
-    if (!isEventPayment || !paymentSectionRef.current) return;
+    if (!paymentSectionRef.current) return;
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const frame = window.requestAnimationFrame(() => {
@@ -56,7 +55,7 @@ function InnerPaymentStep({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [isEventPayment]);
+  }, []);
 
   async function handleConfirm() {
     if (!stripe || !elements) return;
@@ -128,26 +127,20 @@ function InnerPaymentStep({
   );
 
   return (
-    <div ref={paymentSectionRef} className={isEventPayment ? 'space-y-4 pb-[92px] lg:pb-0' : 'space-y-4'}>
+    <div ref={paymentSectionRef} className="space-y-4 pb-[92px] lg:pb-0">
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <p className="mb-1 text-sm font-semibold text-gray-700">Paiement sécurisé</p>
         <p className="mb-4 text-xs leading-relaxed text-gray-500">{billingCountryHint}</p>
-        {isEventPayment && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900" role="note">
-            N’interrompez pas le paiement : après l’initialisation, ne fermez pas et n’actualisez pas cette page jusqu’à la confirmation.
-          </div>
-        )}
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900" role="note">
+          N’interrompez pas le paiement : après l’initialisation, ne fermez pas et n’actualisez pas cette page jusqu’à la confirmation.
+        </div>
         <PaymentElement options={{ layout: 'accordion' }} />
       </div>
 
-      {isEventPayment ? (
-        <>
-          <div className="hidden lg:block">{payButton}</div>
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
-            <div className="mx-auto max-w-xl">{payButton}</div>
-          </div>
-        </>
-      ) : payButton}
+      <div className="hidden lg:block">{payButton}</div>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
+        <div className="mx-auto max-w-xl">{payButton}</div>
+      </div>
     </div>
   );
 }
