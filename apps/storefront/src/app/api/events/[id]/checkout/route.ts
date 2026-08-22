@@ -4,9 +4,6 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventPaymentIntentMetadata } from '@lepefy/types';
 
-// Agente e2e Fase 0 — voir api/checkout/route.ts : getStripeClient() ne peut
-// plus être instancié au scope module, la résolution de clé dépend désormais
-// de la requête en cours (next/headers()).
 const MAX_QUANTITY_PER_TICKET = 999;
 
 function isValidEmail(value: string): boolean {
@@ -77,8 +74,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const totalQuantity = rawItems.reduce((s, i) => s + i.quantity, 0);
 
-    // Contrôle préliminaire ("fail fast") — la vérification définitive et
-    // atomique a lieu dans reserve_event_capacity() au moment du webhook.
     if (eventRow.capacity_remaining < totalQuantity) {
       return NextResponse.json(
         { error: 'Capacité insuffisante pour le nombre de places demandées.' },
@@ -103,9 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const paymentIntent = await stripe.paymentIntents.create({
       amount:   Math.round(total * 100),
       currency: tenant.currency ?? 'eur',
-      // Voir api/checkout/route.ts — RAPPEL : Link à désactiver manuellement
-      // depuis Stripe Dashboard (Settings → Payment Methods → Link).
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       metadata: metadata as unknown as Record<string, string>,
     });
 
