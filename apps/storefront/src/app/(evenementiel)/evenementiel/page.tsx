@@ -20,6 +20,17 @@ type EventPhotoRef = Pick<EventGalleryPhoto, 'event_id' | 'image_url'>;
 
 export const revalidate = 120;
 
+function availabilityClasses(remaining: number) {
+  if (remaining <= 0) return 'border-red-200 bg-red-50 text-red-700';
+  if (remaining <= 10) return 'border-red-200 bg-red-50 text-red-700';
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+}
+
+function availabilityLabel(remaining: number) {
+  if (remaining <= 0) return 'Complet';
+  return `${remaining} place${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''}`;
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -151,12 +162,16 @@ export default async function EvenementielHubPage() {
                         <p className="flex items-center gap-2"><IconCalendarEvent size={18} className="text-[var(--color-primary)]" />{formatEventDayDate(featuredEvent.date_start)}</p>
                         <p className="flex items-center gap-2"><IconClock size={18} className="text-[var(--color-primary)]" />{formatEventTime(featuredEvent.date_start)}</p>
                         {featuredEvent.location && <p className="flex items-center gap-2 sm:col-span-2"><IconMapPin size={18} className="shrink-0 text-[var(--color-primary)]" /><span className="line-clamp-1">{featuredEvent.location}</span></p>}
-                        <p className="flex items-center gap-2 sm:col-span-2"><IconUsers size={18} className="text-[var(--color-primary)]" />{featuredEvent.capacity_remaining <= 0 ? 'Complet' : `${featuredEvent.capacity_remaining} place${featuredEvent.capacity_remaining > 1 ? 's' : ''} restante${featuredEvent.capacity_remaining > 1 ? 's' : ''}`}</p>
+                        <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold sm:col-span-2 ${availabilityClasses(featuredEvent.capacity_remaining)}`}>
+                          <IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining)}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-7 flex items-center justify-between gap-4 border-t border-black/[0.06] pt-5">
                       <span className="text-sm text-gray-500">Voir les formules et disponibilités</span>
-                      <span className="inline-flex min-h-11 items-center rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">Réserver</span>
+                      <span className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">
+                        Réserve ta place <IconArrowRight size={16} />
+                      </span>
                     </div>
                   </div>
                 </Link>
@@ -172,7 +187,12 @@ export default async function EvenementielHubPage() {
                             <p className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatEventDayDate(event.date_start)}</p>
                             {event.location && <p className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="line-clamp-1">{event.location}</span></p>}
                           </div>
-                          <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">Découvrir <IconArrowRight size={15} /></span>
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}>
+                              <IconUsers size={13} /> {availabilityLabel(event.capacity_remaining)}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">Réserve ta place <IconArrowRight size={15} /></span>
+                          </div>
                         </div>
                       </Link>
                     ))}
