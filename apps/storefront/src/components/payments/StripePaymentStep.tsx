@@ -11,6 +11,8 @@ interface CreateIntentResult {
   error?: string;
 }
 
+type StripePaymentLocale = 'auto' | 'fr' | 'it';
+
 interface StripePaymentStepProps {
   module:        PaymentModule;
   amount:        number;
@@ -21,16 +23,20 @@ interface StripePaymentStepProps {
   payLabel:      string;
   processingLabel: string;
   billingCountryHint: string;
+  paymentWarning?: string;
+  locale?: StripePaymentLocale;
   createIntent:  () => Promise<CreateIntentResult>;
   onError:       (msg: string) => void;
   onSucceeded:   (paymentIntentId?: string) => void;
   isTest?: boolean;
 }
 
+const DEFAULT_PAYMENT_WARNING = 'N’interrompez pas le paiement : après l’initialisation, ne fermez pas et n’actualisez pas cette page jusqu’à la confirmation.';
+
 function InnerPaymentStep({
-  module, color, returnUrl, payLabel, processingLabel, billingCountryHint,
+  module, color, returnUrl, payLabel, processingLabel, billingCountryHint, paymentWarning,
   createIntent, onError, onSucceeded, referenceIdRef,
-}: Omit<StripePaymentStepProps, 'referenceId' | 'amount' | 'currency'> & { referenceIdRef: React.MutableRefObject<string | null> }) {
+}: Omit<StripePaymentStepProps, 'referenceId' | 'amount' | 'currency' | 'locale'> & { referenceIdRef: React.MutableRefObject<string | null> }) {
   const stripe   = useStripe();
   const elements = useElements();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -56,6 +62,18 @@ function InnerPaymentStep({
 
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (!isConfirming) return;
+
+    const preventAccidentalExit = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', preventAccidentalExit);
+    return () => window.removeEventListener('beforeunload', preventAccidentalExit);
+  }, [isConfirming]);
 
   async function handleConfirm() {
     if (!stripe || !elements) return;
@@ -132,7 +150,7 @@ function InnerPaymentStep({
         <p className="mb-1 text-sm font-semibold text-gray-700">Paiement sécurisé</p>
         <p className="mb-4 text-xs leading-relaxed text-gray-500">{billingCountryHint}</p>
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900" role="note">
-          N’interrompez pas le paiement : après l’initialisation, ne fermez pas et n’actualisez pas cette page jusqu’à la confirmation.
+          {paymentWarning ?? DEFAULT_PAYMENT_WARNING}
         </div>
         <PaymentElement options={{ layout: 'accordion' }} />
       </div>
@@ -157,7 +175,7 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
         amount: Math.round(props.amount * 100),
         currency: props.currency.toLowerCase(),
         ...(isEventPayment ? { paymentMethodTypes: ['card'] } : {}),
-        locale: isEventPayment ? 'fr' : 'auto',
+        locale: props.locale ?? 'fr',
         appearance: {
           theme: 'stripe',
           variables: {
