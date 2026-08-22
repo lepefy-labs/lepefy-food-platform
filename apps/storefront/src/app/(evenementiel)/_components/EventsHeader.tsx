@@ -16,9 +16,9 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
             <Image
               src={tenant.logo_url}
               alt={tenant.name}
-              width={220}
-              height={64}
-              className="h-9 w-auto max-w-[116px] object-contain sm:h-11 sm:max-w-[210px]"
+              width={260}
+              height={72}
+              className="h-11 w-auto max-w-[148px] object-contain sm:h-[52px] sm:max-w-[240px]"
               priority
             />
           ) : (
