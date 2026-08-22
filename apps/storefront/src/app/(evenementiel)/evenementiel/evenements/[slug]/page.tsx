@@ -187,7 +187,7 @@ export default async function EventDetailPage({ params }: PageProps) {
             isE2ETest={isE2ERequest()}
           />
 
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500">
+          <div className="mt-7 mb-24 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500 sm:mt-5 sm:mb-0">
             <span className="flex items-center gap-2"><IconLock size={17} className="text-[var(--color-primary)]" />Paiement sécurisé</span>
             <span className="flex items-center gap-2"><IconCircleCheck size={17} className="text-[var(--color-primary)]" />Réservation confirmée après paiement</span>
           </div>
