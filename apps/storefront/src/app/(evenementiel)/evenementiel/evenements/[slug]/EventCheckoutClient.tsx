@@ -42,12 +42,12 @@ function EventStepper({ current }: { current: Step }) {
   const activeIndex = steps.findIndex((step) => step.key === normalized);
 
   return (
-    <ol className="mx-auto grid max-w-[760px] grid-cols-3 gap-2" aria-label="Étapes de réservation">
+    <ol className="mx-auto grid max-w-[650px] grid-cols-3 gap-2" aria-label="Étapes de réservation">
       {steps.map((step, index) => (
         <li key={step.key} className="relative flex flex-col items-center text-center">
-          {index > 0 && <span className="absolute right-1/2 top-4 -z-0 h-px w-full bg-black/10" aria-hidden="true" />}
-          <span className={`relative z-[1] flex size-8 items-center justify-center rounded-full text-xs font-bold ${index <= activeIndex ? 'bg-[var(--color-primary)] text-white' : 'bg-[#e9e3d8] text-gray-500'}`}>{index + 1}</span>
-          <span className={`mt-1.5 text-[11px] sm:text-xs ${index === activeIndex ? 'font-bold text-gray-900' : 'text-gray-500'}`}>{step.label}</span>
+          {index > 0 && <span className="absolute right-1/2 top-3.5 -z-0 h-px w-full bg-black/10" aria-hidden="true" />}
+          <span className={`relative z-[1] flex size-7 items-center justify-center rounded-full text-[11px] font-bold ${index <= activeIndex ? 'bg-[var(--color-primary)] text-white' : 'bg-[#e9e3d8] text-gray-500'}`}>{index + 1}</span>
+          <span className={`mt-1 text-[10px] sm:text-[11px] ${index === activeIndex ? 'font-bold text-gray-900' : 'text-gray-500'}`}>{step.label}</span>
         </li>
       ))}
     </ol>
@@ -188,18 +188,19 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   }
 
   const summary = (
-    <div className={`rounded-[24px] border border-black/[0.06] bg-white p-5 shadow-sm transition-all ${selectedTickets.length === 0 ? 'lg:p-4' : ''}`}>
-      <div className="flex items-center gap-2"><IconBasket size={19} className="text-[var(--color-primary)]" /><h3 className="font-display text-xl font-semibold">Votre réservation</h3></div>
+    <div className={`rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-sm transition-all ${selectedTickets.length === 0 ? 'lg:p-4' : ''}`}>
+      <div className="flex items-center gap-2"><IconBasket size={18} className="text-[var(--color-primary)]" /><h3 className="font-display text-lg font-semibold">Votre réservation</h3></div>
       {selectedTickets.length === 0 ? <p className="mt-3 text-sm leading-relaxed text-gray-500">Choisissez une formule pour commencer.</p> : (
-        <div className="mt-4 divide-y divide-black/[0.06]">
+        <div className="mt-3 divide-y divide-black/[0.06]">
           {selectedTickets.map((ticket) => (
-            <div key={ticket.id} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="min-w-0 truncate">{quantities[ticket.id]} × {ticket.label}</span><span className="shrink-0 font-semibold">{formatPrice((quantities[ticket.id] ?? 0) * ticket.price, tenant.currency)}</span></div>
+            <div key={ticket.id} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="min-w-0 truncate">{quantities[ticket.id]} × {ticket.label}</span><span className="shrink-0 font-semibold">{formatPrice((quantities[ticket.id] ?? 0) * ticket.price, tenant.currency)}</span></div>
           ))}
         </div>
       )}
-      <div className="mt-4 flex items-center justify-between border-t border-black/[0.08] pt-4"><span className="text-sm font-semibold">Total</span><span className="text-xl font-bold">{formatPrice(total, tenant.currency)}</span></div>
+      {totalQuantity > 0 && <p className="mt-3 text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p>}
+      <div className="mt-2.5 flex items-center justify-between border-t border-black/[0.08] pt-3"><span className="text-sm font-semibold">Total</span><span className="text-lg font-bold">{formatPrice(total, tenant.currency)}</span></div>
       {step === 'select' && totalQuantity > 0 && (
-        <button onClick={handleContinueToInfo} className="mt-4 hidden min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--color-primary-dark)] lg:block">Continuer</button>
+        <button onClick={handleContinueToInfo} className="mt-3 hidden min-h-11 w-full rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--color-primary-dark)] lg:block">Continuer</button>
       )}
     </div>
   );
@@ -219,10 +220,10 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   if (step === 'info') {
     const emailInvalid = emailTouched && email.trim().length > 0 && !isValidEmail(email);
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <EventStepper current={step} />
         <button type="button" onClick={() => { setError(null); setStep('select'); }} className="min-h-11 rounded-xl px-2 text-sm font-semibold text-gray-600">← Retour</button>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
           <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
             <h2 className="font-display text-2xl font-semibold">Vos coordonnées</h2>
             <div className="mt-5 space-y-3">
@@ -250,10 +251,10 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     ];
 
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <EventStepper current={step} />
         <button type="button" onClick={() => { setError(null); setStep('info'); }} disabled={isSubmitting} className="min-h-11 rounded-xl px-2 text-sm font-semibold text-gray-600">← Retour</button>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
           <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
             <h2 className="font-display text-2xl font-semibold">Méthode de paiement</h2>
             <div className="mt-5"><PaymentOptionList options={options} /></div>
@@ -271,37 +272,37 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   return (
     <div className={totalQuantity > 0 ? 'pb-[104px] lg:pb-0' : ''}>
       <EventStepper current={step} />
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <div>
           {featureRow}
-          <section className={featureRow ? 'mt-6' : ''}>
+          <section className={featureRow ? 'mt-4' : ''}>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Réservation</p>
-              <h2 className="mt-1 font-display text-3xl font-semibold text-gray-900">Choisis ta formule</h2>
-              <p className="mt-2 text-sm text-gray-500">Sélectionne le nombre de billets souhaité pour chaque formule.</p>
+              <h2 className="mt-1 font-display text-[2rem] font-semibold leading-tight text-gray-900">Choisis ta formule</h2>
+              <p className="mt-1.5 text-sm text-gray-500">Sélectionne le nombre de billets souhaité pour chaque formule.</p>
             </div>
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 space-y-2.5">
               {ticketTypes.map((ticket) => {
                 const quantity = quantities[ticket.id] ?? 0;
                 const selected = quantity > 0;
                 return (
-                  <article key={ticket.id} className={`relative rounded-[22px] border p-5 shadow-sm transition-colors ${selected ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)]' : ticket.badge ? 'border-[color-mix(in_srgb,var(--color-primary)_35%,white)] bg-white' : 'border-black/[0.06] bg-white'}`}>
+                  <article key={ticket.id} className={`relative rounded-[20px] border p-4 shadow-sm transition-colors ${selected ? 'border-[color-mix(in_srgb,var(--color-primary)_65%,white)] bg-[color-mix(in_srgb,var(--color-primary)_3%,white)]' : ticket.badge ? 'border-[color-mix(in_srgb,var(--color-primary)_28%,white)] bg-white' : 'border-black/[0.06] bg-white'}`}>
                     <div className="flex flex-wrap items-center gap-2">
-                      {ticket.badge && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[10px] font-bold text-white"><IconStarFilled size={11} />{ticket.badge}</span>}
-                      {selected && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700"><IconCheck size={11} />Sélectionnée</span>}
+                      {ticket.badge && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[9px] font-bold text-white"><IconStarFilled size={10} />{ticket.badge}</span>}
+                      {selected && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-700"><IconCheck size={10} />Sélectionnée</span>}
                     </div>
-                    <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className={`${ticket.badge || selected ? 'mt-2.5' : ''} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline justify-between gap-3">
-                          <h3 className="text-base font-bold text-gray-900">{ticket.label}</h3>
-                          <p className="text-lg font-bold text-[var(--color-primary)]">{formatPrice(ticket.price, tenant.currency)}</p>
+                          <h3 className="text-[15px] font-bold text-gray-900">{ticket.label}</h3>
+                          <p className="text-[17px] font-bold text-[var(--color-primary)]">{formatPrice(ticket.price, tenant.currency)}</p>
                         </div>
-                        {ticket.description && <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-gray-500">{ticket.description}</p>}
+                        {ticket.description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-500">{ticket.description}</p>}
                       </div>
-                      <div className="inline-flex h-12 items-center overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm" aria-label={`Quantité pour ${ticket.label}`}>
-                        <button type="button" aria-label={`Retirer une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, -1)} disabled={quantity === 0} className="flex h-12 w-11 items-center justify-center text-gray-700 disabled:opacity-35"><IconMinus size={16} /></button>
-                        <span className="flex h-12 w-10 items-center justify-center border-x border-black/10 text-base font-bold">{quantity}</span>
-                        <button type="button" aria-label={`Ajouter une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, 1)} className="flex h-12 w-11 items-center justify-center text-gray-700"><IconPlus size={16} /></button>
+                      <div className="inline-flex h-11 items-center overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm" aria-label={`Quantité pour ${ticket.label}`}>
+                        <button type="button" aria-label={`Retirer une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, -1)} disabled={quantity === 0} className="flex h-11 w-10 items-center justify-center text-gray-700 disabled:opacity-35"><IconMinus size={15} /></button>
+                        <span className="flex h-11 w-9 items-center justify-center border-x border-black/10 text-sm font-bold">{quantity}</span>
+                        <button type="button" aria-label={`Ajouter une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, 1)} className="flex h-11 w-10 items-center justify-center text-gray-700"><IconPlus size={15} /></button>
                       </div>
                     </div>
                   </article>
@@ -309,9 +310,9 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
               })}
             </div>
           </section>
-          {error && <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+          {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
         </div>
-        <aside className="sticky top-[92px] hidden lg:block">{summary}</aside>
+        <aside className="sticky top-[88px] hidden lg:block">{summary}</aside>
       </div>
 
       {totalQuantity > 0 && (
