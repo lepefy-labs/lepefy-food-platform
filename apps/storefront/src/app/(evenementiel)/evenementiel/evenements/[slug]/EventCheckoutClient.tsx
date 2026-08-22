@@ -188,7 +188,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   }
 
   const summary = (
-    <div className={`rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-sm transition-all ${selectedTickets.length === 0 ? 'lg:p-4' : ''}`}>
+    <div className="rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-sm transition-all">
       <div className="flex items-center gap-2"><IconBasket size={18} className="text-[var(--color-primary)]" /><h3 className="font-display text-lg font-semibold">Votre réservation</h3></div>
       {selectedTickets.length === 0 ? <p className="mt-3 text-sm leading-relaxed text-gray-500">Choisissez une formule pour commencer.</p> : (
         <div className="mt-3 divide-y divide-black/[0.06]">
@@ -199,42 +199,24 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
       )}
       {totalQuantity > 0 && <p className="mt-3 text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p>}
       <div className="mt-2.5 flex items-center justify-between border-t border-black/[0.08] pt-3"><span className="text-sm font-semibold">Total</span><span className="text-lg font-bold">{formatPrice(total, tenant.currency)}</span></div>
-      {step === 'select' && totalQuantity > 0 && (
-        <button onClick={handleContinueToInfo} className="mt-3 hidden min-h-11 w-full rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--color-primary-dark)] lg:block">Continuer</button>
-      )}
+      {step === 'select' && totalQuantity > 0 && <button onClick={handleContinueToInfo} className="mt-3 hidden min-h-11 w-full rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--color-primary-dark)] lg:block">Continuer</button>}
     </div>
   );
 
   const mobileSummary = selectedTickets.length > 0 && (
     <details className="rounded-2xl border border-black/[0.06] bg-white shadow-sm lg:hidden">
       <summary className="group flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0">
-          <span className="block text-xs text-gray-500">Votre réservation · {totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</span>
-          <span className="block text-base font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
-        </span>
+        <span className="min-w-0"><span className="block text-xs text-gray-500">Votre réservation · {totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</span><span className="block text-base font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span></span>
         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">Voir le détail <IconChevronDown size={14} className="transition-transform group-open:rotate-180" /></span>
       </summary>
       <div className="border-t border-black/[0.06] px-4 pb-3">
-        {selectedTickets.map((ticket) => (
-          <div key={ticket.id} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-2.5 text-xs last:border-b-0">
-            <span className="min-w-0 truncate">{quantities[ticket.id]} × {ticket.label}</span>
-            <span className="shrink-0 font-semibold">{formatPrice((quantities[ticket.id] ?? 0) * ticket.price, tenant.currency)}</span>
-          </div>
-        ))}
+        {selectedTickets.map((ticket) => <div key={ticket.id} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-2.5 text-xs last:border-b-0"><span className="min-w-0 truncate">{quantities[ticket.id]} × {ticket.label}</span><span className="shrink-0 font-semibold">{formatPrice((quantities[ticket.id] ?? 0) * ticket.price, tenant.currency)}</span></div>)}
       </div>
     </details>
   );
 
   if (step === 'payment' && showPaymentStep) {
-    return (
-      <div className="mx-auto max-w-xl space-y-5">
-        <EventStepper current={step} />
-        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-        <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
-          <StripePaymentStep module="event" isTest={isE2ETest} amount={total} currency={tenant.currency} color="var(--color-primary)" returnUrl={`${window.location.origin}/evenementiel`} referenceId={event.id} payLabel={`Payer ${formatPrice(total, tenant.currency)}`} processingLabel="Traitement en cours…" billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle." createIntent={createIntent} onError={setError} onSucceeded={(paymentIntentId) => router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntentId ?? ''}`)} />
-        </div>
-      </div>
-    );
+    return <div className="mx-auto max-w-xl space-y-5"><EventStepper current={step} />{error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}<div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6"><StripePaymentStep module="event" isTest={isE2ETest} amount={total} currency={tenant.currency} color="var(--color-primary)" returnUrl={`${window.location.origin}/evenementiel`} referenceId={event.id} payLabel={`Payer ${formatPrice(total, tenant.currency)}`} processingLabel="Traitement en cours…" billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle." createIntent={createIntent} onError={setError} onSucceeded={(paymentIntentId) => router.push(`${window.location.pathname}/confirmation?payment_intent=${paymentIntentId ?? ''}`)} /></div></div>;
   }
 
   if (step === 'info') {
@@ -258,12 +240,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           <aside className="hidden lg:sticky lg:top-[92px] lg:block">{summary}</aside>
         </div>
         {mobileSummary}
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-[620px] items-center gap-3">
-            <div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div>
-            <button onClick={handleContinueToPayment} className="min-h-12 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">Continuer</button>
-          </div>
-        </div>
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden"><div className="mx-auto flex max-w-[620px] items-center gap-3"><div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div><button onClick={handleContinueToPayment} className="min-h-12 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">Continuer</button></div></div>
       </div>
     );
   }
@@ -278,20 +255,22 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     ];
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 lg:space-y-4">
         <EventStepper current={step} />
-        <button type="button" onClick={() => { setError(null); setStep('info'); }} disabled={isSubmitting} className="min-h-11 rounded-xl px-2 text-sm font-semibold text-gray-600">← Retour</button>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-          <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
+        <button type="button" onClick={() => { setError(null); setStep('info'); }} disabled={isSubmitting} className="min-h-10 rounded-xl px-1 text-sm font-semibold text-gray-600 sm:px-2">← Retour</button>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-6">
+          <div className="rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-sm sm:p-6 lg:rounded-3xl">
             <h2 className="font-display text-2xl font-semibold">Méthode de paiement</h2>
-            <div className="mt-5"><PaymentOptionList options={options} /></div>
+            <div className="mt-4 sm:mt-5"><PaymentOptionList options={options} /></div>
             {selectedExternalMethod && <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />}
-            <div className="mt-5 rounded-2xl bg-[#f8f4ec] p-4"><p className="text-xs text-gray-500">Billet envoyé à</p><p className="mt-1 truncate text-sm font-semibold text-gray-900">{email}</p><button type="button" onClick={() => setStep('info')} className="mt-2 min-h-11 text-xs font-bold text-[var(--color-primary)]">Modifier les coordonnées</button></div>
-            {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-            <button onClick={handleConfirmPayment} disabled={isSubmitting} className="mt-5 min-h-12 w-full rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: ctaColor }}>{isSubmitting ? 'Traitement…' : selectedExternalMethod ? `${ctaLabel} · ${formatPrice(total, tenant.currency)}` : ctaLabel}</button>
+            <div className="mt-4 rounded-2xl bg-[#f8f4ec] p-3.5 sm:mt-5 sm:p-4"><p className="text-xs text-gray-500">Billet envoyé à</p><p className="mt-1 truncate text-sm font-semibold text-gray-900">{email}</p><button type="button" onClick={() => setStep('info')} className="mt-1.5 min-h-10 text-xs font-bold text-[var(--color-primary)]">Modifier les coordonnées</button></div>
+            {error && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+            <button onClick={handleConfirmPayment} disabled={isSubmitting} className="mt-4 hidden min-h-12 w-full rounded-xl px-5 py-3 text-sm font-bold text-white disabled:opacity-50 lg:block" style={{ backgroundColor: ctaColor }}>{isSubmitting ? 'Traitement…' : selectedExternalMethod ? `${ctaLabel} · ${formatPrice(total, tenant.currency)}` : ctaLabel}</button>
           </div>
-          <aside className="lg:sticky lg:top-[92px]">{summary}</aside>
+          <aside className="hidden lg:sticky lg:top-[92px] lg:block">{summary}</aside>
         </div>
+        {mobileSummary}
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden"><div className="mx-auto flex max-w-[620px] items-center gap-3"><div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div><button onClick={handleConfirmPayment} disabled={isSubmitting} className="min-h-12 rounded-xl px-4 text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: ctaColor }}>{isSubmitting ? 'Traitement…' : ctaLabel}</button></div></div>
       </div>
     );
   }
@@ -303,37 +282,12 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         <div>
           {featureRow}
           <section className={featureRow ? 'mt-4' : ''}>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Réservation</p>
-              <h2 className="mt-1 font-display text-[2rem] font-semibold leading-tight text-gray-900">Choisis ta formule</h2>
-              <p className="mt-1.5 text-sm text-gray-500">Sélectionne le nombre de billets souhaité pour chaque formule.</p>
-            </div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Réservation</p><h2 className="mt-1 font-display text-[2rem] font-semibold leading-tight text-gray-900">Choisis ta formule</h2><p className="mt-1.5 text-sm text-gray-500">Sélectionne le nombre de billets souhaité pour chaque formule.</p></div>
             <div className="mt-4 space-y-2.5">
               {ticketTypes.map((ticket) => {
                 const quantity = quantities[ticket.id] ?? 0;
                 const selected = quantity > 0;
-                return (
-                  <article key={ticket.id} className={`relative rounded-[20px] border p-3.5 shadow-sm transition-colors sm:p-4 ${selected ? 'border-[color-mix(in_srgb,var(--color-primary)_65%,white)] bg-[color-mix(in_srgb,var(--color-primary)_3%,white)]' : ticket.badge ? 'border-[color-mix(in_srgb,var(--color-primary)_28%,white)] bg-white' : 'border-black/[0.06] bg-white'}`}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {ticket.badge && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[9px] font-bold text-white"><IconStarFilled size={10} />{ticket.badge}</span>}
-                      {selected && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-700"><IconCheck size={10} />Sélectionnée</span>}
-                    </div>
-                    <div className={`${ticket.badge || selected ? 'mt-2.5' : ''} flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between`}>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline justify-between gap-3">
-                          <h3 className="text-[15px] font-bold text-gray-900">{ticket.label}</h3>
-                          <p className="text-[17px] font-bold text-[var(--color-primary)]">{formatPrice(ticket.price, tenant.currency)}</p>
-                        </div>
-                        {ticket.description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-500">{ticket.description}</p>}
-                      </div>
-                      <div className="inline-flex h-11 w-fit shrink-0 self-end items-center overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm sm:self-auto" aria-label={`Quantité pour ${ticket.label}`}>
-                        <button type="button" aria-label={`Retirer une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, -1)} disabled={quantity === 0} className="flex h-11 w-10 items-center justify-center text-gray-700 disabled:opacity-35"><IconMinus size={15} /></button>
-                        <span className="flex h-11 w-9 items-center justify-center border-x border-black/10 text-sm font-bold">{quantity}</span>
-                        <button type="button" aria-label={`Ajouter une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, 1)} className="flex h-11 w-10 items-center justify-center text-gray-700"><IconPlus size={15} /></button>
-                      </div>
-                    </div>
-                  </article>
-                );
+                return <article key={ticket.id} className={`relative rounded-[20px] border p-3.5 shadow-sm transition-colors sm:p-4 ${selected ? 'border-[color-mix(in_srgb,var(--color-primary)_65%,white)] bg-[color-mix(in_srgb,var(--color-primary)_3%,white)]' : ticket.badge ? 'border-[color-mix(in_srgb,var(--color-primary)_28%,white)] bg-white' : 'border-black/[0.06] bg-white'}`}><div className="flex flex-wrap items-center gap-2">{ticket.badge && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[9px] font-bold text-white"><IconStarFilled size={10} />{ticket.badge}</span>}{selected && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-700"><IconCheck size={10} />Sélectionnée</span>}</div><div className={`${ticket.badge || selected ? 'mt-2.5' : ''} flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between`}><div className="min-w-0 flex-1"><div className="flex flex-wrap items-baseline justify-between gap-3"><h3 className="text-[15px] font-bold text-gray-900">{ticket.label}</h3><p className="text-[17px] font-bold text-[var(--color-primary)]">{formatPrice(ticket.price, tenant.currency)}</p></div>{ticket.description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-500">{ticket.description}</p>}</div><div className="inline-flex h-11 w-fit shrink-0 self-end items-center overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm sm:self-auto" aria-label={`Quantité pour ${ticket.label}`}><button type="button" aria-label={`Retirer une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, -1)} disabled={quantity === 0} className="flex h-11 w-10 items-center justify-center text-gray-700 disabled:opacity-35"><IconMinus size={15} /></button><span className="flex h-11 w-9 items-center justify-center border-x border-black/10 text-sm font-bold">{quantity}</span><button type="button" aria-label={`Ajouter une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, 1)} className="flex h-11 w-10 items-center justify-center text-gray-700"><IconPlus size={15} /></button></div></div></article>;
               })}
             </div>
           </section>
@@ -341,15 +295,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
         </div>
         <aside className="sticky top-[88px] hidden lg:block">{summary}</aside>
       </div>
-
-      {totalQuantity > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
-          <div className="mx-auto flex max-w-[620px] items-center gap-3">
-            <div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div>
-            <button onClick={handleContinueToInfo} className="min-h-12 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">Continuer</button>
-          </div>
-        </div>
-      )}
+      {totalQuantity > 0 && <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden"><div className="mx-auto flex max-w-[620px] items-center gap-3"><div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div><button onClick={handleContinueToInfo} className="min-h-12 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">Continuer</button></div></div>}
     </div>
   );
 }
