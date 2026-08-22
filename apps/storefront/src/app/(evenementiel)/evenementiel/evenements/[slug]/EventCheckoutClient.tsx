@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconBasket, IconCheck, IconCreditCard, IconInfoCircle, IconMinus, IconPlus, IconStarFilled } from '@tabler/icons-react';
+import { IconBasket, IconCheck, IconChevronDown, IconCreditCard, IconInfoCircle, IconMinus, IconPlus, IconStarFilled } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import {
@@ -207,12 +207,12 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
 
   const mobileSummary = selectedTickets.length > 0 && (
     <details className="rounded-2xl border border-black/[0.06] bg-white shadow-sm lg:hidden">
-      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+      <summary className="group flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
           <span className="block text-xs text-gray-500">Votre réservation · {totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</span>
           <span className="block text-base font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
         </span>
-        <span className="shrink-0 text-xs font-bold text-[var(--color-primary)]">Voir le détail</span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--color-primary)]">Voir le détail <IconChevronDown size={14} className="transition-transform group-open:rotate-180" /></span>
       </summary>
       <div className="border-t border-black/[0.06] px-4 pb-3">
         {selectedTickets.map((ticket) => (
@@ -240,7 +240,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   if (step === 'info') {
     const emailInvalid = emailTouched && email.trim().length > 0 && !isValidEmail(email);
     return (
-      <div className="space-y-3 pb-[92px] lg:pb-0">
+      <div className="space-y-3 lg:pb-0">
         <EventStepper current={step} />
         <button type="button" onClick={() => { setError(null); setStep('select'); }} className="min-h-10 rounded-xl px-1 text-sm font-semibold text-gray-600">← Retour</button>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
