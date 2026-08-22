@@ -6,10 +6,10 @@ import type { Tenant } from '@lepefy/types';
 export function EventsHeader({ tenant }: { tenant: Tenant }) {
   return (
     <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/10 bg-[var(--color-primary-dark)] text-white shadow-sm">
-      <div className="mx-auto flex h-[68px] max-w-[1180px] items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-[68px] max-w-[1180px] items-center justify-between gap-1.5 px-3 sm:gap-4 sm:px-6">
         <Link
           href="/evenementiel"
-          className="flex min-h-11 min-w-0 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
+          className="flex min-h-11 min-w-0 shrink items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
           aria-label={`${tenant.name} — accueil événementiel`}
         >
           {tenant.logo_url ? (
@@ -18,11 +18,11 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
               alt={tenant.name}
               width={220}
               height={64}
-              className="h-10 w-auto max-w-[180px] object-contain sm:h-11 sm:max-w-[210px]"
+              className="h-9 w-auto max-w-[116px] object-contain sm:h-11 sm:max-w-[210px]"
               priority
             />
           ) : (
-            <span className="font-display text-lg font-semibold leading-tight">{tenant.name}</span>
+            <span className="truncate font-display text-base font-semibold leading-tight sm:text-lg">{tenant.name}</span>
           )}
         </Link>
 
@@ -43,13 +43,13 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <a
             href="/evenementiel#evenements"
-            className="hidden min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:inline-flex"
+            className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[12px] font-bold shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:gap-2 sm:px-4 sm:text-sm"
             style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}
           >
-            Voir les dates <IconCalendarEvent size={17} />
+            Voir les dates <IconCalendarEvent size={16} className="shrink-0 sm:size-[17px]" />
           </a>
 
           <details className="group relative lg:hidden">
@@ -70,13 +70,6 @@ export function EventsHeader({ tenant }: { tenant: Tenant }) {
                   {label}
                 </a>
               ))}
-              <a
-                href="/evenementiel#evenements"
-                className="mt-1 flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-bold"
-                style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}
-              >
-                Voir les dates
-              </a>
             </div>
           </details>
         </div>
