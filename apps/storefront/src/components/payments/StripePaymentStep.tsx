@@ -115,11 +115,7 @@ function InnerPaymentStep({
           </div>
         )}
 
-        <PaymentElement
-          options={{
-            layout: 'accordion',
-          }}
-        />
+        <PaymentElement options={{ layout: 'accordion' }} />
       </div>
       <button
         onClick={handleConfirm}
@@ -135,6 +131,12 @@ function InnerPaymentStep({
 
 export function StripePaymentStep(props: StripePaymentStepProps) {
   const referenceIdRef = useRef<string | null>(props.referenceId);
+  const isEventCheckout = props.module === 'event';
+  const cardOnly = props.cardOnly ?? isEventCheckout;
+  const locale = props.locale ?? (isEventCheckout ? 'fr' : 'auto');
+  const paymentWarning = props.paymentWarning ?? (isEventCheckout
+    ? 'N’interrompez pas le paiement : après l’initialisation, ne fermez pas et n’actualisez pas cette page jusqu’à la confirmation.'
+    : undefined);
 
   return (
     <Elements
@@ -143,8 +145,8 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
         mode: 'payment',
         amount: Math.round(props.amount * 100),
         currency: props.currency.toLowerCase(),
-        ...(props.cardOnly ? { paymentMethodTypes: ['card'] } : {}),
-        locale: props.locale ?? 'auto',
+        ...(cardOnly ? { paymentMethodTypes: ['card'] } : {}),
+        locale,
         appearance: {
           theme: 'stripe',
           variables: {
@@ -155,7 +157,7 @@ export function StripePaymentStep(props: StripePaymentStepProps) {
         },
       }}
     >
-      <InnerPaymentStep {...props} referenceIdRef={referenceIdRef} />
+      <InnerPaymentStep {...props} paymentWarning={paymentWarning} referenceIdRef={referenceIdRef} />
     </Elements>
   );
 }
