@@ -286,12 +286,12 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
                 const quantity = quantities[ticket.id] ?? 0;
                 const selected = quantity > 0;
                 return (
-                  <article key={ticket.id} className={`relative rounded-[20px] border p-4 shadow-sm transition-colors ${selected ? 'border-[color-mix(in_srgb,var(--color-primary)_65%,white)] bg-[color-mix(in_srgb,var(--color-primary)_3%,white)]' : ticket.badge ? 'border-[color-mix(in_srgb,var(--color-primary)_28%,white)] bg-white' : 'border-black/[0.06] bg-white'}`}>
+                  <article key={ticket.id} className={`relative rounded-[20px] border p-3.5 shadow-sm transition-colors sm:p-4 ${selected ? 'border-[color-mix(in_srgb,var(--color-primary)_65%,white)] bg-[color-mix(in_srgb,var(--color-primary)_3%,white)]' : ticket.badge ? 'border-[color-mix(in_srgb,var(--color-primary)_28%,white)] bg-white' : 'border-black/[0.06] bg-white'}`}>
                     <div className="flex flex-wrap items-center gap-2">
                       {ticket.badge && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-[9px] font-bold text-white"><IconStarFilled size={10} />{ticket.badge}</span>}
                       {selected && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-700"><IconCheck size={10} />Sélectionnée</span>}
                     </div>
-                    <div className={`${ticket.badge || selected ? 'mt-2.5' : ''} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+                    <div className={`${ticket.badge || selected ? 'mt-2.5' : ''} flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between`}>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline justify-between gap-3">
                           <h3 className="text-[15px] font-bold text-gray-900">{ticket.label}</h3>
@@ -299,7 +299,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
                         </div>
                         {ticket.description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-500">{ticket.description}</p>}
                       </div>
-                      <div className="inline-flex h-11 items-center overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm" aria-label={`Quantité pour ${ticket.label}`}>
+                      <div className="inline-flex h-11 w-fit shrink-0 self-end items-center overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm sm:self-auto" aria-label={`Quantité pour ${ticket.label}`}>
                         <button type="button" aria-label={`Retirer une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, -1)} disabled={quantity === 0} className="flex h-11 w-10 items-center justify-center text-gray-700 disabled:opacity-35"><IconMinus size={15} /></button>
                         <span className="flex h-11 w-9 items-center justify-center border-x border-black/10 text-sm font-bold">{quantity}</span>
                         <button type="button" aria-label={`Ajouter une formule ${ticket.label}`} onClick={() => setQuantity(ticket.id, 1)} className="flex h-11 w-10 items-center justify-center text-gray-700"><IconPlus size={15} /></button>
