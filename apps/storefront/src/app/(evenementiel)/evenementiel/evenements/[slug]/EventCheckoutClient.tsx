@@ -205,6 +205,26 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     </div>
   );
 
+  const mobileSummary = selectedTickets.length > 0 && (
+    <details className="rounded-2xl border border-black/[0.06] bg-white shadow-sm lg:hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-xs text-gray-500">Votre réservation · {totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</span>
+          <span className="block text-base font-bold text-gray-900">{formatPrice(total, tenant.currency)}</span>
+        </span>
+        <span className="shrink-0 text-xs font-bold text-[var(--color-primary)]">Voir le détail</span>
+      </summary>
+      <div className="border-t border-black/[0.06] px-4 pb-3">
+        {selectedTickets.map((ticket) => (
+          <div key={ticket.id} className="flex items-center justify-between gap-3 border-b border-black/[0.05] py-2.5 text-xs last:border-b-0">
+            <span className="min-w-0 truncate">{quantities[ticket.id]} × {ticket.label}</span>
+            <span className="shrink-0 font-semibold">{formatPrice((quantities[ticket.id] ?? 0) * ticket.price, tenant.currency)}</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+
   if (step === 'payment' && showPaymentStep) {
     return (
       <div className="mx-auto max-w-xl space-y-5">
@@ -220,22 +240,29 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   if (step === 'info') {
     const emailInvalid = emailTouched && email.trim().length > 0 && !isValidEmail(email);
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 pb-[92px] lg:pb-0">
         <EventStepper current={step} />
-        <button type="button" onClick={() => { setError(null); setStep('select'); }} className="min-h-11 rounded-xl px-2 text-sm font-semibold text-gray-600">← Retour</button>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-          <div className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
+        <button type="button" onClick={() => { setError(null); setStep('select'); }} className="min-h-10 rounded-xl px-1 text-sm font-semibold text-gray-600">← Retour</button>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+          <div className="rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-sm sm:p-6">
             <h2 className="font-display text-2xl font-semibold">Vos coordonnées</h2>
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 space-y-2.5 sm:space-y-3">
               <label className="block text-xs font-medium text-gray-600">Nom complet *<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
               <label className="block text-xs font-medium text-gray-600">Email *<input value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} type="email" autoComplete="email" className={`${inputClass} mt-1.5 ${emailInvalid ? 'border-red-300' : ''}`} /></label>
-              {emailInvalid ? <p className="text-xs text-red-600">Adresse email invalide : vérifiez le format.</p> : <p className="flex items-center gap-1.5 text-xs text-gray-500"><IconInfoCircle size={14} />Votre billet sera envoyé à cette adresse.</p>}
+              {emailInvalid ? <p className="text-xs text-red-600">Adresse email invalide : vérifiez le format.</p> : <p className="flex items-center gap-1.5 text-[12px] text-gray-500"><IconInfoCircle size={14} />Votre billet sera envoyé à cette adresse.</p>}
               <label className="block text-xs font-medium text-gray-600">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
             </div>
-            {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
-            <button onClick={handleContinueToPayment} className="mt-5 min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white">Continuer</button>
+            {error && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+            <button onClick={handleContinueToPayment} className="mt-4 hidden min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white lg:block">Continuer</button>
           </div>
-          <aside className="lg:sticky lg:top-[92px]">{summary}</aside>
+          <aside className="hidden lg:sticky lg:top-[92px] lg:block">{summary}</aside>
+        </div>
+        {mobileSummary}
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-[620px] items-center gap-3">
+            <div className="min-w-0 flex-1"><p className="text-xs text-gray-500">{totalQuantity} billet{totalQuantity > 1 ? 's' : ''}</p><p className="text-lg font-bold text-gray-900">{formatPrice(total, tenant.currency)}</p></div>
+            <button onClick={handleContinueToPayment} className="min-h-12 rounded-xl bg-[var(--color-primary)] px-5 text-sm font-bold text-white">Continuer</button>
+          </div>
         </div>
       </div>
     );
