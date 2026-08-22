@@ -13,16 +13,25 @@ interface EventImageFaderProps {
 /**
  * Rotation auto-fade (crossfade) entre plusieurs images d'événement, sans
  * aucune interaction utilisateur (pas de swipe, pas de puces cliquables).
- * `images.length` pilote le rendu : 0 → couleur unie, 1 → image statique
- * (pas de setInterval), >1 → stack crossfade — comportement identique à
- * l'ancien `banner_image_url` unique pour les deux premiers cas.
  *
- * Dimensions toujours fournies par l'appelant via `className` (jamais de
- * vh/dvh ni de hauteur calculée en JS ici) pour rester cross-device par
- * construction, comme le reste du projet.
+ * Le fallback reste toujours peint derrière les images : ainsi une URL
+ * distante invalide ou qui ne charge pas ne laisse jamais apparaître un
+ * panneau transparent/illisible. Pour 0 image, le résultat reste simplement
+ * la couleur de fallback. Pour 1 ou plusieurs images, celles-ci se peignent
+ * par-dessus dès qu'elles sont effectivement disponibles.
+ *
+ * L'appelant peut fournir sa propre utility de positionnement (`absolute`,
+ * `relative`, etc.). On n'ajoute `relative` que lorsqu'aucune position n'est
+ * déjà présente afin d'éviter le conflit Tailwind qui faisait perdre
+ * `absolute inset-0` au hero.
+ *
+ * `isolate` crée un stacking context local : les overlays internes en z-10
+ * restent confinés dans le fader et ne passent pas au-dessus des CTA / textes
+ * frères du hero.
  */
 export function EventImageFader({ images, fallbackColor, intervalMs = 5000, className = '', children }: EventImageFaderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const hasPositionClass = /(^|\s)(static|fixed|absolute|relative|sticky)(\s|$)/.test(className);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -35,13 +44,16 @@ export function EventImageFader({ images, fallbackColor, intervalMs = 5000, clas
   }, [images.length, intervalMs]);
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
-      {images.length === 0 && (
-        <div className="absolute inset-0" style={{ backgroundColor: fallbackColor }} aria-hidden="true" />
-      )}
-
+    <div
+      className={`${hasPositionClass ? '' : 'relative '}isolate overflow-hidden ${className}`}
+      style={{ backgroundColor: fallbackColor }}
+    >
       {images.length === 1 && (
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${images[0]})` }} aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${images[0]})` }}
+          aria-hidden="true"
+        />
       )}
 
       {images.length > 1 && images.map((src, i) => (

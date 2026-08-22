@@ -4,18 +4,17 @@ import { useState } from 'react';
 import { IconCircleCheck } from '@tabler/icons-react';
 
 export default function DevisForm({ serviceSlug }: { serviceSlug: string }) {
-  const [name, setName]       = useState('');
-  const [email, setEmail]     = useState('');
-  const [phone, setPhone]     = useState('');
-  const [date, setDate]       = useState('');
-  const [guests, setGuests]   = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [date, setDate] = useState('');
+  const [guests, setGuests] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const [sent, setSent]       = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
 
-  const inputClass =
-    'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+  const inputClass = 'w-full min-h-11 rounded-xl border border-black/10 bg-[#fffdf9] px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_18%,transparent)]';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,60 +55,63 @@ export default function DevisForm({ serviceSlug }: { serviceSlug: string }) {
 
   if (sent) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
-        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-          <IconCircleCheck size={26} className="text-green-600" />
+      <div className="rounded-3xl border border-black/[0.06] bg-white p-7 text-center shadow-[0_18px_45px_rgba(50,37,20,.08)]" role="status">
+        <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-green-100">
+          <IconCircleCheck size={28} className="text-green-700" />
         </div>
-        <p className="font-semibold text-gray-900 mb-1">Demande envoyée !</p>
-        <p className="text-sm text-gray-500">Notre équipe vous recontactera rapidement.</p>
+        <p className="font-display text-2xl font-semibold text-gray-900">Demande envoyée</p>
+        <p className="mt-2 text-sm text-gray-500">Notre équipe reviendra vers vous avec les prochaines étapes.</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-      <p className="text-sm font-semibold text-gray-700 mb-1">Demander un devis</p>
-
-      <div className="grid grid-cols-2 gap-3">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom complet" className={inputClass} />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={inputClass} />
-      </div>
-      <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" placeholder="Téléphone (optionnel)" className={inputClass} />
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Date souhaitée</label>
-          <input value={date} onChange={(e) => setDate(e.target.value)} type="date" className={inputClass} />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Nombre d&apos;invités</label>
-          <input
-            value={guests}
-            onChange={(e) => setGuests(e.target.value.replace(/[^0-9]/g, ''))}
-            inputMode="numeric"
-            placeholder="Ex. 30"
-            className={inputClass}
-          />
-        </div>
+    <form onSubmit={handleSubmit} className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-[0_18px_45px_rgba(50,37,20,.08)] sm:p-6">
+      <div className="mb-5">
+        <p className="font-display text-2xl font-semibold text-gray-900">Demander un devis</p>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500">Quelques informations suffisent pour démarrer.</p>
       </div>
 
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Décrivez votre événement, vos besoins…"
-        rows={4}
-        className={inputClass}
-      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-medium text-gray-600">
+          Nom complet *
+          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} />
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          Email *
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" className={`${inputClass} mt-1.5`} />
+        </label>
+      </div>
 
-      {error && <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{error}</p>}
+      <label className="mt-3 block text-xs font-medium text-gray-600">
+        Téléphone
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} />
+      </label>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-medium text-gray-600">
+          Date souhaitée
+          <input value={date} onChange={(e) => setDate(e.target.value)} type="date" className={`${inputClass} mt-1.5`} />
+        </label>
+        <label className="text-xs font-medium text-gray-600">
+          Nombre d&apos;invités
+          <input value={guests} onChange={(e) => setGuests(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Ex. 30" className={`${inputClass} mt-1.5`} />
+        </label>
+      </div>
+
+      <label className="mt-3 block text-xs font-medium text-gray-600">
+        Votre projet
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Décrivez votre événement, vos besoins…" rows={5} className={`${inputClass} mt-1.5 min-h-[130px] resize-y`} />
+      </label>
+
+      {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full py-3.5 rounded-2xl font-bold text-white text-sm disabled:opacity-50 transition-opacity"
-        style={{ backgroundColor: 'var(--color-primary)' }}
+        className="mt-5 min-h-11 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--color-primary-dark)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"
       >
-        {isSubmitting ? 'Envoi…' : 'Envoyer la demande'}
+        {isSubmitting ? 'Envoi…' : 'Envoyer ma demande'}
       </button>
     </form>
   );

@@ -1,7 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { IconCalendarEvent, IconMapPin, IconClock, IconUsers, IconChefHat, IconTools, IconArrowRight } from '@tabler/icons-react';
+import {
+  IconArrowRight,
+  IconCalendarEvent,
+  IconChefHat,
+  IconClock,
+  IconMapPin,
+  IconTools,
+  IconUsers,
+} from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatEventDayDate, formatEventTime, formatPrice } from '@/lib/utils/format';
@@ -9,28 +17,43 @@ import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import type { EventRow, ServiceOffering, EventGalleryPhoto } from '@lepefy/types';
 
 type EventPhotoRef = Pick<EventGalleryPhoto, 'event_id' | 'image_url'>;
+type EventPriceRef = { event_id: string; price: number };
 
 export const revalidate = 120;
 
+function availabilityClasses(remaining: number) {
+  if (remaining <= 10) return 'border-red-200 bg-red-50 text-red-700';
+  if (remaining <= 25) return 'border-amber-200 bg-amber-50 text-amber-800';
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+}
+
+function availabilityLabel(remaining: number) {
+  if (remaining <= 0) return 'Complet';
+  if (remaining <= 25) return `Plus que ${remaining} place${remaining > 1 ? 's' : ''}`;
+  return 'Encore beaucoup de places';
+}
+
+function availabilityDetail(remaining: number) {
+  if (remaining <= 0 || remaining <= 25) return null;
+  return `${remaining} places disponibles`;
+}
+
 export async function generateMetadata(): Promise<Metadata> {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   return {
     title: 'Événementiel',
-    description: `Soirées, traiteur et location de matériel — ${tenant.name}.`,
+    description: `Événements, traiteur et location de matériel — ${tenant.name}.`,
   };
 }
 
 export default async function EvenementielHubPage() {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  if (!tenant.events_enabled && !tenant.services_enabled) {
-    notFound();
-  }
+  if (!tenant.events_enabled && !tenant.services_enabled) notFound();
 
   const supabase = createPublicClient();
-
   const [eventsRes, servicesRes, galleryRes, eventPhotosRes] = await Promise.all([
     tenant.events_enabled
       ? supabase
@@ -55,15 +78,8 @@ export default async function EvenementielHubPage() {
           .select('*')
           .eq('tenant_id', tenant.id)
           .order('sort_order', { ascending: true })
-          .limit(8)
+          .limit(10)
       : Promise.resolve({ data: [] as EventGalleryPhoto[] }),
-    // Photos multi-image par événement (carousel auto-fade des cards) — pas de
-    // filtre .in(event_id) ici : les ids des events du Promise.all voisin ne
-    // sont pas encore connus au moment de construire cette requête (même
-    // Promise.all = exécution parallèle, pas séquentielle). On récupère donc
-    // toutes les photos rattachées à un événement pour ce tenant et on
-    // regroupe par event_id en JS ci-dessous ; les events non retournés
-    // ci-dessus (brouillon, passés) ne seront simplement jamais lookup.
     tenant.events_enabled
       ? supabase
           .from('event_gallery_photos')
@@ -74,11 +90,11 @@ export default async function EvenementielHubPage() {
       : Promise.resolve({ data: [] as EventPhotoRef[] }),
   ]);
 
-  const events   = (eventsRes.data ?? []) as EventRow[];
+  const events = (eventsRes.data ?? []) as EventRow[];
   const services = (servicesRes.data ?? []) as ServiceOffering[];
-  const gallery  = (galleryRes.data ?? []) as EventGalleryPhoto[];
-
+  const gallery = (galleryRes.data ?? []) as EventGalleryPhoto[];
   const photosByEvent = new Map<string, string[]>();
+
   for (const photo of (eventPhotosRes.data ?? []) as EventPhotoRef[]) {
     if (!photo.event_id) continue;
     const list = photosByEvent.get(photo.event_id) ?? [];
@@ -86,222 +102,133 @@ export default async function EvenementielHubPage() {
     photosByEvent.set(photo.event_id, list);
   }
 
-  return (
-    <div className="min-h-screen bg-[#f7f9f8]">
-      {/* ── Hero ── */}
-      {/* Dégradé mono-teinte dérivé du seul --color-primary du tenant (formule
-          alignée sur le mockup validé), plus jamais primary→secondary : ce
-          dernier produisait un rendu bicolore (vert→jaune pour ChloeFood)
-          perçu comme "générique", sans lien avec l'identité du tenant. */}
-      <section
-        className="relative overflow-hidden px-4 py-20 sm:py-28 text-center text-white"
-        style={{ background: 'linear-gradient(160deg, var(--color-primary-dark) 0%, var(--color-primary) 100%)' }}
-      >
-        {/* Motif triangles SVG en overlay — repris à l'identique du mockup
-            (Maquette_Evenementiel_ChloeFood.html, .hero-pattern / pattern#tri) */}
-        <svg
-          className="absolute inset-0 w-full h-full opacity-[.14] pointer-events-none"
-          viewBox="0 0 200 200"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <defs>
-            <pattern id="evenementiel-hero-tri" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(8)">
-              <polygon points="12,2 22,20 2,20" fill="none" stroke="#ffffff" strokeWidth="0.6" />
-            </pattern>
-          </defs>
-          <rect width="200" height="200" fill="url(#evenementiel-hero-tri)" />
-        </svg>
+  const eventIds = events.map((event) => event.id);
+  const ticketPricesRes = eventIds.length > 0
+    ? await supabase
+        .from('event_ticket_types')
+        .select('event_id, price')
+        .in('event_id', eventIds)
+        .eq('active', true)
+    : { data: [] as EventPriceRef[] };
 
-        <div className="relative z-[2] max-w-2xl mx-auto">
-          <p
-            className="text-xs font-semibold uppercase tracking-widest mb-5"
-            style={{ color: 'var(--color-secondary)' }}
-          >
-            Traiteur · Barbecue · Location de matériel
-          </p>
-          <h1 className="font-display text-3xl sm:text-5xl font-bold mb-5 leading-[1.08]">
-            Soirées, traiteur &amp; location de matériel avec {tenant.name}
-          </h1>
-          <p className="text-sm sm:text-base text-white/85 max-w-xl mx-auto mb-8">
-            Réservez votre place à nos soirées barbecue, demandez un devis traiteur ou louez le matériel
-            qu&apos;il vous faut pour votre événement.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <a
-              href="#evenements"
-              className="text-sm font-semibold px-7 py-3.5 rounded-[10px] transition-transform hover:-translate-y-0.5"
-              style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}
-            >
-              Voir les événements à venir
-            </a>
-            <a
-              href="#services"
-              className="text-sm font-semibold px-7 py-3.5 rounded-[10px] border border-white/45 text-white transition-colors hover:border-[var(--color-secondary)] hover:text-[var(--color-secondary)]"
-            >
-              Découvrir nos services
-            </a>
+  const minPriceByEvent = new Map<string, number>();
+  for (const ticket of (ticketPricesRes.data ?? []) as EventPriceRef[]) {
+    const current = minPriceByEvent.get(ticket.event_id);
+    if (current == null || ticket.price < current) minPriceByEvent.set(ticket.event_id, ticket.price);
+  }
+
+  const featuredEvent = events[0] ?? null;
+  const secondaryEvents = events.slice(1);
+  const heroImages = featuredEvent
+    ? (photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : []))
+    : gallery.slice(0, 3).map((photo) => photo.image_url);
+  const traiteur = services.find((service) => service.type === 'traiteur') ?? services.find((service) => service.cta_type === 'devis') ?? null;
+  const location = services.find((service) => service.type === 'location_materiel') ?? services.find((service) => service.cta_type === 'reservation') ?? null;
+
+  return (
+    <div className="min-h-screen bg-[#f7f3eb] text-[#20231f]">
+      <section className="relative isolate min-h-[520px] overflow-hidden lg:min-h-[570px]">
+        <EventImageFader images={heroImages} fallbackColor="var(--color-primary-dark)" className="absolute inset-0 h-full w-full">
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,24,15,.92)_0%,rgba(7,24,15,.68)_46%,rgba(7,24,15,.18)_76%,rgba(7,24,15,.28)_100%)]" aria-hidden="true" />
+        </EventImageFader>
+        <div className="relative z-[2] mx-auto flex min-h-[520px] max-w-[1180px] items-center px-4 py-14 sm:px-6 lg:min-h-[570px]">
+          <div className="max-w-[620px] text-white">
+            <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-secondary)]">Chloe Food Events</p>
+            <h1 className="font-display text-[2.65rem] font-semibold leading-[0.98] sm:text-6xl">Des événements<br />qui ont du goût.</h1>
+            <p className="mt-6 max-w-lg text-base leading-relaxed text-white/82 sm:text-lg">
+              Soirées conviviales, service traiteur et location de matériel : une expérience pensée pour recevoir avec style et simplicité.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href="#evenements" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}>
+                Découvrir les événements <IconArrowRight size={17} />
+              </a>
+              <a href="#services" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/35 bg-white/10 px-5 text-sm font-semibold backdrop-blur-sm hover:bg-white/15">Voir nos services</a>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="max-w-6xl mx-auto w-full px-4">
-
-        {/* ── Soirées barbecue ── */}
+      <main className="mx-auto max-w-[1180px] px-4 sm:px-6">
         {tenant.events_enabled && (
-          <section id="evenements" className="py-10 scroll-mt-[92px]">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-gray-900 mb-1">
-              Nos soirées barbecue
-            </h2>
-            <p className="text-sm text-gray-500 mb-6">Réservez votre formule et recevez votre billet par QR code.</p>
-
-            {events.length === 0 ? (
-              <p className="text-sm text-gray-400 bg-white rounded-2xl border border-gray-100 p-6 text-center">
-                Aucun événement à venir pour le moment — revenez bientôt !
-              </p>
-            ) : (
-              <div className="flex flex-wrap justify-center gap-4">
-                {events.map((event, index) => {
-                  const eventImages = photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : []);
-                  // `events` arrive déjà trié par date_start ascendant (requête
-                  // server-side ci-dessus) — index 0 = événement le plus proche,
-                  // pas de re-tri nécessaire ici (voir Step 0, deviation report).
-                  const isNext = index === 0;
-                  const isSoldOut = event.capacity_remaining <= 0;
-                  return (
-                  <Link
-                    key={event.id}
-                    href={`/evenementiel/evenements/${event.slug}`}
-                    className="group flex basis-full sm:basis-[calc(50%-0.5rem)] bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5"
-                  >
-                    <EventImageFader
-                      images={eventImages}
-                      fallbackColor="var(--color-primary-light)"
-                      className="w-[110px] sm:w-[130px] shrink-0 self-stretch bg-gray-100"
-                    >
-                      {isSoldOut ? (
-                        <span className="absolute top-2 left-2 text-2xs font-semibold px-2 py-1 rounded-full bg-white/90 text-red-600">
-                          Complet
-                        </span>
-                      ) : isNext ? (
-                        // Colonne image fixe (110/130px) trop étroite pour "PROCHAIN
-                        // ÉVÉNEMENT" en une ligne à une taille lisible — vérifié
-                        // empiriquement (mockup_hub_card.png ne montrait que le rendu
-                        // large) : wrap 2 lignes/rounded-lg sous sm, pill 1 ligne dès sm.
-                        <span
-                          className="absolute top-2 left-2 right-2 sm:right-auto whitespace-normal sm:whitespace-nowrap text-[9px] font-bold leading-tight px-1.5 py-1 rounded-lg sm:rounded-full"
-                          style={{ backgroundColor: 'var(--color-secondary)', color: 'var(--color-primary-dark)' }}
-                        >
-                          PROCHAIN ÉVÉNEMENT
-                        </span>
-                      ) : null}
-                    </EventImageFader>
-                    <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
-                      <div className="space-y-1">
-                        <p
-                          className="text-2xs font-semibold uppercase tracking-wide flex items-center gap-1"
-                          style={{ color: 'var(--color-primary)' }}
-                        >
-                          <IconCalendarEvent size={13} /> {formatEventDayDate(event.date_start)}
-                        </p>
-                        <h3 className="font-semibold text-gray-900 line-clamp-1">{event.title}</h3>
-                        {event.location && (
-                          <p className="text-xs text-gray-500 flex items-center gap-1">
-                            <IconMapPin size={13} /> {event.location}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-400 flex items-center gap-1">
-                          <IconClock size={13} /> {formatEventTime(event.date_start)}
-                        </p>
-                        {event.capacity_remaining > 0 && (
-                          <p className="text-xs text-green-600 flex items-center gap-1">
-                            <IconUsers size={13} /> {event.capacity_remaining} places disponibles
-                          </p>
-                        )}
-                      </div>
-                      <span
-                        className="text-[13px] font-semibold flex items-center justify-center gap-1.5 text-white rounded-[10px] mt-1 py-2.5 transition-colors group-hover:[background-color:var(--color-primary-dark)]"
-                        style={{ backgroundColor: 'var(--color-primary)' }}
-                      >
-                        Réserve ta place <IconArrowRight size={14} />
-                      </span>
-                    </div>
-                  </Link>
-                  );
-                })}
+          <section id="evenements" className="scroll-mt-24 py-12 sm:py-16">
+            <div className="mb-7 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">À venir</p>
+                <h2 className="mt-1 font-display text-3xl font-semibold sm:text-4xl">À venir chez {tenant.name}</h2>
               </div>
-            )}
-          </section>
-        )}
+              {events.length > 1 && <span className="hidden text-sm text-gray-500 sm:inline">{events.length} événements programmés</span>}
+            </div>
 
-        {/* ── Services ── */}
-        {tenant.services_enabled && services.length > 0 && (
-          <section id="services" className="py-10 scroll-mt-[92px]">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-gray-900 mb-1">Nos services</h2>
-            <p className="text-sm text-gray-500 mb-6">Traiteur sur mesure et location de matériel pour vos événements.</p>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              {services.map((service) => (
-                <Link
-                  key={service.id}
-                  href={`/evenementiel/services/${service.slug}`}
-                  className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex"
-                >
-                  <div
-                    className="w-28 shrink-0 bg-cover bg-center flex items-center justify-center"
-                    style={{
-                      backgroundImage: service.cover_image_url ? `url(${service.cover_image_url})` : undefined,
-                      backgroundColor: service.cover_image_url ? undefined : 'var(--color-primary-light)',
-                    }}
-                  >
-                    {!service.cover_image_url && (
-                      service.type === 'traiteur'
-                        ? <IconChefHat size={28} color="var(--color-primary)" />
-                        : <IconTools size={28} color="var(--color-primary)" />
-                    )}
-                  </div>
-                  <div className="p-4 flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">{service.title}</h3>
-                    {service.description && (
-                      <p className="text-xs text-gray-500 line-clamp-2 mb-2">{service.description}</p>
-                    )}
-                    <span
-                      className="text-xs font-semibold inline-flex items-center gap-1"
-                      style={{ color: 'var(--color-primary)' }}
-                    >
-                      {service.cta_type === 'devis' ? 'Demander un devis' : 'Voir le catalogue'} <IconArrowRight size={13} />
-                    </span>
+            {featuredEvent ? (
+              <div className="space-y-5">
+                <Link href={`/evenementiel/evenements/${featuredEvent.slug}`} className="group grid overflow-hidden rounded-[28px] border border-black/[0.06] bg-white shadow-[0_18px_45px_rgba(50,37,20,.08)] md:grid-cols-[1.15fr_.85fr]">
+                  <EventImageFader images={photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="min-h-[250px] md:min-h-[330px]">
+                    <span className="absolute left-4 top-4 rounded-full bg-[var(--color-secondary)] px-3 py-1.5 text-[11px] font-extrabold tracking-wide text-[var(--color-primary-dark)]">À LA UNE</span>
+                  </EventImageFader>
+                  <div className="flex flex-col justify-between p-5 sm:p-6 md:p-7">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">Prochain événement</p>
+                      <div className="mt-1.5 flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">{featuredEvent.title}</h3>
+                          {featuredEvent.subtitle && <p className="mt-1.5 text-sm text-gray-600">{featuredEvent.subtitle}</p>}
+                        </div>
+                        {minPriceByEvent.has(featuredEvent.id) && <div className="shrink-0 text-right"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">À partir de</p><p className="mt-0.5 font-display text-2xl font-semibold text-gray-900">{formatPrice(minPriceByEvent.get(featuredEvent.id)!, tenant.currency)}</p></div>}
+                      </div>
+                      <div className="mt-5 grid gap-2.5 text-sm text-gray-650 sm:grid-cols-2">
+                        <p className="flex items-center gap-2"><IconCalendarEvent size={18} className="text-[var(--color-primary)]" />{formatEventDayDate(featuredEvent.date_start)}</p>
+                        <p className="flex items-center gap-2"><IconClock size={18} className="text-[var(--color-primary)]" />{formatEventTime(featuredEvent.date_start)}</p>
+                        {featuredEvent.location && <p className="flex items-center gap-2 sm:col-span-2"><IconMapPin size={18} className="shrink-0 text-[var(--color-primary)]" /><span className="line-clamp-1">{featuredEvent.location}</span></p>}
+                        <div className="sm:col-span-2">
+                          <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining)}</p>
+                          {availabilityDetail(featuredEvent.capacity_remaining) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining)}</p>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-5 flex items-center justify-end border-t border-black/[0.06] pt-4">
+                      <span className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-[var(--color-primary)] px-5 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">Réserve ta place <IconArrowRight size={16} /></span>
+                    </div>
                   </div>
                 </Link>
-              ))}
+
+                {secondaryEvents.length > 0 && (
+                  <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3">
+                    {secondaryEvents.map((event) => (
+                      <Link key={event.id} href={`/evenementiel/evenements/${event.slug}`} className="group min-w-[78vw] snap-start overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm sm:min-w-0">
+                        <EventImageFader images={photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="aspect-[16/10]" />
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3"><h3 className="font-display text-xl font-semibold">{event.title}</h3>{minPriceByEvent.has(event.id) && <span className="shrink-0 text-sm font-bold text-gray-900">{formatPrice(minPriceByEvent.get(event.id)!, tenant.currency)}</span>}</div>
+                          <div className="mt-3 space-y-1.5 text-xs text-gray-500"><p className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatEventDayDate(event.date_start)}</p>{event.location && <p className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="line-clamp-1">{event.location}</span></p>}</div>
+                          <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><div><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining)}</span>{availabilityDetail(event.capacity_remaining) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining)}</p>}</div><span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">Réserve ta place <IconArrowRight size={15} /></span></div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : <div className="rounded-3xl border border-black/[0.06] bg-white p-8 text-center text-sm text-gray-500">Aucun événement à venir pour le moment.</div>}
+          </section>
+        )}
+
+        {tenant.services_enabled && services.length > 0 && (
+          <section id="services" className="scroll-mt-24 pb-14 sm:pb-18">
+            <div className="mb-6"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Nos savoir-faire</p><h2 className="mt-1 font-display text-3xl font-semibold sm:text-4xl">Pour vos événements, deux façons de vous accompagner.</h2></div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {traiteur && <Link id="traiteur" href={`/evenementiel/services/${traiteur.slug}`} className="group relative min-h-[310px] overflow-hidden rounded-[28px] bg-[var(--color-primary-dark)] text-white shadow-lg">{traiteur.cover_image_url && <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundImage: `url(${traiteur.cover_image_url})` }} />}<div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/50 to-black/20" /><div className="relative flex h-full min-h-[310px] max-w-md flex-col justify-end p-6 sm:p-8"><IconChefHat size={30} className="mb-4 text-[var(--color-secondary)]" /><h3 className="font-display text-3xl font-semibold">Traiteur</h3>{traiteur.description && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/75">{traiteur.description}</p>}<span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--color-secondary)]">Découvrir <IconArrowRight size={16} /></span></div></Link>}
+              {location && <Link id="location" href={`/evenementiel/services/${location.slug}`} className="group relative min-h-[310px] overflow-hidden rounded-[28px] bg-[#e9dcc1] text-[#1f281f] shadow-lg">{location.cover_image_url && <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundImage: `url(${location.cover_image_url})` }} />}<div className="absolute inset-0 bg-gradient-to-r from-[#f3e8d1]/95 via-[#f3e8d1]/78 to-[#f3e8d1]/25" /><div className="relative flex h-full min-h-[310px] max-w-md flex-col justify-end p-6 sm:p-8"><IconTools size={30} className="mb-4 text-[var(--color-primary)]" /><h3 className="font-display text-3xl font-semibold">Location de matériel</h3>{location.description && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-[#374139]">{location.description}</p>}<span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--color-primary-dark)]">Découvrir <IconArrowRight size={16} /></span></div></Link>}
             </div>
           </section>
         )}
 
-        {/* ── Galerie ── */}
         {gallery.length > 0 && (
-          <section id="galerie" className="py-10 scroll-mt-[92px]">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-gray-900 mb-1">Nos événements passés</h2>
-            <p className="text-sm text-gray-500 mb-6">Un aperçu de l&apos;ambiance de nos soirées.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {gallery.map((photo) => (
-                <div key={photo.id} className="aspect-square rounded-2xl overflow-hidden bg-gray-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.image_url} alt={photo.caption ?? ''} className="w-full h-full object-cover" />
-                </div>
-              ))}
+          <section id="galerie" className="scroll-mt-24 pb-16 sm:pb-20">
+            <div className="mb-6 flex items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Inspiration</p><h2 className="mt-1 font-display text-3xl font-semibold sm:text-4xl">Ambiances &amp; inspirations</h2></div><span className="hidden text-sm text-gray-500 sm:inline">Un aperçu de nos univers</span></div>
+            <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0">
+              {gallery.map((photo, index) => <figure key={photo.id} className={`relative min-w-[68vw] snap-start overflow-hidden rounded-2xl bg-gray-100 sm:min-w-0 ${index % 5 === 0 ? 'sm:col-span-2 sm:row-span-2' : ''}`}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={photo.image_url} alt={photo.caption ?? ''} className="aspect-[4/3] h-full min-h-[210px] w-full object-cover sm:aspect-auto" />{photo.caption && <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10 text-xs text-white">{photo.caption}</figcaption>}</figure>)}
             </div>
           </section>
         )}
-
-        {/* Le CTA de clôture ("Nous contacter" + retour boutique) vit
-            désormais dans EventsFooter, rendu par (evenementiel)/layout.tsx
-            sur TOUTES les pages du module — cette section dupliquait le même
-            rôle uniquement sur le hub, avec un lien boutique relatif
-            (invalide depuis events.chloefood.com). Supprimée au profit du
-            footer dédié, conforme au mockup validé (une seule footer-cta). */}
-        <div className="h-6" />
-      </div>
+      </main>
     </div>
   );
 }
