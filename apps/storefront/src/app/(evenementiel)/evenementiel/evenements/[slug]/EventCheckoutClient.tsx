@@ -270,7 +270,7 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
   }
 
   return (
-    <div className={totalQuantity > 0 ? 'pb-[104px] lg:pb-0' : ''}>
+    <div>
       <EventStepper current={step} />
       <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <div>
