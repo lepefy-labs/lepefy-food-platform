@@ -1,96 +1,171 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { IconCalendar, IconMail, IconPhone, IconSearch, IconUsers } from '@tabler/icons-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { ServiceInquiryStatus } from '@lepefy/types';
+import InquiryMetrics from './_components/InquiryMetrics';
+import InquiryToolbar from './_components/InquiryToolbar';
+import InquiryList from './_components/InquiryList';
+import InquiryDetail from './_components/InquiryDetail';
+import type { InquiryFilter, InquiryWithService } from './inquiryTypes';
+import { STATUS_PRIORITY } from './inquiryTypes';
 
-interface InquiryWithService {
-  id: string;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string | null;
-  date_souhaitee: string | null;
-  nombre_invites: number | null;
-  message: string | null;
-  status: ServiceInquiryStatus;
-  created_at: string;
-  service_offerings: { title: string; slug: string } | null;
+function matchesFilter(status: ServiceInquiryStatus, filter: InquiryFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'new') return status === 'nouveau';
+  if (filter === 'actionable') return ['nouveau', 'a_contacter'].includes(status);
+  if (filter === 'followup') return ['contacte', 'devis_envoye'].includes(status);
+  return ['accepte', 'refuse', 'clos'].includes(status);
 }
 
-const STATUS_OPTIONS: ServiceInquiryStatus[] = ['nouveau', 'contacte', 'clos'];
-const STATUS_LABELS: Record<ServiceInquiryStatus, string> = { nouveau: 'Nouveau', contacte: 'Contacté', clos: 'Clos' };
-const STATUS_COLORS: Record<ServiceInquiryStatus, string> = {
-  nouveau: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-  contacte: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-  clos: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300',
-};
+function sortOperational(a: InquiryWithService, b: InquiryWithService): number {
+  const aClosed = ['accepte', 'refuse', 'clos'].includes(a.status);
+  const bClosed = ['accepte', 'refuse', 'clos'].includes(b.status);
+  if (aClosed !== bClosed) return aClosed ? 1 : -1;
+
+  const priorityDiff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
+  if (priorityDiff !== 0) return priorityDiff;
+
+  if (aClosed && bClosed) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+}
 
 export default function InquiriesClient({ initialInquiries }: { initialInquiries: InquiryWithService[] }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedId = searchParams.get('request');
+
   const [inquiries, setInquiries] = useState(initialInquiries);
-  const [statusFilter, setStatusFilter] = useState<'all' | ServiceInquiryStatus>('all');
+  const [filter, setFilter] = useState<InquiryFilter>('all');
   const [search, setSearch] = useState('');
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [noteSavingId, setNoteSavingId] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('fr');
     return [...inquiries]
-      .filter((inquiry) => statusFilter === 'all' || inquiry.status === statusFilter)
-      .filter((inquiry) => !query || `${inquiry.customer_name} ${inquiry.customer_email}`.toLocaleLowerCase('fr').includes(query))
-      .sort((a, b) => {
-        if (a.status === 'nouveau' && b.status !== 'nouveau') return -1;
-        if (b.status === 'nouveau' && a.status !== 'nouveau') return 1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-  }, [inquiries, search, statusFilter]);
+      .filter((inquiry) => matchesFilter(inquiry.status, filter))
+      .filter((inquiry) => {
+        if (!query) return true;
+        return `${inquiry.customer_name} ${inquiry.customer_email} ${inquiry.customer_phone ?? ''} ${inquiry.service_offerings?.title ?? ''}`
+          .toLocaleLowerCase('fr')
+          .includes(query);
+      })
+      .sort(sortOperational);
+  }, [filter, inquiries, search]);
+
+  const requestedInquiry = requestedId ? filtered.find((item) => item.id === requestedId) ?? null : null;
+  const desktopSelected = requestedInquiry ?? filtered[0] ?? null;
+
+  useEffect(() => {
+    if (!requestedId) return;
+    const stillVisible = filtered.some((item) => item.id === requestedId);
+    if (!stillVisible) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('request');
+      const query = params.toString();
+      router.replace(query ? `?${query}` : '?', { scroll: false });
+    }
+  }, [filtered, requestedId, router, searchParams]);
+
+  function selectInquiry(id: string) {
+    setStatusError(null);
+    setNoteError(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('request', id);
+    router.push(`?${params.toString()}`, { scroll: false });
+  }
+
+  function closeMobileDetail() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('request');
+    const query = params.toString();
+    router.push(query ? `?${query}` : '?', { scroll: false });
+  }
 
   async function updateStatus(id: string, status: ServiceInquiryStatus) {
-    const res = await fetch(`/api/admin/evenementiel/inquiries/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
-    });
-    if (res.ok) setInquiries((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+    setStatusError(null);
+    setStatusSavingId(id);
+    try {
+      const res = await fetch(`/api/admin/evenementiel/inquiries/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setStatusError(result.error ?? 'Impossible de mettre à jour le statut.');
+        return;
+      }
+      setInquiries((prev) => prev.map((item) => item.id === id ? result as InquiryWithService : item));
+    } catch {
+      setStatusError('Impossible de mettre à jour le statut.');
+    } finally {
+      setStatusSavingId(null);
+    }
+  }
+
+  async function saveNote(id: string, internalNotes: string | null): Promise<boolean> {
+    setNoteError(null);
+    setNoteSavingId(id);
+    try {
+      const res = await fetch(`/api/admin/evenementiel/inquiries/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ internal_notes: internalNotes }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setNoteError(result.error ?? 'Impossible d’enregistrer la note.');
+        return false;
+      }
+      setInquiries((prev) => prev.map((item) => item.id === id ? result as InquiryWithService : item));
+      return true;
+    } catch {
+      setNoteError('Impossible d’enregistrer la note.');
+      return false;
+    } finally {
+      setNoteSavingId(null);
+    }
+  }
+
+  if (inquiries.length === 0) {
+    return <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Aucune demande pour le moment.</div>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center">
-        <label className="relative min-w-0 flex-1">
-          <span className="sr-only">Rechercher par client ou email</span>
-          <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Client ou email…" className="min-h-11 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
-        </label>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | ServiceInquiryStatus)} className="min-h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200">
-          <option value="all">Tous les statuts</option>
-          {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
-        </select>
+    <div className="space-y-3">
+      <div className={requestedInquiry ? 'hidden lg:block' : 'block'}>
+        <div className="space-y-3">
+          <InquiryMetrics inquiries={inquiries} />
+          <InquiryToolbar search={search} onSearchChange={setSearch} filter={filter} onFilterChange={setFilter} />
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Aucune demande correspondante.</div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {filtered.map((inquiry) => (
-              <article key={inquiry.id} className="p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{inquiry.customer_name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{inquiry.service_offerings?.title ?? 'Service'} · {new Date(inquiry.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                  </div>
-                  <select value={inquiry.status} onChange={(e) => updateStatus(inquiry.id, e.target.value as ServiceInquiryStatus)} aria-label={`Statut de la demande de ${inquiry.customer_name}`} className={`min-h-11 rounded-lg border-0 px-3 text-xs font-semibold ${STATUS_COLORS[inquiry.status]}`}>
-                    {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
-                  </select>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="flex items-center gap-1"><IconMail size={13} /> {inquiry.customer_email}</span>
-                  {inquiry.customer_phone && <span className="flex items-center gap-1"><IconPhone size={13} /> {inquiry.customer_phone}</span>}
-                  {inquiry.date_souhaitee && <span className="flex items-center gap-1"><IconCalendar size={13} /> {new Date(inquiry.date_souhaitee).toLocaleDateString('fr-FR')}</span>}
-                  {inquiry.nombre_invites != null && <span className="flex items-center gap-1"><IconUsers size={13} /> {inquiry.nombre_invites} invités</span>}
-                </div>
-                {inquiry.message && <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-800/70 dark:text-gray-200">{inquiry.message}</p>}
-              </article>
-            ))}
-          </div>
+      <div className="lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(360px,.8fr)] lg:items-start lg:gap-4">
+        <div className={requestedInquiry ? 'hidden lg:block' : 'block'}>
+          <InquiryList inquiries={filtered} selectedId={desktopSelected?.id ?? null} onSelect={selectInquiry} />
         </div>
-      )}
+
+        <div className={requestedInquiry ? 'block' : 'hidden lg:block'}>
+          {desktopSelected ? (
+            <InquiryDetail
+              inquiry={requestedInquiry ?? desktopSelected}
+              onBack={requestedInquiry ? closeMobileDetail : undefined}
+              onStatusChange={(status) => updateStatus((requestedInquiry ?? desktopSelected).id, status)}
+              statusSaving={statusSavingId === (requestedInquiry ?? desktopSelected).id}
+              statusError={statusError}
+              onSaveNote={(note) => saveNote((requestedInquiry ?? desktopSelected).id, note)}
+              noteSaving={noteSavingId === (requestedInquiry ?? desktopSelected).id}
+              noteError={noteError}
+            />
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Sélectionnez une demande pour afficher les détails.</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
