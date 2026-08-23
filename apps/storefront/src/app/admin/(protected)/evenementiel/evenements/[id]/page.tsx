@@ -8,9 +8,8 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export default async function AdminEventDetailPage({ params }: { params: { id: string } }) {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-
   const supabase = createServiceClient();
 
   const { data: event } = await supabase
@@ -22,28 +21,30 @@ export default async function AdminEventDetailPage({ params }: { params: { id: s
 
   if (!event) notFound();
 
-  const { data: ticketTypes } = await supabase
-    .from('event_ticket_types')
-    .select('*')
-    .eq('event_id', event.id)
-    .order('sort_order', { ascending: true });
-
-  const { data: reservations } = await supabase
-    .from('event_reservations')
-    .select('*')
-    .eq('event_id', event.id)
-    .order('created_at', { ascending: false });
-
-  // Paiements en attente (Phase 2 — lien externe) pour CET événement.
-  const { data: pendingRequests } = await supabase
-    .from('event_reservation_requests')
-    .select('*')
-    .eq('event_id', event.id)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true });
+  const [{ data: ticketTypes }, { data: reservations }, { data: pendingRequests }] = await Promise.all([
+    supabase
+      .from('event_ticket_types')
+      .select('*')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('event_reservations')
+      .select('*')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('event_reservation_requests')
+      .select('*')
+      .eq('event_id', event.id)
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true }),
+  ]);
 
   return (
-    <div className="max-w-4xl">
+    <div className="mx-auto w-full max-w-7xl">
       <EventDetailAdminClient
         event={event as EventRow}
         initialTicketTypes={(ticketTypes ?? []) as EventTicketType[]}
