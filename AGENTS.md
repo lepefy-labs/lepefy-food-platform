@@ -45,16 +45,30 @@ Do **not** stop after an intermediate milestone merely because one sub-step is f
 Do **not** ask `Proceed?`, `Continue?`, or similar questions between implementation sub-steps.
 Do **not** require the requester to send another message to resume work already covered by the approval.
 
-Only ask the requester again when a newly discovered decision would materially change something outside the approved scope, specifically:
+### Mandatory re-approval exceptions
 
-- business behavior
-- user workflow
-- stored data semantics
-- permissions/security model
-- destructive data operations
-- the approved UX direction
+Even after the requester has approved the overall implementation, stop and request explicit approval **before** performing any newly discovered action that falls into one of these categories:
 
-A build failure, type error, implementation detail, component split, endpoint refactor, responsive adjustment, or extra corrective commit is **not** a reason to ask for approval again.
+- a significant database migration or schema migration with meaningful production impact
+- destructive or difficult-to-reverse data migration/backfill
+- payment, checkout, billing, refunds, payouts, Stripe/payment-provider logic, or other money-moving flows
+- authentication, authorization, secrets, security policy, or access-control changes with material impact
+- another clearly critical production module where a failure could materially affect orders, payments, customer data, availability, or compliance
+
+Minor additive migrations that were already clearly described and explicitly approved in the POST proposal may proceed only when they are low-risk and reversible. When there is reasonable doubt about migration impact, treat it as significant and ask.
+
+When asking for this exceptional approval, explain only:
+
+1. what critical action is required,
+2. why it is required,
+3. the principal risk,
+4. whether there is a safer alternative.
+
+Keep the request concise and do not perform the critical action until approved.
+
+Outside these critical exceptions, continue autonomously.
+
+A build failure, type error, implementation detail, component split, endpoint refactor, responsive adjustment, low-risk UI/API corrective change, or extra corrective commit is **not** a reason to ask for approval again.
 
 The agent is considered finished only when the complete approved scope has been implemented and final remote verification has been performed, or when a genuine external blocker prevents completion.
 
