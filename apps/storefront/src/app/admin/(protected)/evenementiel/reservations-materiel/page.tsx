@@ -19,23 +19,19 @@ interface RentalReservationWithDetails {
 }
 
 export default async function AdminRentalReservationsPage() {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-
   const supabase = createServiceClient();
 
   const { data: reservations } = await supabase
     .from('rental_reservations')
     .select('*, service_offerings(title, slug)')
     .eq('tenant_id', tenant.id)
-    .order('created_at', { ascending: false });
+    .order('pickup_date', { ascending: true });
 
   const ids = (reservations ?? []).map((r) => r.id as string);
   const { data: items } = ids.length > 0
-    ? await supabase
-        .from('rental_reservation_items')
-        .select('*, rental_items(name)')
-        .in('reservation_id', ids)
+    ? await supabase.from('rental_reservation_items').select('*, rental_items(name)').in('reservation_id', ids)
     : { data: [] };
 
   const itemsByReservation = new Map<string, unknown[]>();
@@ -45,12 +41,20 @@ export default async function AdminRentalReservationsPage() {
     itemsByReservation.set(item.reservation_id, list);
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const result = (reservations ?? []).map((r) => ({
     ...r,
     items: itemsByReservation.get(r.id as string) ?? [],
-  })) as unknown as RentalReservationWithDetails[];
+  })).sort((a, b) => {
+    const aUpcoming = a.status === 'confirmed' && new Date(a.pickup_date).getTime() >= today.getTime();
+    const bUpcoming = b.status === 'confirmed' && new Date(b.pickup_date).getTime() >= today.getTime();
+    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+    const aTime = new Date(a.pickup_date).getTime();
+    const bTime = new Date(b.pickup_date).getTime();
+    return aUpcoming ? aTime - bTime : bTime - aTime;
+  }) as unknown as RentalReservationWithDetails[];
 
-  // Paiements en attente (Phase 3 — lien externe), tous services confondus.
   const { data: pendingRequestsRaw } = await supabase
     .from('rental_reservation_requests')
     .select('*')
@@ -59,30 +63,19 @@ export default async function AdminRentalReservationsPage() {
     .order('created_at', { ascending: true });
 
   const pendingRequests = (pendingRequestsRaw ?? []) as RentalReservationRequest[];
-
-  // Résolution des noms d'articles pour le résumé du bandeau — items ne
-  // porte que rental_item_id, jamais le nom (voir migration 061).
   const pendingItemIds = [...new Set(pendingRequests.flatMap((r) => r.items.map((i) => i.rental_item_id)))];
   const { data: pendingRentalItems } = pendingItemIds.length > 0
     ? await supabase.from('rental_items').select('id, name').in('id', pendingItemIds)
     : { data: [] };
-  const rentalItemNameById = new Map(
-    ((pendingRentalItems ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]),
-  );
+  const rentalItemNameById = new Map(((pendingRentalItems ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Réservations matériel</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Réservations payées depuis les pages de service en mode « réservation » (Location matériel).
+      <h1 className="text-xl font-semibold text-gray-950 dark:text-white">Locations</h1>
+      <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
+        Retraits confirmés à venir en priorité, puis historique des réservations.
       </p>
-
-      <RentalReservationsClient
-        initialReservations={result}
-        initialPendingRequests={pendingRequests}
-        rentalItemNameById={Object.fromEntries(rentalItemNameById)}
-        currency={tenant.currency}
-      />
+      <RentalReservationsClient initialReservations={result} initialPendingRequests={pendingRequests} rentalItemNameById={Object.fromEntries(rentalItemNameById)} currency={tenant.currency} />
     </div>
   );
 }
