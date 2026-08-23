@@ -31,17 +31,12 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect('/admin/login');
-  }
+  if (!user) redirect('/admin/login');
 
-  const slug      = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant    = await getTenant(slug);
-  const adminClient  = createServiceClient();
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(slug);
+  const adminClient = createServiceClient();
 
-  // admin_users n'a aucune policy publique (service_role uniquement) — même
-  // mécanisme que requireAdmin.ts (lib/auth/requireAdmin.ts), pour ne jamais
-  // avoir deux sources de vérité sur les permissions admin.
   const { data: admin } = await adminClient
     .from('admin_users')
     .select('id, role, tenant_id, active')
@@ -49,24 +44,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .eq('active', true)
     .single();
 
-  if (!admin) {
-    redirect('/admin/login?error=unauthorized');
-  }
-
-  // platform_owner (tenant_id null) a un accès global, invariant. Tout autre
-  // rôle — tenant_admin ET tenant_cashier (047) — est scoped à son tenant.
-  if (admin.role !== 'platform_owner' && admin.tenant_id !== tenant.id) {
-    redirect('/admin/login?error=unauthorized');
-  }
-
-  // tenant_cashier (047) n'a accès qu'à /admin/loyalty/scan (route hors de ce
-  // groupe protégé, avec sa propre vérification de rôle) — jamais au tableau
-  // de bord, aux commandes, au catalogue, etc. rendus par ce layout partagé.
-  // Point d'intervention minimal : un redirect ici évite d'avoir à masquer
-  // conditionnellement chaque section de AdminSidebar/AdminMobileNav.
-  if (admin.role === 'tenant_cashier') {
-    redirect('/admin/loyalty/scan');
-  }
+  if (!admin) redirect('/admin/login?error=unauthorized');
+  if (admin.role !== 'platform_owner' && admin.tenant_id !== tenant.id) redirect('/admin/login?error=unauthorized');
+  if (admin.role === 'tenant_cashier') redirect('/admin/loyalty/scan');
 
   const { data: categories } = await adminClient
     .from('categories')
@@ -74,28 +54,33 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     .eq('tenant_id', tenant.id)
     .order('position');
 
-  // Badge sidebar "Commandes" — Phase 1 lien externe (voir PendingPaymentsBanner).
-  const { count: pendingPaymentsCount } = await adminClient
-    .from('checkout_sessions')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenant.id)
-    .eq('payment_method', 'external_link');
-
-  // Badge sidebar "Événements" — Phase 2 lien externe, agrégé tous événements
-  // (même mécanisme que le badge "Commandes" ci-dessus).
-  const { count: pendingEventRequestsCount } = await adminClient
-    .from('event_reservation_requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenant.id)
-    .eq('status', 'pending');
-
-  // Badge sidebar "Réservations matériel" — Phase 3 lien externe, agrégé
-  // tous services (même mécanisme que les deux badges ci-dessus).
-  const { count: pendingRentalRequestsCount } = await adminClient
-    .from('rental_reservation_requests')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenant.id)
-    .eq('status', 'pending');
+  const [
+    pendingPaymentsResult,
+    pendingEventRequestsResult,
+    pendingRentalRequestsResult,
+    newInquiriesResult,
+  ] = await Promise.all([
+    adminClient
+      .from('checkout_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('payment_method', 'external_link'),
+    adminClient
+      .from('event_reservation_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'pending'),
+    adminClient
+      .from('rental_reservation_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'pending'),
+    adminClient
+      .from('service_inquiries')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'nouveau'),
+  ]);
 
   return (
     <AdminThemeProvider>
@@ -112,9 +97,10 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           <Suspense fallback={<div className="w-56 h-full" />}>
             <AdminSidebar
               categories={categories ?? []}
-              pendingPaymentsCount={pendingPaymentsCount ?? 0}
-              pendingEventRequestsCount={pendingEventRequestsCount ?? 0}
-              pendingRentalRequestsCount={pendingRentalRequestsCount ?? 0}
+              pendingPaymentsCount={pendingPaymentsResult.count ?? 0}
+              pendingEventRequestsCount={pendingEventRequestsResult.count ?? 0}
+              pendingRentalRequestsCount={pendingRentalRequestsResult.count ?? 0}
+              newInquiriesCount={newInquiriesResult.count ?? 0}
               isPlatformOwner={admin.role === 'platform_owner'}
             />
           </Suspense>
