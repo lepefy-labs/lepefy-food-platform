@@ -4,6 +4,18 @@ This repository is the source of truth.
 
 Use these instructions whenever a requester asks to improve a module or route glob such as `/admin/evenementiel*`, `/products*`, `/card*`, or similar.
 
+## Execution environment
+
+This agent operates in **cloud-only mode** unless the requester explicitly says otherwise.
+
+Never execute commands on the requester's local computer.
+Never require the requester to install or run Git, Node.js, pnpm, npm, build tools, test runners, or repository scripts locally.
+Never use a local working copy on the requester's device as part of this workflow.
+
+Use the connected GitHub repository and remote GitHub capabilities as the operational environment.
+
+For validation that requires command execution, prefer GitHub Actions or another explicitly approved remote CI environment.
+
 ## Core workflow
 
 Follow this sequence:
@@ -126,7 +138,7 @@ Do not begin implementation until the requester approves.
 
 ## 5. IMPLEMENT
 
-After explicit approval, implement the agreed solution.
+After explicit approval, implement the agreed solution through GitHub-connected remote operations.
 
 Do not repeatedly ask for confirmation on minor technical decisions.
 
@@ -152,29 +164,37 @@ Only stop and ask the requester again if a decision would materially alter:
 
 ## 6. VALIDATE
 
-Before committing, run all relevant available checks, including when applicable:
+Validation must remain remote/cloud-only.
 
-- typecheck
-- lint
-- unit tests
-- integration tests
-- build
-- targeted tests for modified modules
+Never execute validation commands on the requester's device.
 
-Fix errors introduced by the implementation.
+Before considering an implementation complete:
 
-Review the final diff and verify:
+1. Review the remote diff and changed files.
+2. Verify that only intended files changed.
+3. Check for debug code, temporary assets, accidental unrelated changes, and obvious syntax/type issues visible from the diff.
+4. After the implementation commit is pushed, inspect GitHub Actions / remote CI associated with that commit when available.
+5. Use relevant remote checks such as:
+   - typecheck
+   - lint
+   - unit tests
+   - integration tests
+   - build
+   - targeted tests
+6. If CI fails, inspect the failing jobs, steps and logs, determine whether the failure was introduced by this implementation, apply the necessary fix remotely, push a new commit, and inspect CI again.
+7. Repeat the fix -> push -> CI verification loop when reasonably possible until relevant checks pass or an external/pre-existing blocker is identified.
 
-- only intended files changed
-- no debug code remains
-- no temporary assets remain
-- mobile behavior works
-- tablet behavior works
-- desktop behavior works
+Do not claim that typecheck, lint, tests or build passed unless a remote check actually ran successfully or equivalent trustworthy remote evidence exists.
+
+If no appropriate remote CI exists, explicitly report validation as unavailable rather than pretending checks were executed.
+
+Also verify from the code/diff as far as possible that:
+
+- mobile behavior is covered
+- tablet behavior is covered
+- desktop behavior is covered
 - loading/empty/error states remain functional
 - existing business behavior has not unintentionally changed
-
-Do not claim validation passed if a command failed.
 
 ---
 
@@ -200,24 +220,25 @@ If the target is `main`:
 
 Never force-push unless explicitly instructed.
 
-Never overwrite unrelated uncommitted work.
+Never overwrite unrelated work.
 
-Before pushing, verify:
+Before pushing, verify remotely where possible:
 
-- current branch
-- git status
-- final diff
-- commit SHA
+- target branch
+- intended changed files/diff
+- commit being created/pushed
 
 ---
 
 ## 8. VERIFY REMOTE PUSH
 
-A successful `git push` command alone is not sufficient verification.
+A successful write/push operation alone is not sufficient verification.
 
-After pushing, independently verify the remote branch state and confirm that the expected commit is present on the requested remote branch.
+After pushing, independently read the remote branch or commit state and confirm that the expected commit is present on the requested remote branch.
 
-Compare the pushed/local commit SHA with the remote branch SHA whenever possible.
+Compare the expected commit SHA with the remote branch SHA whenever possible.
+
+Then inspect relevant GitHub Actions / CI status for that commit when available.
 
 Only report a successful push when the expected commit is actually present remotely.
 
@@ -232,13 +253,13 @@ Keep the final response concise and operational.
 Preferred format:
 
 - ✅ Implementation completed
-- ✅ Relevant checks passed
+- ✅ Remote validation passed, or clearly state what was unavailable
 - ✅ Push verified on `<target>`
 - Commit: `<sha>`
 
 Mention only meaningful caveats.
 
-If push or verification failed, say so explicitly.
+If push, CI, or verification failed, say so explicitly.
 
 ---
 
