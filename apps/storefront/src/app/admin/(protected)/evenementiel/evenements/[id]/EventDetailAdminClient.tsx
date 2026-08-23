@@ -100,14 +100,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
     router.refresh();
   }
 
-  async function refundReservation(id: string) {
-    const reservation = reservations.find((item) => item.id === id);
-    const customer = reservation?.customer_name ? ` pour ${reservation.customer_name}` : '';
-    const confirmed = window.confirm(
-      `Confirmer le remboursement${customer} ?\n\nCette action rembourse la réservation et libère les places correspondantes. Elle ne doit être utilisée qu’après vérification du paiement et de la demande client.`,
-    );
-    if (!confirmed) return;
-
+  async function refundReservation(id: string): Promise<boolean> {
     setReservationError(null);
     setRefundingId(id);
     try {
@@ -115,12 +108,14 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
       const result = await res.json().catch(() => ({}));
       if (!res.ok) {
         setReservationError(result.error ?? 'Erreur lors du remboursement.');
-        return;
+        return false;
       }
       setReservations((prev) => prev.map((reservationItem) => reservationItem.id === id ? { ...reservationItem, status: 'refunded' } : reservationItem));
       router.refresh();
+      return true;
     } catch {
       setReservationError('Erreur réseau lors du remboursement.');
+      return false;
     } finally {
       setRefundingId(null);
     }
