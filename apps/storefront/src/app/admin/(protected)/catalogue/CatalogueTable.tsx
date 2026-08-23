@@ -9,6 +9,7 @@ import {
   IconCheck,
   IconChevronLeft,
   IconChevronRight,
+  IconCopy,
   IconDotsVertical,
   IconPhoto,
   IconPlus,
@@ -50,6 +51,10 @@ interface Props {
 }
 
 const PAGE_SIZE = 25;
+
+function closeMenu(target: EventTarget & HTMLElement) {
+  target.closest('details')?.removeAttribute('open');
+}
 
 export default function CatalogueTable({
   tenantCurrency,
@@ -154,6 +159,15 @@ export default function CatalogueTable({
     }
   }
 
+  async function copySlug(slug: string) {
+    try {
+      await navigator.clipboard.writeText(slug);
+      setFeedback('Slug copié');
+    } catch {
+      setFeedback('Erreur lors de la copie');
+    }
+  }
+
   async function saveStock(productId: string, nextValue: number) {
     const current = products.find((p) => p.id === productId)?.stock ?? 0;
     setStockValues((prev) => ({ ...prev, [productId]: nextValue }));
@@ -196,6 +210,42 @@ export default function CatalogueTable({
 
   const filtersActive = Boolean(category || status !== 'all' || sort !== 'position_asc');
 
+  function ActionMenu({ product }: { product: Product }) {
+    const active = activeStates[product.id] ?? product.active;
+    return (
+      <details className="relative">
+        <summary
+          aria-label={`Plus d'actions pour ${product.name}`}
+          className="flex cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        >
+          <IconDotsVertical size={16} />
+        </summary>
+        <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 text-left shadow-xl">
+          <button
+            type="button"
+            onClick={(e) => {
+              closeMenu(e.currentTarget);
+              void toggleActive(product.id);
+            }}
+            className="flex min-h-10 w-full items-center rounded-lg px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            {active ? 'Désactiver' : 'Activer'}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              closeMenu(e.currentTarget);
+              void copySlug(product.slug);
+            }}
+            className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <IconCopy size={15} /> Copier le slug
+          </button>
+        </div>
+      </details>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-4 pb-24 md:pb-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -206,10 +256,7 @@ export default function CatalogueTable({
           </div>
           <p className="mt-1 text-sm text-gray-500">Gérez rapidement disponibilité, stock et contenu.</p>
         </div>
-        <Link
-          href="/admin/catalogue/nouveau"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90"
-        >
+        <Link href="/admin/catalogue/nouveau" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90">
           <IconPlus size={18} /> Nouveau produit
         </Link>
       </div>
@@ -218,17 +265,8 @@ export default function CatalogueTable({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
             <IconSearch size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher nom, slug, catégorie ou code-barres…"
-              className="min-h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} aria-label="Effacer" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 hover:bg-gray-100">
-                <IconX size={16} />
-              </button>
-            )}
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher nom, slug, catégorie ou code-barres…" className="min-h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[var(--color-primary)]" />
+            {search && <button onClick={() => setSearch('')} aria-label="Effacer" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 hover:bg-gray-100"><IconX size={16} /></button>}
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">
@@ -239,17 +277,7 @@ export default function CatalogueTable({
               ['out', `Rupture${status === 'out' ? ` (${statusCounts.out})` : ''}`],
               ['ai', `IA à revoir${status === 'ai' ? ` (${statusCounts.ai})` : ''}`],
             ] as const).map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => setStatus(value)}
-                className={`min-h-10 shrink-0 rounded-xl border px-3 text-xs font-semibold transition ${
-                  status === value
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
+              <button key={value} onClick={() => setStatus(value)} className={`min-h-10 shrink-0 rounded-xl border px-3 text-xs font-semibold transition ${status === value ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>{label}</button>
             ))}
           </div>
         </div>
@@ -268,11 +296,7 @@ export default function CatalogueTable({
             <option value="stock_asc">Stock croissant</option>
             <option value="stock_desc">Stock décroissant</option>
           </select>
-          <button
-            onClick={() => { setCategory(''); setSort('position_asc'); setStatus('all'); }}
-            disabled={!filtersActive}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 px-3 text-sm text-gray-600 disabled:opacity-40"
-          >
+          <button onClick={() => { setCategory(''); setSort('position_asc'); setStatus('all'); }} disabled={!filtersActive} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 px-3 text-sm text-gray-600 disabled:opacity-40">
             <IconAdjustments size={16} /> Réinitialiser
           </button>
         </div>
@@ -287,13 +311,9 @@ export default function CatalogueTable({
         </div>
       )}
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <IconAlertTriangle size={18} /> {error}
-        </div>
-      )}
+      {error && <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><IconAlertTriangle size={18} /> {error}</div>}
 
-      <div className="hidden overflow-hidden rounded-2xl border border-gray-200 bg-white md:block">
+      <div className="hidden overflow-visible rounded-2xl border border-gray-200 bg-white md:block">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
             <tr>
@@ -303,7 +323,7 @@ export default function CatalogueTable({
               <th className="px-4 py-3">Prix</th>
               <th className="px-4 py-3">Stock</th>
               <th className="px-4 py-3">Statut</th>
-              <th className="w-28 px-4 py-3 text-right">Actions</th>
+              <th className="w-32 px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -322,10 +342,7 @@ export default function CatalogueTable({
                         {product.image_url ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" /> : <IconPhoto size={18} className="text-gray-300" />}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate font-semibold text-gray-900">{product.name}</p>
-                          {product.description_source === 'ai' && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">IA</span>}
-                        </div>
+                        <div className="flex items-center gap-2"><p className="truncate font-semibold text-gray-900">{product.name}</p>{product.description_source === 'ai' && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">IA</span>}</div>
                         <p className="truncate font-mono text-xs text-gray-400">{product.slug}</p>
                       </div>
                     </div>
@@ -333,24 +350,13 @@ export default function CatalogueTable({
                   <td className="px-4 py-3 text-gray-600">{product.categories?.name ?? '—'}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{formatPrice(product.price, tenantCurrency)}</td>
                   <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      min={0}
-                      value={stock}
-                      onChange={(e) => setStockValues((prev) => ({ ...prev, [product.id]: Math.max(0, Number(e.target.value) || 0) }))}
-                      onBlur={(e) => saveStock(product.id, Math.max(0, Number(e.target.value) || 0))}
-                      className={`w-20 rounded-lg border px-2 py-1.5 text-center text-sm font-semibold ${stock === 0 ? 'border-red-200 bg-red-50 text-red-600' : stock < 10 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-700'}`}
-                    />
+                    <input type="number" min={0} value={stock} onChange={(e) => setStockValues((prev) => ({ ...prev, [product.id]: Math.max(0, Number(e.target.value) || 0) }))} onBlur={(e) => saveStock(product.id, Math.max(0, Number(e.target.value) || 0))} className={`w-20 rounded-lg border px-2 py-1.5 text-center text-sm font-semibold ${stock === 0 ? 'border-red-200 bg-red-50 text-red-600' : stock < 10 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-700'}`} />
                   </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => toggleActive(product.id)} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeStates[product.id] ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {activeStates[product.id] ? 'Actif' : 'Inactif'}
-                    </button>
-                  </td>
+                  <td className="px-4 py-3"><button onClick={() => toggleActive(product.id)} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeStates[product.id] ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{activeStates[product.id] ? 'Actif' : 'Inactif'}</button></td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-1">
                       <Link href={`/admin/catalogue/${product.id}`} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">Modifier</Link>
-                      <button aria-label="Plus d'actions" className="rounded-lg border border-gray-200 p-2 text-gray-500"><IconDotsVertical size={16} /></button>
+                      <ActionMenu product={product} />
                     </div>
                   </td>
                 </tr>
@@ -371,37 +377,19 @@ export default function CatalogueTable({
             <div key={product.id} className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
               <div className="flex gap-3">
                 <button onClick={() => toggleSelection(product.id)} className="self-start pt-1"><input type="checkbox" checked={selected.has(product.id)} readOnly aria-label={`Sélectionner ${product.name}`} /></button>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100">
-                  {product.image_url ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" /> : <IconPhoto size={22} className="text-gray-300" />}
-                </div>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100">{product.image_url ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" /> : <IconPhoto size={22} className="text-gray-300" />}</div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-gray-950">{product.name}</p>
-                      <p className="truncate text-xs text-gray-400">{product.categories?.name ?? 'Sans catégorie'}</p>
-                    </div>
-                    <button onClick={() => toggleActive(product.id)} className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${activeStates[product.id] ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {activeStates[product.id] ? 'Actif' : 'Inactif'}
-                    </button>
+                    <div className="min-w-0"><p className="truncate font-semibold text-gray-950">{product.name}</p><p className="truncate text-xs text-gray-400">{product.categories?.name ?? 'Sans catégorie'}</p></div>
+                    <button onClick={() => toggleActive(product.id)} className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${activeStates[product.id] ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{activeStates[product.id] ? 'Actif' : 'Inactif'}</button>
                   </div>
-                  <div className="mt-2 flex items-center gap-3 text-sm">
-                    <span className="font-semibold text-gray-900">{formatPrice(product.price, tenantCurrency)}</span>
-                    <span className={stock === 0 ? 'font-semibold text-red-600' : stock < 10 ? 'font-semibold text-amber-700' : 'text-gray-500'}>Stock {stock}</span>
-                    {product.description_source === 'ai' && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">IA</span>}
-                  </div>
+                  <div className="mt-2 flex items-center gap-3 text-sm"><span className="font-semibold text-gray-900">{formatPrice(product.price, tenantCurrency)}</span><span className={stock === 0 ? 'font-semibold text-red-600' : stock < 10 ? 'font-semibold text-amber-700' : 'text-gray-500'}>Stock {stock}</span>{product.description_source === 'ai' && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">IA</span>}</div>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 border-t border-gray-100 pt-3">
-                <input
-                  type="number"
-                  min={0}
-                  value={stock}
-                  onChange={(e) => setStockValues((prev) => ({ ...prev, [product.id]: Math.max(0, Number(e.target.value) || 0) }))}
-                  onBlur={(e) => saveStock(product.id, Math.max(0, Number(e.target.value) || 0))}
-                  className="min-h-10 rounded-xl border border-gray-200 px-3 text-sm"
-                  aria-label={`Stock ${product.name}`}
-                />
+              <div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-2 border-t border-gray-100 pt-3">
+                <input type="number" min={0} value={stock} onChange={(e) => setStockValues((prev) => ({ ...prev, [product.id]: Math.max(0, Number(e.target.value) || 0) }))} onBlur={(e) => saveStock(product.id, Math.max(0, Number(e.target.value) || 0))} className="min-h-10 rounded-xl border border-gray-200 px-3 text-sm" aria-label={`Stock ${product.name}`} />
                 <Link href={`/admin/catalogue/${product.id}`} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">Modifier</Link>
+                <ActionMenu product={product} />
               </div>
             </div>
           );
