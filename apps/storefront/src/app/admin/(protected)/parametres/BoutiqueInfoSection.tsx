@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { IconBuildingStore } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
+const LABEL_CLS = 'mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300';
 
 interface BoutiqueInfoSectionProps {
   tagline: string | null;
@@ -61,60 +62,56 @@ export function BoutiqueInfoSection({
   }
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 p-5">
-      <h2 className="text-sm font-semibold text-gray-700 mb-1">Infos boutique</h2>
-      <p className="text-xs text-gray-400 mb-4">
-        Affichées sur la boutique et la carte digitale.
-      </p>
-
-      {toast && (
-        <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-          {toast.msg}
+    <section className="overflow-hidden rounded-2xl border border-[#E8E4FF] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <header className="flex items-start gap-3 border-b border-[#E8E4FF] bg-[var(--admin-primary-soft)] px-4 py-3.5 dark:border-gray-800 dark:bg-gray-900">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80 text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800">
+          <IconBuildingStore size={19} stroke={1.7} />
         </div>
-      )}
-
-      <div className="space-y-4 mb-4">
         <div>
-          <label className={LABEL_CLS}>Slogan</label>
-          <input type="text" value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} placeholder="ex: Les saveurs de chez nous" className={INPUT_CLS} />
+          <h2 className="text-sm font-semibold text-[var(--admin-primary-fg)] dark:text-violet-200">Boutique</h2>
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Informations visibles par vos clients</p>
         </div>
+      </header>
 
-        <div>
-          <label className={LABEL_CLS}>Numéro WhatsApp</label>
-          <input type="text" value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} className={INPUT_CLS} />
-          <p className="text-xs text-gray-400 mt-1">Format international sans espaces ni symboles, ex: 393296958822</p>
-        </div>
+      <div className="p-4 sm:p-5">
+        {toast && (
+          <div className={`mb-4 rounded-lg px-3 py-2 text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {toast.msg}
+          </div>
+        )}
 
-        <div>
-          <label className={LABEL_CLS}>Adresse click & collect</label>
-          <textarea value={form.click_collect_address} onChange={(e) => setForm({ ...form, click_collect_address: e.target.value })} rows={2} className={`${INPUT_CLS} resize-none`} />
-        </div>
-
-        <div>
-          <label className={LABEL_CLS}>Lien Google Maps</label>
-          <input
-            type="url"
-            value={form.google_maps_url}
-            onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })}
-            placeholder="https://maps.app.goo.gl/..."
-            className={INPUT_CLS}
-          />
-          <p className="text-xs text-gray-400 mt-1">Lien vers la fiche ou la position exacte de l&apos;établissement sur Google Maps.</p>
-        </div>
-
-        <div>
-          <label className={LABEL_CLS}>Horaires click & collect</label>
-          <input type="text" value={form.click_collect_hours} onChange={(e) => setForm({ ...form, click_collect_hours: e.target.value })} className={INPUT_CLS} />
-        </div>
-
-        <div>
-          <label className={LABEL_CLS}>Horaires click & collect (italien)</label>
-          <input type="text" value={form.click_collect_hours_it} onChange={(e) => setForm({ ...form, click_collect_hours_it: e.target.value })} placeholder="ex: Lun-Sab: 9h-20h · Dom: 10h-19h" className={INPUT_CLS} />
-          <p className="text-xs text-gray-400 mt-1">Si vide, le français sera affiché même en italien.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLS}>Slogan</label>
+            <input type="text" value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} placeholder="ex: Les saveurs de chez nous" className={INPUT_CLS} />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>WhatsApp</label>
+            <input type="text" value={form.whatsapp_number} onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value })} className={INPUT_CLS} />
+            <p className="mt-1 text-xs text-gray-500">Format international sans espaces ni symboles.</p>
+          </div>
+          <div>
+            <label className={LABEL_CLS}>Lien Google Maps</label>
+            <input type="url" value={form.google_maps_url} onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })} placeholder="https://maps.app.goo.gl/..." className={INPUT_CLS} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLS}>Adresse click & collect</label>
+            <textarea value={form.click_collect_address} onChange={(e) => setForm({ ...form, click_collect_address: e.target.value })} rows={2} className={`${INPUT_CLS} resize-none`} />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>Horaires click & collect</label>
+            <input type="text" value={form.click_collect_hours} onChange={(e) => setForm({ ...form, click_collect_hours: e.target.value })} className={INPUT_CLS} />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>Horaires (italien)</label>
+            <input type="text" value={form.click_collect_hours_it} onChange={(e) => setForm({ ...form, click_collect_hours_it: e.target.value })} placeholder="ex: Lun-Sab: 9h-20h" className={INPUT_CLS} />
+          </div>
         </div>
       </div>
 
-      <Button onClick={handleSave} loading={isSaving}>Enregistrer</Button>
+      <footer className="flex justify-end border-t border-[#E8E4FF] bg-[#FCFBFF] px-4 py-3 dark:border-gray-800 dark:bg-gray-900/80">
+        <Button onClick={handleSave} loading={isSaving}>Enregistrer</Button>
+      </footer>
     </section>
   );
 }
