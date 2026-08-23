@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { IconArrowRight, IconCalendarEvent, IconClock, IconFileDescription, IconPackage } from '@tabler/icons-react';
+import { IconArrowRight, IconCalendarEvent, IconCheck, IconClock, IconFileDescription, IconPackage } from '@tabler/icons-react';
 import type { OverviewAction, OverviewEvent, OverviewInquiry, OverviewRental } from '@/lib/admin/evenementiel/getEvenementielOverview';
 
 type MetricTone = 'neutral' | 'amber' | 'green' | 'red';
@@ -23,17 +23,19 @@ export function OverviewMetricCard({
   tone?: MetricTone;
 }) {
   return (
-    <div className={`rounded-xl border bg-white dark:bg-gray-900 p-4 ${metricToneClass[tone]}`}>
+    <div className={`rounded-xl border bg-white px-4 py-3 dark:bg-gray-900 ${metricToneClass[tone]}`}>
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-950 dark:text-white">{value}</p>
-      {detail && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{detail}</p>}
+      <div className="mt-1 flex min-h-8 items-end gap-2">
+        <p className="text-[1.65rem] font-semibold leading-none tabular-nums text-gray-950 dark:text-white">{value}</p>
+        {detail && <p className="pb-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">{detail}</p>}
+      </div>
     </div>
   );
 }
 
 const actionToneClass = {
-  urgent: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
-  attention: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+  urgent: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+  attention: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
   default: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
 };
 
@@ -45,16 +47,18 @@ export function EventActionList({ actions }: { actions: OverviewAction[] }) {
         <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Priorisé par urgence opérationnelle.</p>
       </div>
       {actions.length === 0 ? (
-        <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Tout est à jour</div>
+        <div className="flex items-center gap-2 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+          <IconCheck size={16} className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" /> Tout est à jour
+        </div>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {actions.map((action) => (
             <Link
               key={action.id}
               href={action.href}
-              className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] dark:hover:bg-white/5"
+              className="flex min-h-14 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] dark:hover:bg-white/5"
             >
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${actionToneClass[action.tone]}`} aria-hidden="true" />
+              <span className={`shrink-0 rounded-md px-2 py-1 text-2xs font-semibold ${actionToneClass[action.tone]}`}>{action.kind}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">{action.label}</span>
                 {action.detail && <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{action.detail}</span>}
@@ -75,6 +79,13 @@ const EVENT_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Annulé',
 };
 
+const EVENT_STATUS_CLASS: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  published: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  closed: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+  cancelled: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+};
+
 export function UpcomingEvents({ events }: { events: OverviewEvent[] }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -88,7 +99,7 @@ export function UpcomingEvents({ events }: { events: OverviewEvent[] }) {
         </Link>
       </div>
       {events.length === 0 ? (
-        <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Aucun événement à venir</div>
+        <div className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">Aucun événement à venir</div>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {events.map((event) => {
@@ -103,18 +114,18 @@ export function UpcomingEvents({ events }: { events: OverviewEvent[] }) {
                 <div className="flex items-start gap-3">
                   <IconCalendarEvent size={18} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{event.title}</p>
-                      <span className="text-2xs font-semibold text-gray-500 dark:text-gray-400">{EVENT_STATUS_LABEL[event.status] ?? event.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${EVENT_STATUS_CLASS[event.status] ?? EVENT_STATUS_CLASS.draft}`}>{EVENT_STATUS_LABEL[event.status] ?? event.status}</span>
                     </div>
                     <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                       {new Date(event.date_start).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}
                     </p>
                     <div className="mt-2 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                         <div className="h-full rounded-full bg-[var(--color-primary)]" style={{ width: `${ratio}%` }} />
                       </div>
-                      <span className="shrink-0 text-xs tabular-nums text-gray-600 dark:text-gray-300">{reserved} / {event.capacity_total} places</span>
+                      <span className="shrink-0 text-xs font-medium tabular-nums text-gray-600 dark:text-gray-300">{reserved} / {event.capacity_total} places</span>
                     </div>
                   </div>
                 </div>
@@ -140,7 +151,7 @@ export function RecentInquiries({ inquiries }: { inquiries: OverviewInquiry[] })
         </Link>
       </div>
       {inquiries.length === 0 ? (
-        <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Aucune nouvelle demande</div>
+        <div className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">Aucune nouvelle demande</div>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {inquiries.map((inquiry) => (
@@ -183,7 +194,7 @@ export function UpcomingRentals({ rentals }: { rentals: OverviewRental[] }) {
         </Link>
       </div>
       {rentals.length === 0 ? (
-        <div className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Aucune location à préparer</div>
+        <div className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">Aucune location à préparer</div>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {rentals.map((rental) => {
