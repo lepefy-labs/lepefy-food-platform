@@ -13,18 +13,59 @@ function revalidateEventPaths(eventSlug: string | undefined) {
 const EDITABLE_FIELDS = ['label', 'description', 'price', 'sort_order', 'active', 'badge'] as const;
 
 export async function PATCH(req: NextRequest, { params }: { params: { ticketId: string } }) {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const body  = await req.json() as Record<string, unknown>;
+  const body = await req.json() as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
 
   for (const field of EDITABLE_FIELDS) {
     if (body[field] === undefined) continue;
-    patch[field] = body[field];
+
+    if (field === 'label') {
+      if (typeof body.label !== 'string' || !body.label.trim()) {
+        return NextResponse.json({ error: 'Le libellé est requis.' }, { status: 400 });
+      }
+      patch.label = body.label.trim();
+      continue;
+    }
+
+    if (field === 'price') {
+      const price = Number(body.price);
+      if (!Number.isFinite(price) || price < 0) {
+        return NextResponse.json({ error: 'Le prix doit être un nombre positif ou nul.' }, { status: 400 });
+      }
+      patch.price = price;
+      continue;
+    }
+
+    if (field === 'description' || field === 'badge') {
+      const value = body[field];
+      if (value !== null && typeof value !== 'string') {
+        return NextResponse.json({ error: `${field} doit être une chaîne ou null.` }, { status: 400 });
+      }
+      patch[field] = typeof value === 'string' ? value.trim() || null : null;
+      continue;
+    }
+
+    if (field === 'active') {
+      if (typeof body.active !== 'boolean') {
+        return NextResponse.json({ error: 'active doit être un booléen.' }, { status: 400 });
+      }
+      patch.active = body.active;
+      continue;
+    }
+
+    if (field === 'sort_order') {
+      const sortOrder = Number(body.sort_order);
+      if (!Number.isInteger(sortOrder)) {
+        return NextResponse.json({ error: 'sort_order doit être un entier.' }, { status: 400 });
+      }
+      patch.sort_order = sortOrder;
+    }
   }
 
   if (Object.keys(patch).length === 0) {
@@ -32,7 +73,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { ticketId: 
   }
 
   const supabase = createServiceClient();
-
   const { data, error } = await supabase
     .from('event_ticket_types')
     .update(patch)
@@ -51,7 +91,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { ticketId: 
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { ticketId: string } }) {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
   const denied = await requireAdmin(tenant.id);
@@ -73,8 +113,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { ticketId
     .eq('ticket_type_id', params.ticketId);
 
   if (count && count > 0) {
-    // Des réservations existent déjà pour cette formule — on la désactive
-    // plutôt que de la supprimer, pour ne jamais casser l'historique.
     const { data, error } = await supabase
       .from('event_ticket_types')
       .update({ active: false })
