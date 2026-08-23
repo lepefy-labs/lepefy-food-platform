@@ -18,7 +18,7 @@ Use connected GitHub capabilities and approved remote CI/deployment systems such
 
 Follow this sequence:
 
-`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> VALIDATE -> FIX LOOP -> PUSH/VERIFY -> COMPLETE`
+`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> VALIDATE -> FIX LOOP -> PUSH -> VERIFY REMOTE SHA -> VERIFY VERCEL -> COMPLETE`
 
 There is exactly one normal approval gate: between POST MOCKUP and implementation.
 
@@ -221,12 +221,27 @@ A successful write/push call alone is not enough.
 
 After the final push:
 
-- independently read the remote branch/commit state
-- confirm the expected commit is on the requested target
-- inspect relevant GitHub CI
-- inspect Vercel deployment/build status when the project uses Vercel and access is available
+1. Independently read the requested remote branch.
+2. Confirm the expected final commit SHA is present on that target.
+3. Inspect relevant GitHub CI when available.
+4. If the project uses Vercel and access is available, locate the Vercel deployment whose Git commit SHA matches the expected final commit.
+5. Treat `QUEUED`, `INITIALIZING`, `BUILDING`, or equivalent deployment states as **in progress**, never as completion.
+6. Do **not** send a completion response until that matching deployment reaches `READY` / successful production state.
+7. If the matching deployment reaches `ERROR`, `FAILED`, `CANCELED`, or another unsuccessful terminal state:
+   - inspect the actual Vercel build/deployment logs,
+   - diagnose the failure,
+   - fix implementation-introduced issues autonomously,
+   - push the corrective commit,
+   - verify the new remote SHA,
+   - locate the new matching Vercel deployment,
+   - repeat until it reaches `READY`.
+8. If a deployment failure is genuinely external or pre-existing and cannot reasonably be fixed within the approved scope, report it as a blocker with evidence instead of claiming completion.
 
-If deployment fails because of the implementation, fix it and continue automatically.
+The deployment being `READY` is part of the definition of done whenever Vercel is the repository's production deployment path and the deployment is observable by the agent.
+
+Never infer success from "Build Completed" log text alone if the deployment state has not yet become `READY`.
+Never treat a deployment for an older commit as validation of the final commit.
+Never declare the run complete while the final matching deployment is still queued or building.
 
 Only report success once the expected remote state is verified and the relevant available validation/deployment checks are successful.
 
@@ -234,13 +249,13 @@ Only report success once the expected remote state is verified and the relevant 
 
 ## 9. FINAL RESPONSE
 
-Do not send a final completion response while approved implementation work remains unfinished.
+Do not send a final completion response while approved implementation work remains unfinished or while the final matching Vercel deployment is still in progress.
 
 When complete, keep the response concise and operational, for example:
 
 - ✅ Full approved implementation completed
 - ✅ Remote validation passed
-- ✅ Vercel deployment verified (when applicable)
+- ✅ Vercel deployment `READY` verified for final commit (when applicable)
 - ✅ Push verified on `<target>`
 - Final commit: `<sha>`
 
