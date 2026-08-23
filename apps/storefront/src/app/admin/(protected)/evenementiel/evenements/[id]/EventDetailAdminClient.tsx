@@ -1,25 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type {
-  EventHighlight,
-  EventReservation,
-  EventReservationRequest,
-  EventReservationStatus,
-  EventRow,
-  EventStatus,
-  EventTicketType,
-} from '@lepefy/types';
+import { useRouter, useSearchParams } from 'next/navigation';
+import type { EventHighlight, EventReservation, EventReservationRequest, EventReservationStatus, EventRow, EventStatus, EventTicketType } from '@lepefy/types';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
 import { EventAdminHeader, type EventAdminTab } from './_components/EventAdminHeader';
 import EventSummaryTab from './_components/EventSummaryTab';
 import EventReservationsTab from './_components/EventReservationsTab';
 import EventTicketingTab from './_components/EventTicketingTab';
 import EventPageTab from './_components/EventPageTab';
-
-const MAX_HIGHLIGHTS = 3;
-const VALID_TABS: EventAdminTab[] = ['summary', 'reservations', 'ticketing', 'page'];
 
 interface Props {
   event: EventRow;
@@ -29,29 +18,24 @@ interface Props {
   currency: string;
 }
 
-export default function EventDetailAdminClient({
-  event: initialEvent,
-  initialTicketTypes,
-  initialReservations,
-  initialPendingRequests,
-  currency,
-}: Props) {
+const VALID_TABS: EventAdminTab[] = ['summary', 'reservations', 'ticketing', 'page'];
+const MAX_HIGHLIGHTS = 3;
+
+export default function EventDetailAdminClient({ event: initialEvent, initialTicketTypes, initialReservations, initialPendingRequests, currency }: Props) {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab') as EventAdminTab | null;
-  const [activeTab, setActiveTab] = useState<EventAdminTab>(requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : 'summary');
+  const activeTab: EventAdminTab = requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : 'summary';
 
   const [event, setEvent] = useState(initialEvent);
   const [ticketTypes, setTicketTypes] = useState(initialTicketTypes);
   const [reservations, setReservations] = useState(initialReservations);
   const [pendingRequests, setPendingRequests] = useState(initialPendingRequests);
-
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const [reservationSearch, setReservationSearch] = useState('');
-  const [reservationStatus, setReservationStatus] = useState<'all' | EventReservationStatus>('all');
+  const [reservationStatusFilter, setReservationStatusFilter] = useState<'all' | EventReservationStatus>('all');
   const [refundingId, setRefundingId] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
@@ -63,30 +47,28 @@ export default function EventDetailAdminClient({
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
 
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [subtitle, setSubtitle] = useState(initialEvent.subtitle ?? '');
   const [highlights, setHighlights] = useState<EventHighlight[]>(initialEvent.highlights ?? []);
-  const [savingPageContent, setSavingPageContent] = useState(false);
-  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [savingPage, setSavingPage] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pageSaved, setPageSaved] = useState(false);
 
-  function changeTab(tab: EventAdminTab) {
-    setActiveTab(tab);
+  function setTab(tab: EventAdminTab) {
     const params = new URLSearchParams(searchParams.toString());
     if (tab === 'summary') params.delete('tab');
     else params.set('tab', tab);
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    router.push(query ? `?${query}` : '?');
   }
 
   async function updateStatus(status: EventStatus) {
     setStatusError(null);
     if (status === 'published' && ticketTypes.filter((ticket) => ticket.active).length === 0) {
       setStatusError('Impossible de publier un événement sans au moins une formule active.');
-      changeTab('ticketing');
       return;
     }
-
     setSavingStatus(true);
     try {
       const res = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
@@ -119,7 +101,13 @@ export default function EventDetailAdminClient({
   }
 
   async function refundReservation(id: string) {
-    if (!window.confirm('Rembourser cette réservation et libérer les places ?')) return;
+    const reservation = reservations.find((item) => item.id === id);
+    const customer = reservation?.customer_name ? ` pour ${reservation.customer_name}` : '';
+    const confirmed = window.confirm(
+      `Confirmer le remboursement${customer} ?\n\nCette action rembourse la réservation et libère les places correspondantes. Elle ne doit être utilisée qu’après vérification du paiement et de la demande client.`,
+    );
+    if (!confirmed) return;
+
     setReservationError(null);
     setRefundingId(id);
     try {
@@ -129,7 +117,7 @@ export default function EventDetailAdminClient({
         setReservationError(result.error ?? 'Erreur lors du remboursement.');
         return;
       }
-      setReservations((prev) => prev.map((reservation) => reservation.id === id ? { ...reservation, status: 'refunded' } : reservation));
+      setReservations((prev) => prev.map((reservationItem) => reservationItem.id === id ? { ...reservationItem, status: 'refunded' } : reservationItem));
       router.refresh();
     } catch {
       setReservationError('Erreur réseau lors du remboursement.');
@@ -284,14 +272,14 @@ export default function EventDetailAdminClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ banner_image_url: uploadResult.imageUrl }),
       });
-      const patchResult = await patchRes.json();
+      const result = await patchRes.json();
       if (!patchRes.ok) {
-        setPageError(patchResult.error ?? 'Erreur lors de l’enregistrement de la bannière.');
+        setPageError(result.error ?? 'Erreur lors de l’enregistrement de la bannière.');
         return;
       }
-      setEvent(patchResult as EventRow);
+      setEvent(result as EventRow);
     } catch {
-      setPageError('Erreur réseau lors du téléversement de la bannière.');
+      setPageError('Erreur réseau lors de la bannière.');
     } finally {
       setUploadingBanner(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -299,25 +287,27 @@ export default function EventDetailAdminClient({
   }
 
   function addHighlight() {
-    setHighlights((prev) => prev.length >= MAX_HIGHLIGHTS ? prev : [...prev, { icon: HIGHLIGHT_ICON_OPTIONS[0]?.key ?? 'flame', title: '', text: '' }]);
+    setHighlights((prev) => prev.length >= MAX_HIGHLIGHTS ? prev : [...prev, { icon: HIGHLIGHT_ICON_OPTIONS[0]?.key ?? 'sparkles', title: '', text: '' }]);
   }
 
   function updateHighlight(index: number, field: keyof EventHighlight, value: string) {
-    setHighlights((prev) => prev.map((highlight, i) => i === index ? { ...highlight, [field]: value } : highlight));
+    setHighlights((prev) => prev.map((highlight, currentIndex) => currentIndex === index ? { ...highlight, [field]: value } : highlight));
+    setPageSaved(false);
   }
 
   function removeHighlight(index: number) {
-    setHighlights((prev) => prev.filter((_, i) => i !== index));
+    setHighlights((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+    setPageSaved(false);
   }
 
   async function savePageContent() {
     setPageError(null);
+    setPageSaved(false);
     const cleaned = highlights
       .filter((highlight) => highlight.title.trim() || highlight.text.trim())
       .slice(0, MAX_HIGHLIGHTS)
       .map((highlight) => ({ icon: highlight.icon, title: highlight.title.trim(), text: highlight.text.trim() }));
-
-    setSavingPageContent(true);
+    setSavingPage(true);
     try {
       const res = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
         method: 'PATCH',
@@ -330,97 +320,78 @@ export default function EventDetailAdminClient({
         return;
       }
       setEvent(result as EventRow);
-      setSubtitle(result.subtitle ?? '');
-      setHighlights((result.highlights ?? []) as EventHighlight[]);
-      router.refresh();
+      setHighlights(cleaned);
+      setPageSaved(true);
     } catch {
       setPageError('Erreur réseau lors de l’enregistrement.');
     } finally {
-      setSavingPageContent(false);
+      setSavingPage(false);
     }
   }
 
   return (
     <div>
-      <EventAdminHeader
-        event={event}
-        activeTab={activeTab}
-        onTabChange={changeTab}
-        onStatusChange={updateStatus}
-        savingStatus={savingStatus}
-        statusError={statusError}
-      />
+      <EventAdminHeader event={event} activeTab={activeTab} onTabChange={setTab} onStatusChange={updateStatus} savingStatus={savingStatus} statusError={statusError} />
 
-      <div role="tabpanel">
-        {activeTab === 'summary' && (
-          <EventSummaryTab
-            event={event}
-            ticketTypes={ticketTypes}
-            reservations={reservations}
-            pendingRequests={pendingRequests}
-            currency={currency}
-            onPendingConfirmed={onPendingConfirmed}
-            onOpenReservations={() => changeTab('reservations')}
-            onOpenPage={() => changeTab('page')}
-            onCloseEvent={closeEvent}
-          />
-        )}
+      {activeTab === 'summary' && (
+        <EventSummaryTab
+          event={event}
+          ticketTypes={ticketTypes}
+          reservations={reservations}
+          pendingRequests={pendingRequests}
+          currency={currency}
+          onPendingConfirmed={onPendingConfirmed}
+          onOpenReservations={() => setTab('reservations')}
+          onOpenPage={() => setTab('page')}
+          onCloseEvent={closeEvent}
+        />
+      )}
 
-        {activeTab === 'reservations' && (
-          <EventReservationsTab
-            reservations={reservations}
-            currency={currency}
-            search={reservationSearch}
-            onSearchChange={setReservationSearch}
-            statusFilter={reservationStatus}
-            onStatusFilterChange={setReservationStatus}
-            editingEmailId={editingEmailId}
-            emailDraft={emailDraft}
-            onEmailDraftChange={setEmailDraft}
-            onStartEditEmail={startEditingEmail}
-            onCancelEditEmail={cancelEditingEmail}
-            onConfirmEmailEdit={confirmEmailEdit}
-            onResend={resendReservation}
-            onRefund={refundReservation}
-            resendingId={resendingId}
-            refundingId={refundingId}
-            resendFeedbackId={resendFeedbackId}
-            error={reservationError}
-          />
-        )}
+      {activeTab === 'reservations' && (
+        <EventReservationsTab
+          reservations={reservations}
+          currency={currency}
+          search={reservationSearch}
+          onSearchChange={setReservationSearch}
+          statusFilter={reservationStatusFilter}
+          onStatusFilterChange={setReservationStatusFilter}
+          editingEmailId={editingEmailId}
+          emailDraft={emailDraft}
+          onEmailDraftChange={setEmailDraft}
+          onStartEditEmail={startEditingEmail}
+          onCancelEditEmail={cancelEditingEmail}
+          onConfirmEmailEdit={confirmEmailEdit}
+          onResend={resendReservation}
+          onRefund={refundReservation}
+          resendingId={resendingId}
+          refundingId={refundingId}
+          resendFeedbackId={resendFeedbackId}
+          error={reservationError}
+        />
+      )}
 
-        {activeTab === 'ticketing' && (
-          <EventTicketingTab
-            ticketTypes={ticketTypes}
-            currency={currency}
-            addingTicket={addingTicket}
-            savingTicketId={savingTicketId}
-            ticketError={ticketError}
-            onCreate={createTicket}
-            onUpdate={updateTicket}
-            onRemove={removeTicket}
-          />
-        )}
+      {activeTab === 'ticketing' && (
+        <EventTicketingTab ticketTypes={ticketTypes} currency={currency} onCreate={createTicket} onUpdate={updateTicket} onRemove={removeTicket} adding={addingTicket} savingId={savingTicketId} error={ticketError} />
+      )}
 
-        {activeTab === 'page' && (
-          <EventPageTab
-            event={event}
-            subtitle={subtitle}
-            onSubtitleChange={setSubtitle}
-            highlights={highlights}
-            onAddHighlight={addHighlight}
-            onUpdateHighlight={updateHighlight}
-            onRemoveHighlight={removeHighlight}
-            onSave={savePageContent}
-            saving={savingPageContent}
-            error={pageError}
-            uploadingBanner={uploadingBanner}
-            fileInputRef={fileInputRef}
-            onBannerChange={handleBannerChange}
-            maxHighlights={MAX_HIGHLIGHTS}
-          />
-        )}
-      </div>
+      {activeTab === 'page' && (
+        <EventPageTab
+          event={event}
+          subtitle={subtitle}
+          onSubtitleChange={(value) => { setSubtitle(value); setPageSaved(false); }}
+          highlights={highlights}
+          onAddHighlight={addHighlight}
+          onUpdateHighlight={updateHighlight}
+          onRemoveHighlight={removeHighlight}
+          onBannerChange={handleBannerChange}
+          fileInputRef={fileInputRef}
+          uploadingBanner={uploadingBanner}
+          onSave={savePageContent}
+          saving={savingPage}
+          error={pageError}
+          saved={pageSaved}
+        />
+      )}
     </div>
   );
 }
