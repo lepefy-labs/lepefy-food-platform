@@ -78,15 +78,45 @@ export default function AdminSidebar({
       <button onClick={() => setEvenementielOpen(!evenementielOpen)} className={`mx-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${pathname.startsWith('/admin/evenementiel') ? navClass(true) : navClass(false)}`}>
         <IconCalendarEvent size={20} stroke={pathname.startsWith('/admin/evenementiel') ? 1.75 : 1.5} />
         <span className="flex-1">Événementiel</span>
-        {showEventParentBadge && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300">{eventAttentionCount}</span>}
+        {showEventParentBadge && (
+          <span
+            className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+            title={`${eventAttentionCount} paiements à vérifier dans le module événementiel`}
+            aria-label={`${eventAttentionCount} paiements à vérifier dans le module événementiel`}
+          >
+            {eventAttentionCount}
+          </span>
+        )}
         {evenementielOpen ? <IconChevronDown size={13} stroke={1.5} /> : <IconChevronRight size={13} stroke={1.5} />}
       </button>
       {evenementielOpen && (
         <div className="mb-1 ml-5 space-y-0.5 border-l border-gray-100 pl-3 dark:border-gray-800">
           <Link href="/admin/evenementiel" className={subClass(pathname === '/admin/evenementiel')}>Vue d’ensemble</Link>
-          <Link href="/admin/evenementiel/evenements" className={subClass(pathname.startsWith('/admin/evenementiel/evenements'))}><span className="flex-1">Événements</span>{pendingEventRequestsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300">{pendingEventRequestsCount}</span>}</Link>
+          <Link href="/admin/evenementiel/evenements" className={subClass(pathname.startsWith('/admin/evenementiel/evenements'))}>
+            <span className="flex-1">Événements</span>
+            {pendingEventRequestsCount > 0 && (
+              <span
+                className="rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+                title={`${pendingEventRequestsCount} paiement${pendingEventRequestsCount > 1 ? 's' : ''} à vérifier`}
+                aria-label={`${pendingEventRequestsCount} paiement${pendingEventRequestsCount > 1 ? 's' : ''} à vérifier`}
+              >
+                {pendingEventRequestsCount}
+              </span>
+            )}
+          </Link>
           <Link href="/admin/evenementiel/devis" className={subClass(pathname.startsWith('/admin/evenementiel/devis'))}>Demandes</Link>
-          <Link href="/admin/evenementiel/reservations-materiel" className={subClass(pathname.startsWith('/admin/evenementiel/reservations-materiel'))}><span className="flex-1">Locations</span>{pendingRentalRequestsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300">{pendingRentalRequestsCount}</span>}</Link>
+          <Link href="/admin/evenementiel/reservations-materiel" className={subClass(pathname.startsWith('/admin/evenementiel/reservations-materiel'))}>
+            <span className="flex-1">Locations</span>
+            {pendingRentalRequestsCount > 0 && (
+              <span
+                className="rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+                title={`${pendingRentalRequestsCount} paiement${pendingRentalRequestsCount > 1 ? 's' : ''} à vérifier`}
+                aria-label={`${pendingRentalRequestsCount} paiement${pendingRentalRequestsCount > 1 ? 's' : ''} à vérifier`}
+              >
+                {pendingRentalRequestsCount}
+              </span>
+            )}
+          </Link>
           <Link href="/admin/evenementiel/contenu" className={subClass(pathname.startsWith('/admin/evenementiel/contenu') || pathname.startsWith('/admin/evenementiel/services') || pathname.startsWith('/admin/evenementiel/galerie'))}>Contenu</Link>
           <Link href="/admin/evenementiel/scan" className={subClass(pathname.startsWith('/admin/evenementiel/scan'))}>Scan</Link>
         </div>
