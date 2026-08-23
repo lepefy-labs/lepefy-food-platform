@@ -28,6 +28,7 @@ export default function AdminSidebar({
   const [evenementielOpen, setEvenementielOpen] = useState(pathname.startsWith('/admin/evenementiel'));
   const [parametresOpen, setParametresOpen] = useState(pathname.startsWith('/admin/parametres'));
   const eventAttentionCount = pendingEventRequestsCount + pendingRentalRequestsCount;
+  const showEventParentBadge = pendingEventRequestsCount > 0 && pendingRentalRequestsCount > 0;
 
   function navClass(active: boolean) {
     return active
@@ -77,7 +78,7 @@ export default function AdminSidebar({
       <button onClick={() => setEvenementielOpen(!evenementielOpen)} className={`mx-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${pathname.startsWith('/admin/evenementiel') ? navClass(true) : navClass(false)}`}>
         <IconCalendarEvent size={20} stroke={pathname.startsWith('/admin/evenementiel') ? 1.75 : 1.5} />
         <span className="flex-1">Événementiel</span>
-        {eventAttentionCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300">{eventAttentionCount}</span>}
+        {showEventParentBadge && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300">{eventAttentionCount}</span>}
         {evenementielOpen ? <IconChevronDown size={13} stroke={1.5} /> : <IconChevronRight size={13} stroke={1.5} />}
       </button>
       {evenementielOpen && (
