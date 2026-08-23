@@ -385,6 +385,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
           saving={savingPage}
           error={pageError}
           saved={pageSaved}
+          maxHighlights={MAX_HIGHLIGHTS}
         />
       )}
     </div>
