@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { IconBuildingStore, IconCalendarEvent, IconCreditCard, IconId, IconTruck } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import { PaymentMethodsSection } from '../PaymentMethodsSection';
 import type { TenantPaymentMethod, PaymentModule } from '@lepefy/types';
 
@@ -25,15 +26,16 @@ export default async function ParametresPaiementsPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl pb-10">
-      <div className="mb-5">
-        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]"><IconCreditCard size={21} stroke={1.7} /></div>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-gray-100">Paramètres</h1>
-        <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Configurez votre espace Lepefy et les informations utilisées par vos services.</p>
-      </div>
+      <AdminPageHeader
+        title="Paramètres"
+        description="Configurez la disponibilité des moyens de paiement utilisés par les services du tenant."
+        meta="Paiements"
+        actions={<div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] ring-1 ring-[#D9D3FF]"><IconCreditCard size={22} stroke={1.7} /></div>}
+      />
 
-      <div className="mb-5 flex border-b border-gray-200 dark:border-gray-800" role="tablist" aria-label="Paramètres">
-        <Link href="/admin/parametres" className="px-5 py-3 text-sm font-medium text-gray-500 transition hover:text-gray-900 dark:hover:text-gray-100">Général</Link>
-        <span className="border-b-2 border-[var(--admin-primary)] px-5 py-3 text-sm font-medium text-[var(--admin-primary-fg)]">Paiements</span>
+      <div className="mb-5 inline-flex gap-1 rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1.5" role="tablist" aria-label="Paramètres">
+        <Link href="/admin/parametres" className="min-h-10 rounded-xl px-3.5 py-2 text-sm font-medium text-gray-500 transition hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100">Général</Link>
+        <span className="min-h-10 rounded-xl bg-[var(--admin-primary-soft)] px-3.5 py-2 text-sm font-medium text-[var(--admin-primary-fg)] ring-1 ring-[#D9D3FF]">Paiements</span>
       </div>
 
       <section className="mb-5 overflow-hidden rounded-2xl border border-[#E8E4FF] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">

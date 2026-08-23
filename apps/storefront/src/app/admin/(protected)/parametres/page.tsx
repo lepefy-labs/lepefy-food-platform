@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { IconDownload, IconExternalLink, IconQrcode } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { SocialLinksSection } from './SocialLinksSection';
 import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
@@ -23,34 +24,33 @@ export default async function ParametresPage() {
     supabase.from('tenant_notification_recipients').select('*').eq('tenant_id', tenant.id).order('created_at', { ascending: true }),
   ]);
 
+  const tenantContext = (
+    <div className="flex min-w-[220px] items-center gap-3 rounded-2xl border border-[var(--admin-border)] bg-white px-3.5 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-100 bg-gray-50">
+        {tenant.logo_url ? (
+          <Image src={tenant.logo_url} alt={tenant.name} width={40} height={40} className="h-full w-full object-contain" />
+        ) : (
+          <span className="text-xs font-semibold text-gray-500">{tenant.name.slice(0, 2).toUpperCase()}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{tenant.name}</p>
+        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Boutique active</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl pb-10">
-      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-gray-100">Paramètres</h1>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-            Configurez votre espace Lepefy Commerce et les informations utilisées par vos services.
-          </p>
-        </div>
+      <AdminPageHeader
+        title="Paramètres"
+        description="Configurez votre espace Lepefy Commerce et les informations utilisées par vos services."
+        actions={tenantContext}
+      />
 
-        <div className="flex min-w-[240px] items-center gap-3 rounded-xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-100 bg-gray-50">
-            {tenant.logo_url ? (
-              <Image src={tenant.logo_url} alt={tenant.name} width={40} height={40} className="h-full w-full object-contain" />
-            ) : (
-              <span className="text-xs font-semibold text-gray-500">{tenant.name.slice(0, 2).toUpperCase()}</span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{tenant.name}</p>
-            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-green-600"><span className="h-1.5 w-1.5 rounded-full bg-green-500" />Boutique active</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-5 flex border-b border-gray-200 dark:border-gray-800" role="tablist" aria-label="Paramètres">
-        <span className="border-b-2 border-[var(--admin-primary)] px-5 py-3 text-sm font-medium text-[var(--admin-primary-fg)]">Général</span>
-        <Link href="/admin/parametres/paiements" className="px-5 py-3 text-sm font-medium text-gray-500 transition hover:text-gray-900 dark:hover:text-gray-100">Paiements</Link>
+      <div className="mb-5 inline-flex gap-1 rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1.5" role="tablist" aria-label="Paramètres">
+        <span className="min-h-10 rounded-xl bg-[var(--admin-primary-soft)] px-3.5 py-2 text-sm font-medium text-[var(--admin-primary-fg)] ring-1 ring-[#D9D3FF]">Général</span>
+        <Link href="/admin/parametres/paiements" className="min-h-10 rounded-xl px-3.5 py-2 text-sm font-medium text-gray-500 transition hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100">Paiements</Link>
       </div>
 
       <div className="grid items-start gap-5 xl:grid-cols-2">
@@ -71,12 +71,7 @@ export default async function ParametresPage() {
           countries_served={tenant.countries_served}
         />
 
-        <LegalInfoSection
-          legal_name={tenant.legal_name}
-          legal_address={tenant.legal_address}
-          legal_email={tenant.legal_email}
-        />
-
+        <LegalInfoSection legal_name={tenant.legal_name} legal_address={tenant.legal_address} legal_email={tenant.legal_email} />
         <NotificationRecipientsSection initialRecipients={(notificationRecipients ?? []) as TenantNotificationRecipient[]} />
 
         <div className="xl:col-span-2">
