@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
   const q = (params.get('q') ?? '').trim();
   const categorySlug = (params.get('category') ?? '').trim();
   const status = params.get('status') ?? 'all';
-  const sort = SORT_MAP[params.get('sort') ?? 'position_asc'] ?? SORT_MAP.position_asc;
+  const requestedSort = params.get('sort') ?? 'position_asc';
+  const sort = SORT_MAP[requestedSort] ?? { column: 'position', ascending: true };
   const supabase = createServiceClient();
 
   let categoryId: string | null = null;
