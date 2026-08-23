@@ -52,6 +52,7 @@ export default function EventReservationsTab({
   error: string | null;
 }) {
   const [refundTargetId, setRefundTargetId] = useState<string | null>(null);
+  const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const cancelRefundRef = useRef<HTMLButtonElement>(null);
 
   const filtered = reservations.filter((reservation) => {
@@ -64,7 +65,31 @@ export default function EventReservationsTab({
   const refundInProgress = Boolean(refundTarget && refundingId === refundTarget.id);
 
   useEffect(() => {
+    if (!openActionsId) return;
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest(`[data-reservation-actions="${openActionsId}"]`)) {
+        setOpenActionsId(null);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpenActionsId(null);
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [openActionsId]);
+
+  useEffect(() => {
     if (!refundTargetId) return;
+    setOpenActionsId(null);
     cancelRefundRef.current?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
@@ -130,17 +155,50 @@ export default function EventReservationsTab({
                     {reservation.status === 'confirmed' && editingEmailId !== reservation.id ? (
                       <>
                         <Button type="button" variant="ghost" size="sm" onClick={() => onResend(reservation.id)} loading={resendingId === reservation.id} title="Renvoyer le billet"><IconSend size={14} /> Renvoyer</Button>
-                        <details className="relative">
-                          <summary className="grid min-h-10 min-w-10 cursor-pointer list-none place-items-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200" aria-label="Plus d’actions" title="Plus d’actions"><IconDotsVertical size={17} aria-hidden="true" /></summary>
-                          <div className="absolute right-0 z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                            <button type="button" onClick={() => onStartEditEmail(reservation.id, reservation.customer_email)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-200 dark:hover:bg-white/5"><IconPencil size={14} aria-hidden="true" /> Modifier l’email</button>
-                            <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                            <button type="button" onClick={() => setRefundTargetId(reservation.id)} disabled={refundingId === reservation.id} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"><IconReceiptRefund size={14} aria-hidden="true" /> Rembourser la réservation</button>
-                          </div>
-                        </details>
+                        <div className="relative" data-reservation-actions={reservation.id}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenActionsId((current) => current === reservation.id ? null : reservation.id)}
+                            aria-haspopup="menu"
+                            aria-expanded={openActionsId === reservation.id}
+                            aria-label="Plus d’actions"
+                            title="Plus d’actions"
+                            className="grid min-h-10 min-w-10 place-items-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                          >
+                            <IconDotsVertical size={17} aria-hidden="true" />
+                          </button>
+                          {openActionsId === reservation.id && (
+                            <div role="menu" className="absolute right-0 z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setOpenActionsId(null);
+                                  onStartEditEmail(reservation.id, reservation.customer_email);
+                                }}
+                                className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-200 dark:hover:bg-white/5"
+                              >
+                                <IconPencil size={14} aria-hidden="true" /> Modifier l’email
+                              </button>
+                              <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setOpenActionsId(null);
+                                  setRefundTargetId(reservation.id);
+                                }}
+                                disabled={refundingId === reservation.id}
+                                className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                              >
+                                <IconReceiptRefund size={14} aria-hidden="true" /> Rembourser la réservation
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </>
                     ) : (
-                      <span className="text-xs text-gray-300 dark:text-gray-600" aria-label="Aucune action disponible">—</span>
+                      <span className="text-xs text-gray-300 dark:text-gray-600" aria-label="Aucune action disponibile">—</span>
                     )}
                   </div>
                 </div>
