@@ -1,6 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getStuckSignupBonuses } from '@/lib/loyalty/getStuckSignupBonuses';
+import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { LoyaltyConfigSection } from './LoyaltyConfigSection';
 import { ReferralAccessSection } from './ReferralAccessSection';
 import { PendingReviewSection } from './PendingReviewSection';
@@ -34,30 +36,39 @@ export default async function AdminLoyaltyPage() {
   ]);
 
   return (
-    <div className="max-w-3xl">
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">Fidélité & parrainage</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Configuration du programme, gestion des accès et revue anti-fraude.
-      </p>
+    <div className="mx-auto w-full max-w-5xl pb-10">
+      <AdminPageHeader
+        title="Fidélité & parrainage"
+        description="Configurez le programme, gérez les accès et traitez les éléments qui nécessitent une revue manuelle."
+        meta={tenant.loyalty_enabled ? 'Programme actif' : 'Programme désactivé'}
+      />
 
       <div className="space-y-6">
-        <LoyaltyConfigSection
-          loyalty_enabled={tenant.loyalty_enabled}
-          referral_max_depth={tenant.referral_max_depth}
-          purchase_points_rate={tenant.purchase_points_rate}
-          referral_availability_mode={tenant.referral_availability_mode}
-          referral_unlock_spending_threshold={tenant.referral_unlock_spending_threshold}
-          referral_fraud_max_conversions={tenant.referral_fraud_max_conversions}
-          referral_fraud_period_days={tenant.referral_fraud_period_days}
-          referral_fraud_action={tenant.referral_fraud_action}
-          initialTiers={(tiers ?? []) as TenantReferralTier[]}
-        />
+        <AdminBlockAccent tone="primary">
+          <LoyaltyConfigSection
+            loyalty_enabled={tenant.loyalty_enabled}
+            referral_max_depth={tenant.referral_max_depth}
+            purchase_points_rate={tenant.purchase_points_rate}
+            referral_availability_mode={tenant.referral_availability_mode}
+            referral_unlock_spending_threshold={tenant.referral_unlock_spending_threshold}
+            referral_fraud_max_conversions={tenant.referral_fraud_max_conversions}
+            referral_fraud_period_days={tenant.referral_fraud_period_days}
+            referral_fraud_action={tenant.referral_fraud_action}
+            initialTiers={(tiers ?? []) as TenantReferralTier[]}
+          />
+        </AdminBlockAccent>
 
-        <ReferralAccessSection />
+        <AdminBlockAccent tone="info">
+          <ReferralAccessSection />
+        </AdminBlockAccent>
 
-        <PendingReviewSection initialEntries={(pendingEntries ?? []) as PointsLedgerEntry[]} />
+        <AdminBlockAccent tone={(pendingEntries ?? []).length > 0 ? 'warning' : 'neutral'}>
+          <PendingReviewSection initialEntries={(pendingEntries ?? []) as PointsLedgerEntry[]} />
+        </AdminBlockAccent>
 
-        <StuckSignupBonusSection initialItems={stuckSignupBonuses} />
+        <AdminBlockAccent tone={stuckSignupBonuses.length > 0 ? 'warning' : 'neutral'}>
+          <StuckSignupBonusSection initialItems={stuckSignupBonuses} />
+        </AdminBlockAccent>
       </div>
     </div>
   );

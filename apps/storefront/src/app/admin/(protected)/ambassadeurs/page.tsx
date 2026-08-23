@@ -1,5 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { AmbassadorConfigSection } from './AmbassadorConfigSection';
 import { PromoteAmbassadorSection } from './PromoteAmbassadorSection';
 import { AmbassadorsListSection, type AmbassadorListRow } from './AmbassadorsListSection';
@@ -66,37 +68,45 @@ export default async function AdminAmbassadeursPage() {
   }));
 
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">Programme Ambassadeur</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Commissions en argent réel payées manuellement hors plateforme, réduction optionnelle au premier ordre du
-        client invité — programme séparé de la fidélité &amp; parrainage par points.
-      </p>
+    <div className="mx-auto w-full max-w-5xl pb-10">
+      <AdminPageHeader
+        title="Programme Ambassadeur"
+        description="Pilotez la configuration, les accès ambassadeur et les commissions confirmées depuis un espace opérationnel unique."
+        meta={`${ambassadorRows.length} ambassadeur${ambassadorRows.length !== 1 ? 's' : ''}`}
+      />
 
       <div className="space-y-6">
-        <AmbassadorConfigSection
-          ambassador_min_purchase_amount={tenant.ambassador_min_purchase_amount}
-          ambassador_min_commission_amount={tenant.ambassador_min_commission_amount}
-          ambassador_max_commission_amount={tenant.ambassador_max_commission_amount}
-          ambassador_loyalty_from_second_order={tenant.ambassador_loyalty_from_second_order}
-          ambassador_first_order_discount_type={tenant.ambassador_first_order_discount_type}
-          ambassador_first_order_discount_value={tenant.ambassador_first_order_discount_value}
-          ambassador_payout_threshold_amount={tenant.ambassador_payout_threshold_amount}
-          ambassador_commission_mode={tenant.ambassador_commission_mode}
-          ambassador_split_pool_amount={tenant.ambassador_split_pool_amount}
-          ambassador_split_pool_ambassador_percent={tenant.ambassador_split_pool_ambassador_percent}
-          currency={tenant.currency}
-        />
+        <AdminBlockAccent tone="primary">
+          <AmbassadorConfigSection
+            ambassador_min_purchase_amount={tenant.ambassador_min_purchase_amount}
+            ambassador_min_commission_amount={tenant.ambassador_min_commission_amount}
+            ambassador_max_commission_amount={tenant.ambassador_max_commission_amount}
+            ambassador_loyalty_from_second_order={tenant.ambassador_loyalty_from_second_order}
+            ambassador_first_order_discount_type={tenant.ambassador_first_order_discount_type}
+            ambassador_first_order_discount_value={tenant.ambassador_first_order_discount_value}
+            ambassador_payout_threshold_amount={tenant.ambassador_payout_threshold_amount}
+            ambassador_commission_mode={tenant.ambassador_commission_mode}
+            ambassador_split_pool_amount={tenant.ambassador_split_pool_amount}
+            ambassador_split_pool_ambassador_percent={tenant.ambassador_split_pool_ambassador_percent}
+            currency={tenant.currency}
+          />
+        </AdminBlockAccent>
 
-        <PromoteAmbassadorSection />
+        <AdminBlockAccent tone="info">
+          <PromoteAmbassadorSection />
+        </AdminBlockAccent>
 
-        <AmbassadorsListSection
-          ambassadors={ambassadorRows}
-          payoutThreshold={tenant.ambassador_payout_threshold_amount}
-          currency={tenant.currency}
-        />
+        <AdminBlockAccent tone="success">
+          <AmbassadorsListSection
+            ambassadors={ambassadorRows}
+            payoutThreshold={tenant.ambassador_payout_threshold_amount}
+            currency={tenant.currency}
+          />
+        </AdminBlockAccent>
 
-        <CommissionsSection initialCommissions={commissions ?? []} currency={tenant.currency} />
+        <AdminBlockAccent tone={(commissions ?? []).length > 0 ? 'warning' : 'neutral'}>
+          <CommissionsSection initialCommissions={commissions ?? []} currency={tenant.currency} />
+        </AdminBlockAccent>
       </div>
     </div>
   );

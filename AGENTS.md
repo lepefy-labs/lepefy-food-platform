@@ -18,7 +18,7 @@ Use connected GitHub capabilities and approved remote CI/deployment systems such
 
 Follow this sequence:
 
-`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> VALIDATE -> FIX LOOP -> PUSH -> VERIFY REMOTE SHA -> VERIFY VERCEL -> COMPLETE`
+`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> VALIDATE -> PUSH -> VERIFY REMOTE SHA -> VERIFY VERCEL -> COMPLETE`
 
 There is exactly one normal approval gate: between POST MOCKUP and implementation.
 
@@ -34,11 +34,10 @@ This includes, when needed:
 - editing multiple files
 - creating new components or endpoints
 - performing frontend/backend/schema work already included in the approved plan
-- creating multiple commits
-- pushing intermediate fixes
+- running remote validation
 - reading CI/Vercel failures
 - correcting build, type, lint, test or deployment errors introduced by the work
-- repeating the fix -> push -> validate loop
+- repeating the fix -> validate -> push -> deploy verification loop when necessary
 - verifying the final remote state
 
 Do **not** stop after an intermediate milestone merely because one sub-step is finished.
@@ -164,9 +163,23 @@ Avoid unrelated refactors.
 Reuse existing design-system primitives and components where appropriate.
 Preserve tenant isolation, authentication, authorization and data integrity.
 
-The implementation may be split into multiple commits for safety or reviewability, but intermediate commits are not stopping points.
+### Commit and deployment batching
 
-If one portion is safer to land before another, land it, validate it, and continue automatically with the remaining approved portions.
+Treat one approved logical implementation step as one delivery unit.
+
+Default rule:
+
+`EDIT ALL RELATED FILES -> VALIDATE AS A SET -> ONE FINAL COMMIT -> ONE PUSH -> ONE VERCEL VERIFICATION`
+
+- Batch all related file changes for the logical step before updating the target branch.
+- Do **not** push after each file, component, sub-step, or cosmetic adjustment.
+- Do **not** intentionally create intermediate production commits only to checkpoint implementation progress.
+- A step may touch many files and still must normally produce a single final commit.
+- Vercel verification applies to the **final SHA of the logical step**, not to obsolete intermediate SHAs.
+- If remote validation after the final push exposes an implementation-introduced error, create one corrective commit containing the complete fix, then verify the new final SHA.
+- Multiple commits are acceptable only when technically unavoidable, when recovering from a failed final validation, or when a critical safety boundary requires separate delivery.
+
+This batching rule exists to reduce unnecessary production deployments, avoid concurrent obsolete Vercel builds, and make each deploy correspond to a coherent user-visible step.
 
 ---
 
@@ -176,19 +189,23 @@ Validation remains remote/cloud-only.
 
 Never execute validation commands on the requester's device.
 
-For each meaningful implementation stage and especially the final state:
+Before the normal final push:
 
-1. Review the remote diff and changed files.
-2. Verify only intended files changed.
+1. Review the intended set of changed files.
+2. Verify only intended files are included.
 3. Check for debug code, temporary assets and accidental unrelated changes.
-4. Inspect GitHub Actions and/or Vercel when available.
-5. Use remote checks such as typecheck, lint, tests and build when available.
-6. If validation fails, inspect the actual logs.
-7. Determine whether the failure was introduced by this work.
-8. Apply the fix remotely.
-9. Push the corrective commit.
-10. Re-check validation.
-11. Repeat until relevant checks pass or a genuine external/pre-existing blocker is identified.
+4. Use available remote/static checks that do not require publishing intermediate production commits.
+
+After the final push:
+
+1. Inspect GitHub Actions and/or Vercel when available.
+2. Use remote checks such as typecheck, lint, tests and build when available.
+3. If validation fails, inspect the actual logs.
+4. Determine whether the failure was introduced by this work.
+5. Apply the complete fix remotely.
+6. Push one corrective commit.
+7. Re-check validation and the new matching deployment.
+8. Repeat until relevant checks pass or a genuine external/pre-existing blocker is identified.
 
 Never stop merely to report an implementation-introduced CI/build error that the agent can reasonably fix.
 

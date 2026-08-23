@@ -1,16 +1,17 @@
 import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { ShippingCountryRulesSection } from './ShippingCountryRulesSection';
 import type { ShippingCountryRuleRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const TAB_CLS =
-  'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors';
-const TAB_ACTIVE   = 'bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]';
-const TAB_INACTIVE = 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800';
+const TAB_CLS = 'min-h-10 px-3.5 py-2 rounded-xl text-sm font-medium transition-colors';
+const TAB_ACTIVE = 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] ring-1 ring-[#D9D3FF]';
+const TAB_INACTIVE = 'text-gray-500 dark:text-gray-400 hover:bg-white hover:text-gray-900 dark:hover:bg-gray-900 dark:hover:text-gray-100';
 
 export default async function AdminLivraisonPage() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -25,23 +26,23 @@ export default async function AdminLivraisonPage() {
     .order('position', { ascending: true }) as unknown as { data: ShippingCountryRuleRow[] | null };
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center gap-1 mb-4">
-        <span className={`${TAB_CLS} ${TAB_ACTIVE}`}>
-          Règles par pays
-        </span>
+    <div className="mx-auto w-full max-w-5xl pb-10">
+      <AdminPageHeader
+        title="Livraison"
+        description="Définissez les règles par pays et vérifiez leur résultat avant de les exposer aux clients."
+        meta={`${(rules ?? []).length} règle${(rules ?? []).length !== 1 ? 's' : ''}`}
+      />
+
+      <div className="mb-5 inline-flex gap-1 rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-1.5">
+        <span className={`${TAB_CLS} ${TAB_ACTIVE}`}>Règles par pays</span>
         <Link href="/admin/livraison/simulateur" className={`${TAB_CLS} ${TAB_INACTIVE}`}>
           Simulateur
         </Link>
       </div>
 
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">Règles de livraison par pays</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-        Gratuité au-delà d&apos;un seuil, forfait fixe ou remise — par pays ou pour tous les pays. Ces règles
-        s&apos;appliquent au-dessus du mode de livraison par défaut de la boutique (Packlink ou forfait).
-      </p>
-
-      <ShippingCountryRulesSection initialRules={rules ?? []} currency={tenant.currency} />
+      <AdminBlockAccent tone="info">
+        <ShippingCountryRulesSection initialRules={rules ?? []} currency={tenant.currency} />
+      </AdminBlockAccent>
     </div>
   );
 }

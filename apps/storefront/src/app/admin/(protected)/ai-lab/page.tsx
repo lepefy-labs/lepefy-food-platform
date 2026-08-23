@@ -1,5 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { KnowledgeBaseClient } from './KnowledgeBaseClient';
 import type { KnowledgeBaseEntry } from '@lepefy/types';
 
@@ -18,14 +20,16 @@ export default async function AiLabPage() {
     .order('created_at', { ascending: false });
 
   return (
-    <div className="max-w-3xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Base de connaissance IA</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Contenu culturel curaté à la main (recettes, expressions, contexte, FAQ) utilisé
-        par le chatbox comme référence de ton et d&apos;informations. Jamais généré par l&apos;IA.
-      </p>
+    <div className="mx-auto w-full max-w-5xl pb-10">
+      <AdminPageHeader
+        title="Base de connaissance IA"
+        description="Gérez le contenu culturel et métier validé qui sert de référence à l'assistant, sans le confondre avec du contenu généré automatiquement."
+        meta={`${(data ?? []).length} entrée${(data ?? []).length !== 1 ? 's' : ''}`}
+      />
 
-      <KnowledgeBaseClient initialEntries={(data ?? []) as KnowledgeBaseEntry[]} />
+      <AdminBlockAccent tone="primary">
+        <KnowledgeBaseClient initialEntries={(data ?? []) as KnowledgeBaseEntry[]} />
+      </AdminBlockAccent>
     </div>
   );
 }

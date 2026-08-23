@@ -1,5 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { HeroSlidesSection } from './HeroSlidesSection';
 import type { TenantHeroSlide } from '@lepefy/types';
 
@@ -18,15 +20,16 @@ export default async function AccueilSlidesPage() {
     .order('position', { ascending: true });
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Slides d&apos;accueil</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Gérez les diapositives du carrousel affiché en haut de la page d&apos;accueil.
-        S&apos;il n&apos;y a aucune slide active, une slide de secours générique est
-        affichée automatiquement — la boutique n&apos;est jamais sans hero.
-      </p>
+    <div className="mx-auto w-full max-w-4xl pb-10">
+      <AdminPageHeader
+        title="Slides d'accueil"
+        description="Gérez les diapositives du carrousel affiché en haut de la boutique. Sans slide active, une slide de secours garantit que la page d'accueil conserve toujours un hero."
+        meta={`${(slides ?? []).length} slide${(slides ?? []).length !== 1 ? 's' : ''}`}
+      />
 
-      <HeroSlidesSection initialSlides={(slides ?? []) as TenantHeroSlide[]} />
+      <AdminBlockAccent tone="info">
+        <HeroSlidesSection initialSlides={(slides ?? []) as TenantHeroSlide[]} />
+      </AdminBlockAccent>
     </div>
   );
 }
