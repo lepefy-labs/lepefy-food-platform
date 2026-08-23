@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { IconArrowLeft, IconCalendar, IconMail, IconPhone, IconUsers } from '@tabler/icons-react';
-import Button from '../../../../../_components/ui/Button';
+import Button from '../../../../_components/ui/Button';
 import InquiryStatusBadge from './InquiryStatusBadge';
 import type { InquiryWithService } from '../inquiryTypes';
 import { INQUIRY_STATUSES, STATUS_LABELS, elapsedLabel } from '../inquiryTypes';
