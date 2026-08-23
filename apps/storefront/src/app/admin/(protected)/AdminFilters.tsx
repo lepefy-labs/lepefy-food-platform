@@ -3,45 +3,46 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 
 interface AdminFiltersProps {
-  currentStatus:      string
-  currentDateFrom:    string
-  currentDateTo:      string
+  currentStatus: string
+  currentDateFrom: string
+  currentDateTo: string
   currentFulfillment: string
-  currentPayment:     string
-  statusCounts?:      Record<string, number>
+  currentPayment: string
+  statusCounts?: Record<string, number>
+  hideStatus?: boolean
 }
 
 const filters = [
   {
     paramKey: 'status',
-    label:    'Statut',
+    label: 'Statut',
     options: [
-      { key: '',                 label: 'Tous les statuts' },
-      { key: 'new',              label: 'Nouveau' },
-      { key: 'preparing',        label: 'En préparation' },
+      { key: '', label: 'Tous les statuts' },
+      { key: 'new', label: 'Nouveau' },
+      { key: 'preparing', label: 'En préparation' },
       { key: 'ready_for_pickup', label: 'Prêt à retirer' },
-      { key: 'shipped',          label: 'Expédié' },
-      { key: 'delivered',        label: 'Livré' },
-      { key: 'cancelled',        label: 'Annulé' },
+      { key: 'shipped', label: 'Expédié' },
+      { key: 'delivered', label: 'Livré' },
+      { key: 'cancelled', label: 'Annulé' },
     ],
   },
   {
     paramKey: 'fulfillment',
-    label:    'Livraison',
+    label: 'Livraison',
     options: [
-      { key: '',          label: 'Tous les types' },
-      { key: 'delivery',  label: 'Livraison à domicile' },
-      { key: 'pickup',    label: 'Click & Collect' },
+      { key: '', label: 'Tous les types' },
+      { key: 'delivery', label: 'Livraison à domicile' },
+      { key: 'pickup', label: 'Click & Collect' },
     ],
   },
   {
     paramKey: 'payment',
-    label:    'Paiement',
+    label: 'Paiement',
     options: [
-      { key: '',          label: 'Tous les modes' },
-      { key: 'stripe',    label: 'Carte bancaire' },
-      { key: 'satispay',  label: 'Satispay' },
-      { key: 'in_store',  label: 'En magasin' },
+      { key: '', label: 'Tous les modes' },
+      { key: 'stripe', label: 'Carte bancaire' },
+      { key: 'satispay', label: 'Satispay' },
+      { key: 'in_store', label: 'En magasin' },
     ],
   },
 ]
@@ -51,15 +52,15 @@ function isDefault(value: string | undefined) {
 }
 
 const defaultClass =
-  'text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 ' +
+  'min-h-10 text-xs font-medium px-3 py-2 rounded-xl border border-[var(--admin-border)] ' +
   'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 ' +
-  'hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none cursor-pointer ' +
-  'focus:ring-2 focus:ring-[var(--color-primary)]'
+  'hover:bg-[var(--admin-surface-subtle)] focus:outline-none cursor-pointer ' +
+  'focus:ring-2 focus:ring-[var(--admin-primary)]'
 
 const activeClass =
-  'text-xs font-medium px-3 py-1.5 rounded-lg border cursor-pointer focus:outline-none ' +
-  'focus:ring-2 focus:ring-[var(--color-primary)] ' +
-  'border-[var(--color-primary)] text-[var(--color-primary-dark)] bg-[var(--color-primary-light,#f0fdf4)]'
+  'min-h-10 text-xs font-medium px-3 py-2 rounded-xl border cursor-pointer focus:outline-none ' +
+  'focus:ring-2 focus:ring-[var(--admin-primary)] ' +
+  'border-[#D9D3FF] text-[var(--admin-primary-fg)] bg-[var(--admin-primary-soft)]'
 
 export default function AdminFilters({
   currentStatus,
@@ -68,68 +69,64 @@ export default function AdminFilters({
   currentFulfillment,
   currentPayment,
   statusCounts,
+  hideStatus = false,
 }: AdminFiltersProps) {
-  const router      = useRouter()
+  const router = useRouter()
   const searchParams = useSearchParams()
 
   const currentValues: Record<string, string | undefined> = {
-    status:      currentStatus,
+    status: currentStatus,
     fulfillment: currentFulfillment,
-    payment:     currentPayment,
+    payment: currentPayment,
   }
 
   function handleChange(paramKey: string, value: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (!value) {
-      params.delete(paramKey)
-    } else {
-      params.set(paramKey, value)
-    }
+    if (!value) params.delete(paramKey)
+    else params.set(paramKey, value)
     router.push(`/admin?${params.toString()}`)
   }
 
   function setDateParam(key: 'dateFrom' | 'dateTo', value: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) params.set(key, value); else params.delete(key)
+    if (value) params.set(key, value)
+    else params.delete(key)
     router.push(`/admin?${params.toString()}`)
   }
 
-  function renderSelect(f: typeof filters[number]) {
+  function renderSelect(filter: typeof filters[number]) {
     return (
       <select
-        key={f.paramKey}
-        value={currentValues[f.paramKey]}
-        onChange={e => handleChange(f.paramKey, e.target.value)}
-        className={
-          isDefault(currentValues[f.paramKey])
-            ? defaultClass
-            : activeClass
-        }
+        key={filter.paramKey}
+        value={currentValues[filter.paramKey]}
+        onChange={event => handleChange(filter.paramKey, event.target.value)}
+        aria-label={filter.label}
+        className={isDefault(currentValues[filter.paramKey]) ? defaultClass : activeClass}
       >
-        {f.options.map(o => {
-          let label = o.label
-          if (f.paramKey === 'status' && o.key && statusCounts) {
-            const count = statusCounts[o.key]
-            if (count) label = `${o.label} (${count})`
+        {filter.options.map(option => {
+          let label = option.label
+          if (filter.paramKey === 'status' && option.key && statusCounts) {
+            const count = statusCounts[option.key]
+            if (count) label = `${option.label} (${count})`
           }
-          return <option key={o.key} value={o.key}>{label}</option>
+          return <option key={option.key} value={option.key}>{label}</option>
         })}
       </select>
     )
   }
 
-  const statusFilter = filters.find(f => f.paramKey === 'status')!
-  const otherFilters  = filters.filter(f => f.paramKey !== 'status')
+  const statusFilter = filters.find(filter => filter.paramKey === 'status')!
+  const otherFilters = filters.filter(filter => filter.paramKey !== 'status')
 
   return (
-    <div className="flex flex-wrap gap-2 mb-4 items-center">
-      {renderSelect(statusFilter)}
+    <div className="flex flex-wrap items-center gap-2">
+      {!hideStatus && renderSelect(statusFilter)}
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <input
           type="date"
           value={currentDateFrom}
-          onChange={e => setDateParam('dateFrom', e.target.value)}
+          onChange={event => setDateParam('dateFrom', event.target.value)}
           aria-label="Date de début"
           className={isDefault(currentDateFrom) ? defaultClass : activeClass}
         />
@@ -137,7 +134,7 @@ export default function AdminFilters({
         <input
           type="date"
           value={currentDateTo}
-          onChange={e => setDateParam('dateTo', e.target.value)}
+          onChange={event => setDateParam('dateTo', event.target.value)}
           aria-label="Date de fin"
           className={isDefault(currentDateTo) ? defaultClass : activeClass}
         />
