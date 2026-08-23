@@ -29,7 +29,7 @@ export default async function ParametresPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-gray-100">Paramètres</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-            Configurez votre espace Lepefy et les informations utilisées par vos services.
+            Configurez votre espace Lepefy Commerce et les informations utilisées par vos services.
           </p>
         </div>
 
