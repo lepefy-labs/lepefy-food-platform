@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import ProductEditClient from '../[id]/ProductEditClient';
+import ProductEditWorkspace from '../[id]/ProductEditWorkspace';
 
 // Surface admin — reste dynamique (cf. audit Prompt 4, classification
 // "/admin/**"). Explicite depuis que getTenant() n'utilise plus cookies() :
@@ -76,26 +77,35 @@ export default async function AdminNouveauProduitPage() {
   };
 
   return (
-    <div>
+    <div className="max-w-6xl mx-auto">
       <Link
         href="/admin/catalogue"
-        className="text-sm text-gray-500 hover:text-gray-700 mb-6
-                   inline-flex items-center gap-1"
+        className="text-sm text-gray-500 hover:text-gray-700 mb-4 inline-flex items-center gap-1"
       >
         ← Catalogue
       </Link>
-      <ProductEditClient
-        product={emptyProduct}
-        categories={categories ?? []}
-        producers={producers ?? []}
-        importers={importers ?? []}
-        tenantId={tenant.id}
-        tenantCurrency={tenant.currency}
-        aiEnabled={tenant.ai_image_generation}
-        tenantLocales={tenant.locales ?? ['fr']}
-        aiDescriptionsEnabled={tenant.ai_description_generation ?? false}
+      <ProductEditWorkspace
         isNew={true}
-      />
+        productName="Nouveau produit"
+        categoryName={categories?.[0]?.name ?? null}
+        active={false}
+        stock={0}
+        hasImage={false}
+        descriptionSource={null}
+      >
+        <ProductEditClient
+          product={emptyProduct}
+          categories={categories ?? []}
+          producers={producers ?? []}
+          importers={importers ?? []}
+          tenantId={tenant.id}
+          tenantCurrency={tenant.currency}
+          aiEnabled={tenant.ai_image_generation}
+          tenantLocales={tenant.locales ?? ['fr']}
+          aiDescriptionsEnabled={tenant.ai_description_generation ?? false}
+          isNew={true}
+        />
+      </ProductEditWorkspace>
     </div>
   );
 }

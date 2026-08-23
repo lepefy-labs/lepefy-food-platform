@@ -1,0 +1,52 @@
+.workspace section {
+  scroll-margin-top: 172px;
+}
+
+.workspace > div > div:first-child {
+  position: sticky;
+  top: 52px;
+  z-index: 26;
+  margin-bottom: 0;
+  padding: 10px 0;
+  background: rgba(249, 250, 251, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.workspace > div > div:nth-child(2) {
+  position: sticky;
+  top: 116px;
+  z-index: 25;
+  margin-bottom: 20px;
+  background: rgba(249, 250, 251, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 640px) {
+  .workspace section {
+    scroll-margin-top: 210px;
+  }
+
+  .workspace > div > div:first-child {
+    top: 52px;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 0;
+  }
+
+  .workspace > div > div:first-child > div:last-child {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .workspace > div > div:first-child > div:last-child > * {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .workspace > div > div:nth-child(2) {
+    top: 142px;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-top: 4px;
+  }
+}
