@@ -14,8 +14,8 @@ export interface PlatformBranding {
 }
 
 export const DEFAULT_PLATFORM_BRANDING: PlatformBranding = {
-  platformName: 'Lepefy',
-  logoUrl: null,
+  platformName: 'Lepefy Commerce',
+  logoUrl: '/brand/lepefy-commerce.svg',
   primary: '#6D5AF6',
   primaryHover: '#5B49E8',
   primarySoft: '#F3F1FF',
@@ -51,9 +51,16 @@ export async function getPlatformBranding(): Promise<PlatformBranding> {
     if (error || !data) return DEFAULT_PLATFORM_BRANDING;
 
     const row = data as PlatformBrandingRow;
+    const platformName = row.platform_name?.trim();
+
     return {
-      platformName: row.platform_name || DEFAULT_PLATFORM_BRANDING.platformName,
-      logoUrl: row.logo_url,
+      // The first 073 seed used the generic "Lepefy" label. In this product,
+      // treat that untouched seed value as the product brand while preserving
+      // any explicit custom platform name configured later.
+      platformName: !platformName || platformName === 'Lepefy'
+        ? DEFAULT_PLATFORM_BRANDING.platformName
+        : platformName,
+      logoUrl: row.logo_url || DEFAULT_PLATFORM_BRANDING.logoUrl,
       primary: row.primary_color || DEFAULT_PLATFORM_BRANDING.primary,
       primaryHover: row.primary_hover || DEFAULT_PLATFORM_BRANDING.primaryHover,
       primarySoft: row.primary_soft || DEFAULT_PLATFORM_BRANDING.primarySoft,
@@ -64,7 +71,7 @@ export async function getPlatformBranding(): Promise<PlatformBranding> {
       border: row.border_color || DEFAULT_PLATFORM_BRANDING.border,
     };
   } catch {
-    // Migration 071 may not yet be applied in every environment. Keep /admin
+    // Migration 073 may not yet be applied in every environment. Keep /admin
     // usable with deterministic platform defaults until the table exists.
     return DEFAULT_PLATFORM_BRANDING;
   }
