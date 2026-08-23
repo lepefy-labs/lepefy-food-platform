@@ -2,9 +2,11 @@ import { createServiceClient } from '@/lib/supabase/server';
 import type { EventStatus, ServiceInquiryStatus } from '@lepefy/types';
 
 export type OverviewActionTone = 'urgent' | 'attention' | 'default';
+export type OverviewActionKind = 'Paiement' | 'Demande' | 'Location' | 'Capacité';
 
 export interface OverviewAction {
   id: string;
+  kind: OverviewActionKind;
   label: string;
   detail?: string;
   href: string;
@@ -66,7 +68,20 @@ interface PendingRentalRequest {
   created_at: string;
 }
 
-export async function getEvenementielOverview(tenantId: string): Promise<EvenementielOverview> {
+function elapsedLabel(createdAt: string, now: Date): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(createdAt).getTime()) / 60000));
+  if (minutes < 1) return 'à l’instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  return `il y a ${Math.floor(hours / 24)} j`;
+}
+
+function formatAmount(amount: number, currency: string): string {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(Number(amount || 0));
+}
+
+export async function getEvenementielOverview(tenantId: string, currency: string): Promise<EvenementielOverview> {
   const supabase = createServiceClient();
   const now = new Date();
   const nowIso = now.toISOString();
@@ -170,20 +185,22 @@ export async function getEvenementielOverview(tenantId: string): Promise<Eveneme
   for (const request of pendingEventRequests.slice(0, 4)) {
     actions.push({
       id: `event-payment-${request.id}`,
+      kind: 'Paiement',
       label: 'Paiement événement à confirmer',
-      detail: request.customer_name,
+      detail: `${request.customer_name} · ${formatAmount(request.amount, currency)} · ${elapsedLabel(request.created_at, now)}`,
       href: `/admin/evenementiel/evenements/${request.event_id}`,
-      tone: 'urgent',
+      tone: 'attention',
     });
   }
 
   for (const request of pendingRentalRequests.slice(0, 4)) {
     actions.push({
       id: `rental-payment-${request.id}`,
+      kind: 'Paiement',
       label: 'Paiement location à confirmer',
-      detail: `${request.customer_name} · retrait ${new Date(request.pickup_date).toLocaleDateString('fr-FR')}`,
+      detail: `${request.customer_name} · ${formatAmount(request.amount, currency)} · retrait ${new Date(request.pickup_date).toLocaleDateString('fr-FR')} · ${elapsedLabel(request.created_at, now)}`,
       href: '/admin/evenementiel/reservations-materiel',
-      tone: 'urgent',
+      tone: 'attention',
     });
   }
 
@@ -191,7 +208,9 @@ export async function getEvenementielOverview(tenantId: string): Promise<Eveneme
   if (newInquiriesCount > 0) {
     actions.push({
       id: 'new-inquiries',
+      kind: 'Demande',
       label: `${newInquiriesCount} nouvelle${newInquiriesCount > 1 ? 's' : ''} demande${newInquiriesCount > 1 ? 's' : ''} de devis`,
+      detail: 'Nouveau contact à qualifier',
       href: '/admin/evenementiel/devis',
       tone: 'attention',
     });
@@ -201,8 +220,9 @@ export async function getEvenementielOverview(tenantId: string): Promise<Eveneme
   for (const rental of upcomingRentals.filter((item) => new Date(item.pickup_date) <= soonThreshold).slice(0, 2)) {
     actions.push({
       id: `rental-soon-${rental.id}`,
+      kind: 'Location',
       label: 'Location à préparer prochainement',
-      detail: `${rental.customer_name} · ${new Date(rental.pickup_date).toLocaleDateString('fr-FR')}`,
+      detail: `${rental.customer_name} · retrait ${new Date(rental.pickup_date).toLocaleDateString('fr-FR')}`,
       href: '/admin/evenementiel/reservations-materiel',
       tone: 'default',
     });
@@ -214,6 +234,7 @@ export async function getEvenementielOverview(tenantId: string): Promise<Eveneme
     if (remainingRatio <= 0.2) {
       actions.push({
         id: `capacity-${event.id}`,
+        kind: 'Capacité',
         label: 'Capacité événement à surveiller',
         detail: `${event.title} · ${event.capacity_remaining} place${event.capacity_remaining > 1 ? 's' : ''} restante${event.capacity_remaining > 1 ? 's' : ''}`,
         href: `/admin/evenementiel/evenements/${event.id}`,
