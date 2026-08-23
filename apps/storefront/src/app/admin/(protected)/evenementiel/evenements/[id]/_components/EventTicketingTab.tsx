@@ -9,18 +9,18 @@ import { formatPrice } from '@/lib/utils/format';
 export default function EventTicketingTab({
   ticketTypes,
   currency,
-  addingTicket,
-  savingTicketId,
-  ticketError,
+  adding,
+  savingId,
+  error,
   onCreate,
   onUpdate,
   onRemove,
 }: {
   ticketTypes: EventTicketType[];
   currency: string;
-  addingTicket: boolean;
-  savingTicketId: string | null;
-  ticketError: string | null;
+  adding: boolean;
+  savingId: string | null;
+  error: string | null;
   onCreate: (payload: { label: string; description: string | null; price: number; badge: string | null }) => Promise<boolean>;
   onUpdate: (id: string, payload: { label: string; description: string | null; price: number; badge: string | null }) => Promise<boolean>;
   onRemove: (id: string) => void;
@@ -64,7 +64,7 @@ export default function EventTicketingTab({
       <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Prix<input value={draft.price} onChange={(e) => setDraft((prev) => ({ ...prev, price: e.target.value }))} className={`${inputClass} mt-1`} inputMode="decimal" required /></label>
       <label className="text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">Description<input value={draft.description} onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))} className={`${inputClass} mt-1`} /></label>
       <label className="text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">Badge optionnel<input value={draft.badge} onChange={(e) => setDraft((prev) => ({ ...prev, badge: e.target.value }))} className={`${inputClass} mt-1`} placeholder="LA PLUS POPULAIRE" /></label>
-      <div className="flex gap-2 sm:col-span-2"><Button type="submit" loading={addingTicket || Boolean(savingTicketId)}>{submitLabel}</Button><Button type="button" variant="ghost" onClick={resetEditor}><IconX size={15} /> Annuler</Button></div>
+      <div className="flex gap-2 sm:col-span-2"><Button type="submit" loading={adding || Boolean(savingId)}>{submitLabel}</Button><Button type="button" variant="ghost" onClick={resetEditor}><IconX size={15} /> Annuler</Button></div>
     </form>
   );
 
@@ -75,7 +75,7 @@ export default function EventTicketingTab({
         {!showCreate && !editingId && <Button type="button" onClick={() => { setShowCreate(true); setDraft({ label: '', description: '', price: '', badge: '' }); }}><IconPlus size={16} /> Ajouter une formule</Button>}
       </div>
 
-      {ticketError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{ticketError}</p>}
+      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
       {showCreate && editor(submitCreate, 'Ajouter la formule')}
 
       {ticketTypes.length === 0 ? (
