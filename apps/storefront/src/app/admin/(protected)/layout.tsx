@@ -54,6 +54,11 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     adminClient.from('service_inquiries').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'nouveau'),
   ]);
 
+  const pendingPaymentsCount = pendingPaymentsResult.count ?? 0;
+  const pendingEventRequestsCount = pendingEventRequestsResult.count ?? 0;
+  const pendingRentalRequestsCount = pendingRentalRequestsResult.count ?? 0;
+  const newInquiriesCount = newInquiriesResult.count ?? 0;
+
   return (
     <AdminThemeProvider>
       <AdminHeader
@@ -64,22 +69,26 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
         categories={categories ?? []}
         isPlatformOwner={admin.role === 'platform_owner'}
         adminEmail={user.email ?? ''}
+        pendingPaymentsCount={pendingPaymentsCount}
+        pendingEventRequestsCount={pendingEventRequestsCount}
+        pendingRentalRequestsCount={pendingRentalRequestsCount}
+        newInquiriesCount={newInquiriesCount}
       />
 
       <div className="flex min-h-[calc(100vh-57px)] bg-[var(--admin-page-bg)] dark:bg-gray-950">
-        <aside className="hidden w-56 shrink-0 border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block">
-          <Suspense fallback={<div className="h-full w-56" />}>
+        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block">
+          <Suspense fallback={<div className="h-full w-full" />}>
             <AdminSidebar
               categories={categories ?? []}
-              pendingPaymentsCount={pendingPaymentsResult.count ?? 0}
-              pendingEventRequestsCount={pendingEventRequestsResult.count ?? 0}
-              pendingRentalRequestsCount={pendingRentalRequestsResult.count ?? 0}
-              newInquiriesCount={newInquiriesResult.count ?? 0}
+              pendingPaymentsCount={pendingPaymentsCount}
+              pendingEventRequestsCount={pendingEventRequestsCount}
+              pendingRentalRequestsCount={pendingRentalRequestsCount}
+              newInquiriesCount={newInquiriesCount}
               isPlatformOwner={admin.role === 'platform_owner'}
             />
           </Suspense>
         </aside>
-        <main className="min-w-0 flex-1 p-4 sm:p-5 lg:p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8">{children}</main>
       </div>
     </AdminThemeProvider>
   );

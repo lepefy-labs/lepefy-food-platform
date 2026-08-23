@@ -8,58 +8,81 @@ import AdminSidebar from './AdminSidebar';
 interface AdminMobileNavProps {
   categories: { id: string; name: string; slug: string }[];
   isPlatformOwner?: boolean;
+  pendingPaymentsCount?: number;
+  pendingEventRequestsCount?: number;
+  pendingRentalRequestsCount?: number;
+  newInquiriesCount?: number;
 }
 
-export default function AdminMobileNav({ categories, isPlatformOwner = false }: AdminMobileNavProps) {
+export default function AdminMobileNav({
+  categories,
+  isPlatformOwner = false,
+  pendingPaymentsCount = 0,
+  pendingEventRequestsCount = 0,
+  pendingRentalRequestsCount = 0,
+  newInquiriesCount = 0,
+}: AdminMobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  // Ferme le tiroir dès qu'on navigue vers une nouvelle page — pas à chaque
-  // clic à l'intérieur (le sous-menu Catalogue se déplie sans changer de route).
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
   return (
     <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         aria-label="Ouvrir le menu"
-        className="md:hidden p-2 -ml-2 rounded-lg text-gray-500 dark:text-gray-400
-                   hover:bg-gray-100 dark:hover:bg-gray-800"
+        aria-expanded={open}
+        className="-ml-2 rounded-xl p-2 text-gray-500 transition hover:bg-[var(--admin-primary-soft)] hover:text-[var(--admin-primary-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:text-gray-400 md:hidden"
       >
         <IconMenu2 size={20} />
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-40 md:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menu d'administration"
-          onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }}
-        >
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-64 max-w-[80vw] bg-white dark:bg-gray-900
-                          shadow-xl overflow-y-auto">
-            <div className="flex items-center justify-between px-3 py-3 border-b
-                            border-gray-100 dark:border-gray-800">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400
-                               uppercase tracking-wide">
-                Menu
-              </span>
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menu d'administration">
+          <button type="button" aria-label="Fermer le menu" className="absolute inset-0 bg-gray-950/45 backdrop-blur-[1px]" onClick={() => setOpen(false)} />
+          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[86vw] flex-col bg-white shadow-2xl dark:bg-gray-900">
+            <div className="flex min-h-[57px] items-center justify-between border-b border-[var(--admin-border)] px-4 dark:border-gray-800">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]/70 dark:text-violet-300/70">Administration</p>
+                <p className="mt-0.5 text-xs text-gray-400">Navigation du tenant</p>
+              </div>
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Fermer"
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="rounded-xl p-2 text-gray-500 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:hover:bg-gray-800"
               >
-                <IconX size={16} />
+                <IconX size={18} />
               </button>
             </div>
-            <AdminSidebar categories={categories} isPlatformOwner={isPlatformOwner} />
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+              <AdminSidebar
+                categories={categories}
+                pendingPaymentsCount={pendingPaymentsCount}
+                pendingEventRequestsCount={pendingEventRequestsCount}
+                pendingRentalRequestsCount={pendingRentalRequestsCount}
+                newInquiriesCount={newInquiriesCount}
+                isPlatformOwner={isPlatformOwner}
+              />
+            </div>
           </div>
         </div>
       )}
