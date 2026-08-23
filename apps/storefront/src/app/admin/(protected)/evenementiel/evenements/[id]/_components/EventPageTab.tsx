@@ -16,6 +16,7 @@ export default function EventPageTab({
   onSave,
   saving,
   error,
+  saved,
   uploadingBanner,
   fileInputRef,
   onBannerChange,
@@ -31,6 +32,7 @@ export default function EventPageTab({
   onSave: () => void;
   saving: boolean;
   error: string | null;
+  saved: boolean;
   uploadingBanner: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onBannerChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -75,7 +77,13 @@ export default function EventPageTab({
       </div>
 
       <aside className="space-y-4">
-        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-sm font-semibold text-gray-950 dark:text-white">Enregistrer</h2><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Le sous-titre et les points forts sont enregistrés ensemble. La bannière est enregistrée immédiatement après téléversement.</p>{error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}<Button type="button" onClick={onSave} loading={saving} className="mt-4 w-full">{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</Button></section>
+        <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+          <h2 className="text-sm font-semibold text-gray-950 dark:text-white">Enregistrer</h2>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Le sous-titre et les points forts sont enregistrés ensemble. La bannière est enregistrée immédiatement après téléversement.</p>
+          {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
+          {saved && !error && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Modifications enregistrées.</p>}
+          <Button type="button" onClick={onSave} loading={saving} className="mt-4 w-full">{saving ? 'Enregistrement…' : 'Enregistrer les modifications'}</Button>
+        </section>
         <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-sm font-semibold text-gray-950 dark:text-white">État du contenu</h2><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span className="text-gray-500 dark:text-gray-400">Bannière</span><strong className="text-gray-900 dark:text-gray-100">{event.banner_image_url ? 'Configurée' : 'Non renseignée'}</strong></div><div className="flex justify-between gap-3"><span className="text-gray-500 dark:text-gray-400">Sous-titre</span><strong className="text-gray-900 dark:text-gray-100">{subtitle.trim() ? 'Configuré' : 'Optionnel'}</strong></div><div className="flex justify-between gap-3"><span className="text-gray-500 dark:text-gray-400">Points forts</span><strong className="text-gray-900 dark:text-gray-100">{highlights.length} / {maxHighlights}</strong></div></div></section>
       </aside>
     </div>
