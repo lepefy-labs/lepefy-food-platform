@@ -12,17 +12,51 @@ Never execute commands on the requester's local computer.
 Never require the requester to install or run Git, Node.js, pnpm, npm, build tools, test runners, or repository scripts locally.
 Never use a local working copy on the requester's device as part of this workflow.
 
-Use the connected GitHub repository and remote GitHub capabilities as the operational environment.
-
-For validation that requires command execution, prefer GitHub Actions or another explicitly approved remote CI environment.
+Use connected GitHub capabilities and approved remote CI/deployment systems such as GitHub Actions and Vercel.
 
 ## Core workflow
 
 Follow this sequence:
 
-`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT -> VALIDATE -> PUSH -> VERIFY`
+`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> VALIDATE -> FIX LOOP -> PUSH/VERIFY -> COMPLETE`
 
-Do not skip the approval gate between the POST mockup and implementation unless the requester explicitly asks to bypass it.
+There is exactly one normal approval gate: between POST MOCKUP and implementation.
+
+## Autonomy contract
+
+Once the requester approves the POST mockup or implementation plan, that approval covers the **entire approved scope**.
+
+From that point onward, the agent must organize and execute all required implementation work autonomously until the approved scope is complete.
+
+This includes, when needed:
+
+- splitting the work into multiple technical sub-steps
+- editing multiple files
+- creating new components or endpoints
+- performing frontend/backend/schema work already included in the approved plan
+- creating multiple commits
+- pushing intermediate fixes
+- reading CI/Vercel failures
+- correcting build, type, lint, test or deployment errors introduced by the work
+- repeating the fix -> push -> validate loop
+- verifying the final remote state
+
+Do **not** stop after an intermediate milestone merely because one sub-step is finished.
+Do **not** ask `Proceed?`, `Continue?`, or similar questions between implementation sub-steps.
+Do **not** require the requester to send another message to resume work already covered by the approval.
+
+Only ask the requester again when a newly discovered decision would materially change something outside the approved scope, specifically:
+
+- business behavior
+- user workflow
+- stored data semantics
+- permissions/security model
+- destructive data operations
+- the approved UX direction
+
+A build failure, type error, implementation detail, component split, endpoint refactor, responsive adjustment, or extra corrective commit is **not** a reason to ask for approval again.
+
+The agent is considered finished only when the complete approved scope has been implemented and final remote verification has been performed, or when a genuine external blocker prevents completion.
 
 ---
 
@@ -32,10 +66,9 @@ This phase is read-only.
 
 Inspect the complete current implementation of the requested module, including relevant:
 
-- routes/pages
-- layouts
-- shared and local components
-- navigation and entry/exit flows
+- routes/pages and nested routes
+- layouts and navigation
+- shared/local components
 - forms, dialogs, tables and lists
 - mobile, tablet and desktop behavior
 - loading, empty, error and success states
@@ -44,11 +77,9 @@ Inspect the complete current implementation of the requested module, including r
 - database/schema/migrations when relevant
 - design-system primitives and reusable patterns
 
-Follow imports and references where needed.
+Follow imports and references as needed.
 
-Do not limit analysis to the first route if nested or sibling routes are part of the requested module.
-
-The current repository always overrides stale documentation, previous conversations, screenshots or old mockups.
+The current repository overrides stale documentation, previous conversations, screenshots or old mockups.
 
 Do not ask questions that can be answered by inspecting the codebase.
 
@@ -56,55 +87,35 @@ Do not ask questions that can be answered by inspecting the codebase.
 
 ## 2. PRE MOCKUP
 
-Before proposing changes, create a visual PRE mockup that faithfully represents the current implementation.
+Create a visual PRE mockup faithfully representing the current implementation.
 
-The PRE mockup must not silently improve the interface.
-
-Show the important desktop and mobile states required to understand the current UX.
-
-Its purpose is to establish a clear baseline:
-
-`CURRENT STATE -> PROPOSED STATE`
+Do not silently improve the interface in this mockup.
+Show the important desktop and mobile states needed to understand the current UX.
 
 ---
 
 ## 3. UX AUDIT
 
-Evaluate the module with emphasis on:
+Evaluate with emphasis on:
 
 - information hierarchy
 - operational efficiency
-- unnecessary clicks
-- repeated work
+- unnecessary clicks and repeated work
 - discoverability
 - primary vs secondary actions
-- information density
-- visual scanning
+- information density and scanning
 - navigation clarity
 - form ergonomics
 - feedback after actions
-- error prevention
-- destructive actions
-- responsiveness
-- accessibility
+- error prevention and destructive actions
+- responsiveness and accessibility
 - loading/empty/error UX
 - consistency with the rest of the product
 
 For admin interfaces, prioritize task efficiency and error prevention over decorative redesign.
 
-If frontend UX is constrained by the current data contract, identify it.
-
-When justified, propose backend or data changes such as:
-
-- new endpoints
-- endpoint consolidation
-- aggregated responses
-- filters/query parameters
-- pagination improvements
-- preload strategies
-- server-side calculations
-- schema changes
-- reusable shared components
+If frontend UX is constrained by current data contracts, identify it.
+When justified, propose backend/data changes such as endpoints, aggregation, filters, pagination, server-side calculations or schema changes.
 
 Do not change backend architecture only for aesthetic reasons.
 
@@ -112,19 +123,11 @@ Do not change backend architecture only for aesthetic reasons.
 
 ## 4. POST MOCKUP
 
-Create a visual POST mockup that represents the recommended solution.
+Create a visual POST mockup representing the recommended solution.
 
-The POST mockup should be precise enough to act as the implementation specification.
+It must be precise enough to act as implementation specification and cover desktop/mobile plus important interaction states.
 
-Cover desktop and mobile where applicable, including important interaction states.
-
-Do not invent fake production data when the real structure can be inferred from the repository.
-
-Clearly identify whether proposed changes are:
-
-- frontend-only
-- API/backend
-- database/schema
+Clearly identify frontend-only, API/backend and database/schema changes.
 
 Keep explanations concise.
 
@@ -132,148 +135,112 @@ At the end ask only:
 
 **Proceed with this solution?**
 
-Do not begin implementation until the requester approves.
+Do not implement before approval unless the requester explicitly waived this gate.
 
 ---
 
-## 5. IMPLEMENT
+## 5. IMPLEMENT ALL
 
-After explicit approval, implement the agreed solution through GitHub-connected remote operations.
+After approval, first derive an internal implementation plan covering the whole approved scope.
 
-Do not repeatedly ask for confirmation on minor technical decisions.
+Then execute that plan autonomously from start to finish.
 
-Make reasonable implementation decisions autonomously as long as they remain consistent with the approved POST mockup and existing product behavior.
-
-Preserve existing business logic unless changing it was explicitly part of the approved proposal.
-
+Preserve existing business logic unless changing it was explicitly approved.
 Avoid unrelated refactors.
-
-Reuse existing components and design-system primitives when appropriate.
-
+Reuse existing design-system primitives and components where appropriate.
 Preserve tenant isolation, authentication, authorization and data integrity.
 
-Only stop and ask the requester again if a decision would materially alter:
+The implementation may be split into multiple commits for safety or reviewability, but intermediate commits are not stopping points.
 
-- business behavior
-- user workflow
-- stored data
-- permissions
-- approved UX
+If one portion is safer to land before another, land it, validate it, and continue automatically with the remaining approved portions.
 
 ---
 
-## 6. VALIDATE
+## 6. VALIDATE AND FIX LOOP
 
-Validation must remain remote/cloud-only.
+Validation remains remote/cloud-only.
 
 Never execute validation commands on the requester's device.
 
-Before considering an implementation complete:
+For each meaningful implementation stage and especially the final state:
 
 1. Review the remote diff and changed files.
-2. Verify that only intended files changed.
-3. Check for debug code, temporary assets, accidental unrelated changes, and obvious syntax/type issues visible from the diff.
-4. After the implementation commit is pushed, inspect GitHub Actions / remote CI associated with that commit when available.
-5. Use relevant remote checks such as:
-   - typecheck
-   - lint
-   - unit tests
-   - integration tests
-   - build
-   - targeted tests
-6. If CI fails, inspect the failing jobs, steps and logs, determine whether the failure was introduced by this implementation, apply the necessary fix remotely, push a new commit, and inspect CI again.
-7. Repeat the fix -> push -> CI verification loop when reasonably possible until relevant checks pass or an external/pre-existing blocker is identified.
+2. Verify only intended files changed.
+3. Check for debug code, temporary assets and accidental unrelated changes.
+4. Inspect GitHub Actions and/or Vercel when available.
+5. Use remote checks such as typecheck, lint, tests and build when available.
+6. If validation fails, inspect the actual logs.
+7. Determine whether the failure was introduced by this work.
+8. Apply the fix remotely.
+9. Push the corrective commit.
+10. Re-check validation.
+11. Repeat until relevant checks pass or a genuine external/pre-existing blocker is identified.
 
-Do not claim that typecheck, lint, tests or build passed unless a remote check actually ran successfully or equivalent trustworthy remote evidence exists.
+Never stop merely to report an implementation-introduced CI/build error that the agent can reasonably fix.
 
-If no appropriate remote CI exists, explicitly report validation as unavailable rather than pretending checks were executed.
-
-Also verify from the code/diff as far as possible that:
-
-- mobile behavior is covered
-- tablet behavior is covered
-- desktop behavior is covered
-- loading/empty/error states remain functional
-- existing business behavior has not unintentionally changed
+Do not claim a check passed unless remote evidence shows it passed.
 
 ---
 
 ## 7. GIT TARGET
 
-Respect the Git target requested by the user.
+Respect the target requested by the user.
 
 ### Current PR / branch
 
-If the target is the current PR or branch:
-
-- work on that branch
-- commit the approved changes
-- push the same branch
+Work on that branch, commit approved work and push the same branch.
 
 ### Main
 
-If the target is `main`:
-
-- confirm the repository state is appropriate
-- commit the approved changes
-- push to `main`
+Commit approved work and push to `main`.
 
 Never force-push unless explicitly instructed.
-
 Never overwrite unrelated work.
 
-Before pushing, verify remotely where possible:
-
-- target branch
-- intended changed files/diff
-- commit being created/pushed
+Before writes/pushes, verify the target branch and intended diff as far as remote capabilities allow.
 
 ---
 
-## 8. VERIFY REMOTE PUSH
+## 8. VERIFY REMOTE PUSH AND DEPLOYMENT
 
-A successful write/push operation alone is not sufficient verification.
+A successful write/push call alone is not enough.
 
-After pushing, independently read the remote branch or commit state and confirm that the expected commit is present on the requested remote branch.
+After the final push:
 
-Compare the expected commit SHA with the remote branch SHA whenever possible.
+- independently read the remote branch/commit state
+- confirm the expected commit is on the requested target
+- inspect relevant GitHub CI
+- inspect Vercel deployment/build status when the project uses Vercel and access is available
 
-Then inspect relevant GitHub Actions / CI status for that commit when available.
+If deployment fails because of the implementation, fix it and continue automatically.
 
-Only report a successful push when the expected commit is actually present remotely.
-
-Never claim a push succeeded if it cannot be verified.
+Only report success once the expected remote state is verified and the relevant available validation/deployment checks are successful.
 
 ---
 
 ## 9. FINAL RESPONSE
 
-Keep the final response concise and operational.
+Do not send a final completion response while approved implementation work remains unfinished.
 
-Preferred format:
+When complete, keep the response concise and operational, for example:
 
-- ✅ Implementation completed
-- ✅ Remote validation passed, or clearly state what was unavailable
+- ✅ Full approved implementation completed
+- ✅ Remote validation passed
+- ✅ Vercel deployment verified (when applicable)
 - ✅ Push verified on `<target>`
-- Commit: `<sha>`
+- Final commit: `<sha>`
 
-Mention only meaningful caveats.
-
-If push, CI, or verification failed, say so explicitly.
+Mention only meaningful caveats or genuine blockers.
 
 ---
 
-## 10. ITERATIVE CONTINUATION
+## 10. NEXT MODULE
 
-After completing the requested module, inspect the surrounding workflow.
+After the **entire approved scope** is complete, the agent may suggest one highest-value next module or improvement.
 
-If there is an obvious next UI/UX improvement, suggest only the single highest-value next step.
+That suggestion is a new scope and requires separate approval.
 
-Example:
-
-`Next recommended step: /admin/evenementiel/[id]. Proceed?`
-
-Do not implement the next step without approval.
+Do not confuse an approved implementation sub-step with a new scope.
 
 ---
 
@@ -281,18 +248,7 @@ Do not implement the next step without approval.
 
 Be concise, operational and visual.
 
-Prefer:
-
-- mockups
-- findings
-- decisions
-- implementation
-- verification
-
-over long explanations.
-
+Prefer mockups, findings, decisions, implementation and verification over long explanations.
 Do not narrate routine repository inspection.
-
 Do not explain obvious coding operations.
-
-Ask the requester for input only when their decision is genuinely necessary.
+Do not ask the requester for input unless their decision is genuinely necessary under the Autonomy contract above.
