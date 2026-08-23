@@ -30,8 +30,8 @@ const filters = [
     paramKey: 'fulfillment',
     label: 'Livraison',
     options: [
-      { key: '', label: 'Tous les types' },
-      { key: 'delivery', label: 'Livraison à domicile' },
+      { key: '', label: 'Livraison : toutes' },
+      { key: 'delivery', label: 'À domicile' },
       { key: 'pickup', label: 'Click & Collect' },
     ],
   },
@@ -39,7 +39,7 @@ const filters = [
     paramKey: 'payment',
     label: 'Paiement',
     options: [
-      { key: '', label: 'Tous les modes' },
+      { key: '', label: 'Paiement : tous' },
       { key: 'stripe', label: 'Carte bancaire' },
       { key: 'satispay', label: 'Satispay' },
       { key: 'in_store', label: 'En magasin' },
@@ -52,13 +52,13 @@ function isDefault(value: string | undefined) {
 }
 
 const defaultClass =
-  'min-h-10 text-xs font-medium px-3 py-2 rounded-xl border border-[var(--admin-border)] ' +
-  'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 ' +
+  'h-9 text-xs font-medium px-2.5 rounded-lg border border-[var(--admin-border)] ' +
+  'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 ' +
   'hover:bg-[var(--admin-surface-subtle)] focus:outline-none cursor-pointer ' +
   'focus:ring-2 focus:ring-[var(--admin-primary)]'
 
 const activeClass =
-  'min-h-10 text-xs font-medium px-3 py-2 rounded-xl border cursor-pointer focus:outline-none ' +
+  'h-9 text-xs font-semibold px-2.5 rounded-lg border cursor-pointer focus:outline-none ' +
   'focus:ring-2 focus:ring-[var(--admin-primary)] ' +
   'border-[#D9D3FF] text-[var(--admin-primary-fg)] bg-[var(--admin-primary-soft)]'
 
@@ -119,23 +119,25 @@ export default function AdminFilters({
   const otherFilters = filters.filter(filter => filter.paramKey !== 'status')
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1.5">
       {!hideStatus && renderSelect(statusFilter)}
 
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1">
         <input
           type="date"
           value={currentDateFrom}
           onChange={event => setDateParam('dateFrom', event.target.value)}
           aria-label="Date de début"
+          title="Date de début"
           className={isDefault(currentDateFrom) ? defaultClass : activeClass}
         />
-        <span className="text-xs text-gray-400">→</span>
+        <span className="text-[11px] text-gray-400">→</span>
         <input
           type="date"
           value={currentDateTo}
           onChange={event => setDateParam('dateTo', event.target.value)}
           aria-label="Date de fin"
+          title="Date de fin"
           className={isDefault(currentDateTo) ? defaultClass : activeClass}
         />
       </div>

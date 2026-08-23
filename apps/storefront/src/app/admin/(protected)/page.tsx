@@ -3,18 +3,10 @@ import { Suspense } from 'react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { formatPrice } from '@/lib/utils/format'
-import {
-  IconClock,
-  IconCurrencyEuro,
-  IconPackage,
-  IconTruck,
-} from '@tabler/icons-react'
 import AdminFilters from './AdminFilters'
 import OrdersTable from './OrdersTable'
 import PendingPaymentsBanner from './PendingPaymentsBanner'
-import KpiCard from '../_components/ui/KpiCard'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
-import AdminBlockAccent from '../_components/ui/AdminBlockAccent'
 import type { ListOrder } from './OrdersTable'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
 
@@ -74,7 +66,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const thisMonth = now.getMonth()
   const thisYear = now.getFullYear()
 
-  const totalRevenue = kpiData.reduce((sum, order) => sum + order.total, 0)
   const thisMonthRevenue = kpiData
     .filter(order => {
       const date = new Date(order.created_at)
@@ -91,7 +82,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const totalCount = allData.length
   const todayCount = allData.filter(order => new Date(order.created_at).toDateString() === now.toDateString()).length
   const actionCount = allData.filter(order => ['new', 'preparing', 'ready_for_pickup'].includes(order.status)).length
-  const toShip = allData.filter(order => order.status === 'preparing').length
+  const toPrepare = allData.filter(order => order.status === 'preparing').length
 
   const statusCounts = allData.reduce<Record<string, number>>((acc, order) => {
     acc[order.status] = (acc[order.status] ?? 0) + 1
@@ -142,83 +133,82 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const activeFilterCount = [filterDateFrom, filterDateTo, filterFulfillment, filterPayment].filter(Boolean).length
 
   return (
-    <div className="mx-auto w-full max-w-7xl pb-10">
+    <div className="mx-auto w-full max-w-7xl pb-8">
       <AdminPageHeader
         title="Commandes"
-        description="Traitez les commandes par priorité, vérifiez les paiements et préparez les expéditions depuis un seul espace."
-        meta={`${totalCount} au total`}
+        description="Traitez rapidement les commandes qui demandent votre attention."
+        meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`}
       />
 
+      <div className="-mt-2 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+        <span><strong className="font-semibold text-gray-900 dark:text-gray-100">{actionCount}</strong> à traiter</span>
+        <span><strong className="font-semibold text-amber-700 dark:text-amber-300">{toPrepare}</strong> à préparer</span>
+        <span><strong className="font-semibold text-gray-900 dark:text-gray-100">{todayCount}</strong> aujourd&apos;hui</span>
+        <span><strong className="font-semibold text-gray-900 dark:text-gray-100">{formatPrice(thisMonthRevenue, tenant.currency)}</strong> ce mois</span>
+      </div>
+
       {pendingPayments.length > 0 && (
-        <div className="mb-5">
+        <div className="mb-4">
           <PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} />
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard label="Aujourd'hui" value={String(todayCount)} sub="Nouvelles commandes" icon={IconClock} tone="info" />
-        <KpiCard label="À traiter" value={String(actionCount)} sub="Nouvelles, préparation, retrait" icon={IconPackage} tone="warn" href="/admin?status=new" />
-        <KpiCard label="À expédier" value={String(toShip)} sub="En préparation" icon={IconTruck} tone="warn" href="/admin?status=preparing" />
-        <KpiCard label="CA ce mois" value={formatPrice(thisMonthRevenue, tenant.currency)} sub={`${formatPrice(totalRevenue, tenant.currency)} au total`} icon={IconCurrencyEuro} tone="primary" />
+      <section className="mb-3 rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex gap-1 overflow-x-auto border-b border-[var(--admin-border)] px-2 py-2 dark:border-gray-800 sm:px-3" aria-label="Statuts des commandes">
+          {STATUS_TABS.map(tab => {
+            const active = filterStatus === tab.key
+            const count = tab.key ? (statusCounts[tab.key] ?? 0) : totalCount
+            return (
+              <Link
+                key={tab.key || 'all'}
+                href={buildStatusHref(searchParams, tab.key)}
+                className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] ring-1 ring-[#D9D3FF]'
+                    : tab.key === 'preparing' && count > 0
+                      ? 'text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40'
+                      : 'text-gray-500 hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                }`}
+              >
+                {tab.label}
+                <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] ${
+                  active
+                    ? 'bg-white/80 dark:bg-gray-900/70'
+                    : tab.key === 'preparing' && count > 0
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                      : 'bg-gray-100 dark:bg-gray-800'
+                }`}>
+                  {count}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+
+        <div className="flex flex-col gap-2 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <Suspense fallback={<div className="h-9" />}>
+            <AdminFilters
+              currentStatus={filterStatus}
+              currentDateFrom={filterDateFrom}
+              currentDateTo={filterDateTo}
+              currentFulfillment={filterFulfillment}
+              currentPayment={filterPayment}
+              statusCounts={statusCounts}
+              hideStatus
+            />
+          </Suspense>
+
+          {(filterStatus || activeFilterCount > 0) && (
+            <Link href="/admin" className="shrink-0 text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">
+              Réinitialiser{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            </Link>
+          )}
+        </div>
+      </section>
+
+      <div className="[&_thead_th]:py-2.5 [&_tbody_td]:py-2.5 [&_tbody_tr]:align-middle [&_ul>li>a]:p-3">
+        <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} />
       </div>
-
-      <AdminBlockAccent tone="primary" className="mb-5">
-        <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="border-b border-[var(--admin-border)] px-3 pt-3 dark:border-gray-800 sm:px-4">
-            <div className="flex gap-1 overflow-x-auto pb-3" aria-label="Statuts des commandes">
-              {STATUS_TABS.map(tab => {
-                const active = filterStatus === tab.key
-                const count = tab.key ? (statusCounts[tab.key] ?? 0) : totalCount
-                return (
-                  <Link
-                    key={tab.key || 'all'}
-                    href={buildStatusHref(searchParams, tab.key)}
-                    className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                      active
-                        ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] ring-1 ring-[#D9D3FF]'
-                        : 'text-gray-500 hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
-                    }`}
-                  >
-                    {tab.label}
-                    <span className={`rounded-full px-1.5 py-0.5 text-[11px] ${active ? 'bg-white/80' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                      {count}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="px-3 py-3 sm:px-4">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Affiner la liste</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Livraison, paiement et période{activeFilterCount ? ` · ${activeFilterCount} filtre${activeFilterCount > 1 ? 's' : ''} actif${activeFilterCount > 1 ? 's' : ''}` : ''}
-                </p>
-              </div>
-              {(filterStatus || activeFilterCount > 0) && (
-                <Link href="/admin" className="text-xs font-medium text-[var(--admin-primary-fg)] hover:underline">
-                  Réinitialiser
-                </Link>
-              )}
-            </div>
-            <Suspense fallback={<div className="h-10" />}>
-              <AdminFilters
-                currentStatus={filterStatus}
-                currentDateFrom={filterDateFrom}
-                currentDateTo={filterDateTo}
-                currentFulfillment={filterFulfillment}
-                currentPayment={filterPayment}
-                statusCounts={statusCounts}
-                hideStatus
-              />
-            </Suspense>
-          </div>
-        </section>
-      </AdminBlockAccent>
-
-      <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} />
     </div>
   )
 }
