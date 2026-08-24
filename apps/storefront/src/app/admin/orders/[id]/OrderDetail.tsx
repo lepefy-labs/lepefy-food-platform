@@ -6,208 +6,63 @@ import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import type { Order, OrderStatus } from '@lepefy/types';
 
-// ─── Translations ─────────────────────────────────────────────────────────────
-
-const translations = {
-  fr: {
-    updateOrder:          'Mettre à jour la commande',
-    status:               'Statut',
-    carrier:              'Transporteur effectif',
-    tracking:             'Code de suivi',
-    trackingHint:         'Numéro de tracking du colis',
-    notes:                'Notes internes',
-    notesHint:            'Visible uniquement par vous, pas par le client',
-    save:                 'Enregistrer',
-    saving:               'Enregistrement…',
-    saveOk:               '✓ Modifications enregistrées',
-    saveError:            'Erreur lors de l\'enregistrement',
-    print:                'Imprimer le récapitulatif',
-    pickingList:          '📦 Liste de prélèvement',
-    markAsPaid:           'Marquer comme payé',
-    markingAsPaid:        'Mise à jour…',
-    markAsPaidOk:         '✓ Commande marquée comme payée',
-    markAsPaidError:      'Erreur lors de la mise à jour',
-    pendingPaymentBanner: 'Paiement en attente — à encaisser en boutique',
-    // Status labels — delivery
-    preparing:            'En préparation',
-    shipped:              'Expédié',
-    delivered:            'Livré',
-    cancelled:            'Annulé',
-    // Status labels — pickup
-    ready_for_pickup:     'Prêt à retirer',
-    picked_up:            'Retiré',
-    // Modal
-    changeCarrier:        'Changer de transporteur ?',
-    cancel:               'Annuler',
-    confirm:              'Confirmer',
-    // Shipping details section
-    shippingDetails:      'Détails expédition',
-    sdCarrier:            'Transporteur',
-    sdService:            'Service',
-    sdParcels:            'Nb colis',
-    sdWeight:             'Poids total',
-    sdCarrierCost:        'Coût transporteur',
-    sdPackaging:          'Surplus emballage',
-    sdDiscount:           'Remise livraison',
-    sdFreeBadge:          'Livraison offerte',
-    sdTotal:              'Total livraison facturé',
-  },
-  it: {
-    updateOrder:          'Aggiorna ordine',
-    status:               'Stato',
-    carrier:              'Corriere effettivo',
-    tracking:             'Codice tracking',
-    trackingHint:         'Numero di tracking del pacco',
-    notes:                'Note interne',
-    notesHint:            'Visibile solo a te, non al cliente',
-    save:                 'Salva',
-    saving:               'Salvataggio…',
-    saveOk:               '✓ Modifiche salvate',
-    saveError:            'Errore durante il salvataggio',
-    print:                'Stampa riepilogo',
-    pickingList:          '📦 Lista prelievo',
-    markAsPaid:           'Segna come pagato',
-    markingAsPaid:        'Aggiornamento…',
-    markAsPaidOk:         '✓ Ordine segnato come pagato',
-    markAsPaidError:      'Errore durante l\'aggiornamento',
-    pendingPaymentBanner: 'Pagamento in attesa — da incassare in negozio',
-    // Status labels — delivery
-    preparing:            'In preparazione',
-    shipped:              'Spedito',
-    delivered:            'Consegnato',
-    cancelled:            'Annullato',
-    // Status labels — pickup
-    ready_for_pickup:     'Pronto per il ritiro',
-    picked_up:            'Ritirato',
-    // Modal
-    changeCarrier:        'Cambiare corriere?',
-    cancel:               'Annulla',
-    confirm:              'Conferma',
-    // Shipping details section
-    shippingDetails:      'Dettagli spedizione',
-    sdCarrier:            'Corriere',
-    sdService:            'Servizio',
-    sdParcels:            'N° colli',
-    sdWeight:             'Peso totale',
-    sdCarrierCost:        'Costo corriere',
-    sdPackaging:          'Surplus imballaggio',
-    sdDiscount:           'Sconto spedizione',
-    sdFreeBadge:          'Spedizione omaggio',
-    sdTotal:              'Totale spedizione fatturato',
-  },
-} as const;
-
-type Lang = keyof typeof translations;
-
-// ─── Status option lists ──────────────────────────────────────────────────────
-
-const STATUS_OPTIONS_DELIVERY = [
-  { value: 'preparing', labelKey: 'preparing' },
-  { value: 'shipped',   labelKey: 'shipped'   },
-  { value: 'delivered', labelKey: 'delivered' },
-  { value: 'cancelled', labelKey: 'cancelled' },
-] as const;
-
-const STATUS_OPTIONS_PICKUP = [
-  { value: 'preparing',        labelKey: 'preparing'        },
-  { value: 'ready_for_pickup', labelKey: 'ready_for_pickup' },
-  { value: 'delivered',        labelKey: 'picked_up'        },
-  { value: 'cancelled',        labelKey: 'cancelled'        },
-] as const;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface ShippingDetails {
-  totalWeightG?:            number;
-  numParcels?:              number;
-  packlinkCost?:            number;
-  serviceId?:               number;
-  serviceName?:             string;
-  carrierName?:             string;
-  vatSource?:               'packlink' | 'db';
-  vatRate?:                 number;
-  vatAmount?:               number;
-  surchargeMode?:           string;
+  totalWeightG?: number;
+  numParcels?: number;
+  packlinkCost?: number;
+  serviceName?: string;
+  carrierName?: string;
+  vatSource?: 'packlink' | 'db';
+  vatRate?: number;
+  vatAmount?: number;
   packagingSurchargeTotal?: number;
-  boxDimensions?:           { length: number; width: number; height: number };
-  // Règles commerciales par pays (shipping_country_rules) — voir
-  // lib/shipping/resolveCountryRule.ts. Absents tant qu'aucune règle ne
-  // s'applique à la commande.
-  countryRuleApplied?:      boolean;
-  originalShippingCost?:    number;
-  discountApplied?:         number;
-  freeShippingApplied?:     boolean;
+  discountApplied?: number;
+  freeShippingApplied?: boolean;
 }
 
 interface Props {
-  order:            Order;
-  currency:         string;
-  carriers:         { name: string }[];
-  shippingDetails:  ShippingDetails | null;
+  order: Order;
+  currency: string;
+  carriers: { name: string }[];
+  shippingDetails: ShippingDetails | null;
   shippingProvider: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const CARRIER_MAP: Record<string, string> = {
-  brt:         'BRT',
-  bartolini:   'BRT',
-  dhl:         'DHL',
-  fedex:       'FedEx',
-  tnt:         'TNT',
-  gls:         'GLS',
-  ups:         'UPS',
-  sda:         'SDA',
-  poste:       'Poste Italiane',
-  'poste italiane': 'Poste Italiane',
-  dpd:         'DPD',
-  nexive:      'Nexive',
+  brt: 'BRT', bartolini: 'BRT', dhl: 'DHL', fedex: 'FedEx', tnt: 'TNT',
+  gls: 'GLS', ups: 'UPS', sda: 'SDA', poste: 'Poste Italiane',
+  'poste italiane': 'Poste Italiane', dpd: 'DPD', nexive: 'Nexive',
 };
 
 function formatCarrierName(raw: string | undefined): string {
   if (!raw) return '—';
-  const key = raw.toLowerCase().trim();
-  return CARRIER_MAP[key] ?? raw.trim();
+  return CARRIER_MAP[raw.toLowerCase().trim()] ?? raw.trim();
 }
 
-function vatLabel(sd: ShippingDetails, lang: Lang): string {
-  const pct = Math.round((sd.vatRate ?? 0) * 100);
-  if ((sd.vatSource ?? '') === 'packlink') {
-    return lang === 'fr' ? 'TVA (incluse Packlink)' : 'IVA (inclusa Packlink)';
+function nextAction(status: OrderStatus, isPickup: boolean) {
+  if (status === 'new') return { status: 'preparing' as OrderStatus, label: 'Démarrer la préparation' };
+  if (status === 'preparing') {
+    return isPickup
+      ? { status: 'ready_for_pickup' as OrderStatus, label: 'Marquer prête au retrait' }
+      : { status: 'shipped' as OrderStatus, label: 'Expédier la commande' };
   }
-  return lang === 'fr'
-    ? `TVA livraison (${pct}% — appliquée par le système)`
-    : `IVA spedizione (${pct}% — applicata dal sistema)`;
+  if (status === 'ready_for_pickup' && isPickup) {
+    return { status: 'delivered' as OrderStatus, label: 'Marquer comme retirée' };
+  }
+  if (status === 'shipped' && !isPickup) {
+    return { status: 'delivered' as OrderStatus, label: 'Marquer comme livrée' };
+  }
+  return null;
 }
 
-// ─── Field row ────────────────────────────────────────────────────────────────
-
-function Field({
-  label,
-  value,
-  bold,
-  accent,
-}: {
-  label:   string;
-  value:   string;
-  bold?:   boolean;
-  accent?: boolean;
-}) {
+function Field({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between items-baseline gap-2 text-sm ${bold ? 'font-semibold' : ''}`}>
-      <span className="text-gray-400 text-xs shrink-0">{label}</span>
-      <span className={`text-right ${accent ? 'text-[var(--color-primary)] font-semibold' : bold ? 'text-gray-900' : 'text-gray-700'}`}>
-        {value}
-      </span>
+    <div className={`flex items-baseline justify-between gap-3 text-sm ${bold ? 'font-semibold' : ''}`}>
+      <span className="shrink-0 text-xs text-gray-400">{label}</span>
+      <span className="text-right text-gray-700 dark:text-gray-200">{value}</span>
     </div>
   );
 }
-
-function Divider() {
-  return <div className="border-t border-gray-100 my-2" />;
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OrderDetail({
   order,
@@ -217,146 +72,90 @@ export default function OrderDetail({
   shippingProvider,
 }: Props) {
   const router = useRouter();
-
-  const [lang, setLang] = useState<Lang>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('lepefy-admin-lang') as Lang) ?? 'fr';
-    }
-    return 'fr';
-  });
-
   const isPickup = order.fulfillment_type === 'pickup';
-  const isInStorePending =
-    order.payment_method === 'in_store' && order.payment_status === 'pending';
-
-  // Carrier — priority: tracking_carrier > Packlink suggestion > first in list
+  const isInStorePending = order.payment_method === 'in_store' && order.payment_status === 'pending';
   const packlinkCarrier = shippingDetails?.carrierName ?? '';
-  const originalCarrier =
-    order.tracking_carrier ?? packlinkCarrier ?? carriers[0]?.name ?? '';
+  const originalCarrier = order.tracking_carrier ?? packlinkCarrier ?? carriers[0]?.name ?? '';
 
-  const [status,         setStatus]         = useState<OrderStatus>(order.status);
-  const [carrier,        setCarrier]        = useState(originalCarrier);
-  const [pendingCarrier, setPendingCarrier] = useState<string | null>(null);
-  const [showConfirm,    setShowConfirm]    = useState(false);
-  const [trackingCode,   setTrackingCode]   = useState(order.tracking_code ?? '');
-  const [notes,          setNotes]          = useState(order.notes ?? '');
-  const [saving,         setSaving]         = useState(false);
-  const [saveMsg,        setSaveMsg]        = useState<string | null>(null);
-  const [saveError,      setSaveError]      = useState(false);
-  const [isPaid,         setIsPaid]         = useState(!isInStorePending);
+  const [carrier, setCarrier] = useState(originalCarrier);
+  const [trackingCode, setTrackingCode] = useState(order.tracking_code ?? '');
+  const [notes, setNotes] = useState(order.notes ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState(false);
+  const [isPaid, setIsPaid] = useState(!isInStorePending);
 
-  const t = translations[lang];
+  const action = nextAction(order.status, isPickup);
+  const needsTracking = action?.status === 'shipped';
+  const actionDisabled = saving || (needsTracking && !trackingCode.trim());
+  const inputClass = 'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100';
 
-  // Dynamic label for the suggested carrier in the modal
-  const suggestedCarrierLabel: string = (() => {
-    const labels = {
-      packlink:    lang === 'fr' ? 'Transporteur suggéré :' : 'Corriere suggerito :',
-      flat_rate:   lang === 'fr' ? 'Transporteur par défaut :' : 'Corriere predefinito :',
-      pickup_only: lang === 'fr' ? 'Transporteur :' : 'Corriere :',
-    };
-    return labels[shippingProvider as keyof typeof labels]
-      ?? (lang === 'fr' ? 'Transporteur suggéré :' : 'Corriere suggerito :');
-  })();
-
-  const statusOptions = isPickup ? STATUS_OPTIONS_PICKUP : STATUS_OPTIONS_DELIVERY;
-
-  // STATUS_OPTIONS_PICKUP ne propose jamais 'shipped' (picked_up y tient sa place) :
-  // cette situation ne peut donc se produire que pour une livraison, sans condition
-  // supplémentaire sur fulfillment_type nécessaire.
-  const shippedWithoutTracking =
-    status === 'shipped' && (!trackingCode || trackingCode.trim() === '');
-
-  function switchLang(l: Lang) {
-    setLang(l);
-    localStorage.setItem('lepefy-admin-lang', l);
-  }
-
-  function handleCarrierChange(newValue: string) {
-    if (newValue !== originalCarrier && packlinkCarrier && newValue !== packlinkCarrier) {
-      setPendingCarrier(newValue);
-      setShowConfirm(true);
-    } else {
-      setCarrier(newValue);
-    }
-  }
-
-  function confirmCarrierChange() {
-    if (pendingCarrier) setCarrier(pendingCarrier);
-    setPendingCarrier(null);
-    setShowConfirm(false);
-  }
-
-  function cancelCarrierChange() {
-    setPendingCarrier(null);
-    setShowConfirm(false);
-  }
-
-  async function handleSave() {
+  async function patchOrder(body: Record<string, unknown>, successMessage: string) {
     setSaving(true);
     setSaveMsg(null);
     setSaveError(false);
     try {
-      const body: Record<string, unknown> = {
-        status,
-        notes: notes.trim() || null,
-      };
-      if (!isPickup) {
-        body.tracking_carrier = carrier.trim() || null;
-        body.tracking_code    = trackingCode.trim() || null;
-      }
       const res = await fetch(`/api/admin/orders/${order.id}`, {
-        method:  'PATCH',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      setSaveMsg(t.saveOk);
+      const response = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(response?.error ?? `HTTP ${res.status}`);
+      setSaveMsg(successMessage);
       router.refresh();
-    } catch {
-      setSaveMsg(t.saveError);
+    } catch (error) {
+      setSaveMsg(error instanceof Error ? error.message : 'Erreur lors de la mise à jour.');
       setSaveError(true);
     } finally {
       setSaving(false);
     }
   }
 
-  const inputClass =
-    'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+  async function saveNotesAndLogistics() {
+    await patchOrder({
+      notes: notes.trim() || null,
+      ...(!isPickup ? {
+        tracking_carrier: carrier.trim() || null,
+        tracking_code: trackingCode.trim() || null,
+      } : {}),
+    }, 'Modifications enregistrées.');
+  }
 
-  // Fully-typed shipping details (safe — all fields accessed via optional chaining below)
+  async function runPrimaryAction() {
+    if (!action) return;
+    await patchOrder({
+      status: action.status,
+      notes: notes.trim() || null,
+      ...(!isPickup ? {
+        tracking_carrier: carrier.trim() || null,
+        tracking_code: trackingCode.trim() || null,
+      } : {}),
+    }, 'Commande mise à jour.');
+  }
+
+  async function cancelOrder() {
+    await patchOrder({ status: 'cancelled', notes: notes.trim() || null }, 'Commande annulée.');
+  }
+
   const sd = shippingDetails;
+  const suggestedCarrierLabel = shippingProvider === 'packlink'
+    ? 'Transporteur suggéré'
+    : 'Transporteur par défaut';
 
   return (
     <>
-      {/* Lang toggle */}
-      <div className="flex justify-end gap-1 -mb-2">
-        {(['fr', 'it'] as Lang[]).map((l) => (
-          <button
-            key={l}
-            onClick={() => switchLang(l)}
-            className={`text-xs px-2 py-1 rounded font-medium border transition-colors ${
-              lang === l
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light)]'
-                : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            {l.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
-      {/* In-store payment banner + mark-as-paid */}
       {order.payment_method === 'in_store' && !isPaid && (
-        <section className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm font-semibold text-amber-800 mb-3">
-            🏪 {t.pendingPaymentBanner}
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <p className="mb-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
+            Paiement en attente — à encaisser en boutique
           </p>
           <ConfirmPaymentButton
             endpoint={`/api/admin/orders/${order.id}`}
             method="PATCH"
             body={{ payment_status: 'paid' }}
-            label={t.markAsPaid}
-            confirmingLabel={t.markingAsPaid}
+            label="Marquer comme payé"
+            confirmingLabel="Mise à jour…"
             onSuccess={() => {
               setIsPaid(true);
               router.refresh();
@@ -365,233 +164,118 @@ export default function OrderDetail({
         </section>
       )}
 
-      {/* Section 3 — Shipping details (delivery + Packlink only) */}
-      {!isPickup && sd && (
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">
-            {t.shippingDetails}
-            {sd.freeShippingApplied && (
-              <span
-                className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-semibold align-middle"
-                style={{ background: '#F0FDF4', color: '#15803D', border: '0.5px solid #BBF7D0' }}
-              >
-                {t.sdFreeBadge}
-              </span>
+      {action && (
+        <section className="overflow-hidden rounded-2xl border border-[#D9D3FF] bg-[var(--admin-primary-soft)] shadow-sm">
+          <div className="border-b border-[#D9D3FF] px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Action suivante</p>
+            <h2 className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">{action.label}</h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Le workflow contrôle les transitions autorisées côté serveur.
+            </p>
+          </div>
+
+          <div className="space-y-4 bg-white p-4 dark:bg-gray-900">
+            {!isPickup && (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500">Transporteur effectif</label>
+                  <select value={carrier} onChange={event => setCarrier(event.target.value)} className={inputClass}>
+                    {carrier && !carriers.some(item => item.name === carrier) && <option value={carrier}>{carrier}</option>}
+                    {carriers.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}
+                  </select>
+                  {packlinkCarrier && <p className="mt-1 text-[11px] text-gray-400">{suggestedCarrierLabel} : {formatCarrierName(packlinkCarrier)}</p>}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500">Code de suivi</label>
+                  <input
+                    type="text"
+                    value={trackingCode}
+                    onChange={event => setTrackingCode(event.target.value)}
+                    placeholder="Numéro de tracking du colis"
+                    className={inputClass}
+                  />
+                  {needsTracking && !trackingCode.trim() && (
+                    <p className="mt-1.5 text-xs font-medium text-red-600">Le tracking est obligatoire avant expédition.</p>
+                  )}
+                </div>
+              </>
             )}
-          </h2>
-          <div className="space-y-2">
-            {sd.carrierName && (
-              <Field
-                label={t.sdCarrier}
-                value={formatCarrierName(sd.carrierName)}
-              />
-            )}
-            {sd.serviceName && (
-              <Field label={t.sdService} value={sd.serviceName} />
-            )}
-            {sd.numParcels != null && (
-              <Field label={t.sdParcels} value={String(sd.numParcels)} />
-            )}
-            {sd.totalWeightG != null && (
-              <Field
-                label={t.sdWeight}
-                value={(sd.totalWeightG / 1000).toFixed(2) + ' kg'}
-              />
-            )}
-            <Divider />
-            {sd.packlinkCost != null && (
-              <Field
-                label={t.sdCarrierCost}
-                value={formatPrice(sd.packlinkCost, currency)}
-              />
-            )}
-            {sd.vatAmount != null && (
-              <Field
-                label={vatLabel(sd, lang)}
-                value={formatPrice(sd.vatAmount, currency)}
-              />
-            )}
-            {sd.packagingSurchargeTotal != null && sd.packagingSurchargeTotal > 0 && (
-              <Field
-                label={t.sdPackaging}
-                value={formatPrice(sd.packagingSurchargeTotal, currency)}
-              />
-            )}
-            {sd.discountApplied != null && sd.discountApplied > 0 && (
-              <Field
-                label={t.sdDiscount}
-                value={'-' + formatPrice(sd.discountApplied, currency)}
-              />
-            )}
-            <Divider />
-            <Field
-              label={t.sdTotal}
-              value={formatPrice(order.shipping_cost, currency)}
-              bold
-            />
+
+            <button
+              type="button"
+              onClick={runPrimaryAction}
+              disabled={actionDisabled}
+              className="min-h-11 w-full rounded-xl bg-[var(--admin-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+            >
+              {saving ? 'Mise à jour…' : action.label}
+            </button>
           </div>
         </section>
       )}
 
-      {/* Section 4 — Update form */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">{t.updateOrder}</h2>
-
-        <div className="space-y-4">
-          {/* Status */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1.5 font-medium">{t.status}</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as OrderStatus)}
-              className={inputClass}
-            >
-              {statusOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {t[opt.labelKey as keyof typeof t] as string}
-                </option>
-              ))}
-            </select>
+      {!isPickup && sd && (
+        <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 dark:bg-gray-900">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Détails expédition</h2>
+            {sd.freeShippingApplied && <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">Livraison offerte</span>}
           </div>
-
-          {/* Carrier + tracking — delivery only */}
-          {!isPickup && (
-            <>
-              {/* Carrier select with confirmation modal */}
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5 font-medium">{t.carrier}</label>
-
-                {showConfirm && (
-                  <div style={{
-                    border: '1px solid #E5E7EB', borderRadius: 10, background: '#fff',
-                    padding: 16, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  }}>
-                    <p className="text-sm font-semibold text-gray-800 mb-3">{t.changeCarrier}</p>
-                    <div className="space-y-1.5 text-sm mb-4">
-                      {packlinkCarrier && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 text-xs w-40 shrink-0">{suggestedCarrierLabel}</span>
-                          <span className="font-medium text-gray-700">{packlinkCarrier}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400 text-xs w-40 shrink-0">
-                          {lang === 'fr' ? 'Nouveau transporteur :' : 'Nuovo corriere :'}
-                        </span>
-                        <span className="font-semibold text-gray-900">{pendingCarrier}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={cancelCarrierChange}
-                        className="px-4 py-1.5 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-                      >
-                        {t.cancel}
-                      </button>
-                      <button
-                        onClick={confirmCarrierChange}
-                        className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-colors"
-                        style={{ backgroundColor: 'var(--color-primary)' }}
-                      >
-                        {t.confirm}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <select
-                  value={carrier}
-                  onChange={(e) => handleCarrierChange(e.target.value)}
-                  className={inputClass}
-                >
-                  {carrier && !carriers.some((c) => c.name === carrier) && (
-                    <option value={carrier}>{carrier}</option>
-                  )}
-                  {carriers.map((c) => (
-                    <option key={c.name} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Tracking code */}
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5 font-medium">{t.tracking}</label>
-                <input
-                  type="text"
-                  value={trackingCode}
-                  onChange={(e) => setTrackingCode(e.target.value)}
-                  placeholder={t.trackingHint}
-                  className={inputClass}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1.5 font-medium">{t.notes}</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={t.notesHint}
-              rows={3}
-              className={inputClass + ' resize-none'}
-            />
+          <div className="space-y-2">
+            {sd.carrierName && <Field label="Transporteur" value={formatCarrierName(sd.carrierName)} />}
+            {sd.serviceName && <Field label="Service" value={sd.serviceName} />}
+            {sd.numParcels != null && <Field label="Nb colis" value={String(sd.numParcels)} />}
+            {sd.totalWeightG != null && <Field label="Poids total" value={`${(sd.totalWeightG / 1000).toFixed(2)} kg`} />}
+            {sd.packlinkCost != null && <Field label="Coût transporteur" value={formatPrice(sd.packlinkCost, currency)} />}
+            {sd.vatAmount != null && <Field label="TVA livraison" value={formatPrice(sd.vatAmount, currency)} />}
+            {sd.packagingSurchargeTotal != null && sd.packagingSurchargeTotal > 0 && <Field label="Surplus emballage" value={formatPrice(sd.packagingSurchargeTotal, currency)} />}
+            {sd.discountApplied != null && sd.discountApplied > 0 && <Field label="Remise livraison" value={`-${formatPrice(sd.discountApplied, currency)}`} />}
+            <div className="border-t border-gray-100 pt-2 dark:border-gray-800">
+              <Field label="Total livraison facturé" value={formatPrice(order.shipping_cost, currency)} bold />
+            </div>
           </div>
+        </section>
+      )}
 
-          {saveMsg && (
-            <p className={`text-sm ${saveError ? 'text-red-600' : 'text-green-600'}`}>
-              {saveMsg}
-            </p>
-          )}
-
-          <button
-            onClick={handleSave}
-            disabled={saving || shippedWithoutTracking}
-            className="w-full py-2.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50 transition-opacity"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            {saving ? t.saving : t.save}
-          </button>
-
-          {shippedWithoutTracking && (
-            <p className="text-xs text-red-600 mt-2">
-              {lang === 'fr'
-                ? 'Le code de suivi est requis pour marquer la commande comme expédiée.'
-                : 'Il codice di tracking è obbligatorio per segnare l\'ordine come spedito.'}
-            </p>
-          )}
-        </div>
+      <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 dark:bg-gray-900">
+        <h2 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-100">Notes internes</h2>
+        <textarea
+          value={notes}
+          onChange={event => setNotes(event.target.value)}
+          placeholder="Visible uniquement par l'équipe admin"
+          rows={4}
+          className={`${inputClass} resize-none`}
+        />
+        <button
+          type="button"
+          onClick={saveNotesAndLogistics}
+          disabled={saving}
+          className="mt-3 min-h-10 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:text-gray-200"
+        >
+          Enregistrer les informations
+        </button>
+        {saveMsg && <p className={`mt-2 text-xs font-medium ${saveError ? 'text-red-600' : 'text-emerald-600'}`}>{saveMsg}</p>}
       </section>
 
-      {/* Section 5 — Print controls */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex flex-col gap-3">
-          {/* Picking list — primary print action */}
-          <div>
+      <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 dark:bg-gray-900">
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Actions secondaires</h2>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="min-h-10 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:text-gray-200"
+          >
+            Imprimer la liste de prélèvement
+          </button>
+          {order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'shipped' && (
             <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-white text-sm transition-opacity hover:opacity-90"
-              style={{ backgroundColor: 'var(--color-primary)' }}
+              type="button"
+              onClick={cancelOrder}
+              disabled={saving}
+              className="min-h-10 w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
             >
-              {t.pickingList}
+              Annuler la commande
             </button>
-            <p className="text-xs text-gray-400 mt-1.5">
-              {lang === 'fr'
-                ? 'Feuille de prélèvement magazzin — triée par emplacement'
-                : 'Foglio prelievo magazzino — ordinato per ubicazione'}
-            </p>
-          </div>
-
-          {/* Summary print — secondary */}
-          <div className="border-t border-gray-100 pt-3">
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
-            >
-              <span>🖨</span> {t.print}
-            </button>
-          </div>
+          )}
         </div>
       </section>
     </>
