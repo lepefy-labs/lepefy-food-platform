@@ -11,6 +11,8 @@ interface CartOrderSummaryProps {
   currency?: string;
   canProceed: boolean;
   checkoutHint?: string | null;
+  primaryActionLabel?: string;
+  primaryActionDisabled?: boolean;
   syncStatus: CartSyncStatus;
   freeShippingThreshold?: number | null;
   onCheckout: () => void;
@@ -32,12 +34,16 @@ export function CartOrderSummary({
   currency,
   canProceed,
   checkoutHint,
+  primaryActionLabel = 'Continuer vers le paiement',
+  primaryActionDisabled = false,
   syncStatus,
   freeShippingThreshold = null,
   onCheckout,
   children,
   hideActionsOnMobile = false,
 }: CartOrderSummaryProps) {
+  const totalIsEstimated = shippingCost === null;
+
   return (
     <section aria-labelledby="cart-summary-title" className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
       <div className="border-b border-gray-100 px-5 py-4 sm:px-6">
@@ -56,11 +62,14 @@ export function CartOrderSummary({
           <div className="flex items-center justify-between gap-4 py-1.5">
             <dt className="text-gray-500">{shippingLabel}</dt>
             <dd className="font-semibold tabular-nums">
-              {shippingCost === null ? <span className="text-gray-400">À calculer</span> : shippingCost === 0 ? <span className="text-green-700">Gratuit</span> : formatPrice(shippingCost, currency)}
+              {shippingCost === null ? <span className="text-amber-700">Adresse requise</span> : shippingCost === 0 ? <span className="text-green-700">Gratuit</span> : formatPrice(shippingCost, currency)}
             </dd>
           </div>
           <div className="mt-3 flex items-end justify-between gap-4 border-t border-gray-200 pt-4">
-            <dt className="text-base font-bold text-gray-950">Total</dt>
+            <div>
+              <dt className="text-base font-bold text-gray-950">{totalIsEstimated ? 'Total estimé' : 'Total'}</dt>
+              {totalIsEstimated && <p className="mt-0.5 text-[11px] text-gray-400">hors frais de livraison</p>}
+            </div>
             <dd className="text-2xl font-bold tabular-nums text-gray-950" aria-live="polite">{formatPrice(total, currency)}</dd>
           </div>
         </dl>
@@ -71,19 +80,23 @@ export function CartOrderSummary({
 
         <div className={hideActionsOnMobile ? 'hidden md:block' : undefined}>
           {checkoutHint && (
-            <p className="mt-5 rounded-xl bg-gray-50 px-3 py-2.5 text-center text-xs leading-relaxed text-gray-600">
-              {checkoutHint}
-            </p>
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-left" role="status">
+              <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-amber-700">Pour continuer</p>
+              <p className="mt-1 text-sm font-semibold leading-relaxed text-amber-950">{checkoutHint}</p>
+            </div>
           )}
           <button
             type="button"
             onClick={onCheckout}
-            disabled={!canProceed}
-            className="mt-4 min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white transition-[opacity,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
+            disabled={primaryActionDisabled}
+            className="mt-4 min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white transition-[opacity,transform] active:scale-[0.99] disabled:cursor-wait disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
-            Continuer vers le paiement
+            {primaryActionLabel}
           </button>
+          {!canProceed && !primaryActionDisabled && (
+            <p className="mt-2 text-center text-[11px] leading-relaxed text-gray-400">Le paiement reste inaccessible tant que la livraison n’est pas calculée.</p>
+          )}
 
           <Link href="/products" className="mt-3 flex min-h-10 items-center justify-center text-sm font-semibold text-gray-500 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
             Continuer mes achats

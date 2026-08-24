@@ -48,8 +48,12 @@ export function CartItem({
   const isPage = variant === 'page';
 
   return (
-    <li className={`flex gap-3 border-b border-gray-100 last:border-0 ${isPage ? 'py-4 sm:gap-4 sm:py-5' : 'py-4'}`}>
-      <div className={`${isPage ? 'h-20 w-20 sm:h-[88px] sm:w-[88px]' : 'h-16 w-16'} relative flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50`}>
+    <li
+      className={isPage
+        ? 'flex gap-3 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-[0_4px_18px_rgba(15,23,42,0.035)] transition-[border-color,box-shadow] hover:border-gray-300 hover:shadow-[0_7px_24px_rgba(15,23,42,0.055)] sm:gap-4 sm:p-4 motion-reduce:transition-none'
+        : 'flex gap-4 border-b border-gray-100 py-4 last:border-0'}
+    >
+      <div className={`${isPage ? 'h-20 w-20 sm:h-[88px] sm:w-[88px]' : 'h-16 w-16'} relative flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-gray-100`}>
         {product.image_url ? (
           <Image
             src={product.image_url}

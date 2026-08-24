@@ -65,11 +65,13 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefilledForCustomerRef = useRef<string | null>(null);
+  const addressSectionRef = useRef<HTMLDivElement>(null);
 
   const effectiveShipping = fulfillmentType === 'pickup' ? 0 : shippingTotal;
   const total = calculateCartTotal(subtotal, effectiveShipping);
   const canProceed = canProceedToCheckout(itemCount, fulfillmentType, shippingTotal);
   const shippingPayloadKey = JSON.stringify(shippingPayload());
+  const deliveryQuoteMissing = fulfillmentType === 'delivery' && shippingTotal === null;
 
   const fetchShipping = useCallback(async (zip: string, destinationCountry: string) => {
     if (zip.length < 4) return;
@@ -104,6 +106,14 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
       setShippingLoading(false);
     }
   }, [shippingPayload]);
+
+  function invalidateShippingQuote() {
+    setShippingTotal(null);
+    setShippingDetails(null);
+    setFreeShipping(null);
+    setQuoteToken(null);
+    setShippingError(null);
+  }
 
   useEffect(() => {
     if (fulfillmentType === 'pickup') return;
@@ -142,6 +152,10 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   useEffect(() => {
     if (fulfillmentType === 'pickup' || postalCode.length < 4) return;
     if (shippingTotal === 0 && freeShipping !== null && freeShipping.reason !== 'threshold') return;
+    setShippingTotal(null);
+    setShippingDetails(null);
+    setFreeShipping(null);
+    setQuoteToken(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchShipping(postalCode, country), 800);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -191,7 +205,40 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
     router.push('/checkout');
   }
 
+  function focusAddressSection() {
+    const section = addressSectionRef.current;
+    if (!section) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    window.setTimeout(() => {
+      const target = section.querySelector<HTMLInputElement>('input') ?? section.querySelector<HTMLSelectElement>('select');
+      target?.focus();
+    }, reduceMotion ? 0 : 350);
+  }
+
+  function handlePrimaryAction() {
+    if (canProceed) {
+      handleProceed();
+      return;
+    }
+    if (fulfillmentType === 'delivery') focusAddressSection();
+  }
+
   if (isEmpty) return <div className="flex min-h-[60vh]"><CartEmpty headingLevel="h1" /></div>;
+
+  const primaryActionLabel = canProceed
+    ? 'Continuer vers le paiement'
+    : shippingLoading
+      ? 'Calcul de la livraison…'
+      : shippingError
+        ? 'Modifier mon adresse'
+        : 'Indiquer mon adresse';
+
+  const primaryActionHint = deliveryQuoteMissing
+    ? shippingError
+      ? 'Vérifiez votre adresse pour recalculer la livraison.'
+      : 'Adresse requise : elle sert à calculer vos frais de livraison avant le paiement.'
+    : null;
 
   const shippingControls = (
     <div className="space-y-4">
@@ -233,16 +280,25 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
       )}
 
       {fulfillmentType === 'delivery' && (
-        <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+        <div
+          ref={addressSectionRef}
+          className={`rounded-2xl border p-4 transition-colors ${deliveryQuoteMissing ? 'border-amber-200 bg-amber-50/55' : 'border-green-100 bg-green-50/35'}`}
+        >
           <div className="mb-3">
-            <p className="text-sm font-semibold text-gray-800">Adresse de livraison</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Renseignez votre destination pour afficher le coût réel de livraison.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900">Adresse de livraison</p>
+              {deliveryQuoteMissing && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.05em] text-amber-800">Requise</span>}
+            </div>
+            <p className="mt-1 text-xs font-medium leading-relaxed text-gray-600">Nous en avons besoin maintenant uniquement pour calculer vos frais de livraison.</p>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-[125px_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[125px_minmax(0,1fr)]">
             <select
               aria-label="Pays de livraison"
               value={country}
-              onChange={(event) => setCountry(event.target.value)}
+              onChange={(event) => {
+                invalidateShippingQuote();
+                setCountry(event.target.value);
+              }}
               className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             >
               {COUNTRIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
@@ -254,7 +310,10 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
                 inputMode="numeric"
                 placeholder="Code postal"
                 value={postalCode}
-                onChange={(event) => setPostalCode(event.target.value)}
+                onChange={(event) => {
+                  invalidateShippingQuote();
+                  setPostalCode(event.target.value);
+                }}
                 maxLength={10}
                 className="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               />
@@ -263,12 +322,14 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
                 country={country}
                 placeholder="Rue et numéro, ville"
                 onSelect={(result) => {
+                  invalidateShippingQuote();
                   setPostalCode(result.postalCode);
                   setAddressStreet(result.street);
                   setAddressHouseNumber(result.houseNumber);
                   setAddressCity(result.city);
                 }}
                 onManualFallback={() => {
+                  invalidateShippingQuote();
                   setManualMode(true);
                   setAddressStreet('');
                   setAddressHouseNumber('');
@@ -278,10 +339,10 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
             )}
           </div>
           {prefilledAddress && <p className="mt-2 text-xs text-gray-500">Votre adresse habituelle a été préremplie — vous pouvez la modifier.</p>}
-          {shippingLoading && <p className="mt-2 text-xs text-gray-500" role="status">Calcul de la livraison…</p>}
-          {!shippingLoading && shippingError && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-700" role="alert">{shippingError}</p>}
+          {shippingLoading && <p className="mt-2 text-xs font-medium text-gray-600" role="status">Calcul de la livraison…</p>}
+          {!shippingLoading && shippingError && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs font-medium text-red-700" role="alert">{shippingError}</p>}
           {!shippingLoading && shippingTotal !== null && !shippingError && (
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-green-700"><span className="h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden="true" /> Livraison calculée pour cette destination.</p>
+            <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><span className="h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden="true" /> Livraison calculée. Votre total est maintenant définitif.</p>
           )}
           {!shippingLoading && freeShipping && <p className="mt-1.5 text-sm font-medium text-green-700">Livraison offerte{freeShipping.reason === 'threshold' ? ' pour cette commande' : ' pour ce pays'}.</p>}
         </div>
@@ -290,7 +351,7 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-5 pb-52 sm:px-6 sm:py-7 md:pb-10 lg:px-8 lg:py-8">
+    <div className="mx-auto w-full max-w-6xl px-4 py-5 pb-56 sm:px-6 sm:py-7 md:pb-10 lg:px-8 lg:py-8">
       <nav aria-label="Fil d’Ariane" className="mb-3 text-xs font-medium text-gray-400 sm:text-sm">
         <a href="/products" className="transition-colors hover:text-gray-800">Catalogue</a>
         <span aria-hidden="true" className="px-1.5">/</span>
@@ -308,16 +369,16 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-8">
-        <section aria-labelledby="cart-items-title" className="min-w-0 overflow-hidden rounded-3xl border border-gray-200 bg-white px-4 shadow-[0_8px_30px_rgba(15,23,42,0.04)] sm:px-5 lg:px-6">
-          <div className="flex items-center justify-between border-b border-gray-100 py-4">
+        <section aria-labelledby="cart-items-title" className="min-w-0">
+          <div className="mb-3 flex items-center justify-between px-1">
             <div>
               <h2 id="cart-items-title" className="text-sm font-bold text-gray-900">Articles</h2>
-              <p className="mt-0.5 text-xs text-gray-400">Modifiez les quantités avant de finaliser.</p>
+              <p className="mt-0.5 text-xs text-gray-500">Vérifiez chaque article avant de choisir la livraison.</p>
             </div>
             <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{formatProductCount(itemCount)}</span>
           </div>
-          <ul>{items.map((item) => <CartItem key={item.product.id} item={item} variant="page" currency={tenant.currency} unavailableProductIds={unavailableProductIds} pendingProductIds={pendingProductIds} onIncrement={handleIncrement} onDecrement={handleDecrement} onRemove={handleRemove} />)}</ul>
-          {undo && <div className="pb-4"><CartUndoToast productName={undo.item.product.name} onUndo={handleUndo} /></div>}
+          <ul className="space-y-3">{items.map((item) => <CartItem key={item.product.id} item={item} variant="page" currency={tenant.currency} unavailableProductIds={unavailableProductIds} pendingProductIds={pendingProductIds} onIncrement={handleIncrement} onDecrement={handleDecrement} onRemove={handleRemove} />)}</ul>
+          {undo && <div className="pt-3"><CartUndoToast productName={undo.item.product.name} onUndo={handleUndo} /></div>}
         </section>
 
         <aside className="lg:sticky lg:top-6">
@@ -327,9 +388,11 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
             total={total}
             currency={tenant.currency}
             canProceed={canProceed}
-            checkoutHint={!canProceed && fulfillmentType === 'delivery' ? 'Ajoutez votre adresse pour calculer la livraison et activer le paiement.' : null}
+            checkoutHint={primaryActionHint}
+            primaryActionLabel={primaryActionLabel}
+            primaryActionDisabled={shippingLoading}
             syncStatus={syncStatus}
-            onCheckout={handleProceed}
+            onCheckout={handlePrimaryAction}
             hideActionsOnMobile
           >
             {shippingControls}
@@ -337,7 +400,17 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
         </aside>
       </div>
 
-      {shouldShowMobileCartStickyCta(itemCount) && <MobileCartStickyCTA total={total} currency={tenant.currency} disabled={!canProceed} onCheckout={handleProceed} />}
+      {shouldShowMobileCartStickyCta(itemCount) && (
+        <MobileCartStickyCTA
+          total={total}
+          currency={tenant.currency}
+          totalIsEstimated={deliveryQuoteMissing}
+          label={primaryActionLabel}
+          hint={primaryActionHint}
+          disabled={shippingLoading}
+          onCheckout={handlePrimaryAction}
+        />
+      )}
     </div>
   );
 }
