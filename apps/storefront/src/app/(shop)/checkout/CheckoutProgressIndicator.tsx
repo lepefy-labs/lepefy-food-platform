@@ -1,6 +1,6 @@
 import { IconCheck } from '@tabler/icons-react';
 
-type CheckoutStep = 'shipping' | 'contact' | 'select-payment' | 'payment';
+type CheckoutStep = 'shipping' | 'contact' | 'form' | 'select-payment' | 'payment';
 
 const STEPS = [
   { key: 'shipping', label: 'Livraison' },
@@ -13,7 +13,7 @@ interface CheckoutProgressIndicatorProps {
 }
 
 export function CheckoutProgressIndicator({ currentStep }: CheckoutProgressIndicatorProps) {
-  const logicalStep = currentStep === 'select-payment' ? 'payment' : currentStep;
+  const logicalStep = currentStep === 'form' ? 'contact' : currentStep === 'select-payment' ? 'payment' : currentStep;
   const activeIdx = STEPS.findIndex((step) => step.key === logicalStep);
 
   return (
