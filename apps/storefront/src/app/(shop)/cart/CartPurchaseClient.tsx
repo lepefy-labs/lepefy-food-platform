@@ -63,7 +63,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-4 pb-28 sm:px-6 sm:py-7 md:pb-10 lg:px-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-4 pb-44 sm:px-6 sm:py-7 md:pb-10 lg:px-8">
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4 lg:order-1">
           <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] sm:p-5 lg:hidden" aria-label="Total du panier">
@@ -74,15 +74,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
               </div>
               <p className="pb-1 text-sm font-medium text-gray-500">{formatProductCount(itemCount)}</p>
             </div>
-            <button
-              type="button"
-              onClick={startCheckout}
-              className="mt-4 min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              Continuer — Livraison
-            </button>
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement 100 % sécurisé</p>
+            <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement 100 % sécurisé</p>
           </section>
 
           <section aria-label="Articles du panier">
@@ -104,7 +96,10 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
             {undo && <div className="pt-3"><CartUndoToast productName={undo.item.product.name} onUndo={restore} /></div>}
           </section>
 
-          <Link href="/products" className="inline-flex min-h-11 items-center text-sm font-semibold text-gray-600 hover:text-gray-950 focus-visible:outline-none focus-visible:underline">
+          <Link
+            href="/products"
+            className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-gray-900 px-4 py-3.5 text-sm font-bold text-white shadow-sm transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 sm:w-auto sm:min-w-[220px]"
+          >
             Continuer mes achats
           </Link>
         </div>
@@ -121,6 +116,19 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
           </button>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement sécurisé</p>
         </aside>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-16 z-40 border-t border-black/10 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur md:hidden">
+        <div className="mx-auto max-w-xl">
+          <button
+            type="button"
+            onClick={startCheckout}
+            className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
+            Continuer — Livraison
+          </button>
+        </div>
       </div>
     </div>
   );
