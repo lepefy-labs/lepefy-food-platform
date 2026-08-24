@@ -3,8 +3,7 @@ import { IconCheck } from '@tabler/icons-react';
 type CheckoutStep = 'shipping' | 'contact' | 'form' | 'select-payment' | 'payment';
 
 const STEPS = [
-  { key: 'shipping', label: 'Livraison' },
-  { key: 'contact', label: 'Coordonnées' },
+  { key: 'shipping', label: 'Livraison / retrait' },
   { key: 'payment', label: 'Paiement' },
 ] as const;
 
@@ -13,7 +12,7 @@ interface CheckoutProgressIndicatorProps {
 }
 
 export function CheckoutProgressIndicator({ currentStep }: CheckoutProgressIndicatorProps) {
-  const logicalStep = currentStep === 'form' ? 'contact' : currentStep === 'select-payment' ? 'payment' : currentStep;
+  const logicalStep = currentStep === 'shipping' ? 'shipping' : 'payment';
   const activeIdx = STEPS.findIndex((step) => step.key === logicalStep);
 
   return (
@@ -24,7 +23,7 @@ export function CheckoutProgressIndicator({ currentStep }: CheckoutProgressIndic
         const last = index === STEPS.length - 1;
         return (
           <div key={step.key} className={`flex items-start ${last ? '' : 'flex-1'}`}>
-            <div className="flex w-[78px] shrink-0 flex-col items-center">
+            <div className="flex w-[110px] shrink-0 flex-col items-center">
               <div
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors"
                 style={{
