@@ -1,0 +1,30 @@
+.checkoutFunnel {
+  position: relative;
+}
+
+@media (max-width: 767px) {
+  .checkoutFunnel {
+    padding-bottom: 88px;
+  }
+
+  .checkoutFunnel :global(button.min-h-12.w-full.rounded-2xl[style*="background-color"]) {
+    position: fixed;
+    left: 50%;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 45;
+    width: calc(100% - 32px);
+    max-width: 608px;
+    transform: translateX(-50%);
+    box-shadow:
+      0 -10px 28px rgba(15, 23, 42, 0.10),
+      0 0 0 12px rgba(255, 255, 255, 0.96);
+  }
+
+  .checkoutFunnel :global(.fixed button.min-h-12.w-full.rounded-2xl[style*="background-color"]) {
+    position: static;
+    width: 100%;
+    max-width: none;
+    transform: none;
+    box-shadow: none;
+  }
+}
