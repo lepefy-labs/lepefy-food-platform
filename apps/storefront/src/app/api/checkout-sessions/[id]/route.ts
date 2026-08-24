@@ -5,75 +5,65 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
+import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
 
-// Route dati mutabili (letta/scritta anche da flussi admin/webhook diversi)
-// — bug noto Next.js 14.2.x, force-dynamic da solo non basta (vedi altre
-// route admin/* dello stesso repo).
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const stripe = getStripeClient('shop');
-
-// Identico a /api/checkout/route.ts e /api/checkout/external-link/route.ts —
-// nessuna route esistente modificata in questo prompt, questa costante è
-// dupliquée volontairement (extraire un helper partagé est laissé à un
-// prompt futur, cf. consegna Task 5).
 const MAX_QUANTITY_PER_ITEM = 999;
 
 interface CartItemPayload {
-  productId:    string;
-  name:         string;
-  price:        number;
-  quantity:     number;
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
 }
 
 interface CheckoutSessionRow {
-  id:                         string;
-  tenant_id:                  string;
-  customer_id:                string | null;
-  email:                      string;
-  full_name:                  string | null;
-  phone:                      string | null;
-  fulfillment_type:           'delivery' | 'pickup';
-  shipping_address:           ShippingAddress | null;
-  shipping_details:           Record<string, unknown> | null;
-  shipping_total:             number;
+  id: string;
+  tenant_id: string;
+  customer_id: string | null;
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  fulfillment_type: 'delivery' | 'pickup';
+  shipping_address: ShippingAddress | null;
+  shipping_details: Record<string, unknown> | null;
+  shipping_total: number;
   ambassador_discount_amount: number | null;
-  items:                      CartItemPayload[];
-  status:                     'open' | 'cancelled';
-  payment_method:             'stripe' | 'external_link';
-  external_payment_type:      string | null;
-  external_payment_label:     string | null;
-  external_payment_link:      string | null;
-  stripe_payment_intent_id:   string | null;
-  consent_terms_accepted:     boolean | null;
-  consent_terms_doc_version:  number | null;
+  items: CartItemPayload[];
+  status: 'open' | 'completed' | 'cancelled' | 'expired';
+  expires_at: string;
+  payment_method: 'stripe' | 'external_link';
+  external_payment_type: string | null;
+  external_payment_label: string | null;
+  external_payment_link: string | null;
+  stripe_payment_intent_id: string | null;
+  consent_terms_accepted: boolean | null;
+  consent_terms_doc_version: number | null;
   consent_marketing_accepted: boolean | null;
-  created_at:                 string;
+  created_at: string;
 }
 
-// Champs exposés au client pour précompiler un form — jamais
-// stripe_payment_intent_id (identifiant interne Stripe, aucune raison de
-// fuiter côté client) ni les colonnes de consentement (déjà figées, la UI
-// de reprise n'a pas à les rejouer/afficher).
 function toClientShape(session: CheckoutSessionRow) {
   return {
-    id:                      session.id,
-    email:                   session.email,
-    fullName:                session.full_name,
-    phone:                   session.phone,
-    fulfillmentType:         session.fulfillment_type,
-    shippingAddress:         session.shipping_address,
-    shippingDetails:         session.shipping_details,
-    shippingTotal:           session.shipping_total,
-    items:                   session.items,
-    paymentMethod:           session.payment_method,
-    externalPaymentType:     session.external_payment_type,
-    externalPaymentLabel:    session.external_payment_label,
-    externalPaymentLink:     session.external_payment_link,
+    id: session.id,
+    email: session.email,
+    fullName: session.full_name,
+    phone: session.phone,
+    fulfillmentType: session.fulfillment_type,
+    shippingAddress: session.shipping_address,
+    shippingDetails: session.shipping_details,
+    shippingTotal: session.shipping_total,
+    items: session.items,
+    paymentMethod: session.payment_method,
+    externalPaymentType: session.external_payment_type,
+    externalPaymentLabel: session.external_payment_label,
+    externalPaymentLink: session.external_payment_link,
   };
 }
 
@@ -88,12 +78,14 @@ async function loadAndAuthorizeSession(
   sessionCustomerId: string | null,
   accessToken: string | null,
 ): Promise<AuthResult> {
+  const nowIso = new Date().toISOString();
   const { data, error } = await supabase
     .from('checkout_sessions')
     .select('*')
     .eq('id', sessionId)
     .eq('tenant_id', tenantId)
     .eq('status', 'open')
+    .gt('expires_at', nowIso)
     .maybeSingle();
 
   if (error) {
@@ -101,22 +93,25 @@ async function loadAndAuthorizeSession(
     return { ok: false, status: 500, error: 'Erreur serveur. Veuillez réessayer.' };
   }
 
-  // Une session 'cancelled' répond 404 comme une session inexistante — elle
-  // ne doit jamais être réanimée (cf. prompt).
   if (!data) {
-    return { ok: false, status: 404, error: 'Session de paiement introuvable.' };
+    // Expiry is durable, never a hidden client-side convention.
+    await supabase
+      .from('checkout_sessions')
+      .update({ status: 'expired', updated_at: nowIso })
+      .eq('id', sessionId)
+      .eq('tenant_id', tenantId)
+      .eq('status', 'open')
+      .lte('expires_at', nowIso);
+    return { ok: false, status: 404, error: 'Session de paiement introuvable ou expirée.' };
   }
 
   const session = data as CheckoutSessionRow;
-
   if (session.customer_id) {
     if (!sessionCustomerId || sessionCustomerId !== session.customer_id) {
       return { ok: false, status: 403, error: 'Accès non autorisé à cette session.' };
     }
-  } else {
-    if (!accessToken || !isValidCheckoutSessionAccessToken(session.id, session.email, accessToken)) {
-      return { ok: false, status: 403, error: 'Accès non autorisé à cette session.' };
-    }
+  } else if (!accessToken || !isValidCheckoutSessionAccessToken(session.id, session.email, accessToken)) {
+    return { ok: false, status: 403, error: 'Accès non autorisé à cette session.' };
   }
 
   return { ok: true, session };
@@ -124,19 +119,15 @@ async function loadAndAuthorizeSession(
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant      = await getTenant(tenantSlug);
-    const supabase    = createServiceClient();
-
+    const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+    const supabase = createServiceClient();
     const sessionCustomer = await getSessionCustomer(tenant.id);
-    const accessToken     = req.nextUrl.searchParams.get('token');
+    const accessToken = req.nextUrl.searchParams.get('token');
 
     const auth = await loadAndAuthorizeSession(
       supabase, tenant.id, params.id, sessionCustomer?.id ?? null, accessToken,
     );
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
-    }
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     return NextResponse.json(toClientShape(auth.session));
   } catch (err) {
@@ -146,52 +137,41 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 interface PatchBody {
-  items?:                    Array<{ productId: string; quantity: number }>;
-  shippingAddress?:          ShippingAddress | null;
-  fulfillmentType?:          'delivery' | 'pickup';
-  shippingTotal?:            number;
-  shippingDetails?:          Record<string, unknown> | null;
-  quoteToken?:               string | null;
-  paymentMethod?:            'stripe' | 'external_link';
-  externalPaymentMethodId?:  string;
-  accessToken?:              string;
-  // Extension (Entry Point A) — seule valeur acceptée ici : annulation
-  // explicite par le client depuis /checkout/en-attente ("Annuler cette
-  // demande"). Une session 'cancelled' n'est plus jamais réanimable (cf.
-  // loadAndAuthorizeSession, filtre status='open').
-  status?:                   'cancelled';
+  items?: Array<{ productId: string; quantity: number }>;
+  shippingAddress?: ShippingAddress | null;
+  fulfillmentType?: 'delivery' | 'pickup';
+  shippingTotal?: number;
+  shippingDetails?: Record<string, unknown> | null;
+  quoteToken?: string | null;
+  paymentMethod?: 'stripe' | 'external_link';
+  externalPaymentMethodId?: string;
+  accessToken?: string;
+  status?: 'cancelled';
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body: PatchBody = await req.json();
-
-    const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-    const tenant      = await getTenant(tenantSlug);
-    const supabase    = createServiceClient();
-
+    const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+    const supabase = createServiceClient();
     const sessionCustomer = await getSessionCustomer(tenant.id);
 
     const auth = await loadAndAuthorizeSession(
       supabase, tenant.id, params.id, sessionCustomer?.id ?? null, body.accessToken ?? null,
     );
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
-    }
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const session = auth.session;
+    const now = new Date();
+    const nowIso = now.toISOString();
 
-    // ── Annulation explicite (Entry Point A — "Annuler cette demande") ──────
-    // Court-circuite tout le reste : aucune re-lecture produits/quote
-    // nécessaire pour annuler. Même principe que le changement stripe →
-    // external_link ci-dessous — aucun paiement n'a jamais été capturé pour
-    // une ligne encore présente dans checkout_sessions, donc annuler
-    // l'intent est toujours sûr.
     if (body.status === 'cancelled') {
       if (session.payment_method === 'stripe' && session.stripe_payment_intent_id) {
         try {
-          await stripe.paymentIntents.cancel(session.stripe_payment_intent_id);
-          console.info('[checkout-sessions][PATCH] PaymentIntent cancelled (session cancellation) — id:', session.stripe_payment_intent_id);
+          const intent = await stripe.paymentIntents.retrieve(session.stripe_payment_intent_id);
+          if (intent.status !== 'succeeded' && intent.status !== 'canceled') {
+            await stripe.paymentIntents.cancel(intent.id);
+          }
         } catch (cancelErr) {
           console.warn('[checkout-sessions][PATCH] PaymentIntent cancel failed (non-blocking):', cancelErr,
             '— id:', session.stripe_payment_intent_id);
@@ -200,7 +180,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
       const { error: cancelError } = await supabase
         .from('checkout_sessions')
-        .update({ status: 'cancelled', stripe_payment_intent_id: null })
+        .update({
+          status: 'cancelled',
+          stripe_payment_intent_id: null,
+          last_activity_at: nowIso,
+          updated_at: nowIso,
+        })
         .eq('id', session.id)
         .eq('tenant_id', tenant.id);
 
@@ -208,43 +193,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         console.error('[checkout-sessions][PATCH] cancel error:', cancelError, '— session:', session.id);
         return NextResponse.json({ error: 'Erreur lors de l\'annulation de la session.' }, { status: 500 });
       }
-
-      console.info('[checkout-sessions][PATCH] session cancelled — id:', session.id, '— tenant:', tenant.id);
       return NextResponse.json({ id: session.id, status: 'cancelled' as const });
     }
 
-    // ── Items : ricalcolo prezzo/nome/storage_type dal DB, mai dal client ────
     let items = session.items;
     if (body.items) {
-      if (!body.items.length) {
-        return NextResponse.json({ error: 'Le panier ne peut pas être vide.' }, { status: 400 });
-      }
-
-      for (const i of body.items) {
-        if (
-          !i.productId ||
-          !Number.isInteger(i.quantity) ||
-          i.quantity < 1 ||
-          i.quantity > MAX_QUANTITY_PER_ITEM
-        ) {
+      if (!body.items.length) return NextResponse.json({ error: 'Le panier ne peut pas être vide.' }, { status: 400 });
+      for (const item of body.items) {
+        if (!item.productId || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > MAX_QUANTITY_PER_ITEM) {
           return NextResponse.json({ error: 'Article invalide.' }, { status: 400 });
         }
       }
 
-      const productIds = [...new Set(body.items.map((i) => i.productId))];
+      const productIds = [...new Set(body.items.map((item) => item.productId))];
       const { data: dbProducts, error: productsError } = await supabase
         .from('products')
         .select('id, name, price, storage_type, stock')
         .eq('tenant_id', tenant.id)
         .eq('active', true)
         .in('id', productIds) as {
-          data: Array<{
-            id:           string;
-            name:         string;
-            price:        number;
-            storage_type: 'dry' | 'fresh' | 'frozen' | null;
-            stock:        number;
-          }> | null;
+          data: Array<{ id: string; name: string; price: number; storage_type: 'dry' | 'fresh' | 'frozen' | null; stock: number }> | null;
           error: unknown;
         };
 
@@ -253,92 +221,61 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
       }
 
-      const productById = new Map(dbProducts.map((p) => [p.id, p]));
+      const productById = new Map(dbProducts.map((product) => [product.id, product]));
       if (productIds.some((id) => !productById.has(id))) {
-        return NextResponse.json(
-          { error: 'Certains articles de votre panier ne sont plus disponibles.' },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: 'Certains articles de votre panier ne sont plus disponibles.' }, { status: 400 });
       }
 
       const quantityByProduct = new Map<string, number>();
-      for (const i of body.items) {
-        quantityByProduct.set(i.productId, (quantityByProduct.get(i.productId) ?? 0) + i.quantity);
-      }
-
+      for (const item of body.items) quantityByProduct.set(item.productId, (quantityByProduct.get(item.productId) ?? 0) + item.quantity);
       const insufficientStock: string[] = [];
       for (const [productId, requestedQty] of quantityByProduct) {
-        const p = productById.get(productId)!;
-        if (p.stock < requestedQty) insufficientStock.push(p.name);
+        const product = productById.get(productId)!;
+        if (product.stock < requestedQty) insufficientStock.push(product.name);
       }
       if (insufficientStock.length > 0) {
-        return NextResponse.json(
-          { error: `Stock insuffisant pour : ${insufficientStock.join(', ')}.` },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: `Stock insuffisant pour : ${insufficientStock.join(', ')}.` }, { status: 400 });
       }
 
-      items = body.items.map((i) => {
-        const p = productById.get(i.productId)!;
+      items = body.items.map((item) => {
+        const product = productById.get(item.productId)!;
         return {
-          productId:    p.id,
-          name:         p.name,
-          price:        p.price,
-          quantity:     i.quantity,
-          storage_type: p.storage_type ?? 'dry',
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity,
+          storage_type: product.storage_type ?? 'dry',
         };
       });
     }
 
-    // ── Fulfillment / shipping ───────────────────────────────────────────────
     const fulfillmentType = body.fulfillmentType ?? session.fulfillment_type;
     const shippingAddress = body.shippingAddress !== undefined ? body.shippingAddress : session.shipping_address;
     const shippingDetails = body.shippingDetails !== undefined ? body.shippingDetails : session.shipping_details;
-
     let shippingTotal = session.shipping_total;
+
     if (body.shippingTotal !== undefined) {
       if (fulfillmentType === 'pickup') {
         shippingTotal = 0;
       } else {
         const quoteSecret = process.env.TRACKING_SECRET;
-        if (!quoteSecret) {
-          console.error('[checkout-sessions][PATCH] TRACKING_SECRET manquant — impossible de vérifier le devis');
-          return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
-        }
-
+        if (!quoteSecret) return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
         if (!body.quoteToken || !shippingAddress) {
-          return NextResponse.json(
-            { error: 'Frais de livraison non calculés. Veuillez repasser par le panier.' },
-            { status: 400 },
-          );
+          return NextResponse.json({ error: 'Frais de livraison non calculés. Veuillez repasser par le panier.' }, { status: 400 });
         }
-
         const verification = verifyQuote(body.quoteToken, quoteSecret);
         if (!verification.valid) {
-          console.warn('[checkout-sessions][PATCH] quote token rejected — reason:', verification.reason);
-          return NextResponse.json(
-            { error: 'Le devis de livraison a expiré. Veuillez repasser par le panier.' },
-            { status: 400 },
-          );
+          return NextResponse.json({ error: 'Le devis de livraison a expiré. Veuillez repasser par le panier.' }, { status: 400 });
         }
-
         const quote = verification.payload;
         if (quote.c !== shippingAddress.country || quote.z !== shippingAddress.postal_code) {
-          return NextResponse.json(
-            { error: 'L\'adresse de livraison a changé. Veuillez recalculer les frais depuis le panier.' },
-            { status: 400 },
-          );
+          return NextResponse.json({ error: 'L\'adresse de livraison a changé. Veuillez recalculer les frais depuis le panier.' }, { status: 400 });
         }
-
         shippingTotal = quote.t;
       }
     }
 
-    // ── Recalcolo ambassador discount se il subtotal cambia ─────────────────
-    const subtotal = parseFloat(
-      items.reduce((sum, i) => sum + i.price * i.quantity, 0).toFixed(2),
-    );
-
+    const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
     let ambassadorDiscount = session.ambassador_discount_amount ?? 0;
     if (body.items) {
       ambassadorDiscount = await resolveCheckoutAmbassadorDiscount({
@@ -355,61 +292,51 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         subtotal,
       });
     }
-
     const total = parseFloat((subtotal + shippingTotal - ambassadorDiscount).toFixed(2));
-
-    // ── Gestion du changement de moyen de paiement ───────────────────────────
     const paymentMethod = body.paymentMethod ?? session.payment_method;
 
     let stripePaymentIntentId = session.stripe_payment_intent_id;
-    let externalPaymentType   = session.external_payment_type;
-    let externalPaymentLabel  = session.external_payment_label;
-    let externalPaymentLink   = session.external_payment_link;
+    let externalPaymentType = session.external_payment_type;
+    let externalPaymentLabel = session.external_payment_label;
+    let externalPaymentLink = session.external_payment_link;
     let clientSecret: string | null = null;
     let externalLinkResponse: { link: string; amount: number; currency: string; isPaypal: boolean; label: string } | null = null;
 
     if (paymentMethod === 'stripe') {
-      if (session.payment_method === 'external_link' && stripePaymentIntentId) {
-        // Ne devrait jamais arriver (external_link n'a jamais d'intent), gardé
-        // par sécurité — sinon on repart d'un intent obsolète.
-        stripePaymentIntentId = null;
-      }
-
-      externalPaymentType  = null;
+      externalPaymentType = null;
       externalPaymentLabel = null;
-      externalPaymentLink  = null;
+      externalPaymentLink = null;
 
       if (stripePaymentIntentId) {
         try {
-          const updated = await stripe.paymentIntents.update(stripePaymentIntentId, {
-            amount: Math.round(total * 100),
-          });
-          clientSecret = updated.client_secret;
-          console.info('[checkout-sessions][PATCH] PaymentIntent updated — id:', stripePaymentIntentId, '— amount:', updated.amount);
+          const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+          if (intent.status === 'canceled' || intent.status === 'succeeded') {
+            stripePaymentIntentId = null;
+          } else {
+            const updated = await stripe.paymentIntents.update(intent.id, {
+              amount: Math.round(total * 100),
+              metadata: { session_id: session.id, tenant_id: tenant.id },
+            });
+            clientSecret = updated.client_secret;
+          }
         } catch (stripeErr) {
-          console.error('[checkout-sessions][PATCH] PaymentIntent update failed:', stripeErr, '— id:', stripePaymentIntentId);
-          return NextResponse.json({ error: 'Erreur lors de la mise à jour du paiement. Veuillez réessayer.' }, { status: 500 });
+          console.warn('[checkout-sessions][PATCH] PaymentIntent update unavailable, will recreate on pay:', stripeErr);
+          stripePaymentIntentId = null;
         }
       }
-      // Sinon (pas encore d'intent — flux différé) : rien à faire ici, il
-      // sera créé au moment voulu par le flux existant (createIntent()).
     } else {
-      // paymentMethod === 'external_link'
       if (session.payment_method === 'stripe' && stripePaymentIntentId) {
         try {
-          await stripe.paymentIntents.cancel(stripePaymentIntentId);
-          console.info('[checkout-sessions][PATCH] PaymentIntent cancelled — id:', stripePaymentIntentId);
+          const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+          if (intent.status !== 'succeeded' && intent.status !== 'canceled') await stripe.paymentIntents.cancel(intent.id);
         } catch (cancelErr) {
-          // Idempotent — "already canceled" ou similaire ne doit jamais
-          // bloquer le changement de méthode de paiement.
-          console.warn('[checkout-sessions][PATCH] PaymentIntent cancel failed (non-blocking):', cancelErr, '— id:', stripePaymentIntentId);
+          console.warn('[checkout-sessions][PATCH] PaymentIntent cancel failed (non-blocking):', cancelErr);
         }
         stripePaymentIntentId = null;
       }
 
       const needsLinkRebuild = body.paymentMethod !== undefined || body.items !== undefined
         || body.shippingTotal !== undefined || body.externalPaymentMethodId !== undefined;
-
       if (needsLinkRebuild) {
         const methodId = body.externalPaymentMethodId;
         if (!methodId && session.payment_method !== 'external_link') {
@@ -424,71 +351,64 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             .eq('tenant_id', tenant.id)
             .eq('active', true)
             .maybeSingle();
-
           const method = methodRow as TenantPaymentMethod | null;
-
           if (!method || method.method === 'bank_transfer' || method.method === 'cash' || !method.extra?.link) {
             return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
           }
-
           const currency = (tenant.currency ?? 'EUR').toUpperCase();
-          const finalLink =
-            method.method === 'paypal'
-              ? `${method.extra.link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency}`
-              : method.extra.link;
-
-          externalPaymentType  = method.method;
+          const finalLink = method.method === 'paypal'
+            ? `${method.extra.link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency}`
+            : method.extra.link;
+          externalPaymentType = method.method;
           externalPaymentLabel = method.label ?? method.method;
-          externalPaymentLink  = finalLink;
-
+          externalPaymentLink = finalLink;
           externalLinkResponse = {
-            link:     finalLink,
-            amount:   total,
+            link: finalLink,
+            amount: total,
             currency,
             isPaypal: method.method === 'paypal',
-            label:    method.label ?? method.method,
+            label: method.label ?? method.method,
           };
         } else if (externalPaymentType === 'paypal' && externalPaymentLink) {
-          // Montant changé (items/shipping) mais moyen de paiement inchangé :
-          // on ne peut pas relire tenant_payment_methods sans son id — on
-          // reconstruit uniquement le lien paypal.me à partir de son préfixe.
           const currency = (tenant.currency ?? 'EUR').toUpperCase();
           const base = externalPaymentLink.replace(/\/[0-9.,]+[A-Z]{3}$/i, '');
           externalPaymentLink = `${base}/${total.toFixed(2)}${currency}`;
           externalLinkResponse = {
-            link:     externalPaymentLink,
-            amount:   total,
+            link: externalPaymentLink,
+            amount: total,
             currency,
             isPaypal: true,
-            label:    externalPaymentLabel ?? 'PayPal',
+            label: externalPaymentLabel ?? 'PayPal',
           };
         } else if (externalPaymentLink) {
           externalLinkResponse = {
-            link:     externalPaymentLink,
-            amount:   total,
+            link: externalPaymentLink,
+            amount: total,
             currency: (tenant.currency ?? 'EUR').toUpperCase(),
             isPaypal: false,
-            label:    externalPaymentLabel ?? externalPaymentType ?? 'Autre',
+            label: externalPaymentLabel ?? externalPaymentType ?? 'Autre',
           };
         }
       }
     }
 
-    // ── Update ────────────────────────────────────────────────────────────
     const { data: updated, error: updateError } = await supabase
       .from('checkout_sessions')
       .update({
         items,
-        fulfillment_type:          fulfillmentType,
-        shipping_address:          shippingAddress,
-        shipping_details:          shippingDetails,
-        shipping_total:            shippingTotal,
+        fulfillment_type: fulfillmentType,
+        shipping_address: shippingAddress,
+        shipping_details: shippingDetails,
+        shipping_total: shippingTotal,
         ambassador_discount_amount: ambassadorDiscount,
-        payment_method:            paymentMethod,
-        stripe_payment_intent_id:  stripePaymentIntentId,
-        external_payment_type:     externalPaymentType,
-        external_payment_label:    externalPaymentLabel,
-        external_payment_link:     externalPaymentLink,
+        payment_method: paymentMethod,
+        stripe_payment_intent_id: stripePaymentIntentId,
+        external_payment_type: externalPaymentType,
+        external_payment_label: externalPaymentLabel,
+        external_payment_link: externalPaymentLink,
+        last_activity_at: nowIso,
+        updated_at: nowIso,
+        expires_at: checkoutExpiryFromNow(now),
       })
       .eq('id', session.id)
       .eq('tenant_id', tenant.id)
@@ -499,9 +419,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       console.error('[checkout-sessions][PATCH] update error:', updateError, '— session:', session.id);
       return NextResponse.json({ error: 'Erreur lors de la mise à jour de la session.' }, { status: 500 });
     }
-
-    console.info('[checkout-sessions][PATCH] session updated — id:', session.id, '— tenant:', tenant.id,
-      '— paymentMethod:', paymentMethod);
 
     return NextResponse.json({
       ...toClientShape(updated as CheckoutSessionRow),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   IconClock,
@@ -57,15 +57,37 @@ function sessionTotal(session: PendingPaymentSession) {
 }
 
 export default function PendingPaymentsBanner({
-  sessions,
+  sessions: initialSessions,
   tenantCurrency,
 }: {
   sessions: PendingPaymentSession[];
   tenantCurrency: string;
 }) {
   const router = useRouter();
+  const [sessions, setSessions] = useState<PendingPaymentSession[]>([]);
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(false);
+
+  // Completed checkout_sessions are now retained for audit/analytics. Never
+  // trust the legacy server list (which historically relied on DELETE): refresh
+  // from the status-aware endpoint so only live external payments are shown.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/checkout-sessions/open', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json() as { sessions?: PendingPaymentSession[] };
+        if (!cancelled) setSessions(json.sessions ?? []);
+      } catch (error) {
+        console.warn('[PendingPaymentsBanner] open sessions refresh failed:', error);
+        // Safer to hide than to expose a completed checkout as pending. The
+        // server-provided list remains deliberately unused after lifecycle v2.
+        if (!cancelled) setSessions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initialSessions]);
 
   const visible = sessions.filter((session) => !confirmedIds.has(session.id));
   const pendingTotal = useMemo(
@@ -91,7 +113,7 @@ export default function PendingPaymentsBanner({
             </span>
           </div>
           <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-            Demandes non converties en commandes · aucun stock réservé.
+            Checkouts ouverts non convertis en commandes · aucun stock réservé.
           </p>
         </div>
 
@@ -154,9 +176,7 @@ export default function PendingPaymentsBanner({
                       className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white transition-opacity disabled:opacity-50"
                       style={{ backgroundColor: '#D97706' }}
                       onSuccess={(warning) => {
-                        if (!warning) {
-                          setConfirmedIds((prev) => new Set(prev).add(session.id));
-                        }
+                        if (!warning) setConfirmedIds((prev) => new Set(prev).add(session.id));
                         router.refresh();
                       }}
                     />

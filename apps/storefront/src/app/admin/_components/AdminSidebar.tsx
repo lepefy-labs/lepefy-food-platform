@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
   IconShoppingBag,
+  IconChartBar,
   IconPackage,
   IconUsers,
   IconTag,
@@ -67,6 +68,11 @@ export default function AdminSidebar({
         {pendingPaymentsCount > 0 && (
           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-300">{pendingPaymentsCount}</span>
         )}
+      </Link>
+
+      <Link href="/admin/checkout-funnel" className={`mx-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${navClass(pathname === '/admin/checkout-funnel')}`}>
+        <IconChartBar size={20} stroke={pathname === '/admin/checkout-funnel' ? 1.8 : 1.5} />
+        <span className="flex-1">Funnel checkout</span>
       </Link>
 
       <Link href="/admin/catalogue" className={`mx-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${navClass(pathname.startsWith('/admin/catalogue'))}`}>
