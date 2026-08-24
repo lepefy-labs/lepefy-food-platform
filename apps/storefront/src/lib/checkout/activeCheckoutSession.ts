@@ -11,8 +11,8 @@ export interface ActiveCheckoutPayload {
   full_name: string | null;
   phone: string | null;
   fulfillment_type: 'delivery' | 'pickup';
-  shipping_address: Record<string, unknown> | null;
-  shipping_details: Record<string, unknown> | null;
+  shipping_address: unknown | null;
+  shipping_details: unknown | null;
   shipping_total: number;
   ambassador_discount_amount: number | null;
   items: unknown[];
@@ -50,19 +50,9 @@ async function logCheckoutEvent(
     reference_id: referenceId,
     event_type: eventType,
   });
-  if (error) {
-    console.warn('[activeCheckoutSession] funnel log failed:', eventType, error);
-  }
+  if (error) console.warn('[activeCheckoutSession] funnel log failed:', eventType, error);
 }
 
-/**
- * Persist the current purchase intent.
- *
- * Authenticated customers have at most one open checkout per tenant. A new
- * checkout submission refreshes that row instead of creating a second payment
- * attempt. Guests still get a new row because email alone is not a safe
- * identity key; they resume through their signed checkout-session token.
- */
 export async function upsertActiveCheckoutSession({
   supabase,
   tenantId,
@@ -77,12 +67,9 @@ export async function upsertActiveCheckoutSession({
   const now = new Date();
   const nowIso = now.toISOString();
   const expiresAt = checkoutExpiryFromNow(now);
-
   let existing: ExistingActiveCheckout | null = null;
 
   if (customerId) {
-    // Lazy expiry keeps the state machine correct even when no cron extension
-    // is installed. Expired rows remain available for analytics/audit.
     const { error: expiryError } = await supabase
       .from('checkout_sessions')
       .update({ status: 'expired', updated_at: nowIso })
@@ -90,9 +77,7 @@ export async function upsertActiveCheckoutSession({
       .eq('customer_id', customerId)
       .eq('status', 'open')
       .lte('expires_at', nowIso);
-    if (expiryError) {
-      console.warn('[activeCheckoutSession] lazy expiry failed:', expiryError);
-    }
+    if (expiryError) console.warn('[activeCheckoutSession] lazy expiry failed:', expiryError);
 
     const { data, error } = await supabase
       .from('checkout_sessions')
@@ -104,7 +89,6 @@ export async function upsertActiveCheckoutSession({
       .order('last_activity_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-
     if (error) throw error;
     existing = data as ExistingActiveCheckout | null;
   }
@@ -142,8 +126,6 @@ export async function upsertActiveCheckoutSession({
     .select('id')
     .single();
 
-  // Two tabs may race against the partial unique index. Re-read the winner and
-  // update it rather than surfacing a false checkout failure to the customer.
   if ((insertError as { code?: string } | null)?.code === '23505' && customerId) {
     const { data: winner, error: winnerError } = await supabase
       .from('checkout_sessions')
