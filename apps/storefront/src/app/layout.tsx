@@ -50,6 +50,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
+  // Client Components need tenant branding/configuration, but they must never
+  // receive provider credentials or private assistant instructions. Keep the
+  // canonical Tenant type for backwards-compatible consumers while replacing
+  // server-only values before React serializes the provider prop.
+  const clientTenant = {
+    ...tenant,
+    packlink_api_key: null,
+    chatbox_extra_context: null,
+  };
+
   return (
     <html lang={tenant.locale.split('-')[0]} suppressHydrationWarning>
       <head>
@@ -64,7 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
       <body className={`${inter.variable} ${bricolage.variable}`}>
-        <TenantProvider tenant={tenant}>{children}</TenantProvider>
+        <TenantProvider tenant={clientTenant}>{children}</TenantProvider>
         <PWARegister />
       </body>
     </html>
