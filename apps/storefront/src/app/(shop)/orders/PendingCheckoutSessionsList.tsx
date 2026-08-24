@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { IconChevronRight, IconClock } from '@tabler/icons-react';
+import { IconAlertTriangle, IconChevronRight, IconClock, IconCreditCard, IconPackage } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 
 // Section distincte de OrdersListClient (jamais un tableau unique mélangé) :
@@ -27,38 +27,66 @@ function paymentMethodLabel(session: PendingSessionListItem): string {
 
 export function PendingCheckoutSessionsList({ sessions }: PendingCheckoutSessionsListProps) {
   return (
-    <div className="max-w-xl mx-auto px-4 pt-6">
-      <h2 className="text-lg font-bold text-gray-900 mb-1">En attente de paiement</h2>
-      <p className="text-xs text-gray-400 mb-4">
-        Ces demandes ne sont pas encore des commandes confirmées.
-      </p>
-      <div className="flex flex-col gap-3 mb-2">
+    <section className="mx-auto max-w-3xl px-4 pt-7 sm:px-6 sm:pt-9">
+      <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white text-amber-700 shadow-sm">
+            <IconAlertTriangle size={18} />
+          </span>
+          <div>
+            <h2 className="text-base font-bold text-gray-950 sm:text-lg">Paiement à finaliser</h2>
+            <p className="mt-1 text-sm leading-5 text-amber-900/70">
+              Ces demandes ne sont pas encore des commandes confirmées. Ouvrez-les pour vérifier ou terminer le paiement.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
         {sessions.map((session) => (
           <Link
             key={session.id}
             href={`/orders/en-attente/${session.id}`}
-            className="flex items-center justify-between gap-3 bg-white rounded-2xl border border-amber-100 shadow-card px-4 py-3.5 hover:border-amber-200 transition-colors"
+            className="group rounded-2xl border border-amber-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 sm:p-5"
           >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-sm font-semibold text-gray-900 font-mono">
-                  Demande #{session.id.slice(0, 8).toUpperCase()}
-                </span>
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                  <IconClock size={12} /> En attente de confirmation
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm font-semibold text-gray-950">
+                    Demande #{session.id.slice(0, 8).toUpperCase()}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    <IconClock size={13} /> En attente
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 sm:text-sm">
+                  <span>{formatDate(session.createdAt)}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <IconPackage size={15} />
+                    {session.itemCount} article{session.itemCount > 1 ? 's' : ''}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <IconCreditCard size={15} />
+                    {paymentMethodLabel(session)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-3">
+                <p className="text-base font-bold text-gray-950 sm:text-lg">{formatPrice(session.total)}</p>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-600 transition group-hover:bg-amber-100">
+                  <IconChevronRight size={18} />
                 </span>
               </div>
-              <p className="text-xs text-gray-400">
-                {formatDate(session.createdAt)} · {session.itemCount} article{session.itemCount > 1 ? 's' : ''} · {paymentMethodLabel(session)}
-              </p>
-              <p className="text-sm font-bold mt-1" style={{ color: 'var(--color-primary)' }}>
-                {formatPrice(session.total)}
-              </p>
             </div>
-            <IconChevronRight size={18} className="text-gray-300 flex-shrink-0" />
+
+            <div className="mt-4 border-t border-amber-100 pt-3 text-xs font-semibold text-amber-700 sm:text-sm">
+              Vérifier cette demande
+            </div>
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
