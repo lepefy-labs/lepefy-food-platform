@@ -84,6 +84,8 @@ export default function AdminFilters({
     const params = new URLSearchParams(searchParams.toString())
     if (!value) params.delete(paramKey)
     else params.set(paramKey, value)
+    params.delete('page')
+    params.delete('view')
     router.push(`/admin?${params.toString()}`)
   }
 
@@ -91,6 +93,7 @@ export default function AdminFilters({
     const params = new URLSearchParams(searchParams.toString())
     if (value) params.set(key, value)
     else params.delete(key)
+    params.delete('page')
     router.push(`/admin?${params.toString()}`)
   }
 
