@@ -18,11 +18,13 @@ export default async function CheckoutPage() {
   const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
 
   return (
-    <CheckoutFlow
-      tenant={tenant}
-      externalPaymentMethods={externalPaymentMethods}
-      consentState={consentState}
-      isE2ETest={isE2ERequest()}
-    />
+    <div className="checkout-funnel">
+      <CheckoutFlow
+        tenant={tenant}
+        externalPaymentMethods={externalPaymentMethods}
+        consentState={consentState}
+        isE2ETest={isE2ERequest()}
+      />
+    </div>
   );
 }
