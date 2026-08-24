@@ -18,7 +18,7 @@ Use connected GitHub capabilities and approved remote CI/deployment systems such
 
 Follow this sequence:
 
-`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> VALIDATE -> PUSH -> VERIFY REMOTE SHA -> VERIFY VERCEL -> COMPLETE`
+`DISCOVER -> PRE MOCKUP -> UX AUDIT -> POST MOCKUP -> APPROVAL -> IMPLEMENT ALL -> UPDATE PROJECT CONTEXT IF NEEDED -> VALIDATE -> PUSH -> VERIFY REMOTE SHA -> VERIFY VERCEL -> COMPLETE`
 
 There is exactly one normal approval gate: between POST MOCKUP and implementation.
 
@@ -39,6 +39,7 @@ This includes, when needed:
 - correcting build, type, lint, test or deployment errors introduced by the work
 - repeating the fix -> validate -> push -> deploy verification loop when necessary
 - verifying the final remote state
+- updating `LEPEFY_PROJECT_CONTEXT.md` when the implementation materially changes the documented system state
 
 Do **not** stop after an intermediate milestone merely because one sub-step is finished.
 Do **not** ask `Proceed?`, `Continue?`, or similar questions between implementation sub-steps.
@@ -89,6 +90,7 @@ Inspect the complete current implementation of the requested module, including r
 - authentication and permissions
 - database/schema/migrations when relevant
 - design-system primitives and reusable patterns
+- `LEPEFY_PROJECT_CONTEXT.md` when it contains architecture or constraints relevant to the module
 
 Follow imports and references as needed.
 
@@ -163,13 +165,49 @@ Avoid unrelated refactors.
 Reuse existing design-system primitives and components where appropriate.
 Preserve tenant isolation, authentication, authorization and data integrity.
 
+### Mandatory project-context maintenance
+
+Before final validation/push, evaluate whether the approved implementation materially changed the persistent architecture or operating model documented in:
+
+```text
+LEPEFY_PROJECT_CONTEXT.md
+```
+
+An update is **mandatory in the same delivery unit** when the implementation changes one or more of:
+
+- application architecture or state machine
+- main routes/modules or their responsibilities
+- permanent business workflow/rules
+- database schema or significant migrations
+- checkout/payment architecture
+- authentication, authorization or role model
+- cart synchronization model
+- shipping/logistics model
+- tenant or platform configuration
+- cross-cutting admin/storefront design system
+- shared component behavior that affects multiple modules
+- a known technical-debt/inconsistency item documented in the context
+
+When an update is required:
+
+1. re-read the real target branch after implementation changes;
+2. update the existing current-state section instead of appending session chronology;
+3. remove or correct statements that became stale;
+4. add only technical debt that is verifiably present in code;
+5. update the audit date/reference to the implementation state being documented;
+6. include the context-file change in the same logical delivery/commit whenever technically possible.
+
+For a local cosmetic micro-fix, copy-only adjustment, isolated styling tweak, or bug fix that does not change any persistent documented system fact, a context edit is not required. The agent must still consciously evaluate the file before completion rather than silently assuming it is irrelevant.
+
+Do not allow `LEPEFY_PROJECT_CONTEXT.md` to remain knowingly stale after an important implementation.
+
 ### Commit and deployment batching
 
 Treat one approved logical implementation step as one delivery unit.
 
 Default rule:
 
-`EDIT ALL RELATED FILES -> VALIDATE AS A SET -> ONE FINAL COMMIT -> ONE PUSH -> ONE VERCEL VERIFICATION`
+`EDIT ALL RELATED FILES -> UPDATE PROJECT CONTEXT IF REQUIRED -> VALIDATE AS A SET -> ONE FINAL COMMIT -> ONE PUSH -> ONE VERCEL VERIFICATION`
 
 - Batch all related file changes for the logical step before updating the target branch.
 - Do **not** push after each file, component, sub-step, or cosmetic adjustment.
@@ -194,7 +232,8 @@ Before the normal final push:
 1. Review the intended set of changed files.
 2. Verify only intended files are included.
 3. Check for debug code, temporary assets and accidental unrelated changes.
-4. Use available remote/static checks that do not require publishing intermediate production commits.
+4. Confirm `LEPEFY_PROJECT_CONTEXT.md` was updated when required by the maintenance rule above.
+5. Use available remote/static checks that do not require publishing intermediate production commits.
 
 After the final push:
 
@@ -203,9 +242,10 @@ After the final push:
 3. If validation fails, inspect the actual logs.
 4. Determine whether the failure was introduced by this work.
 5. Apply the complete fix remotely.
-6. Push one corrective commit.
-7. Re-check validation and the new matching deployment.
-8. Repeat until relevant checks pass or a genuine external/pre-existing blocker is identified.
+6. Update project context too if the corrective fix changes the documented architecture/state.
+7. Push one corrective commit.
+8. Re-check validation and the new matching deployment.
+9. Repeat until relevant checks pass or a genuine external/pre-existing blocker is identified.
 
 Never stop merely to report an implementation-introduced CI/build error that the agent can reasonably fix.
 
@@ -271,6 +311,7 @@ Do not send a final completion response while approved implementation work remai
 When complete, keep the response concise and operational, for example:
 
 - ✅ Full approved implementation completed
+- ✅ Project context reviewed/updated when required
 - ✅ Remote validation passed
 - ✅ Vercel deployment `READY` verified for final commit (when applicable)
 - ✅ Push verified on `<target>`
