@@ -1,0 +1,140 @@
+.listPolish :global(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: inherit;
+}
+
+.listPolish :global(thead tr) {
+  background: #f8fafc;
+}
+
+.listPolish :global(thead th) {
+  padding-top: 11px !important;
+  padding-bottom: 11px !important;
+  border-bottom: 1px solid #e8edf4;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .07em;
+}
+
+.listPolish :global(tbody > tr > td) {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.listPolish :global(tbody > tr:hover > td) {
+  background: #fafaff;
+}
+
+.listPolish :global(tbody > tr:has(input[type='checkbox']:checked) > td) {
+  background: #f7f5ff;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(3)) {
+  min-width: 220px;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(3) p:first-child) {
+  color: #64748b;
+  font-size: 11px;
+  letter-spacing: .015em;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(3) p:last-child) {
+  margin-top: 5px;
+  max-width: 210px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(4)) {
+  min-width: 250px;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(5)) {
+  min-width: 165px;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(6)) {
+  min-width: 115px;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(6) > span:first-child) {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.listPolish :global(tbody > tr > td:nth-child(7)) {
+  min-width: 155px;
+}
+
+.listPolish :global(tbody > tr > td:last-child a:last-child) {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border-color: #dbe2ea;
+  border-radius: 10px;
+  padding-left: 12px;
+  padding-right: 12px;
+  font-weight: 650;
+  color: #334155;
+  background: #fff;
+}
+
+.listPolish :global(tbody > tr > td:last-child a:last-child:hover) {
+  border-color: #c9c1ff;
+  background: #f7f5ff;
+  color: #5145cd;
+}
+
+.listPolish :global(ul[aria-label='Commandes'] > li) {
+  background: #fff;
+}
+
+.listPolish :global(ul[aria-label='Commandes'] > li > a) {
+  padding: 15px 14px !important;
+}
+
+.listPolish :global(ul[aria-label='Commandes'] > li > a:hover) {
+  background: #fafaff;
+}
+
+:global(.dark) .listPolish :global(thead tr) {
+  background: #111827;
+}
+
+:global(.dark) .listPolish :global(thead th) {
+  border-bottom-color: #273244;
+  color: #94a3b8;
+}
+
+:global(.dark) .listPolish :global(tbody > tr > td),
+:global(.dark) .listPolish :global(ul[aria-label='Commandes'] > li) {
+  background: #111827;
+  border-bottom-color: #1f2937;
+}
+
+:global(.dark) .listPolish :global(tbody > tr:hover > td),
+:global(.dark) .listPolish :global(ul[aria-label='Commandes'] > li > a:hover) {
+  background: #151b2b;
+}
+
+:global(.dark) .listPolish :global(tbody > tr:has(input[type='checkbox']:checked) > td) {
+  background: #1b1930;
+}
+
+:global(.dark) .listPolish :global(tbody > tr > td:nth-child(3) p:last-child) {
+  color: #f8fafc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .listPolish :global(tbody > tr > td) {
+    transition: none;
+  }
+}
