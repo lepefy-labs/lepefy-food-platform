@@ -16,16 +16,13 @@ interface OtpLoginFormProps {
 
 export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
   const tenant = useTenant();
-  const [step, setStep]           = useState<'email' | 'code'>('email');
-  const [email, setEmail]         = useState('');
-  const [code, setCode]           = useState<string[]>(Array(6).fill(''));
+  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState<string[]>(Array(6).fill(''));
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [resendIn, setResendIn]   = useState(0);
-  // Connu seulement après l'envoi du code (pré-check côté /api/auth/request-otp,
-  // Ciclo 4) — détermine si la case CGV doit apparaître à l'étape code : un
-  // signup, pas un simple login, ne doit la demander qu'une fois.
+  const [error, setError] = useState<string | null>(null);
+  const [resendIn, setResendIn] = useState(0);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
@@ -37,20 +34,19 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  async function sendCode(e?: React.FormEvent) {
-    e?.preventDefault();
+  async function sendCode() {
     if (!email || isSending) return;
     setIsSending(true);
     setError(null);
     try {
-      const res  = await fetch('/api/auth/request-otp', {
-        method:  'POST',
+      const res = await fetch('/api/auth/request-otp', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email }),
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? 'Erreur lors de l\'envoi du code.');
+        setError(data.error ?? "Erreur lors de l'envoi du code.");
         return;
       }
       setIsNewCustomer(data.isNewCustomer === true);
@@ -61,7 +57,7 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
       setResendIn(RESEND_DELAY_S);
       setTimeout(() => cellRefs.current[0]?.focus(), 50);
     } catch {
-      setError('Erreur lors de l\'envoi du code.');
+      setError("Erreur lors de l'envoi du code.");
     } finally {
       setIsSending(false);
     }
@@ -70,16 +66,16 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
   async function submitCode(fullCode: string) {
     if (isVerifying) return;
     if (isNewCustomer && !termsAccepted) {
-      setError('Merci d\'accepter les Conditions Générales de Vente pour continuer.');
+      setError("Merci d'accepter les Conditions Générales de Vente pour continuer.");
       return;
     }
     setIsVerifying(true);
     setError(null);
     try {
-      const res  = await fetch('/api/auth/verify-otp', {
-        method:  'POST',
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email, token: fullCode, marketingOptIn }),
+        body: JSON.stringify({ email, token: fullCode, marketingOptIn }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -88,10 +84,6 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
         cellRefs.current[0]?.focus();
         return;
       }
-      // Signal global — CartSyncProvider (ShopLayout) est monté une seule
-      // fois et persistant entre navigations client-side : il ne se
-      // remonte pas au retour depuis /compte/connexion, donc ne peut pas
-      // découvrir le login sans cet événement explicite.
       window.dispatchEvent(new Event('lepefy:customer-authenticated'));
       onAuthenticated?.();
     } catch {
@@ -103,17 +95,14 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
 
   function handleCellChange(index: number, value: string) {
     const digit = value.replace(/\D/g, '').slice(-1);
-    const next  = [...code];
+    const next = [...code];
     next[index] = digit;
     setCode(next);
 
-    if (digit && index < 5) {
-      cellRefs.current[index + 1]?.focus();
-    }
-
+    if (digit && index < 5) cellRefs.current[index + 1]?.focus();
     if (digit && index === 5) {
       const fullCode = next.join('');
-      if (fullCode.length === 6) submitCode(fullCode);
+      if (fullCode.length === 6) void submitCode(fullCode);
     }
   }
 
@@ -131,19 +120,16 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
     for (let i = 0; i < pasted.length; i++) next[i] = pasted[i];
     setCode(next);
     if (pasted.length === 6) {
-      submitCode(pasted);
+      void submitCode(pasted);
     } else {
       cellRefs.current[pasted.length]?.focus();
     }
   }
 
   return (
-    <div
-      className="rounded-2xl border border-gray-100 p-4"
-      style={{ boxShadow: 'var(--shadow-card)' }}
-    >
+    <div className="rounded-2xl border border-gray-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
       {step === 'email' ? (
-        <form onSubmit={sendCode} className="space-y-3">
+        <div className="space-y-3">
           <p className="text-sm font-semibold text-gray-700">Connecte-toi pour gagner des points</p>
           <input
             type="email"
@@ -152,19 +138,26 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
             placeholder="Ton email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              e.stopPropagation();
+              void sendCode();
+            }}
             className={INPUT_CLS}
             required
           />
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <button
-            type="submit"
+            type="button"
+            onClick={() => void sendCode()}
             disabled={isSending || !email}
             className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50 transition-opacity"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
             {isSending ? 'Envoi…' : 'Recevoir mon code'}
           </button>
-        </form>
+        </div>
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-gray-600">
@@ -222,7 +215,7 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <button
             type="button"
-            onClick={() => sendCode()}
+            onClick={() => void sendCode()}
             disabled={resendIn > 0 || isSending}
             className="text-xs text-gray-400 disabled:opacity-60"
             style={resendIn === 0 ? { color: 'var(--color-primary)' } : undefined}
