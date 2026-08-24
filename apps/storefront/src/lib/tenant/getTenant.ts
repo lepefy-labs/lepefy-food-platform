@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import { createPublicClient } from '@/lib/supabase/public';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { Tenant } from '@lepefy/types';
 
 export class TenantNotFoundError extends Error {
@@ -9,12 +9,15 @@ export class TenantNotFoundError extends Error {
   }
 }
 
-// Client public (pas de cookies()) : getTenant() ne lit jamais rien de
-// personnalisé par utilisateur (nom, couleurs, config), et le layout racine
-// l'appelle sur CHAQUE route — un client lié aux cookies ici forçait tout le
-// site en dynamique, y compris les routes qui n'en ont aucun besoin.
+// Tenant configuration can contain server-only values (for example provider
+// API keys and private assistant context). Resolve the canonical tenant with
+// the service-role client and only expose a sanitized projection to Client
+// Components at the layout boundary.
+//
+// createServiceClient() does not read cookies, so this remains safe to call
+// from the root layout without making the result user-specific.
 export const getTenant = cache(async (slug: string): Promise<Tenant> => {
-  const supabase = createPublicClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from('tenants')
     .select('*')
