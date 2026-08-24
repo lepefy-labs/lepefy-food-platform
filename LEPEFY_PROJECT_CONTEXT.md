@@ -2,87 +2,64 @@
 
 > **Documento operativo di riferimento per Codex / Claude Code / sviluppatori.**
 >
-> **Aggiornato:** 22 agosto 2026 — **v4.0 Current-State Snapshot**
+> **Aggiornato:** 24 agosto 2026 — **v5.0 Current-State Snapshot**
 >
 > **Source of truth:** `main` di `lepefy-labs/lepefy-food-platform`, audit eseguito sul commit
-> `dd1e0f8270a6671705e0271293acdb42cb56ba9c`.
+> `9063b441a534bc4341fb0b811af2a81e539e1316`.
 >
-> Questa revisione cambia deliberatamente il formato del documento: invece di continuare ad
-> accumulare un changelog di sessione sempre più lungo, descrive **lo stato realmente presente
-> nel codice**. Per la storia puntuale delle modifiche usare `git log` / Pull Request / commit.
-> Se questo documento e il codice divergono, **vince il codice**.
+> Questo documento descrive lo **stato realmente presente nel codice**. Per la cronologia usare
+> `git log`, PR e commit. Se questo documento e il codice divergono, **vince il codice**.
 
 ---
 
 ## 1. Cos'è Lepefy Food Platform
 
-Lepefy Food è una piattaforma SaaS e-commerce **multi-tenant** per attività food, con storefront,
-back-office, pagamenti, spedizioni, loyalty/referral, carta digitale, assistente shopping e un
-modulo Événementiel separato.
+Lepefy Food è una piattaforma SaaS e-commerce **multi-tenant** per attività food, con:
 
-Il tenant di riferimento attualmente usato più spesso è `chloefood`, ma il codice non deve
-hardcodare Chloe Food salvo seed/configurazioni esplicitamente tenant-specifiche.
+- storefront commerce;
+- back-office tenant;
+- pagamenti e checkout;
+- shipping/logistica;
+- loyalty/referral;
+- digital card;
+- assistente shopping Nala;
+- modulo Événementiel con eventi, servizi e rental.
+
+Il tenant di riferimento più usato è `chloefood`, ma il codice non deve hardcodare Chloe Food
+salvo seed/configurazioni esplicitamente tenant-specifiche.
 
 Principi architetturali:
 
-- un'unica codebase multi-tenant;
-- branding e configurazione letti dal tenant;
+- unica codebase multi-tenant;
 - isolamento dati tramite `tenant_id` e RLS dove previsto;
 - Next.js App Router;
 - Supabase per database/auth;
 - Stripe per i pagamenti carta;
-- Packlink per la logistica/spedizione;
-- Zustand per lo stato cart client;
-- TypeScript condiviso tramite `@lepefy/types`.
+- Packlink per shipping;
+- Zustand per il cart client;
+- TypeScript condiviso tramite `@lepefy/types`;
+- branding storefront tenant e branding admin piattaforma sono concetti separati.
 
 ---
 
-## 2. Monorepo
+## 2. Monorepo e stack
 
 ```text
 lepefy-food-platform/
-├─ apps/
-│  └─ storefront/            # applicazione Next.js principale
-├─ packages/
-│  └─ types/                 # tipi TypeScript condivisi (@lepefy/types)
-├─ supabase/
-│  ├─ migrations/            # schema e migrazioni SQL
-│  └─ seed.sql               # seed
-├─ docs/                     # documentazione tecnica
-├─ scripts/                  # script operativi / one-off
+├─ apps/storefront/         # applicazione Next.js principale
+├─ packages/types/          # tipi TypeScript condivisi
+├─ supabase/migrations/     # schema versionato
+├─ docs/
+├─ scripts/
+├─ AGENTS.md                # workflow UX Agent
 ├─ CLAUDE.md
 ├─ INTEGRATION.md
-├─ README.md
 └─ LEPEFY_PROJECT_CONTEXT.md
 ```
 
 Package manager: **pnpm workspaces**.
 
-Comandi storefront:
-
-```bash
-pnpm dev
-pnpm build
-pnpm lint
-pnpm typecheck
-```
-
-Nel package storefront sono inoltre presenti:
-
-```bash
-pnpm test:unit
-pnpm test:e2e
-pnpm test:e2e:report
-```
-
-Quindi non è più corretto affermare che il repository non abbia test: esistono runner Playwright
-dedicati a unit ed E2E.
-
----
-
-## 3. Stack attuale
-
-Dallo `apps/storefront/package.json` corrente:
+Stack storefront corrente:
 
 - Next.js `14.2.35`
 - React / ReactDOM `18.3.1`
@@ -102,104 +79,81 @@ Dallo `apps/storefront/package.json` corrente:
 - `@google/genai` `^1.0.0`
 - `react-markdown` `^10.1.0`
 
-Non introdurre dipendenze nuove per problemi che possono essere risolti con le primitive già
-presenti, salvo necessità esplicita.
+Script applicativi includono build, lint, typecheck e runner Playwright unit/E2E.
 
 ---
 
-## 4. Multi-tenancy
+## 3. Multi-tenancy e branding
 
-Il tenant pubblico è risolto a partire da:
+Storefront tenant risolto principalmente da:
 
 ```env
 NEXT_PUBLIC_TENANT_SLUG
 ```
 
-Il flusso di riferimento resta:
+Flusso di riferimento:
 
 1. `src/lib/tenant/getTenant.ts`
 2. caricamento tenant da Supabase
-3. root layout
-4. CSS custom properties / provider tenant
-5. query applicative filtrate per `tenant_id`
-6. RLS Supabase dove configurata
+3. root layout/provider
+4. CSS custom properties tenant
+5. query filtrate per `tenant_id`
+6. RLS dove configurata
 
-Variabili pubbliche essenziali:
+### Branding admin di piattaforma
 
-```env
-NEXT_PUBLIC_TENANT_SLUG=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-NEXT_PUBLIC_APP_URL=
+Dal 23/24 agosto 2026 `/admin/**` non deve essere considerato semplicemente un'estensione dei
+colori del tenant. Esiste una configurazione separata di **platform branding** per l'identità
+SaaS admin.
+
+Migrazione corrente:
+
+```text
+supabase/migrations/071_platform_branding.sql
 ```
 
-Variabili server-only tipiche:
+Tabella singleton:
 
-```env
-SUPABASE_SERVICE_ROLE_KEY=
-STRIPE_SECRET_KEY=
-PACKLINK_API_KEY=
+```text
+public.platform_branding
 ```
 
-Le Preview Vercel e Production possono avere configurazioni env differenti. Una differenza
-visiva o dati mancanti tra Preview e Production non deve essere interpretata automaticamente
-come bug del codice: verificare prima le env e il tenant effettivamente risolto.
+Campi principali includono nome piattaforma, logo e token colore/surface. L'accesso è
+server-side tramite service role; non esiste deliberatamente una policy browser-facing per la
+scrittura diretta.
+
+L'admin usa l'identità **Lepefy Commerce** e primitive condivise di pagina/blocco; tenant branding
+continua invece a guidare storefront e superfici tenant dove previsto.
 
 ---
 
-## 5. Route groups principali
+## 4. Route groups principali
 
-### Storefront shop
-
-Le pagine cliente vivono prevalentemente in:
+### Shop
 
 ```text
 apps/storefront/src/app/(shop)/
 ```
 
-Il modulo shop comprende, tra le altre aree:
-
-- homepage;
-- catalogo `/products`;
-- product detail;
-- cart;
-- checkout;
-- conferma ordine;
-- account `/compte`;
-- ordini cliente;
-- indirizzi;
-- loyalty/referral dove integrati.
+Include homepage, `/products`, product detail, `/cart`, `/checkout`, confirmation, `/compte`,
+indirizzi e ordini cliente.
 
 ### Digital Card
-
-Route indipendente:
 
 ```text
 apps/storefront/src/app/card/
 ```
 
-La card non è una semplice loyalty card: è diventata un hub mobile del tenant con:
-
-- identità/branding tenant;
-- informazioni pratiche;
-- location fisica;
-- Google Maps URL configurabile;
-- metodi di pagamento;
-- Quick Pay carta;
-- componenti dedicati come `CardQuickPay`, `CardLocation`,
-  `PaymentMethodsAccordion`, `DigitalCard`.
+Hub mobile tenant con branding, location fisica, Google Maps URL configurabile, metodi di
+pagamento e Quick Pay.
 
 ### Événementiel
-
-Route group dedicato:
 
 ```text
 apps/storefront/src/app/(evenementiel)/
 ```
 
-È deliberatamente separato dal layout shop standard e dispone di header/footer/pagine
-pubbliche dedicate.
+Layout pubblico dedicato e separato dallo shop standard.
 
 ### Admin
 
@@ -207,7 +161,7 @@ pubbliche dedicate.
 apps/storefront/src/app/admin/
 ```
 
-L'area protetta usa Supabase Auth e il modello `admin_users`.
+Area protetta con Supabase Auth e `admin_users`.
 
 ### API
 
@@ -215,85 +169,47 @@ L'area protetta usa Supabase Auth e il modello `admin_users`.
 apps/storefront/src/app/api/
 ```
 
-Le API Next.js coprono checkout, shipping, customer cart/account, admin, eventi, rental,
-pagamenti, notifiche e integrazioni applicative.
+Checkout, shipping, auth/customer, cart, admin, eventi, rental, pagamenti, notifiche e webhook.
 
 ---
 
-## 6. Catalogo e storefront commerce
+## 5. Catalogo `/products`
 
-Il catalogo `/products` è oggi la superficie commerce primaria e mobile-first.
+Il catalogo è la superficie commerce primaria e mobile-first.
 
-Stato UI/UX corrente da preservare:
+Stato da preservare:
 
-- search molto prominente;
-- search sticky;
-- eliminazione/riduzione di heading ridondanti che sottraevano spazio ai prodotti;
-- `Nos univers`:
-  - mobile: scroller orizzontale;
-  - tablet/desktop: grid;
-  - comportamento motion rispettoso di `prefers-reduced-motion`;
-  - immagini categoria con fallback basato sulle immagini prodotto reali;
-- product grid più densa;
-- ProductCard ottimizzata per mobile;
-- quick-add con target touch adeguato;
-- prezzi promozionali reali quando disponibili (`compare_at_price`);
-- business logic cart invariata dalle modifiche puramente visuali.
+- search prominente e sticky;
+- heading/banner ridondanti ridotti;
+- `Nos univers` mobile come scroller orizzontale;
+- tablet/desktop come grid;
+- auto-motion rispettosa di `prefers-reduced-motion`;
+- fallback immagini categoria da immagini prodotto reali;
+- product grid densa;
+- ProductCard mobile ottimizzata;
+- quick-add con touch target adeguato;
+- prezzi promo basati su dati reali (`compare_at_price`).
 
 La PWA è orientata all'apertura del catalogo; verificare `src/app/manifest.ts` prima di cambiare
 la destinazione iniziale.
 
-Non reintrodurre hero/banner/heading ridondanti nel catalogo senza motivazione prodotto.
-
 ---
 
-## 7. Cart: stato, sync e UX
+## 6. Cart — stato, sync e UX corrente
 
-### Stato client
+### Stato e sync
 
-Il cart usa Zustand:
+Il cart usa Zustand (`src/stores/cartStore.ts`) con persistenza guest in `localStorage`.
 
-```text
-src/stores/cartStore.ts
-```
-
-Persistenza guest in `localStorage`.
-
-### Sync cross-device
-
-Per utenti autenticati il cart è sincronizzato server-side con optimistic concurrency control.
-
-Componenti logici principali:
+Per utenti autenticati esiste sync server-side con optimistic concurrency control:
 
 ```text
 src/lib/cart/
-src/stores/cartStore.ts
 src/components/cart/CartSyncProvider.tsx
-```
-
-Protocollo attuale:
-
-- mutation tipizzate:
-  - `add`
-  - `set_quantity`
-  - `remove`
-  - `clear`
-- client optimistic;
-- coda pendente persistita;
-- debounce/retry/backoff;
-- gestione offline;
-- 409 = riconciliazione con stato canonico, non overwrite;
-- merge login idempotente;
-- isolamento della coda per customer;
-- logout non deve lasciare il carrello del cliente come guest cart.
-
-Server:
-
-```text
 POST /api/customers/me/cart
 ```
 
-Payload logico:
+Protocollo logico:
 
 ```ts
 {
@@ -302,72 +218,170 @@ Payload logico:
 }
 ```
 
-La migrazione di riferimento è:
+Mutation: `add`, `set_quantity`, `remove`, `clear`. Il 409 è riconciliazione canonica, non
+sovrascrittura cieca. Migrazione di riferimento: `070_cart_versioning.sql`, RPC
+`apply_cart_mutations()`.
+
+### `/cart` dopo il redesign del 24 agosto
+
+`/cart` è tornato ad avere una responsabilità chiara: **modificare il basket e iniziare il
+checkout**, non raccogliere indirizzo o calcolare la spedizione.
+
+File di riferimento:
 
 ```text
-070_cart_versioning.sql
+apps/storefront/src/app/(shop)/cart/CartPurchaseClient.tsx
+apps/storefront/src/components/cart/CartItem.tsx
 ```
 
-e usa l'RPC atomica `apply_cart_mutations()`.
+UX corrente:
 
-Documentazione tecnica:
+- niente titolo/breadcrumb mobile ridondante;
+- card prodotto separate, compatte e cliccabili verso `/products/[slug]`;
+- controlli `+`, `-`, `Retirer` indipendenti dalla navigazione card;
+- Nala nascosta nel purchase funnel;
+- action bar mobile unica con due azioni affiancate:
+  - ritorno acquisti secondario;
+  - `Livraison` primaria;
+- CTA persistente sopra la BottomNav con safe-area;
+- `/cart` non contiene più form indirizzo/shipping quote.
 
-```text
-docs/CART_SYNC.md
-```
-
-### Cart Drawer
-
-Il desktop header non è più obbligato a navigare immediatamente a `/cart`: esiste un Mini
-Cart / Cart Drawer dedicato, costruito senza una libreria Dialog esterna.
-
-Componenti di riferimento in `components/cart/` includono:
-
-- `CartDrawer`
-- `CartDrawerHeader`
-- `CartItem`
-- `CartQuantityControl`
-- `CartDrawerFooter`
-- `CartDrawerEmpty`
-- `CartUndoToast`
-
-`/cart` resta la pagina completa di gestione carrello.
+Il Cart Drawer desktop continua a esistere come esperienza separata.
 
 ---
 
-## 8. Account cliente
+## 7. Checkout shop — architettura reale
 
-La pagina `/compte` è stata riprogettata come dashboard account responsive.
+Il checkout shop è stato ristrutturato il 24 agosto 2026.
 
-Principi correnti:
-
-- mobile lineare e leggibile;
-- desktop composto, non semplice colonna mobile ingrandita;
-- loyalty prominente;
-- reminder ambassadeur secondario;
-- accesso a tutti gli indirizzi salvati;
-- azione `Ajouter` con target touch adeguato;
-- navigazione account compatta;
-- logout visivamente secondario;
-- focus visibile e contrasto dell'accent tenant verificabile;
-- non inventare route o meccaniche loyalty non esistenti.
-
-File rilevanti includono:
+Route:
 
 ```text
-apps/storefront/src/app/(shop)/compte/AccountDashboard.tsx
-apps/storefront/src/components/.../LoyaltyCardWidget.tsx
+/apps/storefront/src/app/(shop)/checkout/
 ```
 
-Verificare sempre il path reale del widget prima di modificarlo.
+Componente attivo:
+
+```text
+CheckoutFlow.tsx
+```
+
+Il vecchio `CheckoutForm.tsx` è ancora presente nel repository per compatibilità/storia, ma il
+nuovo funnel è implementato in `CheckoutFlow`.
+
+### State machine percepita
+
+Il checkout non è più:
+
+```text
+Livraison -> Coordonnées -> Paiement
+```
+
+È ora:
+
+```text
+Livraison / Retrait + informations destinataire -> Paiement
+```
+
+`CheckoutProgressIndicator` mostra **2 macro-step**.
+
+### Primo macro-step
+
+Nello stesso flusso vengono raccolti:
+
+1. modalità `delivery` / `pickup`;
+2. destinatario (`firstName`, `lastName`) o persona che ritira;
+3. indirizzo di consegna per delivery;
+4. contatto (`email`, `phone`).
+
+Per delivery, Nome + Cognome alimentano anche:
+
+```text
+shippingAddress.full_name
+```
+
+Per pickup non viene richiesto un indirizzo cliente; viene mostrato l'indirizzo di ritiro tenant.
+
+Il telefono è **obbligatorio nella validazione client** (`contactSchema`, minimo 6 caratteri) sia
+per delivery sia per Click & Collect, perché serve al corriere o al negozio per contattare il
+cliente.
+
+### Shipping quote
+
+Il quote Packlink continua a dipendere dai dati logistici necessari e non aspetta il completamento
+di nome/email/telefono. La UI calcola il quote appena paese/CAP sono sufficienti e conserva il
+`quoteToken` firmato.
+
+L'indirizzo selezionato può essere bloccato/riepilogato come `Adresse validée` e riaperto con
+`Modifier`.
+
+### Login durante checkout
+
+Il checkout guest resta supportato. `OtpLoginForm` è una facilitazione opzionale e il suo submit è
+isolato dal form checkout per evitare form annidati/submit involontari.
+
+### Payment step
+
+Dopo la validazione completa si entra direttamente nella selezione pagamento:
+
+- Stripe/card;
+- external payment links configurati;
+- pagamento in boutique solo quando applicabile al pickup.
+
+Stripe resta un sottostato `payment` del macro-step Paiement.
+
+### Chrome purchase funnel
+
+Durante `/checkout*`:
+
+- header focalizzato con back/logo/security cue;
+- BottomNav nascosta;
+- ticker promozionale nascosto;
+- Nala nascosta;
+- CTA mobile sticky con totale persistente.
+
+### Protezioni business da preservare
+
+Non semplificare o spostare sul client:
+
+- pricing server-side;
+- stock validation;
+- quote token verification;
+- shipping amount verificato server-side;
+- ambassador discount server-side;
+- checkout session/retry;
+- Stripe deferred PaymentIntent;
+- external-link flow;
+- payment redirect recovery.
+
+---
+
+## 8. Incoerenza reale: telefono checkout
+
+La UI corrente rende il telefono obbligatorio, ma le API shop al commit auditato tipizzano ancora:
+
+```ts
+phone?: string | null
+```
+
+in particolare in:
+
+```text
+apps/storefront/src/app/api/checkout/route.ts
+apps/storefront/src/app/api/checkout/external-link/route.ts
+```
+
+La guardia iniziale server controlla gli elementi/email (e gli altri requisiti specifici), non
+impone ancora in modo uniforme il telefono.
+
+Quindi **non dichiarare che l'obbligatorietà del telefono è server-enforced** finché le route non
+vengono allineate. È technical debt reale da correggere in un intervento checkout approvato.
 
 ---
 
 ## 9. Nala / shopping assistant
 
-Il repository integra un assistente shopping branded **Nala**.
-
-File di riferimento:
+Componente:
 
 ```text
 apps/storefront/src/components/chat/ChatWidget.tsx
@@ -375,21 +389,18 @@ apps/storefront/src/components/chat/ChatWidget.tsx
 
 Identità approvata:
 
-- nome: `Nala`;
-- sottotitolo: `Assistant shopping par Lepefy`;
-- primary indipendente dal tenant: `#6D5AF6`;
-- launcher mobile inizialmente esteso;
-- stato persistente compatto icon-only dopo onboarding/scroll;
-- il launcher non deve coprire ProductCard o competere con il catalogo;
-- suggested prompts passano attraverso il flusso chat esistente.
+- `Nala`;
+- `Assistant shopping par Lepefy`;
+- primary indipendente dal tenant `#6D5AF6`;
+- launcher mobile discovery -> compact;
+- suggested prompts nel flusso chat esistente.
 
-Non ribrandizzare Nala con i colori tenant salvo decisione prodotto esplicita.
+Regola corrente importante: **Nala non deve apparire in `/cart`, `/checkout*` e purchase funnel
+correlato**, dove compete con le CTA di conversione.
 
 ---
 
-## 10. Pagamenti — architettura corrente
-
-I pagamenti Stripe hanno oggi una base UI/client condivisa.
+## 10. Pagamenti condivisi
 
 Componente centrale:
 
@@ -397,310 +408,32 @@ Componente centrale:
 apps/storefront/src/components/payments/StripePaymentStep.tsx
 ```
 
-Responsabilità correnti del componente:
+Responsabilità:
 
-- inizializzazione `Elements`;
-- `PaymentElement`;
-- locale Stripe;
-- warning prima del pagamento;
+- Stripe Elements/PaymentElement;
+- locale;
+- warning pagamento;
 - funnel logging;
 - `elements.submit()`;
-- creazione differita del PaymentIntent tramite callback `createIntent`;
+- callback `createIntent` differita;
 - `stripe.confirmPayment`;
 - `return_url`;
-- gestione `redirect: 'if_required'`;
-- protezione `beforeunload` mentre `isConfirming`;
-- auto-centering del blocco pagamento;
-- rispetto di `prefers-reduced-motion`;
-- CTA pagamento:
-  - desktop inline;
-  - mobile sticky bottom;
-- padding mobile per evitare che la CTA copra il form.
+- `redirect: 'if_required'`;
+- protezione `beforeunload` durante conferma;
+- auto-centering;
+- `prefers-reduced-motion`;
+- CTA mobile sticky.
 
-Locale supportata dal wrapper:
+Non modificare il componente condiviso senza verificare tutti i caller shop/event/rental/card.
 
-```ts
-'auto' | 'fr' | 'it'
-```
+La configurazione Stripe è modulare (`PaymentModule`) e un metodo disponibile nel Dashboard non
+implica che sia disponibile in ogni modulo.
 
-Il default corrente del wrapper è francese, mentre i caller possono esplicitare una locale
-diversa quando necessario (per esempio `/card`).
-
-### Payment modules
-
-La configurazione Stripe è modulare e usa `PaymentModule` / config client-server dedicata.
-Non assumere che ogni modulo condivida necessariamente le stesse chiavi o gli stessi metodi.
-
-### Funnel logging
-
-La tabella condivisa `payment_funnel_logs` raccoglie eventi del funnel tra i moduli di pagamento.
-Il `reference_id` deve restare coerente per il tentativo/modulo.
-
-Non rimuovere funnel logging durante refactor UI.
+`payment_funnel_logs` resta cross-module e il `reference_id` deve restare coerente.
 
 ---
 
-## 11. Événementiel — stato reale al 22 agosto 2026
-
-Il modulo Événementiel è molto più evoluto della prima implementazione documentata nelle
-revisioni storiche.
-
-### Layout pubblico
-
-File principali:
-
-```text
-apps/storefront/src/app/(evenementiel)/layout.tsx
-apps/storefront/src/app/(evenementiel)/_components/EventsHeader.tsx
-apps/storefront/src/app/(evenementiel)/_components/EventsFooter.tsx
-```
-
-Header:
-
-- usa il vero `tenant.logo_url`;
-- non applicare inversioni/filtri cosmetici arbitrari al logo;
-- non aggiungere lockup testuali inventati;
-- CTA `Voir les dates` visibile anche su mobile;
-- menu mobile separato.
-
-### Hub `/evenementiel`
-
-File:
-
-```text
-apps/storefront/src/app/(evenementiel)/evenementiel/page.tsx
-```
-
-Il redesign corrente comprende:
-
-- hero più compatto;
-- featured event;
-- cards eventi;
-- CTA di prenotazione più esplicita;
-- pricing reale ricavato dai ticket type attivi;
-- urgenza/disponibilità visiva;
-- sezioni servizi;
-- immagini reali da database quando disponibili.
-
-Disponibilità evento:
-
-- `0`: completo;
-- capacità molto bassa: stato rosso / urgenza alta;
-- capacità intermedia: amber;
-- capacità ampia: verde.
-
-Non inventare prezzi, posti, date o immagini.
-
-### Immagini eventi
-
-Componente:
-
-```text
-apps/storefront/src/components/evenementiel/EventImageFader.tsx
-```
-
-Il componente deve mantenere:
-
-- fallback visivo dietro le immagini;
-- positioning del caller;
-- stacking context locale (`isolate`) per evitare che overlay interni blocchino hero/CTA;
-- nessun overlay che intercetti pointer events dei contenuti sovrapposti.
-
-### Dettaglio evento e checkout
-
-File principali:
-
-```text
-apps/storefront/src/app/(evenementiel)/evenementiel/evenements/[slug]/page.tsx
-apps/storefront/src/app/(evenementiel)/evenementiel/evenements/[slug]/EventCheckoutClient.tsx
-```
-
-La state machine checkout resta:
-
-```text
-select -> info -> select-payment -> payment
-```
-
-Questa sequenza è parte del comportamento approvato e non va alterata per un semplice redesign.
-
-Il flusso preserva:
-
-- ticket type reali;
-- pricing server-side;
-- controllo capacità;
-- customer info;
-- draft/recovery;
-- Stripe;
-- external payment links quando configurati;
-- stati pending;
-- conferma/QR dopo successo.
-
-### Stripe eventi: card-only
-
-Per il pagamento Stripe interno dell'evento, il codice corrente è **card-only**.
-
-Client `StripePaymentStep`:
-
-```ts
-module === 'event'
-=> paymentMethodTypes: ['card']
-```
-
-Server:
-
-```text
-apps/storefront/src/app/api/events/[id]/checkout/route.ts
-```
-
-crea il PaymentIntent con:
-
-```ts
-payment_method_types: ['card']
-```
-
-Quindi Satispay/Klarna/Amazon Pay/Bancontact/EPS non devono comparire nel Payment Element
-dell'evento.
-
-Questo non elimina automaticamente gli **external payment links** configurati dal tenant:
-quelli sono un percorso separato.
-
-### API checkout evento
-
-L'API corrente:
-
-- verifica `events_enabled`;
-- valida nome/email;
-- valida formato email;
-- valida quantità ticket;
-- verifica tenant/event/status;
-- rilegge ticket type e prezzi dal database;
-- non si fida del prezzo client;
-- effettua controllo preliminare capacità;
-- delega la garanzia atomica definitiva a `reserve_event_capacity()` al momento corretto del
-  workflow;
-- crea metadata `type: event_reservation`;
-- logga `intent_created`.
-
-### Stati pending e ticket
-
-Sono presenti pagine dedicate per:
-
-- pending payment evento;
-- pending payment rental;
-- confirmation rental;
-- ticket pubblico via QR token.
-
-File noti:
-
-```text
-.../evenements/[slug]/en-attente/PendingEventPaymentClient.tsx
-.../services/[slug]/en-attente/PendingRentalPaymentClient.tsx
-.../services/[slug]/confirmation/RentalConfirmationClient.tsx
-.../billet/[qr_token]/page.tsx
-```
-
----
-
-## 12. Services / Catering / Rental
-
-All'interno del route group Événementiel esistono due famiglie da non confondere:
-
-1. **services / devis**, per esempio catering;
-2. **rental / location matériel**, con basket e checkout dedicati.
-
-File rappresentativi:
-
-```text
-apps/storefront/src/app/(evenementiel)/evenementiel/services/[slug]/page.tsx
-apps/storefront/src/app/(evenementiel)/evenementiel/services/[slug]/DevisForm.tsx
-apps/storefront/src/app/(evenementiel)/evenementiel/services/[slug]/RentalCheckoutClient.tsx
-```
-
-`RentalItem` non dispone di una description libera da inventare. I campi applicativi noti sono:
-
-```ts
-id
-tenant_id
-service_offering_id
-name
-category
-price_per_unit
-stock_quantity
-image_url
-active
-sort_order
-```
-
-Non generare testo descrittivo falso per un rental item se il dato non esiste nel modello.
-
----
-
-## 13. `/card` — digital card e location fisica
-
-La card contiene una sezione location esplicitamente progettata per rispondere a:
-
-> dove si trova il negozio fisico?
-
-e:
-
-> come apro il percorso?
-
-Configurazione tenant:
-
-```text
-tenant.google_maps_url
-```
-
-Il link deve essere:
-
-- validato;
-- configurabile dall'admin;
-- passato alla card;
-- aperto esattamente come configurato.
-
-Il design corrente evita deliberatamente:
-
-- Google Maps iframe;
-- API Google Maps;
-- API key;
-- geolocalizzazione;
-- tile/mappe finte;
-- logo Google simulato;
-- nomi strada/geografia inventati.
-
-`CardLocation` può usare una preview astratta/direzionale, ma deve restare chiaramente
-decorativa e onesta.
-
-Migrazione:
-
-```text
-supabase/migrations/071_tenant_google_maps_url.sql
-```
-
-Admin:
-
-```text
-/admin/(protected)/parametres/
-api/admin/tenant
-```
-
-Tipi:
-
-```text
-packages/types/tenant.ts
-apps/storefront/src/lib/supabase/types.ts
-```
-
-### Quick Pay
-
-`CardQuickPay` usa il pagamento Stripe condiviso e deve mantenere il `return_url`/recovery.
-La UI Stripe può essere localizzata in base al contesto card.
-
----
-
-## 14. Admin
-
-L'area admin è protetta da Supabase Auth lato Server Component/layout.
+## 11. Admin — shell e identità piattaforma
 
 Ruoli applicativi:
 
@@ -708,42 +441,144 @@ Ruoli applicativi:
 - `tenant_admin`
 - `tenant_cashier`
 
-Guard di riferimento:
+Guard:
 
 ```text
 src/lib/auth/requireAdmin.ts
 ```
 
+`admin_users` è la fonte applicativa per ruolo, tenant e active state. Nascondere una voce UI non
+sostituisce mai authorization server-side.
+
+### UI system admin
+
+Dal redesign del 23/24 agosto l'admin usa una gerarchia condivisa e il branding Lepefy Commerce,
+separato dal storefront tenant. Sono presenti primitive condivise per page header e block accent,
+un shell responsive e un drawer mobile accessibile.
+
+Le pagine `/admin/parametres*` e pagamento sono state riallineate a questo sistema.
+
+---
+
+## 12. Admin Commandes / order detail
+
+`/admin` / Commandes è oggi un **workspace operativo**, non una semplice tabella archivio.
+
+Stato corrente:
+
+- KPI operativi compatti;
+- pagamenti esterni pending collassabili;
+- tabs/stati ordine;
+- quick views operative;
+- filtri secondari;
+- ordinamento server-side;
+- ricerca server-side;
+- paginazione server-side, 50 ordini/pagina;
+- rimosso il vecchio limite funzionale dei 500 record caricati client-side;
+- righe tabella più dense e gerarchizzate;
+- responsive/mobile dedicato.
+
+### Workflow ordine
+
+La logica di transizione singola e bulk è stata unificata.
+
+Flusso operativo principale:
+
+```text
+new -> preparing
+```
+
+Delivery:
+
+```text
+preparing -> shipped -> delivered
+```
+
+Pickup:
+
+```text
+preparing -> ready_for_pickup -> delivered
+```
+
+`cancelled` è gestito separatamente secondo le regole applicative.
+
 Regole importanti:
 
-- `platform_owner`: accesso globale secondo il guard;
-- tenant roles: tenant scope obbligatorio;
-- `tenant_cashier`: percorso operativo più ristretto;
-- team management è platform-only;
-- non creare accessi admin basati solo su UI hiding.
+- regressioni/transizioni incompatibili vengono bloccate;
+- delivery non può passare a `shipped` senza tracking;
+- bulk e dettaglio usano le stesse regole;
+- la spedizione bulk deve attivare la stessa side-effect pipeline/notifica della spedizione singola;
+- loyalty resta collegata alla transizione `delivered` dove prevista;
+- payment logic non va confusa con fulfillment status.
 
-Il modello `admin_users` è la fonte applicativa per ruolo, tenant e active state.
-
----
-
-## 15. Loyalty / QR / scanner
-
-La piattaforma contiene loyalty/referral e flussi scanner QR.
-
-`html5-qrcode` è già dipendenza del progetto.
-
-Il componente scanner deve proteggere `stop()` anche da eccezioni sincrone e non assumere
-che lo scanner sia sempre in stato `SCANNING` o `PAUSED`.
-
-Non duplicare scanner implementations se una componente condivisa già soddisfa il caso d'uso.
+Il dettaglio ordine è action-oriented: mostra la **prossima azione valida** invece di affidare il
+workflow a un select libero di enum.
 
 ---
 
-## 16. Shipping
+## 13. Événementiel
 
-Packlink resta l'integrazione di spedizione principale.
+Route group:
 
-La logica shipping deve essere trattata come business logic sensibile:
+```text
+apps/storefront/src/app/(evenementiel)/
+```
+
+È un modulo separato con layout/header/footer dedicati.
+
+Hub e detail usano dati reali per eventi, pricing, availability e immagini. Non inventare prezzi,
+posti, date o immagini.
+
+Checkout evento mantiene la state machine:
+
+```text
+select -> info -> select-payment -> payment
+```
+
+Per Stripe evento il Payment Element interno è **card-only** lato client e server. External payment
+links configurati sono un percorso separato.
+
+Capacità/prezzi devono essere verificati server-side; la capacità finale usa la logica atomica
+prevista dal modulo.
+
+Services/catering e rental sono famiglie distinte: non inventare campi description per rental item
+se non esistono nel modello.
+
+---
+
+## 14. Digital Card `/card`
+
+La digital card è un hub mobile tenant.
+
+Location fisica usa:
+
+```text
+tenant.google_maps_url
+```
+
+Regole:
+
+- URL configurabile e validato;
+- apertura dell'URL esatto;
+- niente Google Maps iframe/API/key;
+- niente tile/mappe/geografia finte;
+- preview solo astratta/decorativa.
+
+Quick Pay usa il pagamento Stripe condiviso e deve preservare return URL/recovery.
+
+Migrazione location:
+
+```text
+071_tenant_google_maps_url.sql
+```
+
+---
+
+## 15. Shipping
+
+Packlink resta integrazione principale.
+
+Trattare come business logic sensibile:
 
 - packaging;
 - peso;
@@ -752,152 +587,92 @@ La logica shipping deve essere trattata come business logic sensibile:
 - VAT;
 - surcharge;
 - country rules;
-- eventuali regole tenant.
+- tenant rules.
 
-Non semplificare il calcolo dal frontend.
-
-Esistono configurazioni/migrazioni successive per shipping country rules e simulatori admin:
-prima di cambiare comportamento leggere l'implementazione attuale in `src/lib/shipping/`
-e le relative route admin/API.
+Il frontend non è source of truth del costo. Leggere `src/lib/shipping/` e route quote/admin prima
+di cambiare comportamento.
 
 ---
 
-## 17. Notifiche
+## 16. Notifiche
 
-Il codice corrente include configurazione destinatari notifiche tenant.
+La configurazione destinatari notifiche tenant è versionata e non va sostituita con indirizzi
+hardcoded.
 
-Migrazione:
-
-```text
-supabase/migrations/071_tenant_notification_recipients.sql
-```
-
-Helper:
+Riferimenti:
 
 ```text
-apps/storefront/src/lib/notifications/getNotificationRecipients.ts
+071_tenant_notification_recipients.sql
+src/lib/notifications/getNotificationRecipients.ts
+/api/admin/notification-recipients/
 ```
-
-API admin:
-
-```text
-apps/storefront/src/app/api/admin/notification-recipients/
-```
-
-Non hardcodare indirizzi destinatari in nuove route se il caso è coperto da questa
-configurazione.
 
 ---
 
-## 18. Database e migrations
+## 17. Database / migrations
 
-Le migrations sono la fonte versionata dello schema.
+Le migration sono fonte versionata dello schema, ma la presenza nel repo **non prova** che siano
+applicate in ogni Supabase remoto.
 
-### Cart versioning
+### Collisione prefisso `071`
 
-```text
-070_cart_versioning.sql
-```
-
-### Collisione di numerazione nota
-
-Sul `main` attuale esistono **due migrations con prefisso 071**:
+Al commit auditato esistono almeno **tre migration con prefisso 071**:
 
 ```text
 071_tenant_google_maps_url.sql
 071_tenant_notification_recipients.sql
+071_platform_branding.sql
 ```
 
-Questa è una incoerenza reale del repository.
-
-**Regola:** non rinominare retroattivamente migrations già potenzialmente applicate a DB remoti
-senza una procedura di migrazione esplicita. Per nuove migration usare un numero successivo e
-documentare la collisione.
-
-### Stato DB remoto
-
-La presenza di un file SQL nel repository **non prova** che sia già applicato in ogni ambiente
-Supabase. Prima di fare diagnosi su Preview/Production distinguere:
-
-- migration presente nel repo;
-- migration applicata nel DB;
-- env Vercel che punta a quel DB.
+È una incoerenza reale. Non rinominare retroattivamente file potenzialmente già applicati senza
+una procedura esplicita. Per nuove migration usare una numerazione successiva non ambigua.
 
 ---
 
-## 19. Supabase clients
+## 18. Supabase / auth
 
-Usare il client corretto per contesto.
-
-Browser:
+Browser client:
 
 ```text
 src/lib/supabase/client.ts
 ```
 
-Server:
+Server/service:
 
 ```text
 src/lib/supabase/server.ts
 ```
 
-Le operazioni privilegiate/service-role devono restare server-only.
+Operazioni service-role devono restare server-only. Non esporre `SUPABASE_SERVICE_ROLE_KEY`.
 
-Non esporre `SUPABASE_SERVICE_ROLE_KEY`.
+Il checkout guest è supportato; OTP login durante checkout è opzionale e non deve bloccare la
+conversione.
 
 ---
 
-## 20. UI conventions
+## 19. UI conventions
 
-Lingua principale storefront corrente: **francese**.
+Lingua storefront principale: **francese**.
 
-Eccezioni/localizzazioni esistono dove deliberate, per esempio `/card`.
-
-Convenzioni:
+Convenzioni permanenti:
 
 - Tabler Icons;
-- focus visibile;
-- target touch >= ~44px dove interattivo;
 - responsive mobile-first;
-- safe areas su CTA fixed/mobile bottom;
+- target touch ~44px o superiore;
+- focus visibile;
+- safe-area su CTA fixed/sticky;
 - `prefers-reduced-motion` per motion automatica;
-- niente dati fake per completare mockup;
-- tenant branding da DB;
-- non alterare logo tenant con filtri se non esplicitamente previsto;
-- UI premium sì, business logic no-touch quando il task è visuale.
+- niente dati fake nei mockup/implementazioni;
+- storefront branding da tenant;
+- admin branding da platform branding;
+- non alterare arbitrariamente logo tenant;
+- per task visuali, business logic resta invariata salvo approvazione esplicita.
 
 ---
 
-## 21. Regole per modifiche future
+## 20. File/moduli ad alto impatto
 
-Prima di modificare un modulo:
-
-1. leggere il file corrente su `main`;
-2. leggere i caller e i tipi;
-3. identificare API/migration coinvolte;
-4. verificare se il componente è condiviso;
-5. evitare regressioni su shop/event/rental/card;
-6. non dedurre schema da vecchie note;
-7. preservare tenant isolation;
-8. preservare funnel/payment recovery;
-9. non inventare dati;
-10. eseguire almeno typecheck quando l'ambiente lo consente.
-
-Per una modifica puramente UI:
-
-- non cambiare route;
-- non cambiare schema;
-- non cambiare checkout semantics;
-- non cambiare pricing/calcoli;
-- non cambiare auth;
-- non cambiare payment method configuration;
-- salvo che il task lo richieda esplicitamente.
-
----
-
-## 22. File ad alto impatto
-
-Prima di toccare questi file verificare tutti i caller:
+Prima di toccare verificare caller e contratti:
 
 ```text
 apps/storefront/src/components/payments/StripePaymentStep.tsx
@@ -907,209 +682,145 @@ apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
 apps/storefront/src/lib/supabase/*
 apps/storefront/src/app/api/checkout/*
+apps/storefront/src/app/(shop)/checkout/*
 apps/storefront/src/app/api/events/*
 apps/storefront/src/app/(evenementiel)/*
-apps/storefront/src/app/(shop)/checkout/*
+apps/storefront/src/app/admin/*
 packages/types/*
 supabase/migrations/*
 ```
 
 ---
 
-## 23. Known inconsistencies / technical debt
+## 21. Known inconsistencies / technical debt
 
-### 23.1 Duplicate migration prefix `071`
+### 21.1 Prefisso migration `071` duplicato/triplicato
 
-Confermato sul `main`:
+Vedi sezione Database. Non correggere con rename distruttivo senza conoscere lo stato remoto.
 
-```text
-071_tenant_google_maps_url.sql
-071_tenant_notification_recipients.sql
-```
+### 21.2 Telefono checkout non ancora server-enforced
 
-Non correggere con rename distruttivo senza conoscere lo stato dei DB remoti.
+La UI lo rende obbligatorio, ma le route checkout continuano a modellarlo come opzionale. Da
+allineare in un intervento checkout/business approvato.
 
-### 23.2 `CLAUDE.md` non è completamente aggiornato
+### 21.3 Legacy `CheckoutForm.tsx`
 
-Il file dichiara ancora:
+Il nuovo shop checkout usa `CheckoutFlow.tsx`; il vecchio componente resta nel repository. Prima
+di rimuoverlo verificare import/caller e compatibility needs.
 
-> There is no test suite yet.
+### 21.4 `CLAUDE.md`
 
-ma `apps/storefront/package.json` contiene `test:unit` e `test:e2e`.
+Può contenere affermazioni storiche superate (per esempio sul testing). Codice + questo snapshot
+corrente prevalgono.
 
-`CLAUDE.md` resta utile per l'architettura di base ma non va considerato più autorevole del
-codice o di questo snapshot aggiornato.
+### 21.5 Test/CI
 
-### 23.3 Le note storiche del precedente `LEPEFY_PROJECT_CONTEXT.md`
-
-Il precedente documento incorporava moltissimi report di sessione, inclusi stati temporanei
-come “non pushato”, branch locali, test eseguiti in sessioni precedenti e gap branch/main poi
-superati.
-
-Queste informazioni non sono affidabili come descrizione dello stato attuale.
-
-Da v4.0:
-
-- questo file descrive lo **stato corrente**;
-- `git log` conserva lo storico;
-- i test vanno dichiarati “verdi” solo se eseguiti sul commit in questione;
-- non riutilizzare risultati di typecheck/CI di commit precedenti come prova sul commit corrente.
-
-### 23.4 Test/CI
-
-Questo audit è documentale e di codebase. Non dedurre che l'ultimo `main` sia verde solo perché
-revisioni precedenti dichiaravano typecheck/test verdi.
+Non riutilizzare la dichiarazione “test verdi” di commit precedenti. Ogni delivery deve essere
+validata sul proprio SHA finale.
 
 ---
 
-## 24. Ultimi filoni entrati su `main` prima di questo snapshot
+## 22. Cambiamenti strutturali entrati dopo lo snapshot del 22 agosto
 
-I commit recenti su `main` mostrano questi filoni:
+### Admin / piattaforma
 
-### 21 agosto 2026
+- platform branding separato dal tenant;
+- identità Lepefy Commerce nell'admin;
+- shell/page hierarchy condivisa;
+- `/admin/parametres*` riallineato;
+- Commandes/order detail trasformati in workspace operativo;
+- workflow ordine singolo/bulk unificato;
+- tracking server-side richiesto prima di shipped;
+- ricerca/paginazione/ordinamento server-side;
+- quick views operative.
 
-- Google Maps URL tenant per `/card`;
-- admin/schema/types/seed collegati;
-- `CardLocation` azionabile;
-- preview astratta direzioni;
-- redesign completo Événementiel:
-  - header/footer;
-  - hub;
-  - service pages;
-  - rental;
-  - event detail;
-  - checkout;
-  - pending states;
-  - rental confirmation;
-  - public ticket;
-  - image fader;
-  - logo tenant corretto.
+### Cart / checkout
 
-### 22 agosto 2026
-
-- affinamenti hub/dettaglio/booking mobile;
-- availability e pricing sulle cards evento;
-- contact step più compatto;
-- trust cues;
-- mobile payment step;
-- Stripe event card-only;
-- shared sticky payment CTA;
-- auto-centering Stripe form;
-- warning/protezione active payment;
-- locale Stripe condivisa;
-- `/card` localizzata sul wrapper condiviso.
-
-Il commit di riferimento di questo snapshot è:
-
-```text
-dd1e0f8270a6671705e0271293acdb42cb56ba9c
-fix(card): localize shared Stripe payment UI
-```
+- `/cart` ridotto a gestione basket + ingresso checkout;
+- card prodotto cliccabili e più compatte;
+- action bar mobile dual-CTA;
+- Nala esclusa dal purchase funnel;
+- checkout con chrome focalizzato;
+- ticker e BottomNav nascosti nel checkout;
+- shipping/address spostati dal cart al checkout;
+- state machine shop ridotta a 2 macro-step;
+- destinatario + address/pickup + contact unificati;
+- telefono obbligatorio lato UI;
+- OTP submit isolato dal form checkout;
+- sticky purchase CTA con totale;
+- Stripe/external payment engine preservato.
 
 ---
 
-## 25. Cosa NON assumere
-
-Non assumere che:
-
-- ogni migration repo sia applicata in Production;
-- Preview e Production puntino allo stesso Supabase project;
-- il tenant seed corrisponda ai valori runtime;
-- un prezzo mostrato in un vecchio screenshot sia hardcoded;
-- un metodo Stripe disponibile in Dashboard debba apparire in ogni modulo;
-- shop/event/rental/card possano essere modificati insieme senza verificare i caller;
-- una descrizione di rental item esista;
-- il logo Chloe possa essere ricostruito come testo;
-- una Google Maps preview possa simulare una mappa reale;
-- una nota storica “test verdi” valga per l'ultimo commit.
-
----
-
-## 26. Checklist rapida prima di consegnare codice
+## 23. Checklist prima di consegnare codice
 
 ### Repo
 
-- [ ] ho letto `main` attuale;
-- [ ] conosco il commit di base;
+- [ ] letto il `main` corrente;
+- [ ] base SHA nota;
 - [ ] diff limitato allo scope;
-- [ ] nessun file generato/spazzatura incluso.
+- [ ] nessun artefatto temporaneo.
 
-### TypeScript
+### Business critical
 
-- [ ] `pnpm typecheck` eseguito, oppure dichiarato esplicitamente non eseguito.
-
-### Payments
-
-- [ ] nessun `return_url` rimosso;
-- [ ] `StripePaymentStep` condiviso verificato sui caller;
-- [ ] event card-only preservato;
-- [ ] external-link flow non confuso con Stripe Payment Element;
-- [ ] funnel logging preservato;
-- [ ] mobile sticky CTA non copre contenuto.
-
-### Events
-
-- [ ] state machine `select -> info -> select-payment -> payment` preservata;
-- [ ] prezzi riletti dal DB/server;
-- [ ] capacità preservata;
-- [ ] logo da `tenant.logo_url`;
-- [ ] nessun dato fake.
-
-### Cart
-
-- [ ] niente accesso diretto a internals del sync engine da UI;
-- [ ] mutation semantics preservate;
-- [ ] conflitti 409 non trasformati in overwrite.
-
-### Tenant
-
-- [ ] `tenant_id` filtrato;
-- [ ] config da tenant quando prevista;
+- [ ] tenant isolation preservata;
+- [ ] pricing/stock server-side preservati;
+- [ ] shipping quote/token preservati;
+- [ ] payment return/recovery preservati;
+- [ ] auth/roles verificati;
 - [ ] nessun secret esposto.
 
 ### UX
 
-- [ ] mobile verificato;
-- [ ] desktop verificato;
+- [ ] mobile;
+- [ ] desktop;
 - [ ] touch target;
 - [ ] focus;
+- [ ] safe-area;
 - [ ] reduced motion;
-- [ ] safe-area per elementi fixed.
+- [ ] niente dati inventati.
+
+### Delivery
+
+- [ ] remote validation riferita allo SHA finale;
+- [ ] Vercel `READY` quando applicabile;
+- [ ] `LEPEFY_PROJECT_CONTEXT.md` rivalutato se l'implementazione è importante.
 
 ---
 
-## 27. Regola di manutenzione di questo file
+## 24. Regola di manutenzione di questo file
 
-Aggiornare questo documento quando cambia uno di questi elementi:
+Questo file deve essere aggiornato quando una implementazione importante cambia uno o più di:
 
 - architettura;
 - route/module principali;
+- workflow business permanente;
 - schema/migrations significative;
-- payment architecture;
-- auth/roles;
+- payment/checkout architecture;
+- auth/roles/security model;
 - cart sync;
 - shipping;
-- tenant config;
-- feature cross-cutting;
-- convenzioni permanenti.
+- tenant/platform config;
+- design system cross-cutting;
+- feature condivisa fra moduli.
 
-Non aggiungere un nuovo paragrafo “cronaca della sessione” per ogni micro-fix.
+Non aggiungere cronaca per micro-fix cosmetici o bug locali senza impatto sul modello del sistema.
 
-Per i micro-fix usare commit message / PR.
+Per ogni aggiornamento:
 
-Quando si aggiorna questo documento:
+1. leggere il codice reale sul target corrente;
+2. aggiornare data e SHA auditato;
+3. correggere/rimuovere affermazioni superate;
+4. aggiungere solo technical debt verificato;
+5. non dichiarare test/build verdi senza evidenza sullo SHA pertinente.
 
-1. impostare data;
-2. indicare commit `main` auditato;
-3. correggere la sezione corrente;
-4. aggiungere technical debt reale;
-5. rimuovere affermazioni superate;
-6. non dichiarare test eseguiti se non verificati sul commit.
+`AGENTS.md` contiene la regola operativa che rende questa verifica parte del Definition of Done
+delle implementazioni importanti.
 
 ---
 
-# Fine snapshot v4.0
+# Fine snapshot v5.0
 
-**Audit reference:** `main @ dd1e0f8270a6671705e0271293acdb42cb56ba9c`  
-**Data:** 22 agosto 2026  
+**Audit reference:** `main @ 9063b441a534bc4341fb0b811af2a81e539e1316`  
+**Data:** 24 agosto 2026  
 **Obiettivo:** descrivere la situazione reale del codebase, non la cronologia delle conversazioni.
