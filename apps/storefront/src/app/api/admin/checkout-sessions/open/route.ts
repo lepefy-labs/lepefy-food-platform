@@ -11,23 +11,15 @@ export async function GET() {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const nowIso = new Date().toISOString();
   const supabase = createServiceClient();
-
-  await supabase
-    .from('checkout_sessions')
-    .update({ status: 'expired', updated_at: nowIso })
-    .eq('tenant_id', tenant.id)
-    .eq('status', 'open')
-    .lte('expires_at', nowIso);
 
   const { data, error } = await supabase
     .from('checkout_sessions')
-    .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
+    .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at, status')
     .eq('tenant_id', tenant.id)
-    .eq('status', 'open')
-    .gt('expires_at', nowIso)
     .eq('payment_method', 'external_link')
+    .in('status', ['open', 'expired', 'awaiting_verification'])
+    .is('order_id', null)
     .order('created_at', { ascending: true });
 
   if (error) {
