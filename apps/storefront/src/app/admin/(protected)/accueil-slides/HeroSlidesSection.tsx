@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { IconChevronUp, IconChevronDown, IconTrash, IconPlus } from '@tabler/icons-react';
 import { VARIANT_BACKGROUND } from '@/components/home/HeroCarousel';
 import type { TenantHeroSlide, HeroSlideBackgroundVariant } from '@lepefy/types';
+import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -222,6 +223,7 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   function showToast(msg: string, type: 'success' | 'error') {
@@ -285,12 +287,12 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm('Supprimer définitivement cette slide ?')) return;
     setSavingId(id);
     try {
       const res = await fetch(`/api/admin/hero-slides/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       setSlides((prev) => prev.filter((s) => s.id !== id));
+      setPendingDeleteId(null);
       showToast('Slide supprimée', 'success');
     } catch {
       showToast('Erreur lors de la suppression', 'error');
@@ -390,7 +392,7 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
                   {editingId === slide.id ? 'Fermer' : 'Modifier'}
                 </button>
                 <button
-                  onClick={() => handleDelete(slide.id)}
+                  onClick={() => setPendingDeleteId(slide.id)}
                   disabled={savingId === slide.id}
                   className="min-h-11 px-3 py-2 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"
                 >
@@ -434,6 +436,20 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
           Ajouter une slide
         </button>
       )}
+
+      <ConfirmActionModal
+        open={pendingDeleteId !== null}
+        title="Supprimer cette slide ?"
+        description="Cette slide sera supprimée définitivement de la page d’accueil. Cette action est irréversible."
+        confirmLabel="Supprimer la slide"
+        cancelLabel="Conserver"
+        destructive
+        loading={pendingDeleteId !== null && savingId === pendingDeleteId}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => {
+          if (pendingDeleteId) void handleDelete(pendingDeleteId);
+        }}
+      />
     </section>
   );
 }
