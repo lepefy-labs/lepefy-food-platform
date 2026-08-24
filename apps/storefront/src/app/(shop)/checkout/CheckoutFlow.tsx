@@ -159,6 +159,7 @@ export default function CheckoutFlow({
   const stripeSessionIdRef = useRef<string | null>(null);
   const stripeSessionSnapshotRef = useRef<string | null>(null);
   const prefilledForCustomerRef = useRef<string | null>(null);
+  const addressSectionRef = useRef<HTMLElement | null>(null);
 
   const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm<ContactValues>({
     resolver: zodResolver(contactSchema),
@@ -216,6 +217,9 @@ export default function CheckoutFlow({
   const effectiveShippingTotal = isPickup ? 0 : shippingTotal;
   const total = subtotal + effectiveShippingTotal - ambassadorDiscount;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const hasCompleteAddress = Boolean(
+    country.trim() && postalCode.trim() && street.trim() && houseNumber.trim() && city.trim(),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -303,6 +307,17 @@ export default function CheckoutFlow({
     setShippingError(null);
   }
 
+  function focusAddressSection(message?: string) {
+    if (message) setSubmitError(message);
+    requestAnimationFrame(() => {
+      addressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => {
+        const input = addressSectionRef.current?.querySelector<HTMLInputElement>('input');
+        input?.focus({ preventScroll: true });
+      }, 350);
+    });
+  }
+
   function changeFulfillment(next: FulfillmentType) {
     setFulfillmentType(next);
     setSubmitError(null);
@@ -321,12 +336,12 @@ export default function CheckoutFlow({
       setStep('contact');
       return;
     }
-    if (!street || !houseNumber || !city || !postalCode || !country) {
-      setSubmitError('Veuillez compléter votre adresse de livraison.');
+    if (!hasCompleteAddress) {
+      focusAddressSection('Indiquez une adresse complète pour calculer vos frais de livraison.');
       return;
     }
     if (!quoteToken) {
-      setSubmitError(shippingError ?? 'Veuillez attendre le calcul des frais de livraison.');
+      focusAddressSection(shippingError ?? 'Le calcul de la livraison est en cours. Veuillez patienter un instant.');
       return;
     }
     saveDraft();
@@ -489,8 +504,15 @@ export default function CheckoutFlow({
 
       {step === 'shipping' && (
         <div className="space-y-5">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--color-primary)_6%,white)] px-4 py-3.5">
+            <p className="text-sm font-bold text-gray-950">Finalisez votre livraison</p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-600">
+              1. Choisissez comment recevoir votre commande. 2. Si vous choisissez la livraison, indiquez votre adresse pour calculer les frais avant de continuer.
+            </p>
+          </section>
+
           <section>
-            <h1 className="text-lg font-bold text-gray-950">Mode de récupération</h1>
+            <h1 className="text-lg font-bold text-gray-950"><span className="mr-2 text-[var(--color-primary)]">1.</span>Mode de récupération</h1>
             <div className="mt-3 grid grid-cols-2 gap-3">
               {(['delivery', 'pickup'] as const).filter((type) => type === 'delivery' || tenant.click_collect_enabled).map((type) => {
                 const active = fulfillmentType === type;
@@ -515,35 +537,42 @@ export default function CheckoutFlow({
               </section>
             )
           ) : (
-            <section>
-              <h2 className="text-sm font-bold text-gray-900">Adresse de livraison</h2>
-              <div className="mt-3 space-y-3">
-                <select value={country} onChange={(event) => { invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+            <section ref={addressSectionRef} className="scroll-mb-48 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-xs font-black text-white">2</span>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-950">Adresse de livraison</h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Indiquez l’adresse complète : elle sert à calculer vos frais de livraison avant le paiement.</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                <select value={country} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
                   {COUNTRIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
                 </select>
                 {manualMode ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <input value={street} onChange={(event) => { invalidateQuote(); setStreet(event.target.value); }} placeholder="Rue" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    <input value={houseNumber} onChange={(event) => { invalidateQuote(); setHouseNumber(event.target.value); }} placeholder="Numéro" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    <input value={postalCode} onChange={(event) => { invalidateQuote(); setPostalCode(event.target.value); }} placeholder="Code postal" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    <input value={city} onChange={(event) => { invalidateQuote(); setCity(event.target.value); }} placeholder="Ville" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                    <input value={street} onChange={(event) => { setSubmitError(null); invalidateQuote(); setStreet(event.target.value); }} placeholder="Rue" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                    <input value={houseNumber} onChange={(event) => { setSubmitError(null); invalidateQuote(); setHouseNumber(event.target.value); }} placeholder="Numéro" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                    <input value={postalCode} onChange={(event) => { setSubmitError(null); invalidateQuote(); setPostalCode(event.target.value); }} placeholder="Code postal" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                    <input value={city} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCity(event.target.value); }} placeholder="Ville" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
                   </div>
                 ) : (
                   <AddressAutocomplete
                     country={country}
                     placeholder="Saisissez votre adresse complète"
                     onSelect={(result) => {
+                      setSubmitError(null);
                       invalidateQuote();
                       setPostalCode(result.postalCode);
                       setStreet(result.street);
                       setHouseNumber(result.houseNumber);
                       setCity(result.city);
                     }}
-                    onManualFallback={() => setManualMode(true)}
+                    onManualFallback={() => { setSubmitError(null); setManualMode(true); }}
                   />
                 )}
-                <p className="text-xs leading-relaxed text-gray-500">L’adresse est utilisée maintenant pour calculer vos frais de livraison. Vous pourrez vérifier vos coordonnées avant le paiement.</p>
-                {shippingLoading && <p className="text-xs font-semibold text-gray-600" role="status">Calcul de la livraison…</p>}
+                {submitError && <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700" role="alert">{submitError}</p>}
+                {shippingLoading && <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600" role="status">Calcul de la livraison en cours…</p>}
                 {!shippingLoading && shippingError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" role="alert">{shippingError}</p>}
                 {!shippingLoading && quoteToken && (
                   <div className="rounded-2xl border border-green-100 bg-green-50 p-3 text-sm text-green-800">
@@ -561,9 +590,14 @@ export default function CheckoutFlow({
             <div className="mt-2 flex items-end justify-between border-t border-gray-200 pt-3"><span className="font-bold">{isPickup || quoteToken ? 'Total' : 'Total estimé'}</span><span className="text-2xl font-black">{formatPrice(total, tenant.currency)}</span></div>
           </section>
 
-          {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitError}</p>}
           <button type="button" onClick={continueFromShipping} disabled={shippingLoading} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
-            {shippingLoading ? 'Calcul de la livraison…' : isPickup || quoteToken ? 'Continuer — Coordonnées' : 'Calculer et continuer'}
+            {shippingLoading
+              ? 'Calcul de la livraison…'
+              : isPickup || quoteToken
+                ? 'Continuer — Coordonnées'
+                : hasCompleteAddress
+                  ? 'Calculer la livraison'
+                  : 'Indiquer mon adresse'}
           </button>
         </div>
       )}
