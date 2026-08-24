@@ -62,8 +62,7 @@ export function OrdersListClient({ orders }: OrdersListClientProps) {
             <Link
               key={order.id}
               href={`/orders/${order.id}?token=${order.trackingToken}`}
-              className="group rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:p-5"
-              style={{ '--tw-ring-color': 'var(--color-primary)' } as React.CSSProperties}
+              className="group rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
