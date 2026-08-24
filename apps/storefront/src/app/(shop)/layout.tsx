@@ -3,7 +3,7 @@ import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { ShopNotificationBar } from '@/components/layout/ShopNotificationBar';
-import { ChatWidget } from '@/components/chat/ChatWidget';
+import { ChatWidgetGate } from '@/components/chat/ChatWidgetGate';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { CartSyncProvider } from '@/components/cart/CartSyncProvider';
 import { CartDrawer } from '@/components/cart/CartDrawer';
@@ -26,7 +26,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
       <Footer socialLinks={socialLinks} storyEnabled={storyEnabled} />
       <BottomNav />
-      <ChatWidget
+      <ChatWidgetGate
         enabled={tenant.ai_chatbox_enabled}
         tenantName={tenant.name}
         whatsappNumber={tenant.whatsapp_number ?? null}
