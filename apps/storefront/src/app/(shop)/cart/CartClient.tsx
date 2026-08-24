@@ -2,20 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconBuildingStore, IconCheck, IconMapPin, IconTruck } from '@tabler/icons-react';
+import { IconArrowRight, IconBuildingStore, IconCheck, IconMapPin, IconTruck } from '@tabler/icons-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { CartEmpty } from '@/components/cart/CartEmpty';
 import { CartItem } from '@/components/cart/CartItem';
 import { CartOrderSummary } from '@/components/cart/CartOrderSummary';
 import { CartUndoToast } from '@/components/cart/CartUndoToast';
-import { MobileCartStickyCTA } from '@/components/cart/MobileCartStickyCTA';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
-import { calculateCartTotal, canProceedToCheckout, shouldShowMobileCartStickyCta } from '@/lib/cart/cartPagePresentation';
+import { calculateCartTotal, canProceedToCheckout } from '@/lib/cart/cartPagePresentation';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { useCartStore } from '@/stores/cartStore';
+import { formatPrice } from '@/lib/utils/format';
 import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
 
 const COUNTRIES = [
@@ -234,6 +234,14 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
         ? 'Modifier mon adresse'
         : 'Indiquer mon adresse';
 
+  const mobilePrimaryLabel = canProceed
+    ? `Passer au paiement (${formatProductCount(itemCount)})`
+    : shippingLoading
+      ? 'Calcul de la livraison…'
+      : shippingError
+        ? 'Modifier mon adresse'
+        : 'Continuer vers la livraison';
+
   const primaryActionHint = deliveryQuoteMissing
     ? shippingError
       ? 'Vérifiez votre adresse pour recalculer la livraison.'
@@ -241,7 +249,7 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
     : null;
 
   const shippingControls = (
-    <div className="space-y-4">
+    <div className="space-y-3 lg:space-y-4">
       {tenant.click_collect_enabled && (
         <fieldset>
           <legend className="mb-2 text-sm font-semibold text-gray-800">Mode de récupération</legend>
@@ -254,14 +262,14 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setFulfillmentType(type)}
-                  className={`relative flex min-h-[66px] items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)] text-gray-950' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
+                  className={`relative flex min-h-[62px] items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)] text-gray-950' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
                 >
                   <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-100 text-gray-500'}`}>
                     {type === 'delivery' ? <IconTruck size={18} aria-hidden="true" /> : <IconBuildingStore size={18} aria-hidden="true" />}
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold">{type === 'delivery' ? 'Livraison' : 'Click & Collect'}</span>
-                    <span className="mt-0.5 hidden text-[11px] leading-tight text-gray-500 xl:block">{type === 'delivery' ? 'À votre adresse' : 'Retrait en boutique'}</span>
+                    <span className="mt-0.5 hidden text-[11px] leading-tight text-gray-500 sm:block">{type === 'delivery' ? 'À votre adresse' : 'Retrait en boutique'}</span>
                   </span>
                   {active && <IconCheck size={15} aria-hidden="true" className="absolute right-2.5 top-2.5 text-[var(--color-primary)]" />}
                 </button>
@@ -282,14 +290,14 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
       {fulfillmentType === 'delivery' && (
         <div
           ref={addressSectionRef}
-          className={`rounded-2xl border p-4 transition-colors ${deliveryQuoteMissing ? 'border-amber-200 bg-amber-50/55' : 'border-green-100 bg-green-50/35'}`}
+          className={`rounded-2xl border p-4 transition-colors ${deliveryQuoteMissing ? 'border-amber-300 bg-amber-50' : 'border-green-100 bg-green-50/35'}`}
         >
           <div className="mb-3">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-gray-900">Adresse de livraison</p>
+              <p className="text-sm font-bold text-gray-950">{deliveryQuoteMissing ? 'Adresse requise pour calculer la livraison' : 'Adresse de livraison'}</p>
               {deliveryQuoteMissing && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.05em] text-amber-800">Requise</span>}
             </div>
-            <p className="mt-1 text-xs font-medium leading-relaxed text-gray-600">Nous en avons besoin maintenant uniquement pour calculer vos frais de livraison.</p>
+            <p className="mt-1 text-xs font-medium leading-relaxed text-gray-600">Indiquez votre destination pour afficher les frais réels avant le paiement.</p>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-[125px_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[125px_minmax(0,1fr)]">
             <select
@@ -351,66 +359,62 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-5 pb-56 sm:px-6 sm:py-7 md:pb-10 lg:px-8 lg:py-8">
-      <nav aria-label="Fil d’Ariane" className="mb-3 text-xs font-medium text-gray-400 sm:text-sm">
-        <a href="/products" className="transition-colors hover:text-gray-800">Catalogue</a>
-        <span aria-hidden="true" className="px-1.5">/</span>
-        <span aria-current="page" className="text-gray-600">Panier</span>
-      </nav>
-
-      <header className="mb-5 flex items-end justify-between gap-4 sm:mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-[34px]">Votre panier</h1>
-          <p className="mt-1 text-sm text-gray-500" aria-live="polite">{formatProductCount(itemCount)}</p>
-        </div>
-        <a href="/products" className="hidden min-h-10 items-center text-sm font-semibold text-gray-500 transition-colors hover:text-gray-900 sm:flex">
-          Continuer mes achats
-        </a>
-      </header>
-
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:gap-8">
-        <section aria-labelledby="cart-items-title" className="min-w-0">
-          <div className="mb-3 flex items-center justify-between px-1">
+    <div className="mx-auto w-full max-w-6xl px-4 py-4 pb-28 sm:px-6 sm:py-6 md:pb-10 lg:px-8 lg:py-8">
+      <div className="mb-4 lg:hidden">
+        <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.06)]" aria-label="Total du panier">
+          <div className="flex items-end justify-between gap-3">
             <div>
-              <h2 id="cart-items-title" className="text-sm font-bold text-gray-900">Articles</h2>
-              <p className="mt-0.5 text-xs text-gray-500">Vérifiez chaque article avant de choisir la livraison.</p>
+              <p className="text-base font-semibold text-gray-800">{deliveryQuoteMissing ? 'Total estimé' : 'Total'}</p>
+              <p className="mt-0.5 text-xs text-gray-500">{formatProductCount(itemCount)}{deliveryQuoteMissing ? ' · hors livraison' : ''}</p>
             </div>
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{formatProductCount(itemCount)}</span>
+            <p className="text-[30px] font-bold leading-none tracking-tight text-gray-950" aria-live="polite">{formatPrice(total, tenant.currency)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handlePrimaryAction}
+            disabled={shippingLoading}
+            className="mt-4 flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-base font-bold text-white shadow-sm transition-[opacity,transform] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
+            {mobilePrimaryLabel}
+            {!shippingLoading && <IconArrowRight size={20} aria-hidden="true" />}
+          </button>
+        </section>
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 xl:gap-8">
+        <section aria-label="Articles du panier" className="order-3 min-w-0 lg:order-1">
+          <div className="mb-3 hidden items-center justify-between lg:flex">
+            <p className="text-sm font-semibold text-gray-500">{formatProductCount(itemCount)}</p>
+            <a href="/products" className="min-h-10 items-center text-sm font-semibold text-gray-500 transition-colors hover:text-gray-900">
+              Continuer mes achats
+            </a>
           </div>
           <ul className="space-y-3">{items.map((item) => <CartItem key={item.product.id} item={item} variant="page" currency={tenant.currency} unavailableProductIds={unavailableProductIds} pendingProductIds={pendingProductIds} onIncrement={handleIncrement} onDecrement={handleDecrement} onRemove={handleRemove} />)}</ul>
           {undo && <div className="pt-3"><CartUndoToast productName={undo.item.product.name} onUndo={handleUndo} /></div>}
         </section>
 
-        <aside className="lg:sticky lg:top-6">
-          <CartOrderSummary
-            subtotal={subtotal}
-            shippingCost={effectiveShipping}
-            total={total}
-            currency={tenant.currency}
-            canProceed={canProceed}
-            checkoutHint={primaryActionHint}
-            primaryActionLabel={primaryActionLabel}
-            primaryActionDisabled={shippingLoading}
-            syncStatus={syncStatus}
-            onCheckout={handlePrimaryAction}
-            hideActionsOnMobile
-          >
+        <aside className="order-2 space-y-4 lg:sticky lg:top-6 lg:order-2">
+          <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_6px_24px_rgba(15,23,42,0.04)] lg:p-5">
             {shippingControls}
-          </CartOrderSummary>
+          </div>
+
+          <div className="hidden lg:block">
+            <CartOrderSummary
+              subtotal={subtotal}
+              shippingCost={effectiveShipping}
+              total={total}
+              currency={tenant.currency}
+              canProceed={canProceed}
+              checkoutHint={primaryActionHint}
+              primaryActionLabel={primaryActionLabel}
+              primaryActionDisabled={shippingLoading}
+              syncStatus={syncStatus}
+              onCheckout={handlePrimaryAction}
+            />
+          </div>
         </aside>
       </div>
-
-      {shouldShowMobileCartStickyCta(itemCount) && (
-        <MobileCartStickyCTA
-          total={total}
-          currency={tenant.currency}
-          totalIsEstimated={deliveryQuoteMissing}
-          label={primaryActionLabel}
-          hint={primaryActionHint}
-          disabled={shippingLoading}
-          onCheckout={handlePrimaryAction}
-        />
-      )}
     </div>
   );
 }
