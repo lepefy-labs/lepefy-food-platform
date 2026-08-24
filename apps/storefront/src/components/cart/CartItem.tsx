@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { IconArrowUpRight } from '@tabler/icons-react';
+import { IconChevronRight } from '@tabler/icons-react';
 import type { CartItem as CartItemType } from '@lepefy/types';
 import { formatPrice } from '@/lib/utils/format';
 import { deriveCartItemState } from '@/lib/cart/cartItemState';
@@ -52,7 +52,7 @@ export function CartItem({
   return (
     <li
       className={isPage
-        ? 'group relative flex gap-3 overflow-hidden rounded-3xl border border-gray-200 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-primary)_5%,white),white_58%)] p-3.5 shadow-[0_6px_22px_rgba(15,23,42,0.045)] transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--color-primary)_32%,#d1d5db)] hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] sm:gap-4 sm:p-4 motion-reduce:transform-none motion-reduce:transition-none'
+        ? 'group relative flex gap-3 overflow-hidden rounded-3xl border border-gray-200 bg-[linear-gradient(135deg,color-mix(in_srgb,var(--color-primary)_5%,white),white_58%)] p-3 shadow-[0_5px_18px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--color-primary)_32%,#d1d5db)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.07)] sm:gap-4 sm:p-4 motion-reduce:transform-none motion-reduce:transition-none'
         : 'flex gap-4 border-b border-gray-100 py-4 last:border-0'}
     >
       {isPage && (
@@ -66,13 +66,13 @@ export function CartItem({
         </>
       )}
 
-      <div className={`${isPage ? 'h-24 w-24 sm:h-[104px] sm:w-[104px]' : 'h-16 w-16'} relative z-10 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-black/5 shadow-sm transition-transform duration-200 group-hover:scale-[1.015] motion-reduce:transition-none motion-reduce:transform-none pointer-events-none`}>
+      <div className={`${isPage ? 'h-[88px] w-[88px] sm:h-24 sm:w-24' : 'h-16 w-16'} relative z-10 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-black/5 shadow-sm transition-transform duration-200 group-hover:scale-[1.015] motion-reduce:transition-none motion-reduce:transform-none pointer-events-none`}>
         {product.image_url ? (
           <Image
             src={product.image_url}
             alt={product.name}
             fill
-            sizes={isPage ? '(min-width: 640px) 104px, 96px' : '64px'}
+            sizes={isPage ? '(min-width: 640px) 96px, 88px' : '64px'}
             className="object-cover"
           />
         ) : (
@@ -85,9 +85,12 @@ export function CartItem({
       </div>
 
       <div className="relative z-10 min-w-0 flex-1 pointer-events-none">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className={`${isPage ? 'text-[15px] sm:text-base' : 'text-sm'} line-clamp-2 font-bold leading-snug text-gray-950`}>{product.name}</p>
+            <div className="flex items-start gap-1">
+              <p className={`${isPage ? 'text-[15px] sm:text-base' : 'text-sm'} line-clamp-2 font-bold leading-snug text-gray-950`}>{product.name}</p>
+              {isPage && <IconChevronRight size={16} className="mt-0.5 shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+            </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
               {weightLabel && <span>{weightLabel}</span>}
               <span className="font-medium">{formatPrice(product.price, currency)} / unité</span>
@@ -97,12 +100,6 @@ export function CartItem({
                 </span>
               )}
             </div>
-            {isPage && (
-              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-[var(--color-primary)] ring-1 ring-black/5 shadow-sm">
-                Voir le produit
-                <IconArrowUpRight size={13} aria-hidden="true" />
-              </span>
-            )}
           </div>
           {isPage && (
             <span className="hidden shrink-0 rounded-xl bg-white/85 px-2.5 py-1.5 text-base font-bold tabular-nums text-gray-950 ring-1 ring-black/5 shadow-sm sm:block" aria-live="polite">
@@ -111,7 +108,7 @@ export function CartItem({
           )}
         </div>
 
-        <div className={`${isPage ? 'mt-3' : 'mt-2'} flex items-center justify-between gap-3`}>
+        <div className={`${isPage ? 'mt-2.5' : 'mt-2'} flex items-center justify-between gap-3`}>
           <div className="relative z-20 flex items-center gap-1.5 pointer-events-auto">
             <CartQuantityControl
               quantity={quantity}
@@ -133,7 +130,7 @@ export function CartItem({
         <button
           type="button"
           onClick={() => onRemove(product.id)}
-          className="relative z-20 -ml-2 mt-1 inline-flex min-h-10 items-center rounded px-2 text-xs font-medium text-gray-500 transition-colors hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 pointer-events-auto"
+          className="relative z-20 -ml-2 mt-0.5 inline-flex min-h-9 items-center rounded px-2 text-xs font-medium text-gray-500 transition-colors hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 pointer-events-auto"
         >
           Retirer
         </button>
