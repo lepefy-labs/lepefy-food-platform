@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { formatPrice } from '@/lib/utils/format'
 import {
-  IconClock,
+  IconBuildingStore,
   IconCurrencyEuro,
   IconPackage,
   IconTruck,
@@ -35,7 +35,7 @@ const STATUS_TABS = [
   { key: 'preparing', label: 'À préparer' },
   { key: 'ready_for_pickup', label: 'Prêtes au retrait' },
   { key: 'shipped', label: 'Expédiées' },
-  { key: 'delivered', label: 'Livrées' },
+  { key: 'delivered', label: 'Terminées' },
   { key: 'cancelled', label: 'Annulées' },
 ] as const
 
@@ -86,9 +86,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   const allData = allOrders ?? []
   const totalCount = allData.length
-  const todayCount = allData.filter(order => new Date(order.created_at).toDateString() === now.toDateString()).length
-  const actionCount = allData.filter(order => ['new', 'preparing', 'ready_for_pickup'].includes(order.status)).length
+  const newCount = allData.filter(order => order.status === 'new').length
   const toPrepare = allData.filter(order => order.status === 'preparing').length
+  const readyForPickup = allData.filter(order => order.status === 'ready_for_pickup').length
 
   const statusCounts = allData.reduce<Record<string, number>>((acc, order) => {
     acc[order.status] = (acc[order.status] ?? 0) + 1
@@ -140,9 +140,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   const compactKpis = [
     {
-      label: 'À traiter',
-      value: String(actionCount),
-      helper: 'Priorité opérationnelle',
+      label: 'Nouvelles',
+      value: String(newCount),
+      helper: 'À prendre en charge',
       href: '/admin?status=new',
       icon: IconPackage,
       tone: 'text-violet-700 bg-violet-50 dark:text-violet-300 dark:bg-violet-950/40',
@@ -150,17 +150,17 @@ export default async function AdminPage({ searchParams }: PageProps) {
     {
       label: 'À préparer',
       value: String(toPrepare),
-      helper: 'Commandes en préparation',
+      helper: 'Préparation en cours',
       href: '/admin?status=preparing',
       icon: IconTruck,
       tone: 'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950/40',
     },
     {
-      label: "Aujourd'hui",
-      value: String(todayCount),
-      helper: 'Commandes reçues',
-      href: '/admin',
-      icon: IconClock,
+      label: 'Prêtes au retrait',
+      value: String(readyForPickup),
+      helper: 'En attente du client',
+      href: '/admin?status=ready_for_pickup',
+      icon: IconBuildingStore,
       tone: 'text-sky-700 bg-sky-50 dark:text-sky-300 dark:bg-sky-950/40',
     },
     {
@@ -177,7 +177,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     <div className="mx-auto w-full max-w-7xl pb-8">
       <AdminPageHeader
         title="Commandes"
-        description="Traitez rapidement les commandes qui demandent votre attention."
+        description="Pilotez les commandes selon l'action opérationnelle suivante."
         meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`}
       />
 
