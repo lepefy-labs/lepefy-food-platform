@@ -4,6 +4,7 @@ import { useState, Fragment } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import type { ShippingCountryRuleRow, ShippingDiscountType } from '@lepefy/types';
+import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -75,8 +76,6 @@ function countryLabel(code: string): string {
   return COUNTRIES.find((c) => c.value === code)?.label ?? code;
 }
 
-// ─── Form ─────────────────────────────────────────────────────────────────────
-
 interface RuleFormProps {
   initial?: ShippingCountryRuleRow;
   currency: string;
@@ -115,29 +114,19 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
 
   return (
     <div className="space-y-3">
-      {error && (
-        <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>
-      )}
+      {error && <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
 
       <div>
         <label className={LABEL_CLS}>Pays</label>
         <label className="flex items-center gap-2 text-sm text-gray-700 mb-2">
-          <input
-            type="checkbox"
-            checked={form.allCountries}
-            onChange={(e) => set('allCountries', e.target.checked)}
-          />
+          <input type="checkbox" checked={form.allCountries} onChange={(e) => set('allCountries', e.target.checked)} />
           Tous les pays
         </label>
         {!form.allCountries && (
           <div className="flex flex-wrap gap-3">
             {COUNTRIES.map((c) => (
               <label key={c.value} className="flex items-center gap-1.5 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={form.countries.includes(c.value)}
-                  onChange={() => toggleCountry(c.value)}
-                />
+                <input type="checkbox" checked={form.countries.includes(c.value)} onChange={() => toggleCountry(c.value)} />
                 {c.label}
               </label>
             ))}
@@ -148,37 +137,19 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={LABEL_CLS}>Gratuité dès ({currency}, optionnel)</label>
-          <input
-            type="number" step="0.01" min={0}
-            value={form.free_shipping_above}
-            onChange={(e) => set('free_shipping_above', e.target.value)}
-            placeholder="Ex. 60"
-            className={INPUT_CLS}
-          />
+          <input type="number" step="0.01" min={0} value={form.free_shipping_above} onChange={(e) => set('free_shipping_above', e.target.value)} placeholder="Ex. 60" className={INPUT_CLS} />
         </div>
         <div>
           <label className={LABEL_CLS}>Forfait fixe ({currency}, optionnel)</label>
-          <input
-            type="number" step="0.01" min={0}
-            value={form.flat_rate_override}
-            onChange={(e) => set('flat_rate_override', e.target.value)}
-            placeholder="Bypass Packlink"
-            className={INPUT_CLS}
-          />
+          <input type="number" step="0.01" min={0} value={form.flat_rate_override} onChange={(e) => set('flat_rate_override', e.target.value)} placeholder="Bypass Packlink" className={INPUT_CLS} />
         </div>
       </div>
-      <p className="text-xs text-gray-400 -mt-1">
-        Un forfait fixe remplace entièrement le calcul Packlink pour ce(s) pays — aucun appel API n&apos;est effectué.
-      </p>
+      <p className="text-xs text-gray-400 -mt-1">Un forfait fixe remplace entièrement le calcul Packlink pour ce(s) pays — aucun appel API n&apos;est effectué.</p>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={LABEL_CLS}>Remise</label>
-          <select
-            value={form.discount_type}
-            onChange={(e) => set('discount_type', e.target.value as FormState['discount_type'])}
-            className={INPUT_CLS}
-          >
+          <select value={form.discount_type} onChange={(e) => set('discount_type', e.target.value as FormState['discount_type'])} className={INPUT_CLS}>
             <option value="">Aucune</option>
             <option value="percentage">Pourcentage</option>
             <option value="fixed">Montant fixe</option>
@@ -186,63 +157,31 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
         </div>
         {form.discount_type && (
           <div>
-            <label className={LABEL_CLS}>
-              Valeur ({form.discount_type === 'percentage' ? '%' : currency})
-            </label>
-            <input
-              type="number" step="0.01" min={0} max={form.discount_type === 'percentage' ? 100 : undefined}
-              value={form.discount_value}
-              onChange={(e) => set('discount_value', e.target.value)}
-              className={INPUT_CLS}
-            />
+            <label className={LABEL_CLS}>Valeur ({form.discount_type === 'percentage' ? '%' : currency})</label>
+            <input type="number" step="0.01" min={0} max={form.discount_type === 'percentage' ? 100 : undefined} value={form.discount_value} onChange={(e) => set('discount_value', e.target.value)} className={INPUT_CLS} />
           </div>
         )}
       </div>
 
       <div>
         <label className={LABEL_CLS}>Note interne (optionnel)</label>
-        <input
-          type="text"
-          value={form.note}
-          onChange={(e) => set('note', e.target.value)}
-          className={INPUT_CLS}
-        />
+        <input type="text" value={form.note} onChange={(e) => set('note', e.target.value)} className={INPUT_CLS} />
       </div>
 
       <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id={`active-${initial?.id ?? 'new'}`}
-          checked={form.active}
-          onChange={(e) => set('active', e.target.checked)}
-          className="w-5 h-5"
-        />
+        <input type="checkbox" id={`active-${initial?.id ?? 'new'}`} checked={form.active} onChange={(e) => set('active', e.target.checked)} className="w-5 h-5" />
         <label htmlFor={`active-${initial?.id ?? 'new'}`} className="text-sm text-gray-600">Actif</label>
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={handleSubmit}
-          disabled={isSaving}
-          className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
-        >
-          {submitLabel}
-        </button>
+        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">{submitLabel}</button>
         {onCancel && (
-          <button
-            onClick={onCancel}
-            disabled={isSaving}
-            className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50"
-          >
-            Annuler
-          </button>
+          <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Annuler</button>
         )}
       </div>
     </div>
   );
 }
-
-// ─── Section ──────────────────────────────────────────────────────────────────
 
 interface ShippingCountryRulesSectionProps {
   initialRules: ShippingCountryRuleRow[];
@@ -250,12 +189,11 @@ interface ShippingCountryRulesSectionProps {
 }
 
 export function ShippingCountryRulesSection({ initialRules, currency }: ShippingCountryRulesSectionProps) {
-  const [rules, setRules] = useState<ShippingCountryRuleRow[]>(
-    [...initialRules].sort((a, b) => a.position - b.position),
-  );
+  const [rules, setRules] = useState<ShippingCountryRuleRow[]>([...initialRules].sort((a, b) => a.position - b.position));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   function showToast(msg: string, type: 'success' | 'error') {
@@ -266,11 +204,7 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
   async function handleCreate(form: FormState) {
     setSavingId('new');
     try {
-      const res = await fetch('/api/admin/shipping-rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formToBody(form)),
-      });
+      const res = await fetch('/api/admin/shipping-rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formToBody(form)) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       setRules((prev) => [...prev, data as ShippingCountryRuleRow].sort((a, b) => a.position - b.position));
@@ -285,11 +219,7 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
 
   async function patchRule(id: string, payload: object): Promise<boolean> {
     try {
-      const res = await fetch(`/api/admin/shipping-rules/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(`/api/admin/shipping-rules/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       return true;
@@ -314,19 +244,17 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
   async function handleToggleActive(rule: ShippingCountryRuleRow) {
     setSavingId(rule.id);
     const ok = await patchRule(rule.id, { active: !rule.active });
-    if (ok) {
-      setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, active: !r.active } : r)));
-    }
+    if (ok) setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, active: !r.active } : r)));
     setSavingId(null);
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm('Supprimer définitivement cette règle ?')) return;
     setSavingId(id);
     try {
       const res = await fetch(`/api/admin/shipping-rules/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       setRules((prev) => prev.filter((r) => r.id !== id));
+      setPendingDeleteId(null);
       showToast('Règle supprimée', 'success');
     } catch {
       showToast('Erreur lors de la suppression', 'error');
@@ -337,103 +265,34 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
 
   return (
     <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      {toast && (
-        <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-          {toast.msg}
-        </div>
-      )}
+      {toast && <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.msg}</div>}
 
-      {rules.length === 0 && !creating && (
-        <p className="text-sm text-gray-400 mb-4">
-          Aucune règle configurée — le calcul de livraison standard s&apos;applique sans modification.
-        </p>
-      )}
+      {rules.length === 0 && !creating && <p className="text-sm text-gray-400 mb-4">Aucune règle configurée — le calcul de livraison standard s&apos;applique sans modification.</p>}
 
       {rules.length > 0 && (
         <div className="overflow-x-auto mb-6">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
-                <th className="py-2 pr-3">Pays</th>
-                <th className="py-2 pr-3">Gratuité dès</th>
-                <th className="py-2 pr-3">Forfait</th>
-                <th className="py-2 pr-3">Remise</th>
-                <th className="py-2 pr-3">Actif</th>
-                <th className="py-2 pr-3 text-right">Actions</th>
+                <th className="py-2 pr-3">Pays</th><th className="py-2 pr-3">Gratuité dès</th><th className="py-2 pr-3">Forfait</th><th className="py-2 pr-3">Remise</th><th className="py-2 pr-3">Actif</th><th className="py-2 pr-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rules.map((rule) => (
                 <Fragment key={rule.id}>
                   <tr className="border-b border-gray-50 dark:border-gray-800/60">
-                    <td className="py-2.5 pr-3">
-                      <div className="flex flex-wrap gap-1">
-                        {rule.countries.includes(ALL_COUNTRIES) ? (
-                          <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                            Tous les pays
-                          </span>
-                        ) : (
-                          rule.countries.map((c) => (
-                            <span key={c} className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">
-                              {countryLabel(c)}
-                            </span>
-                          ))
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">
-                      {rule.free_shipping_above != null ? formatPrice(rule.free_shipping_above, currency) : '—'}
-                    </td>
-                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">
-                      {rule.flat_rate_override != null ? formatPrice(rule.flat_rate_override, currency) : '—'}
-                    </td>
-                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">
-                      {rule.discount_type
-                        ? rule.discount_type === 'percentage'
-                          ? `-${rule.discount_value}%`
-                          : `-${formatPrice(rule.discount_value ?? 0, currency)}`
-                        : '—'}
-                    </td>
-                    <td className="py-2.5 pr-3">
-                      <input
-                        type="checkbox"
-                        checked={rule.active}
-                        onChange={() => handleToggleActive(rule)}
-                        disabled={savingId === rule.id}
-                        className="w-5 h-5"
-                      />
-                    </td>
-                    <td className="py-2.5 pr-3">
-                      <div className="flex items-center gap-2 justify-end">
-                        <button
-                          onClick={() => setEditingId(editingId === rule.id ? null : rule.id)}
-                          className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200"
-                        >
-                          {editingId === rule.id ? 'Fermer' : 'Modifier'}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(rule.id)}
-                          disabled={savingId === rule.id}
-                          className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"
-                        >
-                          <IconTrash size={14} stroke={1.5} />
-                        </button>
-                      </div>
-                    </td>
+                    <td className="py-2.5 pr-3"><div className="flex flex-wrap gap-1">{rule.countries.includes(ALL_COUNTRIES) ? <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">Tous les pays</span> : rule.countries.map((c) => <span key={c} className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">{countryLabel(c)}</span>)}</div></td>
+                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.free_shipping_above != null ? formatPrice(rule.free_shipping_above, currency) : '—'}</td>
+                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.flat_rate_override != null ? formatPrice(rule.flat_rate_override, currency) : '—'}</td>
+                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.discount_type ? rule.discount_type === 'percentage' ? `-${rule.discount_value}%` : `-${formatPrice(rule.discount_value ?? 0, currency)}` : '—'}</td>
+                    <td className="py-2.5 pr-3"><input type="checkbox" checked={rule.active} onChange={() => handleToggleActive(rule)} disabled={savingId === rule.id} className="w-5 h-5" /></td>
+                    <td className="py-2.5 pr-3"><div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => setEditingId(editingId === rule.id ? null : rule.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === rule.id ? 'Fermer' : 'Modifier'}</button>
+                      <button onClick={() => setPendingDeleteId(rule.id)} disabled={savingId === rule.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
+                    </div></td>
                   </tr>
                   {editingId === rule.id && (
-                    <tr>
-                      <td colSpan={6} className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4">
-                        <RuleForm
-                          initial={rule}
-                          currency={currency}
-                          submitLabel="Enregistrer"
-                          isSaving={savingId === rule.id}
-                          onSubmit={(form) => handleUpdate(rule.id, form)}
-                          onCancel={() => setEditingId(null)}
-                        />
-                      </td>
-                    </tr>
+                    <tr><td colSpan={6} className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4"><RuleForm initial={rule} currency={currency} submitLabel="Enregistrer" isSaving={savingId === rule.id} onSubmit={(form) => handleUpdate(rule.id, form)} onCancel={() => setEditingId(null)} /></td></tr>
                   )}
                 </Fragment>
               ))}
@@ -443,25 +302,22 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
       )}
 
       {creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4">
-          <p className="text-xs font-medium text-gray-500 mb-3">Nouvelle règle</p>
-          <RuleForm
-            currency={currency}
-            submitLabel="Ajouter"
-            isSaving={savingId === 'new'}
-            onSubmit={handleCreate}
-            onCancel={() => setCreating(false)}
-          />
-        </div>
+        <div className="border border-dashed border-gray-200 rounded-lg p-4"><p className="text-xs font-medium text-gray-500 mb-3">Nouvelle règle</p><RuleForm currency={currency} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
       ) : (
-        <button
-          onClick={() => setCreating(true)}
-          className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"
-        >
-          <IconPlus size={14} stroke={1.5} />
-          Ajouter une règle
-        </button>
+        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter une règle</button>
       )}
+
+      <ConfirmActionModal
+        open={pendingDeleteId !== null}
+        title="Supprimer cette règle de livraison ?"
+        description="Cette règle sera supprimée définitivement. Les prochains devis de livraison utiliseront immédiatement les règles restantes ou le calcul standard."
+        confirmLabel="Supprimer la règle"
+        cancelLabel="Conserver"
+        destructive
+        loading={pendingDeleteId !== null && savingId === pendingDeleteId}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={() => { if (pendingDeleteId) void handleDelete(pendingDeleteId); }}
+      />
     </section>
   );
 }
