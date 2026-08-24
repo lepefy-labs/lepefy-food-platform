@@ -4,6 +4,7 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import CheckoutFlow from './CheckoutFlow';
+import styles from './checkoutSticky.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export default async function CheckoutPage() {
   const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
 
   return (
-    <div className="checkout-funnel">
+    <div className={styles.checkoutFunnel}>
       <CheckoutFlow
         tenant={tenant}
         externalPaymentMethods={externalPaymentMethods}
