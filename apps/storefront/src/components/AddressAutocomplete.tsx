@@ -18,6 +18,23 @@ interface GeocodeResult {
   country: string;
 }
 
+function normalizeResult(result: GeocodeResult): GeocodeResult {
+  if (result.houseNumber.trim()) return result;
+
+  const prefix = result.label.match(/^\s*([0-9]+[A-Za-z0-9\/-]*)\s*,\s*(.+)$/);
+  if (!prefix) return result;
+
+  const inferredNumber = prefix[1]?.trim() ?? '';
+  const remainder = prefix[2]?.trim() ?? '';
+  if (!inferredNumber) return result;
+
+  return {
+    ...result,
+    houseNumber: inferredNumber,
+    street: result.street.trim() || remainder.split(',')[0]?.trim() || remainder,
+  };
+}
+
 export default function AddressAutocomplete({
   country,
   placeholder = 'Rue et numéro, ville',
@@ -28,13 +45,13 @@ export default function AddressAutocomplete({
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [selected, setSelected] = useState<GeocodeResult | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (selectedLabel) return;
+    if (selected) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -71,22 +88,48 @@ export default function AddressAutocomplete({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, country, selectedLabel]);
+  }, [query, country, selected]);
 
   const handleSelect = (result: GeocodeResult) => {
-    setSelectedLabel(result.label);
-    setQuery(result.label);
+    const normalized = normalizeResult(result);
+    setSelected(normalized);
+    setQuery(normalized.label);
     setResults([]);
     setSearched(false);
-    onSelect(result);
+    onSelect(normalized);
   };
 
   const handleReset = () => {
-    setSelectedLabel(null);
+    setSelected(null);
     setQuery('');
     setResults([]);
     setSearched(false);
   };
+
+  if (selected) {
+    return (
+      <div data-address-selected="true" className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-green-800">Adresse validée</p>
+            <p className="mt-1 text-sm font-semibold leading-snug text-gray-950">
+              {selected.street}{selected.houseNumber ? ` ${selected.houseNumber}` : ''}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-gray-600">
+              {[selected.postalCode, selected.city, selected.country].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[var(--color-primary)] hover:bg-white"
+          >
+            Modifier
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex-1">
@@ -96,22 +139,11 @@ export default function AddressAutocomplete({
           placeholder={placeholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          readOnly={!!selectedLabel}
           className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
-        {selectedLabel && (
-          <button
-            type="button"
-            onClick={handleReset}
-            aria-label="Réinitialiser"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
-          >
-            ✕
-          </button>
-        )}
       </div>
 
-      {!selectedLabel && results.length > 0 && (
+      {results.length > 0 && (
         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           {results.map((result, i) => (
             <button
@@ -129,7 +161,7 @@ export default function AddressAutocomplete({
         </div>
       )}
 
-      {!selectedLabel && !loading && searched && results.length === 0 && (
+      {!loading && searched && results.length === 0 && (
         <div className="mt-1.5 text-xs text-gray-400">
           Aucune adresse trouvée — vous pouvez{' '}
           <button
