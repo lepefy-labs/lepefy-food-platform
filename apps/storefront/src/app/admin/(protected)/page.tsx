@@ -17,6 +17,7 @@ import AdminFilters from './AdminFilters'
 import OrdersTable from './OrdersTable'
 import PendingPaymentsBanner from './PendingPaymentsBanner'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
+import styles from './OrdersListPolish.module.css'
 import type { ListOrder } from './OrdersTable'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
 
@@ -24,6 +25,9 @@ export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
 const PAGE_SIZE = 50
+
+type OrderView = '' | 'to_ship' | 'pickup_ready' | 'payment_pending'
+type SortKey = 'date_desc' | 'date_asc' | 'total_desc' | 'total_asc'
 
 interface PageProps {
   searchParams: {
@@ -34,6 +38,8 @@ interface PageProps {
     payment?: string
     q?: string
     page?: string
+    view?: string
+    sort?: string
   }
 }
 
@@ -47,8 +53,21 @@ const STATUS_TABS = [
   { key: 'cancelled', label: 'Annulées' },
 ] as const
 
+const VALID_VIEWS = new Set<OrderView>(['', 'to_ship', 'pickup_ready', 'payment_pending'])
+const VALID_SORTS = new Set<SortKey>(['date_desc', 'date_asc', 'total_desc', 'total_asc'])
+
 function sanitizeSearch(raw: string) {
   return raw.trim().replace(/[^a-zA-Z0-9À-ÿ@._\- ]/g, '').slice(0, 60)
+}
+
+function sanitizeView(raw: string | undefined): OrderView {
+  const value = (raw ?? '') as OrderView
+  return VALID_VIEWS.has(value) ? value : ''
+}
+
+function sanitizeSort(raw: string | undefined): SortKey {
+  const value = (raw ?? 'date_desc') as SortKey
+  return VALID_SORTS.has(value) ? value : 'date_desc'
 }
 
 function appendSharedParams(params: URLSearchParams, searchParams: PageProps['searchParams']) {
@@ -57,12 +76,21 @@ function appendSharedParams(params: URLSearchParams, searchParams: PageProps['se
   if (searchParams.fulfillment) params.set('fulfillment', searchParams.fulfillment)
   if (searchParams.payment) params.set('payment', searchParams.payment)
   if (searchParams.q) params.set('q', sanitizeSearch(searchParams.q))
+  const view = sanitizeView(searchParams.view)
+  const sort = sanitizeSort(searchParams.sort)
+  if (view) params.set('view', view)
+  if (sort !== 'date_desc') params.set('sort', sort)
 }
 
 function buildStatusHref(searchParams: PageProps['searchParams'], status: string) {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
-  appendSharedParams(params, searchParams)
+  if (searchParams.dateFrom) params.set('dateFrom', searchParams.dateFrom)
+  if (searchParams.dateTo) params.set('dateTo', searchParams.dateTo)
+  if (searchParams.payment) params.set('payment', searchParams.payment)
+  if (searchParams.q) params.set('q', sanitizeSearch(searchParams.q))
+  const sort = sanitizeSort(searchParams.sort)
+  if (sort !== 'date_desc') params.set('sort', sort)
   const query = params.toString()
   return query ? `/admin?${query}` : '/admin'
 }
@@ -72,6 +100,27 @@ function buildPageHref(searchParams: PageProps['searchParams'], page: number) {
   if (searchParams.status) params.set('status', searchParams.status)
   appendSharedParams(params, searchParams)
   if (page > 1) params.set('page', String(page))
+  const query = params.toString()
+  return query ? `/admin?${query}` : '/admin'
+}
+
+function buildViewHref(searchParams: PageProps['searchParams'], view: OrderView) {
+  const params = new URLSearchParams()
+  if (view) params.set('view', view)
+  if (searchParams.dateFrom) params.set('dateFrom', searchParams.dateFrom)
+  if (searchParams.dateTo) params.set('dateTo', searchParams.dateTo)
+  if (searchParams.q) params.set('q', sanitizeSearch(searchParams.q))
+  const sort = sanitizeSort(searchParams.sort)
+  if (sort !== 'date_desc') params.set('sort', sort)
+  const query = params.toString()
+  return query ? `/admin?${query}` : '/admin'
+}
+
+function buildSortHref(searchParams: PageProps['searchParams'], sort: SortKey) {
+  const params = new URLSearchParams()
+  if (searchParams.status) params.set('status', searchParams.status)
+  appendSharedParams(params, { ...searchParams, sort: undefined })
+  if (sort !== 'date_desc') params.set('sort', sort)
   const query = params.toString()
   return query ? `/admin?${query}` : '/admin'
 }
@@ -87,6 +136,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const filterFulfillment = searchParams.fulfillment ?? ''
   const filterPayment = searchParams.payment ?? ''
   const searchQuery = sanitizeSearch(searchParams.q ?? '')
+  const filterView = sanitizeView(searchParams.view)
+  const sortKey = sanitizeSort(searchParams.sort)
   const requestedPage = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
 
   const { data: kpiOrders } = await supabase
@@ -109,7 +160,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   const { data: allOrders } = await supabase
     .from('orders')
-    .select('id, status, created_at')
+    .select('id, status, created_at, fulfillment_type, payment_status')
     .eq('tenant_id', tenant.id)
 
   const allData = allOrders ?? []
@@ -117,6 +168,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const newCount = allData.filter(order => order.status === 'new').length
   const toPrepare = allData.filter(order => order.status === 'preparing').length
   const readyForPickup = allData.filter(order => order.status === 'ready_for_pickup').length
+  const toShipCount = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery').length
+  const pendingPaymentCount = allData.filter(order => order.payment_status === 'pending').length
 
   const statusCounts = allData.reduce<Record<string, number>>((acc, order) => {
     acc[order.status] = (acc[order.status] ?? 0) + 1
@@ -132,11 +185,19 @@ export default async function AdminPage({ searchParams }: PageProps) {
       order_items(id, name, quantity, subtotal, storage_type)
     `, { count: 'exact' })
     .eq('tenant_id', tenant.id)
-    .order('created_at', { ascending: false })
 
-  if (filterStatus) query = query.eq('status', filterStatus)
-  if (filterFulfillment) query = query.eq('fulfillment_type', filterFulfillment)
-  if (filterPayment) query = query.eq('payment_method', filterPayment)
+  if (filterView === 'to_ship') {
+    query = query.eq('status', 'preparing').eq('fulfillment_type', 'delivery')
+  } else if (filterView === 'pickup_ready') {
+    query = query.eq('status', 'ready_for_pickup')
+  } else if (filterView === 'payment_pending') {
+    query = query.eq('payment_status', 'pending')
+  } else {
+    if (filterStatus) query = query.eq('status', filterStatus)
+    if (filterFulfillment) query = query.eq('fulfillment_type', filterFulfillment)
+    if (filterPayment) query = query.eq('payment_method', filterPayment)
+  }
+
   if (filterDateFrom) query = query.gte('created_at', new Date(filterDateFrom).toISOString())
   if (filterDateTo) {
     const end = new Date(filterDateTo)
@@ -153,6 +214,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
       query = query.or(`full_name.ilike.%${escaped}%,email.ilike.%${escaped}%`)
     }
   }
+
+  if (sortKey === 'date_asc') query = query.order('created_at', { ascending: true })
+  else if (sortKey === 'total_desc') query = query.order('total', { ascending: false }).order('created_at', { ascending: false })
+  else if (sortKey === 'total_asc') query = query.order('total', { ascending: true }).order('created_at', { ascending: false })
+  else query = query.order('created_at', { ascending: false })
 
   const initialFrom = (requestedPage - 1) * PAGE_SIZE
   const initialTo = initialFrom + PAGE_SIZE - 1
@@ -189,7 +255,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     .order('created_at', { ascending: true })
   const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
-  const activeFilterCount = [filterDateFrom, filterDateTo, filterFulfillment, filterPayment].filter(Boolean).length
+  const activeFilterCount = [filterDateFrom, filterDateTo, filterFulfillment, filterPayment, filterView].filter(Boolean).length
   const pageStart = filteredCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredCount)
 
@@ -228,6 +294,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
     },
   ]
 
+  const quickViews: { key: OrderView; label: string; count: number; helper: string }[] = [
+    { key: 'to_ship', label: 'Livraisons à expédier', count: toShipCount, helper: 'En préparation · livraison' },
+    { key: 'pickup_ready', label: 'Retraits prêts', count: readyForPickup, helper: 'Client attendu en boutique' },
+    { key: 'payment_pending', label: 'Paiements en attente', count: pendingPaymentCount, helper: 'Action de paiement requise' },
+  ]
+
   return (
     <div className="mx-auto w-full max-w-7xl pb-8">
       <AdminPageHeader
@@ -264,10 +336,45 @@ export default async function AdminPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <section className="mb-2 rounded-xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <section className="mb-3 overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="border-b border-[var(--admin-border)] px-3 py-3 dark:border-gray-800 sm:px-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">Vues opérationnelles</p>
+              <p className="mt-0.5 text-xs text-gray-400">Accès direct aux commandes qui demandent une action.</p>
+            </div>
+            {filterView && (
+              <Link href={buildViewHref(searchParams, '')} className="text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">
+                Quitter la vue
+              </Link>
+            )}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            {quickViews.map(view => {
+              const active = filterView === view.key
+              return (
+                <Link
+                  key={view.key}
+                  href={buildViewHref(searchParams, active ? '' : view.key)}
+                  className={`min-w-[190px] rounded-xl border px-3 py-2.5 transition-colors ${active
+                    ? 'border-[#C9C1FF] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]'
+                    : 'border-gray-200 bg-gray-50/70 text-gray-700 hover:border-[#D9D3FF] hover:bg-[#FAF9FF] dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-200'
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold">{view.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${active ? 'bg-white/80' : 'bg-white dark:bg-gray-900'}`}>{view.count}</span>
+                  </span>
+                  <span className="mt-1 block text-[11px] text-gray-400">{view.helper}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+
         <div className="flex gap-1 overflow-x-auto border-b border-[var(--admin-border)] px-2 py-1.5 dark:border-gray-800 sm:px-3" aria-label="Statuts des commandes">
           {STATUS_TABS.map(tab => {
-            const active = filterStatus === tab.key
+            const active = !filterView && filterStatus === tab.key
             const count = tab.key ? (statusCounts[tab.key] ?? 0) : totalCount
             return (
               <Link
@@ -296,7 +403,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
           })}
         </div>
 
-        <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
           <Suspense fallback={<div className="h-9" />}>
             <AdminFilters
               currentStatus={filterStatus}
@@ -317,21 +424,23 @@ export default async function AdminPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      <div className="mb-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:flex-row lg:items-center lg:justify-between">
         <form method="get" action="/admin" className="flex min-w-0 flex-1 items-center gap-2">
-          {filterStatus && <input type="hidden" name="status" value={filterStatus} />}
+          {filterStatus && !filterView && <input type="hidden" name="status" value={filterStatus} />}
+          {filterView && <input type="hidden" name="view" value={filterView} />}
           {filterDateFrom && <input type="hidden" name="dateFrom" value={filterDateFrom} />}
           {filterDateTo && <input type="hidden" name="dateTo" value={filterDateTo} />}
-          {filterFulfillment && <input type="hidden" name="fulfillment" value={filterFulfillment} />}
-          {filterPayment && <input type="hidden" name="payment" value={filterPayment} />}
+          {filterFulfillment && !filterView && <input type="hidden" name="fulfillment" value={filterFulfillment} />}
+          {filterPayment && !filterView && <input type="hidden" name="payment" value={filterPayment} />}
+          {sortKey !== 'date_desc' && <input type="hidden" name="sort" value={sortKey} />}
           <div className="relative w-full max-w-xl">
             <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
               name="q"
               defaultValue={searchQuery}
-              placeholder="Rechercher dans toutes les commandes (client, email ou UUID)..."
-              className="h-10 w-full rounded-lg border border-[var(--admin-border)] bg-white pl-9 pr-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              placeholder="Client, email ou UUID de commande..."
+              className="h-10 w-full rounded-xl border border-[var(--admin-border)] bg-white pl-9 pr-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
             />
             {searchQuery && (
               <Link
@@ -343,16 +452,38 @@ export default async function AdminPage({ searchParams }: PageProps) {
               </Link>
             )}
           </div>
-          <button type="submit" className="h-10 shrink-0 rounded-lg bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90">
+          <button type="submit" className="h-10 shrink-0 rounded-xl bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90">
             Rechercher
           </button>
         </form>
-        <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-          {filteredCount} résultat{filteredCount !== 1 ? 's' : ''}
-        </p>
+
+        <div className="flex items-center justify-between gap-3 lg:justify-end">
+          <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+            {filteredCount} résultat{filteredCount !== 1 ? 's' : ''}
+          </p>
+          <div className="flex items-center gap-1 rounded-lg border border-[var(--admin-border)] bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-950">
+            {([
+              ['date_desc', 'Plus récentes'],
+              ['date_asc', 'Plus anciennes'],
+              ['total_desc', 'Montant ↓'],
+              ['total_asc', 'Montant ↑'],
+            ] as [SortKey, string][]).map(([key, label]) => (
+              <Link
+                key={key}
+                href={buildSortHref(searchParams, key)}
+                className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition-colors ${sortKey === key
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
+                  : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="[&>div>div:first-of-type]:hidden [&_thead_th]:py-2.5 [&_tbody_td]:py-2.5 [&_tbody_tr]:align-middle [&_ul>li>a]:p-3">
+      <div className={`${styles.listPolish} [&>div>div:first-of-type]:hidden [&_ul>li>a]:p-3`}>
         <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} />
       </div>
 
