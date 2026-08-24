@@ -12,6 +12,7 @@ import {
   IconCreditCard,
   IconChevronDown,
   IconChevronUp,
+  IconX,
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
@@ -65,12 +66,11 @@ export default function PendingPaymentsBanner({
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState<PendingPaymentSession[]>([]);
-  const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  // Completed checkout_sessions are now retained for audit/analytics. Never
-  // trust the legacy server list (which historically relied on DELETE): refresh
-  // from the status-aware endpoint so only live external payments are shown.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -81,15 +81,42 @@ export default function PendingPaymentsBanner({
         if (!cancelled) setSessions(json.sessions ?? []);
       } catch (error) {
         console.warn('[PendingPaymentsBanner] open sessions refresh failed:', error);
-        // Safer to hide than to expose a completed checkout as pending. The
-        // server-provided list remains deliberately unused after lifecycle v2.
         if (!cancelled) setSessions([]);
       }
     })();
     return () => { cancelled = true; };
   }, [initialSessions]);
 
-  const visible = sessions.filter((session) => !confirmedIds.has(session.id));
+  async function cancelSession(session: PendingPaymentSession) {
+    const customer = session.full_name ?? session.email;
+    const confirmed = window.confirm(
+      `Annuler cette demande de paiement pour ${customer} ?\n\n` +
+      `Cette action ferme uniquement la demande dans Lepefy. ` +
+      `Elle n'annule ni ne rembourse un éventuel paiement déjà effectué sur PayPal, Revolut ou un autre service externe.`,
+    );
+    if (!confirmed) return;
+
+    setActionError(null);
+    setCancellingId(session.id);
+    try {
+      const res = await fetch(`/api/admin/checkout-sessions/${session.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const payload = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(payload.error ?? `HTTP ${res.status}`);
+
+      setResolvedIds((previous) => new Set(previous).add(session.id));
+      router.refresh();
+    } catch (error) {
+      console.error('[PendingPaymentsBanner] cancel failed:', error);
+      setActionError(error instanceof Error ? error.message : 'Impossible d\'annuler cette demande.');
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  const visible = sessions.filter((session) => !resolvedIds.has(session.id));
   const pendingTotal = useMemo(
     () => visible.reduce((sum, session) => sum + sessionTotal(session), 0),
     [visible],
@@ -113,8 +140,13 @@ export default function PendingPaymentsBanner({
             </span>
           </div>
           <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-            Checkouts ouverts non convertis en commandes · aucun stock réservé.
+            Paiements externes à vérifier manuellement · aucun stock réservé.
           </p>
+          {actionError && (
+            <p className="mt-1 text-[11px] font-medium text-red-700 dark:text-red-300" role="alert">
+              {actionError}
+            </p>
+          )}
         </div>
 
         <button
@@ -138,6 +170,7 @@ export default function PendingPaymentsBanner({
               const Icon = PAYMENT_ICONS[meta.iconName];
               const color = methodColor(methodType, '#92400E');
               const itemsSummary = session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ');
+              const isCancelling = cancellingId === session.id;
 
               return (
                 <div
@@ -165,18 +198,28 @@ export default function PendingPaymentsBanner({
                     <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">{elapsedLabel(session.created_at)}</p>
                   </div>
 
-                  <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
-                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 sm:justify-end">
+                    <span className="mr-1 text-sm font-bold text-gray-900 dark:text-gray-100">
                       {formatPrice(total, tenantCurrency)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => void cancelSession(session)}
+                      disabled={isCancelling}
+                      className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                      aria-label={`Annuler la demande de paiement de ${session.full_name ?? session.email}`}
+                    >
+                      <IconX size={14} />
+                      {isCancelling ? 'Annulation…' : 'Annuler'}
+                    </button>
                     <ConfirmPaymentButton
                       endpoint={`/api/admin/checkout-sessions/${session.id}/confirm-payment`}
                       label="Confirmer réception"
                       confirmingLabel="Confirmation…"
-                      className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white transition-opacity disabled:opacity-50"
+                      className="min-h-9 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white transition-opacity disabled:opacity-50"
                       style={{ backgroundColor: '#D97706' }}
                       onSuccess={(warning) => {
-                        if (!warning) setConfirmedIds((prev) => new Set(prev).add(session.id));
+                        if (!warning) setResolvedIds((prev) => new Set(prev).add(session.id));
                         router.refresh();
                       }}
                     />
