@@ -5,9 +5,13 @@ import { getTenant } from '@/lib/tenant/getTenant'
 import { formatPrice } from '@/lib/utils/format'
 import {
   IconBuildingStore,
+  IconChevronLeft,
+  IconChevronRight,
   IconCurrencyEuro,
   IconPackage,
+  IconSearch,
   IconTruck,
+  IconX,
 } from '@tabler/icons-react'
 import AdminFilters from './AdminFilters'
 import OrdersTable from './OrdersTable'
@@ -19,6 +23,8 @@ import type { PendingPaymentSession } from './PendingPaymentsBanner'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
+const PAGE_SIZE = 50
+
 interface PageProps {
   searchParams: {
     status?: string
@@ -26,6 +32,8 @@ interface PageProps {
     dateTo?: string
     fulfillment?: string
     payment?: string
+    q?: string
+    page?: string
   }
 }
 
@@ -35,17 +43,35 @@ const STATUS_TABS = [
   { key: 'preparing', label: 'À préparer' },
   { key: 'ready_for_pickup', label: 'Prêtes au retrait' },
   { key: 'shipped', label: 'Expédiées' },
-  { key: 'delivered', label: 'Terminées' },
+  { key: 'delivered', label: 'Livrées' },
   { key: 'cancelled', label: 'Annulées' },
 ] as const
 
-function buildStatusHref(searchParams: PageProps['searchParams'], status: string) {
-  const params = new URLSearchParams()
-  if (status) params.set('status', status)
+function sanitizeSearch(raw: string) {
+  return raw.trim().replace(/[^a-zA-Z0-9À-ÿ@._\- ]/g, '').slice(0, 60)
+}
+
+function appendSharedParams(params: URLSearchParams, searchParams: PageProps['searchParams']) {
   if (searchParams.dateFrom) params.set('dateFrom', searchParams.dateFrom)
   if (searchParams.dateTo) params.set('dateTo', searchParams.dateTo)
   if (searchParams.fulfillment) params.set('fulfillment', searchParams.fulfillment)
   if (searchParams.payment) params.set('payment', searchParams.payment)
+  if (searchParams.q) params.set('q', sanitizeSearch(searchParams.q))
+}
+
+function buildStatusHref(searchParams: PageProps['searchParams'], status: string) {
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  appendSharedParams(params, searchParams)
+  const query = params.toString()
+  return query ? `/admin?${query}` : '/admin'
+}
+
+function buildPageHref(searchParams: PageProps['searchParams'], page: number) {
+  const params = new URLSearchParams()
+  if (searchParams.status) params.set('status', searchParams.status)
+  appendSharedParams(params, searchParams)
+  if (page > 1) params.set('page', String(page))
   const query = params.toString()
   return query ? `/admin?${query}` : '/admin'
 }
@@ -60,6 +86,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const filterDateTo = searchParams.dateTo ?? ''
   const filterFulfillment = searchParams.fulfillment ?? ''
   const filterPayment = searchParams.payment ?? ''
+  const searchQuery = sanitizeSearch(searchParams.q ?? '')
+  const requestedPage = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
 
   const { data: kpiOrders } = await supabase
     .from('orders')
@@ -102,10 +130,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
       subtotal, shipping_cost, payment_method, payment_status,
       fulfillment_type, shipping_address, shipping_details,
       order_items(id, name, quantity, subtotal, storage_type)
-    `)
+    `, { count: 'exact' })
     .eq('tenant_id', tenant.id)
     .order('created_at', { ascending: false })
-    .limit(500)
 
   if (filterStatus) query = query.eq('status', filterStatus)
   if (filterFulfillment) query = query.eq('fulfillment_type', filterFulfillment)
@@ -117,8 +144,34 @@ export default async function AdminPage({ searchParams }: PageProps) {
     query = query.lte('created_at', end.toISOString())
   }
 
-  const { data: orders } = await query as { data: ListOrder[] | null }
-  const orderList = orders ?? []
+  if (searchQuery) {
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (uuidPattern.test(searchQuery)) {
+      query = query.eq('id', searchQuery)
+    } else {
+      const escaped = searchQuery.replace(/[%_]/g, '')
+      query = query.or(`full_name.ilike.%${escaped}%,email.ilike.%${escaped}%`)
+    }
+  }
+
+  const initialFrom = (requestedPage - 1) * PAGE_SIZE
+  const initialTo = initialFrom + PAGE_SIZE - 1
+  const firstResult = await query.range(initialFrom, initialTo) as {
+    data: ListOrder[] | null
+    count: number | null
+  }
+
+  const filteredCount = firstResult.count ?? 0
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE))
+  const currentPage = Math.min(requestedPage, totalPages)
+
+  let orderList = firstResult.data ?? []
+  if (currentPage !== requestedPage) {
+    const from = (currentPage - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+    const corrected = await query.range(from, to) as { data: ListOrder[] | null }
+    orderList = corrected.data ?? []
+  }
 
   const { data: carriersRaw } = await supabase
     .from('carriers')
@@ -137,6 +190,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
   const activeFilterCount = [filterDateFrom, filterDateTo, filterFulfillment, filterPayment].filter(Boolean).length
+  const pageStart = filteredCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredCount)
 
   const compactKpis = [
     {
@@ -177,7 +232,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
     <div className="mx-auto w-full max-w-7xl pb-8">
       <AdminPageHeader
         title="Commandes"
-        description="Pilotez les commandes selon l'action opérationnelle suivante."
+        description="Traitez rapidement les commandes qui demandent votre attention."
         meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`}
       />
 
@@ -254,7 +309,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
             />
           </Suspense>
 
-          {(filterStatus || activeFilterCount > 0) && (
+          {(filterStatus || activeFilterCount > 0 || searchQuery) && (
             <Link href="/admin" className="shrink-0 text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">
               Réinitialiser{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             </Link>
@@ -262,8 +317,72 @@ export default async function AdminPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      <div className="[&_thead_th]:py-2.5 [&_tbody_td]:py-2.5 [&_tbody_tr]:align-middle [&_ul>li>a]:p-3">
+      <div className="mb-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+        <form method="get" action="/admin" className="flex min-w-0 flex-1 items-center gap-2">
+          {filterStatus && <input type="hidden" name="status" value={filterStatus} />}
+          {filterDateFrom && <input type="hidden" name="dateFrom" value={filterDateFrom} />}
+          {filterDateTo && <input type="hidden" name="dateTo" value={filterDateTo} />}
+          {filterFulfillment && <input type="hidden" name="fulfillment" value={filterFulfillment} />}
+          {filterPayment && <input type="hidden" name="payment" value={filterPayment} />}
+          <div className="relative w-full max-w-xl">
+            <IconSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="search"
+              name="q"
+              defaultValue={searchQuery}
+              placeholder="Rechercher dans toutes les commandes (client, email ou UUID)..."
+              className="h-10 w-full rounded-lg border border-[var(--admin-border)] bg-white pl-9 pr-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            />
+            {searchQuery && (
+              <Link
+                href={buildPageHref({ ...searchParams, q: undefined, page: undefined }, 1)}
+                aria-label="Effacer la recherche"
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              >
+                <IconX size={14} />
+              </Link>
+            )}
+          </div>
+          <button type="submit" className="h-10 shrink-0 rounded-lg bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90">
+            Rechercher
+          </button>
+        </form>
+        <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+          {filteredCount} résultat{filteredCount !== 1 ? 's' : ''}
+        </p>
+      </div>
+
+      <div className="[&>div>div:first-of-type]:hidden [&_thead_th]:py-2.5 [&_tbody_td]:py-2.5 [&_tbody_tr]:align-middle [&_ul>li>a]:p-3">
         <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} />
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {pageStart}–{pageEnd} sur {filteredCount} commande{filteredCount !== 1 ? 's' : ''}
+        </span>
+        <nav className="flex items-center gap-1" aria-label="Pagination des commandes">
+          {currentPage > 1 ? (
+            <Link href={buildPageHref(searchParams, currentPage - 1)} className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--admin-border)] px-2.5 text-xs font-semibold text-gray-600 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-300">
+              <IconChevronLeft size={14} /> Précédent
+            </Link>
+          ) : (
+            <span className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-100 px-2.5 text-xs font-semibold text-gray-300 dark:border-gray-800 dark:text-gray-600">
+              <IconChevronLeft size={14} /> Précédent
+            </span>
+          )}
+          <span className="min-w-20 px-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-200">
+            {currentPage} / {totalPages}
+          </span>
+          {currentPage < totalPages ? (
+            <Link href={buildPageHref(searchParams, currentPage + 1)} className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--admin-border)] px-2.5 text-xs font-semibold text-gray-600 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-300">
+              Suivant <IconChevronRight size={14} />
+            </Link>
+          ) : (
+            <span className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-100 px-2.5 text-xs font-semibold text-gray-300 dark:border-gray-800 dark:text-gray-600">
+              Suivant <IconChevronRight size={14} />
+            </span>
+          )}
+        </nav>
       </div>
     </div>
   )
