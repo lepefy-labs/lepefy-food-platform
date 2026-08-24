@@ -103,7 +103,12 @@ begin
 end;
 $$;
 
-create or replace view public.checkout_funnel_30d as
+-- PostgreSQL does not allow CREATE OR REPLACE VIEW to insert/rename columns in
+-- the middle of an existing view definition. Recreate it explicitly so the new
+-- checkout_awaiting_verification metric has a stable schema and reruns remain safe.
+drop view if exists public.checkout_funnel_30d;
+
+create view public.checkout_funnel_30d as
 select
   tenant_id,
   count(*) filter (where created_at >= now() - interval '30 days') as checkout_started,
