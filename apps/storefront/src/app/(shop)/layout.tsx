@@ -2,7 +2,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { ShopNotificationBar } from '@/components/layout/ShopNotificationBar';
+import { CheckoutNotificationBarGate } from '@/components/layout/CheckoutNotificationBarGate';
 import { ChatWidgetGate } from '@/components/chat/ChatWidgetGate';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { CartSyncProvider } from '@/components/cart/CartSyncProvider';
@@ -21,7 +21,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <PWABanner />
       <Header />
 
-      <ShopNotificationBar />
+      <CheckoutNotificationBarGate />
 
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
       <Footer socialLinks={socialLinks} storyEnabled={storyEnabled} />
