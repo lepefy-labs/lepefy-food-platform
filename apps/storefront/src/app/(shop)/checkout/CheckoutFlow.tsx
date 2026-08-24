@@ -15,6 +15,8 @@ import {
   IconLock,
   IconMapPin,
   IconTruck,
+  IconUser,
+  IconPhone,
 } from '@tabler/icons-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
@@ -45,15 +47,15 @@ const COUNTRIES = [
   { value: 'CH', label: 'Suisse' },
 ];
 
-type Step = 'shipping' | 'contact' | 'select-payment' | 'payment';
+type Step = 'shipping' | 'select-payment' | 'payment';
 type FulfillmentType = 'delivery' | 'pickup';
 type PaymentMode = 'stripe' | 'in_store';
 
 const contactSchema = z.object({
-  firstName: z.string().min(1, 'Prénom requis'),
-  lastName: z.string().min(1, 'Nom requis'),
-  email: z.string().email('Email invalide'),
-  phone: z.string().optional(),
+  firstName: z.string().trim().min(1, 'Prénom requis'),
+  lastName: z.string().trim().min(1, 'Nom requis'),
+  email: z.string().trim().email('Email invalide'),
+  phone: z.string().trim().min(6, 'Téléphone requis'),
 });
 
 type ContactValues = z.infer<typeof contactSchema>;
@@ -137,6 +139,7 @@ export default function CheckoutFlow({
   const [houseNumber, setHouseNumber] = useState(initialDraft?.houseNumber ?? '');
   const [city, setCity] = useState(initialDraft?.city ?? '');
   const [manualMode, setManualMode] = useState(false);
+  const [addressLocked, setAddressLocked] = useState(Boolean(initialDraft?.quoteToken && initialDraft.street));
   const [shippingTotal, setShippingTotal] = useState(initialDraft?.shippingTotal ?? 0);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(initialDraft?.shippingDetails ?? null);
   const [freeShipping, setFreeShipping] = useState<FreeShippingInfo>(initialDraft?.freeShipping ?? null);
@@ -161,7 +164,7 @@ export default function CheckoutFlow({
   const prefilledForCustomerRef = useRef<string | null>(null);
   const addressSectionRef = useRef<HTMLElement | null>(null);
 
-  const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm<ContactValues>({
+  const { register, handleSubmit, setValue, getValues, setFocus, watch, formState: { errors } } = useForm<ContactValues>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
       firstName: initialDraft?.firstName ?? '',
@@ -170,6 +173,11 @@ export default function CheckoutFlow({
       phone: initialDraft?.phone ?? '',
     },
   });
+
+  const firstName = watch('firstName');
+  const lastName = watch('lastName');
+  const email = watch('email');
+  const phone = watch('phone');
 
   usePaymentRedirectRecovery('shop', () => {
     useCartStore.getState().clearCart();
@@ -217,9 +225,9 @@ export default function CheckoutFlow({
   const effectiveShippingTotal = isPickup ? 0 : shippingTotal;
   const total = subtotal + effectiveShippingTotal - ambassadorDiscount;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const hasCompleteAddress = Boolean(
-    country.trim() && postalCode.trim() && street.trim() && houseNumber.trim() && city.trim(),
-  );
+  const hasCompleteAddress = Boolean(country.trim() && postalCode.trim() && street.trim() && houseNumber.trim() && city.trim());
+  const recipientComplete = Boolean(firstName?.trim() && lastName?.trim());
+  const contactComplete = Boolean(email?.trim() && phone?.trim().length >= 6);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,6 +317,7 @@ export default function CheckoutFlow({
 
   function focusAddressSection(message?: string) {
     if (message) setSubmitError(message);
+    setAddressLocked(false);
     requestAnimationFrame(() => {
       addressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       window.setTimeout(() => {
@@ -329,32 +338,27 @@ export default function CheckoutFlow({
     }
   }
 
-  function continueFromShipping() {
-    if (isPickup) {
-      saveDraft();
-      setSubmitError(null);
-      setStep('contact');
-      return;
-    }
-    if (!hasCompleteAddress) {
+  const continueFromInformation = (data: ContactValues) => {
+    if (!isPickup && !hasCompleteAddress) {
       focusAddressSection('Indiquez une adresse complète pour calculer vos frais de livraison.');
       return;
     }
-    if (!quoteToken) {
+    if (!isPickup && !quoteToken) {
       focusAddressSection(shippingError ?? 'Le calcul de la livraison est en cours. Veuillez patienter un instant.');
       return;
     }
-    saveDraft();
-    setSubmitError(null);
-    setStep('contact');
-  }
-
-  const continueFromContact = (data: ContactValues) => {
-    if (!data.firstName || !data.lastName || !data.email) return;
+    if (!data.firstName || !data.lastName || !data.email || !data.phone) return;
     saveDraft();
     setSubmitError(null);
     setStep('select-payment');
   };
+
+  function focusFirstContactError() {
+    if (!firstName?.trim()) setFocus('firstName');
+    else if (!lastName?.trim()) setFocus('lastName');
+    else if (!email?.trim()) setFocus('email');
+    else setFocus('phone');
+  }
 
   function buildSharedPayload() {
     const data = getValues();
@@ -375,7 +379,7 @@ export default function CheckoutFlow({
       },
       fulfillmentType,
       email: data.email,
-      phone: data.phone ?? null,
+      phone: data.phone,
       fullName: `${data.firstName} ${data.lastName}`,
       shippingDetails: isPickup ? null : shippingDetails,
       quoteToken: isPickup ? null : quoteToken,
@@ -499,20 +503,19 @@ export default function CheckoutFlow({
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4 pb-10 sm:px-6 sm:py-7">
       <CheckoutProgressIndicator currentStep={step} />
-
       <div className="mb-5">{compactSummary}</div>
 
       {step === 'shipping' && (
         <div className="space-y-5">
           <section className="rounded-2xl bg-[color-mix(in_srgb,var(--color-primary)_6%,white)] px-4 py-3.5">
-            <p className="text-sm font-bold text-gray-950">Finalisez votre livraison</p>
+            <p className="text-sm font-bold text-gray-950">{isPickup ? 'Préparez votre retrait' : 'Préparez votre livraison'}</p>
             <p className="mt-1 text-xs leading-relaxed text-gray-600">
-              1. Choisissez comment recevoir votre commande. 2. Si vous choisissez la livraison, indiquez votre adresse pour calculer les frais avant de continuer.
+              Renseignez la personne qui reçoit ou retire la commande, puis les informations nécessaires pour la livraison et le contact.
             </p>
           </section>
 
           <section>
-            <h1 className="text-lg font-bold text-gray-950"><span className="mr-2 text-[var(--color-primary)]">1.</span>Mode de récupération</h1>
+            <h1 className="text-lg font-bold text-gray-950">Mode de récupération</h1>
             <div className="mt-3 grid grid-cols-2 gap-3">
               {(['delivery', 'pickup'] as const).filter((type) => type === 'delivery' || tenant.click_collect_enabled).map((type) => {
                 const active = fulfillmentType === type;
@@ -528,61 +531,117 @@ export default function CheckoutFlow({
             </div>
           </section>
 
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${recipientComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{recipientComplete ? <IconCheck size={15} /> : '1'}</span>
+              <div>
+                <h2 className="text-sm font-bold text-gray-950">{isPickup ? 'Personne qui retire' : 'Destinataire'}</h2>
+                <p className="mt-0.5 text-xs text-gray-500">Nom utilisé pour remettre ou livrer la commande.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div><input {...register('firstName')} autoComplete="given-name" placeholder="Prénom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.firstName && <p className="mt-1 text-xs font-medium text-red-600">{errors.firstName.message}</p>}</div>
+              <div><input {...register('lastName')} autoComplete="family-name" placeholder="Nom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.lastName && <p className="mt-1 text-xs font-medium text-red-600">{errors.lastName.message}</p>}</div>
+            </div>
+          </section>
+
           {isPickup ? (
-            tenant.click_collect_address && (
-              <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                <p className="flex items-center gap-2 text-sm font-bold text-blue-900"><IconMapPin size={17} /> Adresse de retrait</p>
-                <p className="mt-2 text-sm text-blue-800">{tenant.click_collect_address}</p>
-                <p className="mt-2 text-xs font-semibold text-green-700">Aucun frais de livraison.</p>
-              </section>
-            )
+            <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-600 text-white"><IconCheck size={15} /></span>
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-bold text-blue-900"><IconMapPin size={17} /> Retrait chez {tenant.name}</p>
+                  {tenant.click_collect_address && <p className="mt-2 text-sm text-blue-800">{tenant.click_collect_address}</p>}
+                  <p className="mt-2 text-xs font-semibold text-green-700">Aucun frais de livraison.</p>
+                </div>
+              </div>
+            </section>
           ) : (
             <section ref={addressSectionRef} className="scroll-mb-48 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-xs font-black text-white">2</span>
-                <div>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${quoteToken && hasCompleteAddress ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{quoteToken && hasCompleteAddress ? <IconCheck size={15} /> : '2'}</span>
+                <div className="min-w-0 flex-1">
                   <h2 className="text-sm font-bold text-gray-950">Adresse de livraison</h2>
-                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Indiquez l’adresse complète : elle sert à calculer vos frais de livraison avant le paiement.</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Elle sert à calculer les frais de livraison avant le paiement.</p>
                 </div>
               </div>
-              <div className="mt-4 space-y-3">
-                <select value={country} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
-                  {COUNTRIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
-                </select>
-                {manualMode ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <input value={street} onChange={(event) => { setSubmitError(null); invalidateQuote(); setStreet(event.target.value); }} placeholder="Rue" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    <input value={houseNumber} onChange={(event) => { setSubmitError(null); invalidateQuote(); setHouseNumber(event.target.value); }} placeholder="Numéro" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    <input value={postalCode} onChange={(event) => { setSubmitError(null); invalidateQuote(); setPostalCode(event.target.value); }} placeholder="Code postal" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    <input value={city} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCity(event.target.value); }} placeholder="Ville" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+
+              {addressLocked && hasCompleteAddress ? (
+                <div className="mt-4 rounded-xl bg-green-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-xs font-bold text-green-800"><IconCheck size={15} /> Adresse validée</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">{street} {houseNumber}</p>
+                      <p className="text-xs text-gray-600">{postalCode} {city} · {COUNTRIES.find((entry) => entry.value === country)?.label ?? country}</p>
+                    </div>
+                    <button type="button" onClick={() => { setAddressLocked(false); setSubmitError(null); }} className="shrink-0 text-xs font-semibold text-[var(--color-primary)]">Modifier</button>
                   </div>
-                ) : (
-                  <AddressAutocomplete
-                    country={country}
-                    placeholder="Saisissez votre adresse complète"
-                    onSelect={(result) => {
-                      setSubmitError(null);
-                      invalidateQuote();
-                      setPostalCode(result.postalCode);
-                      setStreet(result.street);
-                      setHouseNumber(result.houseNumber);
-                      setCity(result.city);
-                    }}
-                    onManualFallback={() => { setSubmitError(null); setManualMode(true); }}
-                  />
-                )}
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <select value={country} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                    {COUNTRIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+                  </select>
+                  {manualMode ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={street} onChange={(event) => { setSubmitError(null); invalidateQuote(); setStreet(event.target.value); }} placeholder="Rue" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                      <input value={houseNumber} onChange={(event) => { setSubmitError(null); invalidateQuote(); setHouseNumber(event.target.value); }} placeholder="Numéro" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                      <input value={postalCode} onChange={(event) => { setSubmitError(null); invalidateQuote(); setPostalCode(event.target.value); }} placeholder="Code postal" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                      <input value={city} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCity(event.target.value); }} placeholder="Ville" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
+                    </div>
+                  ) : (
+                    <AddressAutocomplete
+                      country={country}
+                      placeholder="Saisissez votre adresse complète"
+                      onSelect={(result) => {
+                        setSubmitError(null);
+                        invalidateQuote();
+                        setPostalCode(result.postalCode);
+                        setStreet(result.street);
+                        setHouseNumber(result.houseNumber);
+                        setCity(result.city);
+                        if (result.postalCode && result.street && result.houseNumber && result.city) setAddressLocked(true);
+                      }}
+                      onManualFallback={() => { setSubmitError(null); setManualMode(true); }}
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="mt-3 space-y-2">
                 {submitError && <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700" role="alert">{submitError}</p>}
                 {shippingLoading && <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600" role="status">Calcul de la livraison en cours…</p>}
                 {!shippingLoading && shippingError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" role="alert">{shippingError}</p>}
-                {!shippingLoading && quoteToken && (
-                  <div className="rounded-2xl border border-green-100 bg-green-50 p-3 text-sm text-green-800">
-                    <p className="flex items-center gap-2 font-bold"><IconCheck size={17} /> Livraison disponible</p>
-                    <p className="mt-1 text-xs">Frais calculés pour votre adresse : {formatPrice(shippingTotal, tenant.currency)}</p>
-                  </div>
-                )}
+                {!shippingLoading && quoteToken && <p className="rounded-xl border border-green-100 bg-green-50 px-3 py-2.5 text-xs font-semibold text-green-800">✓ Livraison disponible · {formatPrice(shippingTotal, tenant.currency)}</p>}
               </div>
             </section>
           )}
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${contactComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{contactComplete ? <IconCheck size={15} /> : '3'}</span>
+              <div>
+                <h2 className="text-sm font-bold text-gray-950">Contact</h2>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Le téléphone est obligatoire : le transporteur ou la boutique peut vous contacter au sujet de la remise de la commande.</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div><input {...register('email')} type="email" inputMode="email" autoComplete="email" placeholder="Email" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.email && <p className="mt-1 text-xs font-medium text-red-600">{errors.email.message}</p>}</div>
+              <div className="relative"><IconPhone size={16} className="pointer-events-none absolute left-3 top-3.5 text-gray-400" /><input {...register('phone')} type="tel" inputMode="tel" autoComplete="tel" placeholder="Téléphone" className="w-full rounded-xl border border-gray-200 py-3 pl-9 pr-3 text-sm" />{errors.phone && <p className="mt-1 text-xs font-medium text-red-600">{errors.phone.message}</p>}</div>
+            </div>
+
+            <div className="mt-3">
+              {sessionCustomer ? (
+                <p className="rounded-xl bg-green-50 px-3 py-2 text-xs font-medium text-green-800">Connecté(e) en tant que {sessionCustomer.email}. Les informations de cette commande restent modifiables.</p>
+              ) : showLoginForm ? (
+                <OtpLoginForm onAuthenticated={() => { void refreshSessionCustomer(); setShowLoginForm(false); }} />
+              ) : (
+                <button type="button" onClick={() => setShowLoginForm(true)} className="flex min-h-11 w-full items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-left text-xs font-medium text-gray-600">
+                  <span className="flex items-center gap-2"><IconUser size={15} /> Déjà client ? Se connecter</span><IconChevronDown size={16} />
+                </button>
+              )}
+            </div>
+          </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-4">
             <div className="flex justify-between py-1.5 text-sm"><span className="text-gray-500">Sous-total ({itemCount} article{itemCount > 1 ? 's' : ''})</span><span className="font-semibold">{formatPrice(subtotal, tenant.currency)}</span></div>
@@ -590,50 +649,15 @@ export default function CheckoutFlow({
             <div className="mt-2 flex items-end justify-between border-t border-gray-200 pt-3"><span className="font-bold">{isPickup || quoteToken ? 'Total' : 'Total estimé'}</span><span className="text-2xl font-black">{formatPrice(total, tenant.currency)}</span></div>
           </section>
 
-          <button type="button" onClick={continueFromShipping} disabled={shippingLoading} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
-            {shippingLoading
-              ? 'Calcul de la livraison…'
-              : isPickup || quoteToken
-                ? 'Continuer — Coordonnées'
-                : hasCompleteAddress
-                  ? 'Calculer la livraison'
-                  : 'Indiquer mon adresse'}
+          <button type="button" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
+            {shippingLoading ? 'Calcul de la livraison…' : 'Continuer — Paiement'}
           </button>
         </div>
       )}
 
-      {step === 'contact' && (
-        <form onSubmit={handleSubmit(continueFromContact)} className="space-y-5" noValidate>
-          <button type="button" onClick={() => setStep('shipping')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500"><IconArrowLeft size={14} /> Retour à la livraison</button>
-          <section>
-            <h1 className="text-lg font-bold text-gray-950">Vos coordonnées</h1>
-            <div className="mt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><input {...register('firstName')} placeholder="Prénom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.firstName && <p className="mt-1 text-xs text-red-600">{errors.firstName.message}</p>}</div>
-                <div><input {...register('lastName')} placeholder="Nom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.lastName && <p className="mt-1 text-xs text-red-600">{errors.lastName.message}</p>}</div>
-              </div>
-              <div><input {...register('email')} type="email" inputMode="email" placeholder="Email" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}</div>
-              <input {...register('phone')} type="tel" inputMode="tel" placeholder="Téléphone (optionnel)" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-            </div>
-          </section>
-
-          {sessionCustomer ? (
-            <p className="rounded-xl bg-green-50 px-3 py-2 text-xs font-medium text-green-800">Connecté(e) en tant que {sessionCustomer.email}. Vos informations restent modifiables pour cette commande.</p>
-          ) : showLoginForm ? (
-            <OtpLoginForm onAuthenticated={() => { refreshSessionCustomer(); setShowLoginForm(false); }} />
-          ) : (
-            <button type="button" onClick={() => setShowLoginForm(true)} className="flex min-h-11 w-full items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-left text-xs font-medium text-gray-600">
-              <span>Vous avez déjà un compte ? Se connecter</span><IconChevronDown size={16} />
-            </button>
-          )}
-
-          <button type="submit" className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Continuer — Paiement</button>
-        </form>
-      )}
-
       {step === 'select-payment' && (
         <div className="space-y-5">
-          <button type="button" onClick={() => setStep('contact')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500"><IconArrowLeft size={14} /> Retour aux coordonnées</button>
+          <button type="button" onClick={() => setStep('shipping')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500"><IconArrowLeft size={14} /> Modifier la livraison et les coordonnées</button>
           <section>
             <h1 className="text-lg font-bold text-gray-950">Choisissez votre moyen de paiement</h1>
             <div className="mt-3">
