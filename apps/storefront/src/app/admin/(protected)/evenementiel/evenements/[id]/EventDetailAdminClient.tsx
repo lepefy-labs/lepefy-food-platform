@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { EventHighlight, EventReservation, EventReservationRequest, EventReservationStatus, EventRow, EventStatus, EventTicketType } from '@lepefy/types';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
+import ConfirmActionModal from '../../../../_components/ui/ConfirmActionModal';
 import { EventAdminHeader, type EventAdminTab } from './_components/EventAdminHeader';
 import EventSummaryTab from './_components/EventSummaryTab';
 import EventReservationsTab from './_components/EventReservationsTab';
@@ -33,6 +34,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
   const [pendingRequests, setPendingRequests] = useState(initialPendingRequests);
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   const [reservationSearch, setReservationSearch] = useState('');
   const [reservationStatusFilter, setReservationStatusFilter] = useState<'all' | EventReservationStatus>('all');
@@ -45,6 +47,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
 
   const [addingTicket, setAddingTicket] = useState(false);
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
+  const [pendingRemoveTicketId, setPendingRemoveTicketId] = useState<string | null>(null);
   const [ticketError, setTicketError] = useState<string | null>(null);
 
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -91,8 +94,8 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
   }
 
   async function closeEvent() {
-    if (!window.confirm('Clôturer cet événement ? Les réservations ne seront plus ouvertes.')) return;
     await updateStatus('closed');
+    setConfirmCloseOpen(false);
   }
 
   function onPendingConfirmed(id: string, warning?: string) {
@@ -229,7 +232,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
 
   async function removeTicket(id: string) {
     setTicketError(null);
-    if (!window.confirm('Retirer cette formule ? Si elle est déjà utilisée, elle sera désactivée afin de préserver l’historique.')) return;
+    setSavingTicketId(id);
     try {
       const res = await fetch(`/api/admin/evenementiel/ticket-types/${id}`, { method: 'DELETE' });
       const result = await res.json();
@@ -242,8 +245,11 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
       } else {
         setTicketTypes((prev) => prev.filter((ticket) => ticket.id !== id));
       }
+      setPendingRemoveTicketId(null);
     } catch {
       setTicketError('Erreur réseau lors du retrait de la formule.');
+    } finally {
+      setSavingTicketId(null);
     }
   }
 
@@ -338,7 +344,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
           onPendingConfirmed={onPendingConfirmed}
           onOpenReservations={() => setTab('reservations')}
           onOpenPage={() => setTab('page')}
-          onCloseEvent={closeEvent}
+          onCloseEvent={() => setConfirmCloseOpen(true)}
         />
       )}
 
@@ -366,7 +372,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
       )}
 
       {activeTab === 'ticketing' && (
-        <EventTicketingTab ticketTypes={ticketTypes} currency={currency} onCreate={createTicket} onUpdate={updateTicket} onRemove={removeTicket} adding={addingTicket} savingId={savingTicketId} error={ticketError} />
+        <EventTicketingTab ticketTypes={ticketTypes} currency={currency} onCreate={createTicket} onUpdate={updateTicket} onRemove={setPendingRemoveTicketId} adding={addingTicket} savingId={savingTicketId} error={ticketError} />
       )}
 
       {activeTab === 'page' && (
@@ -388,6 +394,29 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
           maxHighlights={MAX_HIGHLIGHTS}
         />
       )}
+
+      <ConfirmActionModal
+        open={confirmCloseOpen}
+        title="Clôturer cet événement ?"
+        description="Les nouvelles réservations seront fermées. Les réservations et billets existants restent conservés dans l’historique."
+        confirmLabel="Clôturer l’événement"
+        cancelLabel="Conserver ouvert"
+        loading={savingStatus}
+        onCancel={() => setConfirmCloseOpen(false)}
+        onConfirm={() => void closeEvent()}
+      />
+
+      <ConfirmActionModal
+        open={pendingRemoveTicketId !== null}
+        title="Retirer cette formule ?"
+        description="Si cette formule est déjà utilisée par une réservation, elle sera désactivée afin de préserver l’historique. Sinon elle sera supprimée."
+        confirmLabel="Retirer la formule"
+        cancelLabel="Conserver"
+        destructive
+        loading={pendingRemoveTicketId !== null && savingTicketId === pendingRemoveTicketId}
+        onCancel={() => setPendingRemoveTicketId(null)}
+        onConfirm={() => { if (pendingRemoveTicketId) void removeTicket(pendingRemoveTicketId); }}
+      />
     </div>
   );
 }
