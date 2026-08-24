@@ -1,91 +1,53 @@
 import Link from 'next/link';
-import { IconAlertTriangle, IconChevronRight, IconClock, IconCreditCard, IconPackage } from '@tabler/icons-react';
+import { IconArrowRight, IconClock, IconCreditCard, IconPackage } from '@tabler/icons-react';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 
-// Section distincte de OrdersListClient (jamais un tableau unique mélangé) :
-// une checkout_session pending n'est PAS une commande confirmée — badge et
-// libellés volontairement différents de ORDER_STATUS_LABELS pour ne jamais
-// laisser croire à l'utilisateur qu'il s'agit d'un statut de commande.
-
 export interface PendingSessionListItem {
-  id:                    string;
-  createdAt:             string;
-  itemCount:             number;
-  total:                 number;
-  fulfillmentType:       'delivery' | 'pickup';
-  paymentMethod:         'stripe' | 'external_link';
-  externalPaymentLabel:  string | null;
-}
-
-interface PendingCheckoutSessionsListProps {
-  sessions: PendingSessionListItem[];
+  id: string;
+  createdAt: string;
+  itemCount: number;
+  total: number;
+  fulfillmentType: 'delivery' | 'pickup';
+  paymentMethod: 'stripe' | 'external_link';
+  externalPaymentLabel: string | null;
 }
 
 function paymentMethodLabel(session: PendingSessionListItem): string {
   return session.paymentMethod === 'stripe' ? 'Carte bancaire' : session.externalPaymentLabel ?? 'Lien externe';
 }
 
-export function PendingCheckoutSessionsList({ sessions }: PendingCheckoutSessionsListProps) {
+export function PendingCheckoutSessionsList({ sessions }: { sessions: PendingSessionListItem[] }) {
+  const session = sessions[0];
+  if (!session) return null;
+
   return (
     <section className="mx-auto max-w-3xl px-4 pt-7 sm:px-6 sm:pt-9">
-      <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white text-amber-700 shadow-sm">
-            <IconAlertTriangle size={18} />
-          </span>
-          <div>
-            <h2 className="text-base font-bold text-gray-950 sm:text-lg">Paiement à finaliser</h2>
-            <p className="mt-1 text-sm leading-5 text-amber-900/70">
-              Ces demandes ne sont pas encore des commandes confirmées. Ouvrez-les pour vérifier ou terminer le paiement.
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/75 p-4 shadow-sm sm:p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-700 shadow-sm">
+                <IconClock size={13} /> Achat à finaliser
+              </span>
+              <span className="text-xs text-amber-900/60">{formatDate(session.createdAt)}</span>
+            </div>
+            <h2 className="mt-3 text-lg font-bold text-gray-950 sm:text-xl">Votre commande n&apos;est pas encore confirmée</h2>
+            <p className="mt-1 text-sm leading-5 text-gray-600">
+              Reprenez votre checkout là où vous l&apos;avez laissé. Les prix, le stock et la livraison seront validés avant le paiement.
             </p>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-600 sm:text-sm">
+              <span className="inline-flex items-center gap-1.5"><IconPackage size={15} />{session.itemCount} article{session.itemCount > 1 ? 's' : ''}</span>
+              <span className="inline-flex items-center gap-1.5"><IconCreditCard size={15} />{paymentMethodLabel(session)}</span>
+              <strong className="text-gray-950">{formatPrice(session.total)}</strong>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {sessions.map((session) => (
-          <Link
-            key={session.id}
-            href={`/orders/en-attente/${session.id}`}
-            className="group rounded-2xl border border-amber-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 sm:p-5"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold text-gray-950">
-                    Demande #{session.id.slice(0, 8).toUpperCase()}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                    <IconClock size={13} /> En attente
-                  </span>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 sm:text-sm">
-                  <span>{formatDate(session.createdAt)}</span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <IconPackage size={15} />
-                    {session.itemCount} article{session.itemCount > 1 ? 's' : ''}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <IconCreditCard size={15} />
-                    {paymentMethodLabel(session)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-3">
-                <p className="text-base font-bold text-gray-950 sm:text-lg">{formatPrice(session.total)}</p>
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-600 transition group-hover:bg-amber-100">
-                  <IconChevronRight size={18} />
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 border-t border-amber-100 pt-3 text-xs font-semibold text-amber-700 sm:text-sm">
-              Vérifier cette demande
-            </div>
-          </Link>
-        ))}
+        <Link
+          href={`/checkout/reprendre/${session.id}`}
+          className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 sm:w-auto"
+        >
+          Finaliser mon achat <IconArrowRight size={16} />
+        </Link>
       </div>
     </section>
   );
