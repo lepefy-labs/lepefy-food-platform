@@ -15,16 +15,15 @@ export async function POST(
   if (denied) return denied;
 
   const supabase = createServiceClient();
-  const nowIso = new Date().toISOString();
 
   const { data: session, error: sessionError } = await supabase
     .from('checkout_sessions')
     .select('*')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
-    .eq('status', 'open')
-    .gt('expires_at', nowIso)
     .eq('payment_method', 'external_link')
+    .in('status', ['open', 'expired', 'awaiting_verification'])
+    .is('order_id', null)
     .maybeSingle() as { data: CheckoutSessionRow | null; error: unknown };
 
   if (sessionError) {
@@ -34,7 +33,7 @@ export async function POST(
 
   if (!session) {
     return NextResponse.json(
-      { error: 'Demande de paiement introuvable, expirée ou déjà traitée.' },
+      { error: 'Demande de paiement introuvable ou déjà traitée.' },
       { status: 404 },
     );
   }
