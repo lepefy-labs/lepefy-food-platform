@@ -299,9 +299,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
             <button type="submit" className="h-10 shrink-0 rounded-xl bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90">Rechercher</button>
           </form>
 
-          <div className="flex items-center gap-2">
-            <select defaultValue={sort} onChange={() => {}} form="order-sort-form" className="hidden" aria-hidden="true" />
-            <form id="order-sort-form" method="get" action="/admin">
+          <div className="flex flex-wrap items-center gap-2">
+            <form method="get" action="/admin" className="flex items-center gap-1.5">
               {filterStatus && <input type="hidden" name="status" value={filterStatus} />}
               {filterDateFrom && <input type="hidden" name="dateFrom" value={filterDateFrom} />}
               {filterDateTo && <input type="hidden" name="dateTo" value={filterDateTo} />}
@@ -309,12 +308,13 @@ export default async function AdminPage({ searchParams }: PageProps) {
               {filterPayment && <input type="hidden" name="payment" value={filterPayment} />}
               {attention && <input type="hidden" name="attention" value={attention} />}
               {searchQuery && <input type="hidden" name="q" value={searchQuery} />}
-              <select name="sort" defaultValue={sort} onChange={(e) => e.currentTarget.form?.requestSubmit()} className="h-9 rounded-lg border border-[var(--admin-border)] bg-white px-2.5 text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
+              <select name="sort" defaultValue={sort} className="h-9 rounded-lg border border-[var(--admin-border)] bg-white px-2.5 text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
                 <option value="date_desc">Plus récentes</option>
                 <option value="date_asc">Plus anciennes</option>
                 <option value="total_desc">Montant décroissant</option>
                 <option value="total_asc">Montant croissant</option>
               </select>
+              <button type="submit" className="h-9 rounded-lg border border-[var(--admin-border)] px-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Trier</button>
             </form>
             <span className="text-xs text-gray-400">{filteredCount} résultat{filteredCount !== 1 ? 's' : ''}</span>
             {(filterStatus || activeFilterCount > 0 || searchQuery || sort !== 'date_desc') && <Link href="/admin" className="text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">Réinitialiser</Link>}
