@@ -20,9 +20,7 @@ interface CartOrderSummaryProps {
 
 function SyncMessage({ status }: { status: CartSyncStatus }) {
   if (status === 'offline') return <p role="status">Modifications enregistrées sur cet appareil.</p>;
-  if (status === 'error') {
-    return <p role="status">Impossible de synchroniser votre panier. Nous réessaierons automatiquement.</p>;
-  }
+  if (status === 'error') return <p role="status">Impossible de synchroniser votre panier. Nous réessaierons automatiquement.</p>;
   return null;
 }
 
@@ -41,51 +39,60 @@ export function CartOrderSummary({
   hideActionsOnMobile = false,
 }: CartOrderSummaryProps) {
   return (
-    <section aria-labelledby="cart-summary-title" className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
-      <h2 id="cart-summary-title" className="text-lg font-bold">Résumé de la commande</h2>
-
-      {children && <div className="mt-5">{children}</div>}
-
-      <dl className="mt-6 space-y-3 text-sm">
-        <div className="flex items-center justify-between gap-4">
-          <dt className="text-gray-500">Sous-total</dt>
-          <dd className="font-semibold tabular-nums">{formatPrice(subtotal, currency)}</dd>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <dt className="text-gray-500">{shippingLabel}</dt>
-          <dd className="font-semibold tabular-nums">
-            {shippingCost === null ? <span className="text-gray-400">À calculer</span> : shippingCost === 0 ? <span className="text-green-700">Gratuit</span> : formatPrice(shippingCost, currency)}
-          </dd>
-        </div>
-        <div className="flex items-end justify-between gap-4 border-t border-gray-200 pt-4">
-          <dt className="text-base font-bold">Total</dt>
-          <dd className="text-2xl font-bold tabular-nums" aria-live="polite">{formatPrice(total, currency)}</dd>
-        </div>
-      </dl>
-
-      <div className="mt-4">
-        <FreeShippingProgress subtotal={subtotal} threshold={freeShippingThreshold} currency={currency} />
+    <section aria-labelledby="cart-summary-title" className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
+      <div className="border-b border-gray-100 px-5 py-4 sm:px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-400">Finaliser votre panier</p>
+        <h2 id="cart-summary-title" className="mt-1 text-xl font-bold tracking-tight text-gray-950">Résumé de la commande</h2>
       </div>
 
-      <div className={hideActionsOnMobile ? 'hidden md:block' : undefined}>
-        <button
-          type="button"
-          onClick={onCheckout}
-          disabled={!canProceed}
-          className="mt-6 w-full rounded-2xl py-4 text-base font-bold text-white transition-opacity active:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)]"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          Continuer vers le paiement
-        </button>
-        {checkoutHint && <p className="mt-2 text-center text-xs text-gray-500">{checkoutHint}</p>}
+      <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+        {children && <div className="py-5">{children}</div>}
 
-        <Link href="/products" className="mt-4 block text-center text-sm font-semibold text-gray-600 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
-          Continuer mes achats
-        </Link>
-      </div>
+        <dl className="border-t border-gray-100 pt-5 text-sm">
+          <div className="flex items-center justify-between gap-4 py-1.5">
+            <dt className="text-gray-500">Sous-total</dt>
+            <dd className="font-semibold tabular-nums text-gray-900">{formatPrice(subtotal, currency)}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 py-1.5">
+            <dt className="text-gray-500">{shippingLabel}</dt>
+            <dd className="font-semibold tabular-nums">
+              {shippingCost === null ? <span className="text-gray-400">À calculer</span> : shippingCost === 0 ? <span className="text-green-700">Gratuit</span> : formatPrice(shippingCost, currency)}
+            </dd>
+          </div>
+          <div className="mt-3 flex items-end justify-between gap-4 border-t border-gray-200 pt-4">
+            <dt className="text-base font-bold text-gray-950">Total</dt>
+            <dd className="text-2xl font-bold tabular-nums text-gray-950" aria-live="polite">{formatPrice(total, currency)}</dd>
+          </div>
+        </dl>
 
-      <div className="mt-3 min-h-4 text-center text-xs text-amber-700" aria-live="polite">
-        <SyncMessage status={syncStatus} />
+        <div className="mt-4">
+          <FreeShippingProgress subtotal={subtotal} threshold={freeShippingThreshold} currency={currency} />
+        </div>
+
+        <div className={hideActionsOnMobile ? 'hidden md:block' : undefined}>
+          {checkoutHint && (
+            <p className="mt-5 rounded-xl bg-gray-50 px-3 py-2.5 text-center text-xs leading-relaxed text-gray-600">
+              {checkoutHint}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onCheckout}
+            disabled={!canProceed}
+            className="mt-4 min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white transition-[opacity,transform] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
+            Continuer vers le paiement
+          </button>
+
+          <Link href="/products" className="mt-3 flex min-h-10 items-center justify-center text-sm font-semibold text-gray-500 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
+            Continuer mes achats
+          </Link>
+        </div>
+
+        <div className="mt-2 min-h-4 text-center text-xs text-amber-700" aria-live="polite">
+          <SyncMessage status={syncStatus} />
+        </div>
       </div>
     </section>
   );
