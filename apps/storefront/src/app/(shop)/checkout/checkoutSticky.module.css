@@ -4,7 +4,25 @@
 
 @media (max-width: 767px) {
   .checkoutFunnel {
-    padding-bottom: 88px;
+    padding-bottom: 156px;
+  }
+
+  /* Le résumé compact devient le contexte permanent du CTA : montant + nombre
+     d'articles restent visibles sans dupliquer le détail de la commande. */
+  .checkoutFunnel :global(.mx-auto > .mb-5) {
+    position: fixed;
+    left: 50%;
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
+    z-index: 44;
+    width: calc(100% - 32px);
+    max-width: 608px;
+    margin-bottom: 0;
+    transform: translateX(-50%);
+  }
+
+  .checkoutFunnel :global(.mx-auto > .mb-5 > section) {
+    border-color: rgba(15, 23, 42, 0.10);
+    box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.07);
   }
 
   .checkoutFunnel :global(button.min-h-12.w-full.rounded-2xl[style*="background-color"]) {
@@ -20,6 +38,7 @@
       0 0 0 12px rgba(255, 255, 255, 0.96);
   }
 
+  /* StripePaymentStep possède déjà sa propre barre sticky : ne pas la doubler. */
   .checkoutFunnel :global(.fixed button.min-h-12.w-full.rounded-2xl[style*="background-color"]) {
     position: static;
     width: 100%;
