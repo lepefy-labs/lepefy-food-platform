@@ -2,23 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import { processOrderPointsOnDelivery } from '@/lib/loyalty/processOrderPointsOnDelivery';
-import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
+import {
+  isOrderStatus,
+  runOrderTransitionSideEffects,
+  validateOrderTransition,
+  type FulfillmentType,
+} from '@/lib/orders/adminOrderWorkflow';
 import type { OrderStatus, PaymentStatus } from '@lepefy/types';
 
 interface PatchBody {
-  status?:           OrderStatus;
+  status?: OrderStatus;
   tracking_carrier?: string | null;
-  tracking_code?:    string | null;
-  notes?:            string | null;
-  payment_status?:   PaymentStatus;
+  tracking_code?: string | null;
+  notes?: string | null;
+  payment_status?: PaymentStatus;
 }
 
 interface ExistingOrder {
-  id:        string;
-  status:    string;
-  email:     string;
+  id: string;
+  status: OrderStatus;
+  email: string;
   full_name: string | null;
+  fulfillment_type: FulfillmentType;
+  tracking_code: string | null;
+  tracking_carrier: string | null;
 }
 
 export async function PATCH(
@@ -26,7 +33,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant     = await getTenant(tenantSlug);
+  const tenant = await getTenant(tenantSlug);
 
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
@@ -34,12 +41,11 @@ export async function PATCH(
   try {
     const body: PatchBody = await req.json();
     const { status, tracking_carrier, tracking_code, notes, payment_status } = body;
-
-    const supabase   = createServiceClient();
+    const supabase = createServiceClient();
 
     const { data: existingRaw, error: fetchError } = await supabase
       .from('orders')
-      .select('id, status, email, full_name')
+      .select('id, status, email, full_name, fulfillment_type, tracking_code, tracking_carrier')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
       .single();
@@ -49,30 +55,37 @@ export async function PATCH(
     }
 
     const existing = existingRaw as unknown as ExistingOrder;
-
-    // ── Build update payload ──────────────────────────────────────────────
     const update: Record<string, unknown> = {};
 
     if (status !== undefined) {
-      const validStatuses: OrderStatus[] = [
-        'new', 'preparing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled',
-      ];
-      if (!validStatuses.includes(status)) {
+      if (!isOrderStatus(status)) {
         return NextResponse.json({ error: 'Statut invalide.' }, { status: 400 });
       }
-      update.status = status;
 
+      const effectiveTrackingCode = tracking_code !== undefined
+        ? tracking_code
+        : existing.tracking_code;
+
+      const validation = validateOrderTransition({
+        current: existing.status,
+        next: status,
+        fulfillmentType: existing.fulfillment_type,
+        trackingCode: effectiveTrackingCode,
+      });
+
+      if (!validation.ok) {
+        return NextResponse.json({ error: validation.error }, { status: 409 });
+      }
+
+      update.status = status;
       if (status === 'shipped' && existing.status !== 'shipped') {
         update.shipped_at = new Date().toISOString();
-      }
-      if (status !== 'shipped' && existing.status === 'shipped') {
-        update.shipped_at = null;
       }
     }
 
     if (tracking_carrier !== undefined) update.tracking_carrier = tracking_carrier;
-    if (tracking_code    !== undefined) update.tracking_code    = tracking_code;
-    if (notes            !== undefined) update.notes            = notes;
+    if (tracking_code !== undefined) update.tracking_code = tracking_code;
+    if (notes !== undefined) update.notes = notes;
 
     if (payment_status !== undefined) {
       const validPaymentStatuses: PaymentStatus[] = ['pending', 'paid', 'failed', 'refunded'];
@@ -86,7 +99,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Aucun champ à mettre à jour.' }, { status: 400 });
     }
 
-    // ── Persist ───────────────────────────────────────────────────────────
     const { error: updateError } = await supabase
       .from('orders')
       .update(update)
@@ -94,66 +106,20 @@ export async function PATCH(
       .eq('tenant_id', tenant.id);
 
     if (updateError) {
-      console.error('[admin/orders PATCH] update error:', updateError,
-        '— order_id:', params.id);
+      console.error('[admin/orders PATCH] update error:', updateError, '— order_id:', params.id);
       return NextResponse.json({ error: 'Erreur lors de la mise à jour.' }, { status: 500 });
     }
 
-    console.info('[admin/orders PATCH] updated — order_id:', params.id,
-      '— fields:', Object.keys(update).join(', '));
-
-    // ── Hook loyalty: transitioning to delivered ───────────────────────────
-    // Punto esatto richiesto dal prompt loyalty/referral: qui è dove
-    // orders.status passa a 'delivered'. Idempotente (processOrderPointsOnDelivery
-    // controlla orders.points_processed) — un errore qui non deve far fallire
-    // l'aggiornamento status già persistito, quindi solo log, mai throw.
-    if (status === 'delivered' && existing.status !== 'delivered') {
-      try {
-        await processOrderPointsOnDelivery(params.id);
-      } catch (loyaltyErr) {
-        console.error('[admin/orders PATCH] processOrderPointsOnDelivery failed:', loyaltyErr,
-          '— order_id:', params.id);
-      }
-    }
-
-    // ── Notify n8n when transitioning to shipped ──────────────────────────
-    const transitioningToShipped =
-      status === 'shipped' && existing.status !== 'shipped';
-
-    if (transitioningToShipped && process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
-      try {
-        // Token is deterministic — recompute from orderId + email, no DB column needed
-        const trackingToken     = generateTrackingToken(params.id, existing.email);
-        const storefrontUrl     = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-        const orderTrackingLink = `${storefrontUrl}/orders/${params.id}?token=${trackingToken}`;
-
-        const n8nPayload = {
-          orderId:          params.id,
-          orderNumber:      `#${params.id.slice(0, 8).toUpperCase()}`,
-          email:            existing.email,
-          fullName:         existing.full_name ?? '',
-          trackingCode:     tracking_code    ?? null,
-          trackingCarrier:  tracking_carrier ?? null,
-          orderTrackingLink,
-        };
-
-        console.info('[admin/orders PATCH] notifying n8n order-shipped — order_id:', params.id);
-
-        const n8nRes = await fetch(
-          `${process.env.N8N_WEBHOOK_URL}/webhook/order-shipped`,
-          {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(n8nPayload),
-          },
-        );
-
-        console.info('[admin/orders PATCH] n8n response:', n8nRes.status,
-          '— order_id:', params.id);
-      } catch (n8nErr) {
-        console.error('[admin/orders PATCH] n8n notification failed:', n8nErr,
-          '— order_id:', params.id);
-      }
+    if (status !== undefined) {
+      await runOrderTransitionSideEffects({
+        orderId: params.id,
+        previousStatus: existing.status,
+        nextStatus: status,
+        email: existing.email,
+        fullName: existing.full_name,
+        trackingCode: tracking_code !== undefined ? tracking_code : existing.tracking_code,
+        trackingCarrier: tracking_carrier !== undefined ? tracking_carrier : existing.tracking_carrier,
+      });
     }
 
     return NextResponse.json({ ok: true });
