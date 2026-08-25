@@ -1,31 +1,98 @@
-// Mappage statut DB → statut timeline, dupliqué depuis
-// `(shop)/orders/[id]/page.tsx` (toTimelineStatus / STEPS) plutôt que
-// ré-exporté — ce fichier de page est explicitement hors-scope (non modifiable)
-// pour cette fonctionnalité. Toute évolution de la mappation doit être
-// répercutée dans les deux fichiers.
-export type TrackingStatus = 'confirmed' | 'preparing' | 'shipped' | 'delivered';
+export type CustomerOrderStage =
+  | 'confirmed'
+  | 'preparing'
+  | 'ready_for_pickup'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
 
-export function toTimelineStatus(dbStatus: string): TrackingStatus {
-  const map: Record<string, TrackingStatus> = {
-    new:              'confirmed',
-    confirmed:        'confirmed',
-    preparing:        'preparing',
-    ready_for_pickup: 'preparing',
-    shipped:          'shipped',
-    delivered:        'delivered',
-  };
-  return map[dbStatus] ?? 'confirmed';
+export type FulfillmentKind = 'delivery' | 'pickup';
+
+export interface CustomerOrderPresentation {
+  stage: CustomerOrderStage;
+  label: string;
+  title: string;
+  description: string;
 }
 
-export const ORDER_STATUS_LABELS: Record<TrackingStatus, string> = {
-  confirmed: 'Confirmé',
+export const DELIVERY_STEPS: CustomerOrderStage[] = ['confirmed', 'preparing', 'shipped', 'delivered'];
+export const PICKUP_STEPS: CustomerOrderStage[] = ['confirmed', 'preparing', 'ready_for_pickup', 'delivered'];
+
+export const CUSTOMER_STATUS_LABELS: Record<CustomerOrderStage, string> = {
+  confirmed: 'Confirmée',
   preparing: 'En préparation',
-  shipped:   'Expédié',
-  delivered: 'Livré',
+  ready_for_pickup: 'Prête au retrait',
+  shipped: 'Expédiée',
+  delivered: 'Terminée',
+  cancelled: 'Annulée',
 };
 
-export const ORDER_STATUS_STEPS: TrackingStatus[] = ['confirmed', 'preparing', 'shipped', 'delivered'];
+export function getCustomerOrderPresentation(
+  dbStatus: string,
+  fulfillmentType: FulfillmentKind,
+): CustomerOrderPresentation {
+  if (dbStatus === 'cancelled' || dbStatus === 'stock_conflict') {
+    return {
+      stage: 'cancelled',
+      label: dbStatus === 'stock_conflict' ? 'Action requise' : 'Annulée',
+      title: dbStatus === 'stock_conflict' ? 'Un problème bloque votre commande' : 'Commande annulée',
+      description: dbStatus === 'stock_conflict'
+        ? 'Notre équipe doit vérifier votre commande. Elle vous contactera si une action est nécessaire.'
+        : 'Cette commande ne sera pas préparée. Contactez-nous si vous avez une question.',
+    };
+  }
 
-export function orderStatusStepIndex(status: TrackingStatus): number {
-  return ORDER_STATUS_STEPS.indexOf(status);
+  if (dbStatus === 'delivered') {
+    return {
+      stage: 'delivered',
+      label: fulfillmentType === 'pickup' ? 'Retirée' : 'Livrée',
+      title: fulfillmentType === 'pickup' ? 'Commande retirée' : 'Commande livrée',
+      description: 'Votre commande est terminée. Merci pour votre confiance.',
+    };
+  }
+
+  if (fulfillmentType === 'pickup' && dbStatus === 'ready_for_pickup') {
+    return {
+      stage: 'ready_for_pickup',
+      label: 'Prête au retrait',
+      title: 'Votre commande est prête',
+      description: 'Vous pouvez venir la retirer en boutique.',
+    };
+  }
+
+  if (fulfillmentType === 'delivery' && dbStatus === 'shipped') {
+    return {
+      stage: 'shipped',
+      label: 'Expédiée',
+      title: 'Votre commande est en route',
+      description: 'Le colis a été remis au transporteur. Utilisez le suivi ci-dessous pour connaître son avancement.',
+    };
+  }
+
+  if (dbStatus === 'preparing') {
+    return {
+      stage: 'preparing',
+      label: 'En préparation',
+      title: 'Nous préparons votre commande',
+      description: fulfillmentType === 'pickup'
+        ? 'Nous vous indiquerons ici dès qu’elle sera prête à être retirée.'
+        : 'Nous préparons soigneusement vos articles avant leur remise au transporteur.',
+    };
+  }
+
+  return {
+    stage: 'confirmed',
+    label: 'Confirmée',
+    title: 'Commande confirmée',
+    description: 'Nous avons bien reçu votre commande. Sa préparation va commencer prochainement.',
+  };
+}
+
+export function customerOrderSteps(fulfillmentType: FulfillmentKind): CustomerOrderStage[] {
+  return fulfillmentType === 'pickup' ? PICKUP_STEPS : DELIVERY_STEPS;
+}
+
+export function customerOrderStepIndex(stage: CustomerOrderStage, fulfillmentType: FulfillmentKind): number {
+  if (stage === 'cancelled') return -1;
+  return customerOrderSteps(fulfillmentType).indexOf(stage);
 }
