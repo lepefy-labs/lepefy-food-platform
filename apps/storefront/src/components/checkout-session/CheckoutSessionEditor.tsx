@@ -10,14 +10,8 @@ import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
 import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
 } from '@/components/payment/ExternalPaymentMethodPicker';
+import ConfirmActionModal from '@/components/ui/ConfirmActionModal';
 import type { Tenant, TenantPaymentMethod, ShippingAddress } from '@lepefy/types';
-
-// Composant partagé (cf. deviation report 01_checkout_sessions_edit_foundation) —
-// réutilisable tel quel par la section "En attente" de /orders (prochain
-// prompt, client connecté : accessToken alors absent, l'auth passe par le
-// cookie/customer_id vérifié côté serveur par GET/PATCH). Priorité UX
-// explicite du client : payer reste l'action la plus visible, modifier est
-// secondaire.
 
 const COUNTRIES = [
   { value: 'IT', label: 'Italie' },
@@ -81,12 +75,11 @@ export function CheckoutSessionEditor({
   const [saveError, setSaveError]     = useState<string | null>(null);
   const [isSaving, setIsSaving]       = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [payError, setPayError]       = useState<string | null>(null);
   const [payAsStripe, setPayAsStripe] = useState(false);
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
 
-  // ── Édition locale (feedback visuel seulement — le PATCH recalcule tout
-  // server-side, jamais une valeur envoyée par ce state) ─────────────────────
   const [editItems, setEditItems]           = useState<SessionItem[]>([]);
   const [editPaymentMethod, setEditPaymentMethod] = useState<'stripe' | 'external_link'>('stripe');
   const [editExternalMethodId, setEditExternalMethodId] = useState<string | null>(null);
@@ -187,7 +180,6 @@ export function CheckoutSessionEditor({
     setEditItems((prev) => prev.filter((i) => i.productId !== productId));
   }
 
-  // ── Enregistre les modifications puis paie avec les données à jour ─────────
   async function saveAndPay() {
     setSaveError(null);
 
@@ -240,14 +232,7 @@ export function CheckoutSessionEditor({
       setData(json as SessionData);
       setExpanded(false);
 
-      if (editPaymentMethod === 'external_link') {
-        // La réponse contient link/amount/label/isPaypal (même shape que
-        // /api/checkout/external-link) — data mis à jour ci-dessus suffit,
-        // le rendu ci-dessous lit data.externalPaymentLink.
-        return;
-      }
-
-      // stripe : proc procède comme la CTA primaire (ouvre l'étape paiement).
+      if (editPaymentMethod === 'external_link') return;
       setPayAsStripe(true);
     } catch {
       setSaveError('Une erreur est survenue. Veuillez réessayer.');
@@ -268,15 +253,13 @@ export function CheckoutSessionEditor({
       setStripeClientSecret(json.clientSecret ?? null);
       return { clientSecret: json.clientSecret, reference_id: sessionId };
     } catch {
-      // Réseau coupé ou réponse illisible : erreur gérée plutôt qu'exception
-      // non catturée, qui figerait le bouton de paiement.
       return { error: 'Une erreur est survenue.' };
     }
   }
 
   async function handleCancel() {
-    if (!window.confirm('Annuler cette demande de paiement ? Cette action est définitive.')) return;
     setIsCancelling(true);
+    setSaveError(null);
     try {
       const res = await fetch(`/api/checkout-sessions/${sessionId}`, {
         method:  'PATCH',
@@ -284,6 +267,7 @@ export function CheckoutSessionEditor({
         body:    JSON.stringify({ status: 'cancelled', accessToken }),
       });
       if (res.ok) {
+        setCancelModalOpen(false);
         onCancelled?.();
       } else {
         const json = await res.json();
@@ -325,295 +309,304 @@ export function CheckoutSessionEditor({
   const isPaypal = data.paymentMethod === 'external_link' && data.externalPaymentType === 'paypal';
 
   return (
-    <div className="max-w-md mx-auto px-4 py-8">
-      {/* Résumé compact */}
-      <div className="bg-gray-50 rounded-2xl p-5 mb-4 space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Montant</span>
-          <span className="text-lg font-bold">
-            {formatPrice(data.items.reduce((s, i) => s + i.price * i.quantity, 0) + data.shippingTotal, tenant.currency)}
-          </span>
+    <>
+      <div className="max-w-md mx-auto px-4 py-8">
+        <div className="bg-gray-50 rounded-2xl p-5 mb-4 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Montant</span>
+            <span className="text-lg font-bold">
+              {formatPrice(data.items.reduce((s, i) => s + i.price * i.quantity, 0) + data.shippingTotal, tenant.currency)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Paiement</span>
+            <span className="text-sm font-semibold">
+              {data.paymentMethod === 'stripe' ? 'Carte bancaire' : data.externalPaymentLabel ?? 'Lien externe'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">{data.fulfillmentType === 'pickup' ? 'Retrait' : 'Livraison'}</span>
+            <span className="text-sm font-semibold text-right">
+              {data.fulfillmentType === 'pickup'
+                ? 'En boutique'
+                : data.shippingAddress
+                  ? `${data.shippingAddress.city}, ${data.shippingAddress.country}`
+                  : 'Non renseignée'}
+            </span>
+          </div>
         </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Paiement</span>
-          <span className="text-sm font-semibold">
-            {data.paymentMethod === 'stripe' ? 'Carte bancaire' : data.externalPaymentLabel ?? 'Lien externe'}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">{data.fulfillmentType === 'pickup' ? 'Retrait' : 'Livraison'}</span>
-          <span className="text-sm font-semibold text-right">
-            {data.fulfillmentType === 'pickup'
-              ? 'En boutique'
-              : data.shippingAddress
-                ? `${data.shippingAddress.city}, ${data.shippingAddress.country}`
-                : 'Non renseignée'}
-          </span>
-        </div>
-      </div>
 
-      {/* CTA primaire : payer */}
-      {data.paymentMethod === 'external_link' && data.externalPaymentLink && (
-        <div className="space-y-2 mb-6">
-          <a
-            href={data.externalPaymentLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white text-sm"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            Payer maintenant <IconExternalLink size={16} />
-          </a>
-          {isPaypal ? (
-            <p className="text-xs text-gray-500 text-center">
-              Sélectionnez « Amis et famille » lors du paiement pour éviter les frais.
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500 text-center">
-              Le montant n&apos;est pas prérempli : saisissez-le manuellement.
-            </p>
-          )}
-          <p className="text-xs text-gray-400 text-center">
-            Généralement vérifié en quelques heures, parfois jusqu&apos;à 24-48h selon les jours.
-            Merci de votre patience, vous recevrez un email dès la confirmation.
-          </p>
-        </div>
-      )}
-
-      {data.paymentMethod === 'stripe' && !payAsStripe && (
-        <button
-          type="button"
-          onClick={() => setPayAsStripe(true)}
-          className="w-full py-3.5 rounded-2xl font-bold text-white text-sm mb-6"
-          style={{ backgroundColor: 'var(--color-primary)' }}
-        >
-          Payer maintenant
-        </button>
-      )}
-
-      {payAsStripe && (
-        <div className="mb-6">
-          {payError && (
-            <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-3">{payError}</p>
-          )}
-          <StripePaymentStep
-            key={stripeClientSecret ?? 'pending'}
-            module="shop"
-            amount={editTotal || data.items.reduce((s, i) => s + i.price * i.quantity, 0) + data.shippingTotal}
-            currency={tenant.currency}
-            color="var(--color-primary)"
-            returnUrl={typeof window !== 'undefined' ? `${window.location.origin}/order-confirmation` : ''}
-            referenceId={sessionId}
-            payLabel={`Payer ${formatPrice(editTotal || 0, tenant.currency)}`}
-            processingLabel="Traitement en cours…"
-            billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
-            createIntent={createIntent}
-            onError={(msg) => setPayError(msg)}
-            onSucceeded={() => {
-              window.location.href = '/order-confirmation';
-            }}
-          />
-        </div>
-      )}
-
-      {/* Modifier la commande — secondaire, repliable */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between text-sm text-gray-500 hover:text-gray-800 py-2"
-      >
-        <span>Modifier la commande</span>
-        <IconChevronDown size={16} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-
-      {expanded && (
-        <div className="space-y-6 mt-3 pt-4 border-t border-gray-100">
-          {/* Moyen de paiement */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
-            <PaymentOptionList
-              options={[
-                {
-                  key:      'stripe',
-                  selected: editPaymentMethod === 'stripe',
-                  onSelect: () => setEditPaymentMethod('stripe'),
-                  icon:     <IconCreditCard size={16} stroke={1.8} className="text-white" />,
-                  color:    'var(--color-primary)',
-                  label:    'Carte bancaire',
-                  sub:      'Paiement sécurisé, confirmation immédiate',
-                },
-                ...buildExternalPaymentOptions(
-                  externalPaymentMethods,
-                  editPaymentMethod === 'external_link' ? editExternalMethodId : null,
-                  (id) => { setEditPaymentMethod('external_link'); setEditExternalMethodId(id); },
-                ),
-              ]}
-            />
-            {editPaymentMethod === 'external_link' && editExternalMethodId && (
-              <ExternalPaymentNote
-                method={externalPaymentMethods.find((m) => m.id === editExternalMethodId)!}
-                total={editTotal}
-                currency={tenant.currency}
-              />
+        {data.paymentMethod === 'external_link' && data.externalPaymentLink && (
+          <div className="space-y-2 mb-6">
+            <a
+              href={data.externalPaymentLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white text-sm"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              Payer maintenant <IconExternalLink size={16} />
+            </a>
+            {isPaypal ? (
+              <p className="text-xs text-gray-500 text-center">
+                Sélectionnez « Amis et famille » lors du paiement pour éviter les frais.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 text-center">
+                Le montant n&apos;est pas prérempli : saisissez-le manuellement.
+              </p>
             )}
+            <p className="text-xs text-gray-400 text-center">
+              Généralement vérifié en quelques heures, parfois jusqu&apos;à 24-48h selon les jours.
+              Merci de votre patience, vous recevrez un email dès la confirmation.
+            </p>
           </div>
+        )}
 
-          {/* Fulfillment + adresse */}
-          {tenant.click_collect_enabled && (
-            <div className="flex gap-3">
-              {(['delivery', 'pickup'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setEditFulfillmentType(type)}
-                  className={`flex-1 py-2.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-1.5 ${
-                    editFulfillmentType === type
-                      ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                      : 'border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {type === 'delivery' ? <IconTruck size={16} /> : <IconBuildingStore size={16} />}
-                  {type === 'delivery' ? 'Livraison' : 'Click & Collect'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {editFulfillmentType === 'delivery' && (
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
-                  <input
-                    value={editStreet}
-                    onChange={(e) => setEditStreet(e.target.value)}
-                    placeholder="Rue"
-                    className="col-span-2 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={editHouseNumber}
-                    onChange={(e) => setEditHouseNumber(e.target.value)}
-                    placeholder="Numéro"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    value={editPostalCode}
-                    onChange={(e) => {
-                      const zip = e.target.value;
-                      setEditPostalCode(zip);
-                      setEditQuoteToken(null);
-                      if (zip.trim().length >= 4) requoteShipping(editCountry, zip);
-                    }}
-                    placeholder="Code postal"
-                    inputMode="numeric"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={editCity}
-                    onChange={(e) => setEditCity(e.target.value)}
-                    placeholder="Ville"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                  />
-                </div>
-                <select
-                  value={editCountry}
-                  onChange={(e) => {
-                    const c = e.target.value;
-                    setEditCountry(c);
-                    setEditQuoteToken(null);
-                    if (editPostalCode.trim().length >= 4) requoteShipping(c, editPostalCode);
-                  }}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-                <div className="flex justify-between items-center text-sm px-1">
-                  <span className="text-gray-500">Frais de livraison</span>
-                  {requoting ? (
-                    <span className="text-gray-400 text-xs animate-pulse">Calcul…</span>
-                  ) : requoteError ? (
-                    <span className="text-red-500 text-xs">{requoteError}</span>
-                  ) : (
-                    <span className="font-semibold">{formatPrice(editShippingTotal, tenant.currency)}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Articles */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3">Articles</p>
-            <div className="space-y-2">
-              {editItems.map((item) => (
-                <div key={item.productId} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-1">{item.name}</p>
-                    <p className="text-xs text-gray-400">{formatPrice(item.price, tenant.currency)}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => updateQty(item.productId, item.quantity - 1)}
-                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600"
-                    >
-                      −
-                    </button>
-                    <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => updateQty(item.productId, item.quantity + 1)}
-                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(item.productId)}
-                    className="text-gray-300 hover:text-red-400 flex-shrink-0"
-                    aria-label="Supprimer"
-                  >
-                    <IconTrash size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-sm mt-3 px-1">
-              <span className="text-gray-500">Sous-total (indicatif)</span>
-              <span className="font-semibold">{formatPrice(editSubtotal, tenant.currency)}</span>
-            </div>
-          </div>
-
-          {saveError && (
-            <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{saveError}</p>
-          )}
-
+        {data.paymentMethod === 'stripe' && !payAsStripe && (
           <button
             type="button"
-            onClick={saveAndPay}
-            disabled={isSaving}
-            className="w-full py-3.5 rounded-2xl font-bold text-white text-sm disabled:opacity-50"
+            onClick={() => setPayAsStripe(true)}
+            className="w-full py-3.5 rounded-2xl font-bold text-white text-sm mb-6"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
-            {isSaving ? 'Enregistrement…' : 'Enregistrer et payer'}
+            Payer maintenant
           </button>
-        </div>
-      )}
+        )}
 
-      {/* Annuler — tertiaire, discret */}
-      <button
-        type="button"
-        onClick={handleCancel}
-        disabled={isCancelling}
-        className="w-full text-center text-xs text-gray-400 hover:text-red-500 mt-6 disabled:opacity-50"
-      >
-        {isCancelling ? 'Annulation…' : 'Annuler cette demande'}
-      </button>
-    </div>
+        {payAsStripe && (
+          <div className="mb-6">
+            {payError && (
+              <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3 mb-3">{payError}</p>
+            )}
+            <StripePaymentStep
+              key={stripeClientSecret ?? 'pending'}
+              module="shop"
+              amount={editTotal || data.items.reduce((s, i) => s + i.price * i.quantity, 0) + data.shippingTotal}
+              currency={tenant.currency}
+              color="var(--color-primary)"
+              returnUrl={typeof window !== 'undefined' ? `${window.location.origin}/order-confirmation` : ''}
+              referenceId={sessionId}
+              payLabel={`Payer ${formatPrice(editTotal || 0, tenant.currency)}`}
+              processingLabel="Traitement en cours…"
+              billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
+              createIntent={createIntent}
+              onError={(msg) => setPayError(msg)}
+              onSucceeded={() => {
+                window.location.href = '/order-confirmation';
+              }}
+            />
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full flex items-center justify-between text-sm text-gray-500 hover:text-gray-800 py-2"
+        >
+          <span>Modifier la commande</span>
+          <IconChevronDown size={16} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+
+        {expanded && (
+          <div className="space-y-6 mt-3 pt-4 border-t border-gray-100">
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Mode de paiement</p>
+              <PaymentOptionList
+                options={[
+                  {
+                    key:      'stripe',
+                    selected: editPaymentMethod === 'stripe',
+                    onSelect: () => setEditPaymentMethod('stripe'),
+                    icon:     <IconCreditCard size={16} stroke={1.8} className="text-white" />,
+                    color:    'var(--color-primary)',
+                    label:    'Carte bancaire',
+                    sub:      'Paiement sécurisé, confirmation immédiate',
+                  },
+                  ...buildExternalPaymentOptions(
+                    externalPaymentMethods,
+                    editPaymentMethod === 'external_link' ? editExternalMethodId : null,
+                    (id) => { setEditPaymentMethod('external_link'); setEditExternalMethodId(id); },
+                  ),
+                ]}
+              />
+              {editPaymentMethod === 'external_link' && editExternalMethodId && (
+                <ExternalPaymentNote
+                  method={externalPaymentMethods.find((m) => m.id === editExternalMethodId)!}
+                  total={editTotal}
+                  currency={tenant.currency}
+                />
+              )}
+            </div>
+
+            {tenant.click_collect_enabled && (
+              <div className="flex gap-3">
+                {(['delivery', 'pickup'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setEditFulfillmentType(type)}
+                    className={`flex-1 py-2.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-1.5 ${
+                      editFulfillmentType === type
+                        ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                        : 'border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {type === 'delivery' ? <IconTruck size={16} /> : <IconBuildingStore size={16} />}
+                    {type === 'delivery' ? 'Livraison' : 'Click & Collect'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {editFulfillmentType === 'delivery' && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <input
+                      value={editStreet}
+                      onChange={(e) => setEditStreet(e.target.value)}
+                      placeholder="Rue"
+                      className="col-span-2 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                    <input
+                      value={editHouseNumber}
+                      onChange={(e) => setEditHouseNumber(e.target.value)}
+                      placeholder="Numéro"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      value={editPostalCode}
+                      onChange={(e) => {
+                        const zip = e.target.value;
+                        setEditPostalCode(zip);
+                        setEditQuoteToken(null);
+                        if (zip.trim().length >= 4) requoteShipping(editCountry, zip);
+                      }}
+                      placeholder="Code postal"
+                      inputMode="numeric"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                    <input
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      placeholder="Ville"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <select
+                    value={editCountry}
+                    onChange={(e) => {
+                      const c = e.target.value;
+                      setEditCountry(c);
+                      setEditQuoteToken(null);
+                      if (editPostalCode.trim().length >= 4) requoteShipping(c, editPostalCode);
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                  <div className="flex justify-between items-center text-sm px-1">
+                    <span className="text-gray-500">Frais de livraison</span>
+                    {requoting ? (
+                      <span className="text-gray-400 text-xs animate-pulse">Calcul…</span>
+                    ) : requoteError ? (
+                      <span className="text-red-500 text-xs">{requoteError}</span>
+                    ) : (
+                      <span className="font-semibold">{formatPrice(editShippingTotal, tenant.currency)}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Articles</p>
+              <div className="space-y-2">
+                {editItems.map((item) => (
+                  <div key={item.productId} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium line-clamp-1">{item.name}</p>
+                      <p className="text-xs text-gray-400">{formatPrice(item.price, tenant.currency)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => updateQty(item.productId, item.quantity - 1)}
+                        className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600"
+                      >
+                        −
+                      </button>
+                      <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQty(item.productId, item.quantity + 1)}
+                        className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.productId)}
+                      className="text-gray-300 hover:text-red-400 flex-shrink-0"
+                      aria-label="Supprimer"
+                    >
+                      <IconTrash size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-sm mt-3 px-1">
+                <span className="text-gray-500">Sous-total (indicatif)</span>
+                <span className="font-semibold">{formatPrice(editSubtotal, tenant.currency)}</span>
+              </div>
+            </div>
+
+            {saveError && (
+              <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{saveError}</p>
+            )}
+
+            <button
+              type="button"
+              onClick={saveAndPay}
+              disabled={isSaving}
+              className="w-full py-3.5 rounded-2xl font-bold text-white text-sm disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              {isSaving ? 'Enregistrement…' : 'Enregistrer et payer'}
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setCancelModalOpen(true)}
+          disabled={isCancelling}
+          className="w-full text-center text-xs text-gray-400 hover:text-red-500 mt-6 disabled:opacity-50"
+        >
+          {isCancelling ? 'Annulation…' : 'Annuler cette demande'}
+        </button>
+      </div>
+
+      <ConfirmActionModal
+        open={cancelModalOpen}
+        title="Annuler cette demande de paiement ?"
+        description="La reprise de cet achat ne sera plus disponible. Cette action est définitive."
+        confirmLabel="Annuler la demande"
+        cancelLabel="Conserver"
+        destructive
+        loading={isCancelling}
+        onCancel={() => {
+          if (!isCancelling) setCancelModalOpen(false);
+        }}
+        onConfirm={() => void handleCancel()}
+      />
+    </>
   );
 }
