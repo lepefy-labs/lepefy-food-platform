@@ -83,7 +83,6 @@ async function renderTextLayer(fontPath: string, options: TextLayerOptions) {
       height: options.height,
       align: options.align ?? 'left',
       rgba: true,
-      dpi: 72,
     },
   }).png().toBuffer();
 }
