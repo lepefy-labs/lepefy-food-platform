@@ -17,6 +17,7 @@ export interface TenantNotificationContext {
     fromName: string;
     fromEmail: string;
     supportEmail: string | null;
+    whatsappNumber: string | null;
   };
   business: {
     city: string | null;
@@ -40,6 +41,7 @@ interface TenantNotificationRow {
   legal_email: string | null;
   legal_website: string | null;
   legal_address: string | null;
+  whatsapp_number: string | null;
 }
 
 export async function getTenantNotificationContext(
@@ -50,7 +52,7 @@ export async function getTenantNotificationContext(
     const { data, error } = await supabase
       .from('tenants')
       .select(
-        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, legal_email, legal_website, legal_address',
+        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, legal_email, legal_website, legal_address, whatsapp_number',
       )
       .eq('id', tenantId)
       .eq('active', true)
@@ -82,6 +84,7 @@ export async function getTenantNotificationContext(
         fromName: tenant.name,
         fromEmail: process.env.ORDER_NOTIFICATION_FROM_EMAIL ?? 'noreply@lepefy.com',
         supportEmail: tenant.legal_email,
+        whatsappNumber: tenant.whatsapp_number,
       },
       business: {
         city: tenant.city,
