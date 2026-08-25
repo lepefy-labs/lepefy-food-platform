@@ -84,9 +84,10 @@ export default function EventSocialShareButton({
         aria-label={`Partager ${eventTitle}`}
         title="Partager"
         onClick={() => { setOpen(true); setError(null); }}
-        className={`flex size-11 items-center justify-center rounded-full border border-white/55 bg-white/92 text-gray-800 shadow-lg backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${className}`}
+        className={`inline-flex h-11 min-w-[116px] items-center justify-center gap-2 rounded-full border border-white/75 bg-white/95 px-4 text-sm font-bold text-gray-900 shadow-[0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_10px_28px_rgba(0,0,0,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${className}`}
       >
-        <IconShare3 size={19} stroke={2} />
+        <IconShare3 size={18} stroke={2.2} className="text-[var(--color-primary)]" />
+        <span>Partager</span>
       </button>
 
       {open && (
