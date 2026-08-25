@@ -27,6 +27,8 @@ interface ExistingOrder {
   tracking_code: string | null;
   tracking_carrier: string | null;
   picking_started_at: string | null;
+  packing_completed_at: string | null;
+  packing_parcel_count: number | null;
 }
 
 interface PickingItemRow {
@@ -68,7 +70,7 @@ export async function PATCH(
 
     const { data: existingRaw, error: fetchError } = await supabase
       .from('orders')
-      .select('id, status, email, full_name, fulfillment_type, tracking_code, tracking_carrier, picking_started_at')
+      .select('id, status, email, full_name, fulfillment_type, tracking_code, tracking_carrier, picking_started_at, packing_completed_at, packing_parcel_count')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
       .single();
@@ -117,6 +119,15 @@ export async function PATCH(
 
         const error = pickingError((pickingItemsRaw ?? []) as PickingItemRow[]);
         if (error) return NextResponse.json({ error }, { status: 409 });
+      }
+
+      if (existing.status === 'preparing' && status === 'shipped') {
+        if (!existing.packing_completed_at || !existing.packing_parcel_count || existing.packing_parcel_count < 1) {
+          return NextResponse.json(
+            { error: 'Packing incomplet : renseignez les colis et validez l’emballage avant l’expédition.' },
+            { status: 409 },
+          );
+        }
       }
 
       update.status = status;
