@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconCheck, IconSnowflake, IconTemperature } from '@tabler/icons-react';
+import { IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
@@ -30,6 +30,11 @@ interface PickingProgress {
   complete: boolean;
 }
 
+interface PackingProgress {
+  parcelCount: number | null;
+  complete: boolean;
+}
+
 interface Props {
   order: Order;
   currency: string;
@@ -38,6 +43,7 @@ interface Props {
   shippingProvider: string;
   coldChain?: { fresh: number; frozen: number };
   pickingProgress: PickingProgress;
+  packingProgress: PackingProgress;
 }
 
 const CARRIER_MAP: Record<string, string> = {
@@ -84,6 +90,7 @@ export default function OrderDetail({
   shippingProvider,
   coldChain = { fresh: 0, frozen: 0 },
   pickingProgress,
+  packingProgress,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -105,7 +112,8 @@ export default function OrderDetail({
   const finishingPreparation = order.status === 'preparing'
     && (action?.status === 'shipped' || action?.status === 'ready_for_pickup');
   const pickingBlocked = finishingPreparation && !pickingProgress.complete;
-  const actionDisabled = saving || (needsTracking && !trackingCode.trim()) || pickingBlocked;
+  const packingBlocked = order.status === 'preparing' && action?.status === 'shipped' && !packingProgress.complete;
+  const actionDisabled = saving || (needsTracking && !trackingCode.trim()) || pickingBlocked || packingBlocked;
   const hasColdChain = coldChain.fresh > 0 || coldChain.frozen > 0;
   const inputClass = 'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100';
 
@@ -200,6 +208,25 @@ export default function OrderDetail({
               </div>
             )}
 
+            {needsTracking && (
+              <div className={`rounded-xl border p-3 ${packingProgress.complete
+                ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30'
+                : 'border-violet-200 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/30'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <p className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide ${packingProgress.complete ? 'text-emerald-700 dark:text-emerald-300' : 'text-violet-700 dark:text-violet-300'}`}>
+                    <IconPackage size={14} /> Packing
+                  </p>
+                  {packingProgress.parcelCount != null && <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{packingProgress.parcelCount} colis</span>}
+                </div>
+                <p className={`mt-2 text-xs leading-5 ${packingProgress.complete ? 'font-semibold text-emerald-700 dark:text-emerald-300' : 'text-violet-700 dark:text-violet-300'}`}>
+                  {packingProgress.complete
+                    ? 'Packing validé. La commande peut être expédiée dès que le tracking est renseigné.'
+                    : 'Validez le nombre réel de colis et l’emballage avant l’expédition.'}
+                </p>
+              </div>
+            )}
+
             {hasColdChain && (
               <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
                 <p className="text-xs font-bold uppercase tracking-wide text-sky-800 dark:text-sky-200">Chaîne du froid</p>
@@ -288,7 +315,8 @@ export default function OrderDetail({
           <div className="space-y-2">
             {sd.carrierName && <Field label="Transporteur" value={formatCarrierName(sd.carrierName)} />}
             {sd.serviceName && <Field label="Service" value={sd.serviceName} />}
-            {sd.numParcels != null && <Field label="Nb colis" value={String(sd.numParcels)} />}
+            {sd.numParcels != null && <Field label="Colis estimés" value={String(sd.numParcels)} />}
+            {order.packing_parcel_count != null && <Field label="Colis préparés" value={String(order.packing_parcel_count)} bold />}
             {sd.totalWeightG != null && <Field label="Poids total" value={`${(sd.totalWeightG / 1000).toFixed(2)} kg`} />}
             {sd.packlinkCost != null && <Field label="Coût transporteur" value={formatPrice(sd.packlinkCost, currency)} />}
             {sd.vatAmount != null && <Field label="TVA livraison" value={formatPrice(sd.vatAmount, currency)} />}
