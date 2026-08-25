@@ -5,14 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconArrowLeft } from '@tabler/icons-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import ConfirmActionModal from '@/components/ui/ConfirmActionModal';
 import type { Address } from '@lepefy/types';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
 const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-1 block';
 
-// Même liste que CartClient.tsx (non partagée/exportée ailleurs dans le
-// projet) — Packlink dessert ces marchés, cf. calculateShipping.ts.
 const COUNTRIES = [
   { value: 'IT', label: 'Italie' },
   { value: 'FR', label: 'France' },
@@ -21,9 +20,6 @@ const COUNTRIES = [
   { value: 'CH', label: 'Suisse' },
 ];
 
-// Identique à CheckoutForm.tsx (non exportée de là-bas) — reconstitue
-// rue + numéro à partir de addresses.line1 pour pré-remplir le formulaire
-// en édition.
 function splitLine1(line1: string): { street: string; houseNumber: string } {
   const parts = line1.trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return { street: line1.trim(), houseNumber: '' };
@@ -57,6 +53,7 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
   const [error, setError]             = useState<string | null>(null);
   const [isSaving, setIsSaving]       = useState(false);
   const [isDeleting, setIsDeleting]   = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -98,7 +95,6 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
 
   async function handleDelete() {
     if (!address) return;
-    if (!window.confirm('Supprimer cette adresse ?')) return;
     setIsDeleting(true);
     setError(null);
     try {
@@ -108,6 +104,7 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
         setError(data.error ?? 'Erreur lors de la suppression.');
         return;
       }
+      setDeleteModalOpen(false);
       router.push('/compte');
     } catch {
       setError('Erreur lors de la suppression.');
@@ -117,122 +114,138 @@ export function AdresseFormClient({ address, defaultFullName, defaultCountry }: 
   }
 
   return (
-    <div className="min-h-screen flex justify-center px-4 py-8 sm:py-10" style={{ backgroundColor: '#f7f8f6' }}>
-      <div className="w-full flex flex-col gap-4" style={{ maxWidth: 430 }}>
-        <Link href="/compte" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500">
-          <IconArrowLeft size={16} stroke={1.8} />
-          Mon compte
-        </Link>
+    <>
+      <div className="min-h-screen flex justify-center px-4 py-8 sm:py-10" style={{ backgroundColor: '#f7f8f6' }}>
+        <div className="w-full flex flex-col gap-4" style={{ maxWidth: 430 }}>
+          <Link href="/compte" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500">
+            <IconArrowLeft size={16} stroke={1.8} />
+            Mon compte
+          </Link>
 
-        <div
-          className="w-full flex flex-col overflow-hidden rounded-[20px]"
-          style={{ boxShadow: '0 8px 30px rgba(20, 40, 30, 0.12)', backgroundColor: 'white' }}
-        >
-          <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-            <h1 className="font-bold text-gray-900" style={{ fontSize: 16 }}>
-              {isEdit ? 'Modifier l\'adresse' : 'Nouvelle adresse'}
-            </h1>
-          </div>
-
-          <form onSubmit={handleSubmit} className="px-5 pt-4 pb-6 space-y-3">
-            <div>
-              <label className={LABEL_CLS}>Nom du destinataire</label>
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={INPUT_CLS} placeholder="Prénom et nom" />
+          <div
+            className="w-full flex flex-col overflow-hidden rounded-[20px]"
+            style={{ boxShadow: '0 8px 30px rgba(20, 40, 30, 0.12)', backgroundColor: 'white' }}
+          >
+            <div className="px-5 pt-5 pb-4 border-b border-gray-100">
+              <h1 className="font-bold text-gray-900" style={{ fontSize: 16 }}>
+                {isEdit ? 'Modifier l\'adresse' : 'Nouvelle adresse'}
+              </h1>
             </div>
 
-            <div>
-              <label className={LABEL_CLS}>Pays</label>
-              <select
-                value={country}
-                onChange={(e) => {
-                  setCountry(e.target.value);
-                  setManualMode(false);
-                  setStreet('');
-                  setHouseNumber('');
-                  setCity('');
-                  setPostalCode('');
-                }}
-                className={INPUT_CLS}
-              >
-                {COUNTRIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={LABEL_CLS}>Adresse</label>
-              {manualMode ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
-                    <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rue" className={INPUT_CLS} />
-                  </div>
-                  <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} placeholder="Numéro" className={INPUT_CLS} />
-                </div>
-              ) : (
-                <AddressAutocomplete
-                  country={country}
-                  placeholder="Rue et numéro, ville"
-                  onSelect={(r) => {
-                    setStreet(r.street);
-                    setHouseNumber(r.houseNumber);
-                    setCity(r.city);
-                    setPostalCode(r.postalCode);
-                  }}
-                  onManualFallback={() => setManualMode(true)}
-                />
-              )}
-            </div>
-
-            {(manualMode || street) && (
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="Code postal"
-                  inputMode="numeric"
-                  className={INPUT_CLS}
-                />
-                <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ville" className={INPUT_CLS} />
+            <form onSubmit={handleSubmit} className="px-5 pt-4 pb-6 space-y-3">
+              <div>
+                <label className={LABEL_CLS}>Nom du destinataire</label>
+                <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={INPUT_CLS} placeholder="Prénom et nom" />
               </div>
-            )}
 
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={isDefault}
-                disabled={address?.is_default}
-                onChange={(e) => setIsDefault(e.target.checked)}
-                className="rounded border-gray-300"
-                style={{ accentColor: 'var(--color-primary)' }}
-              />
-              Définir comme adresse par défaut
-            </label>
+              <div>
+                <label className={LABEL_CLS}>Pays</label>
+                <select
+                  value={country}
+                  onChange={(e) => {
+                    setCountry(e.target.value);
+                    setManualMode(false);
+                    setStreet('');
+                    setHouseNumber('');
+                    setCity('');
+                    setPostalCode('');
+                  }}
+                  className={INPUT_CLS}
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
 
-            {error && <p className="text-red-500 text-xs">{error}</p>}
+              <div>
+                <label className={LABEL_CLS}>Adresse</label>
+                {manualMode ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rue" className={INPUT_CLS} />
+                    </div>
+                    <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} placeholder="Numéro" className={INPUT_CLS} />
+                  </div>
+                ) : (
+                  <AddressAutocomplete
+                    country={country}
+                    placeholder="Rue et numéro, ville"
+                    onSelect={(r) => {
+                      setStreet(r.street);
+                      setHouseNumber(r.houseNumber);
+                      setCity(r.city);
+                      setPostalCode(r.postalCode);
+                    }}
+                    onManualFallback={() => setManualMode(true)}
+                  />
+                )}
+              </div>
 
-            <button
-              type="submit"
-              disabled={isSaving || isDeleting}
-              className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
+              {(manualMode || street) && (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="Code postal"
+                    inputMode="numeric"
+                    className={INPUT_CLS}
+                  />
+                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ville" className={INPUT_CLS} />
+                </div>
+              )}
 
-            {isEdit && (
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={isDefault}
+                  disabled={address?.is_default}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="rounded border-gray-300"
+                  style={{ accentColor: 'var(--color-primary)' }}
+                />
+                Définir comme adresse par défaut
+              </label>
+
+              {error && <p className="text-red-500 text-xs">{error}</p>}
+
               <button
-                type="button"
-                onClick={handleDelete}
+                type="submit"
                 disabled={isSaving || isDeleting}
-                className="w-full py-2.5 rounded-xl font-semibold text-sm text-red-600 border border-red-200 disabled:opacity-50"
+                className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-primary)' }}
               >
-                {isDeleting ? 'Suppression…' : 'Supprimer cette adresse'}
+                {isSaving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
-            )}
-          </form>
+
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(true)}
+                  disabled={isSaving || isDeleting}
+                  className="w-full py-2.5 rounded-xl font-semibold text-sm text-red-600 border border-red-200 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Suppression…' : 'Supprimer cette adresse'}
+                </button>
+              )}
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+
+      <ConfirmActionModal
+        open={deleteModalOpen}
+        title="Supprimer cette adresse ?"
+        description="Cette adresse sera supprimée de votre compte. Cette action est définitive."
+        confirmLabel="Supprimer"
+        cancelLabel="Conserver"
+        destructive
+        loading={isDeleting}
+        onCancel={() => {
+          if (!isDeleting) setDeleteModalOpen(false);
+        }}
+        onConfirm={() => void handleDelete()}
+      />
+    </>
   );
 }
