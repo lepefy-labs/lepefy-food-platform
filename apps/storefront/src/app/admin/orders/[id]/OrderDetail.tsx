@@ -6,6 +6,7 @@ import { IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/
 import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import PackingPanel from './PackingPanel';
 import type { Order, OrderStatus } from '@lepefy/types';
 
 interface ShippingDetails {
@@ -30,11 +31,6 @@ interface PickingProgress {
   complete: boolean;
 }
 
-interface PackingProgress {
-  parcelCount: number | null;
-  complete: boolean;
-}
-
 interface Props {
   order: Order;
   currency: string;
@@ -43,7 +39,6 @@ interface Props {
   shippingProvider: string;
   coldChain?: { fresh: number; frozen: number };
   pickingProgress: PickingProgress;
-  packingProgress: PackingProgress;
 }
 
 const CARRIER_MAP: Record<string, string> = {
@@ -90,7 +85,6 @@ export default function OrderDetail({
   shippingProvider,
   coldChain = { fresh: 0, frozen: 0 },
   pickingProgress,
-  packingProgress,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -112,6 +106,10 @@ export default function OrderDetail({
   const finishingPreparation = order.status === 'preparing'
     && (action?.status === 'shipped' || action?.status === 'ready_for_pickup');
   const pickingBlocked = finishingPreparation && !pickingProgress.complete;
+  const packingProgress = {
+    parcelCount: order.packing_parcel_count,
+    complete: Boolean(order.packing_completed_at && order.packing_parcel_count && order.packing_parcel_count > 0),
+  };
   const packingBlocked = order.status === 'preparing' && action?.status === 'shipped' && !packingProgress.complete;
   const actionDisabled = saving || (needsTracking && !trackingCode.trim()) || pickingBlocked || packingBlocked;
   const hasColdChain = coldChain.fresh > 0 || coldChain.frozen > 0;
@@ -173,6 +171,19 @@ export default function OrderDetail({
 
   return (
     <>
+      {!isPickup && order.status === 'preparing' && (
+        <PackingPanel
+          orderId={order.id}
+          status={order.status}
+          pickingComplete={pickingProgress.complete}
+          hasColdChain={hasColdChain}
+          estimatedParcels={shippingDetails?.numParcels ?? null}
+          initialParcelCount={order.packing_parcel_count}
+          initialColdChecked={Boolean(order.cold_chain_packing_checked_at)}
+          initialComplete={packingProgress.complete}
+        />
+      )}
+
       {action && (
         <section className="overflow-hidden rounded-2xl border border-[#D9D3FF] bg-[var(--admin-primary-soft)] shadow-sm">
           <div className="border-b border-[#D9D3FF] px-4 py-3">
