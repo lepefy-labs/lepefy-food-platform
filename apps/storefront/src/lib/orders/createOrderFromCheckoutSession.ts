@@ -225,8 +225,10 @@ export async function createOrderFromCheckoutSession(
 
     await notifyN8n('/webhook/order-confirmed', {
       orderId: order.id,
+      orderNumber: `#${order.id.slice(0, 8).toUpperCase()}`,
       email: session.email,
       fullName: session.full_name ?? '',
+      fulfillmentType: session.fulfillment_type,
       total,
       shippingTotal: session.shipping_total ?? 0,
       shippingAddress: session.shipping_address ?? null,
