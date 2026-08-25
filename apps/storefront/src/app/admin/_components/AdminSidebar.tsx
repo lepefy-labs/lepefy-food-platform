@@ -20,6 +20,7 @@ import {
   IconScan,
   IconTruck,
   IconCalendarEvent,
+  IconBell,
 } from '@tabler/icons-react';
 
 interface AdminSidebarProps {
@@ -148,6 +149,7 @@ export default function AdminSidebar({
         <>
           <p className={groupLabel}>Plateforme</p>
           <Link href="/admin/team" className={`mx-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${navClass(pathname === '/admin/team')}`}><IconUsers size={20} stroke={1.5} />Équipe</Link>
+          <Link href="/admin/platform/notifications" className={`mx-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all ${navClass(pathname.startsWith('/admin/platform/notifications'))}`}><IconBell size={20} stroke={1.5} />Tests notifications</Link>
         </>
       )}
     </nav>
