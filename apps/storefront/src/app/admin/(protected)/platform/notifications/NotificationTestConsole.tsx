@@ -53,7 +53,10 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
 
-  const eventInfo = useMemo(() => EVENTS.find(item => item.value === event) ?? EVENTS[0], [event]);
+  const eventDescription = useMemo(
+    () => EVENTS.find(item => item.value === event)?.description ?? '',
+    [event],
+  );
   const isConfirmed = event === 'order-confirmed';
   const isShipped = event === 'order-shipped';
   const needsFulfillment = event === 'order-confirmed' || event === 'order-completed' || event === 'order-cancelled';
@@ -122,7 +125,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               <select value={event} onChange={e => setEvent(e.target.value as TestEvent)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950">
                 {EVENTS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
-              <span className="mt-1 block text-xs font-normal text-gray-500">{eventInfo.description}</span>
+              <span className="mt-1 block text-xs font-normal text-gray-500">{eventDescription}</span>
             </label>
 
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
