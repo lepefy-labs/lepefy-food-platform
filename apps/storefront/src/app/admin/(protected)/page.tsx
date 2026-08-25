@@ -28,8 +28,9 @@ export const fetchCache = 'force-no-store'
 
 const PAGE_SIZE = 50
 const AGED_MS = 24 * 60 * 60 * 1000
+const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 
-type OrderView = '' | 'to_ship' | 'pickup_ready' | 'payment_pending' | 'aged' | 'cold_chain'
+type OrderView = '' | 'to_ship' | 'pickup_ready' | 'payment_pending' | 'aged' | 'cold_chain' | 'picking_incomplete' | 'packing_pending' | 'tracking_missing'
 type SortKey = 'date_desc' | 'date_asc' | 'total_desc' | 'total_asc'
 
 interface PageProps {
@@ -46,6 +47,23 @@ interface PageProps {
   }
 }
 
+interface OperationalOrderRow {
+  id: string
+  status: string
+  created_at: string
+  fulfillment_type: string
+  payment_status: string
+  tracking_code: string | null
+  packing_completed_at: string | null
+  cold_chain_packing_checked_at: string | null
+  order_items: Array<{
+    storage_type: string | null
+    quantity: number
+    picked_at: string | null
+    cold_chain_checked_at: string | null
+  }> | null
+}
+
 const STATUS_TABS = [
   { key: '', label: 'Toutes' },
   { key: 'new', label: 'Nouvelles' },
@@ -56,7 +74,7 @@ const STATUS_TABS = [
   { key: 'cancelled', label: 'Annulées' },
 ] as const
 
-const VALID_VIEWS = new Set<OrderView>(['', 'to_ship', 'pickup_ready', 'payment_pending', 'aged', 'cold_chain'])
+const VALID_VIEWS = new Set<OrderView>(['', 'to_ship', 'pickup_ready', 'payment_pending', 'aged', 'cold_chain', 'picking_incomplete', 'packing_pending', 'tracking_missing'])
 const VALID_SORTS = new Set<SortKey>(['date_desc', 'date_asc', 'total_desc', 'total_asc'])
 
 function sanitizeSearch(raw: string) {
@@ -128,6 +146,19 @@ function buildSortHref(searchParams: PageProps['searchParams'], sort: SortKey) {
   return query ? `/admin?${query}` : '/admin'
 }
 
+function hasColdChain(order: OperationalOrderRow) {
+  return (order.order_items ?? []).some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')
+}
+
+function pickingComplete(order: OperationalOrderRow) {
+  const items = order.order_items ?? []
+  return items.length > 0 && items.every(item => {
+    if (!item.picked_at) return false
+    if (item.storage_type === 'fresh' || item.storage_type === 'frozen') return Boolean(item.cold_chain_checked_at)
+    return true
+  })
+}
+
 export default async function AdminPage({ searchParams }: PageProps) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood'
   const tenant = await getTenant(tenantSlug)
@@ -161,35 +192,40 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   const { data: allOrdersRaw } = await supabase
     .from('orders')
-    .select('id, status, created_at, fulfillment_type, payment_status, order_items(storage_type, quantity)')
+    .select('id, status, created_at, fulfillment_type, payment_status, tracking_code, packing_completed_at, cold_chain_packing_checked_at, order_items(storage_type, quantity, picked_at, cold_chain_checked_at)')
     .eq('tenant_id', tenant.id)
 
-  const allData = (allOrdersRaw ?? []) as Array<{
-    id: string
-    status: string
-    created_at: string
-    fulfillment_type: string
-    payment_status: string
-    order_items: Array<{ storage_type: string | null; quantity: number }> | null
-  }>
-
+  const allData = (allOrdersRaw ?? []) as OperationalOrderRow[]
   const totalCount = allData.length
   const newCount = allData.filter(order => order.status === 'new').length
   const toPrepare = allData.filter(order => order.status === 'preparing').length
   const readyForPickup = allData.filter(order => order.status === 'ready_for_pickup').length
   const toShipCount = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery').length
   const pendingPaymentCount = allData.filter(order => order.payment_status === 'pending').length
-  const agedCount = allData.filter(order => !['delivered', 'cancelled'].includes(order.status) && new Date(order.created_at).getTime() <= new Date(agedCutoffIso).getTime()).length
-  const coldChainCount = allData.filter(order => (order.order_items ?? []).some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')).length
+  const agedOrders = allData.filter(order => !['delivered', 'cancelled'].includes(order.status) && new Date(order.created_at).getTime() <= new Date(agedCutoffIso).getTime())
+  const coldChainOrders = allData.filter(hasColdChain)
+  const pickingIncompleteOrders = allData.filter(order => order.status === 'preparing' && !pickingComplete(order))
+  const packingPendingOrders = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery' && pickingComplete(order) && !order.packing_completed_at)
+  const trackingMissingOrders = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery' && pickingComplete(order) && Boolean(order.packing_completed_at) && !order.tracking_code)
+  const coldChainActionOrders = allData.filter(order => {
+    if (!['new', 'preparing', 'ready_for_pickup'].includes(order.status) || !hasColdChain(order)) return false
+    const coldItems = (order.order_items ?? []).filter(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')
+    const lineCheckMissing = coldItems.some(item => !item.cold_chain_checked_at)
+    const packingCheckMissing = order.fulfillment_type === 'delivery' && order.status === 'preparing' && pickingComplete(order) && !order.cold_chain_packing_checked_at
+    return lineCheckMissing || packingCheckMissing
+  })
+
+  const operationalIds: Record<Exclude<OrderView, '' | 'to_ship' | 'pickup_ready' | 'payment_pending' | 'aged'>, string[]> = {
+    cold_chain: coldChainOrders.map(order => order.id),
+    picking_incomplete: pickingIncompleteOrders.map(order => order.id),
+    packing_pending: packingPendingOrders.map(order => order.id),
+    tracking_missing: trackingMissingOrders.map(order => order.id),
+  }
 
   const statusCounts = allData.reduce<Record<string, number>>((acc, order) => {
     acc[order.status] = (acc[order.status] ?? 0) + 1
     return acc
   }, {})
-
-  const itemRelation = filterView === 'cold_chain'
-    ? 'order_items!inner(id, name, quantity, subtotal, storage_type, warehouse_location)'
-    : 'order_items(id, name, quantity, subtotal, storage_type, warehouse_location)'
 
   let query = supabase
     .from('orders')
@@ -197,7 +233,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
       id, created_at, email, full_name, status, total,
       subtotal, shipping_cost, payment_method, payment_status,
       fulfillment_type, shipping_address, shipping_details,
-      ${itemRelation}
+      order_items(id, name, quantity, subtotal, storage_type, warehouse_location)
     `, { count: 'exact' })
     .eq('tenant_id', tenant.id)
 
@@ -209,8 +245,9 @@ export default async function AdminPage({ searchParams }: PageProps) {
     query = query.eq('payment_status', 'pending')
   } else if (filterView === 'aged') {
     query = query.lte('created_at', agedCutoffIso).not('status', 'in', '(delivered,cancelled)')
-  } else if (filterView === 'cold_chain') {
-    query = query.in('order_items.storage_type', ['fresh', 'frozen'])
+  } else if (filterView === 'cold_chain' || filterView === 'picking_incomplete' || filterView === 'packing_pending' || filterView === 'tracking_missing') {
+    const ids = operationalIds[filterView]
+    query = query.in('id', ids.length > 0 ? ids : [EMPTY_UUID])
   } else {
     if (filterStatus) query = query.eq('status', filterStatus)
     if (filterFulfillment) query = query.eq('fulfillment_type', filterFulfillment)
@@ -276,20 +313,60 @@ export default async function AdminPage({ searchParams }: PageProps) {
     { label: 'Nouvelles', value: String(newCount), helper: 'À prendre en charge', href: '/admin?status=new', icon: IconPackage, tone: 'text-violet-700 bg-violet-50 dark:text-violet-300 dark:bg-violet-950/40' },
     { label: 'À préparer', value: String(toPrepare), helper: 'Préparation en cours', href: '/admin?status=preparing', icon: IconTruck, tone: 'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950/40' },
     { label: 'Prêtes au retrait', value: String(readyForPickup), helper: 'Client attendu', href: '/admin?status=ready_for_pickup', icon: IconBuildingStore, tone: 'text-sky-700 bg-sky-50 dark:text-sky-300 dark:bg-sky-950/40' },
-    { label: 'À surveiller +24 h', value: String(agedCount), helper: 'Commandes actives anciennes', href: '/admin?view=aged', icon: IconAlertTriangle, tone: 'text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40' },
+    { label: 'À surveiller +24 h', value: String(agedOrders.length), helper: 'Commandes actives anciennes', href: '/admin?view=aged', icon: IconAlertTriangle, tone: 'text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40' },
     { label: 'CA ce mois', value: formatPrice(thisMonthRevenue, tenant.currency), helper: 'Commandes payées', href: '/admin', icon: IconCurrencyEuro, tone: 'text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-950/40' },
   ]
 
+  const operationalViews: { key: OrderView; label: string; count: number; helper: string; tone: string }[] = [
+    { key: 'picking_incomplete', label: 'Picking incomplet', count: pickingIncompleteOrders.length, helper: 'Produits ou contrôle froid à valider', tone: pickingIncompleteOrders.length > 0 ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' : '' },
+    { key: 'packing_pending', label: 'Packing à terminer', count: packingPendingOrders.length, helper: 'Picking fini · colis à préparer', tone: packingPendingOrders.length > 0 ? 'border-violet-200 bg-violet-50/70 dark:border-violet-900 dark:bg-violet-950/20' : '' },
+    { key: 'tracking_missing', label: 'Tracking manquant', count: trackingMissingOrders.length, helper: 'Packing fini · suivi requis', tone: trackingMissingOrders.length > 0 ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' : '' },
+    { key: 'cold_chain', label: 'Chaîne du froid', count: coldChainActionOrders.length, helper: 'Contrôle froid encore requis', tone: coldChainActionOrders.length > 0 ? 'border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20' : '' },
+    { key: 'aged', label: 'Commandes +24 h', count: agedOrders.length, helper: 'Workflow à surveiller', tone: agedOrders.length > 0 ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' : '' },
+    { key: 'payment_pending', label: 'Paiements commande', count: pendingPaymentCount, helper: 'Paiement interne non confirmé', tone: pendingPaymentCount > 0 ? 'border-orange-200 bg-orange-50/70 dark:border-orange-900 dark:bg-orange-950/20' : '' },
+  ]
+
   const quickViews: { key: OrderView; label: string; count: number; helper: string }[] = [
-    { key: 'to_ship', label: 'Livraisons à expédier', count: toShipCount, helper: 'En préparation · livraison' },
+    { key: 'to_ship', label: 'Livraisons en préparation', count: toShipCount, helper: 'Workflow delivery en cours' },
     { key: 'pickup_ready', label: 'Retraits prêts', count: readyForPickup, helper: 'Client attendu en boutique' },
-    { key: 'cold_chain', label: 'Chaîne du froid', count: coldChainCount, helper: 'Frais ou surgelés' },
-    { key: 'payment_pending', label: 'Paiements en attente', count: pendingPaymentCount, helper: 'Action de paiement requise' },
+    { key: 'cold_chain', label: 'Toutes froid / surgelé', count: coldChainOrders.length, helper: 'Commandes avec chaîne du froid' },
+    { key: 'payment_pending', label: 'Paiements commande', count: pendingPaymentCount, helper: 'Action de paiement requise' },
   ]
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-8">
       <AdminPageHeader title="Commandes" description="Traitez d'abord les commandes qui demandent votre attention." meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`} />
+
+      <section className="mb-4 rounded-2xl border border-[var(--admin-border)] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-4">
+        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">À faire maintenant</p>
+            <h2 className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">File opérationnelle</h2>
+          </div>
+          <p className="text-xs text-gray-400">Chaque carte ouvre directement les commandes concernées.</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {operationalViews.map(view => {
+            const active = filterView === view.key
+            return (
+              <Link key={view.key} href={buildViewHref(searchParams, active ? '' : view.key)} className={`min-h-[88px] rounded-xl border p-3 transition-colors ${active ? 'border-[#C9C1FF] bg-[var(--admin-primary-soft)] ring-1 ring-[#D9D3FF]' : view.tone || 'border-gray-200 bg-gray-50/70 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:bg-gray-950/50'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{view.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{view.helper}</p>
+                  </div>
+                  <span className={`min-w-9 rounded-full px-2 py-1 text-center text-sm font-bold ${view.count > 0 ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-900 dark:text-gray-100' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>{view.count}</span>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+        {pendingPayments.length > 0 && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            {pendingPayments.length} paiement{pendingPayments.length > 1 ? 's' : ''} externe{pendingPayments.length > 1 ? 's' : ''} à vérifier séparément ci-dessous.
+          </div>
+        )}
+      </section>
 
       <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-5">
         {compactKpis.map(kpi => {
