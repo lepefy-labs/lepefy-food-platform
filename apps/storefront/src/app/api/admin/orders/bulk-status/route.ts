@@ -21,6 +21,23 @@ interface BulkOrderRow {
   full_name: string | null;
 }
 
+interface PickingItemRow {
+  order_id: string;
+  storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  picked_at: string | null;
+  cold_chain_checked_at: string | null;
+}
+
+function pickingComplete(items: PickingItemRow[]) {
+  return items.length > 0 && items.every(item => {
+    if (!item.picked_at) return false;
+    if (item.storage_type === 'fresh' || item.storage_type === 'frozen') {
+      return Boolean(item.cold_chain_checked_at);
+    }
+    return true;
+  });
+}
+
 export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -49,6 +66,38 @@ export async function POST(req: NextRequest) {
   }
 
   const orders = (ordersRaw ?? []) as unknown as BulkOrderRow[];
+  const preparingIds = orders.filter(order => order.status === 'preparing').map(order => order.id);
+
+  if (preparingIds.length > 0) {
+    const { data: pickingItemsRaw, error: pickingError } = await admin
+      .from('order_items')
+      .select('order_id, storage_type, picked_at, cold_chain_checked_at')
+      .in('order_id', preparingIds)
+      .eq('tenant_id', tenant.id);
+
+    if (pickingError) {
+      return NextResponse.json({ error: 'Impossible de vérifier la préparation des commandes.' }, { status: 500 });
+    }
+
+    const itemsByOrder = new Map<string, PickingItemRow[]>();
+    for (const item of (pickingItemsRaw ?? []) as PickingItemRow[]) {
+      const list = itemsByOrder.get(item.order_id) ?? [];
+      list.push(item);
+      itemsByOrder.set(item.order_id, list);
+    }
+
+    const incomplete = preparingIds.filter(id => !pickingComplete(itemsByOrder.get(id) ?? []));
+    if (incomplete.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Préparation incomplète pour ${incomplete.length} commande${incomplete.length > 1 ? 's' : ''}. Terminez le picking et les contrôles froid avant de traiter la sélection.`,
+          orderIds: incomplete,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   const toShipped: BulkOrderRow[] = [];
   const toReadyForPickup: BulkOrderRow[] = [];
   const trackingUpdates: { id: string; carrier: string; code: string }[] = [];
