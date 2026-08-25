@@ -16,6 +16,9 @@ interface OrderRow {
   created_at: string;
   total: number;
   email: string;
+  fulfillment_type: 'delivery' | 'pickup';
+  tracking_code: string | null;
+  tracking_carrier: string | null;
 }
 
 interface PendingSessionRow {
@@ -40,8 +43,6 @@ export default async function OrdersListPage() {
   const supabase = createServiceClient();
   const nowIso = new Date().toISOString();
 
-  // Keep the lifecycle correct even without a scheduled cleanup job. Expired
-  // purchase intents remain in the DB for analytics, but never in customer UI.
   await supabase
     .from('checkout_sessions')
     .update({ status: 'expired', updated_at: nowIso })
@@ -52,7 +53,7 @@ export default async function OrdersListPage() {
 
   const { data: orders } = await supabase
     .from('orders')
-    .select('id, status, created_at, total, email')
+    .select('id, status, created_at, total, email, fulfillment_type, tracking_code, tracking_carrier')
     .eq('tenant_id', tenant.id)
     .eq('customer_id', sessionCustomer.id)
     .order('created_at', { ascending: false }) as { data: OrderRow[] | null };
@@ -88,13 +89,15 @@ export default async function OrdersListPage() {
   const { data: rawItems } = orderIds.length === 0 ? { data: [] } : await (supabase as unknown as {
     from(t: 'order_items'): {
       select(cols: string): {
-        in(col: string, vals: string[]): Promise<{ data: { order_id: string }[] | null }>;
+        in(col: string, vals: string[]): Promise<{ data: { order_id: string; quantity: number }[] | null }>;
       };
     };
-  }).from('order_items').select('order_id').in('order_id', orderIds);
+  }).from('order_items').select('order_id, quantity').in('order_id', orderIds);
 
   const itemCounts = new Map<string, number>();
-  for (const row of rawItems ?? []) itemCounts.set(row.order_id, (itemCounts.get(row.order_id) ?? 0) + 1);
+  for (const row of rawItems ?? []) {
+    itemCounts.set(row.order_id, (itemCounts.get(row.order_id) ?? 0) + row.quantity);
+  }
 
   const ordersWithTokens: OrderListItem[] = (orders ?? []).map((o) => ({
     id: o.id,
@@ -102,6 +105,9 @@ export default async function OrdersListPage() {
     created_at: o.created_at,
     total: o.total,
     itemCount: itemCounts.get(o.id) ?? 0,
+    fulfillmentType: o.fulfillment_type,
+    hasTracking: Boolean(o.tracking_code),
+    trackingCarrier: o.tracking_carrier,
     trackingToken: generateTrackingToken(o.id, o.email),
   }));
 
