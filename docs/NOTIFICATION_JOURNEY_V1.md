@@ -2,23 +2,20 @@
 
 ## Scope
 
-Notification Journey v1 defines the transactional customer communication model for shop orders.
+Notification Journey v1 defines the transactional customer communication model for shop orders and the manual recovery model for unresolved external payments.
 
-The goal is to communicate only meaningful order milestones, reduce uncertainty, and make every
-message answer four questions in this order:
+The goal is to communicate only meaningful milestones, reduce uncertainty, and make every message answer four questions in this order:
 
 1. What happened?
 2. What does it mean for the customer?
 3. What should the customer do now?
 4. What happens next?
 
-v1 is transactional. It does not include abandoned-checkout marketing, review requests, cross-sell,
-loyalty campaigns, or recurring pickup reminders.
+v1 is transactional. It does not include abandoned-checkout marketing, review requests, cross-sell, loyalty campaigns, or recurring pickup reminders.
 
 ## Shared delivery model
 
-n8n is the transport/orchestration layer. Application code is the source of truth for order state and
-webhook payloads.
+n8n is the transport/orchestration layer. Application code is the source of truth for order state and webhook payloads.
 
 All customer-facing order events receive the tenant notification context:
 
@@ -32,8 +29,7 @@ All customer-facing order events receive the tenant notification context:
 
 `pickup.*` must come from tenant Click & Collect configuration, not from the legal address.
 
-Email is the outbound channel in v1. WhatsApp is exposed as a support/contact action, not as an
-automatic outbound status channel.
+Email is the outbound channel in v1. WhatsApp is exposed as a support/contact action, not as an automatic outbound status channel.
 
 ## Customer journey
 
@@ -53,8 +49,7 @@ automatic outbound status channel.
 
 Do not send a separate generic "order in preparation" email in v1.
 
-Orders are created in `preparing`, and `order-confirmed` already tells the customer that preparation
-has started. Sending both in normal flows creates noise without adding useful information.
+Orders are created in `preparing`, and `order-confirmed` already tells the customer that preparation has started. Sending both in normal flows creates noise without adding useful information.
 
 A future preparation-delay notification may be added only for long-running or exceptional workflows.
 
@@ -179,8 +174,7 @@ Customer intent:
 Never promise a refund merely because an order is cancelled.
 Refund wording must depend on real payment/refund state supplied by the application.
 
-Until such refund-state data is explicitly part of the customer payload, use neutral wording and
-direct the customer to support/order details.
+Until such refund-state data is explicitly part of the customer payload, use neutral wording and direct the customer to support/order details.
 
 ### 7. Stock conflict
 
@@ -196,8 +190,86 @@ The current payload contains operational fields such as:
 
 Therefore v1 treats this webhook as an internal/admin incident notification.
 
-A future customer incident flow must be designed separately around the actual refund/resolution state
-before sending automated customer copy.
+A future customer incident flow must be designed separately around the actual refund/resolution state before sending automated customer copy.
+
+## Payment Recovery v1
+
+Payment Recovery is a separate lifecycle from order notifications because an unresolved external-payment checkout is not yet an order.
+
+Domain model:
+
+```text
+checkout_session -> external provider handoff -> awaiting verification -> admin resolution
+```
+
+Admin entry point:
+
+```text
+/admin/paiements-en-attente/[id]
+```
+
+The pending-payment banner keeps `Confirmer réception` as the primary operational action and exposes `Gérer` for recovery/reminder/cancellation details. Destructive cancellation is not a primary row action.
+
+### Manual reminder
+
+Webhook: `/webhook/payment-reminder`
+
+v1 is **manual admin-triggered transactional recovery**, not abandoned-cart automation or marketing.
+
+Server rules:
+
+- first reminder no earlier than 2 hours after checkout creation;
+- maximum 1 reminder per 24 hours;
+- maximum 2 reminders per checkout session;
+- only unresolved external-link sessions without an order are eligible;
+- reminder history is persisted server-side for audit/cooldown;
+- a failed n8n transport must not be presented as a successful reminder.
+
+Customer copy must never state that payment was definitely not received. Use wording equivalent to:
+
+`Nous n’avons pas encore pu confirmer la réception de votre paiement.`
+
+When the provider handoff may already have happened, the message must explicitly warn:
+
+`Si vous avez déjà effectué le paiement, ne payez pas une seconde fois.`
+
+Primary CTA:
+
+- `Reprendre mon achat` -> signed `resumeLink`.
+
+The resume destination is Lepefy, not the payment-provider URL. The customer may:
+
+- keep the same external payment method;
+- select another enabled external method;
+- switch to card/Stripe.
+
+The signed checkout-session access token already used by checkout recovery is the only guest access mechanism. Do not introduce a second token format or expose unrestricted checkout identifiers.
+
+`awaiting_verification` is durable and is not expired solely because the original 24-hour open-checkout TTL passed. When a customer deliberately switches such a session to Stripe, it returns to `open` so the normal Stripe PaymentIntent flow can continue.
+
+Payment-reminder payload includes:
+
+- full tenant notification context;
+- `checkoutSessionId`;
+- `paymentReference`;
+- `email`, `fullName`;
+- `paymentMethod.type`, `paymentMethod.label`;
+- `amount`;
+- `resumeLink`;
+- `paymentStatus`;
+- `providerHandoffStarted`;
+- `reminderNumber`;
+- `idempotencyKey`;
+- `reminderSentAt`.
+
+### What Payment Recovery v1 does not do
+
+- no automatic reminder schedule;
+- no marketing/abandoned-cart campaign;
+- no claim that an external payment failed;
+- no second-payment encouragement when provider handoff has already occurred;
+- no stock reservation;
+- no order creation before confirmed payment.
 
 ## CTA hierarchy
 
@@ -211,9 +283,9 @@ Priority by event:
 - delivered -> order details/support
 - picked up -> order details
 - cancelled -> order details/support
+- payment reminder -> secure checkout resume
 
-Do not let support, storefront browsing, or secondary links visually compete with the event-specific
-primary CTA.
+Do not let support, storefront browsing, or secondary links visually compete with the event-specific primary CTA.
 
 ## Tone
 
@@ -223,10 +295,11 @@ Good:
 - `Bonne nouvelle, votre commande est prête à être retirée.`
 - `Votre commande est en route.`
 - `Votre paiement a bien été reçu.`
+- `Nous n’avons pas encore pu confirmer la réception de votre paiement.`
 
 Avoid exaggerated marketing language, technical system terms, or excessive emoji.
 
-Use emoji/icons as state markers only: `✅`, `📦`, `🚚`, `🏪`, `📍`.
+Use emoji/icons as state markers only: `✅`, `📦`, `🚚`, `🏪`, `📍`, `💳`.
 
 ## Future v2 candidates
 
@@ -238,8 +311,8 @@ Not part of v1:
 - delivery exception notification;
 - review request;
 - loyalty/reorder message;
-- consent-aware abandoned checkout lifecycle messaging;
+- consent-aware automated abandoned checkout lifecycle messaging;
+- automatic payment-recovery reminders;
 - outbound WhatsApp/SMS status notifications.
 
-Each future outbound channel or marketing lifecycle requires explicit tenant configuration, consent
-and timing rules before activation.
+Each future automatic outbound channel or marketing lifecycle requires explicit tenant configuration, consent and timing rules before activation.

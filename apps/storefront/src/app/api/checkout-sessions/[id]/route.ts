@@ -15,6 +15,8 @@ export const fetchCache = 'force-no-store';
 const stripe = getStripeClient('shop');
 const MAX_QUANTITY_PER_ITEM = 999;
 
+type CheckoutStatus = 'open' | 'awaiting_verification' | 'completed' | 'cancelled' | 'expired';
+
 interface CartItemPayload {
   productId: string;
   name: string;
@@ -36,7 +38,7 @@ interface CheckoutSessionRow {
   shipping_total: number;
   ambassador_discount_amount: number | null;
   items: CartItemPayload[];
-  status: 'open' | 'completed' | 'cancelled' | 'expired';
+  status: CheckoutStatus;
   expires_at: string;
   payment_method: 'stripe' | 'external_link';
   external_payment_type: string | null;
@@ -84,8 +86,7 @@ async function loadAndAuthorizeSession(
     .select('*')
     .eq('id', sessionId)
     .eq('tenant_id', tenantId)
-    .eq('status', 'open')
-    .gt('expires_at', nowIso)
+    .in('status', ['open', 'awaiting_verification'])
     .maybeSingle();
 
   if (error) {
@@ -94,7 +95,11 @@ async function loadAndAuthorizeSession(
   }
 
   if (!data) {
-    // Expiry is durable, never a hidden client-side convention.
+    return { ok: false, status: 404, error: 'Session de paiement introuvable ou indisponible.' };
+  }
+
+  const session = data as CheckoutSessionRow;
+  if (session.status === 'open' && new Date(session.expires_at).getTime() <= Date.now()) {
     await supabase
       .from('checkout_sessions')
       .update({ status: 'expired', updated_at: nowIso })
@@ -105,12 +110,18 @@ async function loadAndAuthorizeSession(
     return { ok: false, status: 404, error: 'Session de paiement introuvable ou expirée.' };
   }
 
-  const session = data as CheckoutSessionRow;
-  if (session.customer_id) {
-    if (!sessionCustomerId || sessionCustomerId !== session.customer_id) {
-      return { ok: false, status: 403, error: 'Accès non autorisé à cette session.' };
-    }
-  } else if (!accessToken || !isValidCheckoutSessionAccessToken(session.id, session.email, accessToken)) {
+  if (session.status === 'awaiting_verification' && session.payment_method !== 'external_link') {
+    return { ok: false, status: 409, error: 'État de paiement incohérent. Contactez le support.' };
+  }
+
+  const tokenValid = Boolean(
+    accessToken && isValidCheckoutSessionAccessToken(session.id, session.email, accessToken),
+  );
+  const customerMatches = Boolean(
+    session.customer_id && sessionCustomerId && sessionCustomerId === session.customer_id,
+  );
+
+  if (!customerMatches && !tokenValid) {
     return { ok: false, status: 403, error: 'Accès non autorisé à cette session.' };
   }
 
@@ -187,7 +198,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           updated_at: nowIso,
         })
         .eq('id', session.id)
-        .eq('tenant_id', tenant.id);
+        .eq('tenant_id', tenant.id)
+        .in('status', ['open', 'awaiting_verification']);
 
       if (cancelError) {
         console.error('[checkout-sessions][PATCH] cancel error:', cancelError, '— session:', session.id);
@@ -392,6 +404,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
+    const nextStatus = session.status === 'awaiting_verification' && paymentMethod === 'stripe'
+      ? 'open'
+      : session.status;
+
     const { data: updated, error: updateError } = await supabase
       .from('checkout_sessions')
       .update({
@@ -406,12 +422,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         external_payment_type: externalPaymentType,
         external_payment_label: externalPaymentLabel,
         external_payment_link: externalPaymentLink,
+        status: nextStatus,
         last_activity_at: nowIso,
         updated_at: nowIso,
         expires_at: checkoutExpiryFromNow(now),
       })
       .eq('id', session.id)
       .eq('tenant_id', tenant.id)
+      .in('status', ['open', 'awaiting_verification'])
       .select('*')
       .single();
 

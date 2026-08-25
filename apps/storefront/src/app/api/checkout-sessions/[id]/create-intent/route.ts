@@ -29,7 +29,7 @@ interface CheckoutSessionRow {
   shipping_total: number;
   ambassador_discount_amount: number | null;
   items: CartItemPayload[];
-  status: 'open' | 'completed' | 'cancelled' | 'expired';
+  status: 'open' | 'completed' | 'cancelled' | 'expired' | 'awaiting_verification';
   expires_at: string;
   payment_method: 'stripe' | 'external_link';
   stripe_payment_intent_id: string | null;
@@ -61,15 +61,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!data) return NextResponse.json({ error: 'Session de paiement introuvable ou expirée.' }, { status: 404 });
 
     const session = data as CheckoutSessionRow;
-    if (session.customer_id) {
-      if (!sessionCustomer || sessionCustomer.id !== session.customer_id) {
-        return NextResponse.json({ error: 'Accès non autorisé à cette session.' }, { status: 403 });
-      }
-    } else {
-      const accessToken = body.accessToken ?? null;
-      if (!accessToken || !isValidCheckoutSessionAccessToken(session.id, session.email, accessToken)) {
-        return NextResponse.json({ error: 'Accès non autorisé à cette session.' }, { status: 403 });
-      }
+    const tokenValid = Boolean(
+      body.accessToken && isValidCheckoutSessionAccessToken(session.id, session.email, body.accessToken),
+    );
+    const customerMatches = Boolean(
+      session.customer_id && sessionCustomer && sessionCustomer.id === session.customer_id,
+    );
+    if (!customerMatches && !tokenValid) {
+      return NextResponse.json({ error: 'Accès non autorisé à cette session.' }, { status: 403 });
     }
 
     if (session.payment_method !== 'stripe') {
@@ -118,7 +117,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         expires_at: checkoutExpiryFromNow(now),
       })
       .eq('id', session.id)
-      .eq('tenant_id', tenant.id);
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'open');
 
     if (updateError) {
       console.error('[checkout-sessions][create-intent] failed to persist intent id:', updateError,

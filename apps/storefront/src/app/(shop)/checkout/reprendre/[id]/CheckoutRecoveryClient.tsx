@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconArrowLeft, IconLock } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowLeft, IconLock } from '@tabler/icons-react';
 import { CheckoutSessionEditor } from '@/components/checkout-session/CheckoutSessionEditor';
 import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
 
@@ -10,10 +10,14 @@ export function CheckoutRecoveryClient({
   tenant,
   externalPaymentMethods,
   sessionId,
+  accessToken,
+  awaitingVerification = false,
 }: {
   tenant: Tenant;
   externalPaymentMethods: TenantPaymentMethod[];
   sessionId: string;
+  accessToken?: string;
+  awaitingVerification?: boolean;
 }) {
   const router = useRouter();
 
@@ -34,10 +38,28 @@ export function CheckoutRecoveryClient({
         </p>
       </div>
 
+      {awaitingVerification && (
+        <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900" role="alert">
+          <div className="flex items-start gap-2">
+            <IconAlertTriangle size={19} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="font-bold">Vous avez peut-être déjà effectué ce paiement.</p>
+              <p className="mt-1">
+                Si vous avez déjà payé via le moyen externe affiché ci-dessous, <strong>ne payez pas une seconde fois</strong> : notre équipe est peut-être encore en train de vérifier sa réception.
+              </p>
+              <p className="mt-2">
+                Si vous êtes certain de ne pas avoir payé, vous pouvez reprendre cet achat, conserver le même moyen de paiement ou en choisir un autre.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CheckoutSessionEditor
         tenant={tenant}
         externalPaymentMethods={externalPaymentMethods}
         sessionId={sessionId}
+        accessToken={accessToken}
         onCancelled={() => router.push('/orders')}
       />
     </div>

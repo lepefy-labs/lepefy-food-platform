@@ -9,7 +9,8 @@ type TestEvent =
   | 'order-ready-for-pickup'
   | 'order-completed'
   | 'order-cancelled'
-  | 'order-stock-conflict';
+  | 'order-stock-conflict'
+  | 'payment-reminder';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -19,6 +20,7 @@ const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'order-ready-for-pickup', label: 'Prête au retrait', description: 'Click & Collect prêt.' },
   { value: 'order-completed', label: 'Commande terminée', description: 'Livrée ou retirée.' },
   { value: 'order-cancelled', label: 'Commande annulée', description: 'Annulation sans promesse de remboursement.' },
+  { value: 'payment-reminder', label: 'Rappel paiement', description: 'Rappel prudent pour un paiement externe non encore confirmé.' },
   { value: 'order-stock-conflict', label: 'Conflit de stock', description: 'Notification opérationnelle de test.' },
 ];
 
@@ -59,6 +61,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   );
   const isConfirmed = event === 'order-confirmed';
   const isShipped = event === 'order-shipped';
+  const isPaymentReminder = event === 'payment-reminder';
   const needsFulfillment = event === 'order-confirmed' || event === 'order-completed' || event === 'order-cancelled';
 
   async function sendTest() {
@@ -148,7 +151,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               </label>
             )}
 
-            {(isConfirmed || event === 'order-stock-conflict') && (
+            {(isConfirmed || isPaymentReminder || event === 'order-stock-conflict') && (
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Total
                 <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
@@ -191,6 +194,12 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
                   <input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
                 </label>
               </>
+            )}
+
+            {isPaymentReminder && (
+              <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                Le test simule un paiement PayPal déjà transmis au prestataire. Le vrai lien de reprise n’est pas utilisé : le payload reçoit un token factice de test.
+              </div>
             )}
           </div>
 

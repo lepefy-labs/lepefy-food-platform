@@ -10,7 +10,8 @@ type TestEvent =
   | 'order-ready-for-pickup'
   | 'order-completed'
   | 'order-cancelled'
-  | 'order-stock-conflict';
+  | 'order-stock-conflict'
+  | 'payment-reminder';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -21,6 +22,7 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'order-completed': '/webhook/order-completed',
   'order-cancelled': '/webhook/order-cancelled',
   'order-stock-conflict': '/webhook/order-stock-conflict',
+  'payment-reminder': '/webhook/payment-reminder',
 };
 
 interface TestRequestBody {
@@ -143,6 +145,27 @@ export async function POST(req: NextRequest) {
       adminOrderLink: tenantContext.storefrontUrl
         ? `${tenantContext.storefrontUrl}/admin/orders/${testId}`
         : null,
+    };
+  } else if (body.event === 'payment-reminder') {
+    payload = {
+      ...tenantContext,
+      testMode: true,
+      testSource: 'platform_notification_console',
+      testSentAt: new Date().toISOString(),
+      checkoutSessionId: testId,
+      paymentReference: `#TEST-${shortId}`,
+      email: body.email.trim(),
+      fullName: body.fullName?.trim() || 'Client test',
+      paymentMethod: { type: 'paypal', label: 'PayPal' },
+      amount: total,
+      resumeLink: tenantContext.storefrontUrl
+        ? `${tenantContext.storefrontUrl}/checkout/reprendre/${testId}?token=notification-test`
+        : null,
+      paymentStatus: 'awaiting_verification',
+      providerHandoffStarted: true,
+      reminderNumber: 1,
+      idempotencyKey: `payment-reminder:${testId}:1`,
+      reminderSentAt: new Date().toISOString(),
     };
   }
 

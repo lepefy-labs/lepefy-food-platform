@@ -46,14 +46,13 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   if (admin.role === 'tenant_cashier') redirect('/admin/loyalty/scan');
 
   const { data: categories } = await adminClient.from('categories').select('id, name, slug').eq('tenant_id', tenant.id).order('position');
-  const nowIso = new Date().toISOString();
 
   const [pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
     adminClient.from('checkout_sessions').select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenant.id)
-      .eq('status', 'open')
-      .gt('expires_at', nowIso)
-      .eq('payment_method', 'external_link'),
+      .eq('payment_method', 'external_link')
+      .in('status', ['open', 'expired', 'awaiting_verification'])
+      .is('order_id', null),
     adminClient.from('event_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('rental_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('service_inquiries').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'nouveau'),
