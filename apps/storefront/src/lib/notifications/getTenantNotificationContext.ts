@@ -65,6 +65,7 @@ export async function getTenantNotificationContext(
     }
 
     const tenant = data as TenantNotificationRow;
+    // Tenant data is canonical; deployment-global values are retained only for legacy compatibility.
     const tenantStorefront = tenant.storefront_url?.replace(/\/$/, '') ?? null;
     const legalWebsite = tenant.legal_website?.replace(/\/$/, '') ?? null;
     const legacyConfiguredStorefront = process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/\/$/, '') ?? null;
