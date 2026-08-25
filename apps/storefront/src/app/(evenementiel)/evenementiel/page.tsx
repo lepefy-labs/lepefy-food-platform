@@ -14,9 +14,10 @@ import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatEventDayDate, formatEventTime, formatPrice } from '@/lib/utils/format';
 import { EventImageFader } from '@/components/evenementiel/EventImageFader';
+import EventSocialShareButton, { type EventSocialPhoto } from '@/components/evenementiel/EventSocialShareButton';
 import type { EventRow, ServiceOffering, EventGalleryPhoto } from '@lepefy/types';
 
-type EventPhotoRef = Pick<EventGalleryPhoto, 'event_id' | 'image_url'>;
+type EventPhotoRef = Pick<EventGalleryPhoto, 'id' | 'event_id' | 'image_url' | 'caption'> & { is_social_share?: boolean };
 type EventPriceRef = { event_id: string; price: number };
 
 export const revalidate = 120;
@@ -83,7 +84,7 @@ export default async function EvenementielHubPage() {
     tenant.events_enabled
       ? supabase
           .from('event_gallery_photos')
-          .select('event_id, image_url')
+          .select('*')
           .eq('tenant_id', tenant.id)
           .not('event_id', 'is', null)
           .order('sort_order', { ascending: true })
@@ -94,12 +95,20 @@ export default async function EvenementielHubPage() {
   const services = (servicesRes.data ?? []) as ServiceOffering[];
   const gallery = (galleryRes.data ?? []) as EventGalleryPhoto[];
   const photosByEvent = new Map<string, string[]>();
+  const socialPhotosByEvent = new Map<string, EventSocialPhoto[]>();
 
   for (const photo of (eventPhotosRes.data ?? []) as EventPhotoRef[]) {
     if (!photo.event_id) continue;
+
     const list = photosByEvent.get(photo.event_id) ?? [];
     list.push(photo.image_url);
     photosByEvent.set(photo.event_id, list);
+
+    if (Boolean(photo.is_social_share)) {
+      const socialList = socialPhotosByEvent.get(photo.event_id) ?? [];
+      socialList.push({ id: photo.id, imageUrl: photo.image_url, caption: photo.caption });
+      socialPhotosByEvent.set(photo.event_id, socialList);
+    }
   }
 
   const eventIds = events.map((event) => event.id);
@@ -161,47 +170,67 @@ export default async function EvenementielHubPage() {
 
             {featuredEvent ? (
               <div className="space-y-5">
-                <Link href={`/evenementiel/evenements/${featuredEvent.slug}`} className="group grid overflow-hidden rounded-[28px] border border-black/[0.06] bg-white shadow-[0_18px_45px_rgba(50,37,20,.08)] md:grid-cols-[1.15fr_.85fr]">
-                  <EventImageFader images={photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="min-h-[250px] md:min-h-[330px]">
-                    <span className="absolute left-4 top-4 rounded-full bg-[var(--color-secondary)] px-3 py-1.5 text-[11px] font-extrabold tracking-wide text-[var(--color-primary-dark)]">À LA UNE</span>
-                  </EventImageFader>
-                  <div className="flex flex-col justify-between p-5 sm:p-6 md:p-7">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">Prochain événement</p>
-                      <div className="mt-1.5 flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">{featuredEvent.title}</h3>
-                          {featuredEvent.subtitle && <p className="mt-1.5 text-sm text-gray-600">{featuredEvent.subtitle}</p>}
+                <div className="relative">
+                  <Link href={`/evenementiel/evenements/${featuredEvent.slug}`} className="group grid overflow-hidden rounded-[28px] border border-black/[0.06] bg-white shadow-[0_18px_45px_rgba(50,37,20,.08)] md:grid-cols-[1.15fr_.85fr]">
+                    <EventImageFader images={photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="min-h-[250px] md:min-h-[330px]">
+                      <span className="absolute left-4 top-4 rounded-full bg-[var(--color-secondary)] px-3 py-1.5 text-[11px] font-extrabold tracking-wide text-[var(--color-primary-dark)]">À LA UNE</span>
+                    </EventImageFader>
+                    <div className="flex flex-col justify-between p-5 sm:p-6 md:p-7">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">Prochain événement</p>
+                        <div className="mt-1.5 flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">{featuredEvent.title}</h3>
+                            {featuredEvent.subtitle && <p className="mt-1.5 text-sm text-gray-600">{featuredEvent.subtitle}</p>}
+                          </div>
+                          {minPriceByEvent.has(featuredEvent.id) && <div className="shrink-0 text-right"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">À partir de</p><p className="mt-0.5 font-display text-2xl font-semibold text-gray-900">{formatPrice(minPriceByEvent.get(featuredEvent.id)!, tenant.currency)}</p></div>}
                         </div>
-                        {minPriceByEvent.has(featuredEvent.id) && <div className="shrink-0 text-right"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">À partir de</p><p className="mt-0.5 font-display text-2xl font-semibold text-gray-900">{formatPrice(minPriceByEvent.get(featuredEvent.id)!, tenant.currency)}</p></div>}
+                        <div className="mt-5 grid gap-2.5 text-sm text-gray-650 sm:grid-cols-2">
+                          <p className="flex items-center gap-2"><IconCalendarEvent size={18} className="text-[var(--color-primary)]" />{formatEventDayDate(featuredEvent.date_start)}</p>
+                          <p className="flex items-center gap-2"><IconClock size={18} className="text-[var(--color-primary)]" />{formatEventTime(featuredEvent.date_start)}</p>
+                          {featuredEvent.location && <p className="flex items-center gap-2 sm:col-span-2"><IconMapPin size={18} className="shrink-0 text-[var(--color-primary)]" /><span className="line-clamp-1">{featuredEvent.location}</span></p>}
+                          <div className="sm:col-span-2">
+                            <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining)}</p>
+                            {availabilityDetail(featuredEvent.capacity_remaining) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining)}</p>}
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-5 grid gap-2.5 text-sm text-gray-650 sm:grid-cols-2">
-                        <p className="flex items-center gap-2"><IconCalendarEvent size={18} className="text-[var(--color-primary)]" />{formatEventDayDate(featuredEvent.date_start)}</p>
-                        <p className="flex items-center gap-2"><IconClock size={18} className="text-[var(--color-primary)]" />{formatEventTime(featuredEvent.date_start)}</p>
-                        {featuredEvent.location && <p className="flex items-center gap-2 sm:col-span-2"><IconMapPin size={18} className="shrink-0 text-[var(--color-primary)]" /><span className="line-clamp-1">{featuredEvent.location}</span></p>}
-                        <div className="sm:col-span-2">
-                          <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining)}</p>
-                          {availabilityDetail(featuredEvent.capacity_remaining) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining)}</p>}
-                        </div>
+                      <div className="mt-5 flex items-center justify-end border-t border-black/[0.06] pt-4">
+                        <span className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-[var(--color-primary)] px-5 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">Réserve ta place <IconArrowRight size={16} /></span>
                       </div>
                     </div>
-                    <div className="mt-5 flex items-center justify-end border-t border-black/[0.06] pt-4">
-                      <span className="inline-flex min-h-11 items-center gap-1.5 rounded-[12px] bg-[var(--color-primary)] px-5 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">Réserve ta place <IconArrowRight size={16} /></span>
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                  {(socialPhotosByEvent.get(featuredEvent.id)?.length ?? 0) > 0 && (
+                    <EventSocialShareButton
+                      eventSlug={featuredEvent.slug}
+                      eventTitle={featuredEvent.title}
+                      photos={socialPhotosByEvent.get(featuredEvent.id)!}
+                      className="absolute right-4 top-4"
+                    />
+                  )}
+                </div>
 
                 {secondaryEvents.length > 0 && (
                   <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3">
                     {secondaryEvents.map((event) => (
-                      <Link key={event.id} href={`/evenementiel/evenements/${event.slug}`} className="group min-w-[78vw] snap-start overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm sm:min-w-0">
-                        <EventImageFader images={photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="aspect-[16/10]" />
-                        <div className="p-4">
-                          <div className="flex items-start justify-between gap-3"><h3 className="font-display text-xl font-semibold">{event.title}</h3>{minPriceByEvent.has(event.id) && <span className="shrink-0 text-sm font-bold text-gray-900">{formatPrice(minPriceByEvent.get(event.id)!, tenant.currency)}</span>}</div>
-                          <div className="mt-3 space-y-1.5 text-xs text-gray-500"><p className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatEventDayDate(event.date_start)}</p>{event.location && <p className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="line-clamp-1">{event.location}</span></p>}</div>
-                          <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><div><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining)}</span>{availabilityDetail(event.capacity_remaining) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining)}</p>}</div><span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">Réserve ta place <IconArrowRight size={15} /></span></div>
-                        </div>
-                      </Link>
+                      <div key={event.id} className="relative min-w-[78vw] snap-start sm:min-w-0">
+                        <Link href={`/evenementiel/evenements/${event.slug}`} className="group block h-full overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm">
+                          <EventImageFader images={photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="aspect-[16/10]" />
+                          <div className="p-4">
+                            <div className="flex items-start justify-between gap-3"><h3 className="font-display text-xl font-semibold">{event.title}</h3>{minPriceByEvent.has(event.id) && <span className="shrink-0 text-sm font-bold text-gray-900">{formatPrice(minPriceByEvent.get(event.id)!, tenant.currency)}</span>}</div>
+                            <div className="mt-3 space-y-1.5 text-xs text-gray-500"><p className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatEventDayDate(event.date_start)}</p>{event.location && <p className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="line-clamp-1">{event.location}</span></p>}</div>
+                            <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><div><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining)}</span>{availabilityDetail(event.capacity_remaining) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining)}</p>}</div><span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">Réserve ta place <IconArrowRight size={15} /></span></div>
+                          </div>
+                        </Link>
+                        {(socialPhotosByEvent.get(event.id)?.length ?? 0) > 0 && (
+                          <EventSocialShareButton
+                            eventSlug={event.slug}
+                            eventTitle={event.title}
+                            photos={socialPhotosByEvent.get(event.id)!}
+                            className="absolute right-3 top-3"
+                          />
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}

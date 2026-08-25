@@ -10,7 +10,6 @@ import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { getHighlightIcon } from '@/lib/events/highlightIcons';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import EventCheckoutClient from './EventCheckoutClient';
-import EventSocialShare from './EventSocialShare';
 import type { EventGalleryPhoto, EventRow, EventTicketType } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -111,14 +110,10 @@ export default async function EventDetailPage({ params }: PageProps) {
     .eq('event_id', eventRow.id)
     .order('sort_order', { ascending: true });
 
-  const eventPhotos = (eventPhotosRaw ?? []).map((photo) => ({
-    ...photo,
-    is_social_share: Boolean((photo as { is_social_share?: boolean }).is_social_share),
-  })) as EventGalleryPhoto[];
+  const eventPhotos = (eventPhotosRaw ?? []) as EventGalleryPhoto[];
   const eventImages = eventPhotos.length > 0
     ? eventPhotos.map((photo) => photo.image_url)
     : [eventRow.banner_image_url].filter((url): url is string => Boolean(url));
-  const socialPhotos = eventPhotos.filter((photo) => photo.is_social_share);
 
   const primaryColor = eventRow.theme_primary_color ?? EVENT_MODULE_DEFAULT_PRIMARY;
   const secondaryColor = eventRow.theme_secondary_color ?? EVENT_MODULE_DEFAULT_SECONDARY;
@@ -204,16 +199,6 @@ export default async function EventDetailPage({ params }: PageProps) {
             </div>
           </div>
         </section>
-
-        {socialPhotos.length > 0 && (
-          <div className="mt-4">
-            <EventSocialShare
-              eventSlug={eventRow.slug}
-              eventTitle={eventRow.title}
-              photos={socialPhotos.map((photo) => ({ id: photo.id, imageUrl: photo.image_url, caption: photo.caption }))}
-            />
-          </div>
-        )}
 
         <div className="py-6 sm:py-7">
           <EventCheckoutClient
