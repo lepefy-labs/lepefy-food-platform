@@ -2,11 +2,12 @@
 
 > **Documento operativo di riferimento per Codex / Claude Code / sviluppatori.**
 >
-> **Aggiornato:** 24 agosto 2026 — **v5.1 Current-State Snapshot**
+> **Aggiornato:** 25 agosto 2026 — **v5.2 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Questo aggiornamento
-> è preparato sul `main @ 26453e319f643ae6fec23ad3801c525e7942c349`; per lo stato deployed prevalgono
-> sempre branch/commit effettivamente promossi e migration realmente applicate.
+> è preparato dalla base `main @ 62b9049bd8e26fe52660735cb8879d7029b73de0` e include la delivery
+> Notification Journey v1; per lo stato deployed prevalgono sempre branch/commit effettivamente
+> promossi e migration realmente applicate.
 >
 > Questo documento descrive lo **stato architetturale corrente del codice**. Per la cronologia usare
 > `git log`, PR e commit. Se questo documento e il codice divergono, **vince il codice**.
@@ -86,6 +87,10 @@ Stack storefront corrente:
 
 Storefront tenant risolto principalmente da `NEXT_PUBLIC_TENANT_SLUG`, quindi `getTenant()`, CSS
 custom properties tenant e query filtrate per `tenant_id`.
+
+L'URL storefront pubblico canonico è configurato per tenant tramite `tenants.storefront_url`.
+`NEXT_PUBLIC_STOREFRONT_URL` resta solo fallback legacy quando il contesto notifiche non dispone di
+un URL tenant/legale.
 
 ### Branding admin di piattaforma
 
@@ -380,6 +385,39 @@ e tenant rules sono business logic sensibile. Il frontend non è source of truth
 
 ## 16. Notifiche
 
+Il modello transazionale shop è definito in `docs/NOTIFICATION_JOURNEY_V1.md`.
+
+n8n è il layer di trasporto/orchestrazione; stato ordine e payload webhook restano source of truth
+nell'applicazione. Gli eventi cliente v1 sono:
+
+```text
+order-confirmed
+order-ready-for-pickup
+order-shipped
+order-completed
+order-cancelled
+```
+
+`order-completed` distingue `completionType = delivered | picked_up`.
+
+`order-stock-conflict` resta un incidente operativo/admin in v1 e non va trasformato in una normale
+email cliente finché il flusso refund/risoluzione non è modellato esplicitamente.
+
+Il contesto notifiche è multi-tenant e include identità/branding, `storefrontUrl`, locale/currency,
+support email/WhatsApp, business context e dati Click & Collect:
+
+```text
+pickup.address
+pickup.mapsUrl
+pickup.hours
+```
+
+I dati pickup provengono da `tenant.click_collect_*` / `tenant.google_maps_url`; non usare
+`business.legalAddress` come sostituto semantico della location Click & Collect.
+
+Per le email v1: una sola CTA primaria per milestone, copy transazionale breve, `[TEST]` + banner
+visibile in test mode, niente branding n8n nel messaggio cliente.
+
 I destinatari tenant sono configurati/versionati; non usare email hardcoded. Recovery marketing o
 reminder checkout futuri devono rispettare consenso/configurazione tenant e non partire solo perché
 una sessione è `open`.
@@ -433,9 +471,12 @@ apps/storefront/src/lib/cart/*
 apps/storefront/src/lib/checkout/*
 apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
+apps/storefront/src/lib/notifications/*
+apps/storefront/src/lib/orders/adminOrderWorkflow.ts
 apps/storefront/src/lib/supabase/*
 apps/storefront/src/app/api/checkout/*
 apps/storefront/src/app/api/checkout-sessions/*
+apps/storefront/src/app/api/admin/platform/notifications/*
 apps/storefront/src/app/(shop)/checkout/*
 apps/storefront/src/app/api/webhooks/stripe/*
 apps/storefront/src/app/admin/*
@@ -472,7 +513,8 @@ Ogni delivery deve essere validata sul proprio SHA; non riusare dichiarazioni di
 - shell/page hierarchy condivisa;
 - Commandes/order detail come workspace operativo;
 - workflow singolo/bulk unificato;
-- `/admin/checkout-funnel` per conversion/recovery shop.
+- `/admin/checkout-funnel` per conversion/recovery shop;
+- console `PLATFORM_OWNER` per testare i webhook notifiche senza creare ordini reali.
 
 ### Cart / checkout
 - `/cart` focalizzato sul basket;
@@ -486,6 +528,12 @@ Ogni delivery deve essere validata sul proprio SHA; non riusare dichiarazioni di
 - completed checkout collegato a `order_id` e conservato;
 - expiry 24h non distruttiva;
 - analytics lifecycle/recovery.
+
+### Notifiche
+- payload ordine multi-tenant con branding/support/storefront canonico;
+- Notification Journey v1 come specifica transazionale;
+- contesto Click & Collect esplicito (`pickup.address/mapsUrl/hours`);
+- stock conflict mantenuto come incidente operativo v1.
 
 ---
 
@@ -529,8 +577,8 @@ o feature cross-module. Non trasformarlo in changelog.
 
 ---
 
-# Fine snapshot v5.1
+# Fine snapshot v5.2
 
-**Base audit:** `main @ 26453e319f643ae6fec23ad3801c525e7942c349`  
-**Data:** 24 agosto 2026  
+**Base audit:** `main @ 62b9049bd8e26fe52660735cb8879d7029b73de0` + Notification Journey v1 delivery  
+**Data:** 25 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.

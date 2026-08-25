@@ -24,6 +24,11 @@ export interface TenantNotificationContext {
     country: string;
     legalAddress: string | null;
   };
+  pickup: {
+    address: string | null;
+    mapsUrl: string | null;
+    hours: string | null;
+  };
 }
 
 interface TenantNotificationRow {
@@ -43,6 +48,10 @@ interface TenantNotificationRow {
   legal_website: string | null;
   legal_address: string | null;
   whatsapp_number: string | null;
+  click_collect_address: string | null;
+  google_maps_url: string | null;
+  click_collect_hours: string | null;
+  click_collect_hours_it: string | null;
 }
 
 export async function getTenantNotificationContext(
@@ -53,7 +62,7 @@ export async function getTenantNotificationContext(
     const { data, error } = await supabase
       .from('tenants')
       .select(
-        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number',
+        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number, click_collect_address, google_maps_url, click_collect_hours, click_collect_hours_it',
       )
       .eq('id', tenantId)
       .eq('active', true)
@@ -69,6 +78,9 @@ export async function getTenantNotificationContext(
     const tenantStorefront = tenant.storefront_url?.replace(/\/$/, '') ?? null;
     const legalWebsite = tenant.legal_website?.replace(/\/$/, '') ?? null;
     const legacyConfiguredStorefront = process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/\/$/, '') ?? null;
+    const pickupHours = tenant.locale.toLowerCase().startsWith('it')
+      ? tenant.click_collect_hours_it ?? tenant.click_collect_hours
+      : tenant.click_collect_hours ?? tenant.click_collect_hours_it;
 
     return {
       tenantId: tenant.id,
@@ -93,6 +105,11 @@ export async function getTenantNotificationContext(
         city: tenant.city,
         country: tenant.country,
         legalAddress: tenant.legal_address,
+      },
+      pickup: {
+        address: tenant.click_collect_address,
+        mapsUrl: tenant.google_maps_url,
+        hours: pickupHours,
       },
     };
   } catch (error) {

@@ -22,6 +22,22 @@ Follow this sequence:
 
 There is exactly one normal approval gate: between POST MOCKUP and implementation.
 
+### Instruction refresh checkpoints
+
+Do not rely on a copy of these instructions remembered from earlier in a long conversation.
+
+Treat every newly approved implementation scope as a **new agent run**, even when it starts inside an existing conversation.
+
+For every run:
+
+1. fetch and read the current `AGENTS.md` from the requested target branch before planning implementation;
+2. re-fetch and re-read `AGENTS.md` immediately before the **first remote repository write**;
+3. re-check the target branch SHA and the commit/deployment batching rules immediately before the final ref update/push;
+4. if the target branch moved or the requester materially changes scope, re-read `AGENTS.md` and re-evaluate the delivery plan before writing.
+
+Never assume `AGENTS.md` remains in working memory.
+Never skip these refresh checkpoints because the same file was read earlier in the conversation.
+
 ## Autonomy contract
 
 Once the requester approves the POST mockup or implementation plan, that approval covers the **entire approved scope**.
@@ -217,6 +233,10 @@ Default rule:
 - If remote validation after the final push exposes an implementation-introduced error, create one corrective commit containing the complete fix, then verify the new final SHA.
 - Multiple commits are acceptable only when technically unavoidable, when recovering from a failed final validation, or when a critical safety boundary requires separate delivery.
 
+When the connected GitHub tool would create one commit per file write, **do not use repeated per-file writes on the production target branch**. Prefer an atomic Git tree/commit followed by one ref update, or another staging mechanism that results in one final target-branch commit.
+
+Before the target branch is updated, compare the current target SHA with the run's base SHA. After the update, verify the expected commit count for the run. Normally there must be exactly **one implementation commit** between the base SHA and the final SHA. If there are unexpectedly more, treat it as a delivery-process violation and report it rather than silently accepting it.
+
 This batching rule exists to reduce unnecessary production deployments, avoid concurrent obsolete Vercel builds, and make each deploy correspond to a coherent user-visible step.
 
 ---
@@ -233,7 +253,8 @@ Before the normal final push:
 2. Verify only intended files are included.
 3. Check for debug code, temporary assets and accidental unrelated changes.
 4. Confirm `LEPEFY_PROJECT_CONTEXT.md` was updated when required by the maintenance rule above.
-5. Use available remote/static checks that do not require publishing intermediate production commits.
+5. Re-fetch `AGENTS.md` from the target branch and confirm the planned write strategy still complies with the current batching/deployment rules.
+6. Use available remote/static checks that do not require publishing intermediate production commits.
 
 After the final push:
 
@@ -280,11 +301,12 @@ After the final push:
 
 1. Independently read the requested remote branch.
 2. Confirm the expected final commit SHA is present on that target.
-3. Inspect relevant GitHub CI when available.
-4. If the project uses Vercel and access is available, locate the Vercel deployment whose Git commit SHA matches the expected final commit.
-5. Treat `QUEUED`, `INITIALIZING`, `BUILDING`, or equivalent deployment states as **in progress**, never as completion.
-6. Do **not** send a completion response until that matching deployment reaches `READY` / successful production state.
-7. If the matching deployment reaches `ERROR`, `FAILED`, `CANCELED`, or another unsuccessful terminal state:
+3. Confirm the expected commit count from the recorded base SHA to the final SHA; normally one implementation commit, plus only explicitly justified corrective commits.
+4. Inspect relevant GitHub CI when available.
+5. If the project uses Vercel and access is available, locate the Vercel deployment whose Git commit SHA matches the expected final commit.
+6. Treat `QUEUED`, `INITIALIZING`, `BUILDING`, or equivalent deployment states as **in progress**, never as completion.
+7. Do **not** send a completion response until that matching deployment reaches `READY` / successful production state.
+8. If the matching deployment reaches `ERROR`, `FAILED`, `CANCELED`, or another unsuccessful terminal state:
    - inspect the actual Vercel build/deployment logs,
    - diagnose the failure,
    - fix implementation-introduced issues autonomously,
@@ -292,7 +314,7 @@ After the final push:
    - verify the new remote SHA,
    - locate the new matching Vercel deployment,
    - repeat until it reaches `READY`.
-8. If a deployment failure is genuinely external or pre-existing and cannot reasonably be fixed within the approved scope, report it as a blocker with evidence instead of claiming completion.
+9. If a deployment failure is genuinely external or pre-existing and cannot reasonably be fixed within the approved scope, report it as a blocker with evidence instead of claiming completion.
 
 The deployment being `READY` is part of the definition of done whenever Vercel is the repository's production deployment path and the deployment is observable by the agent.
 
