@@ -1,16 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconSearch,
-  IconX,
+  IconAlertTriangle,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
   IconChevronUp,
+  IconClock,
   IconPrinter,
+  IconSearch,
+  IconSnowflake,
+  IconTemperature,
+  IconX,
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import StatusBadge from '../_components/ui/StatusBadge';
@@ -19,45 +23,42 @@ import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/
 import AdminOrdersPoller from './AdminOrdersPoller';
 import type { OrderStatus } from '@lepefy/types';
 
-// ─── Local types ──────────────────────────────────────────────────────────────
-
 interface ShippingAddress {
-  city?:        string;
+  city?: string;
   postal_code?: string;
-  country?:     string;
+  country?: string;
 }
 
 interface ShippingDetails {
   carrierName?: string;
-  numParcels?:  number;
+  numParcels?: number;
 }
 
 export interface OrderItemRow {
-  id:           string;
-  name:         string;
-  quantity:     number;
-  subtotal:     number;
+  id: string;
+  name: string;
+  quantity: number;
+  subtotal: number;
   storage_type: string | null;
+  warehouse_location?: string | null;
 }
 
 export interface ListOrder {
-  id:               string;
-  created_at:       string;
-  full_name:        string | null;
-  email:            string;
+  id: string;
+  created_at: string;
+  full_name: string | null;
+  email: string;
   fulfillment_type: 'delivery' | 'pickup';
   shipping_address: ShippingAddress | null;
   shipping_details: ShippingDetails | null;
-  subtotal:         number;
-  shipping_cost:    number;
-  total:            number;
-  payment_method:   string | null;
-  payment_status:   string;
-  status:           OrderStatus;
-  order_items:      OrderItemRow[];
+  subtotal: number;
+  shipping_cost: number;
+  total: number;
+  payment_method: string | null;
+  payment_status: string;
+  status: OrderStatus;
+  order_items: OrderItemRow[];
 }
-
-// ─── SVG Flags ────────────────────────────────────────────────────────────────
 
 const FLAGS: Record<string, string> = {
   FR: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2"><rect width="1" height="2" fill="#002395"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ED2939"/></svg>`,
@@ -70,133 +71,104 @@ const FLAGS: Record<string, string> = {
   PT: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2"><rect width="3" height="2" fill="#FF0000"/><rect width="1.2" height="2" fill="#006600"/></svg>`,
 };
 
+const PAYMENT_CONFIG: Record<string, { label: string; icon: string; className: string }> = {
+  stripe: { label: 'Carte', icon: '💳', className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200' },
+  external_link: { label: 'Externe', icon: '↗', className: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
+  satispay: { label: 'Satispay', icon: '🟠', className: 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300' },
+  in_store: { label: 'En magasin', icon: '🏪', className: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' },
+  cash: { label: 'Espèces', icon: '💶', className: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300' },
+};
+
 function FlagBadge({ country }: { country: string }) {
   const svg = FLAGS[country.toUpperCase()];
   if (!svg) return <span className="text-xs text-gray-500 dark:text-gray-400">{country}</span>;
   return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold
-                 bg-amber-50 text-amber-800 border border-amber-200
-                 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
-    >
-      <span
-        className="inline-block w-4 h-3 rounded-sm overflow-hidden"
-        dangerouslySetInnerHTML={{ __html: svg }}
-        style={{ lineHeight: 0 }}
-      />
+    <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+      <span className="inline-block h-3 w-4 overflow-hidden rounded-sm" dangerouslySetInnerHTML={{ __html: svg }} style={{ lineHeight: 0 }} />
       {country.toUpperCase()}
     </span>
   );
 }
 
-// ─── DestinationCell ──────────────────────────────────────────────────────────
-
-function DestinationCell({
-  fulfillmentType,
-  shippingAddress,
-}: {
-  fulfillmentType: string;
-  shippingAddress: ShippingAddress | null;
-}) {
+function DestinationCell({ fulfillmentType, shippingAddress }: { fulfillmentType: string; shippingAddress: ShippingAddress | null }) {
   if (fulfillmentType === 'pickup') {
-    return (
-      <span
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold
-                   bg-blue-50 text-blue-800 border border-blue-200
-                   dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
-      >
-        🏪 C&amp;C
-      </span>
-    );
+    return <span className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">🏪 C&amp;C</span>;
   }
-  if (!shippingAddress) return <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>;
-
+  if (!shippingAddress) return <span className="text-xs text-gray-400 dark:text-gray-500">—</span>;
   const country = shippingAddress.country ?? '';
-  const isIT    = country.toUpperCase() === 'IT' || country === '';
-
-  if (isIT) {
-    return (
-      <span className="text-xs text-gray-500 dark:text-gray-400">
-        {shippingAddress.postal_code && (
-          <span className="font-mono">{shippingAddress.postal_code}</span>
-        )}
-        {shippingAddress.city && <span className="ml-1">{shippingAddress.city}</span>}
-      </span>
-    );
+  if (country.toUpperCase() === 'IT' || country === '') {
+    return <span className="text-xs text-gray-500 dark:text-gray-400">{shippingAddress.postal_code && <span className="font-mono">{shippingAddress.postal_code}</span>}{shippingAddress.city && <span className="ml-1">{shippingAddress.city}</span>}</span>;
   }
-
   return <FlagBadge country={country} />;
 }
 
-// ─── PaymentBadge ─────────────────────────────────────────────────────────────
-
-const PAYMENT_CONFIG: Record<string, { label: string; icon: string; className: string }> = {
-  stripe: {
-    label:     'Carte',
-    icon:      '💳',
-    className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
-  },
-  satispay: {
-    label:     'Satispay',
-    icon:      '🟠',
-    className: 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
-  },
-  in_store: {
-    label:     'En magasin',
-    icon:      '🏪',
-    className: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-  },
-  cash: {
-    label:     'Espèces',
-    icon:      '💶',
-    className: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300',
-  },
-};
-
-function PaymentBadge({ method }: { method: string | null }) {
-  if (!method) return <span className="text-gray-400 dark:text-gray-500 text-xs">—</span>;
-
-  const cfg = PAYMENT_CONFIG[method] ?? {
-    label:     method,
-    icon:      '💶',
-    className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
-  };
-
+function PaymentBadge({ method, status }: { method: string | null; status: string }) {
+  if (!method) return <span className="text-xs text-gray-400">—</span>;
+  const cfg = PAYMENT_CONFIG[method] ?? { label: method, icon: '💶', className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200' };
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${cfg.className}`}>
-      <span>{cfg.icon}</span>
-      {cfg.label}
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${status === 'paid' ? cfg.className : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'}`}>
+      <span>{cfg.icon}</span>{status === 'paid' ? cfg.label : `${cfg.label} · en attente`}
     </span>
   );
 }
 
-// ─── OrdersTable ──────────────────────────────────────────────────────────────
+function elapsed(createdAt: string) {
+  const diff = Math.max(0, Date.now() - new Date(createdAt).getTime());
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${Math.max(1, minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  return `${Math.floor(hours / 24)} j`;
+}
+
+function isAged(order: ListOrder) {
+  return !['delivered', 'cancelled'].includes(order.status) && Date.now() - new Date(order.created_at).getTime() >= 24 * 60 * 60 * 1000;
+}
+
+function coldSummary(order: ListOrder) {
+  return (order.order_items ?? []).reduce((acc, item) => {
+    if (item.storage_type === 'frozen') acc.frozen += item.quantity;
+    if (item.storage_type === 'fresh') acc.fresh += item.quantity;
+    return acc;
+  }, { fresh: 0, frozen: 0 });
+}
+
+function nextActionLabel(order: ListOrder) {
+  if (order.status === 'new') return 'Préparer';
+  if (order.status === 'preparing') return order.fulfillment_type === 'pickup' ? 'Prête au retrait' : 'Expédier';
+  if (order.status === 'ready_for_pickup' && order.fulfillment_type === 'pickup') return 'Marquer retirée';
+  if (order.status === 'shipped' && order.fulfillment_type === 'delivery') return 'Marquer livrée';
+  return 'Voir';
+}
+
+function priority(order: ListOrder) {
+  if (order.payment_status !== 'paid') return 0;
+  if (isAged(order)) return 1;
+  if (order.status === 'new') return 2;
+  if (order.status === 'preparing') return 3;
+  if (order.status === 'ready_for_pickup') return 4;
+  if (order.status === 'shipped') return 5;
+  if (order.status === 'delivered') return 8;
+  return 9;
+}
 
 interface OrdersTableProps {
-  orders:         ListOrder[];
+  orders: ListOrder[];
   tenantCurrency: string;
-  carriers:       string[];
+  carriers: string[];
 }
 
 export default function OrdersTable({ orders, tenantCurrency, carriers }: OrdersTableProps) {
   const router = useRouter();
-
-  const [searchQuery, setSearchQuery]     = useState('');
-  const [expandedRows, setExpandedRows]   = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy]               = useState<'date' | 'total' | null>(null);
-  const [sortDir, setSortDir]             = useState<'asc' | 'desc'>('desc');
-  const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set());
-  const [toast, setToast]                 = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<'date' | 'total' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [pendingTracking, setPendingTracking] = useState<PendingTrackingOrder[] | null>(null);
 
-  // Reset selezione quando cambia la ricerca testuale — altrimenti si
-  // rischia di agire su ordini non più visibili. (Sui filtri di
-  // AdminFilters il reset avviene già gratis: cambiano i searchParams,
-  // la pagina server rifà il fetch e OrdersTable viene rimontato.)
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [searchQuery]);
-
+  useEffect(() => { setSelectedIds(new Set()); }, [searchQuery]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
@@ -212,12 +184,8 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
   }
 
   function toggleSort(col: 'date' | 'total') {
-    if (sortBy === col) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(col);
-      setSortDir('desc');
-    }
+    if (sortBy === col) setSortDir(value => value === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('desc'); }
   }
 
   function ariaSort(col: 'date' | 'total'): 'ascending' | 'descending' | 'none' {
@@ -226,24 +194,24 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
   }
 
   const filteredOrders = searchQuery.trim()
-    ? orders.filter(o => {
+    ? orders.filter(order => {
         const q = searchQuery.toLowerCase();
-        return (
-          (o.full_name ?? '').toLowerCase().includes(q) ||
-          (o.email     ?? '').toLowerCase().includes(q) ||
-          o.id.toLowerCase().includes(q)                ||
-          o.id.slice(0, 8).toLowerCase().includes(q)
-        );
+        return (order.full_name ?? '').toLowerCase().includes(q) || order.email.toLowerCase().includes(q) || order.id.toLowerCase().includes(q) || order.id.slice(0, 8).toLowerCase().includes(q);
       })
     : orders;
 
-  const sortedOrders = [...filteredOrders].sort((a, b) => {
-    if (!sortBy) return 0;
-    const mult = sortDir === 'asc' ? 1 : -1;
-    if (sortBy === 'date')  return mult * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    if (sortBy === 'total') return mult * (a.total - b.total);
-    return 0;
-  });
+  const sortedOrders = useMemo(() => {
+    const result = [...filteredOrders];
+    if (sortBy === 'date') {
+      const mult = sortDir === 'asc' ? 1 : -1;
+      return result.sort((a, b) => mult * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+    }
+    if (sortBy === 'total') {
+      const mult = sortDir === 'asc' ? 1 : -1;
+      return result.sort((a, b) => mult * (a.total - b.total));
+    }
+    return result.sort((a, b) => priority(a) - priority(b) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [filteredOrders, sortBy, sortDir]);
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => {
@@ -254,41 +222,34 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
   }
 
   function toggleSelectAll() {
-    setSelectedIds(prev =>
-      prev.size === sortedOrders.length ? new Set() : new Set(sortedOrders.map(o => o.id))
-    );
+    setSelectedIds(prev => prev.size === sortedOrders.length ? new Set() : new Set(sortedOrders.map(order => order.id)));
   }
 
   function handleExportCsv() {
-    const rows = sortedOrders.filter(o => selectedIds.has(o.id));
+    const rows = sortedOrders.filter(order => selectedIds.has(order.id));
     const header = ['Commande', 'Date', 'Client', 'Email', 'Total', 'Statut', 'Paiement', 'Transporteur'];
-    const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-
-    const lines = rows.map(o => [
-      o.id.slice(0, 8).toUpperCase(),
-      new Date(o.created_at).toLocaleDateString('fr-FR'),
-      o.full_name ?? '',
-      o.email,
-      formatPrice(o.total, tenantCurrency),
-      o.status,
-      o.payment_method ?? '',
-      o.shipping_details?.carrierName ?? '',
-    ].map(v => csvEscape(String(v))).join(','));
-
-    const csv = [header.map(csvEscape).join(','), ...lines].join('\r\n');
-    // BOM per far riconoscere l'UTF-8 a Excel su Windows (accenti francesi)
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
+    const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const lines = rows.map(order => [
+      order.id.slice(0, 8).toUpperCase(),
+      new Date(order.created_at).toLocaleDateString('fr-FR'),
+      order.full_name ?? '',
+      order.email,
+      formatPrice(order.total, tenantCurrency),
+      order.status,
+      order.payment_method ?? '',
+      order.shipping_details?.carrierName ?? '',
+    ].map(value => csvEscape(String(value))).join(','));
+    const blob = new Blob(['\uFEFF' + [header.map(csvEscape).join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
     a.download = `commandes_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   function handlePrintPickingLists() {
-    const ids = Array.from(selectedIds).join(',');
-    window.open(`/admin/orders/picking-list?ids=${ids}`, '_blank', 'noopener,noreferrer');
+    window.open(`/admin/orders/picking-list?ids=${Array.from(selectedIds).join(',')}`, '_blank', 'noopener,noreferrer');
   }
 
   async function handleMarkShipped(tracking?: Record<string, { carrier: string; code: string }>) {
@@ -298,500 +259,179 @@ export default function OrdersTable({ orders, tenantCurrency, carriers }: Orders
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderIds: ids, tracking }),
     });
-
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       setToast({ msg: body?.error ?? 'Erreur lors de la mise à jour.', type: 'error' });
       return;
     }
-
     const { shipped, readyForPickup, skipped } = await res.json();
-    const missingTracking = skipped.filter((s: { reason: string }) => s.reason === 'missing_tracking');
-    const wrongStatus     = skipped.filter((s: { reason: string }) => s.reason === 'wrong_status');
-
+    const missingTracking = skipped.filter((item: { reason: string }) => item.reason === 'missing_tracking');
+    const wrongStatus = skipped.filter((item: { reason: string }) => item.reason === 'wrong_status');
     if (missingTracking.length > 0 && !tracking) {
-      // Primo giro: apri il pannello solo per chi manca ancora il tracking
-      setPendingTracking(missingTracking.map((s: { id: string }) => {
-        const order = orders.find(o => o.id === s.id);
-        return {
-          id:    s.id,
-          label: `#${s.id.slice(0, 8).toUpperCase()} — ${order?.full_name ?? order?.email ?? ''}`,
-        };
+      setPendingTracking(missingTracking.map((item: { id: string }) => {
+        const order = orders.find(candidate => candidate.id === item.id);
+        return { id: item.id, label: `#${item.id.slice(0, 8).toUpperCase()} — ${order?.full_name ?? order?.email ?? ''}` };
       }));
-    } else {
-      setPendingTracking(null);
-    }
-
-    // Le risolte escono dalla selezione; quelle bloccate per statuto sbagliato
-    // restano selezionate; quelle in attesa di tracking restano selezionate
-    // finché il pannello non si chiude con successo o annullamento.
-    setSelectedIds(new Set([...wrongStatus.map((s: { id: string }) => s.id), ...missingTracking.map((s: { id: string }) => s.id)]));
-
+    } else setPendingTracking(null);
+    setSelectedIds(new Set([...wrongStatus.map((item: { id: string }) => item.id), ...missingTracking.map((item: { id: string }) => item.id)]));
     const parts: string[] = [];
-    if (shipped.length)             parts.push(`${shipped.length} expédiée${shipped.length > 1 ? 's' : ''}`);
-    if (readyForPickup.length)      parts.push(`${readyForPickup.length} prête${readyForPickup.length > 1 ? 's' : ''} (retrait)`);
-    if (missingTracking.length && tracking) parts.push(`${missingTracking.length} ignorée${missingTracking.length > 1 ? 's' : ''} (code de suivi manquant)`);
-    if (wrongStatus.length)         parts.push(`${wrongStatus.length} ignorée${wrongStatus.length > 1 ? 's' : ''} (statut incompatible)`);
-
-    if (parts.length) {
-      setToast({
-        msg:  parts.join(' · '),
-        type: shipped.length === 0 && readyForPickup.length === 0 ? 'error' : 'success',
-      });
-    }
-
-    router.refresh(); // la pagina server rilegge gli ordini aggiornati
+    if (shipped.length) parts.push(`${shipped.length} expédiée${shipped.length > 1 ? 's' : ''}`);
+    if (readyForPickup.length) parts.push(`${readyForPickup.length} prête${readyForPickup.length > 1 ? 's' : ''} (retrait)`);
+    if (missingTracking.length && tracking) parts.push(`${missingTracking.length} ignorée${missingTracking.length > 1 ? 's' : ''} (tracking manquant)`);
+    if (wrongStatus.length) parts.push(`${wrongStatus.length} ignorée${wrongStatus.length > 1 ? 's' : ''} (statut incompatible)`);
+    if (parts.length) setToast({ msg: parts.join(' · '), type: shipped.length === 0 && readyForPickup.length === 0 ? 'error' : 'success' });
+    router.refresh();
   }
 
   const handleNewOrders = useCallback((newOrders: { id: string }[]) => {
     const first = newOrders[0];
     if (!first) return;
-
-    if (newOrders.length === 1) {
-      setToast({ msg: `Nouvelle commande #${first.id.slice(0, 8).toUpperCase()}`, type: 'success' });
-    } else {
-      setToast({ msg: `${newOrders.length} nouvelles commandes`, type: 'success' });
-    }
-
+    setToast({ msg: newOrders.length === 1 ? `Nouvelle commande #${first.id.slice(0, 8).toUpperCase()}` : `${newOrders.length} nouvelles commandes`, type: 'success' });
     if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('Nouvelle commande', {
-        body: `Commande #${first.id.slice(0, 8).toUpperCase()}`,
-        tag:  'lepefy-new-order',
-      });
+      new Notification('Nouvelle commande', { body: `Commande #${first.id.slice(0, 8).toUpperCase()}`, tag: 'lepefy-new-order' });
     }
   }, []);
 
   return (
     <div>
-
-      {/* ── Polling live (Fase 4) — sospeso in background, non forza il refresh
-           mentre il pannello tracking della Fase 3 è aperto ──────────────────── */}
       <AdminOrdersPoller onNewOrders={handleNewOrders} isEditing={pendingTracking !== null} />
 
-      {/* ── Search bar + contatore ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
-          <IconSearch
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Client, email ou n° commande..."
-            className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200
-                       dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900
-                       text-gray-900 dark:text-gray-100 focus:outline-none
-                       focus:ring-2 focus:ring-[var(--color-primary)]
-                       focus:border-transparent"
-          />
-          {searchQuery && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2"
-              aria-label="Effacer"
-            >
-              <IconX size={13} />
-            </Button>
-          )}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative max-w-sm flex-1">
+          <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Client, email ou n° commande..." className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-8 pr-8 text-sm text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100" />
+          {searchQuery && <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2" aria-label="Effacer"><IconX size={13} /></Button>}
         </div>
-
-        {searchQuery && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
-            {filteredOrders.length} résultat
-            {filteredOrders.length !== 1 ? 's' : ''}
-          </span>
-        )}
+        {searchQuery && <span className="shrink-0 text-xs text-gray-500">{filteredOrders.length} résultat{filteredOrders.length !== 1 ? 's' : ''}</span>}
       </div>
 
-      {/* ── Tabella ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         {sortedOrders.length === 0 ? (
-          <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-12">
-            {searchQuery
-              ? `Aucune commande pour « ${searchQuery} »`
-              : 'Aucune commande.'
-            }
-          </p>
+          <p className="py-12 text-center text-sm text-gray-500">{searchQuery ? `Aucune commande pour « ${searchQuery} »` : 'Aucune commande.'}</p>
         ) : (
           <>
-          {/* ── Desktop / tablet ≥ md: tabella ──────────────────────────────── */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-xs
-                               font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  <th scope="col" className="w-8 px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size > 0 && selectedIds.size === sortedOrders.length}
-                      ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < sortedOrders.length; }}
-                      onChange={toggleSelectAll}
-                      aria-label="Sélectionner toutes les commandes"
-                      className="rounded border-gray-300 dark:border-gray-600"
-                    />
-                  </th>
-                  <th scope="col" className="w-8 px-3 py-3">
-                    <span className="sr-only">Développer</span>
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left" aria-sort={ariaSort('date')}>
-                    <button
-                      onClick={() => toggleSort('date')}
-                      className="flex items-center gap-1 uppercase tracking-wide
-                                 hover:text-gray-700 dark:hover:text-gray-200"
-                    >
-                      Commande
-                      {sortBy === 'date' && (sortDir === 'asc'
-                        ? <IconChevronUp size={12} />
-                        : <IconChevronDown size={12} />)}
-                    </button>
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left">Produits</th>
-                  <th scope="col" className="px-4 py-3 text-left">Destination</th>
-                  <th scope="col" className="px-4 py-3 text-left" aria-sort={ariaSort('total')}>
-                    <button
-                      onClick={() => toggleSort('total')}
-                      className="flex items-center gap-1 uppercase tracking-wide
-                                 hover:text-gray-700 dark:hover:text-gray-200"
-                    >
-                      Montant
-                      {sortBy === 'total' && (sortDir === 'asc'
-                        ? <IconChevronUp size={12} />
-                        : <IconChevronDown size={12} />)}
-                    </button>
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left">Statut</th>
-                  <th scope="col" className="hidden lg:table-cell px-4 py-3 text-left">Paiement</th>
-                  <th scope="col" className="px-4 py-3">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedOrders.map(order => {
-                  const isExpanded   = expandedRows.has(order.id);
-                  const items        = order.order_items ?? [];
-                  const visibleItems = items.slice(0, 2);
-                  const hiddenCount  = Math.max(0, items.length - 2);
-                  const isToday      = new Date(order.created_at).toDateString() === new Date().toDateString();
-
-                  return (
-                    <Fragment key={order.id}>
-
-                      {/* ── Riga principale ──────────────────────────────── */}
-                      <tr className={`border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors${isExpanded ? ' bg-gray-50/60 dark:bg-gray-800/60' : ''}`}>
-
-                        {/* Checkbox selezione */}
-                        <td className="px-3 py-3 w-8">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(order.id)}
-                            onChange={() => toggleSelect(order.id)}
-                            aria-label={`Sélectionner la commande #${order.id.slice(0, 8).toUpperCase()}`}
-                            className="rounded border-gray-300 dark:border-gray-600"
-                          />
-                        </td>
-
-                        {/* Freccia espansione */}
-                        <td className="px-3 py-3 w-8">
-                          {items.length > 0 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleRow(order.id)}
-                              aria-label={isExpanded ? 'Réduire' : 'Développer'}
-                              aria-expanded={isExpanded}
-                            >
-                              {isExpanded
-                                ? <IconChevronDown size={14} stroke={2} />
-                                : <IconChevronRight size={14} stroke={1.5} />
-                              }
-                            </Button>
-                          )}
-                        </td>
-
-                        {/* Commande + Client */}
-                        <td className="px-4 py-3">
-                          <p className="font-mono text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            #{order.id.slice(0, 8).toUpperCase()}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {new Date(order.created_at).toLocaleDateString('fr-FR', {
-                              day: '2-digit', month: '2-digit',
-                            })}
-                          </p>
-                          {isToday && (
-                            <span className="text-xs font-medium bg-yellow-50 text-yellow-700
-                                             dark:bg-yellow-950 dark:text-yellow-300
-                                             px-1.5 py-0.5 rounded mt-0.5 inline-block">
-                              Aujourd&apos;hui
-                            </span>
-                          )}
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-snug mt-1 truncate max-w-[160px]">
-                            {order.full_name ?? '—'}
-                          </p>
-                        </td>
-
-                        {/* Produits — max 2 + contatore */}
-                        <td className="px-4 py-3 max-w-[200px]">
-                          <div className="space-y-1">
-                            {visibleItems.map((item, idx) => (
-                              <div key={item.id ?? idx} className="flex items-center gap-1.5">
-                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400
-                                                 bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 flex-shrink-0">
-                                  ×{item.quantity}
-                                </span>
-                                <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
-                                  {item.name}
-                                </span>
-                                {item.storage_type === 'frozen' && (
-                                  <span className="text-[10px]" title="Surgelé" aria-label="Surgelé" role="img">❄</span>
-                                )}
-                                {item.storage_type === 'fresh' && (
-                                  <span className="text-[10px]" title="Frais" aria-label="Frais" role="img">🌿</span>
-                                )}
-                              </div>
-                            ))}
-                            {hiddenCount > 0 && !isExpanded && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                + {hiddenCount} autre{hiddenCount > 1 ? 's' : ''}{' '}
-                                <span className="text-gray-500 dark:text-gray-400">(↑ développer)</span>
-                              </p>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Destination */}
-                        <td className="px-4 py-3">
-                          <DestinationCell
-                            fulfillmentType={order.fulfillment_type}
-                            shippingAddress={order.shipping_address}
-                          />
-                        </td>
-
-                        {/* Montant (+ Transporteur) */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="font-semibold text-gray-900 dark:text-gray-100">
-                            {formatPrice(order.total, tenantCurrency)}
-                          </span>
-                          {order.shipping_details?.carrierName && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
-                              {order.shipping_details.carrierName}
-                              {order.shipping_details.numParcels != null && order.shipping_details.numParcels > 1
-                                ? ` · ${order.shipping_details.numParcels} colis`
-                                : ''}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Statut */}
-                        <td className="px-4 py-3">
-                          <StatusBadge status={order.status} />
-                        </td>
-
-                        {/* Paiement — secondaria, visibile solo ≥ lg */}
-                        <td className="hidden lg:table-cell px-4 py-3">
-                          <PaymentBadge method={order.payment_method} />
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link
-                              href={`/admin/orders/${order.id}/picking-list`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 text-gray-400 hover:text-gray-600
-                                         dark:text-gray-500 dark:hover:text-gray-300
-                                         hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                              title="Liste de préparation"
-                              aria-label="Imprimer la liste de préparation"
-                            >
-                              <IconPrinter size={15} />
-                            </Link>
-                            <Link
-                              href={`/admin/orders/${order.id}`}
-                              className="text-xs font-medium px-3 py-1.5 rounded-lg
-                                         border border-gray-200 dark:border-gray-700
-                                         text-gray-700 dark:text-gray-300
-                                         hover:bg-gray-50 dark:hover:bg-gray-800
-                                         transition-colors whitespace-nowrap"
-                            >
-                              Voir →
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* ── Pannello espanso ─────────────────────────────── */}
-                      {isExpanded && (
-                        <tr key={`${order.id}-detail`}>
-                          <td />
-                          <td colSpan={8} className="px-4 pb-4 pt-1">
-                            <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800
-                                            overflow-hidden shadow-sm">
-
-                              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800
-                                              bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
-                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400
-                                                 uppercase tracking-wide">
-                                  Détail de la commande
-                                </span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {items.length} article{items.length > 1 ? 's' : ''}
-                                </span>
-                              </div>
-
-                              {/* Dati non più visibili nella riga principale */}
-                              <div className="px-4 py-2.5 border-b border-gray-50 dark:border-gray-800
-                                              flex flex-wrap items-center gap-x-6 gap-y-1
-                                              text-xs text-gray-500 dark:text-gray-400">
-                                <span>{order.email}</span>
-                                <span className="lg:hidden"><PaymentBadge method={order.payment_method} /></span>
-                              </div>
-
-                              <div className="divide-y divide-gray-50 dark:divide-gray-800">
-                                {items.map((item, idx) => (
-                                  <div
-                                    key={item.id ?? idx}
-                                    className="flex items-center justify-between px-4 py-2.5"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-xs font-semibold
-                                                       text-[var(--color-primary)]
-                                                       bg-[var(--color-primary-light)]
-                                                       rounded px-2 py-0.5 flex-shrink-0">
-                                        ×{item.quantity}
-                                      </span>
-                                      <span className="text-sm text-gray-800 dark:text-gray-200">{item.name}</span>
-                                      {item.storage_type === 'frozen' && (
-                                        <span className="text-xs" title="Surgelé" aria-label="Surgelé" role="img">❄</span>
-                                      )}
-                                      {item.storage_type === 'fresh' && (
-                                        <span className="text-xs" title="Frais" aria-label="Frais" role="img">🌿</span>
-                                      )}
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300
-                                                     flex-shrink-0 ml-4">
-                                      {formatPrice(item.subtotal, tenantCurrency)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              <div className="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800
-                                              bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Total commande</span>
-                                <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                  {formatPrice(order.total, tenantCurrency)}
-                                </span>
-                              </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
+                    <th className="w-8 px-3 py-3"><input type="checkbox" checked={selectedIds.size > 0 && selectedIds.size === sortedOrders.length} ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < sortedOrders.length; }} onChange={toggleSelectAll} aria-label="Sélectionner toutes les commandes" /></th>
+                    <th className="w-8 px-2 py-3"><span className="sr-only">Développer</span></th>
+                    <th className="px-3 py-3 text-left" aria-sort={ariaSort('date')}><button onClick={() => toggleSort('date')} className="flex items-center gap-1 uppercase">Commande {sortBy === 'date' && (sortDir === 'asc' ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />)}</button></th>
+                    <th className="px-3 py-3 text-left">Préparation</th>
+                    <th className="px-3 py-3 text-left">Remise</th>
+                    <th className="px-3 py-3 text-left" aria-sort={ariaSort('total')}><button onClick={() => toggleSort('total')} className="flex items-center gap-1 uppercase">Montant {sortBy === 'total' && (sortDir === 'asc' ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />)}</button></th>
+                    <th className="px-3 py-3 text-left">Workflow</th>
+                    <th className="px-3 py-3 text-right">Prochaine action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedOrders.map(order => {
+                    const items = order.order_items ?? [];
+                    const isExpanded = expandedRows.has(order.id);
+                    const cold = coldSummary(order);
+                    const hasCold = cold.fresh > 0 || cold.frozen > 0;
+                    const aged = isAged(order);
+                    const visibleItems = items.slice(0, 2);
+                    const itemQty = items.reduce((sum, item) => sum + item.quantity, 0);
+                    return (
+                      <Fragment key={order.id}>
+                        <tr className={`border-b border-gray-100 align-top transition-colors dark:border-gray-800 ${aged ? 'bg-red-50/40 dark:bg-red-950/10' : hasCold ? 'bg-sky-50/30 dark:bg-sky-950/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'}`}>
+                          <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => toggleSelect(order.id)} aria-label={`Sélectionner #${order.id.slice(0, 8).toUpperCase()}`} /></td>
+                          <td className="px-2 py-3">{items.length > 0 && <Button variant="ghost" size="sm" onClick={() => toggleRow(order.id)} aria-label={isExpanded ? 'Réduire' : 'Développer'}>{isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}</Button>}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-mono text-xs font-bold text-gray-800 dark:text-gray-200">#{order.id.slice(0, 8).toUpperCase()}</span>
+                              {aged && <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300"><IconAlertTriangle size={10} /> +24 h</span>}
+                            </div>
+                            <p className="mt-1 max-w-[180px] truncate text-sm font-semibold text-gray-950 dark:text-gray-100">{order.full_name ?? order.email}</p>
+                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-400"><IconClock size={11} /> {elapsed(order.created_at)}</p>
+                          </td>
+                          <td className="max-w-[260px] px-3 py-3">
+                            <div className="mb-1.5 flex flex-wrap gap-1.5">
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200">{itemQty} unité{itemQty > 1 ? 's' : ''}</span>
+                              {cold.frozen > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-950 dark:text-blue-200"><IconSnowflake size={11} /> {cold.frozen} surgelé{cold.frozen > 1 ? 's' : ''}</span>}
+                              {cold.fresh > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"><IconTemperature size={11} /> {cold.fresh} frais</span>}
+                            </div>
+                            {visibleItems.map(item => <p key={item.id} className="truncate text-xs text-gray-600 dark:text-gray-300"><strong>×{item.quantity}</strong> {item.name}{item.warehouse_location ? ` · ${item.warehouse_location}` : ''}</p>)}
+                            {items.length > 2 && <p className="mt-0.5 text-[11px] text-gray-400">+{items.length - 2} autre{items.length - 2 > 1 ? 's' : ''}</p>}
+                          </td>
+                          <td className="px-3 py-3"><DestinationCell fulfillmentType={order.fulfillment_type} shippingAddress={order.shipping_address} />{order.shipping_details?.carrierName && <p className="mt-1 text-[11px] text-gray-400">{order.shipping_details.carrierName}</p>}</td>
+                          <td className="px-3 py-3 whitespace-nowrap"><p className="font-bold text-gray-950 dark:text-gray-100">{formatPrice(order.total, tenantCurrency)}</p><div className="mt-1"><PaymentBadge method={order.payment_method} status={order.payment_status} /></div></td>
+                          <td className="px-3 py-3"><StatusBadge status={order.status} />{order.payment_status !== 'paid' && <p className="mt-1 text-[10px] font-semibold text-amber-600">Paiement à vérifier</p>}</td>
+                          <td className="px-3 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Link href={`/admin/orders/${order.id}/picking-list`} target="_blank" rel="noopener noreferrer" className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700" aria-label="Imprimer la liste de préparation"><IconPrinter size={15} /></Link>
+                              <Link href={`/admin/orders/${order.id}`} className="inline-flex min-h-9 items-center rounded-lg bg-[var(--admin-primary)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{nextActionLabel(order)}</Link>
                             </div>
                           </td>
                         </tr>
-                      )}
+                        {isExpanded && (
+                          <tr>
+                            <td />
+                            <td colSpan={7} className="px-4 pb-4 pt-1">
+                              <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                                <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2 dark:border-gray-800 dark:bg-gray-800"><span className="text-xs font-bold uppercase tracking-wide text-gray-500">Détail préparation</span><span className="text-xs text-gray-400">{order.email}</span></div>
+                                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                                  {items.map(item => (
+                                    <div key={item.id} className={`flex items-center gap-3 px-4 py-2.5 ${item.storage_type === 'frozen' ? 'bg-blue-50/50 dark:bg-blue-950/10' : item.storage_type === 'fresh' ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : ''}`}>
+                                      <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-gray-950 px-1.5 text-xs font-bold text-white dark:bg-white dark:text-gray-950">×{item.quantity}</span>
+                                      <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{item.name}</p><div className="mt-1 flex flex-wrap gap-1.5">{item.warehouse_location && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{item.warehouse_location}</span>}{item.storage_type === 'frozen' && <span className="text-[10px] font-bold text-blue-700">❄ Surgelé</span>}{item.storage_type === 'fresh' && <span className="text-[10px] font-bold text-emerald-700">🌡 Frais</span>}</div></div>
+                                      <span className="shrink-0 text-sm font-semibold">{formatPrice(item.subtotal, tenantCurrency)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Mobile < md: card list, tap-through al dettaglio ────────────── */}
-          <ul className="md:hidden divide-y divide-gray-100 dark:divide-gray-800" role="list" aria-label="Commandes">
-            {sortedOrders.map(order => (
-              <li key={order.id}>
-                <Link
-                  href={`/admin/orders/${order.id}`}
-                  className="flex items-start gap-3 p-4 active:bg-gray-50 dark:active:bg-gray-800"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs font-medium text-gray-600 dark:text-gray-300">
-                        #{order.id.slice(0, 8).toUpperCase()}
-                      </span>
-                      <StatusBadge status={order.status} />
-                    </div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1 truncate">
-                      {order.full_name ?? '—'}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {(order.order_items ?? []).length} article{(order.order_items ?? []).length > 1 ? 's' : ''}
-                      {' · '}
-                      {new Date(order.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                    </p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mt-1">
-                      {formatPrice(order.total, tenantCurrency)}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800 md:hidden" role="list" aria-label="Commandes">
+              {sortedOrders.map(order => {
+                const cold = coldSummary(order);
+                const aged = isAged(order);
+                const itemQty = (order.order_items ?? []).reduce((sum, item) => sum + item.quantity, 0);
+                return (
+                  <li key={order.id} className={aged ? 'bg-red-50/40 dark:bg-red-950/10' : cold.fresh || cold.frozen ? 'bg-sky-50/30 dark:bg-sky-950/10' : ''}>
+                    <Link href={`/admin/orders/${order.id}`} className="block p-4 active:bg-gray-50 dark:active:bg-gray-800">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5"><span className="font-mono text-xs font-bold text-gray-700 dark:text-gray-200">#{order.id.slice(0, 8).toUpperCase()}</span>{aged && <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">+24 h</span>}</div>
+                          <p className="mt-1 truncate text-sm font-semibold text-gray-950 dark:text-gray-100">{order.full_name ?? order.email}</p>
+                          <p className="mt-0.5 text-xs text-gray-400">{itemQty} unité{itemQty > 1 ? 's' : ''} · ouverte depuis {elapsed(order.created_at)}</p>
+                        </div>
+                        <StatusBadge status={order.status} />
+                      </div>
+                      {(cold.frozen > 0 || cold.fresh > 0) && <div className="mt-2 flex flex-wrap gap-1.5">{cold.frozen > 0 && <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold text-blue-800">❄ {cold.frozen} surgelé{cold.frozen > 1 ? 's' : ''}</span>}{cold.fresh > 0 && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">🌡 {cold.fresh} frais</span>}</div>}
+                      <div className="mt-3 flex items-end justify-between gap-3"><div><DestinationCell fulfillmentType={order.fulfillment_type} shippingAddress={order.shipping_address} /><div className="mt-1"><PaymentBadge method={order.payment_method} status={order.payment_status} /></div></div><div className="text-right"><p className="font-bold text-gray-950 dark:text-gray-100">{formatPrice(order.total, tenantCurrency)}</p><p className="mt-1 text-xs font-semibold text-[var(--admin-primary-fg)]">{nextActionLabel(order)} →</p></div></div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </>
         )}
       </div>
 
-      {/* ── Bulk bar — visibile solo con ≥1 selezione ───────────────────────── */}
       {selectedIds.size > 0 && (
-        <div
-          role="toolbar"
-          aria-label="Actions groupées"
-          className="sticky bottom-4 z-20 mx-auto max-w-fit flex items-center gap-3
-                     bg-gray-900 dark:bg-gray-800 text-white rounded-full
-                     shadow-lg px-4 py-2.5 mt-4"
-        >
-          <span className="text-sm font-medium">
-            {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
-          </span>
+        <div role="toolbar" aria-label="Actions groupées" className="sticky bottom-4 z-20 mx-auto mt-4 flex max-w-fit items-center gap-3 rounded-full bg-gray-900 px-4 py-2.5 text-white shadow-lg dark:bg-gray-800">
+          <span className="text-sm font-medium">{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
           <div className="h-4 w-px bg-white/20" />
-          <button onClick={handleExportCsv} className="text-sm hover:opacity-80 transition-opacity">
-            Exporter CSV
-          </button>
-          <button onClick={handlePrintPickingLists} className="text-sm hover:opacity-80 transition-opacity">
-            Imprimer les listes
-          </button>
-          <button onClick={() => handleMarkShipped()} className="text-sm hover:opacity-80 transition-opacity">
-            Traiter la sélection
-          </button>
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            aria-label="Annuler la sélection"
-            className="ml-1 p-1 hover:bg-white/10 rounded-full"
-          >
-            <IconX size={14} />
-          </button>
+          <button onClick={handleExportCsv} className="text-sm hover:opacity-80">Exporter CSV</button>
+          <button onClick={handlePrintPickingLists} className="text-sm hover:opacity-80">Imprimer les listes</button>
+          <button onClick={() => handleMarkShipped()} className="text-sm hover:opacity-80">Traiter la sélection</button>
+          <button onClick={() => setSelectedIds(new Set())} aria-label="Annuler la sélection" className="ml-1 rounded-full p-1 hover:bg-white/10"><IconX size={14} /></button>
         </div>
       )}
 
-      {/* ── Pannello tracking — apre quando il primo giro segnala ordini senza
-           codice di spedizione, invece di limitarsi a saltarli ─────────────── */}
-      {pendingTracking && (
-        <BulkTrackingModal
-          orders={pendingTracking}
-          carrierOptions={carriers}
-          onCancel={() => setPendingTracking(null)}
-          onConfirm={(tracking) => {
-            handleMarkShipped(tracking);
-          }}
-        />
-      )}
+      {pendingTracking && <BulkTrackingModal orders={pendingTracking} carrierOptions={carriers} onCancel={() => setPendingTracking(null)} onConfirm={tracking => { handleMarkShipped(tracking); }} />}
 
-      {/* ── Toast — stesso pattern dei client etichette ─────────────────────── */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
-            toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
-          }`}
-        >
-          {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}
-          {toast.msg}
-        </div>
-      )}
+      {toast && <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'}`}>{toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}{toast.msg}</div>}
     </div>
   );
 }
