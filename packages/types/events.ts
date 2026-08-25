@@ -199,6 +199,7 @@ export interface EventGalleryPhoto {
   image_url: string;
   caption: string | null;
   sort_order: number;
+  is_social_share: boolean;
   created_at: string;
 }
 

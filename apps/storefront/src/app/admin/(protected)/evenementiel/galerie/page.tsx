@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export default async function AdminGalleryPage() {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
   const supabase = createServiceClient();
@@ -24,15 +24,20 @@ export default async function AdminGalleryPage() {
       .order('date_start', { ascending: false }),
   ]);
 
+  const normalizedPhotos = (photos ?? []).map((photo) => ({
+    ...photo,
+    is_social_share: Boolean((photo as { is_social_share?: boolean }).is_social_share),
+  })) as EventGalleryPhoto[];
+
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-gray-900 mb-1">Galerie</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Photos de vos événements passés, affichées sur la page publique <code>/evenementiel</code>.
+    <div className="max-w-5xl">
+      <h1 className="mb-1 text-xl font-semibold text-gray-900">Galerie & kit social</h1>
+      <p className="mb-6 max-w-2xl text-sm text-gray-500">
+        Gérez les photos de vos événements et choisissez celles que les visiteurs peuvent transformer en story 9:16 pour WhatsApp, Instagram, TikTok et les autres apps installées.
       </p>
 
       <GalleryClient
-        initialPhotos={(photos ?? []) as EventGalleryPhoto[]}
+        initialPhotos={normalizedPhotos}
         events={(events ?? []) as GalleryEventOption[]}
       />
     </div>

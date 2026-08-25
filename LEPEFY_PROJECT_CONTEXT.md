@@ -2,11 +2,11 @@
 
 > **Documento operativo di riferimento per Codex / Claude Code / sviluppatori.**
 >
-> **Aggiornato:** 25 agosto 2026 — **v5.4 Current-State Snapshot**
+> **Aggiornato:** 25 agosto 2026 — **v5.5 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Questo aggiornamento
-> è preparato dalla base `main @ f60f64d51d59bc5bc91e979c75e9a82e5459ea34` e include l'alert tenant per
-> pagamenti external-link in verifica; per lo stato deployed prevalgono sempre branch/commit effettivamente
+> parte da `main @ 93e07f1280a30c6e97492eb16e39b5c90a5bb3c5` e incorpora la delivery
+> Événementiel social sharing; per lo stato deployed prevalgono sempre branch/commit effettivamente
 > promossi e migration realmente applicate.
 >
 > Questo documento descrive lo **stato architetturale corrente del codice**. Per la cronologia usare
@@ -353,6 +353,18 @@ Payment status e fulfillment status restano concetti separati.
 
 Route group `apps/storefront/src/app/(evenementiel)/`. Modulo separato con layout dedicato. Eventi, pricing, disponibilità e immagini devono provenire da dati reali. Checkout evento mantiene la sua state machine e non va confuso con `checkout_sessions` dello shop.
 
+La gallery `event_gallery_photos` resta la singola source of truth per le immagini evento. La colonna `is_social_share` marca esplicitamente le foto approvate dall'admin per il social kit pubblico; foto non associate a un evento non possono essere abilitate nel flusso social.
+
+La pagina dettaglio evento mostra `Partager` soltanto quando esiste almeno una foto approvata. L'utente sceglie la foto e riceve una creatività verticale 9:16 generata server-side con immagine, titolo, data/ora, luogo, tenant e CTA. La condivisione usa la Web Share API con file quando il device lo consente, lasciando al sistema operativo la scelta tra WhatsApp, Instagram, TikTok e le altre app realmente installate; fallback: share URL o download PNG.
+
+Endpoint immagine pubblico:
+
+```text
+/api/evenementiel/events/[slug]/social-card?photo=<gallery-photo-id>
+```
+
+L'endpoint verifica tenant, evento pubblicato, associazione foto-evento e `is_social_share = true` prima di generare il PNG. Non introdurre deep-link social che promettono pubblicazione diretta non supportata uniformemente dal web.
+
 ---
 
 ## 14. Digital Card `/card`
@@ -469,7 +481,7 @@ I destinatari tenant sono configurati/versionati; non usare email hardcoded. Rec
 
 La presenza di una migration nel repo **non prova** che sia applicata in ogni Supabase remoto. Per release che leggono nuove colonne, applicare la migration DB prima di promuovere il codice che le richiede.
 
-Esiste una collisione storica del prefisso `071`; non rinominare retroattivamente file già potenzialmente applicati. Le nuove migration usano numerazione successiva non ambigua; checkout lifecycle usa `074_checkout_recovery_lifecycle.sql`, stato external verification `075_external_payment_verification.sql`, canonical storefront `079_tenant_storefront_url.sql` e alert tenant external payment `080_external_payment_tenant_notifications.sql`.
+Esiste una collisione storica del prefisso `071`; non rinominare retroattivamente file già potenzialmente applicati. Le nuove migration usano numerazione successiva non ambigua; checkout lifecycle usa `074_checkout_recovery_lifecycle.sql`, stato external verification `075_external_payment_verification.sql`, canonical storefront `079_tenant_storefront_url.sql`, alert tenant external payment `080_external_payment_tenant_notifications.sql` e social sharing eventi `081_event_gallery_social_share.sql`.
 
 Migration `080` aggiunge:
 
@@ -477,6 +489,14 @@ Migration `080` aggiunge:
 tenant_notification_recipients.notify_external_payment_pending boolean default true
 checkout_sessions.external_payment_tenant_notified_at timestamptz nullable
 ```
+
+Migration `081` aggiunge:
+
+```text
+event_gallery_photos.is_social_share boolean not null default false
+```
+
+con indice parziale tenant/evento sulle sole foto abilitate per condivisione. Il codice pubblico usa `select('*')` + normalizzazione client/server, quindi il modulo evento non va in errore durante il rollout precedente all'applicazione della migration; il toggle admin richiede invece che `081` sia già applicata.
 
 Payment Recovery reminder continua a usare lifecycle/campi già esistenti e audit JSON in `payment_funnel_logs.detail`.
 
@@ -584,6 +604,12 @@ Le operazioni admin su checkout external payment sono business-critical. Se si m
 - Payment Recovery v1 manuale con cooldown e max 2 reminder;
 - alert tenant idempotente all'ingresso external-link in `awaiting_verification`.
 
+### Événementiel
+- gallery evento estesa con flag admin `is_social_share`;
+- social kit pubblico su dettaglio evento con selezione foto approvata;
+- social card 9:16 generata server-side e share sheet nativa con file/download fallback;
+- metadata Open Graph usa prioritariamente una foto social approvata, poi banner evento.
+
 ### Notifiche
 - payload ordine multi-tenant con branding/support/storefront canonico;
 - Notification Journey v1 come specifica transazionale;
@@ -632,8 +658,8 @@ Aggiornare questo file quando cambiano architettura, route/module principali, wo
 
 ---
 
-# Fine snapshot v5.4
+# Fine snapshot v5.5
 
-**Base audit:** `main @ f60f64d51d59bc5bc91e979c75e9a82e5459ea34` + external-payment tenant alert delivery  
+**Base audit:** `main @ 93e07f1280a30c6e97492eb16e39b5c90a5bb3c5` + Événementiel social sharing delivery  
 **Data:** 25 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.

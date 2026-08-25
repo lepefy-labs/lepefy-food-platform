@@ -10,7 +10,8 @@ import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { getHighlightIcon } from '@/lib/events/highlightIcons';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import EventCheckoutClient from './EventCheckoutClient';
-import type { EventRow, EventTicketType } from '@lepefy/types';
+import EventSocialShare from './EventSocialShare';
+import type { EventGalleryPhoto, EventRow, EventTicketType } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -40,12 +41,35 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const supabase = createPublicClient();
   const { data: event } = await supabase
     .from('events')
-    .select('title, description')
+    .select('id, title, description, banner_image_url')
     .eq('tenant_id', tenant.id)
     .eq('slug', params.slug)
     .eq('status', 'published')
     .maybeSingle();
-  return { title: event?.title ?? 'Événement' };
+
+  if (!event) return { title: 'Événement' };
+
+  const { data: photos } = await supabase
+    .from('event_gallery_photos')
+    .select('*')
+    .eq('tenant_id', tenant.id)
+    .eq('event_id', event.id)
+    .order('sort_order', { ascending: true });
+  const socialImage = (photos ?? []).find((photo) => Boolean((photo as { is_social_share?: boolean }).is_social_share))?.image_url
+    ?? event.banner_image_url
+    ?? undefined;
+  const description = event.description ?? `Découvrez ${event.title} chez ${tenant.name}.`;
+
+  return {
+    title: event.title,
+    description,
+    openGraph: {
+      title: event.title,
+      description,
+      type: 'website',
+      images: socialImage ? [{ url: socialImage }] : undefined,
+    },
+  };
 }
 
 export default async function EventDetailPage({ params }: PageProps) {
@@ -82,14 +106,19 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   const { data: eventPhotosRaw } = await supabase
     .from('event_gallery_photos')
-    .select('image_url')
+    .select('*')
     .eq('tenant_id', tenant.id)
     .eq('event_id', eventRow.id)
     .order('sort_order', { ascending: true });
 
-  const eventImages = eventPhotosRaw && eventPhotosRaw.length > 0
-    ? eventPhotosRaw.map((photo) => photo.image_url as string)
+  const eventPhotos = (eventPhotosRaw ?? []).map((photo) => ({
+    ...photo,
+    is_social_share: Boolean((photo as { is_social_share?: boolean }).is_social_share),
+  })) as EventGalleryPhoto[];
+  const eventImages = eventPhotos.length > 0
+    ? eventPhotos.map((photo) => photo.image_url)
     : [eventRow.banner_image_url].filter((url): url is string => Boolean(url));
+  const socialPhotos = eventPhotos.filter((photo) => photo.is_social_share);
 
   const primaryColor = eventRow.theme_primary_color ?? EVENT_MODULE_DEFAULT_PRIMARY;
   const secondaryColor = eventRow.theme_secondary_color ?? EVENT_MODULE_DEFAULT_SECONDARY;
@@ -176,6 +205,16 @@ export default async function EventDetailPage({ params }: PageProps) {
           </div>
         </section>
 
+        {socialPhotos.length > 0 && (
+          <div className="mt-4">
+            <EventSocialShare
+              eventSlug={eventRow.slug}
+              eventTitle={eventRow.title}
+              photos={socialPhotos.map((photo) => ({ id: photo.id, imageUrl: photo.image_url, caption: photo.caption }))}
+            />
+          </div>
+        )}
+
         <div className="py-6 sm:py-7">
           <EventCheckoutClient
             event={{ id: eventRow.id, slug: eventRow.slug, title: eventRow.title, capacityRemaining: eventRow.capacity_remaining }}
@@ -187,7 +226,7 @@ export default async function EventDetailPage({ params }: PageProps) {
             isE2ETest={isE2ERequest()}
           />
 
-          <div className="mt-7 mb-24 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500 sm:mt-5 sm:mb-0">
+          <div className="mb-24 mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500 sm:mb-0 sm:mt-5">
             <span className="flex items-center gap-2"><IconLock size={17} className="text-[var(--color-primary)]" />Paiement sécurisé</span>
             <span className="flex items-center gap-2"><IconCircleCheck size={17} className="text-[var(--color-primary)]" />Réservation confirmée après paiement</span>
           </div>
