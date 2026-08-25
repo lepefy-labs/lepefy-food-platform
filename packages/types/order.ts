@@ -39,6 +39,14 @@ export interface Order {
   picking_started_at: string | null;
   /** Timestamp set only while every item is picked and all cold-chain checks are validated. */
   picking_completed_at: string | null;
+  /** Timestamp set when packing starts for a delivery order. */
+  packing_started_at: string | null;
+  /** Timestamp set when parcel count and required cold-chain packing control are complete. */
+  packing_completed_at: string | null;
+  /** Actual parcel count prepared by the admin, independent from quote estimates. */
+  packing_parcel_count: number | null;
+  /** Required for delivery orders containing fresh/frozen products. */
+  cold_chain_packing_checked_at: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
