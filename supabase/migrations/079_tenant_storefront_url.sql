@@ -3,6 +3,7 @@
 -- Notifications and platform tools must not infer a tenant storefront from a
 -- deployment-global environment variable. Store the canonical public shop URL
 -- on the tenant instead, while preserving legacy fallbacks in application code.
+-- The admin settings UI is the source of truth for future tenant updates.
 
 alter table public.tenants
   add column if not exists storefront_url text;
