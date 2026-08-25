@@ -19,6 +19,8 @@ interface BulkOrderRow {
   tracking_carrier: string | null;
   email: string;
   full_name: string | null;
+  packing_completed_at: string | null;
+  packing_parcel_count: number | null;
 }
 
 interface PickingItemRow {
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
   const admin = createServiceClient();
   const { data: ordersRaw, error: fetchError } = await admin
     .from('orders')
-    .select('id, status, fulfillment_type, tracking_code, tracking_carrier, email, full_name')
+    .select('id, status, fulfillment_type, tracking_code, tracking_carrier, email, full_name, packing_completed_at, packing_parcel_count')
     .in('id', orderIds)
     .eq('tenant_id', tenant.id);
 
@@ -96,6 +98,21 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
+  }
+
+  const incompletePacking = orders.filter(order =>
+    order.status === 'preparing'
+    && order.fulfillment_type === 'delivery'
+    && (!order.packing_completed_at || !order.packing_parcel_count || order.packing_parcel_count < 1),
+  );
+  if (incompletePacking.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Packing incomplet pour ${incompletePacking.length} commande${incompletePacking.length > 1 ? 's' : ''}. Finalisez les colis avant l’expédition.`,
+        orderIds: incompletePacking.map(order => order.id),
+      },
+      { status: 409 },
+    );
   }
 
   const toShipped: BulkOrderRow[] = [];
