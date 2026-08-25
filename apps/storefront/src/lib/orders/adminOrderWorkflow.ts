@@ -1,5 +1,6 @@
 import { processOrderPointsOnDelivery } from '@/lib/loyalty/processOrderPointsOnDelivery';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
+import { notifyN8n } from '@/lib/events/notifyN8n';
 import type { OrderStatus } from '@lepefy/types';
 
 export type FulfillmentType = 'delivery' | 'pickup';
@@ -87,12 +88,20 @@ export function validateOrderTransition({
   return { ok: true };
 }
 
+function buildTrackingLink(orderId: string, email: string): string | null {
+  if (!process.env.TRACKING_SECRET) return null;
+  const trackingToken = generateTrackingToken(orderId, email);
+  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+  return `${storefrontUrl}/orders/${orderId}?token=${trackingToken}`;
+}
+
 export async function runOrderTransitionSideEffects({
   orderId,
   previousStatus,
   nextStatus,
   email,
   fullName,
+  fulfillmentType,
   trackingCode,
   trackingCarrier,
 }: {
@@ -101,6 +110,7 @@ export async function runOrderTransitionSideEffects({
   nextStatus: OrderStatus;
   email: string;
   fullName: string | null;
+  fulfillmentType: FulfillmentType;
   trackingCode?: string | null;
   trackingCarrier?: string | null;
 }) {
@@ -114,33 +124,41 @@ export async function runOrderTransitionSideEffects({
     }
   }
 
-  if (
-    nextStatus === 'shipped' &&
-    process.env.N8N_WEBHOOK_URL &&
-    process.env.TRACKING_SECRET
-  ) {
-    try {
-      const trackingToken = generateTrackingToken(orderId, email);
-      const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-      const orderTrackingLink = `${storefrontUrl}/orders/${orderId}?token=${trackingToken}`;
+  if (!process.env.N8N_WEBHOOK_URL) return;
 
-      const response = await fetch(`${process.env.N8N_WEBHOOK_URL}/webhook/order-shipped`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          orderNumber: `#${orderId.slice(0, 8).toUpperCase()}`,
-          email,
-          fullName: fullName ?? '',
-          trackingCode: trackingCode ?? null,
-          trackingCarrier: trackingCarrier ?? null,
-          orderTrackingLink,
-        }),
-      });
+  const orderTrackingLink = buildTrackingLink(orderId, email);
+  const commonPayload = {
+    orderId,
+    orderNumber: `#${orderId.slice(0, 8).toUpperCase()}`,
+    email,
+    fullName: fullName ?? '',
+    fulfillmentType,
+    orderTrackingLink,
+  };
 
-      console.info('[admin order workflow] order-shipped webhook:', response.status, '— order_id:', orderId);
-    } catch (error) {
-      console.error('[admin order workflow] order-shipped webhook failed:', error, '— order_id:', orderId);
-    }
+  if (nextStatus === 'shipped') {
+    await notifyN8n('/webhook/order-shipped', {
+      ...commonPayload,
+      trackingCode: trackingCode ?? null,
+      trackingCarrier: trackingCarrier ?? null,
+    });
+    return;
+  }
+
+  if (nextStatus === 'ready_for_pickup') {
+    await notifyN8n('/webhook/order-ready-for-pickup', commonPayload);
+    return;
+  }
+
+  if (nextStatus === 'delivered') {
+    await notifyN8n('/webhook/order-completed', {
+      ...commonPayload,
+      completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered',
+    });
+    return;
+  }
+
+  if (nextStatus === 'cancelled') {
+    await notifyN8n('/webhook/order-cancelled', commonPayload);
   }
 }
