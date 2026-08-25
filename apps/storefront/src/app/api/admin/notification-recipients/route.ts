@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     email?: unknown;
     label?: unknown;
     notify_card_payment?: unknown;
+    notify_external_payment_pending?: unknown;
     notify_order_stock_conflict?: unknown;
   };
 
@@ -57,11 +58,12 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('tenant_notification_recipients')
     .insert({
-      tenant_id:                   tenant.id,
+      tenant_id:                       tenant.id,
       email,
-      label:                       body.label ? String(body.label).trim() : null,
-      notify_card_payment:         typeof body.notify_card_payment === 'boolean' ? body.notify_card_payment : true,
-      notify_order_stock_conflict: typeof body.notify_order_stock_conflict === 'boolean' ? body.notify_order_stock_conflict : false,
+      label:                           body.label ? String(body.label).trim() : null,
+      notify_card_payment:             typeof body.notify_card_payment === 'boolean' ? body.notify_card_payment : true,
+      notify_external_payment_pending: typeof body.notify_external_payment_pending === 'boolean' ? body.notify_external_payment_pending : true,
+      notify_order_stock_conflict:     typeof body.notify_order_stock_conflict === 'boolean' ? body.notify_order_stock_conflict : false,
     })
     .select('*')
     .single();

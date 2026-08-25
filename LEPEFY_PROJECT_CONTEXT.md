@@ -2,11 +2,12 @@
 
 > **Documento operativo di riferimento per Codex / Claude Code / sviluppatori.**
 >
-> **Aggiornato:** 25 agosto 2026 — **v5.3 Current-State Snapshot**
+> **Aggiornato:** 25 agosto 2026 — **v5.4 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Questo aggiornamento
-> è preparato dalla base `main @ b413c16d2ad4c122af8e41887d4afdcc0f4bb26b` e include Payment Recovery v1;
-> per lo stato deployed prevalgono sempre branch/commit effettivamente promossi e migration realmente applicate.
+> è preparato dalla base `main @ f60f64d51d59bc5bc91e979c75e9a82e5459ea34` e include l'alert tenant per
+> pagamenti external-link in verifica; per lo stato deployed prevalgono sempre branch/commit effettivamente
+> promossi e migration realmente applicate.
 >
 > Questo documento descrive lo **stato architetturale corrente del codice**. Per la cronologia usare
 > `git log`, PR e commit. Se questo documento e il codice divergono, **vince il codice**.
@@ -166,6 +167,7 @@ Migration di riferimento:
 ```text
 supabase/migrations/074_checkout_recovery_lifecycle.sql
 supabase/migrations/075_external_payment_verification.sql
+supabase/migrations/080_external_payment_tenant_notifications.sql
 ```
 
 State machine:
@@ -190,6 +192,7 @@ completed_at
 order_id
 resume_count
 last_resumed_at
+external_payment_tenant_notified_at
 ```
 
 Default recovery window delle sessioni `open`: **24 ore**. L'expiry è non distruttiva: una sessione scaduta passa a `expired` e resta disponibile per analytics/audit.
@@ -252,9 +255,11 @@ Dashboard admin:
 /admin/checkout-funnel
 ```
 
-Payment Recovery v1 riusa `payment_funnel_logs` come audit del reminder manuale tramite `event_type = checkout_reused` + `detail.kind`, senza introdurre una tabella o migration dedicata.
+Payment Recovery v1 riusa `payment_funnel_logs` come audit del reminder manuale tramite `event_type = checkout_reused` + `detail.kind`, senza introdurre una tabella dedicata.
 
 Le notifiche automatiche di abandoned-checkout non devono essere attivate senza una policy esplicita su consenso, canale, timing e configurazione tenant. Il reminder Payment Recovery v1 è invece manuale, transazionale e limitato esclusivamente a purchase intent external-link non risolte.
+
+L'alert tenant per external payment è invece **operativo interno**: scatta best-effort quando la sessione entra realmente in `awaiting_verification`, usa `external_payment_tenant_notified_at` come claim atomica/idempotenza e non modifica l'esito del checkout se il trasporto notifiche fallisce.
 
 ### Chrome purchase funnel
 
@@ -273,7 +278,8 @@ Non spostare sul client:
 - Stripe PaymentIntent;
 - external-link flow;
 - payment redirect recovery;
-- autorizzazione/cooldown Payment Recovery.
+- autorizzazione/cooldown Payment Recovery;
+- recipient resolution/idempotenza alert tenant external payment.
 
 ---
 
@@ -329,6 +335,8 @@ Il banner mantiene `Confirmer réception` come CTA primaria e `Gérer` come acce
 
 La pagina di gestione centralizza reminder, secure resume link, conferma ricezione e cancellazione. `Annuler` non è un'azione primaria inline nel banner.
 
+Quando una external-link purchase intent entra in `awaiting_verification`, i destinatari tenant attivi con `notify_external_payment_pending = true` ricevono un alert operativo con CTA alla pagina `Gérer`. L'alert non deve chiamare la purchase intent “commande confirmée” e ricorda che lo stock non è riservato finché il pagamento non viene confermato.
+
 Workflow fulfillment ordine principale:
 
 ```text
@@ -363,7 +371,7 @@ Packlink resta integrazione principale. Packaging, peso, splitting, quote, VAT, 
 
 Il modello transazionale shop è definito in `docs/NOTIFICATION_JOURNEY_V1.md`.
 
-n8n è il layer di trasporto/orchestrazione; stato ordine/checkout e payload webhook restano source of truth nell'applicazione. Gli eventi cliente ordine v1 sono:
+n8n è il layer di trasporto/orchestrazione; stato ordine/checkout, recipient resolution e payload webhook restano source of truth nell'applicazione. Gli eventi cliente ordine v1 sono:
 
 ```text
 order-confirmed
@@ -387,7 +395,47 @@ pickup.hours
 
 I dati pickup provengono da `tenant.click_collect_*` / `tenant.google_maps_url`; non usare `business.legalAddress` come sostituto semantico della location Click & Collect.
 
-Per le email v1: una sola CTA primaria per milestone, copy transazionale breve, `[TEST]` + banner visibile in test mode, niente branding n8n nel messaggio cliente.
+Per le email v1: una sola CTA primaria per milestone, copy transazionale breve, `[TEST]` + banner visibile in test mode, niente branding n8n nel messaggio cliente/tenant.
+
+### Destinatari interni tenant
+
+`tenant_notification_recipients` è la source of truth per email operative staff/proprietario. I flag principali sono:
+
+```text
+notify_card_payment
+notify_external_payment_pending
+notify_order_stock_conflict
+active
+```
+
+Non duplicare mailing list hardcoded in n8n. Il backend risolve `recipients[]` per ogni evento interno.
+
+### External payment tenant alert
+
+Webhook dedicato:
+
+```text
+external-payment-awaiting-verification -> /webhook/external-payment-awaiting-verification
+```
+
+Scatta quando una checkout shop external-link è realmente `awaiting_verification`. Payload principale:
+
+```text
+recipients[]
+checkoutSessionId
+paymentReference
+customer.{fullName,email,phone}
+paymentMethod.{type,label}
+amount
+fulfillmentType
+items[]
+shippingAddress
+adminPaymentLink
+createdAt
+notificationSentAt
+```
+
+Una sola notifica accettata da n8n per checkout session; su errore trasporto/configurazione la claim viene rilasciata per consentire un retry. Il fallimento dell'alert non deve mai fallire il customer checkout.
 
 ### Payment Recovery v1
 
@@ -411,7 +459,7 @@ Regole server v1:
 - se il provider handoff è iniziato, avvisare esplicitamente di non pagare due volte;
 - CTA principale `Reprendre mon achat`, con possibilità di mantenere o cambiare metodo.
 
-La Notification Test Console PLATFORM_OWNER supporta anche `payment-reminder` con payload sintetico/testMode senza toccare ordini, stock o pagamenti reali.
+La Notification Test Console PLATFORM_OWNER supporta `payment-reminder` e `external-payment-awaiting-verification` con payload sintetici/testMode senza toccare ordini, stock o pagamenti reali. Per l'alert tenant, l'email inserita nella console sostituisce solo in test la lista reale `tenant_notification_recipients`.
 
 I destinatari tenant sono configurati/versionati; non usare email hardcoded. Recovery marketing o reminder checkout automatici futuri devono rispettare consenso/configurazione tenant e non partire solo perché una sessione è `open`.
 
@@ -421,9 +469,16 @@ I destinatari tenant sono configurati/versionati; non usare email hardcoded. Rec
 
 La presenza di una migration nel repo **non prova** che sia applicata in ogni Supabase remoto. Per release che leggono nuove colonne, applicare la migration DB prima di promuovere il codice che le richiede.
 
-Esiste una collisione storica del prefisso `071`; non rinominare retroattivamente file già potenzialmente applicati. Le nuove migration usano numerazione successiva non ambigua; checkout lifecycle usa `074_checkout_recovery_lifecycle.sql` e stato external verification `075_external_payment_verification.sql`.
+Esiste una collisione storica del prefisso `071`; non rinominare retroattivamente file già potenzialmente applicati. Le nuove migration usano numerazione successiva non ambigua; checkout lifecycle usa `074_checkout_recovery_lifecycle.sql`, stato external verification `075_external_payment_verification.sql`, canonical storefront `079_tenant_storefront_url.sql` e alert tenant external payment `080_external_payment_tenant_notifications.sql`.
 
-Payment Recovery v1 non richiede nuova migration: usa lifecycle/campi già esistenti e audit JSON in `payment_funnel_logs.detail`.
+Migration `080` aggiunge:
+
+```text
+tenant_notification_recipients.notify_external_payment_pending boolean default true
+checkout_sessions.external_payment_tenant_notified_at timestamptz nullable
+```
+
+Payment Recovery reminder continua a usare lifecycle/campi già esistenti e audit JSON in `payment_funnel_logs.detail`.
 
 ---
 
@@ -491,7 +546,7 @@ UI obbligatoria, route ancora opzionali.
 `CheckoutFlow.tsx` è attivo; verificare caller prima della rimozione.
 
 ### 21.4 Recovery outbound automatico
-Payment Recovery v1 abilita solo reminder manuali per external payment unresolved. Non abilita abandoned-cart email/push automatici. Automazioni future richiedono decisione esplicita su consenso, timing, canali e configurazione tenant.
+Payment Recovery v1 abilita solo reminder manuali per external payment unresolved. Non abilita abandoned-cart email/push automatici. Automazioni future richiedono decisione esplicita su consenso, timing, canali e configurazione tenant. L'alert automatico al tenant per un external payment in verifica è un'eccezione operativa interna, non marketing cliente.
 
 ### 21.5 Test/CI
 Ogni delivery deve essere validata sul proprio SHA; non riusare dichiarazioni di commit precedenti.
@@ -510,7 +565,8 @@ Le operazioni admin su checkout external payment sono business-critical. Se si m
 - workflow singolo/bulk unificato;
 - `/admin/checkout-funnel` per conversion/recovery shop;
 - console `PLATFORM_OWNER` per testare i webhook notifiche senza creare ordini reali;
-- `Gérer` payment recovery per external payments unresolved.
+- `Gérer` payment recovery per external payments unresolved;
+- configurazione destinatari tenant estesa con alert `Paiement externe à vérifier`.
 
 ### Cart / checkout
 - `/cart` focalizzato sul basket;
@@ -525,14 +581,16 @@ Le operazioni admin su checkout external payment sono business-critical. Se si m
 - completed checkout collegato a `order_id` e conservato;
 - expiry 24h non distruttiva per `open`;
 - analytics lifecycle/recovery;
-- Payment Recovery v1 manuale con cooldown e max 2 reminder.
+- Payment Recovery v1 manuale con cooldown e max 2 reminder;
+- alert tenant idempotente all'ingresso external-link in `awaiting_verification`.
 
 ### Notifiche
 - payload ordine multi-tenant con branding/support/storefront canonico;
 - Notification Journey v1 come specifica transazionale;
 - contesto Click & Collect esplicito (`pickup.address/mapsUrl/hours`);
 - stock conflict mantenuto come incidente operativo v1;
-- webhook `payment-reminder` e test console dedicato.
+- webhook `payment-reminder` e test console dedicato;
+- webhook interno `external-payment-awaiting-verification` con `recipients[]` risolti server-side.
 
 ---
 
@@ -574,8 +632,8 @@ Aggiornare questo file quando cambiano architettura, route/module principali, wo
 
 ---
 
-# Fine snapshot v5.3
+# Fine snapshot v5.4
 
-**Base audit:** `main @ b413c16d2ad4c122af8e41887d4afdcc0f4bb26b` + Payment Recovery v1 delivery  
+**Base audit:** `main @ f60f64d51d59bc5bc91e979c75e9a82e5459ea34` + external-payment tenant alert delivery  
 **Data:** 25 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.

@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type NotificationFlag = 'notify_card_payment' | 'notify_order_stock_conflict';
+export type NotificationFlag =
+  | 'notify_card_payment'
+  | 'notify_external_payment_pending'
+  | 'notify_order_stock_conflict';
 
 // Best-effort : une erreur ici ne doit jamais bloquer le flux appelant (ex.
 // webhook de paiement) — retourne toujours un tableau, jamais d'exception.
