@@ -84,14 +84,14 @@ export default function EventSocialShareButton({
         aria-label={`Partager ${eventTitle}`}
         title="Partager"
         onClick={() => { setOpen(true); setError(null); }}
-        className={`inline-flex h-11 min-w-[116px] items-center justify-center gap-2 rounded-full border border-white/75 bg-white/95 px-4 text-sm font-bold text-gray-900 shadow-[0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_10px_28px_rgba(0,0,0,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 ${className}`}
+        className={`inline-flex h-11 min-w-[116px] items-center justify-center gap-2 rounded-full border border-white/75 bg-white/95 px-4 text-sm font-bold text-gray-900 shadow-[0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_10px_28px_rgba(0,0,0,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 lg:hidden ${className}`}
       >
         <IconShare3 size={18} stroke={2.2} className="text-[var(--color-primary)]" />
         <span>Partager</span>
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Partager">
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 sm:items-center sm:p-4 lg:hidden" role="dialog" aria-modal="true" aria-label="Partager">
           <button type="button" className="absolute inset-0" aria-label="Fermer" onClick={() => setOpen(false)} />
           <div className="relative z-[1] max-h-[94dvh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] bg-[#f7f3eb] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[28px] sm:p-5">
             <div className="flex items-center justify-between gap-3">
