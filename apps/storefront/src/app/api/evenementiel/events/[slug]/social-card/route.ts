@@ -12,6 +12,7 @@ const WIDTH = 1080;
 const HEIGHT = 1920;
 const DEFAULT_PRIMARY = '#E65C00';
 const DEFAULT_SECONDARY = '#FFB347';
+const SOCIAL_CARD_FONT = 'DejaVu Sans, sans-serif';
 
 function escapeXml(value: string) {
   return value
@@ -41,7 +42,7 @@ function wrapText(value: string, maxChars: number, maxLines: number) {
 }
 
 function textLines(lines: string[], x: number, y: number, lineHeight: number, fontSize: number, weight: number, fill: string) {
-  return lines.map((line, index) => `<text x="${x}" y="${y + index * lineHeight}" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="${weight}" fill="${fill}">${escapeXml(line)}</text>`).join('');
+  return lines.map((line, index) => `<text x="${x}" y="${y + index * lineHeight}" font-family="${SOCIAL_CARD_FONT}" font-size="${fontSize}" font-weight="${weight}" fill="${fill}">${escapeXml(line)}</text>`).join('');
 }
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -112,15 +113,15 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       </defs>
       <rect width="1080" height="1920" fill="url(#shade)"/>
       <rect x="70" y="82" width="330" height="70" rx="35" fill="${primary}"/>
-      <text x="235" y="128" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#ffffff">${escapeXml(tenant.name)} • EVENTS</text>
+      <text x="235" y="128" text-anchor="middle" font-family="${SOCIAL_CARD_FONT}" font-size="30" font-weight="700" fill="#ffffff">${escapeXml(tenant.name)} • EVENTS</text>
       ${textLines(titleLines, 70, titleStartY, 94, 78, 800, '#ffffff')}
       <rect x="70" y="${detailStartY}" width="940" height="2" fill="#ffffff" opacity="0.28"/>
-      <text x="70" y="${detailStartY + 70}" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="700" fill="${secondary}">${escapeXml(dateLabel)}</text>
-      <text x="70" y="${detailStartY + 124}" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="600" fill="#ffffff">${escapeXml(timeLabel)}</text>
+      <text x="70" y="${detailStartY + 70}" font-family="${SOCIAL_CARD_FONT}" font-size="37" font-weight="700" fill="${secondary}">${escapeXml(dateLabel)}</text>
+      <text x="70" y="${detailStartY + 124}" font-family="${SOCIAL_CARD_FONT}" font-size="34" font-weight="600" fill="#ffffff">${escapeXml(timeLabel)}</text>
       ${locationLines.length ? textLines(locationLines, 70, detailStartY + 184, 48, 31, 500, '#ffffff') : ''}
-      <rect x="70" y="1740" width="940" height="105" rx="28" fill="#ffffff" fill-opacity="0.94"/>
-      <text x="105" y="1806" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="800" fill="${primary}">Réserve ta place</text>
-      <text x="975" y="1806" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="600" fill="#333333">${escapeXml(host)}</text>
+      <rect x="70" y="1754" width="940" height="86" rx="24" fill="#ffffff" fill-opacity="0.94"/>
+      <text x="105" y="1809" font-family="${SOCIAL_CARD_FONT}" font-size="31" font-weight="800" fill="${primary}">Réserve ta place</text>
+      <text x="975" y="1809" text-anchor="end" font-family="${SOCIAL_CARD_FONT}" font-size="23" font-weight="600" fill="#333333">${escapeXml(host)}</text>
     </svg>`;
 
   try {
