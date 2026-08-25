@@ -11,7 +11,8 @@ type TestEvent =
   | 'order-completed'
   | 'order-cancelled'
   | 'order-stock-conflict'
-  | 'payment-reminder';
+  | 'payment-reminder'
+  | 'external-payment-awaiting-verification';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -23,6 +24,7 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'order-cancelled': '/webhook/order-cancelled',
   'order-stock-conflict': '/webhook/order-stock-conflict',
   'payment-reminder': '/webhook/payment-reminder',
+  'external-payment-awaiting-verification': '/webhook/external-payment-awaiting-verification',
 };
 
 interface TestRequestBody {
@@ -166,6 +168,43 @@ export async function POST(req: NextRequest) {
       reminderNumber: 1,
       idempotencyKey: `payment-reminder:${testId}:1`,
       reminderSentAt: new Date().toISOString(),
+    };
+  } else if (body.event === 'external-payment-awaiting-verification') {
+    payload = {
+      ...tenantContext,
+      testMode: true,
+      testSource: 'platform_notification_console',
+      testSentAt: new Date().toISOString(),
+      notificationType: 'external_payment_awaiting_verification',
+      recipients: [body.email.trim()],
+      checkoutSessionId: testId,
+      paymentReference: `#TEST-${shortId}`,
+      customer: {
+        fullName: body.fullName?.trim() || 'Client test',
+        email: 'client-test@example.com',
+        phone: '+33 6 00 00 00 00',
+      },
+      paymentMethod: { type: 'paypal', label: 'PayPal' },
+      amount: total,
+      fulfillmentType,
+      items: [
+        { name: 'Article test', price: Math.max(0, total - (fulfillmentType === 'delivery' ? shippingTotal : 0)), quantity: 1 },
+      ],
+      shippingAddress: fulfillmentType === 'delivery'
+        ? {
+            full_name: body.fullName?.trim() || 'Client test',
+            line1: body.address?.line1?.trim() || 'Adresse de test',
+            line2: body.address?.line2?.trim() || '',
+            postal_code: body.address?.postal_code?.trim() || '00000',
+            city: body.address?.city?.trim() || tenantContext.business.city || 'Ville test',
+            country: body.address?.country?.trim() || tenantContext.business.country,
+          }
+        : null,
+      adminPaymentLink: tenantContext.storefrontUrl
+        ? `${tenantContext.storefrontUrl}/admin/paiements-en-attente/${testId}`
+        : null,
+      createdAt: new Date().toISOString(),
+      notificationSentAt: new Date().toISOString(),
     };
   }
 

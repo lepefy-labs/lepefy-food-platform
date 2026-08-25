@@ -2,20 +2,20 @@
 
 ## Scope
 
-Notification Journey v1 defines the transactional customer communication model for shop orders and the manual recovery model for unresolved external payments.
+Notification Journey v1 defines the transactional customer communication model for shop orders, the manual recovery model for unresolved external payments, and the internal tenant alerting required to resolve external payments safely.
 
 The goal is to communicate only meaningful milestones, reduce uncertainty, and make every message answer four questions in this order:
 
 1. What happened?
-2. What does it mean for the customer?
-3. What should the customer do now?
+2. What does it mean for the recipient?
+3. What should the recipient do now?
 4. What happens next?
 
 v1 is transactional. It does not include abandoned-checkout marketing, review requests, cross-sell, loyalty campaigns, or recurring pickup reminders.
 
 ## Shared delivery model
 
-n8n is the transport/orchestration layer. Application code is the source of truth for order state and webhook payloads.
+n8n is the transport/orchestration layer. Application code is the source of truth for order state, checkout state, recipient selection, idempotency and webhook payloads.
 
 All customer-facing order events receive the tenant notification context:
 
@@ -30,6 +30,8 @@ All customer-facing order events receive the tenant notification context:
 `pickup.*` must come from tenant Click & Collect configuration, not from the legal address.
 
 Email is the outbound channel in v1. WhatsApp is exposed as a support/contact action, not as an automatic outbound status channel.
+
+Internal tenant notifications use `tenant_notification_recipients`; recipient addresses must never be hardcoded in application code or n8n workflows.
 
 ## Customer journey
 
@@ -60,15 +62,15 @@ Every transactional email should use the same recognizable structure:
 1. Optional test banner when `testMode === true`.
 2. Tenant-branded header with logo, primary color, state icon, and state title.
 3. Short explanation of the current milestone.
-4. State-specific information card with `branding.secondaryColor` as the accent.
+4. State-specific information card with the approved tenant accent.
 5. Exactly one primary CTA.
 6. Secondary order/support actions only when useful.
-7. Tenant support box with email and/or WhatsApp.
+7. Tenant support box with email and/or WhatsApp when customer-facing.
 8. Tenant footer with business identity and canonical storefront.
 
 Test messages must use `[TEST]` in the subject and display a visible in-email test banner.
 
-Do not include n8n branding in customer-facing production emails.
+Do not include n8n branding in customer-facing or tenant-facing production emails.
 
 ## Event specifications
 
@@ -210,6 +212,42 @@ Admin entry point:
 
 The pending-payment banner keeps `Confirmer réception` as the primary operational action and exposes `Gérer` for recovery/reminder/cancellation details. Destructive cancellation is not a primary row action.
 
+### Tenant verification alert
+
+Webhook: `/webhook/external-payment-awaiting-verification`
+
+When a shop external-link checkout really reaches `awaiting_verification`, the application sends a best-effort **internal tenant notification** so staff know that an external payment must be checked manually.
+
+Recipients:
+
+- resolved server-side from active `tenant_notification_recipients` rows;
+- only recipients with `notify_external_payment_pending = true` are included;
+- n8n receives the already-resolved `recipients[]` list and must not maintain a separate hardcoded mailing list.
+
+Idempotency:
+
+- one accepted tenant alert per checkout session;
+- `checkout_sessions.external_payment_tenant_notified_at` is used as an atomic send claim;
+- if no recipient is configured, tenant context cannot be resolved, or n8n does not accept the webhook, the claim is released so a later retry can attempt delivery;
+- notification failures must never fail or roll back the customer checkout/provider handoff.
+
+Tenant-facing copy must describe an **achat/paiement externe à vérifier**, not a confirmed order. It must explicitly say that the payment needs manual verification before confirmation and that no stock is reserved yet.
+
+Primary CTA:
+
+- `Vérifier le paiement` -> `adminPaymentLink` -> `/admin/paiements-en-attente/[id]`.
+
+Payload includes:
+
+- full tenant notification context;
+- `recipients[]`;
+- `checkoutSessionId`, `paymentReference`;
+- `customer.fullName`, `customer.email`, `customer.phone`;
+- `paymentMethod.type`, `paymentMethod.label`;
+- `amount`, `fulfillmentType`, `items`, `shippingAddress`;
+- `adminPaymentLink`;
+- `createdAt`, `notificationSentAt`.
+
 ### Manual reminder
 
 Webhook: `/webhook/payment-reminder`
@@ -237,7 +275,7 @@ Primary CTA:
 
 - `Reprendre mon achat` -> signed `resumeLink`.
 
-The resume destination is Lepefy, not the payment-provider URL. The customer may:
+The resume destination is the tenant storefront checkout recovery route, not the payment-provider URL. The customer may:
 
 - keep the same external payment method;
 - select another enabled external method;
@@ -264,12 +302,14 @@ Payment-reminder payload includes:
 
 ### What Payment Recovery v1 does not do
 
-- no automatic reminder schedule;
+- no automatic customer reminder schedule;
 - no marketing/abandoned-cart campaign;
 - no claim that an external payment failed;
 - no second-payment encouragement when provider handoff has already occurred;
 - no stock reservation;
 - no order creation before confirmed payment.
+
+The automatic **tenant verification alert** is operational and internal; it is intentionally distinct from automated customer recovery.
 
 ## CTA hierarchy
 
@@ -283,19 +323,21 @@ Priority by event:
 - delivered -> order details/support
 - picked up -> order details
 - cancelled -> order details/support
+- external payment tenant alert -> pending-payment admin page
 - payment reminder -> secure checkout resume
 
 Do not let support, storefront browsing, or secondary links visually compete with the event-specific primary CTA.
 
 ## Tone
 
-Use concise, reassuring French customer copy.
+Use concise, reassuring French customer copy and concise operational French for tenant alerts.
 
 Good:
 - `Bonne nouvelle, votre commande est prête à être retirée.`
 - `Votre commande est en route.`
 - `Votre paiement a bien été reçu.`
 - `Nous n’avons pas encore pu confirmer la réception de votre paiement.`
+- `Un paiement externe est à vérifier.`
 
 Avoid exaggerated marketing language, technical system terms, or excessive emoji.
 
@@ -312,7 +354,7 @@ Not part of v1:
 - review request;
 - loyalty/reorder message;
 - consent-aware automated abandoned checkout lifecycle messaging;
-- automatic payment-recovery reminders;
+- automatic customer payment-recovery reminders;
 - outbound WhatsApp/SMS status notifications.
 
 Each future automatic outbound channel or marketing lifecycle requires explicit tenant configuration, consent and timing rules before activation.

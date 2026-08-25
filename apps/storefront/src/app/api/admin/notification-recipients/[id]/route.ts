@@ -19,16 +19,18 @@ export async function PATCH(
   const body = await req.json() as {
     label?: unknown;
     notify_card_payment?: unknown;
+    notify_external_payment_pending?: unknown;
     notify_order_stock_conflict?: unknown;
     active?: unknown;
   };
 
   const updatePayload: Record<string, unknown> = {};
 
-  if ('label'                       in body) updatePayload.label                       = body.label ? String(body.label).trim() : null;
-  if ('notify_card_payment'         in body) updatePayload.notify_card_payment         = Boolean(body.notify_card_payment);
-  if ('notify_order_stock_conflict' in body) updatePayload.notify_order_stock_conflict = Boolean(body.notify_order_stock_conflict);
-  if ('active'                      in body) updatePayload.active                      = Boolean(body.active);
+  if ('label'                           in body) updatePayload.label                           = body.label ? String(body.label).trim() : null;
+  if ('notify_card_payment'             in body) updatePayload.notify_card_payment             = Boolean(body.notify_card_payment);
+  if ('notify_external_payment_pending' in body) updatePayload.notify_external_payment_pending = Boolean(body.notify_external_payment_pending);
+  if ('notify_order_stock_conflict'     in body) updatePayload.notify_order_stock_conflict     = Boolean(body.notify_order_stock_conflict);
+  if ('active'                          in body) updatePayload.active                          = Boolean(body.active);
 
   const supabase = createServiceClient();
 

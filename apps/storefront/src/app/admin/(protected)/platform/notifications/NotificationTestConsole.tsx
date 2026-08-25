@@ -10,7 +10,8 @@ type TestEvent =
   | 'order-completed'
   | 'order-cancelled'
   | 'order-stock-conflict'
-  | 'payment-reminder';
+  | 'payment-reminder'
+  | 'external-payment-awaiting-verification';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -21,6 +22,7 @@ const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'order-completed', label: 'Commande terminée', description: 'Livrée ou retirée.' },
   { value: 'order-cancelled', label: 'Commande annulée', description: 'Annulation sans promesse de remboursement.' },
   { value: 'payment-reminder', label: 'Rappel paiement', description: 'Rappel prudent pour un paiement externe non encore confirmé.' },
+  { value: 'external-payment-awaiting-verification', label: 'Paiement externe à vérifier', description: 'Alerte interne au tenant pour vérification et confirmation.' },
   { value: 'order-stock-conflict', label: 'Conflit de stock', description: 'Notification opérationnelle de test.' },
 ];
 
@@ -62,7 +64,11 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const isConfirmed = event === 'order-confirmed';
   const isShipped = event === 'order-shipped';
   const isPaymentReminder = event === 'payment-reminder';
-  const needsFulfillment = event === 'order-confirmed' || event === 'order-completed' || event === 'order-cancelled';
+  const isExternalPaymentTenantAlert = event === 'external-payment-awaiting-verification';
+  const needsFulfillment = event === 'order-confirmed'
+    || event === 'order-completed'
+    || event === 'order-cancelled'
+    || isExternalPaymentTenantAlert;
 
   async function sendTest() {
     setSending(true);
@@ -132,7 +138,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             </label>
 
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Destinataire de test
+              {isExternalPaymentTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
             </label>
 
@@ -151,7 +157,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               </label>
             )}
 
-            {(isConfirmed || isPaymentReminder || event === 'order-stock-conflict') && (
+            {(isConfirmed || isPaymentReminder || isExternalPaymentTenantAlert || event === 'order-stock-conflict') && (
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Total
                 <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
@@ -183,6 +189,23 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               </>
             )}
 
+            {isExternalPaymentTenantAlert && fulfillmentType === 'delivery' && (
+              <>
+                <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Adresse client
+                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Code postal
+                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ville
+                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+              </>
+            )}
+
             {isShipped && (
               <>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -199,6 +222,12 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             {isPaymentReminder && (
               <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
                 Le test simule un paiement PayPal déjà transmis au prestataire. Le vrai lien de reprise n’est pas utilisé : le payload reçoit un token factice de test.
+              </div>
+            )}
+
+            {isExternalPaymentTenantAlert && (
+              <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+                Ce test simule l’alerte interne envoyée au tenant. L’adresse de test remplace temporairement la liste réelle <code>tenant_notification_recipients</code> et aucune checkout session n’est créée.
               </div>
             )}
           </div>

@@ -9,6 +9,7 @@ import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentS
 import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
+import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 const MAX_QUANTITY_PER_ITEM = 999;
@@ -225,6 +226,12 @@ export async function POST(req: NextRequest) {
         shippingAddress: fulfillmentType === 'pickup' ? null : shippingAddress,
       });
     }
+
+    await notifyExternalPaymentAwaitingVerification({
+      supabase,
+      tenantId: tenant.id,
+      checkoutSessionId: active.id,
+    });
 
     const accessToken = generateCheckoutSessionAccessToken(active.id, email);
     return NextResponse.json({

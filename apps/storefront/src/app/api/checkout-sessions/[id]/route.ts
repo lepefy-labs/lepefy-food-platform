@@ -7,6 +7,7 @@ import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessio
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
+import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -438,8 +439,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Erreur lors de la mise à jour de la session.' }, { status: 500 });
     }
 
+    const updatedSession = updated as CheckoutSessionRow;
+    if (updatedSession.status === 'awaiting_verification' && updatedSession.payment_method === 'external_link') {
+      await notifyExternalPaymentAwaitingVerification({
+        supabase,
+        tenantId: tenant.id,
+        checkoutSessionId: updatedSession.id,
+      });
+    }
+
     return NextResponse.json({
-      ...toClientShape(updated as CheckoutSessionRow),
+      ...toClientShape(updatedSession),
       clientSecret,
       ...(externalLinkResponse ?? {}),
     });
