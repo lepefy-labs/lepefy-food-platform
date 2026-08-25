@@ -168,6 +168,7 @@ export async function PATCH(
 
     if (status !== undefined) {
       await runOrderTransitionSideEffects({
+        tenantId: tenant.id,
         orderId: params.id,
         previousStatus: existing.status,
         nextStatus: status,
