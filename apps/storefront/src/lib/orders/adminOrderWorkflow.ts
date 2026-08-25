@@ -1,6 +1,7 @@
 import { processOrderPointsOnDelivery } from '@/lib/loyalty/processOrderPointsOnDelivery';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { OrderStatus } from '@lepefy/types';
 
 export type FulfillmentType = 'delivery' | 'pickup';
@@ -88,14 +89,18 @@ export function validateOrderTransition({
   return { ok: true };
 }
 
-function buildTrackingLink(orderId: string, email: string): string | null {
-  if (!process.env.TRACKING_SECRET) return null;
+function buildTrackingLink(
+  orderId: string,
+  email: string,
+  storefrontUrl: string,
+): string | null {
+  if (!process.env.TRACKING_SECRET || !storefrontUrl) return null;
   const trackingToken = generateTrackingToken(orderId, email);
-  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
   return `${storefrontUrl}/orders/${orderId}?token=${trackingToken}`;
 }
 
 export async function runOrderTransitionSideEffects({
+  tenantId,
   orderId,
   previousStatus,
   nextStatus,
@@ -105,6 +110,7 @@ export async function runOrderTransitionSideEffects({
   trackingCode,
   trackingCarrier,
 }: {
+  tenantId: string;
   orderId: string;
   previousStatus: OrderStatus;
   nextStatus: OrderStatus;
@@ -126,8 +132,15 @@ export async function runOrderTransitionSideEffects({
 
   if (!process.env.N8N_WEBHOOK_URL) return;
 
-  const orderTrackingLink = buildTrackingLink(orderId, email);
+  const tenant = await getTenantNotificationContext(tenantId);
+  if (!tenant) {
+    console.warn('[admin order workflow] tenant notification context unavailable — skipping webhook — tenant_id:', tenantId);
+    return;
+  }
+
+  const orderTrackingLink = buildTrackingLink(orderId, email, tenant.storefrontUrl);
   const commonPayload = {
+    ...tenant,
     orderId,
     orderNumber: `#${orderId.slice(0, 8).toUpperCase()}`,
     email,
