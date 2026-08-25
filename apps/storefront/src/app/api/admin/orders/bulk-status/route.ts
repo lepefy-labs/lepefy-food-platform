@@ -175,6 +175,7 @@ export async function POST(req: NextRequest) {
     for (const order of toShipped) {
       const providedTracking = tracking?.[order.id];
       await runOrderTransitionSideEffects({
+        tenantId: tenant.id,
         orderId: order.id,
         previousStatus: order.status,
         nextStatus: 'shipped',
@@ -197,6 +198,7 @@ export async function POST(req: NextRequest) {
 
     for (const order of toReadyForPickup) {
       await runOrderTransitionSideEffects({
+        tenantId: tenant.id,
         orderId: order.id,
         previousStatus: order.status,
         nextStatus: 'ready_for_pickup',
