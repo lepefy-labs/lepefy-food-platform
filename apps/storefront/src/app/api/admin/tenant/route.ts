@@ -112,6 +112,7 @@ export async function PATCH(req: NextRequest) {
     if (storefrontUrl && !isHttpsUrl(storefrontUrl)) {
       return NextResponse.json({ error: 'L’URL de la boutique doit commencer par https://.' }, { status: 400 });
     }
+    body.storefront_url = storefrontUrl ? storefrontUrl.replace(/\/+$/, '') : '';
   }
 
   const updatePayload = EDITABLE_TENANT_FIELDS.reduce<Record<string, unknown>>((acc, field) => {
