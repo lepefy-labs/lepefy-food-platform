@@ -5,10 +5,14 @@ import Link from 'next/link'
 import {
   IconArrowLeft,
   IconBuildingStore,
+  IconClock,
+  IconExternalLink,
   IconMail,
   IconMapPin,
   IconPackage,
   IconReceipt,
+  IconSnowflake,
+  IconTemperature,
   IconTruck,
 } from '@tabler/icons-react'
 import { formatPrice, formatDate } from '@/lib/utils/format'
@@ -60,10 +64,28 @@ const PICKUP_STEPS = [
 
 function paymentLabel(method: string | null) {
   if (method === 'stripe') return 'Carte bancaire'
+  if (method === 'external_link') return 'Paiement externe'
   if (method === 'satispay') return 'Satispay'
   if (method === 'in_store') return 'En magasin'
   if (method === 'cash') return 'Espèces'
   return method ?? '—'
+}
+
+function elapsedLabel(createdAt: string) {
+  const diff = Math.max(0, Date.now() - new Date(createdAt).getTime())
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 60) return `${Math.max(1, minutes)} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} h`
+  return `${Math.floor(hours / 24)} j`
+}
+
+function nextActionLabel(status: string, isPickup: boolean) {
+  if (status === 'new') return 'Démarrer la préparation'
+  if (status === 'preparing') return isPickup ? 'Marquer prête au retrait' : 'Expédier la commande'
+  if (status === 'ready_for_pickup' && isPickup) return 'Marquer comme retirée'
+  if (status === 'shipped' && !isPickup) return 'Marquer comme livrée'
+  return null
 }
 
 export default async function AdminOrderPage({ params }: PageProps) {
@@ -113,6 +135,16 @@ export default async function AdminOrderPage({ params }: PageProps) {
     city?: string
     country?: string
   } | null
+  const frozenQty = items.filter(item => item.storage_type === 'frozen').reduce((sum, item) => sum + item.quantity, 0)
+  const freshQty = items.filter(item => item.storage_type === 'fresh').reduce((sum, item) => sum + item.quantity, 0)
+  const hasColdChain = frozenQty > 0 || freshQty > 0
+  const activeOrder = !['delivered', 'cancelled'].includes(order.status)
+  const ageMs = Date.now() - new Date(order.created_at).getTime()
+  const needsAttention = activeOrder && ageMs >= 24 * 60 * 60 * 1000
+  const nextAction = nextActionLabel(order.status, isPickup)
+  const mapQuery = address
+    ? [address.line1, address.postal_code, address.city, address.country].filter(Boolean).join(', ')
+    : ''
 
   return (
     <>
@@ -125,38 +157,74 @@ export default async function AdminOrderPage({ params }: PageProps) {
           Retour aux commandes
         </Link>
 
-        <header className="mb-5 flex flex-col gap-4 rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <header className="mb-4 flex flex-col gap-4 rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <h1 className="font-mono text-xl font-semibold tracking-tight text-gray-950 dark:text-gray-100 sm:text-2xl">
                 #{order.id.slice(0, 8).toUpperCase()}
               </h1>
               <StatusBadge status={order.status} />
+              {needsAttention && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                  <IconClock size={13} /> +24 h · à surveiller
+                </span>
+              )}
+              {hasColdChain && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                  <IconSnowflake size={13} /> Chaîne du froid
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {formatDate(order.created_at, 'fr')} · {order.full_name ?? order.email}
             </p>
+            <p className="mt-1 text-xs text-gray-400">Ouverte depuis {elapsedLabel(order.created_at)}</p>
           </div>
-          <div className="flex items-end justify-between gap-4 lg:flex-col lg:items-end">
-            <div>
+          <div className="flex flex-wrap items-end justify-between gap-4 lg:justify-end">
+            {nextAction && (
+              <a
+                href="#order-actions"
+                className="inline-flex min-h-10 items-center rounded-xl bg-[var(--admin-primary)] px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
+              >
+                {nextAction}
+              </a>
+            )}
+            <div className="text-right">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</p>
               <p className="text-2xl font-semibold text-gray-950 dark:text-gray-100">{formatPrice(order.total, tenant.currency)}</p>
-            </div>
-            <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-              <p>{paymentLabel(order.payment_method)}</p>
-              <p className={order.payment_status === 'paid' ? 'font-medium text-emerald-600' : 'font-medium text-amber-600'}>
-                {order.payment_status === 'paid' ? 'Payé' : 'Paiement en attente'}
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {paymentLabel(order.payment_method)} · <span className={order.payment_status === 'paid' ? 'font-medium text-emerald-600' : 'font-medium text-amber-600'}>{order.payment_status === 'paid' ? 'Payé' : 'Paiement en attente'}</span>
               </p>
             </div>
           </div>
         </header>
 
+        {(needsAttention || hasColdChain || order.payment_status !== 'paid') && (
+          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {needsAttention && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+                <strong>Commande ancienne.</strong> Vérifier qu&apos;elle n&apos;est pas bloquée dans le workflow.
+              </div>
+            )}
+            {hasColdChain && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
+                <strong>Chaîne du froid :</strong> {frozenQty > 0 ? `${frozenQty} surgelé${frozenQty > 1 ? 's' : ''}` : ''}{frozenQty > 0 && freshQty > 0 ? ' · ' : ''}{freshQty > 0 ? `${freshQty} frais` : ''}.
+              </div>
+            )}
+            {order.payment_status !== 'paid' && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                <strong>Paiement non confirmé.</strong> Vérifier le moyen de paiement avant traitement final.
+              </div>
+            )}
+          </div>
+        )}
+
         {order.status !== 'cancelled' && (
           <section className="mb-5 rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Avancement de la commande</h2>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Le statut actuel reste modifiable dans le panneau d&apos;actions.</p>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Avancement</h2>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Workflow actuel de la commande.</p>
               </div>
               <StatusBadge status={order.status} />
             </div>
@@ -180,41 +248,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
         )}
 
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.75fr)]">
-          <div className="space-y-5">
-            <AdminBlockAccent tone="info">
-              <section className="rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <header className="flex items-center gap-3 border-b border-[var(--admin-border)] px-4 py-3.5 dark:border-gray-800">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
-                    <IconMail size={18} />
-                  </span>
-                  <div>
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Client</h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Coordonnées associées à cette commande</p>
-                  </div>
-                </header>
-                <div className="grid gap-4 p-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{order.full_name ?? '—'}</p>
-                    <p className="mt-1 break-all text-sm text-gray-500 dark:text-gray-400">{order.email}</p>
-                  </div>
-                  <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
-                    <div className="flex items-start gap-2">
-                      {isPickup ? <IconBuildingStore className="mt-0.5 shrink-0 text-[var(--admin-primary-fg)]" size={17} /> : <IconMapPin className="mt-0.5 shrink-0 text-[var(--admin-primary-fg)]" size={17} />}
-                      <div className="text-sm text-gray-600 dark:text-gray-300">
-                        <p className="font-medium text-gray-800 dark:text-gray-100">{isPickup ? 'Click & Collect' : 'Livraison'}</p>
-                        {!isPickup && address && (
-                          <>
-                            {address.line1 && <p className="mt-1">{address.line1}</p>}
-                            <p>{[address.postal_code, address.city].filter(Boolean).join(' ')}{address.country ? `, ${address.country}` : ''}</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </AdminBlockAccent>
-
+          <div className="order-2 space-y-5 xl:order-1">
             <AdminBlockAccent tone="primary">
               <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <header className="flex items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3.5 dark:border-gray-800">
@@ -223,26 +257,76 @@ export default async function AdminOrderPage({ params }: PageProps) {
                       <IconPackage size={18} />
                     </span>
                     <div>
-                      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Produits commandés</h2>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{items.length} ligne{items.length !== 1 ? 's' : ''}</p>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Préparation des produits</h2>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{items.length} ligne{items.length !== 1 ? 's' : ''} · triées par emplacement</p>
                     </div>
                   </div>
                 </header>
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {items.map(item => (
-                    <div key={item.id} className="flex items-start justify-between gap-4 px-4 py-3.5">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                          <span>Quantité {item.quantity}</span>
-                          {item.warehouse_location && <span>· Emplacement {item.warehouse_location}</span>}
-                          {item.storage_type === 'frozen' && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 dark:bg-blue-950 dark:text-blue-300">❄ Surgelé</span>}
-                          {item.storage_type === 'fresh' && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">🌿 Frais</span>}
+                  {items.map(item => {
+                    const frozen = item.storage_type === 'frozen'
+                    const fresh = item.storage_type === 'fresh'
+                    return (
+                      <div key={item.id} className={`flex items-start gap-3 px-4 py-3.5 ${frozen ? 'bg-blue-50/50 dark:bg-blue-950/10' : fresh ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : ''}`}>
+                        <span className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-xl bg-gray-950 px-2 text-base font-bold text-white dark:bg-white dark:text-gray-950">×{item.quantity}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.name}</p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                            {item.warehouse_location && (
+                              <span className="rounded-full bg-gray-100 px-2 py-1 font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">Emplacement {item.warehouse_location}</span>
+                            )}
+                            {frozen && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200"><IconSnowflake size={13} /> Surgelé</span>}
+                            {fresh && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"><IconTemperature size={13} /> Frais</span>}
+                          </div>
                         </div>
+                        <span className="shrink-0 text-sm font-semibold text-gray-900 dark:text-gray-100">{formatPrice(item.subtotal, tenant.currency)}</span>
                       </div>
-                      <span className="shrink-0 text-sm font-semibold text-gray-900 dark:text-gray-100">{formatPrice(item.subtotal, tenant.currency)}</span>
+                    )
+                  })}
+                </div>
+              </section>
+            </AdminBlockAccent>
+
+            <AdminBlockAccent tone="info">
+              <section className="rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <header className="flex items-center gap-3 border-b border-[var(--admin-border)] px-4 py-3.5 dark:border-gray-800">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
+                    <IconMail size={18} />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Client & remise</h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Informations utiles au traitement</p>
+                  </div>
+                </header>
+                <div className="grid gap-3 p-4 sm:grid-cols-2">
+                  <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{order.full_name ?? '—'}</p>
+                    <a href={`mailto:${order.email}`} className="mt-1 block break-all text-sm text-[var(--admin-primary-fg)] hover:underline">{order.email}</a>
+                  </div>
+                  <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
+                    <div className="flex items-start gap-2">
+                      {isPickup ? <IconBuildingStore className="mt-0.5 shrink-0 text-[var(--admin-primary-fg)]" size={17} /> : <IconMapPin className="mt-0.5 shrink-0 text-[var(--admin-primary-fg)]" size={17} />}
+                      <div className="min-w-0 text-sm text-gray-600 dark:text-gray-300">
+                        <p className="font-medium text-gray-800 dark:text-gray-100">{isPickup ? 'Click & Collect' : 'Livraison'}</p>
+                        {!isPickup && address && (
+                          <>
+                            {address.line1 && <p className="mt-1">{address.line1}</p>}
+                            <p>{[address.postal_code, address.city].filter(Boolean).join(' ')}{address.country ? `, ${address.country}` : ''}</p>
+                            {mapQuery && (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline"
+                              >
+                                Ouvrir dans Maps <IconExternalLink size={12} />
+                              </a>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               </section>
             </AdminBlockAccent>
@@ -260,7 +344,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
             </section>
           </div>
 
-          <aside className="space-y-4 xl:sticky xl:top-24">
+          <aside id="order-actions" className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-24">
             <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
               <IconTruck size={15} />
               Actions & logistique
@@ -271,6 +355,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
               carriers={carriers}
               shippingDetails={shippingDetails}
               shippingProvider={tenant.shipping_provider ?? 'flat_rate'}
+              coldChain={{ fresh: freshQty, frozen: frozenQty }}
             />
           </aside>
         </div>
