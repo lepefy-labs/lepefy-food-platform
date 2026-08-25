@@ -7,6 +7,7 @@ export const runtime = 'nodejs';
 
 const EDITABLE_TENANT_FIELDS = [
   'tagline',
+  'storefront_url',
   'whatsapp_number',
   'click_collect_address',
   'google_maps_url',
@@ -75,6 +76,14 @@ function isAllowedGoogleMapsUrl(value: string): boolean {
   }
 }
 
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -91,6 +100,17 @@ export async function PATCH(req: NextRequest) {
     const mapsUrl = typeof rawMapsUrl === 'string' ? rawMapsUrl.trim() : '';
     if (mapsUrl && !isAllowedGoogleMapsUrl(mapsUrl)) {
       return NextResponse.json({ error: 'Le lien doit être une URL HTTPS Google Maps valide.' }, { status: 400 });
+    }
+  }
+
+  if ('storefront_url' in body) {
+    const rawStorefrontUrl = body.storefront_url;
+    if (rawStorefrontUrl != null && typeof rawStorefrontUrl !== 'string') {
+      return NextResponse.json({ error: 'L’URL de la boutique doit être une URL HTTPS valide.' }, { status: 400 });
+    }
+    const storefrontUrl = typeof rawStorefrontUrl === 'string' ? rawStorefrontUrl.trim() : '';
+    if (storefrontUrl && !isHttpsUrl(storefrontUrl)) {
+      return NextResponse.json({ error: 'L’URL de la boutique doit commencer par https://.' }, { status: 400 });
     }
   }
 
