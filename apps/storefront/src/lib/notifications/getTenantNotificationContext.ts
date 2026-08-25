@@ -38,6 +38,7 @@ interface TenantNotificationRow {
   country: string;
   currency: string;
   locale: string;
+  storefront_url: string | null;
   legal_email: string | null;
   legal_website: string | null;
   legal_address: string | null;
@@ -52,7 +53,7 @@ export async function getTenantNotificationContext(
     const { data, error } = await supabase
       .from('tenants')
       .select(
-        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, legal_email, legal_website, legal_address, whatsapp_number',
+        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number',
       )
       .eq('id', tenantId)
       .eq('active', true)
@@ -64,14 +65,15 @@ export async function getTenantNotificationContext(
     }
 
     const tenant = data as TenantNotificationRow;
-    const configuredStorefront = process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/\/$/, '');
+    const tenantStorefront = tenant.storefront_url?.replace(/\/$/, '') ?? null;
     const legalWebsite = tenant.legal_website?.replace(/\/$/, '') ?? null;
+    const legacyConfiguredStorefront = process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/\/$/, '') ?? null;
 
     return {
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       tenantName: tenant.name,
-      storefrontUrl: configuredStorefront || legalWebsite || '',
+      storefrontUrl: tenantStorefront || legalWebsite || legacyConfiguredStorefront || '',
       locale: tenant.locale,
       currency: tenant.currency,
       branding: {
