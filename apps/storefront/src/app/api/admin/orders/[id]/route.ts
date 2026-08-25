@@ -173,6 +173,7 @@ export async function PATCH(
         nextStatus: status,
         email: existing.email,
         fullName: existing.full_name,
+        fulfillmentType: existing.fulfillment_type,
         trackingCode: tracking_code !== undefined ? tracking_code : existing.tracking_code,
         trackingCarrier: tracking_carrier !== undefined ? tracking_carrier : existing.tracking_carrier,
       });
