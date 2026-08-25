@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  IconAlertTriangle,
   IconClock,
   IconBuildingBank,
   IconCash,
@@ -29,6 +30,8 @@ const PAYMENT_ICONS = {
   IconCreditCard,
 };
 
+const AGED_PAYMENT_MS = 24 * 60 * 60 * 1000;
+
 export interface PendingPaymentSession {
   id: string;
   email: string;
@@ -50,6 +53,10 @@ function elapsedLabel(createdAt: string): string {
   if (hours < 24) return `il y a ${hours} h`;
   const days = Math.floor(hours / 24);
   return `il y a ${days} j`;
+}
+
+function isAgedPayment(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() >= AGED_PAYMENT_MS;
 }
 
 function sessionTotal(session: PendingPaymentSession) {
@@ -111,9 +118,18 @@ export default function PendingPaymentsBanner({
     }
   }
 
-  const visible = sessions.filter((session) => !resolvedIds.has(session.id));
+  const visible = useMemo(
+    () => sessions
+      .filter((session) => !resolvedIds.has(session.id))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [resolvedIds, sessions],
+  );
   const pendingTotal = useMemo(
     () => visible.reduce((sum, session) => sum + sessionTotal(session), 0),
+    [visible],
+  );
+  const agedCount = useMemo(
+    () => visible.filter((session) => isAgedPayment(session.created_at)).length,
     [visible],
   );
 
@@ -134,9 +150,15 @@ export default function PendingPaymentsBanner({
               <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
                 {formatPrice(pendingTotal, tenantCurrency)}
               </span>
+              {agedCount > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                  <IconAlertTriangle size={11} />
+                  {agedCount} à vérifier depuis +24 h
+                </span>
+              )}
             </div>
             <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-              Paiements externes à vérifier manuellement · aucun stock réservé.
+              Paiements externes à vérifier manuellement · aucun stock réservé · les plus anciens sont affichés en premier.
             </p>
             {actionError && (
               <p className="mt-1 text-[11px] font-medium text-red-700 dark:text-red-300" role="alert">
@@ -167,11 +189,12 @@ export default function PendingPaymentsBanner({
                 const color = methodColor(methodType, '#92400E');
                 const itemsSummary = session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ');
                 const isCancelling = cancellingId === session.id;
+                const aged = isAgedPayment(session.created_at);
 
                 return (
                   <div
                     key={session.id}
-                    className="flex flex-col gap-2 rounded-lg border border-amber-100 bg-white px-3 py-2 dark:border-amber-900/60 dark:bg-gray-900 sm:flex-row sm:items-center"
+                    className={`flex flex-col gap-2 rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 sm:flex-row sm:items-center ${aged ? 'border-red-200 dark:border-red-900/70' : 'border-amber-100 dark:border-amber-900/60'}`}
                   >
                     <span
                       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
@@ -189,9 +212,16 @@ export default function PendingPaymentsBanner({
                         <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">
                           {session.full_name ?? session.email}
                         </span>
+                        {aged && (
+                          <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                            Prioritaire
+                          </span>
+                        )}
                       </div>
                       <p className="mt-0.5 truncate text-[11px] text-gray-500 dark:text-gray-400">{itemsSummary}</p>
-                      <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">{elapsedLabel(session.created_at)}</p>
+                      <p className={`mt-0.5 text-[10px] ${aged ? 'font-semibold text-red-600 dark:text-red-300' : 'text-gray-400 dark:text-gray-500'}`}>
+                        {elapsedLabel(session.created_at)}
+                      </p>
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 sm:justify-end">
