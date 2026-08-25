@@ -3,6 +3,7 @@ import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
+import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { Order } from '@lepefy/types';
 
 const stripe = getStripeClient('shop');
@@ -171,6 +172,10 @@ export async function createOrderFromCheckoutSession(
     console.info('[createOrderFromCheckoutSession] checkout_session completed — id:', session.id, '— order:', order.id);
   }
 
+  const tenantContext = process.env.N8N_WEBHOOK_URL
+    ? await getTenantNotificationContext(session.tenant_id)
+    : null;
+
   if (stockError) {
     let refundSucceeded = false;
 
@@ -198,13 +203,16 @@ export async function createOrderFromCheckoutSession(
     }
 
     if (process.env.N8N_WEBHOOK_URL) {
-      const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+      const storefrontUrl = tenantContext?.storefrontUrl ?? process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
       const adminOrderLink = `${storefrontUrl}/admin/orders/${order.id}`;
 
       await notifyN8n('/webhook/order-stock-conflict', {
+        ...(tenantContext ?? { tenantId: session.tenant_id }),
         orderId: order.id,
+        orderNumber: `#${order.id.slice(0, 8).toUpperCase()}`,
         email: session.email,
         fullName: session.full_name ?? '',
+        fulfillmentType: session.fulfillment_type,
         total,
         reason: stockError.message,
         refundSucceeded: isStripe ? refundSucceeded : null,
@@ -220,10 +228,11 @@ export async function createOrderFromCheckoutSession(
 
   if (process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
     const trackingToken = generateTrackingToken(order.id, session.email);
-    const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+    const storefrontUrl = tenantContext?.storefrontUrl ?? process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
     const orderTrackingLink = `${storefrontUrl}/orders/${order.id}?token=${trackingToken}`;
 
     await notifyN8n('/webhook/order-confirmed', {
+      ...(tenantContext ?? { tenantId: session.tenant_id }),
       orderId: order.id,
       orderNumber: `#${order.id.slice(0, 8).toUpperCase()}`,
       email: session.email,
