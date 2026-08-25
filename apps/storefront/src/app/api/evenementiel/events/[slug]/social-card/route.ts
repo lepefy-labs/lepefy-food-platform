@@ -130,7 +130,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       .png({ quality: 92 })
       .toBuffer();
 
-    return new NextResponse(png, {
+    return new NextResponse(new Uint8Array(png), {
       status: 200,
       headers: {
         'Content-Type': 'image/png',
