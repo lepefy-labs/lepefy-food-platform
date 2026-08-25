@@ -18,6 +18,7 @@ export interface Tenant {
   currency: string;
   locale: string;
   stripe_account_id: string | null;
+  storefront_url: string | null;
   click_collect_enabled: boolean;
   click_collect_address: string | null;
   google_maps_url: string | null;
