@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   IconAlertTriangle,
@@ -156,6 +157,12 @@ export default function PendingPaymentsBanner({
                   {agedCount} à vérifier depuis +24 h
                 </span>
               )}
+              <Link
+                href="/admin/checkout-funnel"
+                className="text-[10px] font-semibold text-amber-800 underline decoration-amber-400 underline-offset-2 hover:text-amber-950 dark:text-amber-300 dark:hover:text-amber-100"
+              >
+                Voir le funnel
+              </Link>
             </div>
             <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
               Paiements externes à vérifier manuellement · aucun stock réservé · les plus anciens sont affichés en premier.
