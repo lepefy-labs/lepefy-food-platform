@@ -35,6 +35,10 @@ export interface Order {
   tracking_code: string | null;
   tracking_carrier: string | null;
   shipped_at: string | null;
+  /** Timestamp set when operational picking starts. */
+  picking_started_at: string | null;
+  /** Timestamp set only while every item is picked and all cold-chain checks are validated. */
+  picking_completed_at: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -63,6 +67,10 @@ export interface OrderItem {
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
   /** Shelf / aisle code used to sort picking lists (e.g. "A-03", "FRIGO-2") */
   warehouse_location: string | null;
+  /** Timestamp set when this order line has been physically picked. */
+  picked_at: string | null;
+  /** Required for fresh/frozen lines before picking can be considered complete. */
+  cold_chain_checked_at: string | null;
 }
 
 export interface OrderWithItems extends Order {
