@@ -26,6 +26,29 @@ interface ExistingOrder {
   fulfillment_type: FulfillmentType;
   tracking_code: string | null;
   tracking_carrier: string | null;
+  picking_started_at: string | null;
+}
+
+interface PickingItemRow {
+  storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  picked_at: string | null;
+  cold_chain_checked_at: string | null;
+}
+
+function pickingError(items: PickingItemRow[]) {
+  if (items.length === 0) return 'La commande ne contient aucun article à préparer.';
+  const unpicked = items.filter(item => !item.picked_at).length;
+  const coldUnchecked = items.filter(item =>
+    (item.storage_type === 'fresh' || item.storage_type === 'frozen')
+    && !item.cold_chain_checked_at,
+  ).length;
+
+  if (unpicked === 0 && coldUnchecked === 0) return null;
+
+  const parts: string[] = [];
+  if (unpicked > 0) parts.push(`${unpicked} ligne${unpicked > 1 ? 's' : ''} non prélevée${unpicked > 1 ? 's' : ''}`);
+  if (coldUnchecked > 0) parts.push(`${coldUnchecked} contrôle${coldUnchecked > 1 ? 's' : ''} froid manquant${coldUnchecked > 1 ? 's' : ''}`);
+  return `Préparation incomplète : ${parts.join(' · ')}.`;
 }
 
 export async function PATCH(
@@ -45,7 +68,7 @@ export async function PATCH(
 
     const { data: existingRaw, error: fetchError } = await supabase
       .from('orders')
-      .select('id, status, email, full_name, fulfillment_type, tracking_code, tracking_carrier')
+      .select('id, status, email, full_name, fulfillment_type, tracking_code, tracking_carrier, picking_started_at')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
       .single();
@@ -77,7 +100,29 @@ export async function PATCH(
         return NextResponse.json({ error: validation.error }, { status: 409 });
       }
 
+      const finishingPreparation = existing.status === 'preparing'
+        && (status === 'shipped' || status === 'ready_for_pickup');
+
+      if (finishingPreparation) {
+        const { data: pickingItemsRaw, error: pickingFetchError } = await supabase
+          .from('order_items')
+          .select('storage_type, picked_at, cold_chain_checked_at')
+          .eq('order_id', existing.id)
+          .eq('tenant_id', tenant.id);
+
+        if (pickingFetchError) {
+          console.error('[admin/orders PATCH] picking fetch error:', pickingFetchError, '— order_id:', existing.id);
+          return NextResponse.json({ error: 'Impossible de vérifier la préparation.' }, { status: 500 });
+        }
+
+        const error = pickingError((pickingItemsRaw ?? []) as PickingItemRow[]);
+        if (error) return NextResponse.json({ error }, { status: 409 });
+      }
+
       update.status = status;
+      if (status === 'preparing' && existing.status === 'new' && !existing.picking_started_at) {
+        update.picking_started_at = new Date().toISOString();
+      }
       if (status === 'shipped' && existing.status !== 'shipped') {
         update.shipped_at = new Date().toISOString();
       }
