@@ -5,18 +5,18 @@ import Link from 'next/link'
 import {
   IconArrowLeft,
   IconBuildingStore,
+  IconCheck,
   IconClock,
   IconExternalLink,
   IconMail,
   IconMapPin,
-  IconPackage,
   IconReceipt,
   IconSnowflake,
-  IconTemperature,
   IconTruck,
 } from '@tabler/icons-react'
 import { formatPrice, formatDate } from '@/lib/utils/format'
 import OrderDetail from '../../../orders/[id]/OrderDetail'
+import PickingChecklist from '../../../orders/[id]/PickingChecklist'
 import PickingList from '../../../orders/[id]/PickingList'
 import StatusBadge from '../../../_components/ui/StatusBadge'
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent'
@@ -135,12 +135,30 @@ export default async function AdminOrderPage({ params }: PageProps) {
     city?: string
     country?: string
   } | null
-  const frozenQty = items.filter(item => item.storage_type === 'frozen').reduce((sum, item) => sum + item.quantity, 0)
-  const freshQty = items.filter(item => item.storage_type === 'fresh').reduce((sum, item) => sum + item.quantity, 0)
+
+  const frozenItems = items.filter(item => item.storage_type === 'frozen')
+  const freshItems = items.filter(item => item.storage_type === 'fresh')
+  const frozenQty = frozenItems.reduce((sum, item) => sum + item.quantity, 0)
+  const freshQty = freshItems.reduce((sum, item) => sum + item.quantity, 0)
   const hasColdChain = frozenQty > 0 || freshQty > 0
+  const pickedCount = items.filter(item => item.picked_at).length
+  const coldItems = items.filter(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')
+  const coldChecked = coldItems.filter(item => item.cold_chain_checked_at).length
+  const pickingComplete = items.length > 0
+    && pickedCount === items.length
+    && coldChecked === coldItems.length
+  const pickingProgress = {
+    total: items.length,
+    picked: pickedCount,
+    coldRequired: coldItems.length,
+    coldChecked,
+    complete: pickingComplete,
+  }
+
   const activeOrder = !['delivered', 'cancelled'].includes(order.status)
   const ageMs = Date.now() - new Date(order.created_at).getTime()
   const needsAttention = activeOrder && ageMs >= 24 * 60 * 60 * 1000
+  const pickingNeedsAttention = order.status === 'preparing' && !pickingComplete
   const nextAction = nextActionLabel(order.status, isPickup)
   const mapQuery = address
     ? [address.line1, address.postal_code, address.city, address.country].filter(Boolean).join(', ')
@@ -151,7 +169,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
       <div className="no-print mx-auto w-full max-w-7xl pb-10">
         <Link
           href="/admin"
-          className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 transition hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+          className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 transition hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
         >
           <IconArrowLeft size={17} />
           Retour aux commandes
@@ -174,6 +192,15 @@ export default async function AdminOrderPage({ params }: PageProps) {
                   <IconSnowflake size={13} /> Chaîne du froid
                 </span>
               )}
+              {order.status === 'preparing' && (
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${pickingComplete
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                }`}>
+                  {pickingComplete && <IconCheck size={13} />}
+                  Préparation {pickedCount}/{items.length}
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {formatDate(order.created_at, 'fr')} · {order.full_name ?? order.email}
@@ -184,7 +211,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
             {nextAction && (
               <a
                 href="#order-actions"
-                className="inline-flex min-h-10 items-center rounded-xl bg-[var(--admin-primary)] px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
+                className="inline-flex min-h-11 items-center rounded-xl bg-[var(--admin-primary)] px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
               >
                 {nextAction}
               </a>
@@ -199,12 +226,17 @@ export default async function AdminOrderPage({ params }: PageProps) {
           </div>
         </header>
 
-        {(needsAttention || hasColdChain || order.payment_status !== 'paid') && (
-          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {(needsAttention || hasColdChain || order.payment_status !== 'paid' || pickingNeedsAttention) && (
+          <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {needsAttention && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
                 <strong>Commande ancienne.</strong> Vérifier qu&apos;elle n&apos;est pas bloquée dans le workflow.
               </div>
+            )}
+            {pickingNeedsAttention && (
+              <a href="#picking-checklist" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50">
+                <strong>Préparation incomplète :</strong> {pickedCount}/{items.length} lignes prélevées{coldItems.length > 0 ? ` · froid ${coldChecked}/${coldItems.length}` : ''}.
+              </a>
             )}
             {hasColdChain && (
               <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
@@ -249,43 +281,11 @@ export default async function AdminOrderPage({ params }: PageProps) {
 
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.75fr)]">
           <div className="order-2 space-y-5 xl:order-1">
-            <AdminBlockAccent tone="primary">
-              <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <header className="flex items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3.5 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]">
-                      <IconPackage size={18} />
-                    </span>
-                    <div>
-                      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Préparation des produits</h2>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{items.length} ligne{items.length !== 1 ? 's' : ''} · triées par emplacement</p>
-                    </div>
-                  </div>
-                </header>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {items.map(item => {
-                    const frozen = item.storage_type === 'frozen'
-                    const fresh = item.storage_type === 'fresh'
-                    return (
-                      <div key={item.id} className={`flex items-start gap-3 px-4 py-3.5 ${frozen ? 'bg-blue-50/50 dark:bg-blue-950/10' : fresh ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : ''}`}>
-                        <span className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-xl bg-gray-950 px-2 text-base font-bold text-white dark:bg-white dark:text-gray-950">×{item.quantity}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.name}</p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                            {item.warehouse_location && (
-                              <span className="rounded-full bg-gray-100 px-2 py-1 font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">Emplacement {item.warehouse_location}</span>
-                            )}
-                            {frozen && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200"><IconSnowflake size={13} /> Surgelé</span>}
-                            {fresh && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"><IconTemperature size={13} /> Frais</span>}
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-sm font-semibold text-gray-900 dark:text-gray-100">{formatPrice(item.subtotal, tenant.currency)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            </AdminBlockAccent>
+            <div id="picking-checklist">
+              <AdminBlockAccent tone="primary">
+                <PickingChecklist orderId={order.id} orderStatus={order.status} items={items} />
+              </AdminBlockAccent>
+            </div>
 
             <AdminBlockAccent tone="info">
               <section className="rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -356,6 +356,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
               shippingDetails={shippingDetails}
               shippingProvider={tenant.shipping_provider ?? 'flat_rate'}
               coldChain={{ fresh: freshQty, frozen: frozenQty }}
+              pickingProgress={pickingProgress}
             />
           </aside>
         </div>
