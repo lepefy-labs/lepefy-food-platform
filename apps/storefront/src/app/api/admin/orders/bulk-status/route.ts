@@ -180,6 +180,7 @@ export async function POST(req: NextRequest) {
         nextStatus: 'shipped',
         email: order.email,
         fullName: order.full_name,
+        fulfillmentType: order.fulfillment_type,
         trackingCode: providedTracking?.code ?? order.tracking_code,
         trackingCarrier: providedTracking?.carrier ?? order.tracking_carrier,
       });
@@ -193,6 +194,19 @@ export async function POST(req: NextRequest) {
       .in('id', toReadyForPickup.map(order => order.id))
       .eq('tenant_id', tenant.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    for (const order of toReadyForPickup) {
+      await runOrderTransitionSideEffects({
+        orderId: order.id,
+        previousStatus: order.status,
+        nextStatus: 'ready_for_pickup',
+        email: order.email,
+        fullName: order.full_name,
+        fulfillmentType: order.fulfillment_type,
+        trackingCode: order.tracking_code,
+        trackingCarrier: order.tracking_carrier,
+      });
+    }
   }
 
   return NextResponse.json({
