@@ -7,6 +7,7 @@ import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessi
 import { formatPrice } from '@/lib/utils/format';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import PaymentRecoveryActions from './PaymentRecoveryActions';
+import PaymentRecoveryDetails from './PaymentRecoveryDetails';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -18,6 +19,15 @@ interface SessionItem {
   name: string;
   price: number;
   quantity: number;
+}
+
+interface ShippingAddress {
+  full_name?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  country?: string | null;
 }
 
 interface ReminderLog {
@@ -38,7 +48,7 @@ function statusPresentation(status: string) {
   if (status === 'awaiting_verification') {
     return {
       label: 'Réception à vérifier',
-      description: 'Le client a été envoyé vers un paiement externe. La réception n’est pas encore confirmée dans Lepefy.',
+      description: 'Le client a été redirigé vers un paiement externe. Sa réception n’est pas encore confirmée.',
       tone: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200',
     };
   }
@@ -62,7 +72,7 @@ export default async function PendingPaymentManagementPage({ params }: { params:
 
   const { data: rawSession } = await supabase
     .from('checkout_sessions')
-    .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, status, expires_at, payment_method, external_payment_type, external_payment_label, external_payment_link, order_id, created_at')
+    .select('id, email, full_name, phone, fulfillment_type, shipping_address, items, shipping_total, ambassador_discount_amount, status, expires_at, payment_method, external_payment_type, external_payment_label, external_payment_link, order_id, created_at')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .eq('payment_method', 'external_link')
@@ -76,6 +86,9 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     id: string;
     email: string;
     full_name: string | null;
+    phone: string | null;
+    fulfillment_type: 'delivery' | 'pickup';
+    shipping_address: ShippingAddress | null;
     items: SessionItem[];
     shipping_total: number;
     ambassador_discount_amount: number | null;
@@ -124,9 +137,13 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
     0,
   );
-  const total = Number((subtotal + Number(session.shipping_total ?? 0) - Number(session.ambassador_discount_amount ?? 0)).toFixed(2));
+  const discountTotal = Number(session.ambassador_discount_amount ?? 0);
+  const shippingTotal = Number(session.shipping_total ?? 0);
+  const total = Number((subtotal + shippingTotal - discountTotal).toFixed(2));
   const status = statusPresentation(session.status);
   const customerLabel = session.full_name ?? session.email;
+  const paymentLabel = session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe';
+  const reference = `#${session.id.slice(0, 8).toUpperCase()}`;
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
@@ -137,7 +154,21 @@ export default async function PendingPaymentManagementPage({ params }: { params:
       <AdminPageHeader
         title="Gérer le paiement"
         description="Vérifiez la situation avant de relancer le client, confirmer la réception ou annuler la demande."
-        meta={`#${session.id.slice(0, 8).toUpperCase()}`}
+        meta={reference}
+        actions={(
+          <PaymentRecoveryDetails
+            customer={{ name: customerLabel, email: session.email, phone: session.phone }}
+            payment={{ reference, method: paymentLabel }}
+            fulfillmentType={session.fulfillment_type}
+            shippingAddress={session.shipping_address}
+            items={session.items}
+            subtotal={subtotal}
+            shippingTotal={shippingTotal}
+            discountTotal={discountTotal}
+            total={total}
+            currency={tenant.currency}
+          />
+        )}
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -145,10 +176,11 @@ export default async function PendingPaymentManagementPage({ params }: { params:
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={15} /> Client</div>
           <p className="mt-2 truncate text-sm font-bold text-gray-950 dark:text-white">{customerLabel}</p>
           <p className="mt-1 truncate text-xs text-gray-500">{session.email}</p>
+          {session.phone && <p className="mt-1 truncate text-xs text-gray-500">{session.phone}</p>}
         </div>
         <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconWallet size={15} /> Paiement</div>
-          <p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe'}</p>
+          <p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{paymentLabel}</p>
           <p className="mt-1 text-xl font-bold text-gray-950 dark:text-white">{formatPrice(total, tenant.currency)}</p>
         </div>
         <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">

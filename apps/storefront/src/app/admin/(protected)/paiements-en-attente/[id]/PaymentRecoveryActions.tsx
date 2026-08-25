@@ -79,7 +79,7 @@ export default function PaymentRecoveryActions({
       setReminderCount(payload.reminderCount ?? reminderCount + 1);
       setLastReminderAt(payload.lastReminderAt ?? new Date().toISOString());
       setNextReminderAt(payload.nextReminderAt ?? null);
-      setReminderMessage('Rappel transmis à n8n.');
+      setReminderMessage('Rappel envoyé au client.');
       router.refresh();
     } catch {
       setReminderError(true);
@@ -146,7 +146,7 @@ export default function PaymentRecoveryActions({
         <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <h2 className="font-bold text-gray-950 dark:text-white">Reprise client</h2>
           <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
-            Le lien sécurisé ouvre le checkout Lepefy. Le client peut continuer avec le moyen actuel ou en choisir un autre sans créer une commande tant que le paiement n’est pas confirmé.
+            Le lien sécurisé permet au client de reprendre son achat. Il peut continuer avec le moyen actuel ou en choisir un autre, sans créer de commande tant que le paiement n’est pas confirmé.
           </p>
           {resumeLink && canResume ? (
             <a
