@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconSnowflake, IconTemperature } from '@tabler/icons-react';
+import { IconCheck, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
@@ -22,6 +22,14 @@ interface ShippingDetails {
   freeShippingApplied?: boolean;
 }
 
+interface PickingProgress {
+  total: number;
+  picked: number;
+  coldRequired: number;
+  coldChecked: number;
+  complete: boolean;
+}
+
 interface Props {
   order: Order;
   currency: string;
@@ -29,6 +37,7 @@ interface Props {
   shippingDetails: ShippingDetails | null;
   shippingProvider: string;
   coldChain?: { fresh: number; frozen: number };
+  pickingProgress: PickingProgress;
 }
 
 const CARRIER_MAP: Record<string, string> = {
@@ -74,6 +83,7 @@ export default function OrderDetail({
   shippingDetails,
   shippingProvider,
   coldChain = { fresh: 0, frozen: 0 },
+  pickingProgress,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -92,7 +102,10 @@ export default function OrderDetail({
 
   const action = nextAction(order.status, isPickup);
   const needsTracking = action?.status === 'shipped';
-  const actionDisabled = saving || (needsTracking && !trackingCode.trim());
+  const finishingPreparation = order.status === 'preparing'
+    && (action?.status === 'shipped' || action?.status === 'ready_for_pickup');
+  const pickingBlocked = finishingPreparation && !pickingProgress.complete;
+  const actionDisabled = saving || (needsTracking && !trackingCode.trim()) || pickingBlocked;
   const hasColdChain = coldChain.fresh > 0 || coldChain.frozen > 0;
   const inputClass = 'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100';
 
@@ -163,6 +176,30 @@ export default function OrderDetail({
           </div>
 
           <div className="space-y-4 bg-white p-4 dark:bg-gray-900">
+            {finishingPreparation && (
+              <div className={`rounded-xl border p-3 ${pickingProgress.complete
+                ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30'
+                : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30'
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <p className={`text-xs font-bold uppercase tracking-wide ${pickingProgress.complete ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-200'}`}>
+                    Préparation
+                  </p>
+                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{pickingProgress.picked}/{pickingProgress.total}</span>
+                </div>
+                {pickingProgress.complete ? (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    <IconCheck size={14} /> Picking et contrôles froid terminés.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                    Terminez la checklist avant de finaliser la commande.
+                    {pickingProgress.coldRequired > 0 && ` Contrôles froid : ${pickingProgress.coldChecked}/${pickingProgress.coldRequired}.`}
+                  </p>
+                )}
+              </div>
+            )}
+
             {hasColdChain && (
               <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
                 <p className="text-xs font-bold uppercase tracking-wide text-sky-800 dark:text-sky-200">Chaîne du froid</p>
@@ -173,13 +210,13 @@ export default function OrderDetail({
                     </span>
                   )}
                   {coldChain.fresh > 0 && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
                       <IconTemperature size={14} /> {coldChain.fresh} frais
                     </span>
                   )}
                 </div>
                 <p className="mt-2 text-xs leading-5 text-sky-700 dark:text-sky-300">
-                  Vérifier la préparation et l&apos;emballage adaptés avant de finaliser cette étape.
+                  Le contrôle froid de chaque ligne doit être validé avant la remise ou l&apos;expédition.
                 </p>
               </div>
             )}
@@ -215,7 +252,7 @@ export default function OrderDetail({
               type="button"
               onClick={runPrimaryAction}
               disabled={actionDisabled}
-              className="min-h-11 w-full rounded-xl bg-[var(--admin-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+              className="min-h-11 w-full rounded-xl bg-[var(--admin-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? 'Mise à jour…' : action.label}
             </button>
@@ -277,7 +314,7 @@ export default function OrderDetail({
           type="button"
           onClick={saveNotesAndLogistics}
           disabled={saving}
-          className="mt-3 min-h-10 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:text-gray-200"
+          className="mt-3 min-h-11 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:text-gray-200"
         >
           Enregistrer les informations
         </button>
@@ -290,7 +327,7 @@ export default function OrderDetail({
           <button
             type="button"
             onClick={() => window.print()}
-            className="min-h-10 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:text-gray-200"
+            className="min-h-11 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:text-gray-200"
           >
             Imprimer la liste de prélèvement
           </button>
@@ -299,7 +336,7 @@ export default function OrderDetail({
               type="button"
               onClick={() => setCancelOpen(true)}
               disabled={saving}
-              className="min-h-10 w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
+              className="min-h-11 w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
             >
               Annuler la commande
             </button>
