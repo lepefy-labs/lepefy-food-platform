@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
+import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 import type { Order, OrderStatus } from '@lepefy/types';
 
 interface ShippingDetails {
@@ -26,6 +28,7 @@ interface Props {
   carriers: { name: string }[];
   shippingDetails: ShippingDetails | null;
   shippingProvider: string;
+  coldChain?: { fresh: number; frozen: number };
 }
 
 const CARRIER_MAP: Record<string, string> = {
@@ -70,6 +73,7 @@ export default function OrderDetail({
   carriers,
   shippingDetails,
   shippingProvider,
+  coldChain = { fresh: 0, frozen: 0 },
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -84,10 +88,12 @@ export default function OrderDetail({
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [isPaid, setIsPaid] = useState(!isInStorePending);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const action = nextAction(order.status, isPickup);
   const needsTracking = action?.status === 'shipped';
   const actionDisabled = saving || (needsTracking && !trackingCode.trim());
+  const hasColdChain = coldChain.fresh > 0 || coldChain.frozen > 0;
   const inputClass = 'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100';
 
   async function patchOrder(body: Record<string, unknown>, successMessage: string) {
@@ -136,6 +142,7 @@ export default function OrderDetail({
 
   async function cancelOrder() {
     await patchOrder({ status: 'cancelled', notes: notes.trim() || null }, 'Commande annulée.');
+    setCancelOpen(false);
   }
 
   const sd = shippingDetails;
@@ -145,36 +152,38 @@ export default function OrderDetail({
 
   return (
     <>
-      {order.payment_method === 'in_store' && !isPaid && (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
-          <p className="mb-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
-            Paiement en attente — à encaisser en boutique
-          </p>
-          <ConfirmPaymentButton
-            endpoint={`/api/admin/orders/${order.id}`}
-            method="PATCH"
-            body={{ payment_status: 'paid' }}
-            label="Marquer comme payé"
-            confirmingLabel="Mise à jour…"
-            onSuccess={() => {
-              setIsPaid(true);
-              router.refresh();
-            }}
-          />
-        </section>
-      )}
-
       {action && (
         <section className="overflow-hidden rounded-2xl border border-[#D9D3FF] bg-[var(--admin-primary-soft)] shadow-sm">
           <div className="border-b border-[#D9D3FF] px-4 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Action suivante</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Prochaine action</p>
             <h2 className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">{action.label}</h2>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Le workflow contrôle les transitions autorisées côté serveur.
+              La transition reste contrôlée côté serveur.
             </p>
           </div>
 
           <div className="space-y-4 bg-white p-4 dark:bg-gray-900">
+            {hasColdChain && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
+                <p className="text-xs font-bold uppercase tracking-wide text-sky-800 dark:text-sky-200">Chaîne du froid</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {coldChain.frozen > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                      <IconSnowflake size={14} /> {coldChain.frozen} surgelé{coldChain.frozen > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {coldChain.fresh > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                      <IconTemperature size={14} /> {coldChain.fresh} frais
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-sky-700 dark:text-sky-300">
+                  Vérifier la préparation et l&apos;emballage adaptés avant de finaliser cette étape.
+                </p>
+              </div>
+            )}
+
             {!isPickup && (
               <>
                 <div>
@@ -214,10 +223,29 @@ export default function OrderDetail({
         </section>
       )}
 
+      {order.payment_method === 'in_store' && !isPaid && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <p className="mb-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
+            Paiement en attente — à encaisser en boutique
+          </p>
+          <ConfirmPaymentButton
+            endpoint={`/api/admin/orders/${order.id}`}
+            method="PATCH"
+            body={{ payment_status: 'paid' }}
+            label="Marquer comme payé"
+            confirmingLabel="Mise à jour…"
+            onSuccess={() => {
+              setIsPaid(true);
+              router.refresh();
+            }}
+          />
+        </section>
+      )}
+
       {!isPickup && sd && (
         <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 dark:bg-gray-900">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Détails expédition</h2>
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Expédition & tracking</h2>
             {sd.freeShippingApplied && <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">Livraison offerte</span>}
           </div>
           <div className="space-y-2">
@@ -257,7 +285,7 @@ export default function OrderDetail({
       </section>
 
       <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 dark:bg-gray-900">
-        <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Actions secondaires</h2>
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Documents & actions secondaires</h2>
         <div className="space-y-2">
           <button
             type="button"
@@ -269,7 +297,7 @@ export default function OrderDetail({
           {order.status !== 'cancelled' && order.status !== 'delivered' && order.status !== 'shipped' && (
             <button
               type="button"
-              onClick={cancelOrder}
+              onClick={() => setCancelOpen(true)}
               disabled={saving}
               className="min-h-10 w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30"
             >
@@ -278,6 +306,18 @@ export default function OrderDetail({
           )}
         </div>
       </section>
+
+      <ConfirmActionModal
+        open={cancelOpen}
+        title="Annuler cette commande ?"
+        description="La commande passera au statut annulé. Vérifiez le paiement et les éventuelles actions de remboursement avant de confirmer."
+        confirmLabel="Annuler la commande"
+        cancelLabel="Conserver"
+        destructive
+        loading={saving}
+        onCancel={() => { if (!saving) setCancelOpen(false); }}
+        onConfirm={() => { void cancelOrder(); }}
+      />
     </>
   );
 }
