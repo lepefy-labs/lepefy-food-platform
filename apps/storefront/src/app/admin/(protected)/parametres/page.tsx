@@ -56,6 +56,7 @@ export default async function ParametresPage() {
       <div className="grid items-start gap-5 xl:grid-cols-2">
         <BoutiqueInfoSection
           tagline={tenant.tagline}
+          storefront_url={tenant.storefront_url}
           whatsapp_number={tenant.whatsapp_number}
           click_collect_address={tenant.click_collect_address}
           google_maps_url={tenant.google_maps_url}
