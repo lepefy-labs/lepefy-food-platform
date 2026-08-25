@@ -13,8 +13,9 @@ const WIDTH = 1080;
 const HEIGHT = 1920;
 const DEFAULT_PRIMARY = '#E65C00';
 const DEFAULT_SECONDARY = '#FFB347';
-const SOCIAL_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf';
-const SOCIAL_FONT_PATH = '/tmp/lepefy-social-roboto.ttf';
+const SOCIAL_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/prompt/Prompt-Regular.ttf';
+const SOCIAL_FONT_PATH = '/tmp/lepefy-social-prompt-regular.ttf';
+const SOCIAL_FONT_FAMILY = 'Prompt';
 let socialFontPromise: Promise<string> | null = null;
 
 function escapeMarkup(value: string) {
@@ -52,7 +53,7 @@ async function ensureSocialFont() {
         return SOCIAL_FONT_PATH;
       } catch {
         const response = await fetch(SOCIAL_FONT_URL, { cache: 'force-cache' });
-        if (!response.ok) throw new Error('social-font-unavailable');
+        if (!response.ok) throw new Error(`social-font-unavailable:${response.status}`);
         await writeFile(SOCIAL_FONT_PATH, Buffer.from(await response.arrayBuffer()));
         return SOCIAL_FONT_PATH;
       }
@@ -76,7 +77,7 @@ async function renderTextLayer(fontPath: string, options: TextLayerOptions) {
   return sharp({
     text: {
       text: markup,
-      font: `Roboto ${options.fontSize}`,
+      font: `${SOCIAL_FONT_FAMILY} ${options.fontSize}`,
       fontfile: fontPath,
       width: options.width,
       height: options.height,
@@ -251,7 +252,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
         'Cache-Control': 'public, max-age=300, s-maxage=900, stale-while-revalidate=3600',
       },
     });
-  } catch {
+  } catch (error) {
+    console.error('[social-card] generation failed', error);
     return NextResponse.json({ error: 'Impossible de générer la story.' }, { status: 500 });
   }
 }
