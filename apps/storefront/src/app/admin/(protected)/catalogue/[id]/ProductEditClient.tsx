@@ -14,6 +14,7 @@ import {
 import type { Producer, Importer, NutritionInfo, DurabilityType } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
+import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
 
 interface ProductEditProps {
   product: {
@@ -195,6 +196,7 @@ export default function ProductEditClient({
   const [removeBgOnUpload, setRemoveBgOnUpload]     = useState(false);
   const [isRegeneratingBarcode, setIsRegeneratingBarcode] = useState(false);
   const [displayBarcode, setDisplayBarcode]         = useState(product.barcode_value ?? null);
+  const [barcodeConfirmOpen, setBarcodeConfirmOpen] = useState(false);
   const [removeBgOnLabelBg, setRemoveBgOnLabelBg]   = useState(false);
   const [toast, setToast]               = useState<{
     msg: string;
@@ -300,12 +302,6 @@ export default function ProductEditClient({
   }
 
   async function handleRegenerateBarcode() {
-    if (displayBarcode && !window.confirm(
-      'Rigenerare il barcode? Se sono già state stampate etichette con il codice ' +
-      'attuale, la merce a scaffale non corrisponderà più al nuovo codice finché ' +
-      'non verranno ristampate.'
-    )) return;
-
     setIsRegeneratingBarcode(true);
     try {
       const res = await fetch(`/api/admin/catalogue/${product.id}/regenerate-barcode`, {
@@ -314,6 +310,7 @@ export default function ProductEditClient({
       if (!res.ok) throw new Error('Génération échouée');
       const { barcode } = await res.json() as { barcode: string };
       setDisplayBarcode(barcode);
+      setBarcodeConfirmOpen(false);
       showToast('Barcode généré', 'success');
     } catch {
       showToast('Erreur lors de la génération du code-barres', 'error');
@@ -504,807 +501,751 @@ export default function ProductEditClient({
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">
-            {isNew ? 'Nouveau produit' : product.name}
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            slug: <span className="font-mono">{product.slug}</span>
-          </p>
+    <>
+      <div>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">
+              {isNew ? 'Nouveau produit' : product.name}
+            </h1>
+            <p className="text-sm text-gray-400 mt-0.5">
+              slug: <span className="font-mono">{product.slug}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isNew && (
+              <Link
+                href={`/admin/products/${product.id}/etichetta`}
+                className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+              >
+                <IconTag size={16} />
+                Étiquette
+              </Link>
+            )}
+            <Button onClick={handleSave} loading={isSaving}>
+              {!isSaving && <IconCheck size={16} />}
+              {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {!isNew && (
-            <Link
-              href={`/admin/products/${product.id}/etichetta`}
-              className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              <IconTag size={16} />
-              Étiquette
-            </Link>
-          )}
-          <Button onClick={handleSave} loading={isSaving}>
-            {!isSaving && <IconCheck size={16} />}
-            {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-          </Button>
+
+        <div className="flex items-center gap-1 border-b border-gray-200 mb-5">
+          <button
+            onClick={() => setActiveTab('generale')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'generale'
+                ? 'border-[var(--color-primary)] text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Général
+          </button>
+          <button
+            onClick={() => setActiveTab('etichetta')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'etichetta'
+                ? 'border-[var(--color-primary)] text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            Étiquette
+          </button>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-5">
-        <button
-          onClick={() => setActiveTab('generale')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            activeTab === 'generale'
-              ? 'border-[var(--color-primary)] text-gray-900'
-              : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}
+        <div
+          className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5"
+          style={{ display: activeTab === 'generale' ? 'grid' : 'none' }}
         >
-          Général
-        </button>
-        <button
-          onClick={() => setActiveTab('etichetta')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            activeTab === 'etichetta'
-              ? 'border-[var(--color-primary)] text-gray-900'
-              : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}
-        >
-          Étiquette
-        </button>
-      </div>
+          <div className="space-y-5">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Informations</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className={LABEL_CLS}>Nom du produit</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setField('name', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Catégorie</label>
+                  <select
+                    value={formData.category_id}
+                    onChange={(e) => setField('category_id', e.target.value)}
+                    className={INPUT_CLS}
+                  >
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Type de stockage</label>
+                  <select
+                    value={formData.storage_type}
+                    onChange={(e) => setField('storage_type', e.target.value)}
+                    className={INPUT_CLS}
+                  >
+                    <option value="dry">Sec</option>
+                    <option value="fresh">Frais</option>
+                    <option value="frozen">Surgelé</option>
+                  </select>
+                </div>
+              </div>
+            </section>
 
-      {/* ── Onglet Général ──────────────────────────────────────────────────── */}
-      {/* Toujours monté (display:none quand inactif) pour ne jamais perdre l'état au changement d'onglet */}
-      <div
-        className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5"
-        style={{ display: activeTab === 'generale' ? 'grid' : 'none' }}
-      >
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={SECTION_TITLE_CLS.replace('mb-4', '')}>Descriptions</h2>
+                {formData.descriptionSource === 'ai' && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                    IA — à revoir
+                  </span>
+                )}
+              </div>
+              <div className="space-y-4">
+                {tenantLocales.map((locale) => (
+                  <div key={locale}>
+                    <label className={LABEL_CLS}>Description ({locale.toUpperCase()})</label>
+                    <textarea
+                      value={formData.descriptions[locale] ?? ''}
+                      onChange={(e) => setDescriptionLocale(locale, e.target.value)}
+                      rows={4}
+                      className={`${INPUT_CLS} resize-none`}
+                    />
+                  </div>
+                ))}
+              </div>
+              {aiDescriptionsEnabled && (
+                <Button
+                  onClick={handleGenerateDescriptions}
+                  loading={isGeneratingDescriptions}
+                  className="w-full mt-4"
+                >
+                  {!isGeneratingDescriptions && <IconSparkles size={16} stroke={2} />}
+                  {isGeneratingDescriptions ? 'Génération...' : 'Générer avec IA'}
+                </Button>
+              )}
+            </section>
 
-        {/* ── Left column ─────────────────────────────────────────────────── */}
-        <div className="space-y-5">
-
-          {/* Card: Informations */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className={SECTION_TITLE_CLS}>Informations</h2>
-
-            <div className="space-y-4">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Tarification &amp; Logistique</h2>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className={LABEL_CLS}>Prix (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setField('price', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Poids (grammes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.weight_grams}
+                    onChange={(e) => setField('weight_grams', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+              </div>
               <div>
-                <label className={LABEL_CLS}>Nom du produit</label>
+                <label className={LABEL_CLS}>Emplacement magasin</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setField('name', e.target.value)}
+                  placeholder="ex: Corsia A - Ripiano 2"
+                  value={formData.warehouse_location}
+                  onChange={(e) => setField('warehouse_location', e.target.value)}
                   className={INPUT_CLS}
                 />
               </div>
+            </section>
 
-              <div>
-                <label className={LABEL_CLS}>Catégorie</label>
-                <select
-                  value={formData.category_id}
-                  onChange={(e) => setField('category_id', e.target.value)}
-                  className={INPUT_CLS}
-                >
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+            {!isNew && (
+              <section className="bg-white rounded-xl border border-gray-200 p-5">
+                <h2 className={SECTION_TITLE_CLS}>Code-barres</h2>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    {displayBarcode ? (
+                      <p className="font-mono text-sm text-gray-800">
+                        {formatBarcodeDisplay(displayBarcode)}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-400">Aucun code-barres généré</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      Généré automatiquement en interne — jamais un vrai code GS1 fabricant.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (displayBarcode) setBarcodeConfirmOpen(true);
+                      else void handleRegenerateBarcode();
+                    }}
+                    loading={isRegeneratingBarcode}
+                    className="flex-shrink-0"
+                  >
+                    {isRegeneratingBarcode ? 'Génération...' : displayBarcode ? 'Régénérer' : 'Générer'}
+                  </Button>
+                </div>
+              </section>
+            )}
+          </div>
+
+          <div className="space-y-5">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Médias</h2>
+              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100 mb-4">
+                {formData.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={formData.image_url}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                    <IconPhoto size={32} className="text-gray-300" />
+                    <span className="text-xs text-gray-400">Aucune image</span>
+                  </div>
+                )}
+
+                {isGenerating && (
+                  <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center gap-3 rounded-lg">
+                    <div className="w-8 h-8 border-2 border-[var(--color-primary-light)] border-t-[var(--color-primary)] rounded-full animate-spin" />
+                    <div className="text-center px-4">
+                      <p className="text-xs font-medium text-[var(--color-primary)]">Génération en cours...</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Analyse du produit puis création de l&apos;image</p>
+                      <p className="text-[10px] text-gray-300 mt-0.5">(5 à 15 secondes)</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className={LABEL_CLS}>Type de stockage</label>
-                <select
-                  value={formData.storage_type}
-                  onChange={(e) => setField('storage_type', e.target.value)}
-                  className={INPUT_CLS}
+              {formData.image_url && (
+                <button
+                  onClick={handleDeleteImage}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mt-2 mb-3"
                 >
-                  <option value="dry">Sec</option>
-                  <option value="fresh">Frais</option>
-                  <option value="frozen">Surgelé</option>
-                </select>
-              </div>
-
-            </div>
-          </section>
-
-          {/* Card: Descriptions */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={SECTION_TITLE_CLS.replace('mb-4', '')}>Descriptions</h2>
-              {formData.descriptionSource === 'ai' && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                  IA — à revoir
-                </span>
+                  <IconTrash size={14} />
+                  Supprimer l&apos;image
+                </button>
               )}
-            </div>
 
-            <div className="space-y-4">
-              {tenantLocales.map((locale) => (
-                <div key={locale}>
-                  <label className={LABEL_CLS}>Description ({locale.toUpperCase()})</label>
+              <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={removeBgOnUpload}
+                  onChange={(e) => setRemoveBgOnUpload(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Supprimer le fond automatiquement (IA)
+              </label>
+
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleFileDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg p-4 text-center mb-3 transition-colors cursor-pointer ${
+                  isDragging
+                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <IconUpload size={20} className="mx-auto mb-1 text-gray-400" />
+                <p className="text-xs text-gray-500">Glisser une image ici</p>
+                <span className="text-xs text-gray-400">ou cliquer pour parcourir</span>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
+                }}
+              />
+
+              {aiEnabled && (
+                <>
+                  <Button onClick={handleGenerateAI} loading={isGenerating} className="w-full">
+                    {!isGenerating && <IconSparkles size={16} stroke={2} />}
+                    Générer avec l&apos;IA
+                  </Button>
+                  <p className="text-xs text-gray-400 text-center mt-2">Photo générée automatiquement via IA</p>
+                </>
+              )}
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Statut</h2>
+              <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Actif</p>
+                  <p className="text-xs text-gray-400">Visible en boutique</p>
+                </div>
+                <button
+                  onClick={() => setField('active', !formData.active)}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${
+                    formData.active ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
+                  }`}
+                  aria-label="Activer le produit"
+                >
+                  <span
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                      formData.active ? 'right-1' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">En vedette</p>
+                  <p className="text-xs text-gray-400">Affiché en homepage</p>
+                </div>
+                <button
+                  onClick={() => setField('featured', !formData.featured)}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${
+                    formData.featured ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
+                  }`}
+                  aria-label="Mettre en vedette"
+                >
+                  <span
+                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                      formData.featured ? 'right-1' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Stock</h2>
+              <div>
+                <label className={LABEL_CLS}>Quantité disponible</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.stock}
+                  onChange={(e) => setField('stock', e.target.value)}
+                  className={INPUT_CLS}
+                />
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div
+          className="grid grid-cols-1 lg:grid-cols-2 gap-5"
+          style={{ display: activeTab === 'etichetta' ? 'grid' : 'none' }}
+        >
+          <div className="space-y-5">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Traduction du nom</h3>
+              <div>
+                <label className={LABEL_CLS}>Nome in italiano / traduzione</label>
+                <input
+                  type="text"
+                  value={formData.name_alt}
+                  onChange={(e) => setField('name_alt', e.target.value)}
+                  className={INPUT_CLS}
+                  placeholder="es. Pasta di manioca sotto vuoto"
+                />
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Producteur et importateur</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className={LABEL_CLS}>Producteur</label>
+                  <select
+                    value={formData.producer_id}
+                    onChange={(e) => setField('producer_id', e.target.value)}
+                    className={INPUT_CLS}
+                  >
+                    <option value="">— Aucun —</option>
+                    {producers.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Importateur</label>
+                  <select
+                    value={formData.importer_id}
+                    onChange={(e) => setField('importer_id', e.target.value)}
+                    className={INPUT_CLS}
+                  >
+                    <option value="">— Aucun —</option>
+                    {importers.map(i => (
+                      <option key={i.id} value={i.id}>{i.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Ingrédients et allergènes</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className={LABEL_CLS}>Ingrédients</label>
                   <textarea
-                    value={formData.descriptions[locale] ?? ''}
-                    onChange={(e) => setDescriptionLocale(locale, e.target.value)}
+                    value={formData.ingredients_text}
+                    onChange={(e) => setField('ingredients_text', e.target.value)}
                     rows={4}
                     className={`${INPUT_CLS} resize-none`}
                   />
                 </div>
-              ))}
-            </div>
-
-            {aiDescriptionsEnabled && (
-              <Button
-                onClick={handleGenerateDescriptions}
-                loading={isGeneratingDescriptions}
-                className="w-full mt-4"
-              >
-                {!isGeneratingDescriptions && <IconSparkles size={16} stroke={2} />}
-                {isGeneratingDescriptions ? 'Génération...' : 'Générer avec IA'}
-              </Button>
-            )}
-          </section>
-
-          {/* Card: Tarification & Logistique */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className={SECTION_TITLE_CLS}>
-              Tarification &amp; Logistique
-            </h2>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className={LABEL_CLS}>Prix (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={(e) => setField('price', e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Poids (grammes)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.weight_grams}
-                  onChange={(e) => setField('weight_grams', e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={LABEL_CLS}>Emplacement magasin</label>
-              <input
-                type="text"
-                placeholder="ex: Corsia A - Ripiano 2"
-                value={formData.warehouse_location}
-                onChange={(e) => setField('warehouse_location', e.target.value)}
-                className={INPUT_CLS}
-              />
-            </div>
-          </section>
-
-          {/* Card: Code-barres */}
-          {!isNew && (
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className={SECTION_TITLE_CLS}>Code-barres</h2>
-              <div className="flex items-center justify-between gap-4">
                 <div>
-                  {displayBarcode ? (
-                    <p className="font-mono text-sm text-gray-800">
-                      {formatBarcodeDisplay(displayBarcode)}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-400">Aucun code-barres généré</p>
-                  )}
+                  <label className={LABEL_CLS}>Allergènes</label>
+                  <textarea
+                    value={formData.allergens_text}
+                    onChange={(e) => setField('allergens_text', e.target.value)}
+                    rows={3}
+                    className={`${INPUT_CLS} resize-none`}
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={formData.gluten_free_certified}
+                      onChange={(e) => setField('gluten_free_certified', e.target.checked)}
+                      className="accent-[var(--color-primary)]"
+                    />
+                    Certifié sans gluten (nécessite analyse/certification)
+                  </label>
                   <p className="text-xs text-gray-400 mt-1">
-                    Généré automatiquement en interne — jamais un vrai code GS1 fabricant.
+                    Activez uniquement si une certification ou une analyse de laboratoire existe. Ne vous basez pas sur le fait que les ingrédients soient naturellement sans gluten — risque de contamination croisée.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleRegenerateBarcode}
-                  loading={isRegeneratingBarcode}
-                  className="flex-shrink-0"
-                >
-                  {isRegeneratingBarcode ? 'Génération...' : displayBarcode ? 'Régénérer' : 'Générer'}
-                </Button>
               </div>
             </section>
-          )}
-        </div>
 
-        {/* ── Right column ────────────────────────────────────────────────── */}
-        <div className="space-y-5">
-
-          {/* Card: Médias */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className={SECTION_TITLE_CLS}>Médias</h2>
-
-            {/* Preview */}
-            <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100 mb-4">
-              {formData.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={formData.image_url}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                  <IconPhoto size={32} className="text-gray-300" />
-                  <span className="text-xs text-gray-400">Aucune image</span>
-                </div>
-              )}
-
-              {isGenerating && (
-                <div className="absolute inset-0 bg-white/90 flex flex-col
-                                items-center justify-center gap-3 rounded-lg">
-                  <div className="w-8 h-8 border-2
-                                  border-[var(--color-primary-light)]
-                                  border-t-[var(--color-primary)]
-                                  rounded-full animate-spin" />
-                  <div className="text-center px-4">
-                    <p className="text-xs font-medium text-[var(--color-primary)]">
-                      Génération en cours...
-                    </p>
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      Analyse du produit puis création de l&apos;image
-                    </p>
-                    <p className="text-[10px] text-gray-300 mt-0.5">
-                      (5 à 15 secondes)
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Delete button — only when image exists */}
-            {formData.image_url && (
-              <button
-                onClick={handleDeleteImage}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mt-2 mb-3"
-              >
-                <IconTrash size={14} />
-                Supprimer l&apos;image
-              </button>
-            )}
-
-            <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={removeBgOnUpload}
-                onChange={(e) => setRemoveBgOnUpload(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              Supprimer le fond automatiquement (IA)
-            </label>
-
-            {/* Drag & Drop area */}
-            <div
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleFileDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg p-4 text-center mb-3 transition-colors cursor-pointer ${
-                isDragging
-                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <IconUpload size={20} className="mx-auto mb-1 text-gray-400" />
-              <p className="text-xs text-gray-500">Glisser une image ici</p>
-              <span className="text-xs text-gray-400">ou cliquer pour parcourir</span>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-              }}
-            />
-
-            {/* AI button — only when feature-flagged */}
-            {aiEnabled && (
-              <>
-                <Button
-                  onClick={handleGenerateAI}
-                  loading={isGenerating}
-                  className="w-full"
-                >
-                  {!isGenerating && <IconSparkles size={16} stroke={2} />}
-                  Générer avec l&apos;IA
-                </Button>
-                <p className="text-xs text-gray-400 text-center mt-2">
-                  Photo générée automatiquement via IA
-                </p>
-              </>
-            )}
-          </section>
-
-          {/* Card: Statut */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className={SECTION_TITLE_CLS}>Statut</h2>
-
-            <div className="flex items-center justify-between py-2 border-b border-gray-100">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Actif</p>
-                <p className="text-xs text-gray-400">Visible en boutique</p>
-              </div>
-              <button
-                onClick={() => setField('active', !formData.active)}
-                className={`relative w-10 h-6 rounded-full transition-colors ${
-                  formData.active ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
-                }`}
-                aria-label="Activer le produit"
-              >
-                <span
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                    formData.active ? 'right-1' : 'left-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="text-sm font-medium text-gray-900">En vedette</p>
-                <p className="text-xs text-gray-400">Affiché en homepage</p>
-              </div>
-              <button
-                onClick={() => setField('featured', !formData.featured)}
-                className={`relative w-10 h-6 rounded-full transition-colors ${
-                  formData.featured ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
-                }`}
-                aria-label="Mettre en vedette"
-              >
-                <span
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                    formData.featured ? 'right-1' : 'left-1'
-                  }`}
-                />
-              </button>
-            </div>
-          </section>
-
-          {/* Card: Stock */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className={SECTION_TITLE_CLS}>Stock</h2>
-            <div>
-              <label className={LABEL_CLS}>Quantité disponible</label>
-              <input
-                type="number"
-                min={0}
-                value={formData.stock}
-                onChange={(e) => setField('stock', e.target.value)}
-                className={INPUT_CLS}
-              />
-            </div>
-          </section>
-        </div>
-      </div>
-
-      {/* ── Onglet Étiquette ────────────────────────────────────────────────── */}
-      {/* Toujours monté (display:none quand inactif) pour ne jamais perdre l'état au changement d'onglet */}
-      <div
-        className="grid grid-cols-1 lg:grid-cols-2 gap-5"
-        style={{ display: activeTab === 'etichetta' ? 'grid' : 'none' }}
-      >
-
-        {/* ── Left column ─────────────────────────────────────────────────── */}
-        <div className="space-y-5">
-
-          {/* Traduction du nom */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Traduction du nom</h3>
-            <div>
-              <label className={LABEL_CLS}>Nome in italiano / traduzione</label>
-              <input
-                type="text"
-                value={formData.name_alt}
-                onChange={(e) => setField('name_alt', e.target.value)}
-                className={INPUT_CLS}
-                placeholder="es. Pasta di manioca sotto vuoto"
-              />
-            </div>
-          </section>
-
-          {/* Producteur et importateur */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Producteur et importateur</h3>
-            <div className="space-y-4">
-              <div>
-                <label className={LABEL_CLS}>Producteur</label>
-                <select
-                  value={formData.producer_id}
-                  onChange={(e) => setField('producer_id', e.target.value)}
-                  className={INPUT_CLS}
-                >
-                  <option value="">— Aucun —</option>
-                  {producers.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Importateur</label>
-                <select
-                  value={formData.importer_id}
-                  onChange={(e) => setField('importer_id', e.target.value)}
-                  className={INPUT_CLS}
-                >
-                  <option value="">— Aucun —</option>
-                  {importers.map(i => (
-                    <option key={i.id} value={i.id}>{i.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-
-          {/* Ingrédients et allergènes */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Ingrédients et allergènes</h3>
-            <div className="space-y-4">
-              <div>
-                <label className={LABEL_CLS}>Ingrédients</label>
-                <textarea
-                  value={formData.ingredients_text}
-                  onChange={(e) => setField('ingredients_text', e.target.value)}
-                  rows={4}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Allergènes</label>
-                <textarea
-                  value={formData.allergens_text}
-                  onChange={(e) => setField('allergens_text', e.target.value)}
-                  rows={3}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={formData.gluten_free_certified}
-                    onChange={(e) => setField('gluten_free_certified', e.target.checked)}
-                    className="accent-[var(--color-primary)]"
-                  />
-                  Certifié sans gluten (nécessite analyse/certification)
-                </label>
-                <p className="text-xs text-gray-400 mt-1">
-                  Activez uniquement si une certification ou une analyse de laboratoire
-                  existe. Ne vous basez pas sur le fait que les ingrédients soient
-                  naturellement sans gluten — risque de contamination croisée.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Instructions */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Instructions</h3>
-            <div className="space-y-4">
-              <div>
-                <label className={LABEL_CLS}>Conseils d&apos;utilisation</label>
-                <textarea
-                  value={formData.usage_instructions}
-                  onChange={(e) => setField('usage_instructions', e.target.value)}
-                  rows={3}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Conservation</label>
-                <textarea
-                  value={formData.conservation_instructions}
-                  onChange={(e) => setField('conservation_instructions', e.target.value)}
-                  rows={3}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Conservation après ouverture</label>
-                <textarea
-                  value={formData.conservation_after_opening}
-                  onChange={(e) => setField('conservation_after_opening', e.target.value)}
-                  rows={3}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Origine et conformité */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Origine et conformité</h3>
-            <div className="space-y-4">
-              <div>
-                <label className={LABEL_CLS}>Pays d&apos;origine</label>
-                <input
-                  type="text"
-                  value={formData.country_of_origin}
-                  onChange={(e) => setField('country_of_origin', e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-
-              <div>
-                <label className={LABEL_CLS}>Type de durabilité</label>
-                <div className="space-y-1.5 mt-1">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="radio"
-                      name="durability_type"
-                      checked={formData.durability_type === 'best_before'}
-                      onChange={() => setField('durability_type', 'best_before')}
-                      className="accent-[var(--color-primary)]"
-                    />
-                    DLUO — à consommer de préférence avant le
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="radio"
-                      name="durability_type"
-                      checked={formData.durability_type === 'use_by'}
-                      onChange={() => setField('durability_type', 'use_by')}
-                      className="accent-[var(--color-primary)]"
-                    />
-                    DLC — à consommer jusqu&apos;au
-                  </label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Instructions</h3>
+              <div className="space-y-4">
                 <div>
-                  <label className={LABEL_CLS}>Ingrédient mis en évidence (QUID)</label>
+                  <label className={LABEL_CLS}>Conseils d&apos;utilisation</label>
+                  <textarea
+                    value={formData.usage_instructions}
+                    onChange={(e) => setField('usage_instructions', e.target.value)}
+                    rows={3}
+                    className={`${INPUT_CLS} resize-none`}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Conservation</label>
+                  <textarea
+                    value={formData.conservation_instructions}
+                    onChange={(e) => setField('conservation_instructions', e.target.value)}
+                    rows={3}
+                    className={`${INPUT_CLS} resize-none`}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Conservation après ouverture</label>
+                  <textarea
+                    value={formData.conservation_after_opening}
+                    onChange={(e) => setField('conservation_after_opening', e.target.value)}
+                    rows={3}
+                    className={`${INPUT_CLS} resize-none`}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Origine et conformité</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className={LABEL_CLS}>Pays d&apos;origine</label>
                   <input
                     type="text"
-                    value={formData.quid_ingredient}
-                    onChange={(e) => setField('quid_ingredient', e.target.value)}
+                    value={formData.country_of_origin}
+                    onChange={(e) => setField('country_of_origin', e.target.value)}
                     className={INPUT_CLS}
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLS}>Pourcentage %</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.quid_percentage}
-                    onChange={(e) => setField('quid_percentage', e.target.value)}
-                    className={INPUT_CLS}
-                  />
+                  <label className={LABEL_CLS}>Type de durabilité</label>
+                  <div className="space-y-1.5 mt-1">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="durability_type"
+                        checked={formData.durability_type === 'best_before'}
+                        onChange={() => setField('durability_type', 'best_before')}
+                        className="accent-[var(--color-primary)]"
+                      />
+                      DLUO — à consommer de préférence avant le
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="radio"
+                        name="durability_type"
+                        checked={formData.durability_type === 'use_by'}
+                        onChange={() => setField('durability_type', 'use_by')}
+                        className="accent-[var(--color-primary)]"
+                      />
+                      DLC — à consommer jusqu&apos;au
+                    </label>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className={LABEL_CLS}>Titre alcoométrique %</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.alcohol_pct}
-                  onChange={(e) => setField('alcohol_pct', e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-            </div>
-          </section>
-        </div>
-
-        {/* ── Right column ────────────────────────────────────────────────── */}
-        <div className="space-y-5">
-
-          {/* Valeurs nutritionnelles */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Valeurs nutritionnelles</h3>
-
-            <div className="mb-4">
-              <label className={LABEL_CLS}>Base</label>
-              <div className="flex items-center gap-4 mt-1">
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="nutrition_basis"
-                    checked={formData.nutrition_basis === '100g'}
-                    onChange={() => setField('nutrition_basis', '100g')}
-                    className="accent-[var(--color-primary)]"
-                  />
-                  100 g
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="nutrition_basis"
-                    checked={formData.nutrition_basis === '100ml'}
-                    onChange={() => setField('nutrition_basis', '100ml')}
-                    className="accent-[var(--color-primary)]"
-                  />
-                  100 ml
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {NUTRITION_FIELDS.map(({ key, label }) => (
-                <div key={key}>
-                  <label className={LABEL_CLS}>{label}</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.nutrition[key] ?? ''}
-                    onChange={(e) => updateNutrition(key, e.target.value)}
-                    className={INPUT_CLS}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Quantité et emballage */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Quantité et emballage</h3>
-            <div className="space-y-4">
-              <div>
-                <label className={LABEL_CLS}>
-                  Quantité nette à afficher (ex. &quot;1 L&quot;, laisser vide pour utiliser le poids)
-                </label>
-                <input
-                  type="text"
-                  value={formData.net_quantity_display}
-                  onChange={(e) => setField('net_quantity_display', e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Matériau d&apos;emballage</label>
-                <input
-                  type="text"
-                  value={formData.packaging_material}
-                  onChange={(e) => setField('packaging_material', e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-              <div>
-                <label className={LABEL_CLS}>Note de tri sélectif</label>
-                <textarea
-                  value={formData.recycling_note}
-                  onChange={(e) => setField('recycling_note', e.target.value)}
-                  rows={3}
-                  className={`${INPUT_CLS} resize-none`}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Fond d'étiquette */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className={SECTION_TITLE_CLS}>Fond d&apos;étiquette</h3>
-
-            {isNew ? (
-              <p className="text-xs text-gray-400">
-                Enregistrez d&apos;abord le produit pour ajouter un fond d&apos;étiquette.
-              </p>
-            ) : (
-              <>
-                <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-100 mb-4">
-                  {formData.label_background_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={formData.label_background_image_url}
-                      alt="Fond étiquette"
-                      className="w-full h-full object-cover"
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={LABEL_CLS}>Ingrédient mis en évidence (QUID)</label>
+                    <input
+                      type="text"
+                      value={formData.quid_ingredient}
+                      onChange={(e) => setField('quid_ingredient', e.target.value)}
+                      className={INPUT_CLS}
                     />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                      <IconPhoto size={32} className="text-gray-300" />
-                      <span className="text-xs text-gray-400">Aucun fond</span>
-                    </div>
-                  )}
+                  </div>
+                  <div>
+                    <label className={LABEL_CLS}>Pourcentage %</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.quid_percentage}
+                      onChange={(e) => setField('quid_percentage', e.target.value)}
+                      className={INPUT_CLS}
+                    />
+                  </div>
                 </div>
-
-                {formData.label_background_image_url && (
-                  <button
-                    onClick={handleDeleteLabelBg}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mb-3"
-                  >
-                    <IconTrash size={14} />
-                    Supprimer le fond
-                  </button>
-                )}
-
-                <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
+                <div>
+                  <label className={LABEL_CLS}>Titre alcoométrique %</label>
                   <input
-                    type="checkbox"
-                    checked={removeBgOnLabelBg}
-                    onChange={(e) => setRemoveBgOnLabelBg(e.target.checked)}
-                    className="rounded border-gray-300"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.alcohol_pct}
+                    onChange={(e) => setField('alcohol_pct', e.target.value)}
+                    className={INPUT_CLS}
                   />
-                  Supprimer le fond automatiquement (IA)
-                </label>
-
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setIsDraggingLabelBg(true); }}
-                  onDragLeave={() => setIsDraggingLabelBg(false)}
-                  onDrop={handleLabelBgDrop}
-                  onClick={() => labelBgFileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-lg p-4 text-center mb-4 transition-colors cursor-pointer ${
-                    isDraggingLabelBg
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <IconUpload size={20} className="mx-auto mb-1 text-gray-400" />
-                  <p className="text-xs text-gray-500">
-                    {isUploadingLabelBg ? 'Envoi...' : 'Glisser une image ici'}
-                  </p>
-                  <span className="text-xs text-gray-400">ou cliquer pour parcourir</span>
                 </div>
-                <input
-                  ref={labelBgFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleLabelBgUpload(file);
-                  }}
-                />
-              </>
-            )}
-
-            <div className="mt-1">
-              <label className={LABEL_CLS}>Couleur de fond</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={/^#[0-9a-fA-F]{6}$/.test(formData.label_background_color) ? formData.label_background_color : '#ffffff'}
-                  onChange={(e) => setField('label_background_color', e.target.value)}
-                  className="h-10 w-14 rounded border border-gray-200 cursor-pointer shrink-0"
-                />
-                <input
-                  type="text"
-                  value={formData.label_background_color}
-                  onChange={(e) => setField('label_background_color', e.target.value)}
-                  placeholder="#FFFFFF"
-                  className={INPUT_CLS}
-                />
               </div>
-            </div>
+            </section>
+          </div>
 
-            <p className="text-xs text-gray-400 mt-3">
-              Si non défini, utilise le fond de la catégorie ; si celui-ci n&apos;est
-              pas défini non plus, utilise la couleur par défaut du modèle.
-            </p>
-          </section>
+          <div className="space-y-5">
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Valeurs nutritionnelles</h3>
+              <div className="mb-4">
+                <label className={LABEL_CLS}>Base</label>
+                <div className="flex items-center gap-4 mt-1">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="nutrition_basis"
+                      checked={formData.nutrition_basis === '100g'}
+                      onChange={() => setField('nutrition_basis', '100g')}
+                      className="accent-[var(--color-primary)]"
+                    />
+                    100 g
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="nutrition_basis"
+                      checked={formData.nutrition_basis === '100ml'}
+                      onChange={() => setField('nutrition_basis', '100ml')}
+                      className="accent-[var(--color-primary)]"
+                    />
+                    100 ml
+                  </label>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {NUTRITION_FIELDS.map(({ key, label }) => (
+                  <div key={key}>
+                    <label className={LABEL_CLS}>{label}</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.nutrition[key] ?? ''}
+                      onChange={(e) => updateNutrition(key, e.target.value)}
+                      className={INPUT_CLS}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Quantité et emballage</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className={LABEL_CLS}>
+                    Quantité nette à afficher (ex. &quot;1 L&quot;, laisser vide pour utiliser le poids)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.net_quantity_display}
+                    onChange={(e) => setField('net_quantity_display', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Matériau d&apos;emballage</label>
+                  <input
+                    type="text"
+                    value={formData.packaging_material}
+                    onChange={(e) => setField('packaging_material', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Note de tri sélectif</label>
+                  <textarea
+                    value={formData.recycling_note}
+                    onChange={(e) => setField('recycling_note', e.target.value)}
+                    rows={3}
+                    className={`${INPUT_CLS} resize-none`}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className={SECTION_TITLE_CLS}>Fond d&apos;étiquette</h3>
+              {isNew ? (
+                <p className="text-xs text-gray-400">
+                  Enregistrez d&apos;abord le produit pour ajouter un fond d&apos;étiquette.
+                </p>
+              ) : (
+                <>
+                  <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-100 mb-4">
+                    {formData.label_background_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={formData.label_background_image_url}
+                        alt="Fond étiquette"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                        <IconPhoto size={32} className="text-gray-300" />
+                        <span className="text-xs text-gray-400">Aucun fond</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {formData.label_background_image_url && (
+                    <button
+                      onClick={handleDeleteLabelBg}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mb-3"
+                    >
+                      <IconTrash size={14} />
+                      Supprimer le fond
+                    </button>
+                  )}
+
+                  <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={removeBgOnLabelBg}
+                      onChange={(e) => setRemoveBgOnLabelBg(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Supprimer le fond automatiquement (IA)
+                  </label>
+
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDraggingLabelBg(true); }}
+                    onDragLeave={() => setIsDraggingLabelBg(false)}
+                    onDrop={handleLabelBgDrop}
+                    onClick={() => labelBgFileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-lg p-4 text-center mb-4 transition-colors cursor-pointer ${
+                      isDraggingLabelBg
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <IconUpload size={20} className="mx-auto mb-1 text-gray-400" />
+                    <p className="text-xs text-gray-500">
+                      {isUploadingLabelBg ? 'Envoi...' : 'Glisser une image ici'}
+                    </p>
+                    <span className="text-xs text-gray-400">ou cliquer pour parcourir</span>
+                  </div>
+                  <input
+                    ref={labelBgFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleLabelBgUpload(file);
+                    }}
+                  />
+                </>
+              )}
+
+              <div className="mt-1">
+                <label className={LABEL_CLS}>Couleur de fond</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={/^#[0-9a-fA-F]{6}$/.test(formData.label_background_color) ? formData.label_background_color : '#ffffff'}
+                    onChange={(e) => setField('label_background_color', e.target.value)}
+                    className="h-10 w-14 rounded border border-gray-200 cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={formData.label_background_color}
+                    onChange={(e) => setField('label_background_color', e.target.value)}
+                    placeholder="#FFFFFF"
+                    className={INPUT_CLS}
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-400 mt-3">
+                Si non défini, utilise le fond de la catégorie ; si celui-ci n&apos;est pas défini non plus, utilise la couleur par défaut du modèle.
+              </p>
+            </section>
+          </div>
         </div>
+
+        {toast && (
+          <div
+            className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
+              toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
+            }`}
+          >
+            {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}
+            {toast.msg}
+          </div>
+        )}
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
-            toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
-          }`}
-        >
-          {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}
-          {toast.msg}
-        </div>
-      )}
-    </div>
+      <ConfirmActionModal
+        open={barcodeConfirmOpen}
+        title="Régénérer le code-barres ?"
+        description="Si des étiquettes ont déjà été imprimées avec le code actuel, les produits en rayon ne correspondront plus au nouveau code tant que les étiquettes ne seront pas réimprimées."
+        confirmLabel="Régénérer"
+        cancelLabel="Conserver le code actuel"
+        loading={isRegeneratingBarcode}
+        onCancel={() => {
+          if (!isRegeneratingBarcode) setBarcodeConfirmOpen(false);
+        }}
+        onConfirm={() => void handleRegenerateBarcode()}
+      />
+    </>
   );
 }
