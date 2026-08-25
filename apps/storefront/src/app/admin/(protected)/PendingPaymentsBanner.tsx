@@ -80,6 +80,7 @@ export default function PendingPaymentsBanner({
   const [pendingCancel, setPendingCancel] = useState<PendingPaymentSession | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [expansionTouched, setExpansionTouched] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,6 +135,10 @@ export default function PendingPaymentsBanner({
     [visible],
   );
 
+  useEffect(() => {
+    if (!expansionTouched && agedCount > 0) setExpanded(true);
+  }, [agedCount, expansionTouched]);
+
   if (visible.length === 0) return null;
 
   return (
@@ -176,7 +181,10 @@ export default function PendingPaymentsBanner({
 
           <button
             type="button"
-            onClick={() => setExpanded(value => !value)}
+            onClick={() => {
+              setExpansionTouched(true);
+              setExpanded(value => !value);
+            }}
             aria-expanded={expanded}
             className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-200 dark:hover:bg-amber-950"
           >
