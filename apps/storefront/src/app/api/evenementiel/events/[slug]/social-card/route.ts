@@ -1,3 +1,4 @@
+import { access, writeFile } from 'node:fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { createPublicClient } from '@/lib/supabase/public';
@@ -12,9 +13,11 @@ const WIDTH = 1080;
 const HEIGHT = 1920;
 const DEFAULT_PRIMARY = '#E65C00';
 const DEFAULT_SECONDARY = '#FFB347';
-const SOCIAL_CARD_FONT = 'DejaVu Sans, sans-serif';
+const SOCIAL_FONT_URL = 'https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf';
+const SOCIAL_FONT_PATH = '/tmp/lepefy-social-roboto.ttf';
+let socialFontPromise: Promise<string> | null = null;
 
-function escapeXml(value: string) {
+function escapeMarkup(value: string) {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -41,8 +44,47 @@ function wrapText(value: string, maxChars: number, maxLines: number) {
   return lines;
 }
 
-function textLines(lines: string[], x: number, y: number, lineHeight: number, fontSize: number, weight: number, fill: string) {
-  return lines.map((line, index) => `<text x="${x}" y="${y + index * lineHeight}" font-family="${SOCIAL_CARD_FONT}" font-size="${fontSize}" font-weight="${weight}" fill="${fill}">${escapeXml(line)}</text>`).join('');
+async function ensureSocialFont() {
+  if (!socialFontPromise) {
+    socialFontPromise = (async () => {
+      try {
+        await access(SOCIAL_FONT_PATH);
+        return SOCIAL_FONT_PATH;
+      } catch {
+        const response = await fetch(SOCIAL_FONT_URL, { cache: 'force-cache' });
+        if (!response.ok) throw new Error('social-font-unavailable');
+        await writeFile(SOCIAL_FONT_PATH, Buffer.from(await response.arrayBuffer()));
+        return SOCIAL_FONT_PATH;
+      }
+    })();
+  }
+  return socialFontPromise;
+}
+
+interface TextLayerOptions {
+  text: string;
+  width: number;
+  height: number;
+  fontSize: number;
+  weight: number;
+  color: string;
+  align?: 'left' | 'centre' | 'right';
+}
+
+async function renderTextLayer(fontPath: string, options: TextLayerOptions) {
+  const markup = `<span foreground="${options.color}" weight="${options.weight}">${escapeMarkup(options.text)}</span>`;
+  return sharp({
+    text: {
+      text: markup,
+      font: `Roboto ${options.fontSize}`,
+      fontfile: fontPath,
+      width: options.width,
+      height: options.height,
+      align: options.align ?? 'left',
+      rgba: true,
+      dpi: 72,
+    },
+  }).png().toBuffer();
 }
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -102,7 +144,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const titleStartY = 1310 - Math.max(0, titleLines.length - 1) * 34;
   const detailStartY = titleStartY + titleLines.length * 94 + 54;
-  const overlay = `
+  const shapes = `
     <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
@@ -113,21 +155,91 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       </defs>
       <rect width="1080" height="1920" fill="url(#shade)"/>
       <rect x="70" y="82" width="330" height="70" rx="35" fill="${primary}"/>
-      <text x="235" y="128" text-anchor="middle" font-family="${SOCIAL_CARD_FONT}" font-size="30" font-weight="700" fill="#ffffff">${escapeXml(tenant.name)} • EVENTS</text>
-      ${textLines(titleLines, 70, titleStartY, 94, 78, 800, '#ffffff')}
       <rect x="70" y="${detailStartY}" width="940" height="2" fill="#ffffff" opacity="0.28"/>
-      <text x="70" y="${detailStartY + 70}" font-family="${SOCIAL_CARD_FONT}" font-size="37" font-weight="700" fill="${secondary}">${escapeXml(dateLabel)}</text>
-      <text x="70" y="${detailStartY + 124}" font-family="${SOCIAL_CARD_FONT}" font-size="34" font-weight="600" fill="#ffffff">${escapeXml(timeLabel)}</text>
-      ${locationLines.length ? textLines(locationLines, 70, detailStartY + 184, 48, 31, 500, '#ffffff') : ''}
       <rect x="70" y="1754" width="940" height="86" rx="24" fill="#ffffff" fill-opacity="0.94"/>
-      <text x="105" y="1809" font-family="${SOCIAL_CARD_FONT}" font-size="31" font-weight="800" fill="${primary}">Réserve ta place</text>
-      <text x="975" y="1809" text-anchor="end" font-family="${SOCIAL_CARD_FONT}" font-size="23" font-weight="600" fill="#333333">${escapeXml(host)}</text>
     </svg>`;
 
   try {
+    const fontPath = await ensureSocialFont();
+    const titleText = titleLines.join('\n');
+    const locationText = locationLines.join('\n');
+    const [brandLayer, titleLayer, dateLayer, timeLayer, locationLayer, ctaLayer, hostLayer] = await Promise.all([
+      renderTextLayer(fontPath, {
+        text: `${tenant.name} • EVENTS`,
+        width: 300,
+        height: 52,
+        fontSize: 30,
+        weight: 700,
+        color: '#ffffff',
+        align: 'centre',
+      }),
+      renderTextLayer(fontPath, {
+        text: titleText,
+        width: 940,
+        height: Math.max(100, titleLines.length * 94),
+        fontSize: 78,
+        weight: 800,
+        color: '#ffffff',
+      }),
+      renderTextLayer(fontPath, {
+        text: dateLabel,
+        width: 940,
+        height: 55,
+        fontSize: 37,
+        weight: 700,
+        color: secondary,
+      }),
+      renderTextLayer(fontPath, {
+        text: timeLabel,
+        width: 940,
+        height: 50,
+        fontSize: 34,
+        weight: 600,
+        color: '#ffffff',
+      }),
+      locationText
+        ? renderTextLayer(fontPath, {
+            text: locationText,
+            width: 940,
+            height: Math.max(52, locationLines.length * 48),
+            fontSize: 31,
+            weight: 500,
+            color: '#ffffff',
+          })
+        : Promise.resolve(null),
+      renderTextLayer(fontPath, {
+        text: 'Réserve ta place',
+        width: 430,
+        height: 52,
+        fontSize: 31,
+        weight: 800,
+        color: primary,
+      }),
+      renderTextLayer(fontPath, {
+        text: host,
+        width: 380,
+        height: 44,
+        fontSize: 23,
+        weight: 600,
+        color: '#333333',
+        align: 'right',
+      }),
+    ]);
+
+    const overlays: sharp.OverlayOptions[] = [
+      { input: Buffer.from(shapes) },
+      { input: brandLayer, left: 85, top: 92 },
+      { input: titleLayer, left: 70, top: titleStartY - 72 },
+      { input: dateLayer, left: 70, top: detailStartY + 34 },
+      { input: timeLayer, left: 70, top: detailStartY + 88 },
+      { input: ctaLayer, left: 105, top: 1773 },
+      { input: hostLayer, left: 595, top: 1778 },
+    ];
+    if (locationLayer) overlays.push({ input: locationLayer, left: 70, top: detailStartY + 146 });
+
     const png = await sharp(imageBuffer)
       .resize(WIDTH, HEIGHT, { fit: 'cover', position: 'centre' })
-      .composite([{ input: Buffer.from(overlay) }])
+      .composite(overlays)
       .png({ quality: 92 })
       .toBuffer();
 
