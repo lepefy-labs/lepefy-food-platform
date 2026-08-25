@@ -10,6 +10,7 @@ const LABEL_CLS = 'mb-1 block text-xs font-medium text-gray-600 dark:text-gray-3
 
 interface BoutiqueInfoSectionProps {
   tagline: string | null;
+  storefront_url: string | null;
   whatsapp_number: string | null;
   click_collect_address: string | null;
   google_maps_url: string | null;
@@ -19,6 +20,7 @@ interface BoutiqueInfoSectionProps {
 
 export function BoutiqueInfoSection({
   tagline,
+  storefront_url,
   whatsapp_number,
   click_collect_address,
   google_maps_url,
@@ -27,6 +29,7 @@ export function BoutiqueInfoSection({
 }: BoutiqueInfoSectionProps) {
   const [form, setForm] = useState({
     tagline: tagline ?? '',
+    storefront_url: storefront_url ?? '',
     whatsapp_number: whatsapp_number ?? '',
     click_collect_address: click_collect_address ?? '',
     google_maps_url: google_maps_url ?? '',
@@ -84,6 +87,11 @@ export function BoutiqueInfoSection({
           <div className="sm:col-span-2">
             <label className={LABEL_CLS}>Slogan</label>
             <input type="text" value={form.tagline} onChange={(e) => setForm({ ...form, tagline: e.target.value })} placeholder="ex: Les saveurs de chez nous" className={INPUT_CLS} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLS}>URL canonique de la boutique</label>
+            <input type="url" value={form.storefront_url} onChange={(e) => setForm({ ...form, storefront_url: e.target.value })} placeholder="https://shop.exemple.com" className={INPUT_CLS} />
+            <p className="mt-1 text-xs text-gray-500">Utilisée dans les emails, liens de suivi et outils plateforme. URL HTTPS publique de la boutique.</p>
           </div>
           <div>
             <label className={LABEL_CLS}>WhatsApp</label>
