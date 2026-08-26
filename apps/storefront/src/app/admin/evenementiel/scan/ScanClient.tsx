@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   IconAlertCircle,
   IconArrowBackUp,
@@ -10,7 +10,6 @@ import {
   IconMinus,
   IconPlus,
   IconRotate,
-  IconScan,
   IconTicket,
   IconX,
 } from '@tabler/icons-react';
@@ -43,6 +42,17 @@ interface ScanPreviewItem {
   } | null;
 }
 
+interface ReservationHistoryEntry {
+  id: string;
+  ticket_type_name: string;
+  quantity: number;
+  redeemed_at: string;
+  redeemed_by_name: string | null;
+  voided_at: string | null;
+  voided_by_name: string | null;
+  void_reason: string | null;
+}
+
 interface PreviewData {
   reservation_id: string;
   customer_name: string;
@@ -55,6 +65,7 @@ interface PreviewData {
   checkin_opens_at: string | null;
   checkin_closes_at: string | null;
   items: ScanPreviewItem[];
+  history: ReservationHistoryEntry[];
 }
 
 interface ScanResult {
@@ -96,6 +107,17 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 export function ScanClient({
   eventsEnabled,
   events,
@@ -118,16 +140,11 @@ export function ScanClient({
   const [voidTarget, setVoidTarget] = useState<{ redemptionId: string; ticketTypeName: string; requiresReason: boolean } | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [voidLoading, setVoidLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedEvent = useMemo(
     () => events.find(event => event.id === selectedEventId) ?? null,
     [events, selectedEventId],
   );
-
-  useEffect(() => {
-    if (step === 'scan' && selectedEventId) inputRef.current?.focus();
-  }, [step, selectedEventId]);
 
   useEffect(() => {
     if (step !== 'success') return;
@@ -140,6 +157,7 @@ export function ScanClient({
       setMetrics(null);
       return;
     }
+
     let active = true;
     async function refreshMetrics() {
       try {
@@ -147,9 +165,10 @@ export function ScanClient({
         const data = await res.json();
         if (active && res.ok) setMetrics(data as ScanMetrics);
       } catch {
-        // Metrics are informative and never block the cashier flow.
+        // Metrics never block the cashier flow.
       }
     }
+
     void refreshMetrics();
     const timer = window.setInterval(() => { void refreshMetrics(); }, 15000);
     return () => {
@@ -175,7 +194,7 @@ export function ScanClient({
   function selectAllRemaining(next: PreviewData) {
     const selected: Record<string, number> = {};
     for (const item of next.items) {
-      const remaining = Math.max(0, item.quantity_totale - item.quantity_redenta_netta);
+      const remaining = residual(item);
       if (remaining > 0) selected[item.reservation_item_id] = remaining;
     }
     setDeltas(selected);
@@ -186,6 +205,7 @@ export function ScanClient({
       setError('Aucun événement actif pour le service.');
       return;
     }
+
     setLoading(true);
     setError(null);
     try {
@@ -196,6 +216,7 @@ export function ScanClient({
         setError(data.error ?? 'Erreur lors de la lecture de la réservation.');
         return;
       }
+
       const next = data as PreviewData;
       setPreview(next);
       setEditQuantities(false);
@@ -228,10 +249,12 @@ export function ScanClient({
 
   async function handleConfirm() {
     if (!preview || !selectedEventId || !preview.redeemable) return;
+
     const items = Object.entries(deltas)
       .filter(([, quantity]) => quantity > 0)
       .map(([reservation_item_id, quantity]) => ({ reservation_item_id, quantity }));
     const served = items.reduce((sum, item) => sum + item.quantity, 0);
+
     if (served === 0) {
       setError('Sélectionnez au moins une formule à servir.');
       return;
@@ -255,6 +278,7 @@ export function ScanClient({
         setError(data.error ?? 'Erreur lors de la validation.');
         return;
       }
+
       setResult({
         remaining: data.remaining,
         customerName: data.customerName,
@@ -276,6 +300,7 @@ export function ScanClient({
       setError('Un motif est requis pour cette annulation.');
       return;
     }
+
     setVoidLoading(true);
     setError(null);
     try {
@@ -293,6 +318,7 @@ export function ScanClient({
         setError(data.error ?? "Erreur lors de l'annulation.");
         return;
       }
+
       setVoidTarget(null);
       setVoidReason('');
       await loadPreview(qrToken);
@@ -383,7 +409,7 @@ export function ScanClient({
       )}
 
       {error && (
-        <div className="rounded-2xl border-2 border-red-200 bg-red-50 px-4 py-3 flex items-start gap-2">
+        <div className="flex items-start gap-2 rounded-2xl border-2 border-red-200 bg-red-50 px-4 py-3">
           <IconAlertCircle size={19} className="mt-0.5 shrink-0 text-red-600" />
           <p className="text-sm font-semibold text-red-800">{error}</p>
         </div>
@@ -392,41 +418,46 @@ export function ScanClient({
       {step === 'scan' && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="mb-5 text-center">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-950 text-white">
-              <IconScan size={30} />
-            </div>
-            <h2 className="text-lg font-extrabold text-gray-950">Scanner la réservation</h2>
+            <h2 className="text-xl font-black text-gray-950">Scanner la réservation</h2>
             <p className="mt-1 text-sm text-gray-500">Le repas à remettre s&apos;affichera automatiquement.</p>
           </div>
 
-          <form onSubmit={handleScanSubmit} className="flex flex-col gap-3">
-            <input
-              ref={inputRef}
-              type="text"
-              autoComplete="off"
-              value={qrToken}
-              onChange={event => setQrToken(event.target.value)}
-              placeholder="Code QR ou code réservation"
-              disabled={loading}
-              className="w-full rounded-xl border-2 border-gray-200 px-4 py-4 text-center text-sm tracking-wide focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
-            <button
-              type="submit"
-              disabled={!qrToken.trim() || loading}
-              className="min-h-12 w-full rounded-xl font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              {loading ? 'Lecture…' : 'Continuer'}
-            </button>
-          </form>
-
-          <div className="mt-3">
-            <CameraScanButton onDecoded={text => {
+          <CameraScanButton
+            variant="primary"
+            label="Scanner le QR code"
+            onDecoded={text => {
               const token = extractQrToken(text);
               setQrToken(token);
               void loadPreview(token);
-            }} />
-          </div>
+            }}
+          />
+
+          <p className="mt-2 text-center text-xs font-medium text-gray-400">Mode recommandé pour le service</p>
+
+          <details className="mt-5 border-t border-gray-100 pt-3">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-semibold text-gray-500">
+              Saisir un code manuellement
+              <IconChevronDown size={16} />
+            </summary>
+            <form onSubmit={handleScanSubmit} className="mt-2 flex flex-col gap-3">
+              <input
+                type="text"
+                autoComplete="off"
+                value={qrToken}
+                onChange={event => setQrToken(event.target.value)}
+                placeholder="Code QR ou code réservation"
+                disabled={loading}
+                className="w-full rounded-xl border-2 border-gray-200 px-4 py-4 text-center text-sm tracking-wide focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              />
+              <button
+                type="submit"
+                disabled={!qrToken.trim() || loading}
+                className="min-h-12 w-full rounded-xl border border-gray-200 bg-gray-50 font-bold text-gray-700 disabled:opacity-50"
+              >
+                {loading ? 'Lecture…' : 'Rechercher la réservation'}
+              </button>
+            </form>
+          </details>
         </section>
       )}
 
@@ -436,15 +467,52 @@ export function ScanClient({
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-100">
               <IconTicket size={22} className="text-gray-700" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-base font-extrabold text-gray-950">{preview.customer_name}</p>
               <p className="truncate text-xs text-gray-500">{preview.event_title}</p>
+              <p className="mt-1 text-[11px] font-medium text-gray-400">Réservation {preview.reservation_id.slice(0, 8).toUpperCase()}</p>
             </div>
           </div>
 
           <div className={`mt-4 rounded-xl border-2 px-4 py-3 text-sm font-bold ${preview.redeemable ? preview.quantity_remaining < preview.quantity_total ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-red-200 bg-red-50 text-red-800'}`}>
             {statusLabel}
           </div>
+
+          <details open={!preview.redeemable} className="mt-4 rounded-xl border border-gray-200 bg-gray-50">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 text-sm font-bold text-gray-700">
+              <IconHistory size={17} className="text-gray-500" />
+              Historique de cette réservation
+              <span className="ml-auto text-xs font-medium text-gray-400">{preview.history.length} opération{preview.history.length > 1 ? 's' : ''}</span>
+              <IconChevronDown size={15} className="text-gray-400" />
+            </summary>
+            <div className="border-t border-gray-200 bg-white px-3 py-2">
+              {preview.history.length === 0 ? (
+                <p className="py-3 text-xs text-gray-500">Aucune formule n&apos;a encore été servie sur cette réservation.</p>
+              ) : (
+                preview.history.map(entry => (
+                  <div key={entry.id} className="border-b border-gray-100 py-3 last:border-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-bold ${entry.voided_at ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{entry.ticket_type_name} × {entry.quantity}</p>
+                        <p className="mt-1 text-xs text-gray-500">Servi le {formatDateTime(entry.redeemed_at)}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">Opérateur : {entry.redeemed_by_name || 'Non identifié'}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${entry.voided_at ? 'bg-gray-100 text-gray-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                        {entry.voided_at ? 'Annulé' : 'Valide'}
+                      </span>
+                    </div>
+                    {entry.voided_at && (
+                      <div className="mt-2 rounded-lg bg-gray-50 px-2.5 py-2 text-xs text-gray-600">
+                        <p>Annulé le {formatDateTime(entry.voided_at)}</p>
+                        <p className="mt-0.5">Par : {entry.voided_by_name || 'Non identifié'}</p>
+                        {entry.void_reason && <p className="mt-0.5 font-medium">Motif : {entry.void_reason}</p>}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </details>
 
           {preview.redeemable && (
             <>
@@ -463,6 +531,7 @@ export function ScanClient({
                   const remaining = residual(item);
                   const quantity = deltas[item.reservation_item_id] ?? 0;
                   const fullyServed = remaining === 0;
+
                   return (
                     <div key={item.reservation_item_id} className={`rounded-2xl border p-4 ${fullyServed ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-white'}`}>
                       <div className="flex items-center justify-between gap-4">
