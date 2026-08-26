@@ -6,13 +6,20 @@ import { createServiceClient } from '@/lib/supabase/server';
 import LogoutButton from '../../LogoutButton';
 import { ScanClient } from './ScanClient';
 
-// Route volontairement HORS du groupe admin/(protected) — même raison que
-// /admin/loyalty/scan : ce groupe redirige tout tenant_cashier vers le scan
-// fidélité (voir (protected)/layout.tsx), donc cette page a besoin de sa
-// PROPRE vérification d'accès. Pattern cookies identique à requireAdmin.ts.
 export const dynamic = 'force-dynamic';
 
-export default async function EvenementielScanPage() {
+interface ScanEventRow {
+  id: string;
+  title: string;
+  date_start: string;
+  status: 'draft' | 'published' | 'closed' | 'cancelled';
+}
+
+export default async function EvenementielScanPage({
+  searchParams,
+}: {
+  searchParams?: { event_id?: string };
+}) {
   const cookieStore = cookies();
 
   const supabase = createServerClient(
@@ -33,9 +40,9 @@ export default async function EvenementielScanPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
 
-  const slug        = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant       = await getTenant(slug);
-  const adminClient  = createServiceClient();
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant = await getTenant(slug);
+  const adminClient = createServiceClient();
 
   const { data: admin } = await adminClient
     .from('admin_users')
@@ -51,6 +58,22 @@ export default async function EvenementielScanPage() {
   if (!['platform_owner', 'tenant_admin', 'tenant_cashier'].includes(admin.role)) {
     redirect('/admin/login?error=unauthorized');
   }
+
+  const { data: eventRows } = await adminClient
+    .from('events')
+    .select('id, title, date_start, status')
+    .eq('tenant_id', tenant.id)
+    .in('status', ['published', 'closed'])
+    .order('date_start', { ascending: false })
+    .limit(50);
+
+  const events = (eventRows ?? []) as ScanEventRow[];
+  const requestedEventId = searchParams?.event_id ?? '';
+  const initialEventId = events.some((event) => event.id === requestedEventId)
+    ? requestedEventId
+    : events.length === 1
+      ? events[0].id
+      : '';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -71,7 +94,11 @@ export default async function EvenementielScanPage() {
       </header>
 
       <main className="px-4 py-6 max-w-md mx-auto">
-        <ScanClient eventsEnabled={tenant.events_enabled} />
+        <ScanClient
+          eventsEnabled={tenant.events_enabled}
+          events={events}
+          initialEventId={initialEventId}
+        />
       </main>
     </div>
   );

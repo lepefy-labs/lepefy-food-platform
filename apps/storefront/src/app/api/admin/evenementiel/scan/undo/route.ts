@@ -10,10 +10,8 @@ interface VoidRpcRow {
   quantity_remaining: number | null;
 }
 
-// Annule (soft-void) une redemption ligne précise — jamais de suppression
-// physique du log, cf. void_event_reservation_item_redemption (053).
 export async function POST(req: NextRequest) {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
   const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
@@ -23,11 +21,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 400 });
   }
 
-  const body = await req.json() as { redemption_id?: string; reason?: string };
-  const redemptionId = body.redemption_id;
+  const body = await req.json() as { redemption_id?: string; event_id?: string; reason?: string };
+  const redemptionId = body.redemption_id?.trim() ?? '';
+  const eventId = body.event_id?.trim() ?? '';
 
-  if (!redemptionId) {
-    return NextResponse.json({ error: 'redemption_id requis.' }, { status: 400 });
+  if (!redemptionId || !eventId) {
+    return NextResponse.json({ error: 'redemption_id et event_id requis.' }, { status: 400 });
   }
 
   const adminId = await getAdminId();
@@ -37,19 +36,21 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient();
 
-  // Vérifie que la redemption appartient bien à une réservation de ce tenant
-  // AVANT la RPC — même garde-fou que le POST de scan existant.
   const { data: redemption } = await supabase
     .from('event_reservation_item_redemptions')
-    .select('id, reservation_item_id, event_reservation_items(reservation_id, event_reservations(tenant_id))')
+    .select('id, reservation_item_id, event_reservation_items(reservation_id, event_reservations(tenant_id, event_id))')
     .eq('id', redemptionId)
     .maybeSingle();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const reservationTenantId = (redemption as any)?.event_reservation_items?.event_reservations?.tenant_id;
+  const reservation = (redemption as any)?.event_reservation_items?.event_reservations;
 
-  if (!redemption || reservationTenantId !== tenant.id) {
+  if (!redemption || reservation?.tenant_id !== tenant.id) {
     return NextResponse.json({ error: 'Redemption introuvable pour cette boutique.' }, { status: 404 });
+  }
+
+  if (reservation?.event_id !== eventId) {
+    return NextResponse.json({ error: 'Cette opération appartient à un autre événement.' }, { status: 409 });
   }
 
   const { data, error } = await supabase

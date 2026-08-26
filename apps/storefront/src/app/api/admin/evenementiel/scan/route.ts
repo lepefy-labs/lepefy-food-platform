@@ -6,10 +6,10 @@ import { getAdminId } from '@/lib/auth/getAdminId';
 import { extractQrToken } from '@/lib/events/ticketUrl';
 
 interface RedeemItemsRpcRow {
-  success:             boolean;
+  success: boolean;
   reservation_item_id: string | null;
-  reason:              string;
-  quantity_remaining:  number | null;
+  reason: string;
+  quantity_remaining: number | null;
 }
 
 interface ScanItemInput {
@@ -17,10 +17,8 @@ interface ScanItemInput {
   quantity: number;
 }
 
-// Redemption QR le jour de l'événement — accessible à tenant_admin ET
-// tenant_cashier (même rôle que le scan fidélité, cf. requireAdmin.ts).
 export async function POST(req: NextRequest) {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
   const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
@@ -30,19 +28,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 400 });
   }
 
-  const body = await req.json() as { qr_token?: string; items?: ScanItemInput[] };
-  // Normalisation défensive : le client envoie déjà le token extrait, mais on
-  // tolère aussi l'URL complète du billet (nouveau contenu du QR) ici.
+  const body = await req.json() as { qr_token?: string; event_id?: string; items?: ScanItemInput[] };
   const qrToken = extractQrToken(body.qr_token ?? '');
-  const items   = Array.isArray(body.items) ? body.items : [];
+  const eventId = body.event_id?.trim() ?? '';
+  const items = Array.isArray(body.items) ? body.items : [];
 
   const validItems = items.every(
-    i => typeof i.reservation_item_id === 'string' && i.reservation_item_id.length > 0
-      && Number.isInteger(i.quantity) && i.quantity > 0,
+    item => typeof item.reservation_item_id === 'string' && item.reservation_item_id.length > 0
+      && Number.isInteger(item.quantity) && item.quantity > 0,
   );
 
-  if (!qrToken || items.length === 0 || !validItems) {
-    return NextResponse.json({ error: 'Code QR et lignes de formule valides requis.' }, { status: 400 });
+  if (!qrToken || !eventId || items.length === 0 || !validItems) {
+    return NextResponse.json({ error: 'Événement, code QR et lignes de formule valides requis.' }, { status: 400 });
   }
 
   const adminId = await getAdminId();
@@ -52,8 +49,6 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient();
 
-  // Vérifie que la réservation appartient bien à ce tenant AVANT la RPC —
-  // évite qu'un admin d'un autre tenant valide un QR qui ne le concerne pas.
   const { data: reservation } = await supabase
     .from('event_reservations')
     .select('id, tenant_id, event_id, customer_name')
@@ -64,11 +59,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Code QR invalide pour cette boutique.' }, { status: 404 });
   }
 
+  if (reservation.event_id !== eventId) {
+    return NextResponse.json({ error: 'Ce billet appartient à un autre événement.' }, { status: 409 });
+  }
+
   const { data: eventRow } = await supabase
     .from('events')
-    .select('title, date_start')
-    .eq('id', reservation.event_id)
+    .select('id, tenant_id, title, status')
+    .eq('id', eventId)
     .maybeSingle();
+
+  if (!eventRow || eventRow.tenant_id !== tenant.id) {
+    return NextResponse.json({ error: 'Événement introuvable pour cette boutique.' }, { status: 404 });
+  }
+
+  if (eventRow.status === 'cancelled' || eventRow.status === 'draft') {
+    return NextResponse.json({ error: eventRow.status === 'cancelled' ? 'Événement annulé.' : 'Événement non publié.' }, { status: 409 });
+  }
 
   const { data, error } = await supabase
     .rpc('redeem_event_reservation_items', { p_qr_token: qrToken, p_items: items, p_admin_id: adminId })
@@ -85,9 +92,9 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    success:       true,
-    remaining:     row.quantity_remaining,
-    customerName:  reservation.customer_name,
-    eventTitle:    eventRow?.title ?? null,
+    success: true,
+    remaining: row.quantity_remaining,
+    customerName: reservation.customer_name,
+    eventTitle: eventRow.title ?? null,
   });
 }
