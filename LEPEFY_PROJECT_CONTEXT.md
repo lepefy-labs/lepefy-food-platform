@@ -174,7 +174,15 @@ Superficie operativa:
 /admin/evenementiel/scan?event_id=<event-id>
 ```
 
-Lo scanner è **vincolato all'evento**: lookup, conferma e undo verificano tenant + `event_id`. Un QR appartenente a un altro evento viene rifiutato prima della redemption.
+Lo scanner è **vincolato all'evento**: lookup, conferma, ricerca fallback e undo verificano tenant + `event_id`. Un QR appartenente a un altro evento viene rifiutato prima della redemption.
+
+Il modello operativo corrente è una postazione unica orientata al **service repas / retrait des formules**:
+
+```text
+camera scan -> preview prenotazione -> conferma formule -> success -> ritorno scanner
+```
+
+La camera è l'azione primaria. La ricerca manuale è fallback e può risolvere una prenotazione per nome, e-mail, telefono, QR o riferimento completo senza modificare il ledger.
 
 Preview canonica distingue almeno:
 
@@ -188,9 +196,9 @@ evento draft/cancelled
 fuori finestra check-in configurata
 ```
 
-La prenotazione deve essere `confirmed`; l'RPC di redemption mantiene lock e controllo atomico del residuo per impedire double redemption tra più device.
+Un biglietto interamente utilizzato mostra uno stato di arresto esplicito e non presenta quantità redimibili. La prenotazione deve essere `confirmed`; l'RPC di redemption mantiene lock e controllo atomico del residuo per impedire double redemption tra più device.
 
-Il modello operativo è:
+Il modello dati operativo è:
 
 ```text
 reservation -> reservation_items (diritti/formule) -> item_redemptions (ledger)
@@ -198,12 +206,9 @@ reservation -> reservation_items (diritti/formule) -> item_redemptions (ledger)
 
 `event_reservation_item_redemptions` è la **source of truth canonica** per redemption/audit. Supporta quantità parziali e soft-void. La tabella legacy `event_reservation_redemptions` resta solo storico compatibile e non deve essere usata per nuovi KPI; migration `082` interrompe la creazione di nuove righe aggregate.
 
-Modalità scanner:
+Il client scanner è online-only per le azioni operative: perdita di connettività blocca scan, ricerca, conferma e undo; non esiste redemption offline. Le API scanner sono `force-dynamic`/`force-no-store` e il client usa fetch `no-store` per le preview.
 
-- `Contrôle complet`: quantità manuale per linea;
-- `Entrée rapide`: se esiste una sola linea disponibile non ambigua, preseleziona 1 diritto; **non effettua mai redemption automatica**, la conferma operatore resta obbligatoria.
-
-I KPI live dello scanner derivano da prenotazioni confermate e quantità residue, quindi rispettano anche gli undo: diritti validati, diritti restanti, biglietti già iniziati.
+I KPI live derivano da prenotazioni confermate, reservation items e ledger granulare. `Suivi du service` include totali globali e breakdown per formula (servite/restanti/terminate), quindi rispetta anche gli undo.
 
 ### Finestra check-in
 
@@ -342,11 +347,12 @@ Purchase-intent persistente, una open session per cliente autenticato, `awaiting
 ### Événementiel
 
 - social kit da gallery approvata;
-- scanner evento vincolato a `event_id`;
-- preview stato redimibilità prima della conferma;
+- scanner evento vincolato a `event_id` e orientato al service repas;
+- camera primaria, ricerca prenotazione senza QR come fallback;
+- preview stato redimibilità prima della conferma, con STOP esplicito per biglietto esaurito;
 - finestra check-in opzionale e backward-compatible;
-- modalità controllo completo / entrata rapida con conferma obbligatoria;
-- KPI live scanner;
+- KPI live compatti con breakdown per formula;
+- scanner online-only per operazioni di servizio;
 - ledger `event_reservation_item_redemptions` canonico;
 - undo cashier limitato a propria operazione entro 5 minuti; override admin tracciato.
 
@@ -381,6 +387,6 @@ Aggiornare questo file quando cambiano architettura, route/module principali, wo
 
 # Fine snapshot v5.6
 
-**Base audit:** `main @ 709f3d885516841c7213dbc9fe13189f9d296121` + Événementiel scanner operations delivery  
+**Base audit:** `main @ scanner service-meal current state`  
 **Data:** 26 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.

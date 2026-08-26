@@ -42,19 +42,13 @@ export async function GET(req: NextRequest) {
 
   const reservationIds = confirmed.map(row => row.id as string);
   const customerByReservationId = new Map(confirmed.map(row => [row.id as string, (row.customer_name as string | null) ?? 'Réservation']));
-
-  let recentDeliveries: Array<{
-    id: string;
-    redeemed_at: string;
-    customer_name: string;
-    ticket_type_name: string;
-    quantity: number;
-  }> = [];
+  let recentDeliveries: Array<{ id: string; redeemed_at: string; customer_name: string; ticket_type_name: string; quantity: number }> = [];
+  let formulaBreakdown: Array<{ ticket_type_id: string; label: string; total: number; served: number; remaining: number }> = [];
 
   if (reservationIds.length > 0) {
     const { data: items } = await supabase
       .from('event_reservation_items')
-      .select('id, reservation_id, ticket_type_id')
+      .select('id, reservation_id, ticket_type_id, quantity')
       .in('reservation_id', reservationIds);
 
     const itemRows = items ?? [];
@@ -63,8 +57,8 @@ export async function GET(req: NextRequest) {
 
     const [{ data: ticketTypes }, { data: redemptions }] = await Promise.all([
       ticketTypeIds.length > 0
-        ? supabase.from('event_ticket_types').select('id, label').in('id', ticketTypeIds)
-        : Promise.resolve({ data: [] as Array<{ id: string; label: string }> }),
+        ? supabase.from('event_ticket_types').select('id, label, sort_order').in('id', ticketTypeIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; label: string; sort_order: number }> }),
       itemIds.length > 0
         ? supabase
             .from('event_reservation_item_redemptions')
@@ -72,21 +66,50 @@ export async function GET(req: NextRequest) {
             .in('reservation_item_id', itemIds)
             .is('voided_at', null)
             .order('redeemed_at', { ascending: false })
-            .limit(30)
         : Promise.resolve({ data: [] as Array<{ id: string; reservation_item_id: string; quantity_redeemed: number; redeemed_at: string }> }),
     ]);
 
     const itemById = new Map(itemRows.map(row => [row.id as string, row]));
-    const labelByTicketTypeId = new Map((ticketTypes ?? []).map(row => [row.id as string, (row.label as string | null) ?? 'Formule']));
+    const ticketTypeById = new Map((ticketTypes ?? []).map(row => [row.id as string, row]));
+    const servedByTicketType = new Map<string, number>();
+    for (const redemption of redemptions ?? []) {
+      const item = itemById.get(redemption.reservation_item_id as string);
+      if (!item) continue;
+      const ticketTypeId = item.ticket_type_id as string;
+      servedByTicketType.set(ticketTypeId, (servedByTicketType.get(ticketTypeId) ?? 0) + Number(redemption.quantity_redeemed || 0));
+    }
 
-    recentDeliveries = (redemptions ?? []).map(redemption => {
+    const totalByTicketType = new Map<string, number>();
+    for (const item of itemRows) {
+      const ticketTypeId = item.ticket_type_id as string;
+      totalByTicketType.set(ticketTypeId, (totalByTicketType.get(ticketTypeId) ?? 0) + Number(item.quantity || 0));
+    }
+
+    formulaBreakdown = [...totalByTicketType.entries()]
+      .map(([ticketTypeId, total]) => {
+        const served = servedByTicketType.get(ticketTypeId) ?? 0;
+        const ticketType = ticketTypeById.get(ticketTypeId);
+        return {
+          ticket_type_id: ticketTypeId,
+          label: (ticketType?.label as string | null) ?? 'Formule',
+          total,
+          served,
+          remaining: Math.max(0, total - served),
+          sort_order: Number(ticketType?.sort_order ?? 0),
+        };
+      })
+      .sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label))
+      .map(({ sort_order: _sortOrder, ...row }) => row);
+
+    recentDeliveries = (redemptions ?? []).slice(0, 30).map(redemption => {
       const item = itemById.get(redemption.reservation_item_id as string);
       const reservationId = item?.reservation_id as string | undefined;
+      const ticketType = item ? ticketTypeById.get(item.ticket_type_id as string) : undefined;
       return {
         id: redemption.id as string,
         redeemed_at: redemption.redeemed_at as string,
         customer_name: reservationId ? customerByReservationId.get(reservationId) ?? 'Réservation' : 'Réservation',
-        ticket_type_name: item ? labelByTicketTypeId.get(item.ticket_type_id as string) ?? 'Formule' : 'Formule',
+        ticket_type_name: (ticketType?.label as string | null) ?? 'Formule',
         quantity: Number(redemption.quantity_redeemed || 0),
       };
     });
@@ -99,6 +122,7 @@ export async function GET(req: NextRequest) {
     rights_redeemed: rightsRedeemed,
     rights_remaining: rightsRemaining,
     progress_percent: rightsTotal > 0 ? Math.round((rightsRedeemed / rightsTotal) * 100) : 0,
+    formula_breakdown: formulaBreakdown,
     recent_deliveries: recentDeliveries,
     updated_at: new Date().toISOString(),
   });
