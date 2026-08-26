@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   IconAlertCircle,
   IconArrowBackUp,
@@ -140,6 +140,7 @@ export function ScanClient({
   const [voidTarget, setVoidTarget] = useState<{ redemptionId: string; ticketTypeName: string; requiresReason: boolean } | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [voidLoading, setVoidLoading] = useState(false);
+  const ticketCardRef = useRef<HTMLElement | null>(null);
 
   const selectedEvent = useMemo(
     () => events.find(event => event.id === selectedEventId) ?? null,
@@ -151,6 +152,14 @@ export function ScanClient({
     const timer = window.setTimeout(() => reset(), 5000);
     return () => window.clearTimeout(timer);
   }, [step]);
+
+  useEffect(() => {
+    if (step !== 'preview') return;
+    const timer = window.setTimeout(() => {
+      ticketCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [step, preview?.reservation_id]);
 
   useEffect(() => {
     if (!selectedEventId) {
@@ -359,54 +368,37 @@ export function ScanClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-            <IconTicket size={20} />
+      <section className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+            <IconTicket size={18} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-base font-bold text-gray-950">{selectedEvent?.title}</h1>
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Service actif</span>
+              <h1 className="truncate text-sm font-bold text-gray-950">{selectedEvent?.title}</h1>
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-700">Service actif</span>
             </div>
-            <p className="mt-1 text-xs text-gray-500">Poste unique · retrait des formules réservées</p>
+            <p className="mt-0.5 text-[11px] text-gray-500">Retrait des formules réservées</p>
           </div>
         </div>
 
         {events.length > 1 && (
-          <details className="mt-3 border-t border-gray-100 pt-3">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-xs font-semibold text-gray-500">
+          <details className="mt-2 border-t border-gray-100 pt-2">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between text-xs font-semibold text-gray-500">
               Changer d&apos;événement
-              <IconChevronDown size={16} />
+              <IconChevronDown size={15} />
             </summary>
             <select
               value={selectedEventId}
               onChange={event => handleEventChange(event.target.value)}
               disabled={loading || voidLoading}
-              className="mt-2 min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-900"
+              className="mt-1 min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-900"
             >
               {events.map(event => <option key={event.id} value={event.id}>{formatEventLabel(event)}</option>)}
             </select>
           </details>
         )}
       </section>
-
-      {metrics && (
-        <section className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-gray-200 bg-white p-3 text-center">
-            <p className="text-xl font-extrabold text-gray-950">{metrics.rights_redeemed}</p>
-            <p className="text-[11px] font-medium text-gray-500">servies</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-3 text-center">
-            <p className="text-xl font-extrabold text-gray-950">{metrics.rights_remaining}</p>
-            <p className="text-[11px] font-medium text-gray-500">à servir</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-3 text-center">
-            <p className="text-xl font-extrabold text-gray-950">{metrics.progress_percent}%</p>
-            <p className="text-[11px] font-medium text-gray-500">progression</p>
-          </div>
-        </section>
-      )}
 
       {error && (
         <div className="flex items-start gap-2 rounded-2xl border-2 border-red-200 bg-red-50 px-4 py-3">
@@ -462,13 +454,13 @@ export function ScanClient({
       )}
 
       {step === 'preview' && preview && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <section ref={ticketCardRef} className="scroll-mt-20 rounded-2xl border-2 border-gray-300 bg-white p-5 shadow-lg">
           <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-100">
               <IconTicket size={22} className="text-gray-700" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-extrabold text-gray-950">{preview.customer_name}</p>
+              <p className="truncate text-lg font-black text-gray-950">{preview.customer_name}</p>
               <p className="truncate text-xs text-gray-500">{preview.event_title}</p>
               <p className="mt-1 text-[11px] font-medium text-gray-400">Réservation {preview.reservation_id.slice(0, 8).toUpperCase()}</p>
             </div>
@@ -605,6 +597,34 @@ export function ScanClient({
             <IconRotate size={18} />Scanner le suivant
           </button>
         </section>
+      )}
+
+      {metrics && (
+        <details className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-gray-600">
+            <span>Suivi du service</span>
+            <span className="ml-auto font-bold text-gray-900">{metrics.rights_redeemed} servies</span>
+            <span className="text-gray-300">·</span>
+            <span className="font-bold text-gray-900">{metrics.rights_remaining} à servir</span>
+            <span className="text-gray-300">·</span>
+            <span className="font-bold text-gray-900">{metrics.progress_percent}%</span>
+            <IconChevronDown size={14} className="shrink-0 text-gray-400" />
+          </summary>
+          <div className="grid grid-cols-3 gap-2 border-t border-gray-100 p-3">
+            <div className="rounded-lg bg-gray-50 px-2 py-2 text-center">
+              <p className="text-lg font-extrabold text-gray-950">{metrics.rights_redeemed}</p>
+              <p className="text-[10px] font-medium text-gray-500">servies</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 px-2 py-2 text-center">
+              <p className="text-lg font-extrabold text-gray-950">{metrics.rights_remaining}</p>
+              <p className="text-[10px] font-medium text-gray-500">à servir</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 px-2 py-2 text-center">
+              <p className="text-lg font-extrabold text-gray-950">{metrics.progress_percent}%</p>
+              <p className="text-[10px] font-medium text-gray-500">progression</p>
+            </div>
+          </div>
+        </details>
       )}
 
       {metrics && metrics.recent_deliveries.length > 0 && (
