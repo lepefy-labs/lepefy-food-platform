@@ -72,7 +72,7 @@ export default async function EvenementielScanPage({
   const initialEventId = events.some((event) => event.id === requestedEventId)
     ? requestedEventId
     : events.length === 1
-      ? events[0].id
+      ? (events[0]?.id ?? '')
       : '';
 
   return (
