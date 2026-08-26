@@ -14,7 +14,7 @@ interface CameraScanButtonProps {
 
 export function CameraScanButton({
   onDecoded,
-  variant = 'default',
+  variant = 'primary',
   label = 'Scanner avec la caméra',
 }: CameraScanButtonProps) {
   const [open, setOpen] = useState(false);
