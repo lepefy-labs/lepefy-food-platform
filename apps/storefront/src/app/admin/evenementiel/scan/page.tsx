@@ -17,6 +17,21 @@ interface ScanEventRow {
   checkin_closes_at?: string | null;
 }
 
+function resolveInitialEventId(events: ScanEventRow[], requestedEventId: string): string {
+  if (events.some(event => event.id === requestedEventId)) return requestedEventId;
+
+  const now = Date.now();
+  const activeWindow = events.find(event => {
+    const opensAt = event.checkin_opens_at ? new Date(event.checkin_opens_at).getTime() : Number.NEGATIVE_INFINITY;
+    const closesAt = event.checkin_closes_at ? new Date(event.checkin_closes_at).getTime() : Number.POSITIVE_INFINITY;
+    return event.status === 'published' && now >= opensAt && now <= closesAt;
+  });
+  if (activeWindow) return activeWindow.id;
+
+  const published = events.find(event => event.status === 'published');
+  return published?.id ?? events[0]?.id ?? '';
+}
+
 export default async function EvenementielScanPage({ searchParams }: { searchParams?: { event_id?: string } }) {
   const cookieStore = cookies();
   const supabase = createServerClient(
@@ -24,8 +39,11 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll() }, setAll() {}, get(name: string) { return cookieStore.get(name)?.value },
-        set() {}, remove() {},
+        getAll() { return cookieStore.getAll() },
+        setAll() {},
+        get(name: string) { return cookieStore.get(name)?.value },
+        set() {},
+        remove() {},
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any,
     },
@@ -48,8 +66,6 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
   if (admin.role !== 'platform_owner' && admin.tenant_id !== tenant.id) redirect('/admin/login?error=unauthorized');
   if (!['platform_owner', 'tenant_admin', 'tenant_cashier'].includes(admin.role)) redirect('/admin/login?error=unauthorized');
 
-  // select('*') keeps rollout backward-compatible: before migration 082 is
-  // applied the optional check-in fields are absent and redemption remains unrestricted.
   const { data: eventRows } = await adminClient
     .from('events')
     .select('*')
@@ -58,9 +74,7 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
     .order('date_start', { ascending: false })
     .limit(50);
 
-  const rawEvents = eventRows ?? [];
-  const checkinSettingsAvailable = rawEvents.some((row) => Object.prototype.hasOwnProperty.call(row, 'checkin_opens_at'));
-  const events = rawEvents.map((row) => ({
+  const events: ScanEventRow[] = (eventRows ?? []).map(row => ({
     id: row.id as string,
     title: row.title as string,
     date_start: row.date_start as string,
@@ -68,29 +82,28 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
     checkin_opens_at: (row as ScanEventRow).checkin_opens_at ?? null,
     checkin_closes_at: (row as ScanEventRow).checkin_closes_at ?? null,
   }));
-  const requestedEventId = searchParams?.event_id ?? '';
-  const initialEventId = events.some((event) => event.id === requestedEventId)
-    ? requestedEventId
-    : events.length === 1
-      ? events[0]?.id ?? ''
-      : '';
+
+  const initialEventId = resolveInitialEventId(events, searchParams?.event_id ?? '');
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
         {tenant.logo_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />
         )}
-        <div><span className="font-bold text-gray-900 text-sm">{tenant.name}</span><span className="ml-2 text-xs text-gray-500 font-medium uppercase tracking-wide">Scan événementiel</span></div>
+        <div className="min-w-0">
+          <span className="block truncate text-sm font-bold text-gray-900">{tenant.name}</span>
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Service repas</span>
+        </div>
         <div className="ml-auto"><LogoutButton /></div>
       </header>
-      <main className="px-4 py-6 max-w-md mx-auto">
+
+      <main className="mx-auto max-w-md px-4 py-5">
         <ScanClient
           eventsEnabled={tenant.events_enabled}
           events={events}
           initialEventId={initialEventId}
-          canConfigureCheckin={checkinSettingsAvailable && (admin.role === 'tenant_admin' || admin.role === 'platform_owner')}
         />
       </main>
     </div>
