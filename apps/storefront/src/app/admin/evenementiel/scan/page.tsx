@@ -49,7 +49,7 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
   if (!['platform_owner', 'tenant_admin', 'tenant_cashier'].includes(admin.role)) redirect('/admin/login?error=unauthorized');
 
   // select('*') keeps rollout backward-compatible: before migration 082 is
-  // applied the optional check-in fields are simply absent and therefore unrestricted.
+  // applied the optional check-in fields are absent and redemption remains unrestricted.
   const { data: eventRows } = await adminClient
     .from('events')
     .select('*')
@@ -58,7 +58,9 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
     .order('date_start', { ascending: false })
     .limit(50);
 
-  const events = (eventRows ?? []).map((row) => ({
+  const rawEvents = eventRows ?? [];
+  const checkinSettingsAvailable = rawEvents.some((row) => Object.prototype.hasOwnProperty.call(row, 'checkin_opens_at'));
+  const events = rawEvents.map((row) => ({
     id: row.id as string,
     title: row.title as string,
     date_start: row.date_start as string,
@@ -88,7 +90,7 @@ export default async function EvenementielScanPage({ searchParams }: { searchPar
           eventsEnabled={tenant.events_enabled}
           events={events}
           initialEventId={initialEventId}
-          canConfigureCheckin={admin.role === 'tenant_admin' || admin.role === 'platform_owner'}
+          canConfigureCheckin={checkinSettingsAvailable && (admin.role === 'tenant_admin' || admin.role === 'platform_owner')}
         />
       </main>
     </div>
