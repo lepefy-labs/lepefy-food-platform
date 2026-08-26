@@ -105,6 +105,19 @@
   background: #fafaff;
 }
 
+/* Boutique dashboard hierarchy: keep the control room focused on actionable states. */
+:global(main > div.mx-auto.w-full.max-w-7xl > section:first-of-type a:has(> div > span.bg-gray-100.text-gray-400)) {
+  display: none;
+}
+
+:global(main > div.mx-auto.w-full.max-w-7xl > section:first-of-type > div.mt-3.rounded-xl.border.border-amber-200) {
+  display: none;
+}
+
+:global(main > div.mx-auto.w-full.max-w-7xl > section:first-of-type a) {
+  min-height: 72px;
+}
+
 :global(.dark) .listPolish :global(thead tr) {
   background: #111827;
 }

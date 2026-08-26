@@ -77,7 +77,6 @@ export default function PendingPaymentsBanner({
   const [sessions, setSessions] = useState<PendingPaymentSession[]>([]);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(false);
-  const [expansionTouched, setExpansionTouched] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,30 +109,23 @@ export default function PendingPaymentsBanner({
     [visible],
   );
 
-  useEffect(() => {
-    if (!expansionTouched && agedCount > 0) setExpanded(true);
-  }, [agedCount, expansionTouched]);
-
   if (visible.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30">
+    <section className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/25">
       <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h2 className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
-              <IconClock size={15} /> Paiements en attente
+              <IconClock size={15} /> Paiements à vérifier
             </h2>
-            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
-              {visible.length}
-            </span>
             <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-              {formatPrice(pendingTotal, tenantCurrency)}
+              {visible.length} · {formatPrice(pendingTotal, tenantCurrency)}
             </span>
             {agedCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/50 dark:text-red-300">
                 <IconAlertTriangle size={11} />
-                {agedCount} à vérifier depuis +24 h
+                {agedCount} depuis +24 h
               </span>
             )}
             <Link
@@ -143,27 +135,24 @@ export default function PendingPaymentsBanner({
               Voir le funnel
             </Link>
           </div>
-          <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-            Paiements externes à vérifier manuellement · aucun stock réservé · les plus anciens sont affichés en premier.
-          </p>
         </div>
 
         <button
           type="button"
-          onClick={() => {
-            setExpansionTouched(true);
-            setExpanded(value => !value);
-          }}
+          onClick={() => setExpanded(value => !value)}
           aria-expanded={expanded}
           className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-200 dark:hover:bg-amber-950"
         >
-          {expanded ? 'Masquer' : `Voir les ${visible.length}`}
+          {expanded ? 'Masquer' : 'Détails'}
           {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
         </button>
       </div>
 
       {expanded && (
         <div className="border-t border-amber-200/80 px-3 py-2.5 dark:border-amber-900">
+          <p className="mb-2 text-[11px] text-amber-700 dark:text-amber-400">
+            Paiements externes à vérifier manuellement · aucun stock réservé · les plus anciens sont affichés en premier.
+          </p>
           <div className="space-y-2">
             {visible.map((session) => {
               const total = sessionTotal(session);
