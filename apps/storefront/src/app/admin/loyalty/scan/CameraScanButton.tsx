@@ -8,27 +8,22 @@ const SCANNER_ELEMENT_ID = 'loyalty-camera-scanner';
 
 interface CameraScanButtonProps {
   onDecoded: (text: string) => void;
+  variant?: 'default' | 'primary';
+  label?: string;
 }
 
-// Import dynamique de html5-qrcode DANS l'effet (jamais au top-level) : la
-// librairie touche `navigator`/`document` à l'import, incompatible avec le
-// rendu serveur de ce composant client dans le pipeline Next.js.
-export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
+export function CameraScanButton({
+  onDecoded,
+  variant = 'default',
+  label = 'Scanner avec la caméra',
+}: CameraScanButtonProps) {
   const [open, setOpen] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  // L'enum n'est disponible qu'après l'import dynamique (cf. commentaire
-  // ci-dessus) — on la capture ici pour pouvoir tester l'état dans le cleanup.
   const stateEnumRef = useRef<typeof Html5QrcodeScannerState | null>(null);
-  // Ref pour éviter que le prop (fonction inline chez l'appelant) ne fasse
-  // redémarrer l'effet caméra à chaque re-render du parent.
   const onDecodedRef = useRef(onDecoded);
   onDecodedRef.current = onDecoded;
 
-  // `stop()` de html5-qrcode lance une exception SYNCHRONE ("Cannot stop,
-  // scanner is not running or paused.") si le scanner n'est pas en cours :
-  // un `.catch()` sur la promesse ne suffit pas, d'où la garde sur getState()
-  // + try/catch (l'état peut encore changer entre le test et l'appel).
   function safeStop(scanner: Html5Qrcode) {
     try {
       const states = stateEnumRef.current;
@@ -65,10 +60,7 @@ export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
             safeStop(scanner);
             setOpen(false);
           },
-          () => {
-            // Callback appelé à chaque frame sans QR détecté — bruit normal,
-            // volontairement ignoré (pas une erreur à afficher à l'utilisateur).
-          },
+          () => {},
         );
       } catch {
         if (!cancelled) setScanError('Impossible d\'accéder à la caméra.');
@@ -86,15 +78,22 @@ export function CameraScanButton({ onDecoded }: CameraScanButtonProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const primary = variant === 'primary';
+
   return (
     <>
       <button
         type="button"
         onClick={() => { setScanError(null); setOpen(true); }}
-        className="w-full py-3 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 flex items-center justify-center gap-2"
+        className={primary
+          ? 'w-full min-h-16 rounded-2xl px-5 py-4 text-base font-extrabold text-white shadow-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)]'
+          : 'w-full py-3 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 flex items-center justify-center gap-2'}
+        style={primary ? { backgroundColor: 'var(--color-primary)' } : undefined}
       >
-        <IconCamera size={18} stroke={1.8} />
-        Scanner avec la caméra
+        <span className={primary ? 'flex h-10 w-10 items-center justify-center rounded-full bg-white/15' : undefined}>
+          <IconCamera size={primary ? 24 : 18} stroke={1.8} />
+        </span>
+        {label}
       </button>
 
       {open && (
