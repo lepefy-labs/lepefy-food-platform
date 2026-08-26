@@ -21,7 +21,8 @@ interface RedemptionRow {
   redeemed_at: string;
   redeemed_by: string | null;
   voided_at: string | null;
-  admin_users: { email: string } | null;
+  voided_by: string | null;
+  void_reason: string | null;
 }
 
 export interface ScanPreviewItem {
@@ -107,17 +108,25 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   const { data: ticketTypes } = await supabase
     .from('event_ticket_types')
     .select('id, label')
-    .in('id', itemRows.length ? itemRows.map(i => i.ticket_type_id) : ['00000000-0000-0000-0000-000000000000']);
-  const labelById = new Map((ticketTypes ?? []).map(t => [t.id, t.label as string]));
+    .in('id', itemRows.length ? itemRows.map(item => item.ticket_type_id) : ['00000000-0000-0000-0000-000000000000']);
+  const labelById = new Map((ticketTypes ?? []).map(ticketType => [ticketType.id, ticketType.label as string]));
+  const itemById = new Map(itemRows.map(item => [item.id, item]));
 
   const { data: redemptions } = await supabase
     .from('event_reservation_item_redemptions')
-    .select('id, reservation_item_id, quantity_redeemed, redeemed_at, redeemed_by, voided_at, admin_users(email)')
-    .in('reservation_item_id', itemRows.length ? itemRows.map(i => i.id) : ['00000000-0000-0000-0000-000000000000'])
+    .select('id, reservation_item_id, quantity_redeemed, redeemed_at, redeemed_by, voided_at, voided_by, void_reason')
+    .in('reservation_item_id', itemRows.length ? itemRows.map(item => item.id) : ['00000000-0000-0000-0000-000000000000'])
     .order('redeemed_at', { ascending: true }) as { data: RedemptionRow[] | null };
 
+  const redemptionRows = redemptions ?? [];
+  const adminIds = Array.from(new Set(redemptionRows.flatMap(redemption => [redemption.redeemed_by, redemption.voided_by]).filter((value): value is string => Boolean(value))));
+  const { data: auditAdmins } = adminIds.length
+    ? await supabase.from('admin_users').select('id, email').in('id', adminIds)
+    : { data: [] as { id: string; email: string }[] };
+  const adminNameById = new Map((auditAdmins ?? []).map(auditUser => [auditUser.id, auditUser.email as string]));
+
   const redemptionsByItem = new Map<string, RedemptionRow[]>();
-  for (const redemption of redemptions ?? []) {
+  for (const redemption of redemptionRows) {
     const list = redemptionsByItem.get(redemption.reservation_item_id) ?? [];
     list.push(redemption);
     redemptionsByItem.set(redemption.reservation_item_id, list);
@@ -144,10 +153,24 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
         id: last.id,
         quantity: last.quantity_redeemed,
         redeemed_at: last.redeemed_at,
-        redeemed_by_name: last.admin_users?.email ?? null,
+        redeemed_by_name: last.redeemed_by ? adminNameById.get(last.redeemed_by) ?? null : null,
         can_undo: elevated || cashierOwnRecent,
         undo_requires_reason: elevated && (last.redeemed_by !== adminId || lastAgeMs > CASHIER_UNDO_WINDOW_MS),
       } : null,
+    };
+  });
+
+  const history = [...redemptionRows].reverse().map(redemption => {
+    const item = itemById.get(redemption.reservation_item_id);
+    return {
+      id: redemption.id,
+      ticket_type_name: item ? labelById.get(item.ticket_type_id) ?? 'Formule' : 'Formule',
+      quantity: redemption.quantity_redeemed,
+      redeemed_at: redemption.redeemed_at,
+      redeemed_by_name: redemption.redeemed_by ? adminNameById.get(redemption.redeemed_by) ?? null : null,
+      voided_at: redemption.voided_at,
+      voided_by_name: redemption.voided_by ? adminNameById.get(redemption.voided_by) ?? null : null,
+      void_reason: redemption.void_reason,
     };
   });
 
@@ -172,5 +195,6 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     checkin_opens_at: checkinWindow.openAt,
     checkin_closes_at: checkinWindow.closeAt,
     items: previewItems,
+    history,
   });
 }
