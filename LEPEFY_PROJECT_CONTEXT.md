@@ -1,10 +1,10 @@
 # Lepefy Food Platform — Project Context
 
-> **Documento operativo di riferimento per Codex / Claude Code / sviluppatori.**
+> Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 agosto 2026 — **v5.6 Current-State Snapshot**
+> **Aggiornato:** 27 agosto 2026 — **v5.7 Current-State Snapshot**
 >
-> **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono sempre branch/commit effettivamente promossi e migration realmente applicate. Se questo documento e il codice divergono, **vince il codice**.
+> **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
 ---
 
@@ -12,10 +12,7 @@
 
 Lepefy Food è una piattaforma SaaS e-commerce **multi-tenant** per attività food, con storefront commerce, back-office tenant, pagamenti e checkout, shipping/logistica, loyalty/referral, digital card, assistente shopping Nala e modulo Événementiel con eventi, servizi e rental.
 
-Il tenant di riferimento più usato è `chloefood`, ma il codice non deve hardcodare Chloe Food salvo seed/configurazioni esplicitamente tenant-specifiche.
-
 Principi architetturali:
-
 - unica codebase multi-tenant;
 - isolamento dati tramite `tenant_id` e RLS dove previsto;
 - Next.js App Router;
@@ -43,17 +40,21 @@ lepefy-food-platform/
 └─ LEPEFY_PROJECT_CONTEXT.md
 ```
 
-Package manager: **pnpm workspaces**. Stack principale: Next.js 14.2.35, React 18.3.1, TypeScript, Tailwind, Supabase, Stripe, Zustand, React Hook Form, Zod, Tabler Icons, Playwright, `html5-qrcode`, Google GenAI e React Markdown.
+Package manager: pnpm workspaces. Stack principale: Next.js 14.2.35, React 18.3.1, TypeScript, Tailwind, Supabase, Stripe, Zustand, React Hook Form, Zod, Tabler Icons, Playwright, `html5-qrcode`, Google GenAI e React Markdown.
 
 ---
 
-## 3. Multi-tenancy e branding
+## 3. Multi-tenancy, domini e branding
 
-Storefront tenant risolto principalmente da `NEXT_PUBLIC_TENANT_SLUG`, quindi `getTenant()`, CSS custom properties tenant e query filtrate per `tenant_id`.
+Il tenant applicativo è ancora risolto principalmente da `NEXT_PUBLIC_TENANT_SLUG`, quindi `getTenant()`, CSS custom properties tenant e query filtrate per `tenant_id`.
 
-L'URL storefront pubblico canonico è configurato per tenant tramite `tenants.storefront_url`; `NEXT_PUBLIC_STOREFRONT_URL` resta fallback legacy.
+L'URL pubblico canonico della Boutique è `tenants.storefront_url`; `NEXT_PUBLIC_APP_URL`/fallback legacy non devono prevalere quando `storefront_url` è configurato.
 
-`/admin/**` usa **platform branding** (`public.platform_branding`) indipendente dai colori tenant.
+Il modulo pubblico Événementiel può essere esposto su sottodominio dedicato tramite `NEXT_PUBLIC_EVENTS_SUBDOMAIN`; `next.config.mjs` usa rewrite host-based `beforeFiles` per instradare la surface events nello stesso deployment.
+
+Il progetto Vercel corrente può quindi servire più surface dello stesso tenant (`shop.*`, `events.*`) dallo stesso deployment. Questa è una soluzione intermedia: multi-tenant nel codice/dati, ma tenant resolution ancora deployment/env-based. Una futura infrastruttura host→tenant potrà sostituire `NEXT_PUBLIC_TENANT_SLUG` senza cambiare il nuovo concetto di surface/workspace.
+
+`/admin/**` usa platform branding (`public.platform_branding`) indipendente dai colori tenant.
 
 ---
 
@@ -61,9 +62,10 @@ L'URL storefront pubblico canonico è configurato per tenant tramite `tenants.st
 
 ```text
 apps/storefront/src/app/(shop)/          # shop/cart/checkout/compte/orders
-apps/storefront/src/app/card/            # digital card / quick pay
 apps/storefront/src/app/(evenementiel)/  # modulo pubblico eventi
-apps/storefront/src/app/admin/           # back-office
+apps/storefront/src/app/card/            # digital card / quick pay
+apps/storefront/src/app/admin/           # admin core condiviso
+apps/storefront/src/app/scan/            # service repas operativo
 apps/storefront/src/app/api/             # API e webhook
 ```
 
@@ -89,9 +91,7 @@ Modello canonico:
 cart -> checkout_session -> pagamento confermato -> order
 ```
 
-Una checkout session **non è un ordine**. Non creare `orders` pending per checkout incompleti.
-
-Lifecycle principale:
+Una checkout session non è un ordine. Lifecycle principale:
 
 ```text
 open -> completed | cancelled | expired
@@ -99,13 +99,9 @@ open + external provider handoff -> awaiting_verification
 awaiting_verification -> completed | cancelled | open
 ```
 
-Per cliente autenticato e tenant esiste al massimo una sessione `open`. Guest resume tramite token firmato. PaymentIntent Stripe viene riusato/aggiornato quando possibile. La route canonica recovery è `/checkout/reprendre/[id]`; legacy `/orders/en-attente/[id]` redirige lì.
+Per cliente autenticato e tenant esiste al massimo una sessione `open`. Guest resume tramite token firmato. PaymentIntent Stripe viene riusato/aggiornato quando possibile. Route canonica recovery: `/checkout/reprendre/[id]`; legacy `/orders/en-attente/[id]` redirige lì.
 
-Stock non riservato alla nascita della checkout session; pricing, stock, shipping quote/token, discount, PaymentIntent e completion restano server-side.
-
-`payment_funnel_logs` e `checkout_funnel_30d` coprono lifecycle/recovery. `/admin/checkout-funnel` è la dashboard conversion/recovery.
-
-Payment Recovery v1 è manuale, transazionale e limitato alle external-link unresolved. L'alert tenant per `awaiting_verification` è best-effort e idempotente.
+Stock non riservato alla nascita della checkout session; pricing, stock, shipping quote/token, discount, PaymentIntent e completion restano server-side. `payment_funnel_logs` e `checkout_funnel_30d` coprono lifecycle/recovery. Payment Recovery v1 è manuale e limitato alle external-link unresolved.
 
 ---
 
@@ -127,15 +123,54 @@ Componente centrale: `apps/storefront/src/components/payments/StripePaymentStep.
 
 ---
 
-## 11. Admin — shell e ruoli
+## 11. Admin — core condiviso, workspace e ruoli
 
-Ruoli applicativi: `platform_owner`, `tenant_admin`, `tenant_cashier`. `admin_users` è la fonte per ruolo/tenant/active; authorization server-side obbligatoria anche se una voce è nascosta in UI.
+Ruoli applicativi invariati: `platform_owner`, `tenant_admin`, `tenant_cashier`. `admin_users` resta la fonte per ruolo/tenant/active; authorization server-side obbligatoria anche se una voce è nascosta in UI.
+
+L'admin è ora modellato come **un solo Admin Core con due workspace UX**:
+
+```text
+request host
+   ├─ shop host   -> workspace `shop`
+   └─ events host -> workspace `events`
+```
+
+Il resolver canonico è `src/lib/admin/workspace.ts`. Non introdurre env separate per “admin shop/admin events”.
+
+Workspace Boutique:
+- Commandes;
+- Funnel checkout;
+- Catalogue;
+- Clients/Promotions (quando disponibili);
+- Slides accueil;
+- Fidélité / Parrainage;
+- Scan fidélité;
+- Livraison;
+- Ambassadeurs;
+- IA.
+
+Workspace Événementiel:
+- Vue d’ensemble;
+- Événements;
+- Réservations / Paiements;
+- Demandes traiteur;
+- Locations;
+- Galerie / Contenu;
+- Service repas / Scan.
+
+Paramètres, Abonnement e strumenti platform_owner restano condivisi. La stessa shell, auth, API, DB e design system servono entrambi i workspace.
+
+Lo switch Boutique→Événementiel usa `NEXT_PUBLIC_EVENTS_SUBDOMAIN` tramite il resolver centralizzato. Lo switch Événementiel→Boutique usa **`tenant.storefront_url` come source of truth canonica**, evitando hardcode tenant-specifici.
+
+Su host events, `/admin` viene riscritto internamente verso `/admin/evenementiel`, mantenendo nel browser l'entry point `events.<tenant>/admin` e riusando l'overview eventi esistente.
+
+`tenant_cashier` viene indirizzato alla superficie operativa coerente col workspace: scan fidélité sullo shop, `/scan` sull'host events.
 
 ---
 
 ## 12. Admin Commandes / external payment operations
 
-`/admin` è workspace operativo. La queue **Paiements en attente** riguarda external-link senza `order_id`, separata dagli ordini. Stato canonico dopo provider handoff: `awaiting_verification`.
+Nel workspace Boutique, `/admin` è il workspace operativo ordini. La queue **Paiements en attente** riguarda external-link senza `order_id`, separata dagli ordini. Stato canonico dopo provider handoff: `awaiting_verification`.
 
 Workflow fulfillment:
 
@@ -150,122 +185,87 @@ Payment status e fulfillment status restano separati.
 
 ## 13. Événementiel
 
-Route group `apps/storefront/src/app/(evenementiel)/`. Checkout evento ha state machine propria e non va confuso con `checkout_sessions` shop.
+Route group pubblico `apps/storefront/src/app/(evenementiel)/`. Checkout evento ha state machine propria e non va confuso con `checkout_sessions` shop.
 
 ### Social sharing
 
-`event_gallery_photos` è source of truth immagini. `is_social_share` marca foto approvate. Social card 9:16 server-side:
-
-```text
-/api/evenementiel/events/[slug]/social-card?photo=<gallery-photo-id>
-```
-
-Condivisione tramite Web Share API con file; fallback share URL/download PNG.
+`event_gallery_photos` è source of truth immagini. `is_social_share` marca foto approvate. Social card 9:16 server-side tramite `/api/evenementiel/events/[slug]/social-card?photo=<gallery-photo-id>`.
 
 ### Prenotazioni e biglietti
 
-`event_reservations` nasce solo dopo conferma del pagamento/confirmation flow previsto. Il QR token resta stabile per tutta la vita della prenotazione. Le quantità acquistate sono in `event_reservation_items`; modifiche operative allo scanner non devono rigenerare QR né riscrivere prenotazioni live.
+`event_reservations` nasce solo dopo conferma del pagamento/confirmation flow previsto. Il QR token resta stabile. Quantità acquistate in `event_reservation_items`.
 
-### Scanner evento
+### Scanner / Service repas
 
-Superficie operativa:
+Superficie operativa canonica:
 
 ```text
-/admin/evenementiel/scan?event_id=<event-id>
+/scan?event_id=<event-id>
 ```
 
-Lo scanner è **vincolato all'evento**: lookup, conferma, ricerca fallback e undo verificano tenant + `event_id`. Un QR appartenente a un altro evento viene rifiutato prima della redemption.
+La legacy `/admin/evenementiel/scan` redirige alla surface `/scan`, preferendo il dominio events configurato.
 
-Il modello operativo corrente è una postazione unica orientata al **service repas / retrait des formules**:
+Lo scanner è vincolato all'evento: lookup, conferma, ricerca fallback e undo verificano tenant + `event_id`.
+
+Flusso:
 
 ```text
 camera scan -> preview prenotazione -> conferma formule -> success -> ritorno scanner
 ```
 
-La camera è l'azione primaria. La ricerca manuale è fallback e può risolvere una prenotazione per nome, e-mail, telefono, QR o riferimento completo senza modificare il ledger.
+Camera primaria; ricerca manuale fallback per nome, e-mail, telefono, QR o riferimento completo. Biglietto interamente utilizzato mostra STOP esplicito e nessuna quantità redimibile. L'RPC di redemption mantiene lock e controllo atomico del residuo.
 
-Preview canonica distingue almeno:
-
-```text
-valido
-parzialmente utilizzato
-interamente utilizzato
-annullato
-rimborsato
-evento draft/cancelled
-fuori finestra check-in configurata
-```
-
-Un biglietto interamente utilizzato mostra uno stato di arresto esplicito e non presenta quantità redimibili. La prenotazione deve essere `confirmed`; l'RPC di redemption mantiene lock e controllo atomico del residuo per impedire double redemption tra più device.
-
-Il modello dati operativo è:
+Modello dati:
 
 ```text
-reservation -> reservation_items (diritti/formule) -> item_redemptions (ledger)
+reservation -> reservation_items -> item_redemptions
 ```
 
-`event_reservation_item_redemptions` è la **source of truth canonica** per redemption/audit. Supporta quantità parziali e soft-void. La tabella legacy `event_reservation_redemptions` resta solo storico compatibile e non deve essere usata per nuovi KPI; migration `082` interrompe la creazione di nuove righe aggregate.
+`event_reservation_item_redemptions` è source of truth canonica per redemption/audit, quantità parziali e soft-void. `event_reservation_redemptions` è legacy storico.
 
-Il client scanner è online-only per le azioni operative: perdita di connettività blocca scan, ricerca, conferma e undo; non esiste redemption offline. Le API scanner sono `force-dynamic`/`force-no-store` e il client usa fetch `no-store` per le preview.
-
-I KPI live derivano da prenotazioni confermate, reservation items e ledger granulare. `Suivi du service` include totali globali e breakdown per formula (servite/restanti/terminate), quindi rispetta anche gli undo.
+Scanner online-only per scan/ricerca/conferma/undo; API `force-dynamic`/`force-no-store`; KPI live con breakdown per formula.
 
 ### Finestra check-in
 
-Migration `082_event_checkin_operations.sql` aggiunge:
-
-```text
-events.checkin_opens_at timestamptz null
-events.checkin_closes_at timestamptz null
-```
-
-Regola di rollout fondamentale: `NULL` significa **nessuna restrizione temporale**. Gli eventi/prenotazioni già live mantengono quindi il comportamento precedente senza backfill. Il codice legge gli eventi con `select('*')` e tratta campi assenti come `NULL`, così un deploy applicativo precedente all'applicazione della migration non invalida i QR esistenti.
-
-Se configurata, la finestra è verificata sia nel preview sia nuovamente server-side al POST di redemption. Non affidarsi al client per il controllo temporale.
+Migration `082_event_checkin_operations.sql` aggiunge `checkin_opens_at` e `checkin_closes_at` nullable. `NULL` significa nessuna restrizione temporale. Preview e POST verificano entrambi la finestra.
 
 ### Undo / audit operatori
 
-Policy scanner:
-
-- `tenant_cashier`: può annullare soltanto una propria redemption e solo entro 5 minuti;
-- `tenant_admin` / `platform_owner`: possono correggere redemption più vecchie o di altri operatori; in tali casi il motivo è obbligatorio;
-- l'undo è sempre soft-void, mai delete fisico del ledger.
+- `tenant_cashier`: annulla solo propria redemption entro 5 minuti;
+- `tenant_admin` / `platform_owner`: override più ampio, motivo obbligatorio nei casi previsti;
+- undo sempre soft-void.
 
 ---
 
-## 14. Digital Card `/card`
+## 14. Login admin e destinazione
+
+Password login e OTP supportano un parametro `next` **solo relativo e same-origin** (`/…`, mai `//…`). Questo permette `/scan -> /admin/login?next=/scan -> /scan` senza introdurre open redirect.
+
+Non esiste ancora SSO cross-subdomain esplicito. Le sessioni Supabase non vengono in questo snapshot estese intenzionalmente a `.tenant-domain`; un eventuale SSO shop/events è uno scope auth/security separato.
+
+---
+
+## 15. Digital Card `/card`
 
 Hub mobile tenant. Location usa `tenant.google_maps_url`; niente iframe/API Maps o geografia simulata. Quick Pay usa payment engine condiviso ma resta dominio indipendente dagli ordini shop.
 
 ---
 
-## 15. Shipping
+## 16. Shipping
 
 Packlink resta integrazione principale. Packaging, peso, splitting, quote, VAT, surcharge, country e tenant rules sono business logic sensibile; frontend non source of truth del costo.
 
 ---
 
-## 16. Notifiche
+## 17. Notifiche
 
-Spec: `docs/NOTIFICATION_JOURNEY_V1.md`. n8n è trasporto/orchestrazione; stato ordine/checkout, recipient resolution e payload restano source of truth nell'app.
-
-Eventi cliente ordine v1:
-
-```text
-order-confirmed
-order-ready-for-pickup
-order-shipped
-order-completed
-order-cancelled
-```
-
-`tenant_notification_recipients` è source of truth destinatari interni. Alert external payment usa webhook `external-payment-awaiting-verification`; Payment Recovery usa `payment-reminder` con cooldown e signed resume token esistente.
+Spec: `docs/NOTIFICATION_JOURNEY_V1.md`. n8n è trasporto/orchestrazione; stato ordine/checkout, recipient resolution e payload restano source of truth nell'app. `tenant_notification_recipients` è source of truth destinatari interni.
 
 ---
 
-## 17. Database / migrations
+## 18. Database / migrations
 
-La presenza di una migration nel repo **non prova** che sia applicata in ogni Supabase remoto. Per release che richiedono nuove colonne, applicare la migration DB prima di usare la relativa configurazione.
+La presenza di una migration nel repo non prova che sia applicata in ogni Supabase remoto.
 
 Numerazione recente:
 
@@ -278,29 +278,23 @@ Numerazione recente:
 082_event_checkin_operations.sql
 ```
 
-Migration `082` è backward-compatible:
-
-- aggiunge solo due colonne nullable su `events`;
-- nessun backfill di prenotazioni, reservation items o QR;
-- `NULL` mantiene scanner senza vincolo temporale;
-- mantiene firma/semantica atomica dell'RPC `redeem_event_reservation_items`;
-- smette soltanto di alimentare la tabella aggregata legacy, mantenendone intatto lo storico.
+Il refactor admin workspace **non richiede migration**: riusa `tenants.storefront_url` già esistente e l'attuale env events.
 
 ---
 
-## 18. Supabase / auth
+## 19. Supabase / auth
 
-Browser: `src/lib/supabase/client.ts`. Server/service: `src/lib/supabase/server.ts`. Operazioni service-role server-only. Checkout guest supportato. I signed link Payment Recovery usano il token HMAC esistente.
-
----
-
-## 19. UI conventions
-
-Lingua storefront principale: francese. Tabler Icons, mobile-first, touch target ~44px+, focus visibile, safe-area, reduced motion, niente dati fake, storefront branding tenant, admin branding piattaforma.
+Browser: `src/lib/supabase/client.ts`. Server/service: `src/lib/supabase/server.ts`. Operazioni service-role server-only. Checkout guest supportato. Signed link Payment Recovery usa token HMAC esistente.
 
 ---
 
-## 20. File/moduli ad alto impatto
+## 20. UI conventions
+
+Lingua storefront/admin principale: francese. Tabler Icons, mobile-first, touch target ~44px+, focus visibile, safe-area, reduced motion, niente dati fake, storefront branding tenant, admin branding piattaforma.
+
+---
+
+## 21. File/moduli ad alto impatto
 
 ```text
 apps/storefront/src/components/payments/StripePaymentStep.tsx
@@ -310,35 +304,45 @@ apps/storefront/src/lib/cart/*
 apps/storefront/src/lib/checkout/*
 apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
+apps/storefront/src/lib/admin/workspace.ts
 apps/storefront/src/lib/notifications/*
 apps/storefront/src/app/api/checkout/*
 apps/storefront/src/app/api/checkout-sessions/*
-apps/storefront/src/app/api/admin/checkout-sessions/*
 apps/storefront/src/app/api/admin/evenementiel/scan/*
 apps/storefront/src/app/api/webhooks/stripe/*
 apps/storefront/src/app/admin/*
+apps/storefront/src/app/scan/*
 packages/types/*
 supabase/migrations/*
 ```
 
 ---
 
-## 21. Known inconsistencies / technical debt
+## 22. Known inconsistencies / technical debt
 
 - collisione storica prefisso migration `071`: non rinominare retroattivamente;
 - telefono checkout non uniformemente server-enforced;
 - legacy `CheckoutForm.tsx`: verificare caller prima della rimozione;
 - abandoned-checkout outbound automatico non abilitato senza policy consenso/timing;
 - admin external-payment confirm/cancel richiede controllo concurrency;
-- `event_reservation_redemptions` è legacy storico: nuovi analytics scanner devono usare ledger granulare/residui canonici.
+- `event_reservation_redemptions` è legacy storico;
+- tenant resolution resta deployment/env-based (`NEXT_PUBLIC_TENANT_SLUG`); futura evoluzione consigliata: registry host/domain→tenant senza cambiare il resolver surface/workspace;
+- URL Events resta temporaneamente env-based; futuro modello consigliato: registry `tenant_domains` o equivalente;
+- SSO esplicito cross-subdomain shop/events non ancora introdotto.
 
 ---
 
-## 22. Cambiamenti strutturali correnti
+## 23. Cambiamenti strutturali correnti
 
 ### Admin / piattaforma
 
-Platform branding separato, shell condivisa, Commandes workspace operativo, `/admin/checkout-funnel`, Payment Recovery admin e Notification Test Console.
+- platform branding separato;
+- Admin Core condiviso con workspace Boutique/Événementiel risolti dall'host;
+- switch workspace centralizzato;
+- `tenant.storefront_url` canonico per tornare alla Boutique;
+- host events `/admin` riusa overview Événementiel;
+- `/scan` separato dalla shell admin;
+- login admin supporta destinazione `next` same-origin.
 
 ### Cart / checkout
 
@@ -347,46 +351,33 @@ Purchase-intent persistente, una open session per cliente autenticato, `awaiting
 ### Événementiel
 
 - social kit da gallery approvata;
-- scanner evento vincolato a `event_id` e orientato al service repas;
-- camera primaria, ricerca prenotazione senza QR come fallback;
-- preview stato redimibilità prima della conferma, con STOP esplicito per biglietto esaurito;
-- finestra check-in opzionale e backward-compatible;
-- KPI live compatti con breakdown per formula;
-- scanner online-only per operazioni di servizio;
-- ledger `event_reservation_item_redemptions` canonico;
-- undo cashier limitato a propria operazione entro 5 minuti; override admin tracciato.
+- scanner orientato al service repas e vincolato a `event_id`;
+- camera primaria, ricerca senza QR fallback;
+- STOP biglietto esaurito;
+- KPI breakdown formula;
+- online-only;
+- ledger granulare canonico;
+- undo policy tracciata.
 
 ---
 
-## 23. Checklist prima di consegnare codice
+## 24. Checklist e manutenzione
 
-### Repo
-- [ ] target e base SHA verificati;
-- [ ] diff limitato allo scope;
-- [ ] nessun artefatto temporaneo.
-
-### Business critical
-- [ ] tenant isolation preservata;
-- [ ] pricing/stock/payment invariati salvo scope approvato;
-- [ ] auth/roles verificati;
-- [ ] nessun secret esposto;
-- [ ] migration applicata prima di attivare configurazioni dipendenti.
-
-### Delivery
-- [ ] remote validation sullo SHA finale;
-- [ ] Vercel `READY` quando applicabile;
-- [ ] project context aggiornato.
-
----
-
-## 24. Regola di manutenzione
+Prima di consegnare codice:
+- target/base SHA verificati;
+- diff limitato allo scope;
+- tenant isolation, auth/roles, pricing/stock/payment preservati;
+- nessun secret esposto;
+- project context aggiornato quando cambia architettura;
+- remote validation sullo SHA finale;
+- Vercel `READY` quando applicabile.
 
 Aggiornare questo file quando cambiano architettura, route/module principali, workflow business, schema/migration significative, payment/checkout, auth, cart sync, shipping, tenant/platform config o feature cross-module. Non trasformarlo in changelog.
 
 ---
 
-# Fine snapshot v5.6
+# Fine snapshot v5.7
 
-**Base audit:** `main @ scanner service-meal current state`  
-**Data:** 26 agosto 2026  
+**Base audit:** `main @ admin workspace domains refactor`  
+**Data:** 27 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.
