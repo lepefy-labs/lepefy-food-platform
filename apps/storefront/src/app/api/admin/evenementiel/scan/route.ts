@@ -4,6 +4,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { extractQrToken } from '@/lib/events/ticketUrl';
+import { getEventCheckinWindowState } from '@/lib/events/checkinWindow';
 
 interface RedeemItemsRpcRow {
   success: boolean;
@@ -43,12 +44,9 @@ export async function POST(req: NextRequest) {
   }
 
   const adminId = await getAdminId();
-  if (!adminId) {
-    return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
-  }
+  if (!adminId) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
 
   const supabase = createServiceClient();
-
   const { data: reservation } = await supabase
     .from('event_reservations')
     .select('id, tenant_id, event_id, customer_name')
@@ -58,35 +56,29 @@ export async function POST(req: NextRequest) {
   if (!reservation || reservation.tenant_id !== tenant.id) {
     return NextResponse.json({ error: 'Code QR invalide pour cette boutique.' }, { status: 404 });
   }
-
   if (reservation.event_id !== eventId) {
     return NextResponse.json({ error: 'Ce billet appartient à un autre événement.' }, { status: 409 });
   }
 
-  const { data: eventRow } = await supabase
-    .from('events')
-    .select('id, tenant_id, title, status')
-    .eq('id', eventId)
-    .maybeSingle();
-
+  const { data: eventRow } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle();
   if (!eventRow || eventRow.tenant_id !== tenant.id) {
     return NextResponse.json({ error: 'Événement introuvable pour cette boutique.' }, { status: 404 });
   }
-
   if (eventRow.status === 'cancelled' || eventRow.status === 'draft') {
     return NextResponse.json({ error: eventRow.status === 'cancelled' ? 'Événement annulé.' : 'Événement non publié.' }, { status: 409 });
+  }
+
+  const windowState = getEventCheckinWindowState(eventRow);
+  if (windowState.blockingReason) {
+    return NextResponse.json({ error: windowState.blockingReason }, { status: 409 });
   }
 
   const { data, error } = await supabase
     .rpc('redeem_event_reservation_items', { p_qr_token: qrToken, p_items: items, p_admin_id: adminId })
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const row = data as RedeemItemsRpcRow;
-
   if (!row.success) {
     return NextResponse.json({ error: row.reason, reservationItemId: row.reservation_item_id }, { status: 409 });
   }
