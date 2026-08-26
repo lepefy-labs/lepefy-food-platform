@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { getAdminId } from '@/lib/auth/getAdminId';
 import { extractQrToken } from '@/lib/events/ticketUrl';
+import { getEventCheckinWindowState } from '@/lib/events/checkinWindow';
+
+const CASHIER_UNDO_WINDOW_MS = 5 * 60 * 1000;
 
 interface ItemRow {
   id: string;
@@ -15,6 +19,7 @@ interface RedemptionRow {
   reservation_item_id: string;
   quantity_redeemed: number;
   redeemed_at: string;
+  redeemed_by: string | null;
   voided_at: string | null;
   admin_users: { email: string } | null;
 }
@@ -29,6 +34,8 @@ export interface ScanPreviewItem {
     quantity: number;
     redeemed_at: string;
     redeemed_by_name: string | null;
+    can_undo: boolean;
+    undo_requires_reason: boolean;
   } | null;
 }
 
@@ -56,7 +63,16 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     return NextResponse.json({ error: 'Code QR invalide.' }, { status: 400 });
   }
 
+  const adminId = await getAdminId();
+  if (!adminId) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+
   const supabase = createServiceClient();
+  const { data: admin } = await supabase
+    .from('admin_users')
+    .select('role')
+    .eq('id', adminId)
+    .eq('active', true)
+    .maybeSingle();
 
   const { data: reservation } = await supabase
     .from('event_reservations')
@@ -74,7 +90,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
 
   const { data: eventRow } = await supabase
     .from('events')
-    .select('id, tenant_id, title, status, date_start')
+    .select('*')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -88,17 +104,15 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     .eq('reservation_id', reservation.id) as { data: ItemRow[] | null };
 
   const itemRows = items ?? [];
-
   const { data: ticketTypes } = await supabase
     .from('event_ticket_types')
     .select('id, label')
     .in('id', itemRows.length ? itemRows.map(i => i.ticket_type_id) : ['00000000-0000-0000-0000-000000000000']);
-
   const labelById = new Map((ticketTypes ?? []).map(t => [t.id, t.label as string]));
 
   const { data: redemptions } = await supabase
     .from('event_reservation_item_redemptions')
-    .select('id, reservation_item_id, quantity_redeemed, redeemed_at, voided_at, admin_users(email)')
+    .select('id, reservation_item_id, quantity_redeemed, redeemed_at, redeemed_by, voided_at, admin_users(email)')
     .in('reservation_item_id', itemRows.length ? itemRows.map(i => i.id) : ['00000000-0000-0000-0000-000000000000'])
     .order('redeemed_at', { ascending: true }) as { data: RedemptionRow[] | null };
 
@@ -109,11 +123,17 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     redemptionsByItem.set(redemption.reservation_item_id, list);
   }
 
+  const adminRole = admin?.role ?? null;
+  const nowMs = Date.now();
   const previewItems: ScanPreviewItem[] = itemRows.map(item => {
-    const itemRedemptions = redemptionsByItem.get(item.id) ?? [];
-    const active = itemRedemptions.filter(redemption => !redemption.voided_at);
+    const active = (redemptionsByItem.get(item.id) ?? []).filter(redemption => !redemption.voided_at);
     const quantityRedeemed = active.reduce((sum, redemption) => sum + redemption.quantity_redeemed, 0);
     const last = active[active.length - 1] ?? null;
+    const lastAgeMs = last ? Math.max(0, nowMs - new Date(last.redeemed_at).getTime()) : Number.POSITIVE_INFINITY;
+    const elevated = adminRole === 'tenant_admin' || adminRole === 'platform_owner';
+    const cashierOwnRecent = adminRole === 'tenant_cashier'
+      && last?.redeemed_by === adminId
+      && lastAgeMs <= CASHIER_UNDO_WINDOW_MS;
 
     return {
       reservation_item_id: item.id,
@@ -125,16 +145,20 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
         quantity: last.quantity_redeemed,
         redeemed_at: last.redeemed_at,
         redeemed_by_name: last.admin_users?.email ?? null,
+        can_undo: elevated || cashierOwnRecent,
+        undo_requires_reason: elevated && (last.redeemed_by !== adminId || lastAgeMs > CASHIER_UNDO_WINDOW_MS),
       } : null,
     };
   });
 
+  const checkinWindow = getEventCheckinWindowState(eventRow);
   let blockingReason: string | null = null;
   if (reservation.status === 'cancelled') blockingReason = 'Réservation annulée';
   else if (reservation.status === 'refunded') blockingReason = 'Réservation remboursée';
   else if (reservation.quantity_remaining <= 0) blockingReason = 'Billet entièrement utilisé';
   else if (eventRow.status === 'cancelled') blockingReason = 'Événement annulé';
   else if (eventRow.status === 'draft') blockingReason = 'Événement non publié';
+  else if (checkinWindow.blockingReason) blockingReason = checkinWindow.blockingReason;
 
   return NextResponse.json({
     reservation_id: reservation.id,
@@ -145,6 +169,8 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     quantity_remaining: reservation.quantity_remaining,
     redeemable: blockingReason === null,
     blocking_reason: blockingReason,
+    checkin_opens_at: checkinWindow.openAt,
+    checkin_closes_at: checkinWindow.closeAt,
     items: previewItems,
   });
 }
