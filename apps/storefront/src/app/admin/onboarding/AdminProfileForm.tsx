@@ -24,6 +24,11 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
+  const dirty = form.firstName !== initial.firstName
+    || form.lastName !== initial.lastName
+    || form.nickname !== initial.nickname
+    || form.phone !== initial.phone;
+
   function validate(): FieldErrors {
     const errors: FieldErrors = {};
     if (form.firstName.trim().length < 2) errors.firstName = 'Renseignez votre prénom.';
@@ -64,6 +69,12 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
     } finally {
       setSaving(false);
     }
+  }
+
+  function onCancel() {
+    if (!editing || saving) return;
+    if (dirty && !window.confirm('Quitter sans enregistrer vos modifications ?')) return;
+    router.push(nextPath);
   }
 
   function updateField(field: keyof typeof form, value: string) {
@@ -142,9 +153,25 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
 
       {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{error}</p>}
 
-      <button type="submit" disabled={saving} className="flex min-h-11 w-full items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {saving ? 'Enregistrement…' : editing ? 'Enregistrer le profil' : 'Terminer la configuration'}
-      </button>
+      {editing ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onCancel}
+            className="flex min-h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Annuler
+          </button>
+          <button type="submit" disabled={saving} className="flex min-h-11 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+            {saving ? 'Enregistrement…' : 'Enregistrer le profil'}
+          </button>
+        </div>
+      ) : (
+        <button type="submit" disabled={saving} className="flex min-h-11 w-full items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+          {saving ? 'Enregistrement…' : 'Terminer la configuration'}
+        </button>
+      )}
     </form>
   );
 }

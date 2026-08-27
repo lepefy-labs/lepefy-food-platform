@@ -22,8 +22,8 @@ export interface AdminAccessContext {
 }
 
 const LEGACY_TENANT_ADMIN_PERMISSIONS = [
-  'orders.view','orders.manage','catalog.view','catalog.manage','shipping.view','loyalty.manage','loyalty.scan','growth.manage','ai_knowledge.manage',
-  'events.view','events.manage','event_reservations.view','event_reservations.manage','event_payments.view','event_payments.confirm','event_payments.cancel','event_content.manage',
+  'orders.view','orders.manage','shop_payments.confirm','catalog.view','catalog.manage','shipping.view','shipping.manage','loyalty.manage','loyalty.scan','growth.manage','growth.payouts.manage','ai_knowledge.manage',
+  'events.view','events.manage','event_reservations.view','event_reservations.manage','event_payments.view','event_payments.confirm','event_payments.cancel','event_payments.refund','event_content.manage',
   'scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own','scan.undo_any',
   'tenant_settings.view','tenant_settings.manage','billing.view','ai_usage.view',
 ];
@@ -31,7 +31,12 @@ const LEGACY_TENANT_ADMIN_PERMISSIONS = [
 const LEGACY_CASHIER_PERMISSIONS = ['loyalty.scan','scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own'];
 
 export function canAdmin(context: AdminAccessContext, permission: string): boolean {
-  return context.isPlatformOwner || context.permissions.includes(permission);
+  if (context.isPlatformOwner) return true;
+  // Tenant Admin is a protected system role whose product contract is full
+  // tenant administration. Keep that invariant even when a newly deployed
+  // capability has not yet been backfilled into admin_role_permissions.
+  if (context.roleCode === 'tenant_admin' && !permission.startsWith('platform.')) return true;
+  return context.permissions.includes(permission);
 }
 
 function legacyPermissions(role: string): string[] {

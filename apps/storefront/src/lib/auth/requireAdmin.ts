@@ -1,83 +1,45 @@
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { createServiceClient } from '@/lib/supabase/server';
+import { permissionForAdminApi } from '@/lib/auth/adminApiPermissions';
+import { requirePermission } from '@/lib/auth/adminRbac';
 
 export type AdminRole = 'platform_owner' | 'tenant_admin' | 'tenant_cashier';
 
 /**
- * Guard per le route API admin.
+ * Compatibility guard for existing /api/admin handlers.
  *
- * Le pagine /admin sono protette dal layout (protected), ma le route API
- * sono chiamabili direttamente: ogni handler deve invocare questo guard
- * prima di usare il service client (che bypassa RLS).
+ * Route handlers can keep calling requireAdmin() while authorization is now
+ * capability-driven. The admin-only middleware forwards the request pathname
+ * and method; this function resolves the canonical business permission and
+ * delegates to requirePermission().
  *
- * @param tenantId tenant della route corrente — un tenant_admin/tenant_cashier
- *   viene rifiutato se non combacia con il proprio tenant_id in `admin_users`.
- * @param allowedRoles ruoli ammessi per QUESTA chiamata, oltre a platform_owner
- *   (sempre ammesso, accesso globale — invariato). Default `['tenant_admin']`:
- *   nessun cambiamento di comportamento per le route esistenti, che non
- *   passano questo parametro (047_loyalty_card_system.sql — introduzione del
- *   ruolo tenant_cashier). Passare `['tenant_admin', 'tenant_cashier']` solo
- *   sulle route dove il personale di cassa deve poter operare.
- * @returns null se l'utente è autenticato e autorizzato per questo tenant,
- *          altrimenti la NextResponse 401/403 da restituire subito.
+ * `allowedRoles` remains in the signature only so existing callers compile.
+ * It no longer grants access: RBAC membership + permissions are the source of
+ * truth. Any legacy admin API missing from the central map fails closed.
  */
 export async function requireAdmin(
   tenantId: string,
-  allowedRoles: AdminRole[] = ['tenant_admin'],
+  _allowedRoles: AdminRole[] = ['tenant_admin'],
 ): Promise<NextResponse | null> {
-  const cookieStore = cookies();
+  const requestHeaders = headers();
+  const pathname = requestHeaders.get('x-lepefy-admin-path');
+  const method = requestHeaders.get('x-lepefy-admin-method') ?? 'GET';
 
-  // Provide both old (get/set/remove) and new (getAll/setAll) cookie APIs.
-  // @supabase/ssr@0.3.x reads cookies via get(name) internally, not getAll().
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-        get(name: string) { return cookieStore.get(name)?.value },
-        set() {},
-        remove() {},
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-    },
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+  if (!pathname || !pathname.startsWith('/api/admin/')) {
+    return NextResponse.json(
+      { error: 'Contexte d’autorisation administrateur indisponible.' },
+      { status: 403 },
+    );
   }
 
-  // admin_users n'a aucune policy publique (service_role uniquement) — le
-  // client anon/authenticated ci-dessus ne peut pas la lire directement.
-  const adminClient = createServiceClient();
-
-  const { data: admin } = await adminClient
-    .from('admin_users')
-    .select('id, role, tenant_id, active')
-    .eq('id', user.id)
-    .eq('active', true)
-    .single();
-
-  if (!admin) {
-    return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
+  const permission = permissionForAdminApi(pathname, method);
+  if (!permission) {
+    console.error('[admin-rbac] API admin non mappée:', method, pathname);
+    return NextResponse.json(
+      { error: 'Cette opération administrateur n’est pas encore associée à une permission.' },
+      { status: 403 },
+    );
   }
 
-  if (admin.role === 'platform_owner') {
-    return null; // accesso globale, indipendente da allowedRoles — invariato
-  }
-
-  if (!allowedRoles.includes(admin.role as AdminRole)) {
-    return NextResponse.json({ error: 'Accès refusé pour ce rôle.' }, { status: 403 });
-  }
-
-  if (admin.tenant_id !== tenantId) {
-    return NextResponse.json({ error: 'Accès refusé pour ce tenant.' }, { status: 403 });
-  }
-
-  return null;
+  return requirePermission(tenantId, permission);
 }
