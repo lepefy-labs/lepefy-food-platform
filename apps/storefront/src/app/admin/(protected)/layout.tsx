@@ -7,7 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getPlatformBranding } from '@/lib/admin/platformBranding';
 import { getAdminWorkspaceUrls, resolveAdminWorkspace } from '@/lib/admin/workspace';
 import { canAdmin, getAdminAccessContext } from '@/lib/auth/adminRbac';
-import { defaultAdminDestination, permissionForAdminPath } from '@/lib/auth/adminRoutePermissions';
+import { defaultAdminDestination, isPersonalAdminPath, permissionForAdminPath } from '@/lib/auth/adminRoutePermissions';
 import AdminSidebar from '../_components/AdminSidebar';
 import AdminHeader from '../_components/AdminHeader';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
@@ -41,15 +41,17 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   if (!access) redirect('/admin/login?error=unauthorized');
   if (!access.profileCompleted) redirect(`/admin/onboarding?next=${encodeURIComponent(requestedPath)}`);
 
+  const personalPath = isPersonalAdminPath(requestedPath);
   const requiredPermission = permissionForAdminPath(requestedPath, workspace);
-  if (requiredPermission && !canAdmin(access, requiredPermission)) {
+  if (!personalPath && requiredPermission && !canAdmin(access, requiredPermission)) {
     const destination = defaultAdminDestination(access.permissions, workspace);
     if (!destination) redirect('/admin/login?error=unauthorized');
     redirect(destination);
   }
-  // Unknown admin pages remain available to the protected legacy tenant_admin
-  // during progressive migration, but custom roles are fail-closed.
-  if (!requiredPermission && !access.isPlatformOwner && access.roleCode !== 'tenant_admin') {
+  // Unknown business pages remain available to the protected legacy tenant_admin
+  // during progressive migration, while custom roles fail closed. Personal
+  // account/security pages are always available to an authenticated admin.
+  if (!personalPath && !requiredPermission && !access.isPlatformOwner && access.roleCode !== 'tenant_admin') {
     const destination = defaultAdminDestination(access.permissions, workspace);
     if (!destination) redirect('/admin/login?error=unauthorized');
     redirect(destination);
