@@ -38,7 +38,15 @@ function ambassadorName(a: JoinedCustomer | null): string {
   return a.full_name ?? a.email;
 }
 
-export function CommissionsSection({ initialCommissions, currency }: { initialCommissions: CommissionRow[]; currency: string }) {
+export function CommissionsSection({
+  initialCommissions,
+  currency,
+  canManagePayouts,
+}: {
+  initialCommissions: CommissionRow[];
+  currency: string;
+  canManagePayouts: boolean;
+}) {
   const [commissions, setCommissions] = useState(initialCommissions);
   const [statusFilter, setStatusFilter] = useState<AmbassadorCommissionStatus | 'ALL'>('CONFIRMED');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +67,7 @@ export function CommissionsSection({ initialCommissions, currency }: { initialCo
   }
 
   async function handleMarkPaid(id: string) {
+    if (!canManagePayouts) return;
     setPendingId(id);
     try {
       const res = await fetch(`/api/admin/ambassador/commissions/${id}/pay`, {
@@ -92,6 +101,11 @@ export function CommissionsSection({ initialCommissions, currency }: { initialCo
       <p className="text-xs text-gray-400 mb-4">
         Une commission par client invité (au premier ordre livré), calculée sur le montant payé après réduction.
       </p>
+      {!canManagePayouts && (
+        <p className="mb-4 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+          Vous pouvez consulter les commissions, mais votre rôle ne permet pas de gérer les versements.
+        </p>
+      )}
 
       {isLoading ? (
         <p className="text-sm text-gray-400">Chargement…</p>
@@ -139,7 +153,7 @@ export function CommissionsSection({ initialCommissions, currency }: { initialCo
                     )}
                   </td>
                   <td className="py-2">
-                    {c.status === 'CONFIRMED' && (
+                    {c.status === 'CONFIRMED' && canManagePayouts && (
                       <div className="flex flex-col gap-1 min-w-[140px]">
                         <input
                           type="text"
@@ -153,6 +167,7 @@ export function CommissionsSection({ initialCommissions, currency }: { initialCo
                         </Button>
                       </div>
                     )}
+                    {c.status === 'CONFIRMED' && !canManagePayouts && <span className="text-gray-400">Lecture seule</span>}
                   </td>
                 </tr>
               ))}
