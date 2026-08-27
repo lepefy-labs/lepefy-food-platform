@@ -9,8 +9,12 @@ export function TenantProvider({ tenant, children }: { tenant: Tenant; children:
   return <TenantContext.Provider value={tenant}>{children}</TenantContext.Provider>;
 }
 
+export function useOptionalTenant(): Tenant | null {
+  return useContext(TenantContext);
+}
+
 export function useTenant(): Tenant {
-  const tenant = useContext(TenantContext);
+  const tenant = useOptionalTenant();
   if (!tenant) throw new Error('useTenant must be used within a TenantProvider');
   return tenant;
 }
