@@ -41,15 +41,14 @@ function variationLabel(value: number | null): string {
 }
 
 function smoothPath(coords: Array<{ x: number; y: number }>): string {
-  if (coords.length === 0) return '';
-  if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
-
-  let path = `M ${coords[0].x.toFixed(2)} ${coords[0].y.toFixed(2)}`;
-  for (let index = 1; index < coords.length; index += 1) {
-    const previous = coords[index - 1];
-    const current = coords[index];
+  const [first, ...rest] = coords;
+  if (!first) return '';
+  let path = `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
+  let previous = first;
+  for (const current of rest) {
     const midX = (previous.x + current.x) / 2;
     path += ` C ${midX.toFixed(2)} ${previous.y.toFixed(2)}, ${midX.toFixed(2)} ${current.y.toFixed(2)}, ${current.x.toFixed(2)} ${current.y.toFixed(2)}`;
+    previous = current;
   }
   return path;
 }
@@ -60,9 +59,7 @@ function downloadCsv(point: AiCostHistoryPoint) {
     ...point.details.map((row) => [row.feature, row.provider, row.endpoint, String(row.calls), row.cost.toFixed(6)]),
     ['Total', '', '', String(point.calls), point.cost.toFixed(6)],
   ];
-  const csv = rows
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -75,13 +72,14 @@ function downloadCsv(point: AiCostHistoryPoint) {
 }
 
 export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) {
-  const [selectedKey, setSelectedKey] = useState(points[points.length - 1]?.key ?? '');
+  const current = points.at(-1) ?? null;
+  const previous = points.at(-2) ?? null;
+  const [selectedKey, setSelectedKey] = useState(current?.key ?? '');
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [view, setView] = useState<'line' | 'area'>('line');
 
-  const current = points[points.length - 1];
-  const previous = points[points.length - 2];
   const selected = points.find((point) => point.key === selectedKey) ?? current;
+  const hovered = hoveredKey ? points.find((point) => point.key === hoveredKey) ?? null : null;
   const reversedPoints = useMemo(() => [...points].reverse(), [points]);
   const totalCost = points.reduce((sum, point) => sum + point.cost, 0);
   const totalCalls = points.reduce((sum, point) => sum + point.calls, 0);
@@ -96,17 +94,17 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
   const bottom = 54;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
-  const maxRaw = Math.max(...points.map((point) => point.cost), 0.0001);
-  const maxCost = maxRaw * 1.15;
+  const maxCost = Math.max(...points.map((point) => point.cost), 0.0001) * 1.15;
   const xFor = (index: number) => left + (points.length <= 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
   const yFor = (cost: number) => top + plotHeight - (cost / maxCost) * plotHeight;
   const coords = points.map((point, index) => ({ x: xFor(index), y: yFor(point.cost) }));
   const linePath = smoothPath(coords);
-  const areaPath = coords.length > 0
-    ? `${linePath} L ${coords[coords.length - 1].x.toFixed(2)} ${(top + plotHeight).toFixed(2)} L ${coords[0].x.toFixed(2)} ${(top + plotHeight).toFixed(2)} Z`
+  const firstCoord = coords.at(0) ?? null;
+  const lastCoord = coords.at(-1) ?? null;
+  const areaPath = firstCoord && lastCoord
+    ? `${linePath} L ${lastCoord.x.toFixed(2)} ${(top + plotHeight).toFixed(2)} L ${firstCoord.x.toFixed(2)} ${(top + plotHeight).toFixed(2)} Z`
     : '';
-  const hoveredIndex = hoveredKey ? points.findIndex((point) => point.key === hoveredKey) : -1;
-  const hovered = hoveredIndex >= 0 ? points[hoveredIndex] : null;
+  const hoveredIndex = hovered ? points.findIndex((point) => point.key === hovered.key) : -1;
 
   return (
     <div className="space-y-5">
@@ -117,30 +115,21 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Coût provider estimé · 12 derniers mois · cliquez sur un mois pour l’inspecter</p>
           </div>
           <div className="inline-flex w-fit rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-950/60" aria-label="Affichage du graphique">
-            <button
-              type="button"
-              onClick={() => setView('line')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === 'line' ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-800 dark:text-violet-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
-            >
-              Ligne
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('area')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === 'area' ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-800 dark:text-violet-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
-            >
-              Aire
-            </button>
+            {(['line', 'area'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === mode ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-800 dark:text-violet-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+              >
+                {mode === 'line' ? 'Ligne' : 'Aire'}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="overflow-x-auto px-3 pb-2 pt-4 sm:px-5">
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="h-auto min-w-[720px] w-full"
-            role="img"
-            aria-label="Évolution mensuelle des coûts IA estimés sur douze mois"
-          >
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto min-w-[720px] w-full" role="img" aria-label="Évolution mensuelle des coûts IA estimés sur douze mois">
             <defs>
               <linearGradient id="aiCostLineSubtle" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#7C3AED" />
@@ -193,14 +182,12 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                   {isSelected && <line x1={x} x2={x} y1={top} y2={top + plotHeight} stroke="#7C3AED" strokeOpacity="0.16" strokeDasharray="4 6" />}
                   <circle cx={x} cy={y} r={isSelected ? 8 : 6} fill="#FFFFFF" stroke={isSelected ? '#7C3AED' : '#D946EF'} strokeWidth={isSelected ? 3 : 2} />
                   <circle cx={x} cy={y} r="2.5" fill={isSelected ? '#7C3AED' : '#D946EF'} />
-                  <text x={x} y={height - 22} textAnchor="middle" fill={isSelected ? '#6D28D9' : '#64748B'} fontSize="10.5" fontWeight={isSelected ? '700' : '500'}>
-                    {point.label}
-                  </text>
+                  <text x={x} y={height - 22} textAnchor="middle" fill={isSelected ? '#6D28D9' : '#64748B'} fontSize="10.5" fontWeight={isSelected ? '700' : '500'}>{point.label}</text>
                 </g>
               );
             })}
 
-            {hovered && hoveredIndex >= 0 && (() => {
+            {hovered && hoveredIndex >= 0 ? (() => {
               const x = xFor(hoveredIndex);
               const y = yFor(hovered.cost);
               const boxWidth = 142;
@@ -215,7 +202,7 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                   <text x={boxX + boxWidth - 12} y={boxY + 35} textAnchor="end" fill="#64748B" fontSize="10">{hovered.calls} appels</text>
                 </g>
               );
-            })()}
+            })() : null}
           </svg>
         </div>
       </section>
@@ -228,9 +215,7 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
         </div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
           <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-300">Tendance vs mois précédent</p>
-          <p className={`mt-2 text-lg font-bold ${currentVariation !== null && currentVariation > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-            {variationLabel(currentVariation)}
-          </p>
+          <p className={`mt-2 text-lg font-bold ${currentVariation !== null && currentVariation > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{variationLabel(currentVariation)}</p>
           <p className="mt-1 text-xs text-gray-500">{currentVariation !== null && currentVariation < 0 ? 'Moins de coûts' : currentVariation !== null && currentVariation > 0 ? 'Coût en hausse' : 'Évolution mensuelle'}</p>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20">
@@ -259,7 +244,7 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
             <div className="max-h-[530px] overflow-y-auto">
               {reversedPoints.map((point, reverseIndex) => {
                 const originalIndex = points.length - 1 - reverseIndex;
-                const previousPoint = originalIndex > 0 ? points[originalIndex - 1] : null;
+                const previousPoint = originalIndex > 0 ? points.at(originalIndex - points.length - 1) ?? null : null;
                 const value = variation(point.cost, previousPoint?.cost ?? 0);
                 const active = point.key === selected?.key;
                 const isCurrent = point.key === current?.key;
@@ -274,7 +259,7 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                       <span className="font-semibold text-gray-900 dark:text-white">{point.fullLabel}</span>
                       {isCurrent && <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">Actuel</span>}
                     </span>
-                    <span className="font-semibold text-gray-900 dark:text-white sm:block">{formatUsd(point.cost)}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{formatUsd(point.cost)}</span>
                     <span className="hidden text-gray-600 dark:text-gray-300 sm:block">{point.calls}</span>
                     <span className={`hidden text-xs font-semibold sm:block ${value !== null && value > 0 ? 'text-orange-600' : value !== null && value < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{variationLabel(value)}</span>
                     <span className="hidden text-center text-gray-400 sm:block">{active ? '⌃' : '⌄'}</span>
@@ -291,20 +276,12 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                 <h3 className="mt-1 text-base font-semibold text-gray-950 dark:text-white">{selected?.fullLabel ?? 'Mois sélectionné'}</h3>
               </div>
               {selected && selected.details.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => downloadCsv(selected)}
-                  className="rounded-xl border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/30"
-                >
-                  Exporter CSV
-                </button>
+                <button type="button" onClick={() => downloadCsv(selected)} className="rounded-xl border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/30">Exporter CSV</button>
               )}
             </div>
 
             {!selected || selected.details.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 p-5 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-400">
-                Aucune utilisation IA enregistrée pour ce mois.
-              </div>
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 p-5 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-400">Aucune utilisation IA enregistrée pour ce mois.</div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
                 <table className="w-full min-w-[500px] text-xs">
@@ -319,10 +296,7 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                   <tbody>
                     {selected.details.map((row) => (
                       <tr key={`${row.provider}-${row.endpoint}`} className="border-t border-gray-100 dark:border-gray-800">
-                        <td className="px-3 py-3">
-                          <p className="font-semibold text-gray-800 dark:text-gray-200">{row.feature}</p>
-                          <p className="mt-0.5 font-mono text-[10px] text-gray-400">{row.endpoint}</p>
-                        </td>
+                        <td className="px-3 py-3"><p className="font-semibold text-gray-800 dark:text-gray-200">{row.feature}</p><p className="mt-0.5 font-mono text-[10px] text-gray-400">{row.endpoint}</p></td>
                         <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{row.provider}</td>
                         <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-white">{row.calls}</td>
                         <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-white">{formatUsd(row.cost)}</td>
