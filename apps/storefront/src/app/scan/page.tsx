@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
+import { canAdmin, getAdminAccessContext } from '@/lib/auth/adminRbac';
 import { getAdminWorkspaceUrls, resolveAdminWorkspace } from '@/lib/admin/workspace';
 import LogoutButton from '../admin/LogoutButton';
 import { ScanClient } from '../admin/evenementiel/scan/ScanClient';
@@ -46,15 +47,15 @@ export default async function MealServicePage({ searchParams }: { searchParams?:
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/admin/login?next=${encodeURIComponent(`/scan${searchParams?.event_id ? `?event_id=${searchParams.event_id}` : ''}`)}`);
 
-  const adminClient = createServiceClient();
-  const { data: admin } = await adminClient.from('admin_users').select('id, role, tenant_id, active').eq('id', user.id).eq('active', true).single();
-  if (!admin) redirect('/admin/login?error=unauthorized');
-  if (admin.role !== 'platform_owner' && admin.tenant_id !== tenant.id) redirect('/admin/login?error=unauthorized');
-  if (!['platform_owner', 'tenant_admin', 'tenant_cashier'].includes(admin.role)) redirect('/admin/login?error=unauthorized');
+  const access = (await getAdminAccessContext(user.id, tenant.id)) ?? (await getAdminAccessContext(user.id, null));
+  if (!access || !canAdmin(access, 'scan.access')) redirect('/admin/login?error=unauthorized');
+  if (!access.profileCompleted) redirect(`/admin/onboarding?next=${encodeURIComponent('/scan')}`);
 
+  const adminClient = createServiceClient();
   const { data: eventRows } = await adminClient.from('events').select('*').eq('tenant_id', tenant.id).in('status', ['published', 'closed']).order('date_start', { ascending: false }).limit(50);
   const events: ScanEventRow[] = (eventRows ?? []).map(row => ({ id: row.id as string, title: row.title as string, date_start: row.date_start as string, status: row.status as ScanEventRow['status'], checkin_opens_at: (row as ScanEventRow).checkin_opens_at ?? null, checkin_closes_at: (row as ScanEventRow).checkin_closes_at ?? null }));
   const initialEventId = resolveInitialEventId(events, searchParams?.event_id ?? '');
+  const displayName = access.nickname || [access.firstName, access.lastName].filter(Boolean).join(' ') || access.email;
 
-  return <div className="min-h-screen bg-gray-50"><header className="sticky top-0 z-10 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">{tenant.logo_url && <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />}<div className="min-w-0"><span className="block truncate text-sm font-bold text-gray-900">{tenant.name}</span><span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Service repas</span></div><div className="ml-auto"><LogoutButton /></div></header><main className="mx-auto max-w-md px-4 py-5"><ScanClient eventsEnabled={tenant.events_enabled} events={events} initialEventId={initialEventId} /></main></div>;
+  return <div className="min-h-screen bg-gray-50"><header className="sticky top-0 z-10 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">{tenant.logo_url && <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />}<div className="min-w-0"><span className="block truncate text-sm font-bold text-gray-900">{tenant.name}</span><span className="block text-[10px] font-bold uppercase tracking-wider text-gray-500">Service repas · {displayName}</span></div><div className="ml-auto"><LogoutButton /></div></header><main className="mx-auto max-w-md px-4 py-5"><ScanClient eventsEnabled={tenant.events_enabled} events={events} initialEventId={initialEventId} /></main></div>;
 }
