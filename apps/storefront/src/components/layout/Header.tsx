@@ -1,13 +1,13 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart, IconX } from '@tabler/icons-react';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -28,18 +28,12 @@ export function Header() {
   if (isCheckout) {
     return (
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur">
-        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-between px-4 sm:px-6">
+        <div className="relative mx-auto flex h-[72px] max-w-2xl items-center justify-between px-4 sm:px-6">
           <Link href="/cart" aria-label="Retour au panier" className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
             <IconArrowLeft size={22} />
           </Link>
           <Link href="/" className="absolute left-1/2 -translate-x-1/2" aria-label={tenant.name}>
-            {tenant.logo_url ? (
-              <span className="relative block h-11 w-[116px] max-w-[36vw]">
-                <Image src={tenant.logo_url} alt={tenant.name} fill sizes="116px" className="object-contain" priority />
-              </span>
-            ) : (
-              <span className="font-display text-lg font-bold" style={{ color: 'var(--color-primary)' }}>{tenant.name}</span>
-            )}
+            <TenantLogo variant="compact" priority className="h-11 w-[140px] max-w-[38vw]" />
           </Link>
           <div className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
             <IconLock size={14} />
@@ -52,7 +46,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-      <div className="relative mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
+      <div className="relative mx-auto flex h-20 max-w-7xl items-center gap-3 px-4">
         <button
           type="button"
           onClick={() => setMobileMenuOpen((open) => !open)}
@@ -64,12 +58,8 @@ export function Header() {
           {mobileMenuOpen ? <IconX size={24} /> : <IconMenu2 size={24} />}
         </button>
 
-        <Link href="/" className="absolute left-1/2 -translate-x-1/2 font-display text-xl font-bold md:static md:translate-x-0" style={{ color: 'var(--color-primary)' }}>
-          {tenant.logo_url ? (
-            <span className="relative block h-12 w-[140px] max-w-[40vw] md:h-11 md:w-[120px]">
-              <Image src={tenant.logo_url} alt={tenant.name} fill sizes="(max-width: 767px) 140px, 120px" className="object-contain" priority />
-            </span>
-          ) : tenant.name}
+        <Link href="/" className="absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0" aria-label={tenant.name}>
+          <TenantLogo variant="header" priority />
         </Link>
         <div className="ml-auto flex items-center gap-4">
           <Link
@@ -102,7 +92,7 @@ export function Header() {
       </div>
 
       {mobileMenuOpen && (
-        <nav id="mobile-shop-menu" className="absolute inset-x-0 top-16 border-b border-gray-200 bg-white px-4 py-3 shadow-lg md:hidden" aria-label="Navigation principale mobile">
+        <nav id="mobile-shop-menu" className="absolute inset-x-0 top-20 border-b border-gray-200 bg-white px-4 py-3 shadow-lg md:hidden" aria-label="Navigation principale mobile">
           <div className="mx-auto grid max-w-7xl gap-1">
             {([
               ['Accueil', '/'], ['Catalogue', '/products'], ['Panier', '/cart'], ['Commandes', '/orders'], ['Compte', '/compte/connexion'],
