@@ -92,6 +92,7 @@ export default function AdminSidebar({
       <p className={groupLabel}>Commun</p>
       <Link href="/admin/parametres" className={linkClass(pathname.startsWith('/admin/parametres'))}><IconSettings size={20} />Paramètres</Link>
       <Link href="/admin/billing" className={linkClass(pathname === '/admin/billing')}><IconCreditCard size={20} />Abonnement</Link>
+      <Link href="/admin/ai-usage" className={linkClass(pathname === '/admin/ai-usage')}><IconChartBar size={20} />Utilisation IA</Link>
 
       {isPlatformOwner && (
         <>

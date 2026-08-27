@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 27 agosto 2026 — **v5.8 Current-State Snapshot**
+> **Aggiornato:** 27 agosto 2026 — **v5.9 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -145,7 +145,7 @@ Workspace Événementiel:
 - Galerie / Contenu;
 - Service repas / Scan.
 
-Paramètres, Abonnement e strumenti platform_owner restano condivisi. La stessa shell, auth, API, DB e design system servono entrambi i workspace.
+Paramètres, Abonnement, **Utilisation IA** e strumenti platform_owner restano condivisi. La stessa shell, auth, API, DB e design system servono entrambi i workspace.
 
 Lo switch Boutique→Événementiel usa `NEXT_PUBLIC_EVENTS_SUBDOMAIN` tramite resolver centralizzato. Lo switch Événementiel→Boutique usa **`tenant.storefront_url` come source of truth canonica**.
 
@@ -257,7 +257,7 @@ L'AI usa due livelli distinti che non vanno confusi:
 
 Questi dati sono **service-role only** e rappresentano cost accounting interno. Provider, model e costo industriale non devono essere esposti come valore commerciale al tenant.
 
-La console `/admin/platform/ai-usage` è riservata a `platform_owner` e mostra chiamate/costi provider del tenant corrente per il controllo unit economics.
+La console `/admin/platform/ai-usage` è riservata a `platform_owner` e mostra storico 12 mesi, chiamate/costi provider e dettaglio tecnico mensile del tenant corrente per il controllo unit economics.
 
 ### Utilizzo prodotto tenant
 
@@ -272,7 +272,9 @@ La console `/admin/platform/ai-usage` è riservata a `platform_owner` e mostra c
 
 Ogni feature definisce label tenant, unità d'uso e `creditWeight`. Il `creditWeight` è **solo predisposizione architetturale**: non esistono ancora quota mensile commerciale, overage, blocco o supplemento fatturato.
 
-`/admin/billing` mostra ai tenant solo utilizzo per funzionalità e il messaggio che l'AI è attualmente inclusa nell'abbonamento. La pagina tenant non interroga più provider/model/costo.
+La route tenant canonica è **`/admin/ai-usage`**. Mostra storico 12 mesi, totale/trend/media/cumulato e breakdown mensile per funzionalità prodotto, senza provider, model, token, endpoint o costo tecnico. È accessibile dalla navigazione condivisa di entrambi i workspace admin.
+
+`/admin/billing` resta focalizzata su piano, moduli inclusi, rinnovo e metodi di pagamento; mostra solo un riepilogo compatto dell'utilizzo IA del mese con CTA verso `/admin/ai-usage`.
 
 Quando verrà definita una policy commerciale, entitlement/limiti/credit pack/overage dovranno essere introdotti in uno scope billing dedicato e persistente; non derivare mai il prezzo tenant direttamente dal costo provider.
 
@@ -282,7 +284,7 @@ Quando verrà definita una policy commerciale, entitlement/limiti/credit pack/ov
 
 La presenza di una migration nel repo non prova che sia applicata in ogni Supabase remoto.
 
-AI accounting attuale deriva dalla migration `027_ai_rate_limiting_cost_tracking.sql`; il layer product usage introdotto nello snapshot v5.8 **non richiede una nuova migration**.
+AI accounting attuale deriva dalla migration `027_ai_rate_limiting_cost_tracking.sql`; il layer product usage e lo storico tenant dello snapshot v5.9 **non richiedono una nuova migration**.
 
 Numerazione recente:
 
@@ -362,7 +364,8 @@ supabase/migrations/*
 - host events `/admin` riusa overview Événementiel;
 - `/scan` separato dalla shell admin;
 - login admin supporta destinazione `next` same-origin;
-- utilizzo AI tenant separato dai costi provider interni Lepefy.
+- utilizzo AI tenant separato dai costi provider interni Lepefy;
+- `/admin/ai-usage` è la surface tenant dedicata allo storico IA; `/admin/billing` mantiene solo il riepilogo compatto.
 
 ### Cart / checkout
 
@@ -383,8 +386,9 @@ Purchase-intent persistente, una open session per cliente autenticato, `awaiting
 
 - raw provider accounting in `ai_usage_log`/`ai_pricing` resta interno;
 - product usage tenant aggregato tramite `productUsage.ts`;
-- `/admin/billing` espone valore/utilizzo, non costi industriali;
-- `/admin/platform/ai-usage` espone costi tecnici solo a `platform_owner`;
+- `/admin/ai-usage` espone ai tenant storico e breakdown per funzionalità, non costi industriali;
+- `/admin/billing` mantiene solo un richiamo sintetico all'uso IA;
+- `/admin/platform/ai-usage` espone costi tecnici e storico solo a `platform_owner`;
 - credits predisposti semanticamente ma non ancora monetizzati né applicati.
 
 ---
@@ -404,8 +408,8 @@ Aggiornare questo file quando cambiano architettura, route/module principali, wo
 
 ---
 
-# Fine snapshot v5.8
+# Fine snapshot v5.9
 
-**Base audit:** `main @ AI usage product/platform separation`  
+**Base audit:** `main @ tenant AI usage history separation`  
 **Data:** 27 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.

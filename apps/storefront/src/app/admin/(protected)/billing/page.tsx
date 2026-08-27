@@ -1,6 +1,7 @@
+import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { aggregateTenantAiUsage, aiUsageUnitLabel, type AiRawUsageRow } from '@/lib/ai/productUsage';
+import { aggregateTenantAiUsage, type AiRawUsageRow } from '@/lib/ai/productUsage';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -209,48 +210,22 @@ export default async function BillingPage() {
         </div>
       </div>
 
-      <section className="mt-8">
-        <div className="mb-3 flex items-start justify-between gap-4">
+      <section className="mt-8 rounded-2xl border border-violet-100 bg-violet-50/60 p-5 dark:border-violet-900/50 dark:bg-violet-950/20">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Intelligence artificielle</h2>
-            <p className="mt-1 text-xs text-gray-400">Fonctionnalités IA incluses dans votre abonnement.</p>
-          </div>
-          <span className="shrink-0 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
-            Inclus
-          </span>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex flex-col gap-3 border-b border-gray-100 p-5 dark:border-gray-800 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-3xl font-bold text-gray-950 dark:text-white">{aiUsageTotal}</p>
-              <p className="mt-1 text-xs text-gray-500">utilisations ce mois</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Intelligence artificielle</h2>
+              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-violet-700 shadow-sm dark:bg-violet-950/60 dark:text-violet-300">Inclus</span>
             </div>
-            <p className="text-xs font-medium text-green-700 dark:text-green-300">✓ Aucun coût supplémentaire actuellement</p>
+            <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{aiUsageTotal}</p>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">utilisations ce mois · aucun coût supplémentaire actuellement</p>
           </div>
-
-          {aiUsage.length === 0 ? (
-            <p className="p-5 text-sm text-gray-400">Aucune utilisation IA enregistrée ce mois-ci.</p>
-          ) : (
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {aiUsage.map((feature) => (
-                <div key={feature.key} className="flex items-center justify-between gap-4 px-5 py-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{feature.label}</p>
-                    <p className="mt-0.5 text-xs text-gray-400">{feature.description}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-lg font-bold text-gray-950 dark:text-white">{feature.usageCount}</p>
-                    <p className="text-[11px] text-gray-400">{aiUsageUnitLabel(feature)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="border-t border-gray-100 bg-gray-50/70 px-5 py-3 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-400">
-            Lepefy mesure l&apos;usage par fonctionnalité. Les fournisseurs, modèles et coûts techniques restent gérés par la plateforme.
-          </div>
+          <Link
+            href="/admin/ai-usage"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-200 dark:hover:bg-violet-900/50"
+          >
+            Voir l’utilisation IA
+          </Link>
         </div>
       </section>
 
