@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { IconAlertTriangle, IconArrowLeft, IconCalendarEvent, IconClock, IconExternalLink, IconUser, IconWallet } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { formatPrice } from '@/lib/utils/format';
 import AdminPageHeader from '../../../../_components/ui/AdminPageHeader';
 import EventPendingPaymentActions from './EventPendingPaymentActions';
@@ -21,6 +22,9 @@ function elapsedLabel(createdAt: string) {
 
 export default async function EventPendingPaymentPage({ params }: { params: { id: string } }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  const canConfirmPayment = Boolean(access && canAdmin(access, 'event_payments.confirm'));
+  const canCancelPayment = Boolean(access && canAdmin(access, 'event_payments.cancel'));
   const supabase = createServiceClient();
 
   const { data: rawRequest } = await supabase
@@ -84,7 +88,16 @@ export default async function EventPendingPaymentPage({ params }: { params: { id
         </aside>
       </div>
 
-      {request.status === 'pending' && <div className="space-y-4"><EventPendingPaymentActions requestId={request.id} customerLabel={request.customer_name || request.customer_email} /></div>}
+      {request.status === 'pending' && (
+        <div className="space-y-4">
+          <EventPendingPaymentActions
+            requestId={request.id}
+            customerLabel={request.customer_name || request.customer_email}
+            canConfirm={canConfirmPayment}
+            canCancel={canCancelPayment}
+          />
+        </div>
+      )}
       {request.status !== 'pending' && <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Cette demande n’est plus actionnable. Consultez la réservation ou l’événement pour poursuivre le suivi.</div>}
     </div>
   );
