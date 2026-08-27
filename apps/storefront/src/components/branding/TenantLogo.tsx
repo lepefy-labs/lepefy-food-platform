@@ -5,11 +5,18 @@ import { useTenant } from '@/providers/TenantProvider';
 
 type TenantLogoVariant = 'header' | 'hero' | 'compact';
 
+type TenantLogoIdentity = {
+  name: string;
+  logo_url: string | null;
+};
+
 interface TenantLogoProps {
   variant?: TenantLogoVariant;
   priority?: boolean;
   className?: string;
   showNameFallback?: boolean;
+  identity?: TenantLogoIdentity;
+  fallbackClassName?: string;
 }
 
 const VARIANTS: Record<TenantLogoVariant, { wrapper: string; sizes: string; name: string }> = {
@@ -35,16 +42,19 @@ export function TenantLogo({
   priority = false,
   className = '',
   showNameFallback = true,
+  identity,
+  fallbackClassName = '',
 }: TenantLogoProps) {
-  const tenant = useTenant();
+  const contextTenant = useTenant();
+  const tenant = identity ?? contextTenant;
   const styles = VARIANTS[variant];
 
   if (!tenant.logo_url) {
     if (!showNameFallback) return null;
     return (
       <span
-        className={`font-display font-bold ${styles.name} ${className}`.trim()}
-        style={{ color: 'var(--color-primary)' }}
+        className={`font-display font-bold ${styles.name} ${fallbackClassName || className}`.trim()}
+        style={fallbackClassName ? undefined : { color: 'var(--color-primary)' }}
       >
         {tenant.name}
       </span>
