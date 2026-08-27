@@ -27,9 +27,10 @@ export default async function PlatformConsolePage() {
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <h2 className="text-sm font-semibold">Outils plateforme</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Link href="/admin/team" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Administrateurs</Link>
+        <h2 className="text-sm font-semibold">Accès &amp; outils plateforme</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Link href="/admin/team" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Utilisateurs</Link>
+          <Link href="/admin/platform/access" className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm font-semibold text-violet-800 hover:bg-violet-50 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200">Rôles &amp; permissions</Link>
           <Link href="/admin/platform/ai-usage" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Coûts IA</Link>
           <Link href="/admin/platform/notifications" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Diagnostics notifications</Link>
         </div>
