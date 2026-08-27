@@ -2,10 +2,18 @@ import { notFound } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import EventDetailAdminClient from './EventDetailAdminClient';
-import type { EventRow, EventTicketType, EventReservation, EventReservationRequest } from '@lepefy/types';
+import type { EventRow, EventTicketType, EventReservation, EventReservationItem, EventReservationRequest } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+export type AdminEventReservationItem = EventReservationItem & {
+  ticket_type_label: string;
+};
+
+export type AdminEventReservation = EventReservation & {
+  items: AdminEventReservationItem[];
+};
 
 export default async function AdminEventDetailPage({ params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -43,12 +51,36 @@ export default async function AdminEventDetailPage({ params }: { params: { id: s
       .order('created_at', { ascending: true }),
   ]);
 
+  const reservationRows = (reservations ?? []) as EventReservation[];
+  const reservationIds = reservationRows.map((reservation) => reservation.id);
+  const { data: reservationItems } = reservationIds.length > 0
+    ? await supabase
+        .from('event_reservation_items')
+        .select('id, reservation_id, ticket_type_id, quantity, unit_price')
+        .in('reservation_id', reservationIds)
+    : { data: [] as EventReservationItem[] };
+
+  const labelByTicketType = new Map(
+    ((ticketTypes ?? []) as EventTicketType[]).map((ticket) => [ticket.id, ticket.label]),
+  );
+  const itemsByReservation = new Map<string, AdminEventReservationItem[]>();
+  for (const item of (reservationItems ?? []) as EventReservationItem[]) {
+    const current = itemsByReservation.get(item.reservation_id) ?? [];
+    current.push({ ...item, ticket_type_label: labelByTicketType.get(item.ticket_type_id) ?? 'Formule' });
+    itemsByReservation.set(item.reservation_id, current);
+  }
+
+  const enrichedReservations: AdminEventReservation[] = reservationRows.map((reservation) => ({
+    ...reservation,
+    items: itemsByReservation.get(reservation.id) ?? [],
+  }));
+
   return (
     <div className="mx-auto w-full max-w-7xl">
       <EventDetailAdminClient
         event={event as EventRow}
         initialTicketTypes={(ticketTypes ?? []) as EventTicketType[]}
-        initialReservations={(reservations ?? []) as EventReservation[]}
+        initialReservations={enrichedReservations}
         initialPendingRequests={(pendingRequests ?? []) as EventReservationRequest[]}
         currency={tenant.currency}
       />

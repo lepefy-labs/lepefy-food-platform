@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { EventHighlight, EventReservation, EventReservationRequest, EventReservationStatus, EventRow, EventStatus, EventTicketType } from '@lepefy/types';
+import type { EventHighlight, EventReservationRequest, EventReservationStatus, EventRow, EventStatus, EventTicketType } from '@lepefy/types';
+import type { AdminEventReservation } from './page';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
 import ConfirmActionModal from '../../../../_components/ui/ConfirmActionModal';
 import { EventAdminHeader, type EventAdminTab } from './_components/EventAdminHeader';
@@ -14,7 +15,7 @@ import EventPageTab from './_components/EventPageTab';
 interface Props {
   event: EventRow;
   initialTicketTypes: EventTicketType[];
-  initialReservations: EventReservation[];
+  initialReservations: AdminEventReservation[];
   initialPendingRequests: EventReservationRequest[];
   currency: string;
 }
@@ -350,7 +351,9 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
 
       {activeTab === 'reservations' && (
         <EventReservationsTab
+          eventId={event.id}
           reservations={reservations}
+          ticketTypes={ticketTypes}
           currency={currency}
           search={reservationSearch}
           onSearchChange={setReservationSearch}
