@@ -1,29 +1,24 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { IconCalendarEvent, IconMenu2 } from '@tabler/icons-react';
 import type { Tenant } from '@lepefy/types';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 
 export function EventsHeader({ tenant }: { tenant: Tenant }) {
   return (
     <header className="fixed inset-x-0 top-0 z-[100] border-b border-white/10 bg-[var(--color-primary-dark)] text-white shadow-sm">
-      <div className="mx-auto flex h-[68px] max-w-[1180px] items-center justify-between gap-1.5 px-3 sm:gap-4 sm:px-6">
+      <div className="mx-auto flex h-20 max-w-[1180px] items-center justify-between gap-1.5 px-3 sm:gap-4 sm:px-6">
         <Link
           href="/evenementiel"
           className="flex min-h-11 min-w-0 shrink items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-secondary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-primary-dark)]"
           aria-label={`${tenant.name} — accueil événementiel`}
         >
-          {tenant.logo_url ? (
-            <Image
-              src={tenant.logo_url}
-              alt={tenant.name}
-              width={260}
-              height={72}
-              className="h-11 w-auto max-w-[148px] object-contain sm:h-[52px] sm:max-w-[240px]"
-              priority
-            />
-          ) : (
-            <span className="truncate font-display text-base font-semibold leading-tight sm:text-lg">{tenant.name}</span>
-          )}
+          <TenantLogo
+            variant="header"
+            identity={{ name: tenant.name, logo_url: tenant.logo_url }}
+            priority
+            className="max-w-[150px] sm:max-w-[220px]"
+            fallbackClassName="truncate font-display text-base font-semibold leading-tight text-white sm:text-lg"
+          />
         </Link>
 
         <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Navigation événementielle">
