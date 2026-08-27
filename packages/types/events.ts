@@ -60,7 +60,7 @@ export interface EventReservation {
   created_at: string;
 }
 
-export type EventReservationRequestStatus = 'pending' | 'confirmed' | 'stock_conflict';
+export type EventReservationRequestStatus = 'pending' | 'confirmed' | 'stock_conflict' | 'cancelled';
 
 export interface EventReservationRequest {
   id: string;
@@ -78,6 +78,7 @@ export interface EventReservationRequest {
   status: EventReservationRequestStatus;
   created_at: string;
   confirmed_at: string | null;
+  cancelled_at: string | null;
   reservation_id: string | null;
 }
 
