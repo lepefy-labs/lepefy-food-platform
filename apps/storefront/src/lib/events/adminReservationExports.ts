@@ -129,24 +129,23 @@ export async function loadEventReservationExportData(
 
 export function buildReservationsCsv(data: EventReservationExportData, currency: string): string {
   const header = [
-    'Référence', 'Client', 'Email', 'Téléphone', 'Statut', 'Personnes restantes',
-    'Formule', 'Quantité restante', 'Prix unitaire', 'Valeur restante', 'Montant payé', 'Date réservation',
+    'Référence', 'Client', 'Email', 'Téléphone', 'Statut', 'Plats réservés',
+    'Formule', 'Quantité réservée', 'Prix unitaire', 'Valeur réservée', 'Montant payé', 'Date réservation',
   ].map(csvCell).join(';');
 
   const rows = validReservations(data).flatMap((reservation) => {
-    const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
-    const itemsToExport: Array<ReservationExportItem | null> = validItems.length > 0 ? validItems : [null];
+    const itemsToExport: Array<ReservationExportItem | null> = reservation.items.length > 0 ? reservation.items : [null];
     return itemsToExport.map((item) => [
       reservation.id.slice(0, 8).toUpperCase(),
       reservation.customer_name,
       reservation.customer_email,
       reservation.customer_phone ?? '',
       reservation.status,
-      reservation.quantity_remaining,
+      reservation.quantity_total,
       item?.ticket_type_label ?? '',
-      item?.remaining_quantity ?? '',
+      item?.quantity ?? '',
       item ? formatPrice(item.unit_price, currency) : '',
-      item ? formatPrice(item.unit_price * item.remaining_quantity, currency) : '',
+      item ? formatPrice(item.unit_price * item.quantity, currency) : '',
       formatPrice(reservation.amount_paid, currency),
       new Date(reservation.created_at).toLocaleString('fr-FR'),
     ].map(csvCell).join(';'));
@@ -159,8 +158,7 @@ function formulaSummary(data: EventReservationExportData): Array<{ label: string
   const totals = new Map<string, number>();
   for (const reservation of validReservations(data)) {
     for (const item of reservation.items) {
-      if (item.remaining_quantity <= 0) continue;
-      totals.set(item.ticket_type_id, (totals.get(item.ticket_type_id) ?? 0) + item.remaining_quantity);
+      totals.set(item.ticket_type_id, (totals.get(item.ticket_type_id) ?? 0) + item.quantity);
     }
   }
   return data.ticketTypes
@@ -174,16 +172,16 @@ export function buildReservationListHtml(
   tenantLogoUrl: string | null,
 ): string {
   const valid = validReservations(data);
-  const people = valid.reduce((sum, reservation) => sum + reservation.quantity_remaining, 0);
+  const people = valid.length;
+  const dishes = valid.reduce((sum, reservation) => sum + reservation.quantity_total, 0);
   const summary = formulaSummary(data);
   const reservationRows = valid.map((reservation) => {
-    const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
     return `
     <div class="reservation">
       <div class="check"></div>
       <div class="main">
-        <div class="top"><strong>#${escapeHtml(reservation.id.slice(0, 8).toUpperCase())} · ${escapeHtml(reservation.customer_name)}</strong><span>${reservation.quantity_remaining} pers.</span></div>
-        <div class="items">${validItems.map((item) => `${item.remaining_quantity} × ${escapeHtml(item.ticket_type_label)}`).join(' · ') || 'Détail formule indisponible'}</div>
+        <div class="top"><strong>#${escapeHtml(reservation.id.slice(0, 8).toUpperCase())} · ${escapeHtml(reservation.customer_name)}</strong><span>${reservation.quantity_total} plat${reservation.quantity_total > 1 ? 's' : ''}</span></div>
+        <div class="items">${reservation.items.map((item) => `${item.quantity} × ${escapeHtml(item.ticket_type_label)}`).join(' · ') || 'Détail formule indisponible'}</div>
         ${reservation.customer_phone ? `<div class="phone">${escapeHtml(reservation.customer_phone)}</div>` : ''}
       </div>
     </div>`;
@@ -209,9 +207,9 @@ export function buildReservationListHtml(
     .summary h2 { margin: 0 0 2mm; font-size: 11pt; }
     .summary-row { display: flex; justify-content: space-between; max-width: 95mm; padding: .8mm 0; }
   </style></head><body>
-    <header><div class="brand-row">${tenantBrandHtml(tenantName, tenantLogoUrl, 'tenant-logo')}</div><h1>${escapeHtml(data.event.title)}</h1><div class="meta">${escapeHtml(formatDate(data.event.date_start))}${data.event.location ? ` · ${escapeHtml(data.event.location)}` : ''} · ${valid.length} réservations valides · ${people} personnes restantes</div></header>
+    <header><div class="brand-row">${tenantBrandHtml(tenantName, tenantLogoUrl, 'tenant-logo')}</div><h1>${escapeHtml(data.event.title)}</h1><div class="meta">${escapeHtml(formatDate(data.event.date_start))}${data.event.location ? ` · ${escapeHtml(data.event.location)}` : ''} · ${people} personne${people > 1 ? 's' : ''} · ${dishes} plats réservés</div></header>
     ${reservationRows || '<p>Aucun billet encore valide.</p>'}
-    <section class="summary"><h2>Total encore valide · ${people} personnes</h2>${summary.map((item) => `<div class="summary-row"><span>${escapeHtml(item.label)}</span><strong>${item.quantity}</strong></div>`).join('')}</section>
+    <section class="summary"><h2>Total réservé · ${people} personne${people > 1 ? 's' : ''} · ${dishes} plats</h2>${summary.map((item) => `<div class="summary-row"><span>${escapeHtml(item.label)}</span><strong>${item.quantity}</strong></div>`).join('')}</section>
   </body></html>`;
 }
 
@@ -225,15 +223,14 @@ export function buildReservationTableCardsHtml(
   const cards = valid.map((reservation) => {
     const reference = reservation.id.slice(0, 8).toUpperCase();
     const qrUrl = `${origin}/api/events/reservation-qr?token=${encodeURIComponent(reservation.qr_token)}`;
-    const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
     return `<section class="card">
       <div class="brand">${tenantBrandHtml(tenantName, tenantLogoUrl, 'tenant-logo')}</div>
       <div class="event">${escapeHtml(data.event.title)}</div>
       <div class="eyebrow">RÉSERVATION VALIDE</div>
       <div class="reference">#${escapeHtml(reference)}</div>
       <div class="customer">${escapeHtml(reservation.customer_name)}</div>
-      <div class="people">${reservation.quantity_remaining} PERSONNE${reservation.quantity_remaining > 1 ? 'S' : ''} RESTANTE${reservation.quantity_remaining > 1 ? 'S' : ''}</div>
-      <div class="items">${validItems.map((item) => `<div><strong>${item.remaining_quantity}×</strong> ${escapeHtml(item.ticket_type_label)}</div>`).join('')}</div>
+      <div class="people">${reservation.quantity_total} PLAT${reservation.quantity_total > 1 ? 'S' : ''} RÉSERVÉ${reservation.quantity_total > 1 ? 'S' : ''}</div>
+      <div class="items">${reservation.items.map((item) => `<div><strong>${item.quantity}×</strong> ${escapeHtml(item.ticket_type_label)}</div>`).join('')}</div>
       <img class="qr" src="${escapeHtml(qrUrl)}" alt="QR" />
     </section>`;
   }).join('');
