@@ -2,8 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EventReservation, EventReservationItem, EventRow, EventTicketType } from '@lepefy/types';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 
+export interface ReservationExportItem extends EventReservationItem {
+  ticket_type_label: string;
+  remaining_quantity: number;
+}
+
 export interface ReservationExportRow extends EventReservation {
-  items: Array<EventReservationItem & { ticket_type_label: string }>;
+  items: ReservationExportItem[];
 }
 
 export interface EventReservationExportData {
@@ -11,6 +16,11 @@ export interface EventReservationExportData {
   reservations: ReservationExportRow[];
   ticketTypes: EventTicketType[];
 }
+
+type RedemptionRow = {
+  reservation_item_id: string;
+  quantity_redeemed: number;
+};
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -24,6 +34,12 @@ function escapeHtml(value: unknown): string {
 function csvCell(value: unknown): string {
   const text = String(value ?? '').replaceAll('"', '""');
   return `"${text}"`;
+}
+
+function validReservations(data: EventReservationExportData): ReservationExportRow[] {
+  return data.reservations.filter(
+    (reservation) => reservation.status === 'confirmed' && reservation.quantity_remaining > 0,
+  );
 }
 
 export async function loadEventReservationExportData(
@@ -64,12 +80,34 @@ export async function loadEventReservationExportData(
         .in('reservation_id', reservationIds)
     : { data: [] as EventReservationItem[] };
 
+  const items = (itemRows ?? []) as EventReservationItem[];
+  const itemIds = items.map((item) => item.id);
+  const { data: redemptionRows } = itemIds.length > 0
+    ? await supabase
+        .from('event_reservation_item_redemptions')
+        .select('reservation_item_id, quantity_redeemed')
+        .in('reservation_item_id', itemIds)
+        .is('voided_at', null)
+    : { data: [] as RedemptionRow[] };
+
+  const redeemedByItemId = new Map<string, number>();
+  for (const redemption of (redemptionRows ?? []) as RedemptionRow[]) {
+    redeemedByItemId.set(
+      redemption.reservation_item_id,
+      (redeemedByItemId.get(redemption.reservation_item_id) ?? 0) + redemption.quantity_redeemed,
+    );
+  }
+
   const labelByTicketId = new Map(ticketTypes.map((ticket) => [ticket.id, ticket.label]));
   const itemsByReservation = new Map<string, ReservationExportRow['items']>();
-  for (const item of (itemRows ?? []) as EventReservationItem[]) {
-    const items = itemsByReservation.get(item.reservation_id) ?? [];
-    items.push({ ...item, ticket_type_label: labelByTicketId.get(item.ticket_type_id) ?? 'Formule' });
-    itemsByReservation.set(item.reservation_id, items);
+  for (const item of items) {
+    const reservationItems = itemsByReservation.get(item.reservation_id) ?? [];
+    reservationItems.push({
+      ...item,
+      ticket_type_label: labelByTicketId.get(item.ticket_type_id) ?? 'Formule',
+      remaining_quantity: Math.max(0, item.quantity - (redeemedByItemId.get(item.id) ?? 0)),
+    });
+    itemsByReservation.set(item.reservation_id, reservationItems);
   }
 
   return {
@@ -84,23 +122,24 @@ export async function loadEventReservationExportData(
 
 export function buildReservationsCsv(data: EventReservationExportData, currency: string): string {
   const header = [
-    'Référence', 'Client', 'Email', 'Téléphone', 'Statut', 'Personnes',
-    'Formule', 'Quantité', 'Prix unitaire', 'Total formule', 'Montant payé', 'Date réservation',
+    'Référence', 'Client', 'Email', 'Téléphone', 'Statut', 'Personnes restantes',
+    'Formule', 'Quantité restante', 'Prix unitaire', 'Valeur restante', 'Montant payé', 'Date réservation',
   ].map(csvCell).join(';');
 
-  const rows = data.reservations.flatMap((reservation) => {
-    const items = reservation.items.length > 0 ? reservation.items : [null];
-    return items.map((item) => [
+  const rows = validReservations(data).flatMap((reservation) => {
+    const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
+    const itemsToExport: Array<ReservationExportItem | null> = validItems.length > 0 ? validItems : [null];
+    return itemsToExport.map((item) => [
       reservation.id.slice(0, 8).toUpperCase(),
       reservation.customer_name,
       reservation.customer_email,
       reservation.customer_phone ?? '',
       reservation.status,
-      reservation.quantity_total,
+      reservation.quantity_remaining,
       item?.ticket_type_label ?? '',
-      item?.quantity ?? '',
+      item?.remaining_quantity ?? '',
       item ? formatPrice(item.unit_price, currency) : '',
-      item ? formatPrice(item.unit_price * item.quantity, currency) : '',
+      item ? formatPrice(item.unit_price * item.remaining_quantity, currency) : '',
       formatPrice(reservation.amount_paid, currency),
       new Date(reservation.created_at).toLocaleString('fr-FR'),
     ].map(csvCell).join(';'));
@@ -110,11 +149,11 @@ export function buildReservationsCsv(data: EventReservationExportData, currency:
 }
 
 function formulaSummary(data: EventReservationExportData): Array<{ label: string; quantity: number }> {
-  const confirmed = data.reservations.filter((reservation) => reservation.status === 'confirmed');
   const totals = new Map<string, number>();
-  for (const reservation of confirmed) {
+  for (const reservation of validReservations(data)) {
     for (const item of reservation.items) {
-      totals.set(item.ticket_type_id, (totals.get(item.ticket_type_id) ?? 0) + item.quantity);
+      if (item.remaining_quantity <= 0) continue;
+      totals.set(item.ticket_type_id, (totals.get(item.ticket_type_id) ?? 0) + item.remaining_quantity);
     }
   }
   return data.ticketTypes
@@ -123,18 +162,21 @@ function formulaSummary(data: EventReservationExportData): Array<{ label: string
 }
 
 export function buildReservationListHtml(data: EventReservationExportData, tenantName: string): string {
-  const confirmed = data.reservations.filter((reservation) => reservation.status === 'confirmed');
-  const people = confirmed.reduce((sum, reservation) => sum + reservation.quantity_total, 0);
+  const valid = validReservations(data);
+  const people = valid.reduce((sum, reservation) => sum + reservation.quantity_remaining, 0);
   const summary = formulaSummary(data);
-  const reservationRows = confirmed.map((reservation) => `
+  const reservationRows = valid.map((reservation) => {
+    const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
+    return `
     <div class="reservation">
       <div class="check"></div>
       <div class="main">
-        <div class="top"><strong>#${escapeHtml(reservation.id.slice(0, 8).toUpperCase())} · ${escapeHtml(reservation.customer_name)}</strong><span>${reservation.quantity_total} pers.</span></div>
-        <div class="items">${reservation.items.map((item) => `${item.quantity} × ${escapeHtml(item.ticket_type_label)}`).join(' · ') || 'Détail formule indisponible'}</div>
+        <div class="top"><strong>#${escapeHtml(reservation.id.slice(0, 8).toUpperCase())} · ${escapeHtml(reservation.customer_name)}</strong><span>${reservation.quantity_remaining} pers.</span></div>
+        <div class="items">${validItems.map((item) => `${item.remaining_quantity} × ${escapeHtml(item.ticket_type_label)}`).join(' · ') || 'Détail formule indisponible'}</div>
         ${reservation.customer_phone ? `<div class="phone">${escapeHtml(reservation.customer_phone)}</div>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   return `<!doctype html><html><head><meta charset="utf-8" /><style>
     @page { size: A4; margin: 11mm; }
@@ -154,25 +196,26 @@ export function buildReservationListHtml(data: EventReservationExportData, tenan
     .summary h2 { margin: 0 0 2mm; font-size: 11pt; }
     .summary-row { display: flex; justify-content: space-between; max-width: 95mm; padding: .8mm 0; }
   </style></head><body>
-    <header><div class="tenant">${escapeHtml(tenantName)}</div><h1>${escapeHtml(data.event.title)}</h1><div class="meta">${escapeHtml(formatDate(data.event.date_start))}${data.event.location ? ` · ${escapeHtml(data.event.location)}` : ''} · ${confirmed.length} réservations · ${people} personnes</div></header>
-    ${reservationRows || '<p>Aucune réservation confirmée.</p>'}
-    <section class="summary"><h2>Total attendu · ${people} personnes</h2>${summary.map((item) => `<div class="summary-row"><span>${escapeHtml(item.label)}</span><strong>${item.quantity}</strong></div>`).join('')}</section>
+    <header><div class="tenant">${escapeHtml(tenantName)}</div><h1>${escapeHtml(data.event.title)}</h1><div class="meta">${escapeHtml(formatDate(data.event.date_start))}${data.event.location ? ` · ${escapeHtml(data.event.location)}` : ''} · ${valid.length} réservations valides · ${people} personnes restantes</div></header>
+    ${reservationRows || '<p>Aucun billet encore valide.</p>'}
+    <section class="summary"><h2>Total encore valide · ${people} personnes</h2>${summary.map((item) => `<div class="summary-row"><span>${escapeHtml(item.label)}</span><strong>${item.quantity}</strong></div>`).join('')}</section>
   </body></html>`;
 }
 
 export function buildReservationTableCardsHtml(data: EventReservationExportData, tenantName: string, origin: string): string {
-  const confirmed = data.reservations.filter((reservation) => reservation.status === 'confirmed');
-  const cards = confirmed.map((reservation) => {
+  const valid = validReservations(data);
+  const cards = valid.map((reservation) => {
     const reference = reservation.id.slice(0, 8).toUpperCase();
     const qrUrl = `${origin}/api/events/reservation-qr?token=${encodeURIComponent(reservation.qr_token)}`;
+    const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
     return `<section class="card">
       <div class="brand">${escapeHtml(tenantName)}</div>
       <div class="event">${escapeHtml(data.event.title)}</div>
-      <div class="eyebrow">RÉSERVATION</div>
+      <div class="eyebrow">RÉSERVATION VALIDE</div>
       <div class="reference">#${escapeHtml(reference)}</div>
       <div class="customer">${escapeHtml(reservation.customer_name)}</div>
-      <div class="people">${reservation.quantity_total} PERSONNE${reservation.quantity_total > 1 ? 'S' : ''}</div>
-      <div class="items">${reservation.items.map((item) => `<div><strong>${item.quantity}×</strong> ${escapeHtml(item.ticket_type_label)}</div>`).join('')}</div>
+      <div class="people">${reservation.quantity_remaining} PERSONNE${reservation.quantity_remaining > 1 ? 'S' : ''} RESTANTE${reservation.quantity_remaining > 1 ? 'S' : ''}</div>
+      <div class="items">${validItems.map((item) => `<div><strong>${item.remaining_quantity}×</strong> ${escapeHtml(item.ticket_type_label)}</div>`).join('')}</div>
       <img class="qr" src="${escapeHtml(qrUrl)}" alt="QR" />
     </section>`;
   }).join('');
@@ -191,5 +234,5 @@ export function buildReservationTableCardsHtml(data: EventReservationExportData,
     .people { margin-top: 1mm; font-size: 9pt; font-weight: 700; letter-spacing: .08em; color: #444; }
     .items { margin-top: 3mm; font-size: 10pt; line-height: 1.45; }
     .qr { position: absolute; right: 12mm; bottom: 9mm; width: 27mm; height: 27mm; }
-  </style></head><body>${cards || '<p style="padding:20mm">Aucune réservation confirmée.</p>'}</body></html>`;
+  </style></head><body>${cards || '<p style="padding:20mm">Aucun billet encore valide.</p>'}</body></html>`;
 }

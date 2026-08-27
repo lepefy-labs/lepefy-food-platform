@@ -259,6 +259,8 @@ Capability finanziarie Events:
 
 Scanner canonico `/scan?event_id=<id>` usa ledger `event_reservation_item_redemptions` ed è capability-driven end-to-end.
 
+Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici A5) includono solo prenotazioni ancora utilizzabili: `status = confirmed` e `quantity_remaining > 0`. Il dettaglio formule stampato/exportato usa il residuo per riga calcolato da `event_reservation_item_redemptions` non annullati (`voided_at IS NULL`), così formule già consumate non vengono ristampate come valide.
+
 ---
 
 ## 11. AI usage
