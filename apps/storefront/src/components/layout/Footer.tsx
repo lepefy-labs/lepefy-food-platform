@@ -1,6 +1,5 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   IconBrandInstagram,
@@ -12,6 +11,7 @@ import {
 } from '@tabler/icons-react';
 import { useTenant } from '@/providers/TenantProvider';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink } from '@lepefy/types';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 
 const SOCIAL_ICONS = {
   IconBrandInstagram,
@@ -24,21 +24,13 @@ const SOCIAL_ICONS = {
 
 interface FooterProps {
   socialLinks?: TenantSocialLink[];
-  /** La section "Notre origine" est-elle réellement rendue en home ? Sans
-   *  ça, "Notre histoire" pointerait vers un anchor inexistant. */
   storyEnabled?: boolean;
 }
 
-/**
- * Footer minimal (copyright + "Powered by") — rendu sur toutes les pages.
- * La version étendue à 4 colonnes (Task C) est réservée à la home : sur
- * mobile un footer de navigation lourd fait doublon avec la bottom nav fixe,
- * ça n'a de sens que comme clôture naturelle du scroll en home.
- */
 export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) {
-  const tenant   = useTenant();
+  const tenant = useTenant();
   const pathname = usePathname();
-  const isHome   = pathname === '/';
+  const isHome = pathname === '/';
 
   if (!isHome) {
     return (
@@ -63,27 +55,19 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
   }
 
   const blurb = tenant.tagline || 'Une sélection de produits choisis avec soin.';
-  // Seule entrée "À propos" avec une vraie destination : les autres
-  // (Nos producteurs, etc.) n'ont pas de page dédiée dans le repo — omises
-  // plutôt que de pointer vers du vide.
   const aboutLinks = storyEnabled ? [{ href: '#origine', label: 'Notre histoire' }] : [];
 
   return (
     <footer className="bg-gray-50 border-t border-gray-200 mt-auto">
       <div className="max-w-6xl mx-auto px-4 pt-10">
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-3">
-          {/* Marque */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              {tenant.logo_url && (
-                <Image src={tenant.logo_url} alt={tenant.name} width={28} height={28} className="rounded-sm object-contain" />
-              )}
-              <span className="font-display font-bold text-gray-900">{tenant.name}</span>
+            <div className="mb-3">
+              <TenantLogo variant="compact" className="h-12 w-[140px] max-w-[52vw]" />
             </div>
             <p className="text-sm text-gray-500 leading-relaxed max-w-[32ch]">{blurb}</p>
           </div>
 
-          {/* À propos — omise si aucune destination réelle */}
           {aboutLinks.length > 0 && (
             <div>
               <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-3">À propos</h3>
@@ -99,7 +83,6 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
             </div>
           )}
 
-          {/* Réseaux — uniquement les plateformes réellement configurées */}
           {socialLinks.length > 0 && (
             <div>
               <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-3">Suivez-nous</h3>
@@ -149,8 +132,7 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
 function PoweredBy() {
   return (
     <p className="mt-3 text-xs text-gray-400">
-      Propulsé par{' '}
-      <span className="font-medium text-gray-500">Lepefy Labs</span>
+      Propulsé par <span className="font-medium text-gray-500">Lepefy Labs</span>
     </p>
   );
 }
