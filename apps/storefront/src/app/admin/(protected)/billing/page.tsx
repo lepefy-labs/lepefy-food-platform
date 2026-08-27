@@ -20,6 +20,13 @@ function daysRemaining(iso: string | null): number | null {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+const INCLUDED_MODULES = [
+  'Boutique',
+  'Événementiel',
+  'Carte digitale',
+  'Intelligence IA',
+] as const;
+
 export default async function BillingPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const supabase = createServiceClient();
@@ -59,14 +66,14 @@ export default async function BillingPage() {
     <div className="max-w-2xl">
       <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">Abonnement</h1>
       <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-        Plateforme Lepefy Food · Plan Boutique
+        Plateforme Lepefy Food · Abonnement actif
       </p>
 
       {isExpired && (
         <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
           <span className="mt-0.5 text-lg leading-none">⚠️</span>
           <div>
-            <strong>Abonnement expiré.</strong> Votre boutique en ligne est actuellement suspendue.
+            <strong>Abonnement expiré.</strong> Les services Lepefy de votre établissement sont actuellement suspendus.
             Renouvelez votre abonnement pour rétablir le service.
           </div>
         </div>
@@ -83,13 +90,13 @@ export default async function BillingPage() {
       )}
 
       <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-4 dark:border-gray-800">
+        <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-100 pb-4 dark:border-gray-800">
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{tenant.name}</p>
-            <p className="mt-0.5 text-xs text-gray-400">Plan Boutique · 89,00 €/mois</p>
+            <p className="mt-0.5 text-xs text-gray-400">Lepefy Food Platform · 89,00 €/mois</p>
           </div>
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
               isExpired
                 ? 'bg-red-100 text-red-700'
                 : isWarning
@@ -100,6 +107,20 @@ export default async function BillingPage() {
             <span className={`h-1.5 w-1.5 rounded-full ${isExpired ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-green-500'}`} />
             {isExpired ? 'Expiré' : isWarning ? `Expire dans ${days} jours` : 'Actif'}
           </span>
+        </div>
+
+        <div className="mb-4 border-b border-gray-100 pb-4 dark:border-gray-800">
+          <p className="mb-2 text-xs font-medium text-gray-500">Modules inclus</p>
+          <div className="flex flex-wrap gap-2">
+            {INCLUDED_MODULES.map((module) => (
+              <span
+                key={module}
+                className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300"
+              >
+                {module}
+              </span>
+            ))}
+          </div>
         </div>
 
         <dl className="space-y-3 text-sm">
