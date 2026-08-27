@@ -40,7 +40,9 @@ const LEGACY_FEATURES: TenantBillingFeature[] = [
 ];
 
 export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Promise<TenantBillingSnapshot> {
-  const service = createServiceClient();
+  // New schema is intentionally queried through the service client before generated DB types catch up.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createServiceClient() as any;
 
   const { data: subscription, error: subscriptionError } = await service
     .from('tenant_subscriptions')
@@ -50,21 +52,9 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
 
   if (!subscriptionError && subscription) {
     const [{ data: plan }, { data: features }, { data: platformSettings }] = await Promise.all([
-      service
-        .from('platform_plans')
-        .select('code, name, monthly_price_cents, currency')
-        .eq('id', subscription.plan_id)
-        .single(),
-      service
-        .from('platform_plan_features')
-        .select('feature_key, label, position')
-        .eq('plan_id', subscription.plan_id)
-        .order('position', { ascending: true }),
-      service
-        .from('platform_billing_settings')
-        .select('bank_iban, bank_beneficiary, bank_bic, support_email')
-        .eq('id', 'default')
-        .maybeSingle(),
+      service.from('platform_plans').select('code, name, monthly_price_cents, currency').eq('id', subscription.plan_id).single(),
+      service.from('platform_plan_features').select('feature_key, label, position').eq('plan_id', subscription.plan_id).order('position', { ascending: true }),
+      service.from('platform_billing_settings').select('bank_iban, bank_beneficiary, bank_bic, support_email').eq('id', 'default').maybeSingle(),
     ]);
 
     if (plan) {
@@ -76,7 +66,7 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
         status: subscription.status === 'expired' ? 'expired' : 'active',
         paidUntil: subscription.paid_until,
         stripePaymentLink: subscription.stripe_payment_link,
-        features: (features ?? []).map((feature) => ({
+        features: (features ?? []).map((feature: { feature_key: string; label: string; position: number | null }) => ({
           key: feature.feature_key,
           label: feature.label,
           position: feature.position ?? 0,
@@ -90,7 +80,7 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
     }
   }
 
-  // Compatibility fallback: keeps the tenant admin operational until migration 084 is applied.
+  // Compatibility fallback: keeps tenant billing operational until migration 084 is applied.
   return {
     planCode: 'legacy-food-platform',
     planName: 'Lepefy Food Platform',
@@ -109,9 +99,5 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
 }
 
 export function formatPlanPrice(cents: number, currency: string): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(cents / 100);
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency, minimumFractionDigits: 2 }).format(cents / 100);
 }
