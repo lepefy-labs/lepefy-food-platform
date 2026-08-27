@@ -4,11 +4,13 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { featureForAiEndpoint } from '@/lib/ai/productUsage';
+import AiCostHistoryChart, { type AiCostHistoryPoint } from './AiCostHistoryChart';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 interface CostRow {
+  month: string;
   provider: string;
   endpoint: string;
   total_calls: number | string;
@@ -17,6 +19,11 @@ interface CostRow {
 
 function formatUsd(amount: number): string {
   return `$${amount.toFixed(4)}`;
+}
+
+function monthKey(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export default async function PlatformAiUsagePage() {
@@ -52,19 +59,51 @@ export default async function PlatformAiUsagePage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const historyStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
 
   const { data } = await service
     .from('ai_usage_monthly_by_tenant')
-    .select('provider, endpoint, total_calls, total_cost_usd')
+    .select('month, provider, endpoint, total_calls, total_cost_usd')
     .eq('tenant_id', tenant.id)
-    .gte('month', monthStart)
+    .gte('month', historyStart.toISOString())
+    .order('month', { ascending: true })
     .order('provider', { ascending: true })
     .order('endpoint', { ascending: true });
 
-  const rows = (data ?? []) as CostRow[];
+  const historyRows = (data ?? []) as CostRow[];
+  const currentKey = monthKey(currentMonthStart);
+  const rows = historyRows.filter((row) => monthKey(row.month) === currentKey);
   const totalCalls = rows.reduce((sum, row) => sum + (Number(row.total_calls) || 0), 0);
   const totalCost = rows.reduce((sum, row) => sum + (Number(row.total_cost_usd) || 0), 0);
+
+  const monthlyTotals = new Map<string, { calls: number; cost: number }>();
+  for (const row of historyRows) {
+    const key = monthKey(row.month);
+    const current = monthlyTotals.get(key) ?? { calls: 0, cost: 0 };
+    current.calls += Number(row.total_calls) || 0;
+    current.cost += Number(row.total_cost_usd) || 0;
+    monthlyTotals.set(key, current);
+  }
+
+  const monthFormatter = new Intl.DateTimeFormat('fr-FR', { month: 'short', timeZone: 'UTC' });
+  const fullMonthFormatter = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const historyPoints: AiCostHistoryPoint[] = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(Date.UTC(historyStart.getUTCFullYear(), historyStart.getUTCMonth() + index, 1));
+    const key = monthKey(date);
+    const monthly = monthlyTotals.get(key) ?? { calls: 0, cost: 0 };
+    return {
+      key,
+      label: monthFormatter.format(date).replace('.', ''),
+      fullLabel: fullMonthFormatter.format(date),
+      cost: monthly.cost,
+      calls: monthly.calls,
+    };
+  });
+
+  const currentCost = historyPoints[historyPoints.length - 1]?.cost ?? 0;
+  const previousCost = historyPoints[historyPoints.length - 2]?.cost ?? 0;
+  const totalCost12Months = historyPoints.reduce((sum, point) => sum + point.cost, 0);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5">
@@ -92,9 +131,16 @@ export default async function PlatformAiUsagePage() {
         </div>
       </section>
 
+      <AiCostHistoryChart
+        points={historyPoints}
+        currentCost={currentCost}
+        previousCost={previousCost}
+        totalCost12Months={totalCost12Months}
+      />
+
       <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Détail technique</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Détail technique · mois courant</h2>
           <p className="mt-1 text-xs text-gray-400">Provider, endpoint et coûts restent internes à la plateforme.</p>
         </div>
 
