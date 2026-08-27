@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   IconClock, IconShoppingBag, IconUserPlus, IconBrandWhatsapp,
   IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBrandYoutube,
   IconBrandLinkedin, IconBrandX, IconCreditCard, IconExternalLink,
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 import { AddToHomeScreen } from './AddToHomeScreen';
 import { CardLocation } from './CardLocation';
 import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
@@ -62,7 +62,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
       {!inPayment && <header className="relative overflow-hidden px-5 pb-5 pt-3 text-center" style={{ backgroundColor: tenant.primary_color }}>
         <div aria-hidden className="absolute -left-12 top-10 h-28 w-28 rounded-full opacity-[0.045]" style={{ backgroundColor: tenant.secondary_color }} /><div aria-hidden className="absolute -right-14 -top-12 h-36 w-36 rounded-full opacity-[0.045]" style={{ backgroundColor: tenant.secondary_color }} />
         <div className="absolute right-3 top-2 z-10"><div className="inline-flex rounded-lg border border-white/15 bg-black/[0.05] p-px backdrop-blur-sm" aria-label="Language">{(['fr','it'] as Lang[]).map(l=><button key={l} type="button" onClick={()=>changeLang(l)} aria-pressed={lang===l} className="min-h-11 min-w-11 rounded-[7px] px-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={lang===l?{backgroundColor:tenant.secondary_color,color:secondaryForeground}:{color:'rgba(255,255,255,.66)'}}>{l.toUpperCase()}</button>)}</div></div>
-        <div className="relative mx-auto flex h-24 w-40 items-center justify-center">{tenant.logo_url?<Image src={tenant.logo_url} alt={tenant.name} width={160} height={96} className="h-full w-full object-contain" priority/>:<span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 text-2xl font-extrabold text-white ring-1 ring-white/20" style={{fontFamily:'var(--font-card-heading)'}}>{initials}</span>}</div>
+        <div className="relative mx-auto flex min-h-24 items-center justify-center">{tenant.logo_url?<TenantLogo variant="hero" identity={{name:tenant.name,logo_url:tenant.logo_url}} priority className="mx-auto max-w-[72vw]"/>:<span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 text-2xl font-extrabold text-white ring-1 ring-white/20" style={{fontFamily:'var(--font-card-heading)'}}>{initials}</span>}</div>
         <h1 className="relative mt-0.5 text-xl font-extrabold text-white" style={{fontFamily:'var(--font-card-heading)'}}>{tenant.name}</h1><p className="relative mt-0.5 text-sm font-bold text-white/95" style={{fontFamily:'var(--font-card-heading)'}}>{t.descriptor}</p><p className="relative mx-auto mt-0.5 max-w-xs text-[13px] leading-snug text-white/75">{t.heroSupport}</p><div className="relative mx-auto mt-2 h-0.5 w-8 rounded-full" style={{backgroundColor:tenant.secondary_color}}/>
       </header>}
       <div className={inPayment?'p-5 sm:p-7':'relative -mt-4 rounded-t-[1.75rem] bg-white px-4 pb-28 pt-5 sm:px-5'}>{inPayment?<PaymentMethodsAccordion paymentMethods={paymentMethods} primaryColor={tenant.primary_color} currency={tenant.currency} lang={lang} onClose={()=>setInPayment(false)}/>:<>
