@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   const data = await loadEventReservationExportData(createServiceClient(), tenant.id, eventId);
   if (!data) return NextResponse.json({ error: 'Événement introuvable.' }, { status: 404 });
 
-  const pdfBuffer = await htmlToPdf(buildReservationTableCardsHtml(data, tenant.name, req.nextUrl.origin));
+  const pdfBuffer = await htmlToPdf(
+    buildReservationTableCardsHtml(data, tenant.name, tenant.logo_url, req.nextUrl.origin),
+  );
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
       'Content-Type': 'application/pdf',

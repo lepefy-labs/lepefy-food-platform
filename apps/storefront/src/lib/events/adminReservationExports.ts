@@ -36,6 +36,13 @@ function csvCell(value: unknown): string {
   return `"${text}"`;
 }
 
+function tenantBrandHtml(tenantName: string, tenantLogoUrl: string | null, className: string): string {
+  if (tenantLogoUrl) {
+    return `<img class="${className}" src="${escapeHtml(tenantLogoUrl)}" alt="${escapeHtml(tenantName)}" />`;
+  }
+  return `<div class="tenant-name">${escapeHtml(tenantName)}</div>`;
+}
+
 function validReservations(data: EventReservationExportData): ReservationExportRow[] {
   return data.reservations.filter(
     (reservation) => reservation.status === 'confirmed' && reservation.quantity_remaining > 0,
@@ -161,7 +168,11 @@ function formulaSummary(data: EventReservationExportData): Array<{ label: string
     .filter((item) => item.quantity > 0);
 }
 
-export function buildReservationListHtml(data: EventReservationExportData, tenantName: string): string {
+export function buildReservationListHtml(
+  data: EventReservationExportData,
+  tenantName: string,
+  tenantLogoUrl: string | null,
+): string {
   const valid = validReservations(data);
   const people = valid.reduce((sum, reservation) => sum + reservation.quantity_remaining, 0);
   const summary = formulaSummary(data);
@@ -183,7 +194,9 @@ export function buildReservationListHtml(data: EventReservationExportData, tenan
     * { box-sizing: border-box; }
     body { margin: 0; color: #111; font-family: Arial, sans-serif; font-size: 10pt; }
     header { border-bottom: 2px solid #111; padding-bottom: 5mm; margin-bottom: 5mm; }
-    .tenant { font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .brand-row { min-height: 16mm; display: flex; align-items: center; margin-bottom: 2mm; }
+    .tenant-logo { display: block; width: auto; height: auto; max-width: 46mm; max-height: 16mm; object-fit: contain; object-position: left center; }
+    .tenant-name { font-size: 12pt; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
     h1 { margin: 1.5mm 0; font-size: 18pt; }
     .meta { color: #444; }
     .reservation { display: flex; gap: 4mm; padding: 3.2mm 0; border-bottom: 1px solid #bbb; break-inside: avoid; }
@@ -196,20 +209,25 @@ export function buildReservationListHtml(data: EventReservationExportData, tenan
     .summary h2 { margin: 0 0 2mm; font-size: 11pt; }
     .summary-row { display: flex; justify-content: space-between; max-width: 95mm; padding: .8mm 0; }
   </style></head><body>
-    <header><div class="tenant">${escapeHtml(tenantName)}</div><h1>${escapeHtml(data.event.title)}</h1><div class="meta">${escapeHtml(formatDate(data.event.date_start))}${data.event.location ? ` · ${escapeHtml(data.event.location)}` : ''} · ${valid.length} réservations valides · ${people} personnes restantes</div></header>
+    <header><div class="brand-row">${tenantBrandHtml(tenantName, tenantLogoUrl, 'tenant-logo')}</div><h1>${escapeHtml(data.event.title)}</h1><div class="meta">${escapeHtml(formatDate(data.event.date_start))}${data.event.location ? ` · ${escapeHtml(data.event.location)}` : ''} · ${valid.length} réservations valides · ${people} personnes restantes</div></header>
     ${reservationRows || '<p>Aucun billet encore valide.</p>'}
     <section class="summary"><h2>Total encore valide · ${people} personnes</h2>${summary.map((item) => `<div class="summary-row"><span>${escapeHtml(item.label)}</span><strong>${item.quantity}</strong></div>`).join('')}</section>
   </body></html>`;
 }
 
-export function buildReservationTableCardsHtml(data: EventReservationExportData, tenantName: string, origin: string): string {
+export function buildReservationTableCardsHtml(
+  data: EventReservationExportData,
+  tenantName: string,
+  tenantLogoUrl: string | null,
+  origin: string,
+): string {
   const valid = validReservations(data);
   const cards = valid.map((reservation) => {
     const reference = reservation.id.slice(0, 8).toUpperCase();
     const qrUrl = `${origin}/api/events/reservation-qr?token=${encodeURIComponent(reservation.qr_token)}`;
     const validItems = reservation.items.filter((item) => item.remaining_quantity > 0);
     return `<section class="card">
-      <div class="brand">${escapeHtml(tenantName)}</div>
+      <div class="brand">${tenantBrandHtml(tenantName, tenantLogoUrl, 'tenant-logo')}</div>
       <div class="event">${escapeHtml(data.event.title)}</div>
       <div class="eyebrow">RÉSERVATION VALIDE</div>
       <div class="reference">#${escapeHtml(reference)}</div>
@@ -224,11 +242,13 @@ export function buildReservationTableCardsHtml(data: EventReservationExportData,
     @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     html, body { margin: 0; font-family: Arial, sans-serif; color: #111; }
-    .card { width: 210mm; height: 148.5mm; padding: 11mm 14mm; text-align: center; border-bottom: .4mm dashed #999; position: relative; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
+    .card { width: 210mm; height: 148.5mm; padding: 9mm 14mm 11mm; text-align: center; border-bottom: .4mm dashed #999; position: relative; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
     .card:nth-child(2n) { border-bottom: 0; page-break-after: always; }
-    .brand { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #555; }
-    .event { margin-top: 2mm; font-size: 14pt; font-weight: 700; }
-    .eyebrow { margin-top: 5mm; font-size: 9pt; font-weight: 700; letter-spacing: .15em; color: #666; }
+    .brand { height: 18mm; display: flex; align-items: center; justify-content: center; }
+    .tenant-logo { display: block; width: auto; height: auto; max-width: 54mm; max-height: 18mm; object-fit: contain; object-position: center; }
+    .tenant-name { font-size: 12pt; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #444; }
+    .event { margin-top: 1.5mm; font-size: 14pt; font-weight: 700; }
+    .eyebrow { margin-top: 4mm; font-size: 9pt; font-weight: 700; letter-spacing: .15em; color: #666; }
     .reference { margin-top: 1mm; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 34pt; line-height: 1; font-weight: 900; letter-spacing: .06em; }
     .customer { margin-top: 3mm; font-size: 14pt; font-weight: 700; }
     .people { margin-top: 1mm; font-size: 9pt; font-weight: 700; letter-spacing: .08em; color: #444; }
