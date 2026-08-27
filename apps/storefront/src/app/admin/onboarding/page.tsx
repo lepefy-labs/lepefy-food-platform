@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
+import AdminTenantIdentity from '../_components/AdminTenantIdentity';
 import AdminProfileForm from './AdminProfileForm';
 
 export const dynamic = 'force-dynamic';
@@ -44,8 +45,8 @@ export default async function AdminOnboardingPage({ searchParams }: { searchPara
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-12">
         <div className="mx-auto max-w-lg rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">Lepefy Admin</p>
-          <h1 className="mt-2 text-xl font-semibold text-gray-950">Profil administrateur</h1>
+          <AdminTenantIdentity align="left" compact />
+          <h1 className="mt-5 text-xl font-semibold text-gray-950">Profil administrateur</h1>
           <p className="mt-3 text-sm text-amber-700">Le nouveau profil administrateur nécessite la migration RBAC 085 avant de pouvoir être configuré.</p>
         </div>
       </main>
@@ -59,12 +60,10 @@ export default async function AdminOnboardingPage({ searchParams }: { searchPara
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 sm:py-14">
       <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">Lepefy Admin</p>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-950">{editing ? 'Mon profil' : 'Bienvenue dans votre espace admin'}</h1>
+        <AdminTenantIdentity align="left" compact />
+        <h1 className="mt-5 text-2xl font-semibold text-gray-950">{editing ? 'Mon profil' : 'Bienvenue dans votre espace admin'}</h1>
         <p className="mt-2 text-sm leading-6 text-gray-500">
-          {editing
-            ? 'Mettez à jour vos informations de profil.'
-            : 'Avant de commencer, renseignez vos informations.'}
+          {editing ? 'Mettez à jour vos informations de profil.' : 'Avant de commencer, renseignez vos informations.'}
         </p>
         <AdminProfileForm
           email={admin.email ?? user.email ?? ''}
