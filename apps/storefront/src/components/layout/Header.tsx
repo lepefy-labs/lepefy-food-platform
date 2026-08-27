@@ -46,7 +46,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-      <div className="relative mx-auto flex h-[88px] max-w-7xl items-center gap-3 px-4">
+      <div className="relative mx-auto flex h-24 max-w-7xl items-center gap-3 px-4">
         <button
           type="button"
           onClick={() => setMobileMenuOpen((open) => !open)}
@@ -92,7 +92,7 @@ export function Header() {
       </div>
 
       {mobileMenuOpen && (
-        <nav id="mobile-shop-menu" className="absolute inset-x-0 top-[88px] border-b border-gray-200 bg-white px-4 py-3 shadow-lg md:hidden" aria-label="Navigation principale mobile">
+        <nav id="mobile-shop-menu" className="absolute inset-x-0 top-24 border-b border-gray-200 bg-white px-4 py-3 shadow-lg md:hidden" aria-label="Navigation principale mobile">
           <div className="mx-auto grid max-w-7xl gap-1">
             {([
               ['Accueil', '/'], ['Catalogue', '/products'], ['Panier', '/cart'], ['Commandes', '/orders'], ['Compte', '/compte/connexion'],
