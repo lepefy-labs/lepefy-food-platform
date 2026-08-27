@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { AmbassadorConfigSection } from './AmbassadorConfigSection';
@@ -28,8 +29,10 @@ interface BalanceRow {
 }
 
 export default async function AdminAmbassadeursPage() {
-  const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  const canManagePayouts = Boolean(access && canAdmin(access, 'growth.payouts.manage'));
 
   const supabase = createServiceClient();
 
@@ -105,7 +108,7 @@ export default async function AdminAmbassadeursPage() {
         </AdminBlockAccent>
 
         <AdminBlockAccent tone={(commissions ?? []).length > 0 ? 'warning' : 'neutral'}>
-          <CommissionsSection initialCommissions={commissions ?? []} currency={tenant.currency} />
+          <CommissionsSection initialCommissions={commissions ?? []} currency={tenant.currency} canManagePayouts={canManagePayouts} />
         </AdminBlockAccent>
       </div>
     </div>
