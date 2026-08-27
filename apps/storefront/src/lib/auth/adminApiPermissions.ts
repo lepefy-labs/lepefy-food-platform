@@ -38,7 +38,8 @@ function isRead(method: string): boolean {
  * silently fall back to tenant_admin semantics.
  */
 export function permissionForAdminApi(pathname: string, method: string): AdminApiPermission | null {
-  const path = pathname.split('?')[0].replace(/\/+$/, '') || '/';
+  const rawPath = pathname.split('?')[0] ?? pathname;
+  const path = rawPath.replace(/\/+$/, '') || '/';
   const read = isRead(method);
 
   if (/^\/api\/admin\/checkout-sessions\/[^/]+\/confirm-payment$/.test(path)) return 'shop_payments.confirm';
