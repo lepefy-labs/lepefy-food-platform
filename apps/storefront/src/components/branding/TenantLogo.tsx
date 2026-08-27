@@ -21,8 +21,8 @@ interface TenantLogoProps {
 
 const VARIANTS: Record<TenantLogoVariant, { wrapper: string; sizes: string; name: string }> = {
   header: {
-    wrapper: 'h-[52px] w-[160px] max-w-[46vw] md:h-[60px] md:w-[200px] md:max-w-none',
-    sizes: '(max-width: 767px) 160px, 200px',
+    wrapper: 'h-[56px] w-[180px] max-w-[50vw] md:h-[68px] md:w-[240px] md:max-w-none',
+    sizes: '(max-width: 767px) 180px, 240px',
     name: 'text-lg md:text-xl',
   },
   hero: {
