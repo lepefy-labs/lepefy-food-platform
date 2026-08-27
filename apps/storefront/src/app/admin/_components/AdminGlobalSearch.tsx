@@ -27,7 +27,13 @@ function ResultsPanel({ scopes, query, loading, searchedOnce, results, onSelect 
   </div>;
 }
 
-export default function AdminGlobalSearch({ workspace = 'shop' }: { workspace?: AdminWorkspace }) {
+interface AdminGlobalSearchProps {
+  workspace?: AdminWorkspace;
+  permissions?: string[];
+  isPlatformOwner?: boolean;
+}
+
+export default function AdminGlobalSearch({ workspace = 'shop', permissions = [], isPlatformOwner = false }: AdminGlobalSearchProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
@@ -36,13 +42,21 @@ export default function AdminGlobalSearch({ workspace = 'shop' }: { workspace?: 
   const containerRef = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const scopes = useMemo<Scope[]>(() => workspace === 'events' ? ['events'] : ['orders', 'products', 'customers'], [workspace]);
-  const placeholder = workspace === 'events' ? 'Rechercher un événement…' : 'Rechercher commandes, produits, clients…';
+  const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
+  const scopes = useMemo<Scope[]>(() => {
+    if (workspace === 'events') return has('events.view') ? ['events'] : [];
+    const allowed: Scope[] = [];
+    if (has('orders.view')) allowed.push('orders', 'customers');
+    if (has('catalog.view')) allowed.push('products');
+    return allowed;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace, permissions, isPlatformOwner]);
+  const placeholder = workspace === 'events' ? 'Rechercher un événement…' : 'Rechercher dans vos accès…';
 
   useEffect(() => { if (!panelOpen) return; const handleClickOutside = (event: MouseEvent) => { if (containerRef.current && !containerRef.current.contains(event.target as Node)) setPanelOpen(false); }; document.addEventListener('mousedown', handleClickOutside); return () => document.removeEventListener('mousedown', handleClickOutside); }, [panelOpen]);
   useEffect(() => { if (panelOpen) mobileInputRef.current?.focus(); }, [panelOpen]);
   useEffect(() => {
-    if (!panelOpen) return;
+    if (!panelOpen || scopes.length === 0) return;
     if (query.trim().length < 2) { setResults(EMPTY_RESULTS); setSearchedOnce(false); return; }
     const timer = setTimeout(() => {
       abortRef.current?.abort();
@@ -60,6 +74,8 @@ export default function AdminGlobalSearch({ workspace = 'shop' }: { workspace?: 
 
   function handleSelect() { setPanelOpen(false); setQuery(''); setResults(EMPTY_RESULTS); setSearchedOnce(false); }
   function closePanel() { setPanelOpen(false); }
+
+  if (scopes.length === 0) return <div className="w-full" />;
 
   return <div className="relative w-full" ref={containerRef} onKeyDown={event => { if (event.key === 'Escape') closePanel(); }}>
     <div className="relative hidden md:block"><IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input type="text" value={query} onFocus={() => setPanelOpen(true)} onChange={event => setQuery(event.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-gray-200 py-2 pl-9 pr-8 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-800" />{query && <button onClick={() => setQuery('')} aria-label="Effacer" className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><IconX size={14} /></button>}{panelOpen && <div role="dialog" aria-label="Recherche globale" className="absolute left-0 top-full z-50 mt-2 max-h-[32rem] w-full min-w-[20rem] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"><ResultsPanel scopes={scopes} query={query} loading={loading} searchedOnce={searchedOnce} results={results} onSelect={handleSelect} /></div>}</div>
