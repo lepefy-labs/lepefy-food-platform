@@ -41,14 +41,10 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   const path = pathname.split('?')[0].replace(/\/+$/, '') || '/';
   const read = isRead(method);
 
-  // Shop payments / checkout recovery — explicit critical action first.
   if (/^\/api\/admin\/checkout-sessions\/[^/]+\/confirm-payment$/.test(path)) return 'shop_payments.confirm';
   if (path.startsWith('/api/admin/checkout-sessions')) return read ? 'orders.view' : 'orders.manage';
-
-  // Orders / fulfillment.
   if (path.startsWith('/api/admin/orders')) return read ? 'orders.view' : 'orders.manage';
 
-  // Catalogue and merchandising/content tools.
   if (path.startsWith('/api/admin/catalogue')) return read ? 'catalog.view' : 'catalog.manage';
   if (
     path.startsWith('/api/admin/hero-slides') ||
@@ -60,25 +56,18 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
     path === '/api/admin/generate-product-description'
   ) return 'catalog.manage';
 
-  // Digital-card and tenant presentation assets are tenant configuration.
   if (path === '/api/admin/card/poster' || path === '/api/admin/upload-story-photo') return 'tenant_settings.manage';
-
-  // AI knowledge base.
   if (path.startsWith('/api/admin/knowledge-base')) return 'ai_knowledge.manage';
 
-  // Loyalty and cashier station.
   if (path.startsWith('/api/admin/loyalty/scan')) return 'loyalty.scan';
   if (path.startsWith('/api/admin/loyalty')) return 'loyalty.manage';
 
-  // Ambassador/growth. Marking a commission as paid is intentionally isolated.
   if (/^\/api\/admin\/ambassador\/commissions\/[^/]+\/pay$/.test(path)) return 'growth.payouts.manage';
   if (path.startsWith('/api/admin/ambassador')) return 'growth.manage';
 
-  // Shipping rules distinguish read-only operational access from configuration.
   if (path.startsWith('/api/admin/shipping-rules')) return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-simulator') return 'shipping.view';
 
-  // Tenant settings and payment-method configuration.
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/payment-methods')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
@@ -89,21 +78,18 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/cancel$/.test(path)) return 'event_payments.cancel';
   if (/^\/api\/admin\/evenementiel\/reservations\/[^/]+\/refund$/.test(path)) return 'event_payments.refund';
 
-  // Reservation operations, including resend and rentals.
   if (path.startsWith('/api/admin/evenementiel/reservations')) return read ? 'event_reservations.view' : 'event_reservations.manage';
   if (path.startsWith('/api/admin/evenementiel/rental-reservations')) return read ? 'event_reservations.view' : 'event_reservations.manage';
-  if (path.startsWith('/api/admin/evenementiel/rental-items')) return read ? 'event_reservations.view' : 'event_reservations.manage';
-  if (path.includes('/rental-items')) return read ? 'event_reservations.view' : 'event_reservations.manage';
 
-  // Events and ticket configuration.
   if (path.startsWith('/api/admin/evenementiel/events')) return read ? 'events.view' : 'events.manage';
   if (path.startsWith('/api/admin/evenementiel/ticket-types')) return read ? 'events.view' : 'events.manage';
-
-  // Catering/rental inquiries are reservation-facing operations.
   if (path.startsWith('/api/admin/evenementiel/inquiries')) return read ? 'event_reservations.view' : 'event_reservations.manage';
 
-  // Event content/configuration.
+  // Rental inventory belongs to event content/configuration; rental bookings
+  // themselves are handled above through rental-reservations.
   if (
+    path.startsWith('/api/admin/evenementiel/rental-items') ||
+    path.includes('/rental-items') ||
     path.startsWith('/api/admin/evenementiel/gallery') ||
     path.startsWith('/api/admin/evenementiel/services') ||
     path === '/api/admin/evenementiel/upload-image' ||
