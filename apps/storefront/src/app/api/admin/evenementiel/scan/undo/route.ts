@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { getAdminId } from '@/lib/auth/getAdminId';
 
 const CASHIER_UNDO_WINDOW_MS = 5 * 60 * 1000;
@@ -16,11 +16,16 @@ export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
-  if (denied) return denied;
-
   if (!tenant.events_enabled) {
     return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 400 });
+  }
+
+  const adminId = await getAdminId();
+  if (!adminId) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  if (!access || (!canAdmin(access, 'scan.undo_own') && !canAdmin(access, 'scan.undo_any'))) {
+    return NextResponse.json({ error: 'Permission insuffisante.' }, { status: 403 });
   }
 
   const body = await req.json() as { redemption_id?: string; event_id?: string; reason?: string };
@@ -32,19 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'redemption_id et event_id requis.' }, { status: 400 });
   }
 
-  const adminId = await getAdminId();
-  if (!adminId) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
-
   const supabase = createServiceClient();
-  const { data: admin } = await supabase
-    .from('admin_users')
-    .select('role, tenant_id, active')
-    .eq('id', adminId)
-    .eq('active', true)
-    .maybeSingle();
-
-  if (!admin) return NextResponse.json({ error: 'Non autorisé.' }, { status: 403 });
-
   const { data: redemption } = await supabase
     .from('event_reservation_item_redemptions')
     .select('id, redeemed_by, redeemed_at, voided_at, event_reservation_items(reservation_id, event_reservations(tenant_id, event_id))')
@@ -64,20 +57,18 @@ export async function POST(req: NextRequest) {
   }
 
   const ageMs = Math.max(0, Date.now() - new Date(redemption.redeemed_at).getTime());
-  const elevated = admin.role === 'tenant_admin' || admin.role === 'platform_owner';
+  const canUndoAny = canAdmin(access, 'scan.undo_any');
+  const canUndoOwn = canAdmin(access, 'scan.undo_own');
+  const ownRecent = redemption.redeemed_by === adminId && ageMs <= CASHIER_UNDO_WINDOW_MS;
 
-  if (admin.role === 'tenant_cashier') {
-    if (redemption.redeemed_by !== adminId || ageMs > CASHIER_UNDO_WINDOW_MS) {
-      return NextResponse.json(
-        { error: 'Un caissier peut annuler uniquement sa propre dernière validation pendant 5 minutes.' },
-        { status: 403 },
-      );
-    }
-  } else if (!elevated) {
-    return NextResponse.json({ error: 'Non autorisé.' }, { status: 403 });
+  if (!canUndoAny && !(canUndoOwn && ownRecent)) {
+    return NextResponse.json(
+      { error: 'Vous pouvez annuler uniquement votre propre dernière validation pendant 5 minutes.' },
+      { status: 403 },
+    );
   }
 
-  const requiresReason = elevated && (redemption.redeemed_by !== adminId || ageMs > CASHIER_UNDO_WINDOW_MS);
+  const requiresReason = canUndoAny && !ownRecent;
   if (requiresReason && !reason) {
     return NextResponse.json({ error: 'Un motif est requis pour cette annulation.' }, { status: 400 });
   }

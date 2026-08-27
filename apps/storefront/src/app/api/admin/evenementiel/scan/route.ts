@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePermission } from '@/lib/auth/adminRbac';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { extractQrToken } from '@/lib/events/ticketUrl';
 import { getEventCheckinWindowState } from '@/lib/events/checkinWindow';
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
+  const denied = await requirePermission(tenant.id, 'scan.redeem');
   if (denied) return denied;
 
   if (!tenant.events_enabled) {

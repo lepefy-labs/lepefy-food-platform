@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePermission } from '@/lib/auth/adminRbac';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -9,7 +9,7 @@ export const fetchCache = 'force-no-store';
 export async function GET(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
+  const denied = await requirePermission(tenant.id, 'scan.metrics');
   if (denied) return denied;
 
   const eventId = req.nextUrl.searchParams.get('event_id')?.trim() ?? '';

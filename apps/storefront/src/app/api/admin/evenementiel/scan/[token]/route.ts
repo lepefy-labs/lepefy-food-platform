@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { canAdmin, getCurrentAdminAccessContext, requirePermission } from '@/lib/auth/adminRbac';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { extractQrToken } from '@/lib/events/ticketUrl';
 import { getEventCheckinWindowState } from '@/lib/events/checkinWindow';
 
 const CASHIER_UNDO_WINDOW_MS = 5 * 60 * 1000;
 
-interface ItemRow {
-  id: string;
-  ticket_type_id: string;
-  quantity: number;
-}
-
+interface ItemRow { id: string; ticket_type_id: string; quantity: number; }
 interface RedemptionRow {
   id: string;
   reservation_item_id: string;
@@ -47,57 +42,34 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
+  const denied = await requirePermission(tenant.id, 'scan.access');
   if (denied) return denied;
 
-  if (!tenant.events_enabled) {
-    return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 400 });
-  }
+  if (!tenant.events_enabled) return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 400 });
 
   const eventId = req.nextUrl.searchParams.get('event_id')?.trim() ?? '';
-  if (!eventId) {
-    return NextResponse.json({ error: 'Événement à contrôler requis.' }, { status: 400 });
-  }
+  if (!eventId) return NextResponse.json({ error: 'Événement à contrôler requis.' }, { status: 400 });
 
   const qrToken = extractQrToken(decodeURIComponent(params.token));
-  if (!qrToken) {
-    return NextResponse.json({ error: 'Code QR invalide.' }, { status: 400 });
-  }
+  if (!qrToken) return NextResponse.json({ error: 'Code QR invalide.' }, { status: 400 });
 
   const adminId = await getAdminId();
   if (!adminId) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  if (!access) return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
 
   const supabase = createServiceClient();
-  const { data: admin } = await supabase
-    .from('admin_users')
-    .select('role')
-    .eq('id', adminId)
-    .eq('active', true)
-    .maybeSingle();
-
   const { data: reservation } = await supabase
     .from('event_reservations')
     .select('id, tenant_id, event_id, customer_name, quantity_total, quantity_remaining, status')
     .eq('qr_token', qrToken)
     .maybeSingle();
 
-  if (!reservation || reservation.tenant_id !== tenant.id) {
-    return NextResponse.json({ error: 'Code QR invalide pour cette boutique.' }, { status: 404 });
-  }
+  if (!reservation || reservation.tenant_id !== tenant.id) return NextResponse.json({ error: 'Code QR invalide pour cette boutique.' }, { status: 404 });
+  if (reservation.event_id !== eventId) return NextResponse.json({ error: 'Ce billet appartient à un autre événement.' }, { status: 409 });
 
-  if (reservation.event_id !== eventId) {
-    return NextResponse.json({ error: 'Ce billet appartient à un autre événement.' }, { status: 409 });
-  }
-
-  const { data: eventRow } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', eventId)
-    .maybeSingle();
-
-  if (!eventRow || eventRow.tenant_id !== tenant.id) {
-    return NextResponse.json({ error: 'Événement introuvable pour cette boutique.' }, { status: 404 });
-  }
+  const { data: eventRow } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle();
+  if (!eventRow || eventRow.tenant_id !== tenant.id) return NextResponse.json({ error: 'Événement introuvable pour cette boutique.' }, { status: 404 });
 
   const { data: items } = await supabase
     .from('event_reservation_items')
@@ -121,9 +93,12 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
   const redemptionRows = redemptions ?? [];
   const adminIds = Array.from(new Set(redemptionRows.flatMap(redemption => [redemption.redeemed_by, redemption.voided_by]).filter((value): value is string => Boolean(value))));
   const { data: auditAdmins } = adminIds.length
-    ? await supabase.from('admin_users').select('id, email').in('id', adminIds)
-    : { data: [] as { id: string; email: string }[] };
-  const adminNameById = new Map((auditAdmins ?? []).map(auditUser => [auditUser.id, auditUser.email as string]));
+    ? await supabase.from('admin_users').select('id, email, first_name, last_name, nickname').in('id', adminIds)
+    : { data: [] as { id: string; email: string; first_name?: string | null; last_name?: string | null; nickname?: string | null }[] };
+  const adminNameById = new Map((auditAdmins ?? []).map(auditUser => [
+    auditUser.id,
+    auditUser.nickname || [auditUser.first_name, auditUser.last_name].filter(Boolean).join(' ') || auditUser.email,
+  ]));
 
   const redemptionsByItem = new Map<string, RedemptionRow[]>();
   for (const redemption of redemptionRows) {
@@ -132,17 +107,15 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     redemptionsByItem.set(redemption.reservation_item_id, list);
   }
 
-  const adminRole = admin?.role ?? null;
   const nowMs = Date.now();
+  const canUndoAny = canAdmin(access, 'scan.undo_any');
+  const canUndoOwn = canAdmin(access, 'scan.undo_own');
   const previewItems: ScanPreviewItem[] = itemRows.map(item => {
     const active = (redemptionsByItem.get(item.id) ?? []).filter(redemption => !redemption.voided_at);
     const quantityRedeemed = active.reduce((sum, redemption) => sum + redemption.quantity_redeemed, 0);
     const last = active[active.length - 1] ?? null;
     const lastAgeMs = last ? Math.max(0, nowMs - new Date(last.redeemed_at).getTime()) : Number.POSITIVE_INFINITY;
-    const elevated = adminRole === 'tenant_admin' || adminRole === 'platform_owner';
-    const cashierOwnRecent = adminRole === 'tenant_cashier'
-      && last?.redeemed_by === adminId
-      && lastAgeMs <= CASHIER_UNDO_WINDOW_MS;
+    const ownRecent = Boolean(canUndoOwn && last?.redeemed_by === adminId && lastAgeMs <= CASHIER_UNDO_WINDOW_MS);
 
     return {
       reservation_item_id: item.id,
@@ -154,8 +127,8 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
         quantity: last.quantity_redeemed,
         redeemed_at: last.redeemed_at,
         redeemed_by_name: last.redeemed_by ? adminNameById.get(last.redeemed_by) ?? null : null,
-        can_undo: elevated || cashierOwnRecent,
-        undo_requires_reason: elevated && (last.redeemed_by !== adminId || lastAgeMs > CASHIER_UNDO_WINDOW_MS),
+        can_undo: canUndoAny || ownRecent,
+        undo_requires_reason: canUndoAny && (last.redeemed_by !== adminId || lastAgeMs > CASHIER_UNDO_WINDOW_MS),
       } : null,
     };
   });
