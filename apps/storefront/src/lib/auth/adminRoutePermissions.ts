@@ -18,6 +18,7 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/evenementiel/services', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/galerie', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel', permission: 'events.view' },
+  { prefix: '/admin/orders', permission: 'orders.view' },
   { prefix: '/admin/checkout-funnel', permission: 'orders.view' },
   { prefix: '/admin/paiements-en-attente', permission: 'orders.view' },
   { prefix: '/admin/catalogue', permission: 'catalog.view' },
@@ -31,6 +32,10 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/billing', permission: 'billing.view' },
   { prefix: '/admin/ai-usage', permission: 'ai_usage.view' },
 ];
+
+export function isPersonalAdminPath(pathname: string): boolean {
+  return pathname.startsWith('/admin/securite');
+}
 
 export function permissionForAdminPath(pathname: string, workspace: AdminWorkspace): string | null {
   if (pathname === '/admin' || pathname === '/admin/') {
