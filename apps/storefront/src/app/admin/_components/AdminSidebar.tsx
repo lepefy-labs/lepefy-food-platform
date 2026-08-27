@@ -97,6 +97,7 @@ export default function AdminSidebar({
         <>
           <p className={groupLabel}>Plateforme</p>
           <Link href="/admin/team" className={linkClass(pathname === '/admin/team')}><IconUsers size={20} />Équipe</Link>
+          <Link href="/admin/platform/ai-usage" className={linkClass(pathname.startsWith('/admin/platform/ai-usage'))}><IconSparkles size={20} />Coûts IA</Link>
           <Link href="/admin/platform/notifications" className={linkClass(pathname.startsWith('/admin/platform/notifications'))}><IconBell size={20} />Tests notifications</Link>
         </>
       )}

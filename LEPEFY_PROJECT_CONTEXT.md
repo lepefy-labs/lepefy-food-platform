@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 27 agosto 2026 — **v5.7 Current-State Snapshot**
+> **Aggiornato:** 27 agosto 2026 — **v5.8 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -52,7 +52,7 @@ L'URL pubblico canonico della Boutique è `tenants.storefront_url`; `NEXT_PUBLIC
 
 Il modulo pubblico Événementiel può essere esposto su sottodominio dedicato tramite `NEXT_PUBLIC_EVENTS_SUBDOMAIN`; `next.config.mjs` usa rewrite host-based `beforeFiles` per instradare la surface events nello stesso deployment.
 
-Il progetto Vercel corrente può quindi servire più surface dello stesso tenant (`shop.*`, `events.*`) dallo stesso deployment. Questa è una soluzione intermedia: multi-tenant nel codice/dati, ma tenant resolution ancora deployment/env-based. Una futura infrastruttura host→tenant potrà sostituire `NEXT_PUBLIC_TENANT_SLUG` senza cambiare il nuovo concetto di surface/workspace.
+Il progetto Vercel corrente può quindi servire più surface dello stesso tenant (`shop.*`, `events.*`) dallo stesso deployment. Questa è una soluzione intermedia: multi-tenant nel codice/dati, ma tenant resolution ancora deployment/env-based. Una futura infrastruttura host→tenant potrà sostituire `NEXT_PUBLIC_TENANT_SLUG` senza cambiare il concetto di surface/workspace.
 
 `/admin/**` usa platform branding (`public.platform_branding`) indipendente dai colori tenant.
 
@@ -77,15 +77,11 @@ Superficie commerce primaria mobile-first. Preservare search sticky, `Nos univer
 
 ---
 
-## 6. Cart — stato, sync e UX
+## 6. Cart e checkout shop
 
 Il cart usa Zustand con persistenza guest e sync server-side per utenti autenticati con optimistic concurrency (`expectedVersion`). `/cart` modifica basket e avvia checkout; shipping, indirizzo e contatti appartengono al checkout. Nala è esclusa dal purchase funnel.
 
----
-
-## 7. Checkout shop — purchase-intent architecture
-
-Modello canonico:
+Modello checkout canonico:
 
 ```text
 cart -> checkout_session -> pagamento confermato -> order
@@ -103,31 +99,27 @@ Per cliente autenticato e tenant esiste al massimo una sessione `open`. Guest re
 
 Stock non riservato alla nascita della checkout session; pricing, stock, shipping quote/token, discount, PaymentIntent e completion restano server-side. `payment_funnel_logs` e `checkout_funnel_30d` coprono lifecycle/recovery. Payment Recovery v1 è manuale e limitato alle external-link unresolved.
 
----
-
-## 8. Telefono checkout
-
-UI obbligatoria ma alcune API shop modellano ancora `phone?: string | null`: technical debt da trattare in uno scope checkout dedicato.
+Telefono checkout: UI obbligatoria ma alcune API shop modellano ancora `phone?: string | null`; technical debt da trattare in uno scope checkout dedicato.
 
 ---
 
-## 9. Nala
+## 7. Nala
 
 Identità: `Nala`, “Assistant shopping par Lepefy”, primary `#6D5AF6`, tenant-independent. Non appare in `/cart`, `/checkout*` e superfici purchase funnel correlate.
 
 ---
 
-## 10. Pagamenti condivisi
+## 8. Pagamenti condivisi
 
 Componente centrale: `apps/storefront/src/components/payments/StripePaymentStep.tsx`. Non modificarlo senza verificare tutti i caller shop/event/rental/card. `payment_funnel_logs` è cross-module.
 
 ---
 
-## 11. Admin — core condiviso, workspace e ruoli
+## 9. Admin — core condiviso, workspace e ruoli
 
 Ruoli applicativi invariati: `platform_owner`, `tenant_admin`, `tenant_cashier`. `admin_users` resta la fonte per ruolo/tenant/active; authorization server-side obbligatoria anche se una voce è nascosta in UI.
 
-L'admin è ora modellato come **un solo Admin Core con due workspace UX**:
+L'admin è modellato come **un solo Admin Core con due workspace UX**:
 
 ```text
 request host
@@ -138,16 +130,11 @@ request host
 Il resolver canonico è `src/lib/admin/workspace.ts`. Non introdurre env separate per “admin shop/admin events”.
 
 Workspace Boutique:
-- Commandes;
-- Funnel checkout;
-- Catalogue;
-- Clients/Promotions (quando disponibili);
+- Commandes / Funnel checkout / Catalogue;
+- Clients/Promotions quando disponibili;
 - Slides accueil;
-- Fidélité / Parrainage;
-- Scan fidélité;
-- Livraison;
-- Ambassadeurs;
-- IA.
+- Opérations: Scan fidélité, Livraison;
+- Croissance: Fidélité / Parrainage, Ambassadeurs, IA.
 
 Workspace Événementiel:
 - Vue d’ensemble;
@@ -160,15 +147,15 @@ Workspace Événementiel:
 
 Paramètres, Abonnement e strumenti platform_owner restano condivisi. La stessa shell, auth, API, DB e design system servono entrambi i workspace.
 
-Lo switch Boutique→Événementiel usa `NEXT_PUBLIC_EVENTS_SUBDOMAIN` tramite il resolver centralizzato. Lo switch Événementiel→Boutique usa **`tenant.storefront_url` come source of truth canonica**, evitando hardcode tenant-specifici.
+Lo switch Boutique→Événementiel usa `NEXT_PUBLIC_EVENTS_SUBDOMAIN` tramite resolver centralizzato. Lo switch Événementiel→Boutique usa **`tenant.storefront_url` come source of truth canonica**.
 
-Su host events, `/admin` viene riscritto internamente verso `/admin/evenementiel`, mantenendo nel browser l'entry point `events.<tenant>/admin` e riusando l'overview eventi esistente.
+Su host events, `/admin` viene riscritto internamente verso `/admin/evenementiel`, mantenendo nel browser l'entry point `events.<tenant>/admin` e riusando l'overview eventi.
 
 `tenant_cashier` viene indirizzato alla superficie operativa coerente col workspace: scan fidélité sullo shop, `/scan` sull'host events.
 
 ---
 
-## 12. Admin Commandes / external payment operations
+## 10. Admin Commandes / external payment operations
 
 Nel workspace Boutique, `/admin` è il workspace operativo ordini. La queue **Paiements en attente** riguarda external-link senza `order_id`, separata dagli ordini. Stato canonico dopo provider handoff: `awaiting_verification`.
 
@@ -179,11 +166,11 @@ new -> preparing -> shipped -> delivered
 new -> preparing -> ready_for_pickup -> delivered
 ```
 
-Payment status e fulfillment status restano separati.
+Payment status e fulfillment status restano separati. La dashboard ordini privilegia stati operativi azionabili e nasconde le priorità a zero; il blocco external payments è comprimibile e non cambia il workflow di conferma pagamento.
 
 ---
 
-## 13. Événementiel
+## 11. Événementiel
 
 Route group pubblico `apps/storefront/src/app/(evenementiel)/`. Checkout evento ha state machine propria e non va confuso con `checkout_sessions` shop.
 
@@ -225,47 +212,77 @@ reservation -> reservation_items -> item_redemptions
 
 Scanner online-only per scan/ricerca/conferma/undo; API `force-dynamic`/`force-no-store`; KPI live con breakdown per formula.
 
-### Finestra check-in
-
 Migration `082_event_checkin_operations.sql` aggiunge `checkin_opens_at` e `checkin_closes_at` nullable. `NULL` significa nessuna restrizione temporale. Preview e POST verificano entrambi la finestra.
 
-### Undo / audit operatori
-
+Undo:
 - `tenant_cashier`: annulla solo propria redemption entro 5 minuti;
 - `tenant_admin` / `platform_owner`: override più ampio, motivo obbligatorio nei casi previsti;
 - undo sempre soft-void.
 
 ---
 
-## 14. Login admin e destinazione
+## 12. Login admin e destinazione
 
 Password login e OTP supportano un parametro `next` **solo relativo e same-origin** (`/…`, mai `//…`). Questo permette `/scan -> /admin/login?next=/scan -> /scan` senza introdurre open redirect.
 
-Non esiste ancora SSO cross-subdomain esplicito. Le sessioni Supabase non vengono in questo snapshot estese intenzionalmente a `.tenant-domain`; un eventuale SSO shop/events è uno scope auth/security separato.
+Non esiste ancora SSO cross-subdomain esplicito. Le sessioni Supabase non vengono estese intenzionalmente a `.tenant-domain`; un eventuale SSO shop/events è uno scope auth/security separato.
 
 ---
 
-## 15. Digital Card `/card`
+## 13. Digital Card `/card`
 
 Hub mobile tenant. Location usa `tenant.google_maps_url`; niente iframe/API Maps o geografia simulata. Quick Pay usa payment engine condiviso ma resta dominio indipendente dagli ordini shop.
 
 ---
 
-## 16. Shipping
+## 14. Shipping
 
 Packlink resta integrazione principale. Packaging, peso, splitting, quote, VAT, surcharge, country e tenant rules sono business logic sensibile; frontend non source of truth del costo.
 
 ---
 
-## 17. Notifiche
+## 15. Notifiche
 
 Spec: `docs/NOTIFICATION_JOURNEY_V1.md`. n8n è trasporto/orchestrazione; stato ordine/checkout, recipient resolution e payload restano source of truth nell'app. `tenant_notification_recipients` è source of truth destinatari interni.
 
 ---
 
-## 18. Database / migrations
+## 16. AI usage, product value e unit economics
+
+L'AI usa due livelli distinti che non vanno confusi:
+
+### Accounting tecnico Lepefy
+
+`public.ai_usage_log` è la source of truth per chiamate tecniche AI per tenant: endpoint, provider, model, token, immagini, status e `estimated_cost_usd`. `public.ai_pricing` mantiene il listino provider. `public.ai_usage_monthly_by_tenant` aggrega per mese/provider/endpoint.
+
+Questi dati sono **service-role only** e rappresentano cost accounting interno. Provider, model e costo industriale non devono essere esposti come valore commerciale al tenant.
+
+La console `/admin/platform/ai-usage` è riservata a `platform_owner` e mostra chiamate/costi provider del tenant corrente per il controllo unit economics.
+
+### Utilizzo prodotto tenant
+
+`src/lib/ai/productUsage.ts` è il layer semantico canonico che traduce endpoint tecnici in feature prodotto stabili:
+- Nala — Assistant shopping;
+- Recherche intelligente;
+- Descriptions produits;
+- Images produits;
+- Indexation catalogue;
+- Base de connaissance IA;
+- fallback `Autres usages IA` per endpoint futuri non ancora classificati.
+
+Ogni feature definisce label tenant, unità d'uso e `creditWeight`. Il `creditWeight` è **solo predisposizione architetturale**: non esistono ancora quota mensile commerciale, overage, blocco o supplemento fatturato.
+
+`/admin/billing` mostra ai tenant solo utilizzo per funzionalità e il messaggio che l'AI è attualmente inclusa nell'abbonamento. La pagina tenant non interroga più provider/model/costo.
+
+Quando verrà definita una policy commerciale, entitlement/limiti/credit pack/overage dovranno essere introdotti in uno scope billing dedicato e persistente; non derivare mai il prezzo tenant direttamente dal costo provider.
+
+---
+
+## 17. Database / migrations
 
 La presenza di una migration nel repo non prova che sia applicata in ogni Supabase remoto.
+
+AI accounting attuale deriva dalla migration `027_ai_rate_limiting_cost_tracking.sql`; il layer product usage introdotto nello snapshot v5.8 **non richiede una nuova migration**.
 
 Numerazione recente:
 
@@ -278,23 +295,23 @@ Numerazione recente:
 082_event_checkin_operations.sql
 ```
 
-Il refactor admin workspace **non richiede migration**: riusa `tenants.storefront_url` già esistente e l'attuale env events.
+Il refactor admin workspace non ha richiesto migration: riusa `tenants.storefront_url` già esistente e l'attuale env events.
 
 ---
 
-## 19. Supabase / auth
+## 18. Supabase / auth
 
 Browser: `src/lib/supabase/client.ts`. Server/service: `src/lib/supabase/server.ts`. Operazioni service-role server-only. Checkout guest supportato. Signed link Payment Recovery usa token HMAC esistente.
 
 ---
 
-## 20. UI conventions
+## 19. UI conventions
 
 Lingua storefront/admin principale: francese. Tabler Icons, mobile-first, touch target ~44px+, focus visibile, safe-area, reduced motion, niente dati fake, storefront branding tenant, admin branding piattaforma.
 
 ---
 
-## 21. File/moduli ad alto impatto
+## 20. File/moduli ad alto impatto
 
 ```text
 apps/storefront/src/components/payments/StripePaymentStep.tsx
@@ -305,6 +322,7 @@ apps/storefront/src/lib/checkout/*
 apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
 apps/storefront/src/lib/admin/workspace.ts
+apps/storefront/src/lib/ai/*
 apps/storefront/src/lib/notifications/*
 apps/storefront/src/app/api/checkout/*
 apps/storefront/src/app/api/checkout-sessions/*
@@ -318,7 +336,7 @@ supabase/migrations/*
 
 ---
 
-## 22. Known inconsistencies / technical debt
+## 21. Known inconsistencies / technical debt
 
 - collisione storica prefisso migration `071`: non rinominare retroattivamente;
 - telefono checkout non uniformemente server-enforced;
@@ -328,11 +346,12 @@ supabase/migrations/*
 - `event_reservation_redemptions` è legacy storico;
 - tenant resolution resta deployment/env-based (`NEXT_PUBLIC_TENANT_SLUG`); futura evoluzione consigliata: registry host/domain→tenant senza cambiare il resolver surface/workspace;
 - URL Events resta temporaneamente env-based; futuro modello consigliato: registry `tenant_domains` o equivalente;
-- SSO esplicito cross-subdomain shop/events non ancora introdotto.
+- SSO esplicito cross-subdomain shop/events non ancora introdotto;
+- catalogo feature/credit weight AI è oggi applicativo; quando esisterà una vera policy commerciale multi-plan dovrà evolvere verso entitlement/config persistente senza perdere la separazione da `ai_pricing` provider.
 
 ---
 
-## 23. Cambiamenti strutturali correnti
+## 22. Cambiamenti strutturali correnti
 
 ### Admin / piattaforma
 
@@ -342,7 +361,8 @@ supabase/migrations/*
 - `tenant.storefront_url` canonico per tornare alla Boutique;
 - host events `/admin` riusa overview Événementiel;
 - `/scan` separato dalla shell admin;
-- login admin supporta destinazione `next` same-origin.
+- login admin supporta destinazione `next` same-origin;
+- utilizzo AI tenant separato dai costi provider interni Lepefy.
 
 ### Cart / checkout
 
@@ -359,9 +379,17 @@ Purchase-intent persistente, una open session per cliente autenticato, `awaiting
 - ledger granulare canonico;
 - undo policy tracciata.
 
+### AI
+
+- raw provider accounting in `ai_usage_log`/`ai_pricing` resta interno;
+- product usage tenant aggregato tramite `productUsage.ts`;
+- `/admin/billing` espone valore/utilizzo, non costi industriali;
+- `/admin/platform/ai-usage` espone costi tecnici solo a `platform_owner`;
+- credits predisposti semanticamente ma non ancora monetizzati né applicati.
+
 ---
 
-## 24. Checklist e manutenzione
+## 23. Checklist e manutenzione
 
 Prima di consegnare codice:
 - target/base SHA verificati;
@@ -376,8 +404,8 @@ Aggiornare questo file quando cambiano architettura, route/module principali, wo
 
 ---
 
-# Fine snapshot v5.7
+# Fine snapshot v5.8
 
-**Base audit:** `main @ admin workspace domains refactor`  
+**Base audit:** `main @ AI usage product/platform separation`  
 **Data:** 27 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.
