@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { IconAlertTriangle, IconArrowLeft, IconClock, IconPackage, IconUser, IconWallet } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { formatPrice } from '@/lib/utils/format';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
@@ -68,6 +69,9 @@ function statusPresentation(status: string) {
 
 export default async function PendingPaymentManagementPage({ params }: { params: { id: string } }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  const canManageSession = Boolean(access && canAdmin(access, 'orders.manage'));
+  const canConfirmPayment = Boolean(access && canAdmin(access, 'shop_payments.confirm'));
   const supabase = createServiceClient();
 
   const { data: rawSession } = await supabase
@@ -172,38 +176,14 @@ export default async function PendingPaymentManagementPage({ params }: { params:
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={15} /> Client</div>
-          <p className="mt-2 truncate text-sm font-bold text-gray-950 dark:text-white">{customerLabel}</p>
-          <p className="mt-1 truncate text-xs text-gray-500">{session.email}</p>
-          {session.phone && <p className="mt-1 truncate text-xs text-gray-500">{session.phone}</p>}
-        </div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconWallet size={15} /> Paiement</div>
-          <p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{paymentLabel}</p>
-          <p className="mt-1 text-xl font-bold text-gray-950 dark:text-white">{formatPrice(total, tenant.currency)}</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconClock size={15} /> Ancienneté</div>
-          <p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{elapsedLabel(session.created_at)}</p>
-          <p className="mt-1 text-xs text-gray-500">Créé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(session.created_at))}</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconPackage size={15} /> Articles</div>
-          <p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{session.items.reduce((sum, item) => sum + item.quantity, 0)} unité(s)</p>
-          <p className="mt-1 line-clamp-2 text-xs text-gray-500">{session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ')}</p>
-        </div>
+        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={15} /> Client</div><p className="mt-2 truncate text-sm font-bold text-gray-950 dark:text-white">{customerLabel}</p><p className="mt-1 truncate text-xs text-gray-500">{session.email}</p>{session.phone && <p className="mt-1 truncate text-xs text-gray-500">{session.phone}</p>}</div>
+        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconWallet size={15} /> Paiement</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{paymentLabel}</p><p className="mt-1 text-xl font-bold text-gray-950 dark:text-white">{formatPrice(total, tenant.currency)}</p></div>
+        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconClock size={15} /> Ancienneté</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{elapsedLabel(session.created_at)}</p><p className="mt-1 text-xs text-gray-500">Créé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(session.created_at))}</p></div>
+        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconPackage size={15} /> Articles</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{session.items.reduce((sum, item) => sum + item.quantity, 0)} unité(s)</p><p className="mt-1 line-clamp-2 text-xs text-gray-500">{session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ')}</p></div>
       </div>
 
       <div className={`mb-5 rounded-2xl border p-4 ${status.tone}`}>
-        <div className="flex items-start gap-2">
-          <IconAlertTriangle size={19} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="font-bold">{status.label}</p>
-            <p className="mt-1 text-sm leading-6 opacity-90">{status.description}</p>
-            <p className="mt-1 text-xs font-semibold">Aucun stock n’est réservé tant que le paiement n’est pas confirmé.</p>
-          </div>
-        </div>
+        <div className="flex items-start gap-2"><IconAlertTriangle size={19} className="mt-0.5 shrink-0" /><div><p className="font-bold">{status.label}</p><p className="mt-1 text-sm leading-6 opacity-90">{status.description}</p><p className="mt-1 text-xs font-semibold">Aucun stock n’est réservé tant que le paiement n’est pas confirmé.</p></div></div>
       </div>
 
       <PaymentRecoveryActions
@@ -215,6 +195,8 @@ export default async function PendingPaymentManagementPage({ params }: { params:
         initialNextReminderAt={nextReminderAt}
         firstReminderAt={firstReminderAt}
         canResume={canResume && Boolean(resumeLink)}
+        canManageSession={canManageSession}
+        canConfirmPayment={canConfirmPayment}
       />
     </div>
   );
