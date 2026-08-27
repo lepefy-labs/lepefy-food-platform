@@ -168,7 +168,7 @@ select au.id,
        au.active
 from public.admin_users au
 join public.admin_roles r on r.code = au.role
-on conflict (user_id, coalesce(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid)) do nothing;
+on conflict do nothing;
 
 comment on table public.admin_permissions is 'Stable capability catalog enforced by application code. Roles are dynamically composed from this catalog.';
 comment on table public.admin_roles is 'Dynamic RBAC roles. platform_owner is a protected system role; tenant roles can be configured by Platform Owner.';
