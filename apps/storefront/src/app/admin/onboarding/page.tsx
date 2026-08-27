@@ -63,8 +63,8 @@ export default async function AdminOnboardingPage({ searchParams }: { searchPara
         <h1 className="mt-2 text-2xl font-semibold text-gray-950">{editing ? 'Mon profil' : 'Bienvenue dans votre espace admin'}</h1>
         <p className="mt-2 text-sm leading-6 text-gray-500">
           {editing
-            ? 'Mettez à jour les informations utilisées pour vous identifier dans les opérations et les journaux d’audit.'
-            : 'Avant de commencer, renseignez vos informations. Elles permettent d’identifier clairement chaque action réalisée dans l’administration.'}
+            ? 'Mettez à jour vos informations de profil.'
+            : 'Avant de commencer, renseignez vos informations.'}
         </p>
         <AdminProfileForm
           email={admin.email ?? user.email ?? ''}
