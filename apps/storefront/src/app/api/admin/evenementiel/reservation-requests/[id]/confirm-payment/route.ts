@@ -6,17 +6,14 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import type { EventReservationRequest } from '@lepefy/types';
 
-// Confirmation manuelle d'un paiement via lien externe (PayPal/Revolut/autre
-// — Phase 2, billetterie événementiel). Aucun webhook n'existe pour ces
-// liens : c'est l'organisateur qui confirme depuis le bandeau "Paiements en
-// attente" (EventDetailAdminClient.tsx) après avoir vérifié la réception du
-// paiement côté PayPal/Revolut.
+// Confirmation manuelle d'un paiement via lien externe (PayPal/Revolut/autre).
+// Aucune réservation n'existe avant cette décision admin.
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant     = await getTenant(tenantSlug);
+  const tenant = await getTenant(tenantSlug);
 
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
@@ -41,13 +38,13 @@ export async function POST(
   }
 
   const result = await createEventReservationFromRequest(supabase, {
-    eventId:       request.event_id,
-    tenantId:      request.tenant_id,
-    items:         request.items,
-    customerName:  request.customer_name,
+    eventId: request.event_id,
+    tenantId: request.tenant_id,
+    items: request.items,
+    customerName: request.customer_name,
     customerEmail: request.customer_email,
     customerPhone: request.customer_phone ?? '',
-    amountPaid:    request.amount,
+    amountPaid: request.amount,
   });
 
   if ('error' in result) {
@@ -55,7 +52,12 @@ export async function POST(
       await supabase
         .from('event_reservation_requests')
         .update({ status: 'stock_conflict' })
-        .eq('id', request.id);
+        .eq('id', request.id)
+        .eq('status', 'pending');
+
+      revalidatePath('/admin/evenementiel/reservations');
+      revalidatePath(`/admin/evenementiel/paiements-en-attente/${request.id}`);
+      revalidatePath(`/admin/evenementiel/evenements/${request.event_id}`);
 
       return NextResponse.json({
         warning:
@@ -64,29 +66,29 @@ export async function POST(
       });
     }
 
-    console.error('[admin/evenementiel/reservation-requests/confirm-payment] createEventReservationFromRequest failed:',
-      result.error, '— request:', request.id);
+    console.error('[admin/evenementiel/reservation-requests/confirm-payment] createEventReservationFromRequest failed:', result.error, '— request:', request.id);
     return NextResponse.json({ error: 'Erreur lors de la création de la réservation.' }, { status: 500 });
   }
 
   const { error: updateError } = await supabase
     .from('event_reservation_requests')
     .update({
-      status:         'confirmed',
-      confirmed_at:   new Date().toISOString(),
+      status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
       reservation_id: result.reservationId,
     })
-    .eq('id', request.id);
+    .eq('id', request.id)
+    .eq('status', 'pending');
 
   if (updateError) {
-    console.error('[admin/evenementiel/reservation-requests/confirm-payment] request update error:', updateError,
-      '— request:', request.id);
+    console.error('[admin/evenementiel/reservation-requests/confirm-payment] request update error:', updateError, '— request:', request.id);
   }
 
-  console.info('[admin/evenementiel/reservation-requests/confirm-payment] Reservation created — id:', result.reservationId,
-    '— request:', request.id);
+  console.info('[admin/evenementiel/reservation-requests/confirm-payment] Reservation created — id:', result.reservationId, '— request:', request.id);
 
   revalidatePath('/admin');
+  revalidatePath('/admin/evenementiel/reservations');
+  revalidatePath(`/admin/evenementiel/paiements-en-attente/${request.id}`);
   revalidatePath(`/admin/evenementiel/evenements/${request.event_id}`);
 
   return NextResponse.json({ reservationId: result.reservationId });
