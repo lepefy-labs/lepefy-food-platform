@@ -48,7 +48,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
           {eventsAdminUrl && canEvents && <a href={eventsAdminUrl} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm ${workspace === 'events' ? 'bg-[var(--admin-primary-soft)] font-semibold text-[var(--admin-primary-fg)]' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800'}`}><IconCalendarEvent size={16} /><span className="flex-1">Événementiel</span>{workspace === 'events' && <span className="h-1.5 w-1.5 rounded-full bg-[var(--admin-primary)]" />}</a>}
         </div>
       </details>
-      <div className="flex min-w-0 flex-1 justify-end md:mx-3 md:max-w-xl md:justify-start"><AdminGlobalSearch workspace={workspace} /></div>
+      <div className="flex min-w-0 flex-1 justify-end md:mx-3 md:max-w-xl md:justify-start"><AdminGlobalSearch workspace={workspace} permissions={permissions} isPlatformOwner={isPlatformOwner} /></div>
       <div className="ml-auto flex items-center gap-0.5 sm:gap-1"><NotificationBell /><ThemeToggleButton /><AdminUserMenu adminEmail={adminEmail} adminDisplayName={adminDisplayName} /></div>
     </header>
   );
