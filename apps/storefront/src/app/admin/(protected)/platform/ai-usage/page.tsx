@@ -17,10 +17,6 @@ interface CostRow {
   total_cost_usd: number | string;
 }
 
-function formatUsd(amount: number): string {
-  return `$${amount.toFixed(4)}`;
-}
-
 function monthKey(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -72,18 +68,12 @@ export default async function PlatformAiUsagePage() {
     .order('endpoint', { ascending: true });
 
   const historyRows = (data ?? []) as CostRow[];
-  const currentKey = monthKey(currentMonthStart);
-  const rows = historyRows.filter((row) => monthKey(row.month) === currentKey);
-  const totalCalls = rows.reduce((sum, row) => sum + (Number(row.total_calls) || 0), 0);
-  const totalCost = rows.reduce((sum, row) => sum + (Number(row.total_cost_usd) || 0), 0);
-
-  const monthlyTotals = new Map<string, { calls: number; cost: number }>();
+  const rowsByMonth = new Map<string, CostRow[]>();
   for (const row of historyRows) {
     const key = monthKey(row.month);
-    const current = monthlyTotals.get(key) ?? { calls: 0, cost: 0 };
-    current.calls += Number(row.total_calls) || 0;
-    current.cost += Number(row.total_cost_usd) || 0;
-    monthlyTotals.set(key, current);
+    const rows = rowsByMonth.get(key) ?? [];
+    rows.push(row);
+    rowsByMonth.set(key, rows);
   }
 
   const monthFormatter = new Intl.DateTimeFormat('fr-FR', { month: 'short', timeZone: 'UTC' });
@@ -91,101 +81,48 @@ export default async function PlatformAiUsagePage() {
   const historyPoints: AiCostHistoryPoint[] = Array.from({ length: 12 }, (_, index) => {
     const date = new Date(Date.UTC(historyStart.getUTCFullYear(), historyStart.getUTCMonth() + index, 1));
     const key = monthKey(date);
-    const monthly = monthlyTotals.get(key) ?? { calls: 0, cost: 0 };
+    const monthRows = rowsByMonth.get(key) ?? [];
+    const details = monthRows.map((row) => ({
+      feature: featureForAiEndpoint(row.endpoint).label,
+      provider: row.provider,
+      endpoint: row.endpoint,
+      calls: Number(row.total_calls) || 0,
+      cost: Number(row.total_cost_usd) || 0,
+    }));
     return {
       key,
       label: monthFormatter.format(date).replace('.', ''),
       fullLabel: fullMonthFormatter.format(date),
-      cost: monthly.cost,
-      calls: monthly.calls,
+      cost: details.reduce((sum, row) => sum + row.cost, 0),
+      calls: details.reduce((sum, row) => sum + row.calls, 0),
+      details,
     };
   });
 
-  const currentCost = historyPoints[historyPoints.length - 1]?.cost ?? 0;
-  const previousCost = historyPoints[historyPoints.length - 2]?.cost ?? 0;
-  const totalCost12Months = historyPoints.reduce((sum, point) => sum + point.cost, 0);
-
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Plateforme</p>
-        <h1 className="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Coûts IA</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Unit economics techniques pour {tenant.name}. Cette vue est réservée à Lepefy.
-        </p>
+    <div className="mx-auto w-full max-w-6xl space-y-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Plateforme</p>
+          <h1 className="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Coûts IA</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Suivi des coûts provider pour {tenant.name}. Cette vue est réservée à Lepefy.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            12 derniers mois
+          </span>
+          <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+            IA incluse · $0 facturé au tenant
+          </span>
+        </div>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-xs font-medium text-gray-500">Appels ce mois</p>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{totalCalls}</p>
-        </div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-xs font-medium text-gray-500">Coût provider estimé</p>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{formatUsd(totalCost)}</p>
-        </div>
-        <div className="rounded-2xl border border-green-200 bg-green-50/70 p-4 shadow-sm dark:border-green-900 dark:bg-green-950/20">
-          <p className="text-xs font-medium text-green-700 dark:text-green-300">Facturé au tenant pour l’IA</p>
-          <p className="mt-2 text-2xl font-bold text-green-900 dark:text-green-100">$0.0000</p>
-          <p className="mt-1 text-[11px] text-green-700 dark:text-green-300">Actuellement incluse dans le plan</p>
-        </div>
-      </section>
-
-      <AiCostHistoryChart
-        points={historyPoints}
-        currentCost={currentCost}
-        previousCost={previousCost}
-        totalCost12Months={totalCost12Months}
-      />
-
-      <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Détail technique · mois courant</h2>
-          <p className="mt-1 text-xs text-gray-400">Provider, endpoint et coûts restent internes à la plateforme.</p>
-        </div>
-
-        {rows.length === 0 ? (
-          <p className="p-5 text-sm text-gray-400">Aucune utilisation IA enregistrée ce mois-ci.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70 text-left text-xs text-gray-400 dark:border-gray-800 dark:bg-gray-950/40">
-                  <th className="px-5 py-3 font-medium">Fonction produit</th>
-                  <th className="px-4 py-3 font-medium">Provider</th>
-                  <th className="px-4 py-3 font-medium">Endpoint</th>
-                  <th className="px-4 py-3 text-right font-medium">Appels</th>
-                  <th className="px-5 py-3 text-right font-medium">Coût estimé</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const feature = featureForAiEndpoint(row.endpoint);
-                  return (
-                    <tr key={`${row.provider}-${row.endpoint}`} className="border-b border-gray-50 last:border-0 dark:border-gray-800">
-                      <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-200">{feature.label}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{row.provider}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300">{row.endpoint}</td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{Number(row.total_calls) || 0}</td>
-                      <td className="px-5 py-3 text-right font-medium text-gray-900 dark:text-white">{formatUsd(Number(row.total_cost_usd) || 0)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-gray-200 bg-gray-50/60 dark:border-gray-700 dark:bg-gray-950/40">
-                  <td colSpan={3} className="px-5 py-3 font-semibold text-gray-700 dark:text-gray-200">Total du mois</td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-950 dark:text-white">{totalCalls}</td>
-                  <td className="px-5 py-3 text-right font-bold text-gray-950 dark:text-white">{formatUsd(totalCost)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </section>
+      <AiCostHistoryChart points={historyPoints} />
 
       <p className="text-xs text-gray-400">
-        Les crédits produit sont préparés dans le catalogue applicatif mais aucun quota, overage ou supplément IA n’est appliqué aujourd’hui.
+        Les coûts restent des données internes de unit economics. Aucun quota, overage ou supplément IA n’est appliqué au tenant aujourd’hui.
       </p>
     </div>
   );
