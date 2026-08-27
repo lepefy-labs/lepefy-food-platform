@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useTenant } from '@/providers/TenantProvider';
+import { useOptionalTenant } from '@/providers/TenantProvider';
 
 type TenantLogoVariant = 'header' | 'hero' | 'compact';
 
@@ -45,9 +45,13 @@ export function TenantLogo({
   identity,
   fallbackClassName = '',
 }: TenantLogoProps) {
-  const contextTenant = useTenant();
+  const contextTenant = useOptionalTenant();
   const tenant = identity ?? contextTenant;
   const styles = VARIANTS[variant];
+
+  if (!tenant) {
+    throw new Error('TenantLogo requires a TenantProvider or an explicit identity prop');
+  }
 
   if (!tenant.logo_url) {
     if (!showNameFallback) return null;
