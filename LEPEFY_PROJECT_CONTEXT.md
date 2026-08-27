@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 27 agosto 2026 — **v5.9 Current-State Snapshot**
+> **Aggiornato:** 27 agosto 2026 — **v6.0 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -178,9 +178,30 @@ Route group pubblico `apps/storefront/src/app/(evenementiel)/`. Checkout evento 
 
 `event_gallery_photos` è source of truth immagini. `is_social_share` marca foto approvate. Social card 9:16 server-side tramite `/api/evenementiel/events/[slug]/social-card?photo=<gallery-photo-id>`.
 
-### Prenotazioni e biglietti
+### Prenotazioni e pagamenti esterni
 
 `event_reservations` nasce solo dopo conferma del pagamento/confirmation flow previsto. Il QR token resta stabile. Quantità acquistate in `event_reservation_items`.
+
+I pagamenti via link esterno (PayPal/Revolut/altri) restano separati dal checkout Shop e usano `event_reservation_requests`. Lifecycle canonico:
+
+```text
+pending -> confirmed | stock_conflict | cancelled
+```
+
+Finché la request è `pending` **nessuna capacità/posto è riservata**. La conferma manuale admin crea la reservation attraverso `createEventReservationFromRequest`; il controllo finale di capacità resta server-side. `stock_conflict` richiede gestione/rimborso manuale sul provider esterno.
+
+Surface admin canoniche:
+
+```text
+/admin/evenementiel/reservations
+/admin/evenementiel/paiements-en-attente/[request-id]
+```
+
+`Réservations / Paiements` è una queue cross-evento che separa le reservation confermate dai pagamenti esterni da verificare. Il dettaglio evento espone solo una mini-queue con link alla fiche pagamento: la decisione `Confirmer réception` non è più inline nel summary evento.
+
+La fiche pagamento mostra cliente, evento, formule, importo, anzianità, provider/link esterno e stato prima di consentire la conferma. L'annullamento conserva la request in stato `cancelled` e non effettua alcun rimborso presso il provider.
+
+Migration `083_event_external_payment_cancellation.sql` estende il check di `event_reservation_requests.status` con `cancelled` e aggiunge `cancelled_at`.
 
 ### Scanner / Service repas
 
@@ -284,7 +305,7 @@ Quando verrà definita una policy commerciale, entitlement/limiti/credit pack/ov
 
 La presenza di una migration nel repo non prova che sia applicata in ogni Supabase remoto.
 
-AI accounting attuale deriva dalla migration `027_ai_rate_limiting_cost_tracking.sql`; il layer product usage e lo storico tenant dello snapshot v5.9 **non richiedono una nuova migration**.
+AI accounting attuale deriva dalla migration `027_ai_rate_limiting_cost_tracking.sql`; il layer product usage e lo storico tenant dello snapshot v5.9 non richiedono una nuova migration.
 
 Numerazione recente:
 
@@ -295,6 +316,7 @@ Numerazione recente:
 080_external_payment_tenant_notifications.sql
 081_event_gallery_social_share.sql
 082_event_checkin_operations.sql
+083_event_external_payment_cancellation.sql
 ```
 
 Il refactor admin workspace non ha richiesto migration: riusa `tenants.storefront_url` già esistente e l'attuale env events.
@@ -329,6 +351,7 @@ apps/storefront/src/lib/notifications/*
 apps/storefront/src/app/api/checkout/*
 apps/storefront/src/app/api/checkout-sessions/*
 apps/storefront/src/app/api/admin/evenementiel/scan/*
+apps/storefront/src/app/api/admin/evenementiel/reservation-requests/*
 apps/storefront/src/app/api/webhooks/stripe/*
 apps/storefront/src/app/admin/*
 apps/storefront/src/app/scan/*
@@ -344,7 +367,7 @@ supabase/migrations/*
 - telefono checkout non uniformemente server-enforced;
 - legacy `CheckoutForm.tsx`: verificare caller prima della rimozione;
 - abandoned-checkout outbound automatico non abilitato senza policy consenso/timing;
-- admin external-payment confirm/cancel richiede controllo concurrency;
+- admin Shop external-payment confirm/cancel richiede controllo concurrency dedicato;
 - `event_reservation_redemptions` è legacy storico;
 - tenant resolution resta deployment/env-based (`NEXT_PUBLIC_TENANT_SLUG`); futura evoluzione consigliata: registry host/domain→tenant senza cambiare il resolver surface/workspace;
 - URL Events resta temporaneamente env-based; futuro modello consigliato: registry `tenant_domains` o equivalente;
@@ -374,6 +397,9 @@ Purchase-intent persistente, una open session per cliente autenticato, `awaiting
 ### Événementiel
 
 - social kit da gallery approvata;
+- `Réservations / Paiements` è surface operativa cross-evento per pending external payments e reservation recenti;
+- conferma pagamento esterno Events avviene da fiche dedicata, non inline nel summary evento;
+- `event_reservation_requests`: `pending -> confirmed | stock_conflict | cancelled`, nessuna capacità riservata prima della conferma;
 - scanner orientato al service repas e vincolato a `event_id`;
 - camera primaria, ricerca senza QR fallback;
 - STOP biglietto esaurito;
@@ -408,8 +434,8 @@ Aggiornare questo file quando cambiano architettura, route/module principali, wo
 
 ---
 
-# Fine snapshot v5.9
+# Fine snapshot v6.0
 
-**Base audit:** `main @ tenant AI usage history separation`  
+**Base audit:** `main @ event external-payment operations workspace`  
 **Data:** 27 agosto 2026  
 **Obiettivo:** descrivere la situazione architetturale reale del codebase, non la cronologia delle conversazioni.
