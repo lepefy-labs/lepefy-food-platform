@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { IconArrowUpRight, IconCash, IconPhoto, IconX } from '@tabler/icons-react';
 
 export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string }) {
@@ -21,6 +22,30 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [open]);
+
+  const priceListModal = open ? createPortal(
+    <div className="fixed inset-0 z-[100] flex flex-col bg-black/[.92]" role="dialog" aria-modal="true" aria-label="Tarifs sur place" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+      <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/80 px-4 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] text-white backdrop-blur-sm sm:px-6">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/60">Événement</p>
+          <h2 className="text-base font-bold sm:text-lg">Tarifs sur place</h2>
+        </div>
+        <button ref={closeButtonRef} type="button" onClick={() => setOpen(false)} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-gray-950 shadow-lg transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black" aria-label="Fermer la carte des prix">
+          <IconX size={20} /> Fermer
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-5">
+        <div className="mx-auto flex min-h-full max-w-5xl items-start justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="Carte des tarifs des plats et boissons vendus sur place" className="h-auto w-auto max-w-full rounded-lg bg-white object-contain shadow-2xl sm:max-h-[calc(100vh-8rem)]" />
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-white/10 bg-black/70 px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 text-center backdrop-blur-sm">
+        <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Ouvrir l’image pour zoomer <IconArrowUpRight size={15} /></a>
+      </div>
+    </div>,
+    document.body,
+  ) : null;
 
   return (
     <>
@@ -46,26 +71,7 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
         </div>
       </section>
 
-      {open && (
-        <div className="fixed inset-0 z-[90] flex flex-col bg-black/92" role="dialog" aria-modal="true" aria-label="Tarifs sur place" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
-          <div className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-black/45 px-4 py-3 text-white backdrop-blur-sm sm:px-6">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/60">Événement</p>
-              <h2 className="text-base font-bold sm:text-lg">Tarifs sur place</h2>
-            </div>
-            <button ref={closeButtonRef} type="button" onClick={() => setOpen(false)} className="grid size-11 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white" aria-label="Fermer la carte des prix"><IconX size={22} /></button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-5">
-            <div className="mx-auto flex min-h-full max-w-5xl items-start justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageUrl} alt="Carte des tarifs des plats et boissons vendus sur place" className="h-auto w-auto max-w-full rounded-lg bg-white object-contain shadow-2xl sm:max-h-[calc(100vh-8rem)]" />
-            </div>
-          </div>
-          <div className="shrink-0 border-t border-white/10 bg-black/55 px-4 py-3 text-center backdrop-blur-sm">
-            <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Ouvrir l’image pour zoomer <IconArrowUpRight size={15} /></a>
-          </div>
-        </div>
-      )}
+      {priceListModal}
     </>
   );
 }
