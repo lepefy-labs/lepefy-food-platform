@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconArrowUpRight, IconCash, IconPhoto, IconX } from '@tabler/icons-react';
+import { IconArrowUpRight, IconCash, IconCheck, IconPhoto, IconShare, IconX } from '@tabler/icons-react';
 
 export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string }) {
   const [open, setOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -22,6 +23,26 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [open]);
+
+  const sharePriceList = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Tarifs sur place',
+          text: 'Découvrez les tarifs sur place de cet événement.',
+          url,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1800);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+  };
 
   const priceListModal = open ? createPortal(
     <div className="fixed inset-0 z-[100] flex flex-col bg-black/[.92]" role="dialog" aria-modal="true" aria-label="Tarifs sur place" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
@@ -41,7 +62,10 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
         </div>
       </div>
       <div className="shrink-0 border-t border-white/10 bg-black/70 px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 text-center backdrop-blur-sm">
-        <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">Ouvrir l’image pour zoomer <IconArrowUpRight size={15} /></a>
+        <button type="button" onClick={sharePriceList} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white" aria-label="Partager les tarifs sur place">
+          {shareCopied ? <IconCheck size={17} /> : <IconShare size={17} />}
+          {shareCopied ? 'Lien copié' : 'Partager'}
+        </button>
       </div>
     </div>,
     document.body,
