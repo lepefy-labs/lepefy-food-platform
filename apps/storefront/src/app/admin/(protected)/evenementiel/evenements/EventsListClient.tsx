@@ -27,6 +27,7 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   const [dateStart, setDateStart] = useState('');
   const [location, setLocation] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [reportFallbackHours, setReportFallbackHours] = useState('2');
   const [bannerImageUrl, setBannerImageUrl] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [ticketTypes, setTicketTypes] = useState<DraftTicketType[]>([]);
@@ -40,37 +41,29 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   const visibleEvents = useMemo(() => {
     const now = Date.now();
     const q = search.trim().toLocaleLowerCase('fr');
-    return events
-      .filter((event) => {
-        const start = new Date(event.date_start).getTime();
-        if (filter === 'upcoming') return start >= now && event.status !== 'cancelled' && event.status !== 'closed';
-        if (filter === 'drafts') return event.status === 'draft';
-        if (filter === 'history') return start < now || event.status === 'closed' || event.status === 'cancelled';
-        return true;
-      })
-      .filter((event) => !q || `${event.title} ${event.location ?? ''}`.toLocaleLowerCase('fr').includes(q))
-      .sort((a, b) => {
-        const aTime = new Date(a.date_start).getTime();
-        const bTime = new Date(b.date_start).getTime();
-        return filter === 'history' ? bTime - aTime : aTime - bTime;
-      });
+    return events.filter((event) => {
+      const start = new Date(event.date_start).getTime();
+      if (filter === 'upcoming') return start >= now && event.status !== 'cancelled' && event.status !== 'closed';
+      if (filter === 'drafts') return event.status === 'draft';
+      if (filter === 'history') return start < now || event.status === 'closed' || event.status === 'cancelled';
+      return true;
+    }).filter((event) => !q || `${event.title} ${event.location ?? ''}`.toLocaleLowerCase('fr').includes(q)).sort((a, b) => {
+      const aTime = new Date(a.date_start).getTime();
+      const bTime = new Date(b.date_start).getTime();
+      return filter === 'history' ? bTime - aTime : aTime - bTime;
+    });
   }, [events, filter, search]);
 
   async function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]; if (!file) return;
     setError(null); setUploadingBanner(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file); formData.append('kind', 'event-banner');
+      const formData = new FormData(); formData.append('file', file); formData.append('kind', 'event-banner');
       const res = await fetch('/api/admin/evenementiel/upload-image', { method: 'POST', body: formData });
       const result = await res.json();
       if (!res.ok) { setError(result.error ?? 'Erreur lors du téléversement de la bannière.'); return; }
       setBannerImageUrl(result.imageUrl);
-    } finally {
-      setUploadingBanner(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    } finally { setUploadingBanner(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   }
 
   function addTicketTypeRow() { setTicketTypes((prev) => [...prev, { label: '', description: '', price: '' }]); }
@@ -80,7 +73,9 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault(); setError(null);
     const capacityNum = Number(capacity);
+    const fallbackHours = Number(reportFallbackHours);
     if (!title.trim() || !dateStart || !Number.isInteger(capacityNum) || capacityNum < 0) { setError('Titre, date et capacité valides requis.'); return; }
+    if (!Number.isInteger(fallbackHours) || fallbackHours < 1 || fallbackHours > 168) { setError('Le délai des rapports doit être compris entre 1 et 168 heures.'); return; }
     const ticketTypesPayload: { label: string; description: string | null; price: number }[] = [];
     for (const t of ticketTypes) {
       const price = Number(t.price);
@@ -91,12 +86,16 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
     try {
       const res = await fetch('/api/admin/evenementiel/events', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), slug: slugify(title), date_start: new Date(dateStart).toISOString(), location: location.trim() || null, capacity_total: capacityNum, status: 'draft', banner_image_url: bannerImageUrl, ticket_types: ticketTypesPayload }),
+        body: JSON.stringify({
+          title: title.trim(), slug: slugify(title), date_start: new Date(dateStart).toISOString(), location: location.trim() || null,
+          capacity_total: capacityNum, status: 'draft', banner_image_url: bannerImageUrl, ticket_types: ticketTypesPayload,
+          booking_close_reports_fallback_hours: fallbackHours,
+        }),
       });
       const result = await res.json();
       if (!res.ok) { setError(result.error ?? 'Erreur lors de la création.'); return; }
       setEvents((prev) => [result, ...prev]); setShowForm(false); setFilter('drafts');
-      setTitle(''); setDateStart(''); setLocation(''); setCapacity(''); setBannerImageUrl(null); setTicketTypes([]);
+      setTitle(''); setDateStart(''); setLocation(''); setCapacity(''); setReportFallbackHours('2'); setBannerImageUrl(null); setTicketTypes([]);
     } catch { setError('Erreur réseau.'); } finally { setIsSubmitting(false); }
   }
 
@@ -108,10 +107,7 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Button type="button" onClick={() => setShowForm((v) => !v)}><IconPlus size={16} /> Nouvel événement</Button>
-        <label className="relative w-full sm:max-w-xs">
-          <span className="sr-only">Rechercher un événement</span><IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className={`${inputClass} pl-9`} />
-        </label>
+        <label className="relative w-full sm:max-w-xs"><span className="sr-only">Rechercher un événement</span><IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className={`${inputClass} pl-9`} /></label>
       </div>
 
       <div className="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900" role="tablist" aria-label="Filtrer les événements">
@@ -123,13 +119,11 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre de l'événement" className={inputClass} />
           <div className="grid gap-3 sm:grid-cols-2"><input value={dateStart} onChange={(e) => setDateStart(e.target.value)} type="datetime-local" className={inputClass} /><input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Capacité totale" className={inputClass} /></div>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Lieu (optionnel)" className={inputClass} />
-          <div><p className="mb-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">Bannière</p>{bannerImageUrl && <img src={bannerImageUrl} alt="Aperçu de la bannière" className="mb-2 max-h-40 w-full rounded-lg object-cover" />}
-            <label className="inline-flex min-h-11 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold dark:border-gray-700"><IconUpload size={14} /> {uploadingBanner ? 'Téléversement…' : bannerImageUrl ? 'Changer l’image' : 'Ajouter une bannière'}<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={uploadingBanner} /></label>
-          </div>
-          <div><div className="mb-1.5 flex items-center justify-between"><p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Formules</p><Button type="button" variant="ghost" size="sm" onClick={addTicketTypeRow}><IconPlus size={14} /> Ajouter une formule</Button></div>
-            {ticketTypes.length === 0 && <p className="text-xs text-gray-400">Aucune formule — un événement publié doit avoir au moins une formule.</p>}
-            <div className="space-y-2">{ticketTypes.map((t, i) => <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-gray-100 p-2 dark:border-gray-800"><div className="flex items-start gap-2"><input value={t.label} onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)} placeholder="Nom de la formule" className={`${flexInputClass} min-w-0 flex-1`} /><input value={t.price} onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)} placeholder="Prix €" inputMode="decimal" className={`${flexInputClass} w-24 shrink-0`} /><Button type="button" variant="ghost" size="sm" onClick={() => removeTicketTypeRow(i)} className="shrink-0" title="Supprimer la formule"><IconTrash size={16} /></Button></div><input value={t.description} onChange={(e) => updateTicketTypeRow(i, 'description', e.target.value)} placeholder="Description (optionnel)" className={inputClass} /></div>)}</div>
-          </div>
+          <label className="block rounded-lg border border-violet-100 bg-violet-50/40 p-3 text-xs font-semibold text-gray-700 dark:border-violet-950/50 dark:bg-violet-950/20 dark:text-gray-200">Envoi des rapports si aucune clôture n’est définie
+            <span className="mt-1.5 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={reportFallbackHours} onChange={(e) => setReportFallbackHours(e.target.value)} className={`${flexInputClass} w-24`} /><span className="font-normal text-gray-500">heure(s) avant le début · défaut 2 h</span></span>
+          </label>
+          <div><p className="mb-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">Bannière</p>{bannerImageUrl && <img src={bannerImageUrl} alt="Aperçu de la bannière" className="mb-2 max-h-40 w-full rounded-lg object-cover" />}<label className="inline-flex min-h-11 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold dark:border-gray-700"><IconUpload size={14} /> {uploadingBanner ? 'Téléversement…' : bannerImageUrl ? 'Changer l’image' : 'Ajouter une bannière'}<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={uploadingBanner} /></label></div>
+          <div><div className="mb-1.5 flex items-center justify-between"><p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Formules</p><Button type="button" variant="ghost" size="sm" onClick={addTicketTypeRow}><IconPlus size={14} /> Ajouter une formule</Button></div>{ticketTypes.length === 0 && <p className="text-xs text-gray-400">Aucune formule — un événement publié doit avoir au moins une formule.</p>}<div className="space-y-2">{ticketTypes.map((t, i) => <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-gray-100 p-2 dark:border-gray-800"><div className="flex items-start gap-2"><input value={t.label} onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)} placeholder="Nom de la formule" className={`${flexInputClass} min-w-0 flex-1`} /><input value={t.price} onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)} placeholder="Prix €" inputMode="decimal" className={`${flexInputClass} w-24 shrink-0`} /><Button type="button" variant="ghost" size="sm" onClick={() => removeTicketTypeRow(i)} className="shrink-0" title="Supprimer la formule"><IconTrash size={16} /></Button></div><input value={t.description} onChange={(e) => updateTicketTypeRow(i, 'description', e.target.value)} placeholder="Description (optionnel)" className={inputClass} /></div>)}</div></div>
           {error && <p className="text-xs text-red-500">{error}</p>}<Button type="submit" loading={isSubmitting}>{isSubmitting ? 'Création…' : 'Créer'}</Button>
         </form>
       )}

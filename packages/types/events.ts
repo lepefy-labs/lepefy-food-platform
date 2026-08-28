@@ -3,6 +3,7 @@
 // (Traiteur / Location Matériel) et la galerie photo associée.
 
 export type EventStatus = 'draft' | 'published' | 'closed' | 'cancelled';
+export type EventBookingCloseReportStatus = 'pending' | 'sending' | 'sent' | 'error';
 
 export interface EventHighlight {
   icon: string;
@@ -18,6 +19,13 @@ export interface EventRow {
   description: string | null;
   date_start: string;
   booking_closes_at: string | null;
+  booking_close_reports_fallback_hours?: number;
+  booking_close_reports_dispatch_token?: string;
+  booking_close_reports_scheduled_for?: string | null;
+  booking_close_reports_status?: EventBookingCloseReportStatus;
+  booking_close_reports_claimed_at?: string | null;
+  booking_close_reports_sent_at?: string | null;
+  booking_close_reports_last_error?: string | null;
   location: string | null;
   capacity_total: number;
   capacity_remaining: number;

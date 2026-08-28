@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.12 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.13 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -279,6 +279,34 @@ Gli eventi possono definire `events.booking_closes_at` come deadline opzionale e
 
 La deadline è enforcement server-side, non solo UI: sia `/api/events/[id]/checkout` sia `/api/events/[id]/checkout-external-link` rifiutano nuove richieste dopo `booking_closes_at`, prima di creare rispettivamente un PaymentIntent Stripe o una `event_reservation_requests`. La chiusura riguarda esclusivamente i canali pubblici: le prenotazioni manuali `admin_in_store` restano disponibili per vendite o eccezioni gestite dal personale. L'admin API valida che `booking_closes_at` preceda `date_start`.
 
+### Report automatici alla chiusura
+
+Migration `093_event_booking_close_reports.sql` rende automatico l'invio al tenant dei tre export operativi già disponibili in admin:
+
+- CSV dettagliato delle prenotazioni;
+- lista prenotazioni stampabile PDF;
+- codici prenotazione A5 PDF.
+
+L'orario effettivo è:
+
+```text
+booking_closes_at ?? (date_start - booking_close_reports_fallback_hours)
+```
+
+`booking_close_reports_fallback_hours` default `2`, configurabile già alla creazione evento e successivamente nella card `Réservations en ligne`. La migration calcola `booking_close_reports_scheduled_for` anche per eventi esistenti; gli eventi già iniziati non vengono mai inviati retroattivamente. Un evento futuro già dentro la finestra fallback diventa immediatamente eleggibile.
+
+Il dispatcher canonico è `.github/workflows/event-booking-close-reports.yml`, schedulato ogni 5 minuti e avviabile anche manualmente. Lo script `scripts/process-event-booking-close-reports.mjs` usa le credenziali Supabase service-role già previste nei GitHub Actions, seleziona solo eventi futuri dovuti e chiama l'applicazione sul dominio canonico del tenant.
+
+Il dispatcher invoca `/api/events/internal/booking-close-reports` con `eventId` e token opaco `booking_close_reports_dispatch_token`. L'RPC service-role-only `claim_event_booking_close_reports` implementa claim atomico/idempotente e recovery di sender bloccati dopo 15 minuti. Stati:
+
+```text
+pending -> sending -> sent
+             |       
+             -> error -> retry dispatcher
+```
+
+La route rigenera i tre file dalla sorgente canonica `loadEventReservationExportData()` al momento dell'invio, quindi include solo reservation ancora utilizzabili (`confirmed` + `quantity_remaining > 0`). Consegna n8n via `/webhook/event-booking-closed-reports` con tre attachment base64. Destinatari: `tenant_notification_recipients.notify_event_booking_closed_reports = true`, default true per destinatari esistenti. Errori di generazione/trasporto portano a `error` e vengono ritentati dal dispatcher; successo imposta `booking_close_reports_sent_at` e impedisce duplicati. Contratto: `docs/EVENT_BOOKING_CLOSE_REPORTS.md`.
+
 ### Visibilità dei posti restanti
 
 Ogni evento può configurare `events.show_remaining_places`. Il default è `true`, quindi gli eventi esistenti mantengono la visualizzazione numerica già in uso. Il tenant admin modifica l'opzione dalla card `Réservations en ligne` insieme alla deadline.
@@ -340,7 +368,7 @@ Le route personali di sicurezza/profilo restano accessibili indipendentemente da
 
 Packlink resta provider shipping principale. `shipping.view` separa consultazione/operazioni da `shipping.manage` per le regole di configurazione.
 
-`docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth dei destinatari interni. Gli alert di pagamento esterno Shop ed Events condividono il flag `notify_external_payment_pending`, ma usano webhook/payload distinti per non mescolare ordine e prenotazione evento.
+`docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth destinatari interni. Gli alert pagamento esterno Shop/Events condividono `notify_external_payment_pending` ma webhook/payload distinti. Gli eventi aggiungono `notify_event_booking_closed_reports` per i tre report automatici di chiusura.
 
 ---
 
@@ -365,6 +393,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 090_event_capacity_management.sql
 091_event_booking_closes_at.sql
 092_event_remaining_places_visibility.sql
+093_event_booking_close_reports.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -378,6 +407,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `091` è additiva: introduce `events.booking_closes_at` nullable. Gli eventi esistenti non ricevono backfill e conservano il comportamento precedente; quando valorizzata, la deadline chiude i checkout pubblici Events ma non le prenotazioni manuali admin.
 
 `092` è additiva: introduce `events.show_remaining_places boolean NOT NULL DEFAULT true`. L'opzione controlla esclusivamente la disclosure pubblica del numero residuo; non modifica capacità, disponibilità reale, checkout o prenotazioni.
+
+`093` è additiva ma operativa: introduce configurazione fallback report, schedule/dispatch/idempotency su `events`, flag destinatario `notify_event_booking_closed_reports`, trigger di calcolo schedule, backfill degli eventi esistenti e RPC di claim service-role-only. Non modifica checkout, prezzi, capacità o pagamenti.
 
 ---
 
@@ -450,8 +481,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.12
+# Fine snapshot v6.13
 
-**Base audit:** `main @ event remaining places visibility`  
+**Base audit:** `main @ automatic event booking-close reports`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

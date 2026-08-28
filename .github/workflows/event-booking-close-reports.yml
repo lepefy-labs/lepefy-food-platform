@@ -1,0 +1,24 @@
+name: Event booking-close reports
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: event-booking-close-reports
+  cancel-in-progress: false
+
+jobs:
+  dispatch-due-reports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Dispatch due event reports
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EVENT_REPORTS_APP_URL: ${{ vars.EVENT_REPORTS_APP_URL }}
+        run: node scripts/process-event-booking-close-reports.mjs
