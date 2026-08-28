@@ -208,22 +208,22 @@ export default async function EvenementielHubPage() {
             {featuredEvent ? (
               <>
                 <div className="mt-5 max-w-lg rounded-2xl border border-white/15 bg-black/20 p-4 backdrop-blur-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/60">Prochain rendez-vous</p>
-                    {featuredUrgency && (
-                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${featuredUrgency.className}`}>
-                        <IconClock size={13} /> {featuredUrgency.label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/60">Prochain rendez-vous</p>
+                  {featuredUrgency && (
+                    <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${featuredUrgency.className}`}>
+                      <IconClock size={13} /> {featuredUrgency.label}
+                    </span>
+                  )}
+                  <div className={`${featuredUrgency ? 'mt-3' : 'mt-1'} flex flex-wrap items-end justify-between gap-3`}>
                     <div>
                       <p className="font-display text-2xl font-semibold">{featuredEvent.title}</p>
                       {featuredEvent.subtitle && <p className="mt-0.5 text-sm text-white/70">{featuredEvent.subtitle}</p>}
                     </div>
-                    <div className={`rounded-full border px-3 py-1.5 text-xs font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}>
-                      {availabilityLabel(featuredEvent.capacity_remaining)}
-                    </div>
+                    {!featuredUrgency && (
+                      <div className={`rounded-full border px-3 py-1.5 text-xs font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}>
+                        {availabilityLabel(featuredEvent.capacity_remaining)}
+                      </div>
+                    )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/75">
                     <span className="inline-flex items-center gap-1.5"><IconCalendarEvent size={15} />{formatEventDayDate(featuredEvent.date_start)}</span>
