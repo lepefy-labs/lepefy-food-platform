@@ -9,10 +9,10 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 // Upload générique pour toutes les images du module Événementiel (bannière
-// événement, galerie, article de location, couverture de service) — même
-// pattern que upload-product-image/upload-story-photo : resize sharp, upload
-// bucket `assets`, chemin déterministe par kind + uuid.
-const VALID_KINDS = ['event-banner', 'gallery', 'rental-item', 'service-cover'] as const;
+// événement, tarifs sur place, galerie, article de location, couverture de
+// service) — même pattern que upload-product-image/upload-story-photo : resize
+// sharp, upload bucket `assets`, chemin déterministe par kind + uuid.
+const VALID_KINDS = ['event-banner', 'event-price-list', 'gallery', 'rental-item', 'service-cover'] as const;
 type Kind = typeof VALID_KINDS[number];
 
 export async function POST(req: NextRequest) {

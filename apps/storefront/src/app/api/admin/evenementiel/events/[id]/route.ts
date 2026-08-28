@@ -11,7 +11,7 @@ export const fetchCache = 'force-no-store';
 const VALID_STATUSES: EventStatus[] = ['draft', 'published', 'closed', 'cancelled'];
 const EDITABLE_FIELDS = [
   'title', 'slug', 'description', 'date_start', 'location',
-  'capacity_total', 'status', 'banner_image_url', 'subtitle', 'highlights',
+  'capacity_total', 'status', 'banner_image_url', 'on_site_price_list_image_url', 'subtitle', 'highlights',
   'checkin_opens_at', 'checkin_closes_at',
 ] as const;
 const MAX_HIGHLIGHTS = 3;
@@ -77,6 +77,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const { data, error } = sanitizeHighlights(body.highlights);
       if (error) return NextResponse.json({ error }, { status: 400 });
       patch.highlights = data;
+      continue;
+    }
+    if (field === 'on_site_price_list_image_url') {
+      const value = body[field];
+      if (value !== null && typeof value !== 'string') {
+        return NextResponse.json({ error: 'on_site_price_list_image_url doit être une URL ou null.' }, { status: 400 });
+      }
+      patch[field] = typeof value === 'string' ? value.trim() || null : null;
       continue;
     }
     if (field === 'checkin_opens_at' || field === 'checkin_closes_at') {

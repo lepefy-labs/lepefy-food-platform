@@ -10,6 +10,7 @@ import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { getHighlightIcon } from '@/lib/events/highlightIcons';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import EventCheckoutClient from './EventCheckoutClient';
+import EventOnSitePriceList from './EventOnSitePriceList';
 import type { EventGalleryPhoto, EventRow, EventTicketType } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -201,6 +202,8 @@ export default async function EventDetailPage({ params }: PageProps) {
         </section>
 
         <div className="py-6 sm:py-7">
+          {eventRow.on_site_price_list_image_url && <EventOnSitePriceList imageUrl={eventRow.on_site_price_list_image_url} />}
+
           <EventCheckoutClient
             event={{ id: eventRow.id, slug: eventRow.slug, title: eventRow.title, capacityRemaining: eventRow.capacity_remaining }}
             ticketTypes={ticketTypes}

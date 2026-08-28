@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 27 agosto 2026 — **v6.3 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.4 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -259,6 +259,8 @@ Capability finanziarie Events:
 
 Scanner canonico `/scan?event_id=<id>` usa ledger `event_reservation_item_redemptions` ed è capability-driven end-to-end.
 
+Gli eventi possono avere una `on_site_price_list_image_url`: è una carta prezzi informativa per piatti/bevande acquistabili e pagabili sul posto, gestita dalla tab admin “Page” e mostrata sul dettaglio evento pubblico prima delle formule. È intenzionalmente separata da `event_ticket_types`, checkout e capacità prenotabile; se il campo è `NULL` la sezione non viene renderizzata.
+
 Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici A5) includono solo prenotazioni ancora utilizzabili: `status = confirmed` e `quantity_remaining > 0`. Il dettaglio formule stampato/exportato usa il residuo per riga calcolato da `event_reservation_item_redemptions` non annullati (`voided_at IS NULL`), così formule già consumate non vengono ristampate come valide.
 
 ---
@@ -307,6 +309,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 085_admin_rbac_permissions.sql
 086_admin_rbac_role_permission_rpc.sql
 087_admin_rbac_completion_permissions.sql
+088_event_on_site_price_list.sql
 ```
 
 `087` è additiva e aggiunge le capability emerse dal full admin authorization audit:
@@ -316,6 +319,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 - `event_payments.refund`.
 
 Le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
+
+`088` aggiunge il campo nullable `events.on_site_price_list_image_url`; non modifica formule, disponibilità, checkout o pagamenti.
 
 ---
 
@@ -387,8 +392,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.3
+# Fine snapshot v6.4
 
-**Base audit:** `main @ RBAC completion + tenant co-branding`  
-**Data:** 27 agosto 2026  
+**Base audit:** `main @ event on-site price list + RBAC completion`  
+**Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

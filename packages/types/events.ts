@@ -22,6 +22,7 @@ export interface EventRow {
   capacity_remaining: number;
   status: EventStatus;
   banner_image_url: string | null;
+  on_site_price_list_image_url: string | null;
   theme_primary_color: string | null;
   theme_secondary_color: string | null;
   subtitle: string | null;
