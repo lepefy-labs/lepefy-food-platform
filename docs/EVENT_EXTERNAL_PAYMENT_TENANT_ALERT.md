@@ -55,6 +55,7 @@ Expected payload:
     quantity: number
   }>,
   adminPaymentLink: string | null,
+  eventsUrl: string,
   createdAt: string,
   notificationSentAt: string,
 
@@ -70,6 +71,10 @@ Expected payload:
   pickup: object
 }
 ```
+
+`storefrontUrl` is intentionally preserved for backward compatibility with the shared tenant notification context and existing Shop workflows. `eventsUrl` is the canonical public Events base URL resolved by `getEventsBaseUrl()` (`NEXT_PUBLIC_EVENTS_SUBDOMAIN` first, then the existing storefront/app fallback).
+
+`adminPaymentLink` intentionally remains based on `storefrontUrl`; adding `eventsUrl` does not change the existing admin/payment confirmation route or authentication flow.
 
 ## Tenant email contract
 
@@ -88,6 +93,8 @@ The message must make these facts explicit:
 5. the primary CTA is `Vérifier et confirmer` using `adminPaymentLink`.
 
 The email should show event, customer, requested formulas, total people, expected amount and external payment method.
+
+For event-facing footer or secondary navigation links, n8n should use `eventsUrl` rather than `storefrontUrl`.
 
 ## Failure semantics
 

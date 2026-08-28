@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getEventsBaseUrl } from '@/lib/events/ticketUrl';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
@@ -40,12 +41,14 @@ export async function notifyEventExternalPaymentAwaitingVerification({
     const tenantContext = await getTenantNotificationContext(tenantId);
     if (!tenantContext) return false;
 
+    const eventsUrl = getEventsBaseUrl().replace(/\/$/, '');
     const adminPaymentLink = tenantContext.storefrontUrl
       ? `${tenantContext.storefrontUrl.replace(/\/$/, '')}/admin/evenementiel/paiements-en-attente/${requestId}`
       : null;
 
     return await notifyN8n('/webhook/event-external-payment-awaiting-verification', {
       ...tenantContext,
+      eventsUrl,
       notificationType: 'event_external_payment_awaiting_verification',
       recipients,
       requestId,
