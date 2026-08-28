@@ -1,89 +1,23 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  IconArrowLeft,
-  IconBrandFacebook,
-  IconBrandInstagram,
-  IconBrandLinkedin,
-  IconBrandTiktok,
-  IconBrandX,
-  IconBrandYoutube,
-  IconCalendarEvent,
-  IconCategory,
-  IconChevronRight,
-  IconCreditCard,
-  IconHome,
-  IconLock,
-  IconMapPin,
-  IconMenu2,
-  IconMessageCircle,
-  IconShoppingCart,
-  IconTools,
-  IconTruckDelivery,
-  IconUserCircle,
-  IconX,
-} from '@tabler/icons-react';
+import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart } from '@tabler/icons-react';
+import type { TenantSocialLink } from '@lepefy/types';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { TenantLogo } from '@/components/branding/TenantLogo';
-import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink } from '@lepefy/types';
-
-const SOCIAL_ICONS = {
-  IconBrandInstagram,
-  IconBrandFacebook,
-  IconBrandTiktok,
-  IconBrandYoutube,
-  IconBrandLinkedin,
-  IconBrandX,
-};
+import {
+  BrandNavigationDrawer,
+  type BrandNavigationSection,
+} from '@/components/layout/BrandNavigationDrawer';
 
 interface HeaderProps {
   socialLinks?: TenantSocialLink[];
   storyEnabled?: boolean;
-}
-
-interface DrawerLinkProps {
-  href: string;
-  label: string;
-  icon: ReactNode;
-  active: boolean;
-  onNavigate: () => void;
-  external?: boolean;
-}
-
-function DrawerLink({ href, label, icon, active, onNavigate, external = false }: DrawerLinkProps) {
-  const classes = `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
-    active ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950'
-  }`;
-
-  const content = (
-    <>
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-white/80' : 'bg-gray-100 text-gray-600 group-hover:bg-white'}`}>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">{label}</span>
-      <IconChevronRight size={17} className="shrink-0 text-gray-400" />
-    </>
-  );
-
-  if (external) {
-    return (
-      <a href={href} target="_blank" rel="noopener noreferrer" onClick={onNavigate} className={classes}>
-        {content}
-      </a>
-    );
-  }
-
-  return (
-    <Link href={href} onClick={onNavigate} className={classes} aria-current={active ? 'page' : undefined}>
-      {content}
-    </Link>
-  );
 }
 
 export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) {
@@ -95,36 +29,18 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
   const { customer } = useSessionCustomer();
   const isCheckout = pathname === '/checkout' || pathname.startsWith('/checkout/');
   const accountHref = customer ? '/compte' : '/compte/connexion';
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [menuOpen]);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   function handleCartClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    setMenuOpen(false);
+    closeMenu();
     openCartDrawer();
   }
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/' || pathname.startsWith('/products/');
     if (href === '/accueil') return pathname === '/accueil';
-    if (href.startsWith('/evenementiel')) return pathname.startsWith('/evenementiel');
     if (href === '/orders') return pathname === '/orders' || pathname.startsWith('/orders/');
     if (href.startsWith('/compte')) return pathname === '/compte' || pathname.startsWith('/compte/');
     return pathname === href;
@@ -133,6 +49,59 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
   const whatsappHref = tenant.whatsapp_number
     ? `https://wa.me/${tenant.whatsapp_number.replace(/\D/g, '')}`
     : null;
+
+  const sections: BrandNavigationSection[] = [
+    {
+      id: 'explorer',
+      label: 'Explorer',
+      items: [
+        { href: '/accueil', label: 'Découvrir', icon: 'home', activeWhen: ['/accueil'] },
+        { href: '/', label: 'Catalogue', icon: 'category', activeWhen: ['/', '/products'] },
+      ],
+    },
+    {
+      id: 'services',
+      label: 'Nos services',
+      items: [
+        ...(tenant.events_enabled
+          ? [{ href: '/evenementiel#evenements', label: 'Événements', icon: 'event' as const, activeWhen: ['/evenementiel'] }]
+          : []),
+        ...(tenant.services_enabled
+          ? [{ href: '/evenementiel#services', label: 'Traiteur & location', icon: 'tools' as const, activeWhen: ['/evenementiel/services'] }]
+          : []),
+        { href: '/card', label: 'Carte & paiement', icon: 'card', activeWhen: ['/card'] },
+        ...(tenant.google_maps_url
+          ? [{ href: tenant.google_maps_url, label: 'Nous trouver', icon: 'map' as const, external: true }]
+          : []),
+      ],
+    },
+    {
+      id: 'account',
+      label: 'Votre espace',
+      intro: {
+        title: customer ? 'Votre compte client' : 'Retrouvez vos achats',
+        text: customer
+          ? 'Commandes, profil et avantages au même endroit.'
+          : 'Connectez-vous pour suivre vos commandes et votre compte.',
+      },
+      items: [
+        { href: '/orders', label: 'Mes commandes', icon: 'orders', activeWhen: ['/orders'] },
+        { href: accountHref, label: customer ? 'Mon compte' : 'Se connecter', icon: 'account', activeWhen: ['/compte'] },
+      ],
+    },
+    {
+      id: 'brand',
+      label: tenant.name,
+      items: [
+        ...(storyEnabled
+          ? [{ href: '/accueil#origine', label: 'Notre histoire', icon: 'home' as const }]
+          : []),
+        ...(whatsappHref
+          ? [{ href: whatsappHref, label: 'Nous contacter', icon: 'message' as const, external: true }]
+          : []),
+      ],
+    },
+  ];
 
   if (isCheckout) {
     return (
@@ -204,96 +173,15 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
         </div>
       </header>
 
-      <div
-        className={`fixed inset-0 z-[70] transition ${menuOpen ? 'pointer-events-auto bg-black/35 opacity-100' : 'pointer-events-none bg-black/0 opacity-0'}`}
-        aria-hidden={!menuOpen}
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setMenuOpen(false);
-        }}
-      >
-        <aside
-          id="storefront-navigation-drawer"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menu de navigation"
-          className={`absolute inset-y-0 left-0 flex w-[86vw] max-w-[360px] flex-col bg-white shadow-2xl transition-transform duration-200 ease-out md:left-auto md:right-0 md:w-[380px] md:max-w-[380px] ${menuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-full'}`}
-        >
-          <div className="flex items-start gap-3 border-b border-gray-100 px-4 py-4">
-            <div className="min-w-0 flex-1">
-              <TenantLogo variant="compact" className="h-11 w-[150px] max-w-[55vw]" />
-              {tenant.tagline && <p className="mt-1.5 line-clamp-2 max-w-[30ch] text-xs leading-relaxed text-gray-500">{tenant.tagline}</p>}
-            </div>
-            <button type="button" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">
-              <IconX size={22} />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-3 py-4">
-            <section aria-labelledby="drawer-explorer-title">
-              <p id="drawer-explorer-title" className="px-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-gray-400">Explorer</p>
-              <div className="space-y-1">
-                <DrawerLink href="/accueil" label="Découvrir" icon={<IconHome size={19} />} active={isActive('/accueil')} onNavigate={() => setMenuOpen(false)} />
-                <DrawerLink href="/" label="Catalogue" icon={<IconCategory size={19} />} active={isActive('/')} onNavigate={() => setMenuOpen(false)} />
-              </div>
-            </section>
-
-            {(tenant.events_enabled || tenant.services_enabled || tenant.google_maps_url) && (
-              <section aria-labelledby="drawer-services-title" className="mt-5 border-t border-gray-100 pt-4">
-                <p id="drawer-services-title" className="px-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-gray-400">Nos services</p>
-                <div className="space-y-1">
-                  {tenant.events_enabled && <DrawerLink href="/evenementiel#evenements" label="Événements" icon={<IconCalendarEvent size={19} />} active={isActive('/evenementiel')} onNavigate={() => setMenuOpen(false)} />}
-                  {tenant.services_enabled && <DrawerLink href="/evenementiel#services" label="Traiteur & location" icon={<IconTools size={19} />} active={isActive('/evenementiel')} onNavigate={() => setMenuOpen(false)} />}
-                  <DrawerLink href="/card" label="Carte & paiement" icon={<IconCreditCard size={19} />} active={pathname.startsWith('/card')} onNavigate={() => setMenuOpen(false)} />
-                  {tenant.google_maps_url && <DrawerLink href={tenant.google_maps_url} label="Nous trouver" icon={<IconMapPin size={19} />} active={false} external onNavigate={() => setMenuOpen(false)} />}
-                </div>
-              </section>
-            )}
-
-            <section aria-labelledby="drawer-account-title" className="mt-5 border-t border-gray-100 pt-4">
-              <p id="drawer-account-title" className="px-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-gray-400">Votre espace</p>
-              <div className="mb-2 rounded-2xl bg-gray-50 px-3 py-3">
-                <p className="text-sm font-bold text-gray-900">{customer ? 'Votre compte client' : 'Retrouvez vos achats'}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{customer ? 'Commandes, profil et avantages au même endroit.' : 'Connectez-vous pour suivre vos commandes et votre compte.'}</p>
-              </div>
-              <div className="space-y-1">
-                <DrawerLink href="/orders" label="Mes commandes" icon={<IconTruckDelivery size={19} />} active={isActive('/orders')} onNavigate={() => setMenuOpen(false)} />
-                <DrawerLink href={accountHref} label={customer ? 'Mon compte' : 'Se connecter'} icon={<IconUserCircle size={19} />} active={isActive('/compte')} onNavigate={() => setMenuOpen(false)} />
-              </div>
-            </section>
-
-            {(storyEnabled || whatsappHref || socialLinks.length > 0) && (
-              <section aria-labelledby="drawer-brand-title" className="mt-5 border-t border-gray-100 pt-4">
-                <p id="drawer-brand-title" className="px-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-gray-400">{tenant.name}</p>
-                <div className="space-y-1">
-                  {storyEnabled && <DrawerLink href="/accueil#origine" label="Notre histoire" icon={<IconHome size={19} />} active={false} onNavigate={() => setMenuOpen(false)} />}
-                  {whatsappHref && <DrawerLink href={whatsappHref} label="Nous contacter" icon={<IconMessageCircle size={19} />} active={false} external onNavigate={() => setMenuOpen(false)} />}
-                </div>
-                {socialLinks.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2 px-3" aria-label="Réseaux sociaux">
-                    {socialLinks.map((link) => {
-                      const meta = SOCIAL_PLATFORM_REGISTRY[link.platform];
-                      const SocialIcon = SOCIAL_ICONS[meta.iconName];
-                      return (
-                        <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={meta.label} onClick={() => setMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]" style={{ background: meta.badgeBackground }}>
-                          <SocialIcon size={18} stroke={1.6} className="text-white" />
-                        </a>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            )}
-          </div>
-
-          <div className="border-t border-gray-100 px-4 py-3 text-[11px] text-gray-400" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <Link href="/politique-confidentialite" onClick={() => setMenuOpen(false)} className="hover:text-gray-600">Confidentialité</Link>
-              <Link href="/conditions-generales-vente" onClick={() => setMenuOpen(false)} className="hover:text-gray-600">CGV</Link>
-            </div>
-            {tenant.show_powered_by && <p className="mt-1.5">Propulsé par <span className="font-semibold text-gray-500">Lepefy Labs</span></p>}
-          </div>
-        </aside>
-      </div>
+      <BrandNavigationDrawer
+        id="storefront-navigation-drawer"
+        open={menuOpen}
+        onClose={closeMenu}
+        tenant={tenant}
+        sections={sections}
+        socialLinks={socialLinks}
+        side="responsive"
+      />
     </>
   );
 }

@@ -39,13 +39,14 @@ export default function EventSocialShareButton({
   async function shareCard() {
     setError(null);
     setSharing(true);
+
     try {
       const response = await fetch(cardUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error('card-generation-failed');
 
       const blob = await response.blob();
       const file = new File([blob], `${eventSlug}-story.png`, { type: 'image/png' });
-      const eventUrl = new URL(`/evenementiel/evenements/${eventSlug}`, window.location.origin).toString();
+      const eventUrl = new URL(`/evenements/${eventSlug}`, window.location.origin).toString();
       const canShareFiles = typeof navigator.share === 'function'
         && typeof navigator.canShare === 'function'
         && navigator.canShare({ files: [file] });

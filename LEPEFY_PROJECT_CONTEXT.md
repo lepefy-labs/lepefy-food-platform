@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.6 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.7 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -67,6 +67,10 @@ Le route storefront canoniche sono:
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
 
 La navigazione storefront mobile usa due livelli complementari: `BottomNav` per le destinazioni operative frequenti (`Découvrir`, `Catalogue`, `Panier`, `Commandes`, `Compte`) e un drawer laterale aperto dall'header per esplorazione e servizi secondari. Il drawer non duplica il Panier e rende dinamicamente le voci in base alla configurazione tenant: Events/Services tramite `events_enabled` e `services_enabled`, location tramite `google_maps_url`, contatto tramite `whatsapp_number`, storia e social solo se disponibili. Su desktop `Catalogue`, `Découvrir`, `Panier` e `Compte` restano visibili nell'header; lo stesso drawer è accessibile come menu secondario. Lo stato attivo usa anche `aria-current`, non solo il colore.
+
+Il pattern di drawer è condiviso da Shop ed Events tramite `BrandNavigationDrawer`: overlay, chiusura Escape/backdrop, body scroll lock, focus ring, safe-area footer, social e legal sono implementati una sola volta; ogni surface passa sezioni e capability proprie.
+
+Sul dominio Events la navigazione pubblica usa URL pulite (`/`, `/evenements/[slug]`, `/services/[slug]`) mentre le route interne `/evenementiel/**` restano l'implementazione App Router e continuano a essere raggiunte tramite rewrite host-based. I link verso Traiteur/Location/Galerie sono esposti solo se esistono contenuti pubblici attivi, non soltanto in base al flag modulo.
 
 La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker pre-cachea la root canonica senza mantenere `/products` come asset storefront separato.
 
@@ -276,6 +280,10 @@ Capability finanziarie Events:
 
 Scanner canonico `/scan?event_id=<id>` usa ledger `event_reservation_item_redemptions` ed è capability-driven end-to-end.
 
+La surface pubblica Events ha `EventsHeader`/`EventsFooter` propri ma usa il drawer cross-surface condiviso con lo Shop. L'header ricava le capability di navigazione dai record pubblici attivi (`service_offerings`, gallery e prossimo evento) così non mostra destinazioni Traiteur/Location/Galerie prive di contenuto. La CTA header punta al prossimo evento quando esiste, altrimenti al contatto; il footer privilegia WhatsApp rispetto all'e-mail quando configurato.
+
+La home Events tratta il prossimo evento come primary conversion object: hero contestuale, disponibilità reale, data/ora e CTA verso il dettaglio. Le card home usano copy `Voir & réserver` perché il click apre prima il dettaglio. Gallery e servizi restano data-driven; la gallery termina con CTA preventivo solo se esiste un servizio Traiteur, altrimenti con contatto generico.
+
 Gli eventi possono avere una `on_site_price_list_image_url`: è una carta prezzi informativa per piatti/bevande acquistabili e pagabili sul posto, gestita dalla tab admin “Page” e mostrata sul dettaglio evento pubblico prima delle formule. È intenzionalmente separata da `event_ticket_types`, checkout e capacità prenotabile; se il campo è `NULL` la sezione non viene renderizzata.
 
 Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici A5) includono solo prenotazioni ancora utilizzabili: `status = confirmed` e `quantity_remaining > 0`. Il dettaglio formule stampato/exportato usa il residuo per riga calcolato da `event_reservation_item_redemptions` non annullati (`voided_at IS NULL`), così formule già consumate non vengono ristampate come valide.
@@ -357,6 +365,7 @@ apps/storefront/src/lib/auth/adminRbac.ts
 apps/storefront/src/lib/auth/adminApiPermissions.ts
 apps/storefront/src/lib/auth/adminRoutePermissions.ts
 apps/storefront/src/lib/auth/requireAdmin.ts
+apps/storefront/src/components/layout/BrandNavigationDrawer.tsx
 apps/storefront/src/components/payments/StripePaymentStep.tsx
 apps/storefront/src/components/checkout-session/*
 apps/storefront/src/stores/cartStore.ts
@@ -409,8 +418,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.6
+# Fine snapshot v6.7
 
-**Base audit:** `main @ storefront Catalogue root + navigation drawer + RBAC completion`  
+**Base audit:** `main @ storefront + Events shared navigation drawer`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
