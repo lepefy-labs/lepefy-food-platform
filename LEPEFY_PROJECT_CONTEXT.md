@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.8 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.9 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -152,6 +152,7 @@ growth.payouts.manage
 ai_knowledge.manage
 events.view
 events.manage
+event_capacity.manage
 event_reservations.view
 event_reservations.manage
 event_payments.view
@@ -173,6 +174,8 @@ platform.*
 ```
 
 Le capability money-moving/manual-financial sono isolate e `critical`. La creazione di una prenotazione Events già incassata in negozio è mappata esplicitamente a `event_payments.confirm`, non alla generica `event_reservations.manage`.
+
+La modifica della capacità vendabile di un evento è isolata nella capability `event_capacity.manage`. Il CRUD generico `events.manage` non può più modificare `capacity_total`; l'unico percorso applicativo supportato è l'endpoint dedicato `/api/admin/evenementiel/events/[id]/capacity`, che usa l'RPC atomica `adjust_event_capacity`.
 
 ---
 
@@ -268,6 +271,19 @@ Le prenotazioni pagate direttamente nel negozio fisico seguono invece un flusso 
 
 La funzione condivisa `createEventReservationFromRequest()` resta il punto canonico per capacity decrement, creazione reservation/items, QR e notifica di conferma. Le prenotazioni `admin_in_store` entrano quindi senza percorsi paralleli in scanner, report, liste e codici A5. Il rimborso Stripe resta disponibile solo per reservation che possiedono un `stripe_payment_intent_id`; una vendita fisica non viene marcata come rimborsata automaticamente dalla piattaforma senza un flusso di rimborso offline dedicato.
 
+### Gestione capacità evento
+
+Il tenant admin può aumentare o ridurre la capacità dalla card `Occupation` del résumé evento tramite `Gérer la capacité`. L'azione è visibile solo a chi supera il controllo server-side `event_capacity.manage`.
+
+La capacità non viene più modificata dal PATCH generico evento. L'endpoint dedicato usa `adjust_event_capacity`, che:
+- acquisisce un lock sulla riga `events`;
+- calcola le places già riservate da `capacity_total - capacity_remaining`;
+- rifiuta qualsiasi nuova capacità inferiore alle places già riservate;
+- aggiorna insieme `capacity_total` e `capacity_remaining`;
+- registra la variazione in `event_capacity_adjustments` con delta, motivo, admin e timestamp.
+
+La riduzione di capacità non annulla, rimborsa o invalida prenotazioni esistenti. Se la capacità fisica desiderata è inferiore alle prenotazioni già confermate, l'admin deve prima gestire le prenotazioni interessate tramite i flussi appropriati.
+
 Capability finanziarie Events:
 - `event_payments.view`;
 - `event_payments.confirm`;
@@ -332,6 +348,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 087_admin_rbac_completion_permissions.sql
 088_event_on_site_price_list.sql
 089_event_manual_reservations.sql
+090_event_capacity_management.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -339,6 +356,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `088` aggiunge il campo nullable `events.on_site_price_list_image_url`; non modifica formule, disponibilità, checkout o pagamenti.
 
 `089` è additiva: aggiunge a `event_reservations` `source`, `payment_method` e `created_by_admin_id`, effettuando un backfill deterministico dell'historico (`stripe_payment_intent_id` presente → online/stripe, assente → external_link/external_link). Abilita la tracciabilità delle prenotazioni incassate in negozio senza cambiare il modello di capacità o QR.
+
+`090` è additiva: introduce `event_capacity_adjustments`, la capability `event_capacity.manage` e l'RPC `adjust_event_capacity`. L'RPC rende atomiche le modifiche di capacità e impedisce di scendere sotto le places già prenotate. La capability viene assegnata ai system role `platform_owner` e `tenant_admin`; i custom role non vengono ampliati automaticamente.
 
 ---
 
@@ -411,8 +430,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.8
+# Fine snapshot v6.9
 
-**Base audit:** `main @ manual in-store event reservations`  
+**Base audit:** `main @ event capacity management`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

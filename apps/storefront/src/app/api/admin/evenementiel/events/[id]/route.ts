@@ -11,7 +11,7 @@ export const fetchCache = 'force-no-store';
 const VALID_STATUSES: EventStatus[] = ['draft', 'published', 'closed', 'cancelled'];
 const EDITABLE_FIELDS = [
   'title', 'slug', 'description', 'date_start', 'location',
-  'capacity_total', 'status', 'banner_image_url', 'on_site_price_list_image_url', 'subtitle', 'highlights',
+  'status', 'banner_image_url', 'on_site_price_list_image_url', 'subtitle', 'highlights',
   'checkin_opens_at', 'checkin_closes_at',
 ] as const;
 const MAX_HIGHLIGHTS = 3;
@@ -67,12 +67,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const field of EDITABLE_FIELDS) {
     if (body[field] === undefined) continue;
     if (field === 'status' && !VALID_STATUSES.includes(body.status as EventStatus)) continue;
-    if (field === 'capacity_total') {
-      const n = Number(body.capacity_total);
-      if (!Number.isInteger(n) || n < 0) continue;
-      patch.capacity_total = n;
-      continue;
-    }
     if (field === 'highlights') {
       const { data, error } = sanitizeHighlights(body.highlights);
       if (error) return NextResponse.json({ error }, { status: 400 });
@@ -94,6 +88,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       continue;
     }
     patch[field] = body[field];
+  }
+
+  if (body.capacity_total !== undefined) {
+    return NextResponse.json({ error: 'La capacité se modifie depuis l’action dédiée « Gérer la capacité ».' }, { status: 400 });
   }
 
   if (Object.keys(patch).length === 0) {
@@ -119,19 +117,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const closeAt = patch.checkin_closes_at !== undefined ? patch.checkin_closes_at : current.checkin_closes_at;
     if (openAt && closeAt && new Date(String(closeAt)).getTime() < new Date(String(openAt)).getTime()) {
       return NextResponse.json({ error: 'La fermeture du contrôle doit être postérieure à son ouverture.' }, { status: 400 });
-    }
-  }
-
-  if (patch.capacity_total !== undefined) {
-    const { data: current } = await supabase
-      .from('events')
-      .select('capacity_total, capacity_remaining')
-      .eq('id', params.id)
-      .eq('tenant_id', tenant.id)
-      .maybeSingle();
-    if (current) {
-      const alreadyReserved = current.capacity_total - current.capacity_remaining;
-      patch.capacity_remaining = Math.max(0, (patch.capacity_total as number) - alreadyReserved);
     }
   }
 
