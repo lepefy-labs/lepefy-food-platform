@@ -30,8 +30,13 @@ function availabilityClasses(remaining: number) {
   return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 }
 
-function availabilityLabel(remaining: number) {
+function availabilityLabel(remaining: number, showExact: boolean) {
   if (remaining <= 0) return 'Complet';
+  if (!showExact) {
+    if (remaining <= 10) return 'Presque complet';
+    if (remaining <= 25) return 'Places limitées';
+    return 'Places disponibles';
+  }
   if (remaining <= 25) return `Plus que ${remaining} place${remaining > 1 ? 's' : ''}`;
   return 'Encore beaucoup de places';
 }
@@ -89,6 +94,7 @@ export default async function EventDetailPage({ params }: PageProps) {
   if (!event) notFound();
 
   const eventRow = event as EventRow;
+  const showRemainingPlaces = eventRow.show_remaining_places !== false;
   const { data: ticketTypesRaw } = await supabase
     .from('event_ticket_types')
     .select('*')
@@ -196,8 +202,8 @@ export default async function EventDetailPage({ params }: PageProps) {
             <IconUsers size={18} className="mt-0.5 shrink-0 text-[var(--color-primary)]" />
             <div>
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Disponibilité</p>
-              <p className={`mt-0.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${availabilityClasses(eventRow.capacity_remaining)}`}>{availabilityLabel(eventRow.capacity_remaining)}</p>
-              {!soldOut && eventRow.capacity_remaining > 25 && <p className="mt-0.5 text-[9px] text-gray-400">{eventRow.capacity_remaining} places disponibles</p>}
+              <p className={`mt-0.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${availabilityClasses(eventRow.capacity_remaining)}`}>{availabilityLabel(eventRow.capacity_remaining, showRemainingPlaces)}</p>
+              {showRemainingPlaces && !soldOut && eventRow.capacity_remaining > 25 && <p className="mt-0.5 text-[9px] text-gray-400">{eventRow.capacity_remaining} places disponibles</p>}
             </div>
           </div>
         </section>
@@ -205,7 +211,11 @@ export default async function EventDetailPage({ params }: PageProps) {
         <div className="py-6 sm:py-7">
           {eventRow.on_site_price_list_image_url && <EventOnSitePriceList imageUrl={eventRow.on_site_price_list_image_url} />}
 
-          <EventBookingDeadlineGate bookingClosesAt={eventRow.booking_closes_at} capacityRemaining={eventRow.capacity_remaining}>
+          <EventBookingDeadlineGate
+            bookingClosesAt={eventRow.booking_closes_at}
+            capacityRemaining={eventRow.capacity_remaining}
+            showRemainingPlaces={showRemainingPlaces}
+          >
             <EventCheckoutClient
               event={{ id: eventRow.id, slug: eventRow.slug, title: eventRow.title, capacityRemaining: eventRow.capacity_remaining }}
               ticketTypes={ticketTypes}
