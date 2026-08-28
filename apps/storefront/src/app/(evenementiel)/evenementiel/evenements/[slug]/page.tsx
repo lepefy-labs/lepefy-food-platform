@@ -95,6 +95,11 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   const eventRow = event as EventRow;
   const showRemainingPlaces = eventRow.show_remaining_places !== false;
+  const bookingClosed = Boolean(
+    eventRow.booking_closes_at
+      && !Number.isNaN(new Date(eventRow.booking_closes_at).getTime())
+      && new Date(eventRow.booking_closes_at).getTime() <= Date.now(),
+  );
   const { data: ticketTypesRaw } = await supabase
     .from('event_ticket_types')
     .select('*')
@@ -199,12 +204,24 @@ export default async function EventDetailPage({ params }: PageProps) {
             <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Lieu</p><p className="mt-0.5 line-clamp-2 text-[13px] font-semibold text-gray-900">{eventRow.location ?? 'À confirmer'}</p>{mapsHref && <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex min-h-7 items-center gap-1 text-[11px] font-bold text-[var(--color-primary)] underline-offset-2 hover:underline">Voir sur la carte <IconExternalLink size={12} /></a>}</div>
           </div>
           <div className="flex min-h-[74px] items-start gap-2.5 p-3.5">
-            <IconUsers size={18} className="mt-0.5 shrink-0 text-[var(--color-primary)]" />
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Disponibilité</p>
-              <p className={`mt-0.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${availabilityClasses(eventRow.capacity_remaining)}`}>{availabilityLabel(eventRow.capacity_remaining, showRemainingPlaces)}</p>
-              {showRemainingPlaces && !soldOut && eventRow.capacity_remaining > 25 && <p className="mt-0.5 text-[9px] text-gray-400">{eventRow.capacity_remaining} places disponibles</p>}
-            </div>
+            {bookingClosed ? (
+              <>
+                <IconClock size={18} className="mt-0.5 shrink-0 text-gray-500" />
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Réservations</p>
+                  <p className="mt-0.5 inline-flex rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700">Réservations clôturées</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <IconUsers size={18} className="mt-0.5 shrink-0 text-[var(--color-primary)]" />
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Disponibilité</p>
+                  <p className={`mt-0.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${availabilityClasses(eventRow.capacity_remaining)}`}>{availabilityLabel(eventRow.capacity_remaining, showRemainingPlaces)}</p>
+                  {showRemainingPlaces && !soldOut && eventRow.capacity_remaining > 25 && <p className="mt-0.5 text-[9px] text-gray-400">{eventRow.capacity_remaining} places disponibles</p>}
+                </div>
+              </>
+            )}
           </div>
         </section>
 
