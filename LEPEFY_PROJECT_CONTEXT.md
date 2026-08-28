@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.11 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.12 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -279,6 +279,12 @@ Gli eventi possono definire `events.booking_closes_at` come deadline opzionale e
 
 La deadline è enforcement server-side, non solo UI: sia `/api/events/[id]/checkout` sia `/api/events/[id]/checkout-external-link` rifiutano nuove richieste dopo `booking_closes_at`, prima di creare rispettivamente un PaymentIntent Stripe o una `event_reservation_requests`. La chiusura riguarda esclusivamente i canali pubblici: le prenotazioni manuali `admin_in_store` restano disponibili per vendite o eccezioni gestite dal personale. L'admin API valida che `booking_closes_at` preceda `date_start`.
 
+### Visibilità dei posti restanti
+
+Ogni evento può configurare `events.show_remaining_places`. Il default è `true`, quindi gli eventi esistenti mantengono la visualizzazione numerica già in uso. Il tenant admin modifica l'opzione dalla card `Réservations en ligne` insieme alla deadline.
+
+Quando `show_remaining_places = false`, le surface pubbliche Events non espongono il numero esatto di `capacity_remaining`: home, card, dettaglio e messaggi di urgenza usano soltanto stati qualitativi (`Places disponibles`, `Places limitées`, `Presque complet`, `Complet`). La capacità reale resta invariata e continua a essere visibile nell'admin e usata integralmente dai controlli server-side di disponibilità/checkout.
+
 ### Gestione capacità evento
 
 Il tenant admin può aumentare o ridurre la capacità dalla card `Occupation` del résumé evento tramite `Gérer la capacité`. L'azione è visibile solo a chi supera il controllo server-side `event_capacity.manage`.
@@ -358,6 +364,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 089_event_manual_reservations.sql
 090_event_capacity_management.sql
 091_event_booking_closes_at.sql
+092_event_remaining_places_visibility.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -369,6 +376,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `090` è additiva: introduce `event_capacity_adjustments`, la capability `event_capacity.manage` e l'RPC `adjust_event_capacity`. L'RPC rende atomiche le modifiche di capacità e impedisce di scendere sotto le places già prenotate. La capability viene assegnata ai system role `platform_owner` e `tenant_admin`; i custom role non vengono ampliati automaticamente.
 
 `091` è additiva: introduce `events.booking_closes_at` nullable. Gli eventi esistenti non ricevono backfill e conservano il comportamento precedente; quando valorizzata, la deadline chiude i checkout pubblici Events ma non le prenotazioni manuali admin.
+
+`092` è additiva: introduce `events.show_remaining_places boolean NOT NULL DEFAULT true`. L'opzione controlla esclusivamente la disclosure pubblica del numero residuo; non modifica capacità, disponibilità reale, checkout o prenotazioni.
 
 ---
 
@@ -441,8 +450,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.11
+# Fine snapshot v6.12
 
-**Base audit:** `main @ event booking deadline`  
+**Base audit:** `main @ event remaining places visibility`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
