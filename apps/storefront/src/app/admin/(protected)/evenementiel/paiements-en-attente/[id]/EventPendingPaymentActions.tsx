@@ -55,12 +55,12 @@ export default function EventPendingPaymentActions({
     <>
       {canConfirm && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <h2 className="font-bold text-gray-950 dark:text-white">Décision paiement</h2>
-          <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">Confirmez uniquement après avoir réellement constaté la réception du paiement externe. La réservation sera créée à ce moment-là seulement.</p>
+          <h2 className="font-bold text-gray-950 dark:text-white">Paiement externe à vérifier</h2>
+          <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">Contrôlez d’abord le prestataire externe, puis confirmez uniquement si le paiement est réellement reçu. La réservation et les places ne seront créées qu’après cette validation.</p>
           <div className="mt-4 max-w-sm">
             <ConfirmPaymentButton
               endpoint={`/api/admin/evenementiel/reservation-requests/${requestId}/confirm-payment`}
-              label="Confirmer réception"
+              label="Vérifier et confirmer"
               confirmingLabel="Confirmation…"
               className="min-h-11 w-full rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
               onSuccess={(warning) => {

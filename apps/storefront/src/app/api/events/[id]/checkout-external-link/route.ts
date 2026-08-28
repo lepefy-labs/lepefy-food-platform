@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { notifyEventExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyEventExternalPaymentAwaitingVerification';
 import type { EventCheckoutItemInput, TenantPaymentMethod } from '@lepefy/types';
 
 const MAX_QUANTITY_PER_TICKET = 999;
@@ -18,7 +19,7 @@ interface EventExternalLinkCheckoutBody {
 // api/events/[id]/checkout/route.ts (capacité, ticket types actifs/prix
 // depuis le DB) — route séparée car aucun PaymentIntent Stripe n'est créé
 // ici : seulement une ligne event_reservation_requests en attente de
-// confirmation manuelle admin (voir Task 4).
+// confirmation manuelle admin.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -43,7 +44,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const supabase = createServiceClient();
 
-    // ── Résolution du moyen de paiement — TOUJOURS depuis la DB. ────────────
     const { data: methodRow } = await supabase
       .from('tenant_payment_methods')
       .select('*')
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const { data: eventRow } = await supabase
       .from('events')
-      .select('id, tenant_id, status, capacity_remaining, title')
+      .select('id, tenant_id, status, capacity_remaining, title, date_start, location')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
       .maybeSingle();
@@ -86,9 +86,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const totalQuantity = rawItems.reduce((s, i) => s + i.quantity, 0);
 
-    // Contrôle préliminaire ("fail fast") — la vérification définitive et
-    // atomique reste reserve_event_capacity(), au moment de la confirmation
-    // admin (voir createEventReservationFromRequest, Task 2) — jamais ici.
     if (eventRow.capacity_remaining < totalQuantity) {
       return NextResponse.json(
         { error: 'Capacité insuffisante pour le nombre de places demandées.' },
@@ -100,7 +97,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       rawItems.reduce((sum, i) => sum + ticketById.get(i.ticket_type_id)!.price * i.quantity, 0).toFixed(2),
     );
 
-    // ── Construction du lien (même règle que Phase 1 — Décision 4) ──────────
     const currency = (tenant.currency ?? 'EUR').toUpperCase();
     const finalLink =
       method.method === 'paypal'
@@ -111,18 +107,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from('event_reservation_requests')
       .insert({
         tenant_id:             tenant.id,
-        event_id:               eventRow.id,
-        items:                  rawItems,
-        customer_name:           customer_name.trim(),
-        customer_email:          customer_email.trim(),
-        customer_phone:          customer_phone?.trim() || null,
-        amount:                  total,
-        currency:                tenant.currency ?? 'eur',
-        payment_method_type:     method.method,
-        payment_method_label:    method.label ?? method.method,
-        payment_link:            finalLink,
+        event_id:              eventRow.id,
+        items:                 rawItems,
+        customer_name:         customer_name.trim(),
+        customer_email:        customer_email.trim(),
+        customer_phone:        customer_phone?.trim() || null,
+        amount:                total,
+        currency:              tenant.currency ?? 'eur',
+        payment_method_type:   method.method,
+        payment_method_label:  method.label ?? method.method,
+        payment_link:          finalLink,
       })
-      .select('id')
+      .select('id, created_at')
       .single();
 
     if (requestError || !request) {
@@ -135,6 +131,43 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     console.info('[events/checkout-external-link] request created — id:', request.id, '— event:', eventRow.id,
       '— method:', method.method);
+
+    const tenantNotificationDelivered = await notifyEventExternalPaymentAwaitingVerification({
+      supabase,
+      tenantId: tenant.id,
+      requestId: request.id,
+      event: {
+        id: eventRow.id,
+        title: eventRow.title,
+        dateStart: eventRow.date_start,
+        location: eventRow.location,
+      },
+      customer: {
+        fullName: customer_name.trim(),
+        email: customer_email.trim(),
+        phone: customer_phone?.trim() || null,
+      },
+      paymentMethod: {
+        type: method.method,
+        label: method.label ?? method.method,
+      },
+      amount: total,
+      currency,
+      items: rawItems.map((item) => {
+        const ticket = ticketById.get(item.ticket_type_id)!;
+        return {
+          ticketTypeId: item.ticket_type_id,
+          name: ticket.label,
+          price: Number(ticket.price),
+          quantity: item.quantity,
+        };
+      }),
+      createdAt: request.created_at,
+    });
+
+    if (!tenantNotificationDelivered) {
+      console.warn('[events/checkout-external-link] tenant notification not delivered — request:', request.id);
+    }
 
     return NextResponse.json({
       requestId: request.id,

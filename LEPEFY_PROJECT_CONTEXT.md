@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.9 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.10 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -262,6 +262,8 @@ pending -> confirmed | stock_conflict | cancelled
 
 Finché `pending`, nessuna capacità è riservata. La conferma admin crea la reservation con capacity-check server-side. L'annullo non rimborsa automaticamente il provider.
 
+Quando una nuova request `external_link` viene creata con successo, l'applicazione invia un alert interno best-effort al tenant tramite n8n (`/webhook/event-external-payment-awaiting-verification`). I destinatari sono risolti da `tenant_notification_recipients` con `notify_external_payment_pending = true`; nessun indirizzo è hardcoded. La CTA porta direttamente a `/admin/evenementiel/paiements-en-attente/[requestId]`. Un errore di notifica non annulla né fallisce la request già creata e non modifica la capacità. Il contratto del payload è documentato in `docs/EVENT_EXTERNAL_PAYMENT_TENANT_ALERT.md`.
+
 Le prenotazioni pagate direttamente nel negozio fisico seguono invece un flusso admin diretto da evento → `Réservations` → `Ajouter une réservation`. L'admin seleziona formule e quantità, inserisce i dati cliente e conferma che il pagamento è già stato incassato in negozio. Il server ricalcola il totale dai prezzi correnti delle formule attive, verifica tenant/evento, usa lo stesso `reserve_event_capacity` atomico degli altri flussi e crea immediatamente una normale `event_reservations` `confirmed` con QR e items. Non viene creata una `event_reservation_requests` intermedia.
 
 `event_reservations` traccia l'origine tramite:
@@ -326,7 +328,7 @@ Le route personali di sicurezza/profilo restano accessibili indipendentemente da
 
 Packlink resta provider shipping principale. `shipping.view` separa consultazione/operazioni da `shipping.manage` per le regole di configurazione.
 
-`docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth dei destinatari interni.
+`docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth dei destinatari interni. Gli alert di pagamento esterno Shop ed Events condividono il flag `notify_external_payment_pending`, ma usano webhook/payload distinti per non mescolare ordine e prenotazione evento.
 
 ---
 
@@ -430,8 +432,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.9
+# Fine snapshot v6.10
 
-**Base audit:** `main @ event capacity management`  
+**Base audit:** `main @ event external-payment tenant alert`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
