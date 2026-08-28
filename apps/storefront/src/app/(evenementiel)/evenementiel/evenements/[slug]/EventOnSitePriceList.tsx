@@ -2,11 +2,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { IconArrowUpRight, IconCash, IconCheck, IconPhoto, IconShare, IconX } from '@tabler/icons-react';
+import { IconArrowUpRight, IconCash, IconCheck, IconDownload, IconPhoto, IconShare, IconX } from '@tabler/icons-react';
+
+type ShareStatus = 'idle' | 'sharing' | 'downloaded' | 'error';
+
+function extensionForMimeType(mimeType: string) {
+  if (mimeType.includes('png')) return 'png';
+  if (mimeType.includes('webp')) return 'webp';
+  if (mimeType.includes('gif')) return 'gif';
+  return 'jpg';
+}
 
 export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string }) {
   const [open, setOpen] = useState(false);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [shareStatus, setShareStatus] = useState<ShareStatus>('idle');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -25,22 +34,52 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
   }, [open]);
 
   const sharePriceList = async () => {
-    const url = window.location.href;
+    if (shareStatus === 'sharing') return;
+    setShareStatus('sharing');
+
     try {
-      if (navigator.share) {
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error('Unable to load price list image');
+
+      const blob = await response.blob();
+      const mimeType = blob.type || 'image/jpeg';
+      const file = new File(
+        [blob],
+        `tarifs-sur-place.${extensionForMimeType(mimeType)}`,
+        { type: mimeType },
+      );
+
+      const canShareFile = Boolean(
+        navigator.share
+        && (!navigator.canShare || navigator.canShare({ files: [file] })),
+      );
+
+      if (canShareFile) {
         await navigator.share({
           title: 'Tarifs sur place',
-          text: 'Découvrez les tarifs sur place de cet événement.',
-          url,
+          files: [file],
         });
+        setShareStatus('idle');
         return;
       }
 
-      await navigator.clipboard.writeText(url);
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 1800);
+      const objectUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = objectUrl;
+      downloadLink.download = file.name;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      URL.revokeObjectURL(objectUrl);
+      setShareStatus('downloaded');
+      window.setTimeout(() => setShareStatus('idle'), 1800);
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setShareStatus('idle');
+        return;
+      }
+      setShareStatus('error');
+      window.setTimeout(() => setShareStatus('idle'), 2200);
     }
   };
 
@@ -62,9 +101,9 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
         </div>
       </div>
       <div className="shrink-0 border-t border-white/10 bg-black/70 px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 text-center backdrop-blur-sm">
-        <button type="button" onClick={sharePriceList} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white" aria-label="Partager les tarifs sur place">
-          {shareCopied ? <IconCheck size={17} /> : <IconShare size={17} />}
-          {shareCopied ? 'Lien copié' : 'Partager'}
+        <button type="button" onClick={sharePriceList} disabled={shareStatus === 'sharing'} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white disabled:cursor-wait disabled:opacity-70" aria-label="Partager l’image des tarifs sur place">
+          {shareStatus === 'downloaded' ? <IconCheck size={17} /> : shareStatus === 'error' ? <IconX size={17} /> : shareStatus === 'sharing' ? <IconDownload size={17} /> : <IconShare size={17} />}
+          {shareStatus === 'sharing' ? 'Préparation…' : shareStatus === 'downloaded' ? 'Image enregistrée' : shareStatus === 'error' ? 'Partage indisponible' : 'Partager'}
         </button>
       </div>
     </div>,
