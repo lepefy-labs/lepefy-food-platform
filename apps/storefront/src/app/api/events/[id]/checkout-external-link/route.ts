@@ -58,9 +58,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
     }
 
+    // select('*') keeps checkout backward-compatible during the short rollout
+    // window before migration 091 is applied. Once the column exists it is
+    // returned automatically and the deadline guard below becomes active.
     const { data: eventRow } = await supabase
       .from('events')
-      .select('id, tenant_id, status, capacity_remaining, title, date_start, location, booking_closes_at')
+      .select('*')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
       .maybeSingle();
