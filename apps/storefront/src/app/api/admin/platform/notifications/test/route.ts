@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
+import { getEventsBaseUrl, getTicketUrl } from '@/lib/events/ticketUrl';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 
@@ -12,7 +13,9 @@ type TestEvent =
   | 'order-cancelled'
   | 'order-stock-conflict'
   | 'payment-reminder'
-  | 'external-payment-awaiting-verification';
+  | 'external-payment-awaiting-verification'
+  | 'event-external-payment-awaiting-verification'
+  | 'event-reservation-confirmed';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -25,6 +28,8 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'order-stock-conflict': '/webhook/order-stock-conflict',
   'payment-reminder': '/webhook/payment-reminder',
   'external-payment-awaiting-verification': '/webhook/external-payment-awaiting-verification',
+  'event-external-payment-awaiting-verification': '/webhook/event-external-payment-awaiting-verification',
+  'event-reservation-confirmed': '/webhook/event-reservation-confirmed',
 };
 
 interface TestRequestBody {
@@ -91,12 +96,13 @@ export async function POST(req: NextRequest) {
     : null;
   const total = Number.isFinite(body.total) ? Number(body.total) : 79.9;
   const shippingTotal = Number.isFinite(body.shippingTotal) ? Number(body.shippingTotal) : 8.9;
+  const testSentAt = new Date().toISOString();
 
   const commonPayload: Record<string, unknown> = {
     ...tenantContext,
     testMode: true,
     testSource: 'platform_notification_console',
-    testSentAt: new Date().toISOString(),
+    testSentAt,
     orderId: testId,
     orderNumber: `#TEST-${shortId}`,
     email: body.email.trim(),
@@ -153,7 +159,7 @@ export async function POST(req: NextRequest) {
       ...tenantContext,
       testMode: true,
       testSource: 'platform_notification_console',
-      testSentAt: new Date().toISOString(),
+      testSentAt,
       checkoutSessionId: testId,
       paymentReference: `#TEST-${shortId}`,
       email: body.email.trim(),
@@ -167,14 +173,14 @@ export async function POST(req: NextRequest) {
       providerHandoffStarted: true,
       reminderNumber: 1,
       idempotencyKey: `payment-reminder:${testId}:1`,
-      reminderSentAt: new Date().toISOString(),
+      reminderSentAt: testSentAt,
     };
   } else if (body.event === 'external-payment-awaiting-verification') {
     payload = {
       ...tenantContext,
       testMode: true,
       testSource: 'platform_notification_console',
-      testSentAt: new Date().toISOString(),
+      testSentAt,
       notificationType: 'external_payment_awaiting_verification',
       recipients: [body.email.trim()],
       checkoutSessionId: testId,
@@ -203,8 +209,86 @@ export async function POST(req: NextRequest) {
       adminPaymentLink: tenantContext.storefrontUrl
         ? `${tenantContext.storefrontUrl}/admin/paiements-en-attente/${testId}`
         : null,
-      createdAt: new Date().toISOString(),
-      notificationSentAt: new Date().toISOString(),
+      createdAt: testSentAt,
+      notificationSentAt: testSentAt,
+    };
+  } else if (body.event === 'event-external-payment-awaiting-verification') {
+    const eventsUrl = getEventsBaseUrl().replace(/\/$/, '');
+    const eventDateStart = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const itemPrice = Math.max(0, total / 2);
+
+    payload = {
+      ...tenantContext,
+      testMode: true,
+      testSource: 'platform_notification_console',
+      testSentAt,
+      eventsUrl,
+      notificationType: 'event_external_payment_awaiting_verification',
+      recipients: [body.email.trim()],
+      requestId: testId,
+      paymentReference: `#TEST-${shortId}`,
+      event: {
+        id: testId,
+        title: 'Événement test',
+        dateStart: eventDateStart,
+        location: tenantContext.business.city || 'Lieu test',
+      },
+      customer: {
+        fullName: body.fullName?.trim() || 'Client test',
+        email: 'client-test@example.com',
+        phone: '+33 6 00 00 00 00',
+      },
+      paymentMethod: { type: 'paypal', label: 'PayPal' },
+      amount: total,
+      currency: 'EUR',
+      quantityTotal: 2,
+      items: [
+        {
+          ticketTypeId: `test-${shortId}`,
+          name: 'Formule test',
+          price: itemPrice,
+          quantity: 2,
+        },
+      ],
+      adminPaymentLink: tenantContext.storefrontUrl
+        ? `${tenantContext.storefrontUrl.replace(/\/$/, '')}/admin/evenementiel/paiements-en-attente/${testId}`
+        : null,
+      createdAt: testSentAt,
+      notificationSentAt: testSentAt,
+    };
+  } else if (body.event === 'event-reservation-confirmed') {
+    const eventDateStart = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const qrToken = testId.replace(/-/g, '').padEnd(64, '0').slice(0, 64);
+    const itemPrice = Math.max(0, total / 2);
+
+    payload = {
+      testMode: true,
+      testSource: 'platform_notification_console',
+      testSentAt,
+      reservationId: testId,
+      eventId: testId,
+      customerName: body.fullName?.trim() || 'Client test',
+      customerEmail: body.email.trim(),
+      customerPhone: '+33 6 00 00 00 00',
+      amountPaid: total,
+      source: 'online',
+      paymentMethod: 'stripe',
+      eventTitle: 'Événement test',
+      eventDateStart,
+      eventLocation: tenantContext.business.city || 'Lieu test',
+      items: [
+        {
+          reservation_id: testId,
+          ticket_type_id: `test-${shortId}`,
+          quantity: 2,
+          unit_price: itemPrice,
+          ticketTypeLabel: 'Formule test',
+        },
+      ],
+      ticketUrl: getTicketUrl(qrToken),
+      adminLink: tenantContext.storefrontUrl
+        ? `${tenantContext.storefrontUrl.replace(/\/$/, '')}/admin/evenementiel/evenements`
+        : null,
     };
   }
 

@@ -11,7 +11,9 @@ type TestEvent =
   | 'order-cancelled'
   | 'order-stock-conflict'
   | 'payment-reminder'
-  | 'external-payment-awaiting-verification';
+  | 'external-payment-awaiting-verification'
+  | 'event-external-payment-awaiting-verification'
+  | 'event-reservation-confirmed';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -24,6 +26,8 @@ const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'payment-reminder', label: 'Rappel paiement', description: 'Rappel prudent pour un paiement externe non encore confirmé.' },
   { value: 'external-payment-awaiting-verification', label: 'Paiement externe à vérifier', description: 'Alerte interne au tenant pour vérification et confirmation.' },
   { value: 'order-stock-conflict', label: 'Conflit de stock', description: 'Notification opérationnelle de test.' },
+  { value: 'event-external-payment-awaiting-verification', label: 'Événement · Paiement externe à vérifier', description: 'Alerte tenant Événementiel avec contexte réel et payload synthétique.' },
+  { value: 'event-reservation-confirmed', label: 'Événement · Réservation confirmée', description: 'Confirmation client Événementiel sans créer de réservation.' },
 ];
 
 interface Props {
@@ -64,11 +68,15 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const isConfirmed = event === 'order-confirmed';
   const isShipped = event === 'order-shipped';
   const isPaymentReminder = event === 'payment-reminder';
-  const isExternalPaymentTenantAlert = event === 'external-payment-awaiting-verification';
+  const isShopExternalPaymentTenantAlert = event === 'external-payment-awaiting-verification';
+  const isEventExternalPaymentTenantAlert = event === 'event-external-payment-awaiting-verification';
+  const isEventReservationConfirmed = event === 'event-reservation-confirmed';
+  const isTenantAlert = isShopExternalPaymentTenantAlert || isEventExternalPaymentTenantAlert;
+  const isEventTest = isEventExternalPaymentTenantAlert || isEventReservationConfirmed;
   const needsFulfillment = event === 'order-confirmed'
     || event === 'order-completed'
     || event === 'order-cancelled'
-    || isExternalPaymentTenantAlert;
+    || isShopExternalPaymentTenantAlert;
 
   async function sendTest() {
     setSending(true);
@@ -112,7 +120,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           </div>
           <h1 className="text-2xl font-bold text-gray-950 dark:text-white">Console de test des notifications</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-            Envoie un payload de test au vrai workflow n8n sans créer de commande, modifier le stock, la fidélité ou un paiement.
+            Envoie un payload de test au vrai workflow n8n sans créer de commande, réservation, modifier le stock, la capacité, la fidélité ou un paiement.
           </p>
         </div>
         <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
@@ -138,7 +146,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             </label>
 
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {isExternalPaymentTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
+              {isTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
             </label>
 
@@ -157,7 +165,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               </label>
             )}
 
-            {(isConfirmed || isPaymentReminder || isExternalPaymentTenantAlert || event === 'order-stock-conflict') && (
+            {(isConfirmed || isPaymentReminder || isShopExternalPaymentTenantAlert || isEventTest || event === 'order-stock-conflict') && (
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Total
                 <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
@@ -189,7 +197,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               </>
             )}
 
-            {isExternalPaymentTenantAlert && fulfillmentType === 'delivery' && (
+            {isShopExternalPaymentTenantAlert && fulfillmentType === 'delivery' && (
               <>
                 <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   Adresse client
@@ -225,9 +233,21 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               </div>
             )}
 
-            {isExternalPaymentTenantAlert && (
+            {isShopExternalPaymentTenantAlert && (
               <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
                 Ce test simule l’alerte interne envoyée au tenant. L’adresse de test remplace temporairement la liste réelle <code>tenant_notification_recipients</code> et aucune checkout session n’est créée.
+              </div>
+            )}
+
+            {isEventExternalPaymentTenantAlert && (
+              <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+                Ce test envoie uniquement le webhook Événementiel. Aucune demande de paiement, réservation ou capacité événement n’est créée ou modifiée.
+              </div>
+            )}
+
+            {isEventReservationConfirmed && (
+              <div className="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                Le payload reprend le contrat réel de confirmation Événementiel avec billet factice. Aucune réservation n’est enregistrée et aucune capacité n’est consommée.
               </div>
             )}
           </div>
