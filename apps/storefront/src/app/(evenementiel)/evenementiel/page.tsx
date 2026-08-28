@@ -315,10 +315,12 @@ export default async function EvenementielHubPage() {
                           <p className="flex items-center gap-2"><IconCalendarEvent size={18} className="text-[var(--color-primary)]" />{formatEventDayDate(featuredEvent.date_start)}</p>
                           <p className="flex items-center gap-2"><IconClock size={18} className="text-[var(--color-primary)]" />{formatEventTime(featuredEvent.date_start)}</p>
                           {featuredEvent.location && <p className="flex items-center gap-2 sm:col-span-2"><IconMapPin size={18} className="shrink-0 text-[var(--color-primary)]" /><span className="line-clamp-1">{featuredEvent.location}</span></p>}
-                          <div className="sm:col-span-2">
-                            <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}</p>
-                            {availabilityDetail(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}</p>}
-                          </div>
+                          {!featuredUrgency?.closed && (
+                            <div className="sm:col-span-2">
+                              <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}</p>
+                              {availabilityDetail(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}</p>}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -365,10 +367,12 @@ export default async function EvenementielHubPage() {
                                 {event.location && <p className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="line-clamp-1">{event.location}</span></p>}
                               </div>
                               <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-                                <div>
-                                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining, showRemainingPlaces)}</span>
-                                  {availabilityDetail(event.capacity_remaining, showRemainingPlaces) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining, showRemainingPlaces)}</p>}
-                                </div>
+                                {!urgency?.closed && (
+                                  <div>
+                                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining, showRemainingPlaces)}</span>
+                                    {availabilityDetail(event.capacity_remaining, showRemainingPlaces) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining, showRemainingPlaces)}</p>}
+                                  </div>
+                                )}
                                 <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">{urgency?.closed ? 'Voir l’événement' : 'Voir & réserver'} <IconArrowRight size={15} /></span>
                               </div>
                             </div>
