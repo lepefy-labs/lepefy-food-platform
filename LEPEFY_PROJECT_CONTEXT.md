@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.7 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.8 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -66,13 +66,13 @@ Le route storefront canoniche sono:
 
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
 
-La navigazione storefront mobile usa due livelli complementari: `BottomNav` per le destinazioni operative frequenti (`Découvrir`, `Catalogue`, `Panier`, `Commandes`, `Compte`) e un drawer laterale aperto dall'header per esplorazione e servizi secondari. Il drawer non duplica il Panier e rende dinamicamente le voci in base alla configurazione tenant: Events/Services tramite `events_enabled` e `services_enabled`, location tramite `google_maps_url`, contatto tramite `whatsapp_number`, storia e social solo se disponibili. Su desktop `Catalogue`, `Découvrir`, `Panier` e `Compte` restano visibili nell'header; lo stesso drawer è accessibile come menu secondario. Lo stato attivo usa anche `aria-current`, non solo il colore.
+La navigazione storefront mobile usa `BottomNav` per le destinazioni operative frequenti e un drawer laterale per esplorazione e servizi secondari. Il drawer è data-driven in base alla configurazione tenant. Su desktop le destinazioni principali restano visibili nell'header e lo stesso drawer è accessibile come menu secondario.
 
-Il pattern di drawer è condiviso da Shop ed Events tramite `BrandNavigationDrawer`: overlay, chiusura Escape/backdrop, body scroll lock, focus ring, safe-area footer, social e legal sono implementati una sola volta; ogni surface passa sezioni e capability proprie.
+Il pattern di drawer è condiviso da Shop ed Events tramite `BrandNavigationDrawer`: overlay, Escape/backdrop, body scroll lock, focus ring, safe-area footer, social e legal sono implementati una sola volta; ogni surface passa sezioni e capability proprie.
 
-Sul dominio Events la navigazione pubblica usa URL pulite (`/`, `/evenements/[slug]`, `/services/[slug]`) mentre le route interne `/evenementiel/**` restano l'implementazione App Router e continuano a essere raggiunte tramite rewrite host-based. I link verso Traiteur/Location/Galerie sono esposti solo se esistono contenuti pubblici attivi, non soltanto in base al flag modulo.
+Sul dominio Events la navigazione pubblica usa URL pulite (`/`, `/evenements/[slug]`, `/services/[slug]`) mentre le route interne `/evenementiel/**` restano l'implementazione App Router raggiunta tramite rewrite host-based. I link verso Traiteur/Location/Galerie sono esposti solo se esistono contenuti pubblici attivi.
 
-La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker pre-cachea la root canonica senza mantenere `/products` come asset storefront separato.
+La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker pre-cachea la root canonica.
 
 ---
 
@@ -104,13 +104,13 @@ Ruoli sistema:
 - `tenant_cashier`: capability operative cassa/scanner;
 - `admin_scanner` / “Service repas”: solo scanner Events.
 
-Il Platform Owner gestisce ruoli, permissions e memberships da `/admin/platform/access`. I ruoli tenant custom possono essere creati senza deploy componendo capability esistenti. Una capability nuova richiede una sola integrazione applicativa, poi può essere assegnata liberamente a qualsiasi ruolo.
+Il Platform Owner gestisce ruoli, permissions e memberships da `/admin/platform/access`. I ruoli tenant custom possono essere creati senza deploy componendo capability esistenti.
 
 ### Semantica system role
 
 `platform_owner` bypassa tutte le capability applicative.
 
-`tenant_admin` è contrattualmente “full tenant admin”: `canAdmin()` considera valido qualsiasi permesso non `platform.*` anche se una capability appena deployata non è ancora stata materializzata in `admin_role_permissions`. Questo evita interruzioni tra deploy applicativo e applicazione di una migration permission-catalog additiva.
+`tenant_admin` è contrattualmente “full tenant admin”: `canAdmin()` considera valido qualsiasi permesso non `platform.*` anche se una capability appena deployata non è ancora stata materializzata in `admin_role_permissions`.
 
 Gli altri ruoli, inclusi i custom role, ricevono esclusivamente le capability persistite nel DB.
 
@@ -122,7 +122,7 @@ Gli altri ruoli, inclusi i custom role, ricevono esclusivamente le capability pe
 
 Scanner usa direttamente `requirePermission()` capability-per-capability.
 
-Le API admin legacy che chiamano ancora `requireAdmin()` non usano più i nomi ruolo come authorization boundary. Il compatibility guard è ora capability-driven:
+Le API admin legacy che chiamano ancora `requireAdmin()` sono capability-driven:
 
 ```text
 /api/admin request
@@ -133,9 +133,7 @@ Le API admin legacy che chiamano ancora `requireAdmin()` non usano più i nomi r
    -> requirePermission()
 ```
 
-`apps/storefront/src/lib/auth/adminApiPermissions.ts` è la mappa canonica method+route → capability per gli handler legacy. La mappa è **fail-closed**: una route admin protetta da `requireAdmin()` ma non mappata restituisce 403 invece di ereditare privilegi da `tenant_admin`.
-
-Questo consente ai custom role di operare su tutti gli endpoint mappati senza modifiche per-role nel codice e mantiene il service-role Supabase dietro un controllo server-side uniforme.
+`apps/storefront/src/lib/auth/adminApiPermissions.ts` è la mappa canonica method+route → capability. La mappa è **fail-closed**.
 
 Capability principali:
 
@@ -174,28 +172,17 @@ ai_usage.view
 platform.*
 ```
 
-Le capability money-moving/manual-financial sono isolate e `critical`: conferma pagamento esterno Shop, conferme/annulli/rimborsi Events e gestione payout ambassador non vengono implicitamente incluse in capability generiche di visualizzazione.
+Le capability money-moving/manual-financial sono isolate e `critical`. La creazione di una prenotazione Events già incassata in negozio è mappata esplicitamente a `event_payments.confirm`, non alla generica `event_reservations.manage`.
 
 ---
 
 ## 5. Profilo e onboarding admin
 
-`admin_users` contiene:
-- `first_name`;
-- `last_name`;
-- `nickname` (UI: “Nom affiché”);
-- `phone` opzionale;
-- `profile_completed_at`.
+`admin_users` contiene `first_name`, `last_name`, `nickname`, `phone` opzionale e `profile_completed_at`.
 
-Al primo accesso un admin senza profilo completo viene indirizzato a `/admin/onboarding`; l'onboarding iniziale resta obbligatorio.
+Al primo accesso un admin senza profilo completo viene indirizzato a `/admin/onboarding`; la modalità `/admin/onboarding?edit=1` è reversibile.
 
-La modalità `/admin/onboarding?edit=1` è invece reversibile: mostra `Annuler`, torna a `/admin` senza salvare e chiede conferma se esistono modifiche non salvate.
-
-Login, onboarding e accept-invite usano co-branding coerente:
-- Lepefy = piattaforma;
-- logo/nome tenant = organizzazione operativa;
-- fallback iniziali se manca il logo;
-- colori admin Lepefy indipendenti dai colori tenant.
+Login, onboarding e accept-invite usano co-branding coerente: Lepefy come piattaforma, logo/nome tenant come organizzazione operativa, fallback iniziali se manca il logo e colori admin Lepefy indipendenti dai colori tenant.
 
 ---
 
@@ -272,6 +259,15 @@ pending -> confirmed | stock_conflict | cancelled
 
 Finché `pending`, nessuna capacità è riservata. La conferma admin crea la reservation con capacity-check server-side. L'annullo non rimborsa automaticamente il provider.
 
+Le prenotazioni pagate direttamente nel negozio fisico seguono invece un flusso admin diretto da evento → `Réservations` → `Ajouter une réservation`. L'admin seleziona formule e quantità, inserisce i dati cliente e conferma che il pagamento è già stato incassato in negozio. Il server ricalcola il totale dai prezzi correnti delle formule attive, verifica tenant/evento, usa lo stesso `reserve_event_capacity` atomico degli altri flussi e crea immediatamente una normale `event_reservations` `confirmed` con QR e items. Non viene creata una `event_reservation_requests` intermedia.
+
+`event_reservations` traccia l'origine tramite:
+- `source`: `online | external_link | admin_in_store`;
+- `payment_method`: `stripe | external_link | in_store`;
+- `created_by_admin_id`: admin che ha registrato l'incasso in negozio, nullable per i flussi cliente.
+
+La funzione condivisa `createEventReservationFromRequest()` resta il punto canonico per capacity decrement, creazione reservation/items, QR e notifica di conferma. Le prenotazioni `admin_in_store` entrano quindi senza percorsi paralleli in scanner, report, liste e codici A5. Il rimborso Stripe resta disponibile solo per reservation che possiedono un `stripe_payment_intent_id`; una vendita fisica non viene marcata come rimborsata automaticamente dalla piattaforma senza un flusso di rimborso offline dedicato.
+
 Capability finanziarie Events:
 - `event_payments.view`;
 - `event_payments.confirm`;
@@ -280,13 +276,13 @@ Capability finanziarie Events:
 
 Scanner canonico `/scan?event_id=<id>` usa ledger `event_reservation_item_redemptions` ed è capability-driven end-to-end.
 
-La surface pubblica Events ha `EventsHeader`/`EventsFooter` propri ma usa il drawer cross-surface condiviso con lo Shop. L'header ricava le capability di navigazione dai record pubblici attivi (`service_offerings`, gallery e prossimo evento) così non mostra destinazioni Traiteur/Location/Galerie prive di contenuto. La CTA header punta al prossimo evento quando esiste, altrimenti al contatto; il footer privilegia WhatsApp rispetto all'e-mail quando configurato.
+La surface pubblica Events ha `EventsHeader`/`EventsFooter` propri ma usa il drawer cross-surface condiviso con lo Shop. L'header ricava le capability di navigazione dai record pubblici attivi. La CTA header punta al prossimo evento quando esiste, altrimenti al contatto; il footer privilegia WhatsApp rispetto all'e-mail quando configurato.
 
-La home Events tratta il prossimo evento come primary conversion object: hero contestuale, disponibilità reale, data/ora e CTA verso il dettaglio. Le card home usano copy `Voir & réserver` perché il click apre prima il dettaglio. Gallery e servizi restano data-driven; la gallery termina con CTA preventivo solo se esiste un servizio Traiteur, altrimenti con contatto generico.
+La home Events tratta il prossimo evento come primary conversion object: hero contestuale, disponibilità reale, data/ora e CTA verso il dettaglio. Gallery e servizi restano data-driven.
 
-Gli eventi possono avere una `on_site_price_list_image_url`: è una carta prezzi informativa per piatti/bevande acquistabili e pagabili sul posto, gestita dalla tab admin “Page” e mostrata sul dettaglio evento pubblico prima delle formule. È intenzionalmente separata da `event_ticket_types`, checkout e capacità prenotabile; se il campo è `NULL` la sezione non viene renderizzata.
+Gli eventi possono avere una `on_site_price_list_image_url`: carta prezzi informativa per piatti/bevande acquistabili e pagabili sul posto, separata da `event_ticket_types`, checkout e capacità prenotabile.
 
-Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici A5) includono solo prenotazioni ancora utilizzabili: `status = confirmed` e `quantity_remaining > 0`. Il dettaglio formule stampato/exportato usa il residuo per riga calcolato da `event_reservation_item_redemptions` non annullati (`voided_at IS NULL`), così formule già consumate non vengono ristampate come valide.
+Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici A5) includono solo prenotazioni ancora utilizzabili: `status = confirmed` e `quantity_remaining > 0`. Il dettaglio formule usa il residuo per riga calcolato da `event_reservation_item_redemptions` non annullati.
 
 ---
 
@@ -335,17 +331,14 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 086_admin_rbac_role_permission_rpc.sql
 087_admin_rbac_completion_permissions.sql
 088_event_on_site_price_list.sql
+089_event_manual_reservations.sql
 ```
 
-`087` è additiva e aggiunge le capability emerse dal full admin authorization audit:
-- `shop_payments.confirm`;
-- `shipping.manage`;
-- `growth.payouts.manage`;
-- `event_payments.refund`.
-
-Le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
+`087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
 
 `088` aggiunge il campo nullable `events.on_site_price_list_image_url`; non modifica formule, disponibilità, checkout o pagamenti.
+
+`089` è additiva: aggiunge a `event_reservations` `source`, `payment_method` e `created_by_admin_id`, effettuando un backfill deterministico dell'historico (`stripe_payment_intent_id` presente → online/stripe, assente → external_link/external_link). Abilita la tracciabilità delle prenotazioni incassate in negozio senza cambiare il modello di capacità o QR.
 
 ---
 
@@ -418,8 +411,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.7
+# Fine snapshot v6.8
 
-**Base audit:** `main @ storefront + Events shared navigation drawer`  
+**Base audit:** `main @ manual in-store event reservations`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

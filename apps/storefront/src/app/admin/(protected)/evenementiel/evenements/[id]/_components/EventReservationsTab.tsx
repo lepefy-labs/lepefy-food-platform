@@ -1,17 +1,24 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { IconAlertTriangle, IconCheck, IconDotsVertical, IconDownload, IconFileSpreadsheet, IconPencil, IconPrinter, IconReceiptRefund, IconSearch, IconSend, IconTicket, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCheck, IconDotsVertical, IconFileSpreadsheet, IconPencil, IconPlus, IconPrinter, IconReceiptRefund, IconSearch, IconSend, IconTicket, IconX } from '@tabler/icons-react';
 import Button from '../../../../../_components/ui/Button';
 import type { EventReservationStatus, EventTicketType } from '@lepefy/types';
 import type { AdminEventReservation } from '../page';
 import { formatPrice } from '@/lib/utils/format';
+import ManualEventReservationModal from './ManualEventReservationModal';
 
 const STATUS_LABELS: Record<EventReservationStatus, string> = {
   confirmed: 'Confirmée',
   refunded: 'Remboursée',
   cancelled: 'Annulée',
 };
+
+function sourceLabel(reservation: AdminEventReservation) {
+  if (reservation.source === 'admin_in_store') return { label: 'En magasin', className: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300' };
+  if (reservation.source === 'external_link' || (!reservation.source && !reservation.stripe_payment_intent_id)) return { label: 'Paiement externe', className: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
+  return { label: 'En ligne', className: 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' };
+}
 
 export default function EventReservationsTab({
   eventId,
@@ -59,9 +66,16 @@ export default function EventReservationsTab({
   const [refundTargetId, setRefundTargetId] = useState<string | null>(null);
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [formulaFilter, setFormulaFilter] = useState('all');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualReservations, setManualReservations] = useState<AdminEventReservation[]>([]);
   const cancelRefundRef = useRef<HTMLButtonElement>(null);
 
-  const filtered = reservations.filter((reservation) => {
+  const allReservations = useMemo(() => {
+    const existingIds = new Set(reservations.map((reservation) => reservation.id));
+    return [...manualReservations.filter((reservation) => !existingIds.has(reservation.id)), ...reservations];
+  }, [manualReservations, reservations]);
+
+  const filtered = allReservations.filter((reservation) => {
     const haystack = `${reservation.customer_name} ${reservation.customer_email} ${reservation.id.slice(0, 8)} ${reservation.items.map((item) => item.ticket_type_label).join(' ')}`.toLowerCase();
     const matchesSearch = !search.trim() || haystack.includes(search.trim().toLowerCase());
     const matchesStatus = statusFilter === 'all' || reservation.status === statusFilter;
@@ -69,7 +83,7 @@ export default function EventReservationsTab({
     return matchesSearch && matchesStatus && matchesFormula;
   });
 
-  const confirmed = reservations.filter((reservation) => reservation.status === 'confirmed');
+  const confirmed = allReservations.filter((reservation) => reservation.status === 'confirmed');
   const confirmedPeople = confirmed.reduce((sum, reservation) => sum + reservation.quantity_total, 0);
   const formulaTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -83,7 +97,7 @@ export default function EventReservationsTab({
       .filter((item) => item.quantity > 0);
   }, [confirmed, ticketTypes]);
 
-  const refundTarget = refundTargetId ? reservations.find((reservation) => reservation.id === refundTargetId) ?? null : null;
+  const refundTarget = refundTargetId ? allReservations.find((reservation) => reservation.id === refundTargetId) ?? null : null;
   const refundInProgress = Boolean(refundTarget && refundingId === refundTarget.id);
 
   useEffect(() => {
@@ -121,6 +135,10 @@ export default function EventReservationsTab({
     if (success) setRefundTargetId(null);
   }
 
+  function onManualCreated(reservation: AdminEventReservation) {
+    setManualReservations((current) => [reservation, ...current.filter((item) => item.id !== reservation.id)]);
+  }
+
   const exportBase = `/api/admin/evenementiel/reservations`;
   const eventQuery = `event_id=${encodeURIComponent(eventId)}`;
 
@@ -141,10 +159,11 @@ export default function EventReservationsTab({
               </div>
             )}
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:shrink-0">
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <button type="button" onClick={() => setManualOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"><IconPlus size={16} /> Ajouter une réservation</button>
             <a href={`${exportBase}/report?${eventQuery}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconFileSpreadsheet size={16} /> Rapport détaillé</a>
             <a href={`${exportBase}/print-list?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconPrinter size={16} /> Liste imprimable</a>
-            <a href={`${exportBase}/table-cards?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"><IconTicket size={16} /> Codes A5</a>
+            <a href={`${exportBase}/table-cards?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconTicket size={16} /> Codes A5</a>
           </div>
         </div>
       </section>
@@ -153,7 +172,7 @@ export default function EventReservationsTab({
         <label className="relative block w-full min-w-0 lg:w-[420px]">
           <span className="sr-only">Rechercher une réservation</span>
           <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Client, email, référence ou formule" className="min-h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+          <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Client, email, référence ou formule" className="min-h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
         </label>
         <div className="flex max-w-full flex-wrap items-center gap-2">
           <select value={formulaFilter} onChange={(event) => setFormulaFilter(event.target.value)} className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200" aria-label="Filtrer par formule">
@@ -181,16 +200,18 @@ export default function EventReservationsTab({
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {filtered.map((reservation) => {
                 const reference = reservation.id.slice(0, 8).toUpperCase();
+                const source = sourceLabel(reservation);
                 return (
                   <div key={reservation.id} className="grid gap-2.5 px-4 py-3 md:grid-cols-[minmax(240px,1fr)_minmax(220px,1fr)_105px_110px_150px] md:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{reservation.customer_name}</p>
                         <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-2xs font-bold tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">#{reference}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${source.className}`}>{source.label}</span>
                       </div>
                       {editingEmailId === reservation.id ? (
                         <div className="mt-1 flex max-w-md items-center gap-1.5">
-                          <input type="email" value={emailDraft} onChange={(e) => onEmailDraftChange(e.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950" autoFocus />
+                          <input type="email" value={emailDraft} onChange={(event) => onEmailDraftChange(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950" autoFocus />
                           <button type="button" onClick={() => onConfirmEmailEdit(reservation.id)} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" aria-label="Confirmer l’email"><IconCheck size={16} /></button>
                           <button type="button" onClick={onCancelEditEmail} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-50" aria-label="Annuler la modification"><IconX size={16} /></button>
                         </div>
@@ -218,8 +239,12 @@ export default function EventReservationsTab({
                             {openActionsId === reservation.id && (
                               <div role="menu" className="absolute right-0 z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
                                 <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); onStartEditEmail(reservation.id, reservation.customer_email); }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-200 dark:hover:bg-white/5"><IconPencil size={14} aria-hidden="true" /> Modifier l’email</button>
-                                <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                                <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); setRefundTargetId(reservation.id); }} disabled={refundingId === reservation.id} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"><IconReceiptRefund size={14} aria-hidden="true" /> Rembourser la réservation</button>
+                                {reservation.stripe_payment_intent_id && (
+                                  <>
+                                    <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                                    <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); setRefundTargetId(reservation.id); }} disabled={refundingId === reservation.id} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"><IconReceiptRefund size={14} aria-hidden="true" /> Rembourser la réservation</button>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
@@ -233,6 +258,8 @@ export default function EventReservationsTab({
           </>
         )}
       </section>
+
+      <ManualEventReservationModal open={manualOpen} eventId={eventId} ticketTypes={ticketTypes} currency={currency} onClose={() => setManualOpen(false)} onCreated={onManualCreated} />
 
       {refundTarget && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !refundInProgress) setRefundTargetId(null); }}>

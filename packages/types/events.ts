@@ -44,6 +44,8 @@ export interface EventTicketType {
 }
 
 export type EventReservationStatus = 'confirmed' | 'cancelled' | 'refunded';
+export type EventReservationSource = 'online' | 'external_link' | 'admin_in_store';
+export type EventReservationPaymentMethod = 'stripe' | 'external_link' | 'in_store';
 
 export interface EventReservation {
   id: string;
@@ -58,6 +60,9 @@ export interface EventReservation {
   quantity_total: number;
   quantity_remaining: number;
   status: EventReservationStatus;
+  source: EventReservationSource;
+  payment_method: EventReservationPaymentMethod;
+  created_by_admin_id: string | null;
   created_at: string;
 }
 

@@ -73,9 +73,10 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/payment-methods')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
 
-  // Events external payments — keep money-moving actions explicit.
+  // Events financial actions remain explicit and never inherit generic CRUD permissions.
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';
   if (/^\/api\/admin\/evenementiel\/rental-reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';
+  if (path === '/api/admin/evenementiel/reservations/manual') return 'event_payments.confirm';
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/cancel$/.test(path)) return 'event_payments.cancel';
   if (/^\/api\/admin\/evenementiel\/reservations\/[^/]+\/refund$/.test(path)) return 'event_payments.refund';
 
@@ -86,8 +87,6 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/evenementiel/ticket-types')) return read ? 'events.view' : 'events.manage';
   if (path.startsWith('/api/admin/evenementiel/inquiries')) return read ? 'event_reservations.view' : 'event_reservations.manage';
 
-  // Rental inventory belongs to event content/configuration; rental bookings
-  // themselves are handled above through rental-reservations.
   if (
     path.startsWith('/api/admin/evenementiel/rental-items') ||
     path.includes('/rental-items') ||

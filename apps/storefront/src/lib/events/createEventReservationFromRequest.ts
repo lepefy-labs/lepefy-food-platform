@@ -5,36 +5,25 @@ import { generateEventQrToken } from '@/lib/events/qrToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
-import type { EventCheckoutItemInput } from '@lepefy/types';
-
-// Agente e2e Fase 0b — plus de client Stripe au scope module ici : le compte
-// à utiliser dépend de `input.isTest` (connu seulement à l'appel), pas de
-// isE2ERequest() côté requête entrante (le webhook Stripe n'a jamais le
-// header x-e2e-test-token — ce n'est pas le test harness qui l'appelle).
-// Voir le point d'usage ci-dessous (refund sur conflit de capacité).
-
-// Extrait de handleEventReservationPaymentSucceeded (api/webhooks/stripe/route.ts)
-// — même logique bit-à-bit pour le flux stripe, réutilisée telle quelle par
-// api/admin/evenementiel/reservation-requests/[id]/confirm-payment (Phase 2 —
-// paiement via lien externe, confirmation manuelle). Seule différence entre
-// les deux appelants : le remboursement automatique Stripe en cas de conflit
-// de capacité, impossible pour external_link (aucun PaymentIntent) — géré
-// ci-dessous via `input.stripePaymentIntentId === undefined`.
+import type { EventCheckoutItemInput, EventReservationPaymentMethod, EventReservationSource } from '@lepefy/types';
 
 export interface CreateEventReservationInput {
-  eventId:        string;
-  tenantId:       string;
-  items:          EventCheckoutItemInput[];
-  customerName:   string;
-  customerEmail:  string;
-  customerPhone:  string;
-  amountPaid:     number;
-  /** intent.id — présent uniquement pour le flux Stripe. undefined pour external_link. */
+  eventId: string;
+  tenantId: string;
+  items: EventCheckoutItemInput[];
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  amountPaid: number;
+  /** intent.id — présent uniquement pour le flux Stripe. */
   stripePaymentIntentId?: string;
-  /** Agente e2e Fase 0 — true uniquement quand appelé depuis le webhook pour
-   *  un événement vérifié contre le compte Stripe séparé dédié aux tests e2e.
-   *  Absent (donc false) pour tous les autres appelants (external_link). */
   isTest?: boolean;
+  /** Par défaut dérivé du flux : online si Stripe, external_link sinon. */
+  source?: EventReservationSource;
+  /** Par défaut dérivé du flux : stripe si PaymentIntent, external_link sinon. */
+  paymentMethod?: EventReservationPaymentMethod;
+  /** Admin ayant créé une réservation encaissée en magasin. */
+  createdByAdminId?: string | null;
 }
 
 export type CreateEventReservationResult =
@@ -47,8 +36,10 @@ export async function createEventReservationFromRequest(
 ): Promise<CreateEventReservationResult> {
   const isStripe = input.stripePaymentIntentId !== undefined;
   const { eventId, tenantId, items, customerName, customerEmail, customerPhone, amountPaid } = input;
+  const source: EventReservationSource = input.source ?? (isStripe ? 'online' : 'external_link');
+  const paymentMethod: EventReservationPaymentMethod = input.paymentMethod ?? (isStripe ? 'stripe' : 'external_link');
 
-  const totalQuantity = items.reduce((s, i) => s + i.quantity, 0);
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   if (totalQuantity <= 0) {
     console.error('[createEventReservationFromRequest] No items to reserve — event:', eventId);
     return { error: 'no_items' };
@@ -58,15 +49,12 @@ export async function createEventReservationFromRequest(
     .from('event_ticket_types')
     .select('id, price, label')
     .eq('event_id', eventId)
-    .in('id', items.map((i) => i.ticket_type_id));
+    .in('id', items.map((item) => item.ticket_type_id));
 
   const typedTicketTypes = (ticketTypes ?? []) as { id: string; price: number; label: string }[];
-  const priceByTicketType = new Map<string, number>(typedTicketTypes.map((t) => [t.id, t.price]));
-  const labelByTicketType = new Map<string, string>(typedTicketTypes.map((t) => [t.id, t.label]));
+  const priceByTicketType = new Map<string, number>(typedTicketTypes.map((ticket) => [ticket.id, ticket.price]));
+  const labelByTicketType = new Map<string, string>(typedTicketTypes.map((ticket) => [ticket.id, ticket.label]));
 
-  // Données événement résolues ICI (pas déléguées à n8n) pour les payloads
-  // des deux webhooks (confirmé + conflit capacité) — templates email
-  // lisibles sans query supplémentaire côté n8n.
   const { data: eventRow } = await supabase
     .from('events')
     .select('title, date_start, location')
@@ -74,17 +62,14 @@ export async function createEventReservationFromRequest(
     .maybeSingle();
 
   const eventDetails = {
-    eventTitle:     eventRow?.title ?? null,
+    eventTitle: eventRow?.title ?? null,
     eventDateStart: eventRow?.date_start ?? null,
-    eventLocation:  eventRow?.location ?? null,
+    eventLocation: eventRow?.location ?? null,
   };
 
   const reservationId = crypto.randomUUID();
-  const qrToken        = generateEventQrToken(reservationId, eventId);
+  const qrToken = generateEventQrToken(reservationId, eventId);
 
-  // Vérification atomique et définitive — jamais allentée pour external_link :
-  // si la capacité a été épuisée entre-temps par une autre réservation
-  // confirmée, ceci échoue exactement comme pour Stripe.
   const { data: capacityResult, error: capacityError } = await supabase
     .rpc('reserve_event_capacity', { p_event_id: eventId, p_quantity: totalQuantity })
     .single();
@@ -98,9 +83,6 @@ export async function createEventReservationFromRequest(
     let refundSucceeded = false;
     if (isStripe && input.stripePaymentIntentId) {
       try {
-        // Le PaymentIntent à rembourser a été créé sur le compte Stripe
-        // correspondant à input.isTest — le refund doit utiliser le même
-        // compte, sinon Stripe répond "no such payment_intent".
         const refundStripe = input.isTest
           ? new Stripe(process.env.STRIPE_SECRET_KEY_TEST ?? '')
           : getStripeClient('event');
@@ -114,12 +96,15 @@ export async function createEventReservationFromRequest(
     }
 
     await notifyN8n('/webhook/event-reservation-capacity-conflict', {
-      eventId, intentId: input.stripePaymentIntentId ?? null, customerName, customerEmail,
+      eventId,
+      intentId: input.stripePaymentIntentId ?? null,
+      customerName,
+      customerEmail,
       refundSucceeded: isStripe ? refundSucceeded : null,
       manualRefundRequired: !isStripe,
+      source,
+      paymentMethod,
       ...eventDetails,
-      // Pas de ticketUrl ici : la réservation n'est pas créée, aucun billet
-      // valide à montrer.
     });
 
     return { error: 'stock_conflict' };
@@ -128,19 +113,22 @@ export async function createEventReservationFromRequest(
   const { error: reservationError } = await supabase
     .from('event_reservations')
     .insert({
-      id:                        reservationId,
-      tenant_id:                 tenantId,
-      event_id:                  eventId,
-      customer_name:             customerName,
-      customer_email:            customerEmail,
-      customer_phone:            customerPhone || null,
-      stripe_payment_intent_id:  input.stripePaymentIntentId ?? null,
-      amount_paid:               amountPaid,
-      qr_token:                  qrToken,
-      quantity_total:            totalQuantity,
-      quantity_remaining:        totalQuantity,
-      status:                    'confirmed',
-      is_test:                   input.isTest ?? false,
+      id: reservationId,
+      tenant_id: tenantId,
+      event_id: eventId,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      customer_phone: customerPhone || null,
+      stripe_payment_intent_id: input.stripePaymentIntentId ?? null,
+      amount_paid: amountPaid,
+      qr_token: qrToken,
+      quantity_total: totalQuantity,
+      quantity_remaining: totalQuantity,
+      status: 'confirmed',
+      is_test: input.isTest ?? false,
+      source,
+      payment_method: paymentMethod,
+      created_by_admin_id: input.createdByAdminId ?? null,
     });
 
   if (reservationError) {
@@ -153,11 +141,11 @@ export async function createEventReservationFromRequest(
     return { error: 'reservation_insert_failed' };
   }
 
-  const itemsPayload = items.map((i) => ({
+  const itemsPayload = items.map((item) => ({
     reservation_id: reservationId,
-    ticket_type_id: i.ticket_type_id,
-    quantity:       i.quantity,
-    unit_price:     priceByTicketType.get(i.ticket_type_id) ?? 0,
+    ticket_type_id: item.ticket_type_id,
+    quantity: item.quantity,
+    unit_price: priceByTicketType.get(item.ticket_type_id) ?? 0,
   }));
 
   const { error: itemsError } = await supabase.from('event_reservation_items').insert(itemsPayload);
@@ -165,22 +153,25 @@ export async function createEventReservationFromRequest(
     console.error('[createEventReservationFromRequest] Failed to insert reservation items:', itemsError, '— reservation:', reservationId);
   }
 
-  console.info('[createEventReservationFromRequest] Reservation created — id:', reservationId, '— event:', eventId, '— qty:', totalQuantity);
+  console.info('[createEventReservationFromRequest] Reservation created — id:', reservationId, '— event:', eventId, '— qty:', totalQuantity, '— source:', source);
 
   const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
   await notifyN8n('/webhook/event-reservation-confirmed', {
-    reservationId, eventId, customerName, customerEmail, customerPhone,
+    reservationId,
+    eventId,
+    customerName,
+    customerEmail,
+    customerPhone,
     amountPaid,
+    source,
+    paymentMethod,
     ...eventDetails,
-    // ticketTypeLabel ajouté UNIQUEMENT dans le payload n8n — itemsPayload
-    // reste inchangé pour l'insert event_reservation_items (pas de colonne
-    // label dans cette table).
-    items: itemsPayload.map((i) => ({
-      ...i,
-      ticketTypeLabel: labelByTicketType.get(i.ticket_type_id) ?? null,
+    items: itemsPayload.map((item) => ({
+      ...item,
+      ticketTypeLabel: labelByTicketType.get(item.ticket_type_id) ?? null,
     })),
-    ticketUrl:  getTicketUrl(qrToken),
-    adminLink:  `${storefrontUrl}/admin/evenementiel/evenements`,
+    ticketUrl: getTicketUrl(qrToken),
+    adminLink: `${storefrontUrl}/admin/evenementiel/evenements`,
   });
 
   return { reservationId };
