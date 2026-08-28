@@ -17,7 +17,7 @@ export function ActiveCheckoutRecoveryBar({
   currency: string;
 }) {
   const pathname = usePathname();
-  const visible = pathname === '/products' || pathname === '/cart' || pathname === '/compte' || pathname === '/orders';
+  const visible = pathname === '/' || pathname === '/cart' || pathname === '/compte' || pathname === '/orders';
 
   if (!visible) return null;
 

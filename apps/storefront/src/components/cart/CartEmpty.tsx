@@ -17,7 +17,7 @@ export function CartEmpty({ onNavigate, headingLevel = 'h2' }: CartEmptyProps) {
         Ajoutez des produits pour commencer votre commande.
       </p>
       <Link
-        href="/products"
+        href="/"
         onClick={onNavigate}
         className="px-6 py-3 rounded-2xl font-semibold text-white text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)]"
         style={{ backgroundColor: 'var(--color-primary)' }}

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { ProductCard } from '@/components/catalog/ProductCard';
-import type { HomeProduct } from '@/app/(shop)/page';
+import type { HomeProduct } from '@/app/(shop)/accueil/page';
 
 interface Props {
   products: HomeProduct[];

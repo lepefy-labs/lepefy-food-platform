@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.4 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.5 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -52,6 +52,21 @@ events host -> workspace events
 Resolver canonico: `src/lib/admin/workspace.ts`.
 
 La navigazione admin e la ricerca globale sono permission-aware. Lo switch workspace è mostrato solo se l'utente possiede almeno una capability della surface destinazione.
+
+### Storefront routing, Catalogue e PWA
+
+Le route storefront canoniche sono:
+
+```text
+/                     -> Catalogue storefront
+/accueil              -> pagina editoriale “Découvrir”
+/products             -> redirect permanente 308 verso /
+/products/[slug]      -> Product Detail, invariato
+```
+
+La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
+
+La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker pre-cachea la root canonica senza mantenere `/products` come asset storefront separato.
 
 ---
 
@@ -392,8 +407,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.4
+# Fine snapshot v6.5
 
-**Base audit:** `main @ event on-site price list + RBAC completion`  
+**Base audit:** `main @ storefront Catalogue root + RBAC completion`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

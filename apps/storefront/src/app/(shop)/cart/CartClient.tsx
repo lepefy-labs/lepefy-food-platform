@@ -386,7 +386,7 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
         <section aria-label="Articles du panier" className="order-3 min-w-0 lg:order-1">
           <div className="mb-3 hidden items-center justify-between lg:flex">
             <p className="text-sm font-semibold text-gray-500">{formatProductCount(itemCount)}</p>
-            <a href="/products" className="min-h-10 items-center text-sm font-semibold text-gray-500 transition-colors hover:text-gray-900">
+            <a href="/" className="min-h-10 items-center text-sm font-semibold text-gray-500 transition-colors hover:text-gray-900">
               Continuer mes achats
             </a>
           </div>

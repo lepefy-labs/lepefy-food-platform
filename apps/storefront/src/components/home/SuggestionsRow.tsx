@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/utils/format';
-import type { HomeProduct } from '@/app/(shop)/page';
+import type { HomeProduct } from '@/app/(shop)/accueil/page';
 
 export interface SuggestionProduct extends HomeProduct {
   compare_at_price: number | null;

@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { CatalogCategoryImage } from '@/components/catalog/CatalogCategoryImage';
 import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
-import type { HomeProduct } from '@/app/(shop)/page';
+import type { HomeProduct } from '@/app/(shop)/accueil/page';
 
 interface CategoryBlockProps {
   /** Index de la catégorie dans le tableau complet (pas seulement les blocs
@@ -93,7 +93,7 @@ export function CategoryBlock({
 
   return (
     <Link
-      href={`/products?category=${slug}`}
+      href={`/?category=${slug}`}
       aria-hidden={hiddenFromA11y || undefined}
       tabIndex={hiddenFromA11y ? -1 : undefined}
       className={`relative flex-[0_0_78%] md:flex-[0_0_300px] snap-start rounded-[20px] overflow-hidden p-4 flex flex-col ${

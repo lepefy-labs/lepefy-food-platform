@@ -19,7 +19,7 @@ const SHORTCUTS: MetadataRoute.Manifest['shortcuts'] = [
   {
     name: 'Voir les produits',
     short_name: 'Produits',
-    url: '/products',
+    url: '/',
     icons: [{ src: '/api/pwa-icon?size=192', sizes: '192x192', type: 'image/png' }],
   },
   {
@@ -40,7 +40,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
       name:             tenant.name,
       short_name:       tenant.name,
       description:      tenant.tagline ?? `${tenant.name} — boutique en ligne`,
-      start_url:        '/products',
+      start_url:        '/',
       display:          'standalone',
       display_override: ['standalone', 'browser'],
       background_color: '#ffffff',
@@ -63,7 +63,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
       name:             'Boutique en ligne',
       short_name:       'Boutique',
       description:      'Boutique en ligne',
-      start_url:        '/products',
+      start_url:        '/',
       display:          'standalone',
       display_override: ['standalone', 'browser'],
       background_color: '#ffffff',

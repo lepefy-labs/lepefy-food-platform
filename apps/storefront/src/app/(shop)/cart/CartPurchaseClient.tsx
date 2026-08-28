@@ -97,7 +97,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
           </section>
 
           <div className="hidden items-center gap-3 md:flex lg:max-w-xl">
-            <Link href="/products" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
+            <Link href="/" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
               <IconArrowLeft size={16} /> Continuer mes achats
             </Link>
             <button type="button" onClick={startCheckout} className="flex min-h-12 flex-[1.2] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
@@ -122,7 +122,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
 
       <div className="fixed inset-x-0 bottom-16 z-40 border-t border-black/10 bg-white/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-xl grid-cols-[0.9fr_1.25fr] gap-2.5">
-          <Link href="/products" className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm font-bold text-gray-800">
+          <Link href="/" className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm font-bold text-gray-800">
             <IconArrowLeft size={15} /> Achats
           </Link>
           <button

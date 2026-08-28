@@ -16,7 +16,7 @@ export function OrdersEmptyState() {
         Vos prochaines commandes apparaîtront ici avec leur statut, leur montant et leur suivi.
       </p>
       <Link
-        href="/products"
+        href="/"
         className="mt-7 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 sm:w-auto"
         style={{ backgroundColor: 'var(--color-primary)' }}
       >

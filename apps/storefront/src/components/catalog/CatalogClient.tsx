@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { ProductGrid } from '@/components/catalog/ProductGrid';
 import { SemanticProductCard } from '@/components/catalog/SemanticProductCard';
@@ -30,6 +30,7 @@ export function CatalogClient({
   currentPage,
   hasNextPage,
 }: Props) {
+  const pathname      = usePathname();
   const router        = useRouter();
   const searchParams  = useSearchParams();
   const [query, setQuery]            = useState(initialQuery);
@@ -103,7 +104,7 @@ export function CatalogClient({
     // résiduel d'une navigation précédente.
     params.delete('page');
     const qs = params.toString();
-    return `/products${qs ? '?' + qs : ''}`;
+    return `${pathname}${qs ? '?' + qs : ''}`;
   }
 
   async function handleLoadMore() {
@@ -126,8 +127,8 @@ export function CatalogClient({
       setHasMore(Boolean(data.hasNextPage));
 
       // Met à jour l'URL affichée (deep-link/partage) sans passer par
-      // router.replace() : celui-ci re-exécuterait le Server Component de
-      // /products et re-fetcherait tout le cumul qu'on vient de charger en
+      // router.replace() : celui-ci re-exécuterait le Server Component du
+      // Catalogue et re-fetcherait tout le cumul qu'on vient de charger en
       // léger via /api/products — on perdrait tout le bénéfice du fetch
       // incrémental. On garde donc l'historique intact (pas de nouvelle
       // entrée par clic) ; ?page= n'est réellement consulté par le serveur

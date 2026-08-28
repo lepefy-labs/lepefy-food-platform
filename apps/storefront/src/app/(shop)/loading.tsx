@@ -1,45 +1,36 @@
-/** Même gabarit visuel que ProductCardSkeleton (ProductGrid.tsx), adapté au
- *  format "shelf" (carte étroite en rangée horizontale) de la home. */
-function ShelfCardSkeleton() {
+/** Même gabarit que ProductCardSkeleton (ProductGrid.tsx) — dupliqué ici car
+ *  loading.tsx doit être autonome et ce composant interne n'est pas exporté. */
+function ProductCardSkeleton() {
   return (
-    <div className="rounded-lg overflow-hidden border border-gray-100 bg-white flex-shrink-0 w-36 md:w-full md:flex-shrink animate-pulse">
-      <div className="aspect-square bg-gray-100" />
-      <div className="px-2 pt-1 pb-6 space-y-1.5">
-        <div className="h-3 bg-gray-100 rounded-sm w-full" />
-        <div className="h-3 bg-gray-100 rounded-sm w-1/2" />
+    <div className="rounded-lg overflow-hidden border border-gray-200 animate-pulse">
+      <div className="aspect-[4/3] bg-gray-100 sm:aspect-square" />
+      <div className="p-2.5 sm:p-3">
+        <div className="space-y-1">
+          <div className="h-3.5 bg-gray-100 rounded-sm w-full" />
+          <div className="h-3.5 bg-gray-100 rounded-sm w-2/3" />
+        </div>
+        <div className="mt-1.5 h-3 w-1/2 rounded-sm bg-gray-100 sm:mt-2" />
+        <div className="mt-1.5 flex items-end justify-between gap-2 sm:mt-2">
+          <div className="h-4 w-16 rounded-sm bg-gray-100" />
+          <div className="h-11 w-11 rounded-full bg-gray-100" />
+        </div>
       </div>
     </div>
   );
 }
 
-function ShelfSectionSkeleton() {
-  return (
-    <section>
-      <div className="flex items-center justify-between px-4 mb-2 mt-5">
-        <div className="h-4 w-32 bg-gray-100 rounded-sm animate-pulse" />
-        <div className="h-3 w-14 bg-gray-100 rounded-sm animate-pulse" />
-      </div>
-      <div className="
-        flex gap-2.5 overflow-x-auto px-4 pb-3
-        [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]
-        md:grid md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]
-        md:overflow-x-visible md:pb-4
-      ">
-        {Array.from({ length: 4 }).map((_, i) => <ShelfCardSkeleton key={i} />)}
-      </div>
-    </section>
-  );
-}
-
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-[#f7f9f8]">
-      {/* Hero placeholder */}
-      <div className="h-56 md:h-72 bg-gray-100 animate-pulse" />
-
-      <div className="max-w-6xl mx-auto w-full">
-        {Array.from({ length: 3 }).map((_, i) => <ShelfSectionSkeleton key={i} />)}
-        <div className="h-6" />
+    <div className="max-w-6xl mx-auto px-4 py-5 md:py-8">
+      <div className="mb-5 space-y-2 animate-pulse"><div className="h-9 w-44 rounded bg-gray-100"/><div className="h-4 w-36 rounded bg-gray-100"/></div>
+      <div className="h-[52px] max-w-2xl bg-gray-50 border border-gray-200 rounded-xl animate-pulse" />
+      <div className="mt-6 mb-3 h-6 w-28 bg-gray-100 rounded animate-pulse" />
+      <div className="mb-6 flex gap-3 overflow-hidden">
+        {Array.from({ length: 5 }).map((_, i) => <div key={i} className="aspect-[4/5] flex-[0_0_31%] sm:flex-[0_0_23%] md:flex-[0_0_168px] rounded-[18px] bg-gray-100 animate-pulse" />)}
+      </div>
+      <div className="h-7 w-40 bg-gray-100 rounded mb-4 animate-pulse" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
       </div>
     </div>
   );

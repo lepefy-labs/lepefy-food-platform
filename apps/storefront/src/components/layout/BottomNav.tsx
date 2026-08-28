@@ -30,11 +30,11 @@ export function BottomNav() {
 
   const tabs: Tab[] = [
     {
-      href: '/', label: 'Accueil', isActive: (p) => p === '/',
+      href: '/accueil', label: 'Découvrir', isActive: (p) => p === '/accueil',
       icon: (active) => <IconSmartHome size={24} stroke={active ? 2 : 1.5} />,
     },
     {
-      href: '/products', label: 'Catalogue', isActive: (p) => p === '/products' || p.startsWith('/products/'),
+      href: '/', label: 'Catalogue', isActive: (p) => p === '/' || p.startsWith('/products/'),
       icon: (active) => <IconCategory size={24} stroke={active ? 2 : 1.5} />,
     },
     {

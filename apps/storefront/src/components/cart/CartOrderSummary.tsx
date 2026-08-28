@@ -98,7 +98,7 @@ export function CartOrderSummary({
             <p className="mt-2 text-center text-[11px] leading-relaxed text-gray-400">Le paiement reste inaccessible tant que la livraison n’est pas calculée.</p>
           )}
 
-          <Link href="/products" className="mt-3 flex min-h-10 items-center justify-center text-sm font-semibold text-gray-500 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
+          <Link href="/" className="mt-3 flex min-h-10 items-center justify-center text-sm font-semibold text-gray-500 hover:text-gray-900 focus-visible:outline-none focus-visible:underline">
             Continuer mes achats
           </Link>
         </div>

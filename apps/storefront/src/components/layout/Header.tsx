@@ -78,7 +78,7 @@ export function Header() {
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex">
-            <Link href="/products" className="text-sm font-medium text-gray-700 hover:text-gray-900">Catalogue</Link>
+            <Link href="/" className="text-sm font-medium text-gray-700 hover:text-gray-900">Catalogue</Link>
             <Link href="/cart" onClick={handleCartClick} aria-haspopup="dialog" className="relative text-sm font-medium text-gray-700 hover:text-gray-900">
               Panier
               {totalItems > 0 && <span className="absolute -right-4 -top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs text-white" style={{ backgroundColor: 'var(--color-primary)' }}>{totalItems}</span>}
@@ -95,7 +95,7 @@ export function Header() {
         <nav id="mobile-shop-menu" className="absolute inset-x-0 top-24 border-b border-gray-200 bg-white px-4 py-3 shadow-lg md:hidden" aria-label="Navigation principale mobile">
           <div className="mx-auto grid max-w-7xl gap-1">
             {([
-              ['Accueil', '/'], ['Catalogue', '/products'], ['Panier', '/cart'], ['Commandes', '/orders'], ['Compte', '/compte/connexion'],
+              ['Découvrir', '/accueil'], ['Catalogue', '/'], ['Panier', '/cart'], ['Commandes', '/orders'], ['Compte', '/compte/connexion'],
             ] as const).map(([label, href]) => (
               <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2">{label}</Link>
             ))}

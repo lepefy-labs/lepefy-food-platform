@@ -112,7 +112,7 @@ export default function OrderConfirmationClient({
         <p className="text-gray-500 text-sm mb-6">
           Votre commande est en cours d&apos;enregistrement. Vérifiez votre email pour la confirmation.
         </p>
-        <Link href="/products" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+        <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
           ← Continuer mes achats
         </Link>
       </div>
@@ -130,7 +130,7 @@ export default function OrderConfirmationClient({
         <p className="text-gray-500 text-sm mb-6">
           Votre paiement est en cours de confirmation. Vous recevrez un email dès que votre commande sera validée.
         </p>
-        <Link href="/products" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+        <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
           ← Continuer mes achats
         </Link>
       </div>
@@ -148,7 +148,7 @@ export default function OrderConfirmationClient({
         <p className="text-gray-500 text-sm mb-2">
           Votre commande a bien été reçue. Vérifiez votre email pour la confirmation.
         </p>
-        <Link href="/products" className="text-sm font-semibold mt-6 inline-block" style={{ color: 'var(--color-primary)' }}>
+        <Link href="/" className="text-sm font-semibold mt-6 inline-block" style={{ color: 'var(--color-primary)' }}>
           ← Continuer mes achats
         </Link>
       </div>
@@ -282,7 +282,7 @@ export default function OrderConfirmationClient({
       </p>
 
       <div className="text-center">
-        <Link href="/products" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+        <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
           ← Continuer mes achats
         </Link>
       </div>

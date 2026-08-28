@@ -10,6 +10,15 @@ const nextConfig = {
     typedRoutes: false,
     serverComponentsExternalPackages: ['sharp', '@resvg/resvg-js'],
   },
+  async redirects() {
+    return [
+      {
+        source: '/products',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     const eventsSubdomain = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
     if (!eventsSubdomain) return { beforeFiles: [] };

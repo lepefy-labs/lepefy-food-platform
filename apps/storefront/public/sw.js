@@ -1,5 +1,5 @@
 const CACHE_NAME = 'chloefood-v2';
-const STATIC_ASSETS = ['/', '/products'];
+const STATIC_ASSETS = ['/'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

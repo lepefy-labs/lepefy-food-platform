@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 
 export function ShopNotificationBar() {
   const pathname = usePathname();
-  if (pathname === '/products') return null;
+  if (pathname === '/') return null;
 
   return (
     <div

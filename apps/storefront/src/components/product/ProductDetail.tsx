@@ -45,11 +45,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   return (
     <div>
       <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6" aria-label="Fil d'Ariane">
-        <Link href="/" className="hover:text-gray-600 transition-colors">Accueil</Link>
+        <Link href="/" className="hover:text-gray-600 transition-colors">Catalogue</Link>
         {product.category && (
           <>
             <span>/</span>
-            <Link href={`/products?category=${product.category.slug}`} className="hover:text-gray-600 transition-colors">
+            <Link href={`/?category=${product.category.slug}`} className="hover:text-gray-600 transition-colors">
               {product.category.name}
             </Link>
           </>
