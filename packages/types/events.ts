@@ -21,6 +21,7 @@ export interface EventRow {
   location: string | null;
   capacity_total: number;
   capacity_remaining: number;
+  show_remaining_places: boolean;
   status: EventStatus;
   banner_image_url: string | null;
   on_site_price_list_image_url: string | null;
