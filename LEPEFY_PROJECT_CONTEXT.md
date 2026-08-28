@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.5 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.6 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -53,7 +53,7 @@ Resolver canonico: `src/lib/admin/workspace.ts`.
 
 La navigazione admin e la ricerca globale sono permission-aware. Lo switch workspace è mostrato solo se l'utente possiede almeno una capability della surface destinazione.
 
-### Storefront routing, Catalogue e PWA
+### Storefront routing, Catalogue, navigation e PWA
 
 Le route storefront canoniche sono:
 
@@ -65,6 +65,8 @@ Le route storefront canoniche sono:
 ```
 
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
+
+La navigazione storefront mobile usa due livelli complementari: `BottomNav` per le destinazioni operative frequenti (`Découvrir`, `Catalogue`, `Panier`, `Commandes`, `Compte`) e un drawer laterale aperto dall'header per esplorazione e servizi secondari. Il drawer non duplica il Panier e rende dinamicamente le voci in base alla configurazione tenant: Events/Services tramite `events_enabled` e `services_enabled`, location tramite `google_maps_url`, contatto tramite `whatsapp_number`, storia e social solo se disponibili. Su desktop `Catalogue`, `Découvrir`, `Panier` e `Compte` restano visibili nell'header; lo stesso drawer è accessibile come menu secondario. Lo stato attivo usa anche `aria-current`, non solo il colore.
 
 La PWA usa `start_url: '/'` e lo shortcut prodotti punta a `/`; il service worker pre-cachea la root canonica senza mantenere `/products` come asset storefront separato.
 
@@ -407,8 +409,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.5
+# Fine snapshot v6.6
 
-**Base audit:** `main @ storefront Catalogue root + RBAC completion`  
+**Base audit:** `main @ storefront Catalogue root + navigation drawer + RBAC completion`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

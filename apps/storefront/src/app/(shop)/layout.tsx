@@ -20,7 +20,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
     <div className="min-h-screen flex flex-col">
       <CartSyncProvider>
       <PWABanner />
-      <Header />
+      <Header socialLinks={socialLinks} storyEnabled={storyEnabled} />
 
       <CheckoutNotificationBarGate />
       <ActiveCheckoutRecovery tenant={tenant} />
