@@ -12,7 +12,7 @@ const VALID_STATUSES: EventStatus[] = ['draft', 'published', 'closed', 'cancelle
 const EDITABLE_FIELDS = [
   'title', 'slug', 'description', 'date_start', 'booking_closes_at', 'location',
   'status', 'banner_image_url', 'on_site_price_list_image_url', 'subtitle', 'highlights',
-  'checkin_opens_at', 'checkin_closes_at',
+  'show_remaining_places', 'checkin_opens_at', 'checkin_closes_at',
 ] as const;
 const MAX_HIGHLIGHTS = 3;
 
@@ -71,6 +71,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const { data, error } = sanitizeHighlights(body.highlights);
       if (error) return NextResponse.json({ error }, { status: 400 });
       patch.highlights = data;
+      continue;
+    }
+    if (field === 'show_remaining_places') {
+      if (typeof body[field] !== 'boolean') {
+        return NextResponse.json({ error: 'show_remaining_places doit être un booléen.' }, { status: 400 });
+      }
+      patch[field] = body[field];
       continue;
     }
     if (field === 'on_site_price_list_image_url') {
