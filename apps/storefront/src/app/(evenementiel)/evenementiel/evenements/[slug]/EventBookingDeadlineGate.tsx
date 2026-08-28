@@ -6,6 +6,7 @@ import { IconClock } from '@tabler/icons-react';
 interface Props {
   bookingClosesAt: string | null;
   capacityRemaining: number;
+  showRemainingPlaces: boolean;
   children: ReactNode;
 }
 
@@ -23,7 +24,7 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
-export default function EventBookingDeadlineGate({ bookingClosesAt, capacityRemaining, children }: Props) {
+export default function EventBookingDeadlineGate({ bookingClosesAt, capacityRemaining, showRemainingPlaces, children }: Props) {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
@@ -67,7 +68,9 @@ export default function EventBookingDeadlineGate({ bookingClosesAt, capacityRema
   }
 
   const hoursRemaining = remainingMs / 3_600_000;
-  const scarcePlaces = capacityRemaining > 0 && capacityRemaining <= 10 ? ` · plus que ${capacityRemaining} place${capacityRemaining > 1 ? 's' : ''}` : '';
+  const scarcePlaces = showRemainingPlaces && capacityRemaining > 0 && capacityRemaining <= 10
+    ? ` · plus que ${capacityRemaining} place${capacityRemaining > 1 ? 's' : ''}`
+    : '';
 
   let message = `Réservations ouvertes jusqu’au ${formatDeadline(bookingClosesAt)}`;
   let tone = 'border-black/[0.08] bg-white text-gray-700';
