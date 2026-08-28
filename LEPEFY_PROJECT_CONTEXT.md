@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.10 Current-State Snapshot**
+> **Aggiornato:** 28 agosto 2026 — **v6.11 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -273,6 +273,12 @@ Le prenotazioni pagate direttamente nel negozio fisico seguono invece un flusso 
 
 La funzione condivisa `createEventReservationFromRequest()` resta il punto canonico per capacity decrement, creazione reservation/items, QR e notifica di conferma. Le prenotazioni `admin_in_store` entrano quindi senza percorsi paralleli in scanner, report, liste e codici A5. Il rimborso Stripe resta disponibile solo per reservation che possiedono un `stripe_payment_intent_id`; una vendita fisica non viene marcata come rimborsata automaticamente dalla piattaforma senza un flusso di rimborso offline dedicato.
 
+### Chiusura prenotazioni online
+
+Gli eventi possono definire `events.booking_closes_at` come deadline opzionale e modificabile dall'admin. Se il campo è `NULL`, il comportamento storico resta invariato. Quando è valorizzato, la pagina pubblica aumenta progressivamente l'urgenza nelle ultime 24/6/2 ore e nasconde il checkout una volta raggiunta la scadenza.
+
+La deadline è enforcement server-side, non solo UI: sia `/api/events/[id]/checkout` sia `/api/events/[id]/checkout-external-link` rifiutano nuove richieste dopo `booking_closes_at`, prima di creare rispettivamente un PaymentIntent Stripe o una `event_reservation_requests`. La chiusura riguarda esclusivamente i canali pubblici: le prenotazioni manuali `admin_in_store` restano disponibili per vendite o eccezioni gestite dal personale. L'admin API valida che `booking_closes_at` preceda `date_start`.
+
 ### Gestione capacità evento
 
 Il tenant admin può aumentare o ridurre la capacità dalla card `Occupation` del résumé evento tramite `Gérer la capacité`. L'azione è visibile solo a chi supera il controllo server-side `event_capacity.manage`.
@@ -351,6 +357,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 088_event_on_site_price_list.sql
 089_event_manual_reservations.sql
 090_event_capacity_management.sql
+091_event_booking_closes_at.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -360,6 +367,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `089` è additiva: aggiunge a `event_reservations` `source`, `payment_method` e `created_by_admin_id`, effettuando un backfill deterministico dell'historico (`stripe_payment_intent_id` presente → online/stripe, assente → external_link/external_link). Abilita la tracciabilità delle prenotazioni incassate in negozio senza cambiare il modello di capacità o QR.
 
 `090` è additiva: introduce `event_capacity_adjustments`, la capability `event_capacity.manage` e l'RPC `adjust_event_capacity`. L'RPC rende atomiche le modifiche di capacità e impedisce di scendere sotto le places già prenotate. La capability viene assegnata ai system role `platform_owner` e `tenant_admin`; i custom role non vengono ampliati automaticamente.
+
+`091` è additiva: introduce `events.booking_closes_at` nullable. Gli eventi esistenti non ricevono backfill e conservano il comportamento precedente; quando valorizzata, la deadline chiude i checkout pubblici Events ma non le prenotazioni manuali admin.
 
 ---
 
@@ -432,8 +441,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.10
+# Fine snapshot v6.11
 
-**Base audit:** `main @ event external-payment tenant alert`  
+**Base audit:** `main @ event booking deadline`  
 **Data:** 28 agosto 2026  
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

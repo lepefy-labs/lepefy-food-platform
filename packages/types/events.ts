@@ -17,6 +17,7 @@ export interface EventRow {
   title: string;
   description: string | null;
   date_start: string;
+  booking_closes_at: string | null;
   location: string | null;
   capacity_total: number;
   capacity_remaining: number;

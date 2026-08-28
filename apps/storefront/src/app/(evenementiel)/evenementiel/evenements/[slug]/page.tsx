@@ -9,6 +9,7 @@ import { formatEventDayDate, formatEventTime, formatPrice } from '@/lib/utils/fo
 import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { getHighlightIcon } from '@/lib/events/highlightIcons';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
+import EventBookingDeadlineGate from './EventBookingDeadlineGate';
 import EventCheckoutClient from './EventCheckoutClient';
 import EventOnSitePriceList from './EventOnSitePriceList';
 import type { EventGalleryPhoto, EventRow, EventTicketType } from '@lepefy/types';
@@ -204,15 +205,17 @@ export default async function EventDetailPage({ params }: PageProps) {
         <div className="py-6 sm:py-7">
           {eventRow.on_site_price_list_image_url && <EventOnSitePriceList imageUrl={eventRow.on_site_price_list_image_url} />}
 
-          <EventCheckoutClient
-            event={{ id: eventRow.id, slug: eventRow.slug, title: eventRow.title, capacityRemaining: eventRow.capacity_remaining }}
-            ticketTypes={ticketTypes}
-            tenant={{ currency: tenant.currency }}
-            soldOut={soldOut}
-            featureRow={featureRow}
-            externalPaymentMethods={externalPaymentMethods}
-            isE2ETest={isE2ERequest()}
-          />
+          <EventBookingDeadlineGate bookingClosesAt={eventRow.booking_closes_at} capacityRemaining={eventRow.capacity_remaining}>
+            <EventCheckoutClient
+              event={{ id: eventRow.id, slug: eventRow.slug, title: eventRow.title, capacityRemaining: eventRow.capacity_remaining }}
+              ticketTypes={ticketTypes}
+              tenant={{ currency: tenant.currency }}
+              soldOut={soldOut}
+              featureRow={featureRow}
+              externalPaymentMethods={externalPaymentMethods}
+              isE2ETest={isE2ERequest()}
+            />
+          </EventBookingDeadlineGate>
 
           <div className="mb-24 mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-500 sm:mb-0 sm:mt-5">
             <span className="flex items-center gap-2"><IconLock size={17} className="text-[var(--color-primary)]" />Paiement sécurisé</span>

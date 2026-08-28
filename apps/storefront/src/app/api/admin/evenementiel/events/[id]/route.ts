@@ -10,7 +10,7 @@ export const fetchCache = 'force-no-store';
 
 const VALID_STATUSES: EventStatus[] = ['draft', 'published', 'closed', 'cancelled'];
 const EDITABLE_FIELDS = [
-  'title', 'slug', 'description', 'date_start', 'location',
+  'title', 'slug', 'description', 'date_start', 'booking_closes_at', 'location',
   'status', 'banner_image_url', 'on_site_price_list_image_url', 'subtitle', 'highlights',
   'checkin_opens_at', 'checkin_closes_at',
 ] as const;
@@ -81,7 +81,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       patch[field] = typeof value === 'string' ? value.trim() || null : null;
       continue;
     }
-    if (field === 'checkin_opens_at' || field === 'checkin_closes_at') {
+    if (field === 'booking_closes_at' || field === 'checkin_opens_at' || field === 'checkin_closes_at') {
       const normalized = normalizeOptionalDate(body[field]);
       if (!normalized.valid) return NextResponse.json({ error: `${field} doit être une date valide ou null.` }, { status: 400 });
       patch[field] = normalized.value;
@@ -103,6 +103,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (patch.status === 'published') {
     const { count } = await supabase.from('event_ticket_types').select('id', { count: 'exact', head: true }).eq('event_id', params.id).eq('active', true);
     if (!count) return NextResponse.json({ error: 'Impossible de publier un événement sans au moins une formule active.' }, { status: 400 });
+  }
+
+  if (patch.booking_closes_at !== undefined || patch.date_start !== undefined) {
+    const { data: current } = await supabase
+      .from('events')
+      .select('date_start, booking_closes_at')
+      .eq('id', params.id)
+      .eq('tenant_id', tenant.id)
+      .maybeSingle();
+    if (!current) return NextResponse.json({ error: 'Événement introuvable.' }, { status: 404 });
+
+    const dateStartValue = patch.date_start !== undefined ? patch.date_start : current.date_start;
+    const dateStart = new Date(String(dateStartValue));
+    if (Number.isNaN(dateStart.getTime())) {
+      return NextResponse.json({ error: 'date_start doit être une date valide.' }, { status: 400 });
+    }
+
+    const bookingClosesAt = patch.booking_closes_at !== undefined ? patch.booking_closes_at : current.booking_closes_at;
+    if (bookingClosesAt && new Date(String(bookingClosesAt)).getTime() >= dateStart.getTime()) {
+      return NextResponse.json({ error: 'La fin des réservations doit être antérieure au début de l’événement.' }, { status: 400 });
+    }
   }
 
   if (patch.checkin_opens_at !== undefined || patch.checkin_closes_at !== undefined) {

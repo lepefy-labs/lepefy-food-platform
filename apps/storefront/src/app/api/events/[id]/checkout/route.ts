@@ -51,13 +51,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const { data: eventRow } = await supabase
       .from('events')
-      .select('id, tenant_id, status, capacity_remaining, title')
+      .select('id, tenant_id, status, capacity_remaining, title, booking_closes_at')
       .eq('id', params.id)
       .eq('tenant_id', tenant.id)
       .maybeSingle();
 
     if (!eventRow || eventRow.status !== 'published') {
       return NextResponse.json({ error: 'Événement introuvable ou non disponible.' }, { status: 404 });
+    }
+
+    if (eventRow.booking_closes_at && Date.now() >= new Date(eventRow.booking_closes_at).getTime()) {
+      return NextResponse.json(
+        { code: 'reservations_closed', error: 'Les réservations sont clôturées pour cet événement.' },
+        { status: 409 },
+      );
     }
 
     const ticketTypeIds = [...new Set(rawItems.map((i) => i.ticket_type_id))];
