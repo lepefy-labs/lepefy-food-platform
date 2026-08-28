@@ -59,7 +59,7 @@ function bookingUrgency(event: EventRow): BookingUrgency | null {
   if (remainingMs <= 0) {
     return {
       label: 'Réservations clôturées',
-      className: 'border-white/25 bg-white/12 text-white',
+      className: 'border-gray-300 bg-gray-100 text-gray-700',
       closed: true,
     };
   }
