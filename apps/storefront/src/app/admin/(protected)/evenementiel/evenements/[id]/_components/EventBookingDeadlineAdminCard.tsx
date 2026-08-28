@@ -23,6 +23,8 @@ function formatDeadline(value: string) {
 export default function EventBookingDeadlineAdminCard({ event }: Props) {
   const [bookingClosesAt, setBookingClosesAt] = useState(toDateTimeLocal(event.booking_closes_at));
   const [savedValue, setSavedValue] = useState(event.booking_closes_at);
+  const [showRemainingPlaces, setShowRemainingPlaces] = useState(event.show_remaining_places !== false);
+  const [savedShowRemainingPlaces, setSavedShowRemainingPlaces] = useState(event.show_remaining_places !== false);
   const [now, setNow] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,15 +71,21 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
       const response = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_closes_at: normalized }),
+        body: JSON.stringify({
+          booking_closes_at: normalized,
+          show_remaining_places: showRemainingPlaces,
+        }),
       });
       const result = await response.json();
       if (!response.ok) {
-        setError(result.error ?? 'Erreur lors de l’enregistrement de la fin des réservations.');
+        setError(result.error ?? 'Erreur lors de l’enregistrement des réservations en ligne.');
         return;
       }
-      setSavedValue((result as EventRow).booking_closes_at);
-      setBookingClosesAt(toDateTimeLocal((result as EventRow).booking_closes_at));
+      const updated = result as EventRow;
+      setSavedValue(updated.booking_closes_at);
+      setBookingClosesAt(toDateTimeLocal(updated.booking_closes_at));
+      setSavedShowRemainingPlaces(updated.show_remaining_places !== false);
+      setShowRemainingPlaces(updated.show_remaining_places !== false);
       setNow(Date.now());
       setSaved(true);
     } catch {
@@ -86,6 +94,8 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
       setSaving(false);
     }
   }
+
+  const dirty = bookingClosesAt !== toDateTimeLocal(savedValue) || showRemainingPlaces !== savedShowRemainingPlaces;
 
   return (
     <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -111,10 +121,32 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
           À cette date, le checkout public est fermé automatiquement. Les réservations manuelles enregistrées par l’admin restent possibles.
         </p>
         {savedValue && <p className="mt-2 text-xs font-medium text-gray-600 dark:text-gray-300">Clôture actuelle : {formatDeadline(savedValue)}</p>}
+
+        <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
+          <label className="flex cursor-pointer items-start justify-between gap-4">
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-gray-700 dark:text-gray-200">Afficher le nombre de places restantes</span>
+              <span className="mt-1 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                Activé : le public voit le nombre exact. Désactivé : la disponibilité reste visible sans révéler le nombre de places.
+              </span>
+            </span>
+            <span className="relative mt-0.5 shrink-0">
+              <input
+                type="checkbox"
+                checked={showRemainingPlaces}
+                onChange={(e) => { setShowRemainingPlaces(e.target.checked); setSaved(false); }}
+                className="peer sr-only"
+              />
+              <span className="block h-6 w-11 rounded-full bg-gray-200 transition-colors peer-checked:bg-[var(--color-primary)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-primary)] peer-focus-visible:ring-offset-2 dark:bg-gray-700" />
+              <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
+            </span>
+          </label>
+        </div>
+
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
-        {saved && !error && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Fin des réservations enregistrée.</p>}
+        {saved && !error && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Paramètres des réservations en ligne enregistrés.</p>}
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={() => void save()} disabled={saving} className="min-h-11 flex-1 rounded-lg bg-[var(--color-primary)] px-3 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60">
+          <button type="button" onClick={() => void save()} disabled={saving || !dirty} className="min-h-11 flex-1 rounded-lg bg-[var(--color-primary)] px-3 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60">
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
           {bookingClosesAt && <button type="button" onClick={() => { setBookingClosesAt(''); setSaved(false); }} disabled={saving} className="min-h-11 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5">Effacer</button>}
