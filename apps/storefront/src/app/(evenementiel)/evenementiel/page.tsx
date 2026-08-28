@@ -34,14 +34,19 @@ function availabilityClasses(remaining: number) {
   return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 }
 
-function availabilityLabel(remaining: number) {
+function availabilityLabel(remaining: number, showExact: boolean) {
   if (remaining <= 0) return 'Complet';
+  if (!showExact) {
+    if (remaining <= 10) return 'Presque complet';
+    if (remaining <= 25) return 'Places limitées';
+    return 'Places disponibles';
+  }
   if (remaining <= 25) return `Plus que ${remaining} place${remaining > 1 ? 's' : ''}`;
   return 'Encore beaucoup de places';
 }
 
-function availabilityDetail(remaining: number) {
-  if (remaining <= 0 || remaining <= 25) return null;
+function availabilityDetail(remaining: number, showExact: boolean) {
+  if (!showExact || remaining <= 0 || remaining <= 25) return null;
   return `${remaining} places disponibles`;
 }
 
@@ -52,7 +57,8 @@ function bookingUrgency(event: EventRow): BookingUrgency | null {
   if (Number.isNaN(deadline)) return null;
 
   const remainingMs = deadline - Date.now();
-  const scarcePlaces = event.capacity_remaining > 0 && event.capacity_remaining <= 10
+  const showExact = event.show_remaining_places !== false;
+  const scarcePlaces = showExact && event.capacity_remaining > 0 && event.capacity_remaining <= 10
     ? ` · ${event.capacity_remaining} place${event.capacity_remaining > 1 ? 's' : ''} restante${event.capacity_remaining > 1 ? 's' : ''}`
     : '';
 
@@ -221,7 +227,7 @@ export default async function EvenementielHubPage() {
                     </div>
                     {!featuredUrgency && (
                       <div className={`rounded-full border px-3 py-1.5 text-xs font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}>
-                        {availabilityLabel(featuredEvent.capacity_remaining)}
+                        {availabilityLabel(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}
                       </div>
                     )}
                   </div>
@@ -310,8 +316,8 @@ export default async function EvenementielHubPage() {
                           <p className="flex items-center gap-2"><IconClock size={18} className="text-[var(--color-primary)]" />{formatEventTime(featuredEvent.date_start)}</p>
                           {featuredEvent.location && <p className="flex items-center gap-2 sm:col-span-2"><IconMapPin size={18} className="shrink-0 text-[var(--color-primary)]" /><span className="line-clamp-1">{featuredEvent.location}</span></p>}
                           <div className="sm:col-span-2">
-                            <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining)}</p>
-                            {availabilityDetail(featuredEvent.capacity_remaining) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining)}</p>}
+                            <p className={`flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 font-bold ${availabilityClasses(featuredEvent.capacity_remaining)}`}><IconUsers size={17} /> {availabilityLabel(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}</p>
+                            {availabilityDetail(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false) && <p className="mt-1.5 pl-1 text-xs text-gray-400">{availabilityDetail(featuredEvent.capacity_remaining, featuredEvent.show_remaining_places !== false)}</p>}
                           </div>
                         </div>
                       </div>
@@ -338,6 +344,7 @@ export default async function EvenementielHubPage() {
                   <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3">
                     {secondaryEvents.map((event) => {
                       const urgency = bookingUrgency(event);
+                      const showRemainingPlaces = event.show_remaining_places !== false;
                       return (
                         <div key={event.id} className="relative min-w-[78vw] snap-start sm:min-w-0">
                           <Link href={`/evenements/${event.slug}`} className="group block h-full overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm">
@@ -359,8 +366,8 @@ export default async function EvenementielHubPage() {
                               </div>
                               <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
                                 <div>
-                                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining)}</span>
-                                  {availabilityDetail(event.capacity_remaining) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining)}</p>}
+                                  <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${availabilityClasses(event.capacity_remaining)}`}><IconUsers size={13} /> {availabilityLabel(event.capacity_remaining, showRemainingPlaces)}</span>
+                                  {availabilityDetail(event.capacity_remaining, showRemainingPlaces) && <p className="mt-1 pl-1 text-[10px] text-gray-400">{availabilityDetail(event.capacity_remaining, showRemainingPlaces)}</p>}
                                 </div>
                                 <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-primary)]">{urgency?.closed ? 'Voir l’événement' : 'Voir & réserver'} <IconArrowRight size={15} /></span>
                               </div>
