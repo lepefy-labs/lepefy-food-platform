@@ -6,6 +6,11 @@ import { IconArrowUpRight, IconCash, IconCheck, IconDownload, IconPhoto, IconSha
 
 type ShareStatus = 'idle' | 'sharing' | 'downloaded' | 'error';
 
+type WebShareNavigator = {
+  share?: (data: ShareData) => Promise<void>;
+  canShare?: (data: ShareData) => boolean;
+};
+
 function extensionForMimeType(mimeType: string) {
   if (mimeType.includes('png')) return 'png';
   if (mimeType.includes('webp')) return 'webp';
@@ -48,17 +53,19 @@ export default function EventOnSitePriceList({ imageUrl }: { imageUrl: string })
         `tarifs-sur-place.${extensionForMimeType(mimeType)}`,
         { type: mimeType },
       );
-
+      const webShare = navigator as unknown as WebShareNavigator;
+      const shareData: ShareData = {
+        title: 'Tarifs sur place',
+        files: [file],
+      };
       const canShareFile = Boolean(
-        navigator.share
-        && (!navigator.canShare || navigator.canShare({ files: [file] })),
+        webShare.share
+        && webShare.canShare
+        && webShare.canShare(shareData),
       );
 
-      if (canShareFile) {
-        await navigator.share({
-          title: 'Tarifs sur place',
-          files: [file],
-        });
+      if (canShareFile && webShare.share) {
+        await webShare.share(shareData);
         setShareStatus('idle');
         return;
       }
