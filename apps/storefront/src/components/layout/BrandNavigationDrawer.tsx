@@ -267,7 +267,19 @@ export function BrandNavigationDrawer({
               <a href={joinUrl(legalBaseUrl, '/politique-confidentialite')} onClick={onClose} className="hover:text-gray-600">Confidentialité</a>
               <a href={joinUrl(legalBaseUrl, '/conditions-generales-vente')} onClick={onClose} className="hover:text-gray-600">CGV</a>
             </div>
-            {tenant.show_powered_by && <p className="mt-1.5">Propulsé par <span className="font-semibold text-gray-500">Lepefy Labs</span></p>}
+            {tenant.show_powered_by && (
+              <p className="mt-1.5">
+                Propulsé par{' '}
+                <a
+                  href="https://www.lepefy.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
+                >
+                  Lepefy Labs
+                </a>
+              </p>
+            )}
           </div>
         )}
       </aside>

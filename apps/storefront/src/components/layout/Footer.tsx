@@ -132,7 +132,15 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
 function PoweredBy() {
   return (
     <p className="mt-3 text-xs text-gray-400">
-      Propulsé par <span className="font-medium text-gray-500">Lepefy Labs</span>
+      Propulsé par{' '}
+      <a
+        href="https://www.lepefy.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400"
+      >
+        Lepefy Labs
+      </a>
     </p>
   );
 }

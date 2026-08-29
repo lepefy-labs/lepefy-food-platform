@@ -81,7 +81,14 @@ export function EventsFooter({ tenant, hasTraiteur, hasLocation }: EventsFooterP
 
         <div className="flex flex-col gap-2 pt-5 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} {tenant.legal_name ?? tenant.name}</span>
-          <span>Powered by Lepefy</span>
+          <a
+            href="https://www.lepefy.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-fit underline-offset-2 hover:text-white/70 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            Powered by Lepefy Labs
+          </a>
         </div>
       </div>
     </footer>

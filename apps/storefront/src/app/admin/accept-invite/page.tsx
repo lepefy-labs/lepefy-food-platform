@@ -51,7 +51,17 @@ export default function AcceptInvitePage() {
             <button type="submit" disabled={status === 'submitting'} className="w-full rounded-lg bg-violet-600 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60">{status === 'submitting' ? 'Enregistrement…' : 'Définir le mot de passe'}</button>
           </form>
         )}
-        <p className="mt-6 text-center text-[11px] text-gray-400">Propulsé par Lepefy</p>
+        <p className="mt-6 text-center text-[11px] text-gray-400">
+          Propulsé par{' '}
+          <a
+            href="https://www.lepefy.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+          >
+            Lepefy Labs
+          </a>
+        </p>
       </div>
     </div>
   );
