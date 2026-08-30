@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { getDefaultEventCheckinClosesAt } from '@/lib/events/checkinWindow';
 import type { EventStatus } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -35,12 +36,13 @@ export async function POST(req: NextRequest) {
   const title = String(body.title ?? '').trim();
   const slugValue = String(body.slug ?? '').trim();
   const dateStart = String(body.date_start ?? '');
+  const dateStartMs = new Date(dateStart).getTime();
   const capacityTotal = Number(body.capacity_total);
   const fallbackHours = body.booking_close_reports_fallback_hours === undefined
     ? 2
     : Number(body.booking_close_reports_fallback_hours);
 
-  if (!title || !slugValue || !dateStart || !Number.isInteger(capacityTotal) || capacityTotal < 0) {
+  if (!title || !slugValue || !dateStart || Number.isNaN(dateStartMs) || !Number.isInteger(capacityTotal) || capacityTotal < 0) {
     return NextResponse.json({ error: 'Titre, slug, date et capacité valides requis.' }, { status: 400 });
   }
   if (!Number.isInteger(fallbackHours) || fallbackHours < 1 || fallbackHours > 168) {
@@ -63,6 +65,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Impossible de publier un événement sans au moins une formule.' }, { status: 400 });
   }
 
+  const requestedCheckinClose = body.checkin_closes_at ? new Date(String(body.checkin_closes_at)) : null;
+  if (requestedCheckinClose && (Number.isNaN(requestedCheckinClose.getTime()) || requestedCheckinClose.getTime() <= dateStartMs)) {
+    return NextResponse.json({ error: 'La fin de validité des billets doit être postérieure au début de l’événement.' }, { status: 400 });
+  }
+  const checkinClosesAt = requestedCheckinClose?.toISOString() ?? getDefaultEventCheckinClosesAt(dateStart);
+
   const supabase = createServiceClient();
   const baseInsert = {
     tenant_id: tenant.id,
@@ -75,6 +83,7 @@ export async function POST(req: NextRequest) {
     capacity_remaining: capacityTotal,
     status,
     banner_image_url: body.banner_image_url ? String(body.banner_image_url) : null,
+    checkin_closes_at: checkinClosesAt,
   };
 
   let result = await supabase.from('events').insert({ ...baseInsert, booking_close_reports_fallback_hours: fallbackHours }).select('*').single();

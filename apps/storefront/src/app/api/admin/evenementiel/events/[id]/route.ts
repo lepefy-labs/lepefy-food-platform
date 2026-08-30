@@ -109,21 +109,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!count) return NextResponse.json({ error: 'Impossible de publier un événement sans au moins une formule active.' }, { status: 400 });
   }
 
+  const dateStartValue = patch.date_start !== undefined ? patch.date_start : current.date_start;
+  const dateStart = new Date(String(dateStartValue));
+  if (Number.isNaN(dateStart.getTime())) return NextResponse.json({ error: 'date_start doit être une date valide.' }, { status: 400 });
+
   if (patch.booking_closes_at !== undefined || patch.date_start !== undefined) {
-    const dateStartValue = patch.date_start !== undefined ? patch.date_start : current.date_start;
-    const dateStart = new Date(String(dateStartValue));
-    if (Number.isNaN(dateStart.getTime())) return NextResponse.json({ error: 'date_start doit être une date valide.' }, { status: 400 });
     const bookingClosesAt = patch.booking_closes_at !== undefined ? patch.booking_closes_at : current.booking_closes_at;
     if (bookingClosesAt && new Date(String(bookingClosesAt)).getTime() >= dateStart.getTime()) {
       return NextResponse.json({ error: 'La fin des réservations doit être antérieure au début de l’événement.' }, { status: 400 });
     }
   }
 
-  if (patch.checkin_opens_at !== undefined || patch.checkin_closes_at !== undefined) {
+  if (patch.checkin_opens_at !== undefined || patch.checkin_closes_at !== undefined || patch.date_start !== undefined) {
     const openAt = patch.checkin_opens_at !== undefined ? patch.checkin_opens_at : current.checkin_opens_at;
     const closeAt = patch.checkin_closes_at !== undefined ? patch.checkin_closes_at : current.checkin_closes_at;
     if (openAt && closeAt && new Date(String(closeAt)).getTime() < new Date(String(openAt)).getTime()) {
       return NextResponse.json({ error: 'La fermeture du contrôle doit être postérieure à son ouverture.' }, { status: 400 });
+    }
+    if (closeAt && new Date(String(closeAt)).getTime() <= dateStart.getTime()) {
+      return NextResponse.json({ error: 'La fin de validité des billets doit être postérieure au début de l’événement.' }, { status: 400 });
     }
   }
 
@@ -132,7 +136,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if ((error as { code?: string }).code === '23505') return NextResponse.json({ error: 'Un événement avec ce slug existe déjà.' }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
 
   revalidatePath(`/evenementiel/evenements/${data.slug}`);
   revalidatePath('/evenementiel');

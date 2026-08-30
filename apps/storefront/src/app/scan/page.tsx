@@ -5,6 +5,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { canAdmin, getAdminAccessContext } from '@/lib/auth/adminRbac';
 import { getAdminWorkspaceUrls, resolveAdminWorkspace } from '@/lib/admin/workspace';
+import { getEventCheckinWindowState } from '@/lib/events/checkinWindow';
 import LogoutButton from '../admin/LogoutButton';
 import { ScanClient } from '../admin/evenementiel/scan/ScanClient';
 
@@ -13,8 +14,7 @@ export const dynamic = 'force-dynamic';
 interface ScanEventRow { id: string; title: string; date_start: string; status: 'draft' | 'published' | 'closed' | 'cancelled'; checkin_opens_at?: string | null; checkin_closes_at?: string | null; }
 function resolveInitialEventId(events: ScanEventRow[], requestedEventId: string): string {
   if (events.some(event => event.id === requestedEventId)) return requestedEventId;
-  const now = Date.now();
-  const activeWindow = events.find(event => { const opensAt = event.checkin_opens_at ? new Date(event.checkin_opens_at).getTime() : Number.NEGATIVE_INFINITY; const closesAt = event.checkin_closes_at ? new Date(event.checkin_closes_at).getTime() : Number.POSITIVE_INFINITY; return event.status === 'published' && now >= opensAt && now <= closesAt; });
+  const activeWindow = events.find(event => event.status === 'published' && !getEventCheckinWindowState(event).blockingReason);
   if (activeWindow) return activeWindow.id;
   return events.find(event => event.status === 'published')?.id ?? events[0]?.id ?? '';
 }

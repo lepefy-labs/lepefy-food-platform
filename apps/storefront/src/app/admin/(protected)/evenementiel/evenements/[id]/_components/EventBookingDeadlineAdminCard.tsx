@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { IconClock, IconFileExport } from '@tabler/icons-react';
+import { IconClock, IconFileExport, IconTicket } from '@tabler/icons-react';
 import type { EventRow } from '@lepefy/types';
+import { getDefaultEventCheckinClosesAt } from '@/lib/events/checkinWindow';
 
 interface Props { event: EventRow; }
+type EventWithCheckin = EventRow & { checkin_closes_at?: string | null; };
 
-function toDateTimeLocal(value: string | null) {
+function toDateTimeLocal(value: string | null | undefined) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -22,9 +24,12 @@ function formatDateTime(value: string | null) {
 }
 
 export default function EventBookingDeadlineAdminCard({ event }: Props) {
+  const eventWithCheckin = event as EventWithCheckin;
   const initialFallback = Number.isFinite(event.booking_close_reports_fallback_hours) ? event.booking_close_reports_fallback_hours : 2;
   const [bookingClosesAt, setBookingClosesAt] = useState(toDateTimeLocal(event.booking_closes_at));
   const [savedValue, setSavedValue] = useState(event.booking_closes_at);
+  const [checkinClosesAt, setCheckinClosesAt] = useState(toDateTimeLocal(eventWithCheckin.checkin_closes_at));
+  const [savedCheckinClosesAt, setSavedCheckinClosesAt] = useState(eventWithCheckin.checkin_closes_at ?? null);
   const [showRemainingPlaces, setShowRemainingPlaces] = useState(event.show_remaining_places !== false);
   const [savedShowRemainingPlaces, setSavedShowRemainingPlaces] = useState(event.show_remaining_places !== false);
   const [fallbackHours, setFallbackHours] = useState(String(initialFallback));
@@ -64,6 +69,8 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
     if (!Number.isInteger(fallbackNumber) || fallbackNumber < 1) return null;
     return new Date(new Date(event.date_start).getTime() - fallbackNumber * 3_600_000).toISOString();
   }, [event.date_start, fallbackNumber, savedValue]);
+  const automaticCheckinClose = getDefaultEventCheckinClosesAt(event.date_start);
+  const effectiveCheckinClose = savedCheckinClosesAt ?? automaticCheckinClose;
 
   async function save() {
     setError(null); setSaved(false);
@@ -74,6 +81,13 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
       if (date.getTime() >= new Date(event.date_start).getTime()) { setError('La fin des réservations doit être antérieure au début de l’événement.'); return; }
       normalized = date.toISOString();
     }
+    let normalizedCheckinClose: string | null = null;
+    if (checkinClosesAt) {
+      const date = new Date(checkinClosesAt);
+      if (Number.isNaN(date.getTime())) { setError('Date de fin de validité des billets invalide.'); return; }
+      if (date.getTime() <= new Date(event.date_start).getTime()) { setError('La fin de validité des billets doit être postérieure au début de l’événement.'); return; }
+      normalizedCheckinClose = date.toISOString();
+    }
     const fallback = Number(fallbackHours);
     if (!Number.isInteger(fallback) || fallback < 1 || fallback > 168) {
       setError('Le délai de secours doit être un nombre entier entre 1 et 168 heures.'); return;
@@ -83,13 +97,15 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
     try {
       const response = await fetch(`/api/admin/evenementiel/events/${event.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_closes_at: normalized, show_remaining_places: showRemainingPlaces, booking_close_reports_fallback_hours: fallback }),
+        body: JSON.stringify({ booking_closes_at: normalized, checkin_closes_at: normalizedCheckinClose, show_remaining_places: showRemainingPlaces, booking_close_reports_fallback_hours: fallback }),
       });
       const result = await response.json();
       if (!response.ok) { setError(result.error ?? 'Erreur lors de l’enregistrement.'); return; }
-      const updated = result as EventRow;
+      const updated = result as EventWithCheckin;
       setSavedValue(updated.booking_closes_at);
       setBookingClosesAt(toDateTimeLocal(updated.booking_closes_at));
+      setSavedCheckinClosesAt(updated.checkin_closes_at ?? null);
+      setCheckinClosesAt(toDateTimeLocal(updated.checkin_closes_at));
       setSavedShowRemainingPlaces(updated.show_remaining_places !== false);
       setShowRemainingPlaces(updated.show_remaining_places !== false);
       setSavedFallbackHours(updated.booking_close_reports_fallback_hours ?? fallback);
@@ -106,6 +122,7 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
   }
 
   const dirty = bookingClosesAt !== toDateTimeLocal(savedValue)
+    || checkinClosesAt !== toDateTimeLocal(savedCheckinClosesAt)
     || showRemainingPlaces !== savedShowRemainingPlaces
     || fallbackHours !== String(savedFallbackHours);
 
@@ -120,14 +137,24 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
   return (
     <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-        <div className="flex items-center gap-2"><IconClock size={16} className="text-[var(--color-primary-dark)]" /><h2 className="text-sm font-semibold text-gray-950 dark:text-white">Réservations en ligne</h2></div>
+        <div className="flex items-center gap-2"><IconClock size={16} className="text-[var(--color-primary-dark)]" /><h2 className="text-sm font-semibold text-gray-950 dark:text-white">Réservations & billets</h2></div>
         <span className={`rounded-full px-2 py-1 text-2xs font-semibold ${statusClass}`}>{status}</span>
       </div>
       <div className="p-4">
         <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Fin des réservations
           <input type="datetime-local" value={bookingClosesAt} max={toDateTimeLocal(event.date_start)} onChange={(e) => { setBookingClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
         </label>
-        <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">À cette date, le checkout public est fermé automatiquement. Les réservations manuelles admin restent possibles.</p>
+        <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Ferme uniquement les nouvelles réservations publiques. Les billets déjà émis restent valides.</p>
+
+        <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/40 p-3 dark:border-sky-950/50 dark:bg-sky-950/20">
+          <div className="flex items-start gap-2"><IconTicket size={16} className="mt-0.5 shrink-0 text-sky-700" /><div className="min-w-0 flex-1">
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200">Fin de validité des billets
+              <input type="datetime-local" value={checkinClosesAt} min={toDateTimeLocal(event.date_start)} onChange={(e) => { setCheckinClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus-visible:ring-sky-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+            </label>
+            <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Après cette heure, le QR est expiré et le scanner refuse toute consommation restante.</p>
+            {!savedCheckinClosesAt && effectiveCheckinClose && <p className="mt-1 text-xs font-medium text-sky-700 dark:text-sky-300">Automatique si non défini : {formatDateTime(effectiveCheckinClose)} (début + 6 h).</p>}
+          </div></div>
+        </div>
 
         <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3 dark:border-violet-950/50 dark:bg-violet-950/20">
           <div className="flex items-start gap-2"><IconFileExport size={16} className="mt-0.5 shrink-0 text-violet-600" /><div className="min-w-0 flex-1">
@@ -147,8 +174,8 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
         </div>
 
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
-        {saved && !error && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Paramètres enregistrés. L’heure d’envoi des rapports a été recalculée automatiquement.</p>}
-        <div className="mt-3 flex gap-2"><button type="button" onClick={() => void save()} disabled={saving || !dirty} className="min-h-11 flex-1 rounded-lg bg-[var(--color-primary)] px-3 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>{bookingClosesAt && <button type="button" onClick={() => { setBookingClosesAt(''); setSaved(false); }} disabled={saving} className="min-h-11 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">Effacer</button>}</div>
+        {saved && !error && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Paramètres enregistrés.</p>}
+        <div className="mt-3 flex gap-2"><button type="button" onClick={() => void save()} disabled={saving || !dirty} className="min-h-11 flex-1 rounded-lg bg-[var(--color-primary)] px-3 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>{bookingClosesAt && <button type="button" onClick={() => { setBookingClosesAt(''); setSaved(false); }} disabled={saving} className="min-h-11 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">Effacer clôture</button>}</div>
       </div>
     </section>
   );

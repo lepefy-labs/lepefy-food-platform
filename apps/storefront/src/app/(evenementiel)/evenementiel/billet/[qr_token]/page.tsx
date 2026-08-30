@@ -10,6 +10,7 @@ import {
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { formatDate, formatEventTime } from '@/lib/utils/format';
+import { getEventCheckinWindowState } from '@/lib/events/checkinWindow';
 import type { EventReservationStatus } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -25,16 +26,36 @@ interface ReservationRow {
   status: EventReservationStatus;
 }
 
+interface TicketEventRow {
+  title: string;
+  date_start: string;
+  location: string | null;
+  status: string;
+  checkin_opens_at: string | null;
+  checkin_closes_at: string | null;
+}
+
 interface StatusBadge {
   label: string;
   className: string;
   ok: boolean;
 }
 
-function statusBadge(reservation: ReservationRow): StatusBadge {
+function statusBadge(reservation: ReservationRow, event: TicketEventRow | null): StatusBadge {
   if (reservation.status === 'cancelled') return { label: 'Réservation annulée', className: 'bg-red-50 text-red-700 border-red-200', ok: false };
   if (reservation.status === 'refunded') return { label: 'Réservation remboursée', className: 'bg-red-50 text-red-700 border-red-200', ok: false };
   if (reservation.quantity_remaining === 0) return { label: 'Billet entièrement utilisé', className: 'bg-gray-100 text-gray-600 border-gray-200', ok: false };
+  if (event) {
+    const windowState = getEventCheckinWindowState(event);
+    if (windowState.blockingReason) {
+      const expired = event.status === 'closed' || (windowState.closeAt && Date.now() > new Date(windowState.closeAt).getTime());
+      return {
+        label: expired ? 'Billet expiré' : windowState.blockingReason,
+        className: expired ? 'bg-gray-100 text-gray-700 border-gray-200' : 'bg-amber-50 text-amber-800 border-amber-200',
+        ok: false,
+      };
+    }
+  }
   if (reservation.quantity_remaining < reservation.quantity_total) {
     return {
       label: `Billet partiellement utilisé — ${reservation.quantity_remaining}/${reservation.quantity_total} place${reservation.quantity_total > 1 ? 's' : ''} restante${reservation.quantity_remaining > 1 ? 's' : ''}`,
@@ -70,10 +91,11 @@ export default async function BilletPage({ params }: { params: { qr_token: strin
   const row = reservation as ReservationRow;
   const { data: event } = await supabase
     .from('events')
-    .select('title, date_start, location')
+    .select('title, date_start, location, status, checkin_opens_at, checkin_closes_at')
     .eq('id', row.event_id)
     .maybeSingle();
-  const badge = statusBadge(row);
+  const eventRow = event as TicketEventRow | null;
+  const badge = statusBadge(row, eventRow);
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10 sm:px-6 sm:py-14">
@@ -81,17 +103,17 @@ export default async function BilletPage({ params }: { params: { qr_token: strin
         <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] text-[var(--color-primary)]"><IconTicket size={27} stroke={1.7} /></div>
         <p className="mt-4 text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Billet numérique</p>
         <h1 className="mt-1 font-display text-3xl font-semibold text-gray-900">Votre billet</h1>
-        <p className="mt-2 text-sm text-gray-500">Présentez le QR code à l’entrée de l’événement.</p>
+        <p className="mt-2 text-sm text-gray-500">{badge.ok ? 'Présentez le QR code à l’entrée de l’événement.' : 'Ce billet ne peut plus être utilisé pour accéder à l’événement.'}</p>
       </div>
 
       <section className="mt-7 overflow-hidden rounded-[28px] border border-black/[0.06] bg-white shadow-[0_18px_45px_rgba(50,37,20,.1)]">
-        {event && (
+        {eventRow && (
           <div className="bg-[#f7f3eb] px-5 py-6 text-center sm:px-7">
-            <h2 className="font-display text-2xl font-semibold text-gray-900">{event.title}</h2>
+            <h2 className="font-display text-2xl font-semibold text-gray-900">{eventRow.title}</h2>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium text-gray-600">
-              <span className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatDate(event.date_start)}</span>
-              <span className="flex items-center gap-1.5"><IconClock size={14} />{formatEventTime(event.date_start)}</span>
-              {event.location && <span className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="max-w-[260px] truncate">{event.location}</span></span>}
+              <span className="flex items-center gap-1.5"><IconCalendarEvent size={14} />{formatDate(eventRow.date_start)}</span>
+              <span className="flex items-center gap-1.5"><IconClock size={14} />{formatEventTime(eventRow.date_start)}</span>
+              {eventRow.location && <span className="flex items-center gap-1.5"><IconMapPin size={14} /><span className="max-w-[260px] truncate">{eventRow.location}</span></span>}
             </div>
           </div>
         )}
@@ -116,7 +138,9 @@ export default async function BilletPage({ params }: { params: { qr_token: strin
       </section>
 
       <div className="mt-5 rounded-2xl bg-[#f7f3eb] p-4 text-center text-xs leading-relaxed text-gray-500">
-        Gardez ce billet accessible sur votre téléphone. La validation des entrées se fait uniquement sur place par l’équipe de {tenant.name}.
+        {badge.ok
+          ? `Gardez ce billet accessible sur votre téléphone. La validation des entrées se fait uniquement sur place par l’équipe de ${tenant.name}.`
+          : 'Le QR code est masqué lorsque le billet n’est plus utilisable.'}
       </div>
     </main>
   );
