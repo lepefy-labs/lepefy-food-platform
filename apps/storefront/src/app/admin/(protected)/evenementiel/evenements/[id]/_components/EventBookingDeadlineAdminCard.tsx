@@ -152,7 +152,7 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
               <input type="datetime-local" value={checkinClosesAt} min={toDateTimeLocal(event.date_start)} onChange={(e) => { setCheckinClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus-visible:ring-sky-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
             </label>
             <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Après cette heure, le QR est expiré et le scanner refuse toute consommation restante.</p>
-            {!savedCheckinClosesAt && effectiveCheckinClose && <p className="mt-1 text-xs font-medium text-sky-700 dark:text-sky-300">Automatique si non défini : {formatDateTime(effectiveCheckinClose)} (début + 6 h).</p>}
+            {!savedCheckinClosesAt && effectiveCheckinClose && <p className="mt-1 text-xs font-medium text-sky-700 dark:text-sky-300">Automatique si non défini : {formatDateTime(effectiveCheckinClose)} (début + 12 h).</p>}
           </div></div>
         </div>
 

@@ -11,7 +11,7 @@ export interface EventCheckinWindowState {
   blockingReason: string | null;
 }
 
-const DEFAULT_CHECKIN_DURATION_HOURS = 6;
+const DEFAULT_CHECKIN_DURATION_HOURS = 12;
 
 function validIso(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
