@@ -7,6 +7,11 @@ import { embedText } from '@/lib/ai/embeddings';
 import { buildSystemPrompt, type ChatTurn, type MatchedProductContext, type KnowledgeSnippet } from '@/lib/ai/chatbox';
 import { matchSmallTalk } from '@/lib/ai/smallTalk';
 import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
+import {
+  logNalaInteraction,
+  prepareNalaAnalytics,
+  type NalaAnalyticsContext,
+} from '@/lib/ai/nalaAnalytics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,12 +25,19 @@ const MAX_HISTORY_TURNS = 6;
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? '' });
 
 interface MatchProductsRow {
+  id: string;
   name: string;
   price: number;
   stock: number | null;
   weight_grams: number | null;
   storage_type: string | null;
   category_name: string | null;
+}
+
+interface MatchKnowledgeRow {
+  id: string;
+  category: string;
+  content: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -47,8 +59,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'message_too_short' }, { status: 400 });
   }
 
+  const analyticsContext: NalaAnalyticsContext | null = await prepareNalaAnalytics({
+    request: req,
+    tenantId: tenant.id,
+    clientSessionId: body?.clientSessionId,
+    sourcePath: body?.sourcePath,
+    locale: body?.locale,
+    deviceType: body?.deviceType,
+  });
+
   const smallTalkReply = matchSmallTalk(message, tenant.name);
   if (smallTalkReply) {
+    await logNalaInteraction({
+      context: analyticsContext,
+      messageText: message,
+      replyText: smallTalkReply,
+      aiCallTriggered: false,
+      outcome: 'small_talk',
+      intent: 'small_talk',
+    });
     return NextResponse.json({ reply: smallTalkReply });
   }
 
@@ -61,8 +90,19 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       status: 'rate_limited',
     });
+    await logNalaInteraction({
+      context: analyticsContext,
+      messageText: message,
+      replyText: null,
+      aiCallTriggered: false,
+      outcome: 'rate_limited',
+    });
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
+
+  let aiCallTriggered = false;
+  let matchedProductIds: string[] | null = null;
+  let matchedKbIds: string[] | null = null;
 
   try {
     const { vector, tokenCount: embedTokens } = await embedText(message);
@@ -76,13 +116,15 @@ export async function POST(req: NextRequest) {
     });
     if (matchError) throw new Error(matchError.message);
 
-    const matchedProducts: MatchedProductContext[] = ((matches ?? []) as MatchProductsRow[]).map((m) => ({
-      name: m.name,
-      price: m.price,
-      stock: m.stock,
-      weightGrams: m.weight_grams,
-      storageType: m.storage_type,
-      categoryName: m.category_name,
+    const productRows = (matches ?? []) as MatchProductsRow[];
+    matchedProductIds = productRows.length ? productRows.map((match) => match.id) : null;
+    const matchedProducts: MatchedProductContext[] = productRows.map((match) => ({
+      name: match.name,
+      price: match.price,
+      stock: match.stock,
+      weightGrams: match.weight_grams,
+      storageType: match.storage_type,
+      categoryName: match.category_name,
     }));
 
     const { data: knowledgeMatches } = await supabase.rpc('match_knowledge_base', {
@@ -92,9 +134,11 @@ export async function POST(req: NextRequest) {
       min_similarity: 0.35,
     });
 
-    const knowledgeSnippets: KnowledgeSnippet[] = ((knowledgeMatches ?? []) as { category: string; content: string }[]).map((k) => ({
-      category: k.category,
-      content: k.content,
+    const knowledgeRows = (knowledgeMatches ?? []) as MatchKnowledgeRow[];
+    matchedKbIds = knowledgeRows.length ? knowledgeRows.map((match) => match.id) : null;
+    const knowledgeSnippets: KnowledgeSnippet[] = knowledgeRows.map((match) => ({
+      category: match.category,
+      content: match.content,
     }));
 
     const systemPrompt = buildSystemPrompt({
@@ -107,10 +151,11 @@ export async function POST(req: NextRequest) {
     });
 
     const conversationText = [
-      ...history.map(h => `${h.role === 'user' ? 'Client' : 'Assistant'}: ${h.text}`),
+      ...history.map((turn) => `${turn.role === 'user' ? 'Client' : 'Assistant'}: ${turn.text}`),
       `Client: ${message}`,
     ].join('\n');
 
+    aiCallTriggered = true;
     const response = await ai.models.generateContent({
       model: MODEL,
       contents: conversationText,
@@ -137,17 +182,35 @@ export async function POST(req: NextRequest) {
       outputTokens,
       status: 'success',
     });
+    await logNalaInteraction({
+      context: analyticsContext,
+      messageText: message,
+      replyText: reply,
+      aiCallTriggered,
+      outcome: matchedProductIds === null && matchedKbIds === null ? 'retrieval_empty' : 'answered',
+      matchedProductIds,
+      matchedKbIds,
+    });
 
     return NextResponse.json({ reply });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue';
-    console.error('[chatbox] Erreur:', message);
+    const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
+    console.error('[chatbox] Erreur:', errorMessage);
     await logAiUsage({
       tenantId: tenant.id,
       endpoint: ENDPOINT,
       provider: 'gemini',
       model: MODEL,
       status: 'error',
+    });
+    await logNalaInteraction({
+      context: analyticsContext,
+      messageText: message,
+      replyText: null,
+      aiCallTriggered,
+      outcome: 'error',
+      matchedProductIds,
+      matchedKbIds,
     });
     return NextResponse.json({ error: 'chat_failed' }, { status: 502 });
   }

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 1 settembre 2026 — **v6.14 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.15 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -226,6 +226,8 @@ tenant_feature_overrides
 
 `src/lib/admin/platformBilling.ts` resta il resolver dello snapshot billing; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
 
+`nala_analytics` è una capability commerciale distinta da `nala`, inclusa nel piano all-inclusive `food-platform`. La raccolta è fail-closed: un errore del resolver analytics non interrompe Nala e non produce scritture. `nala_sessions` e `nala_interactions` conservano conversazioni, associazione cliente nullable, pagina sorgente, locale, device category e geografia approssimativa derivata server-side (country/region/city); non conservano IP, user-agent, fingerprint o cookie analytics. Il target di retention raw è 90 giorni tramite RPC service-role-only, da collegare a uno scheduler giornaliero approvato. Conversion attribution e dashboard Nala non sono ancora implementate.
+
 Le vecchie colonne billing in `tenants` restano compatibilità e non vanno rimosse senza migration dedicata.
 
 ---
@@ -401,6 +403,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 092_event_remaining_places_visibility.sql
 093_event_booking_close_reports.sql
 094_feature_entitlements_foundation.sql
+095_nala_conversation_analytics.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -418,6 +421,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `093` è additiva ma operativa: introduce configurazione fallback report, schedule/dispatch/idempotency su `events`, flag destinatario `notify_event_booking_closed_reports`, trigger di calcolo schedule, backfill degli eventi esistenti e RPC di claim service-role-only. Non modifica checkout, prezzi, capacità o pagamenti.
 
 `094` è additiva: introduce il catalogo `platform_features`, sostituisce il CHECK hardcoded di `platform_plan_features.feature_key` con una foreign key, include `nala` nel piano `food-platform` e crea gli override sparsi `tenant_feature_overrides`. Non crea override per i tenant esistenti e non modifica `tenants.ai_chatbox_enabled`, che resta il toggle operativo Nala.
+
+`095` è additiva: introduce l'entitlement `nala_analytics`, le tabelle service-role-only `nala_sessions` e `nala_interactions`, la risoluzione atomica delle sessioni e la purge raw a 90 giorni. I customer sono referenziati solo per UUID nullable; geografia e metadata sono minimizzati. Lo scheduling giornaliero della purge resta da collegare a infrastruttura approvata.
 
 ---
 
@@ -490,8 +495,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.14
+# Fine snapshot v6.15
 
-**Base audit:** `main @ feature entitlements foundation`
-**Data:** 1 settembre 2026
+**Base audit:** `main @ Nala Analytics V1`
+**Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

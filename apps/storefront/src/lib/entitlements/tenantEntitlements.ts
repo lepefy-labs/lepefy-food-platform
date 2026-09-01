@@ -6,6 +6,7 @@ export const PLATFORM_FEATURE_KEYS = {
   digitalCard: 'digital_card',
   ai: 'ai',
   nala: 'nala',
+  nalaAnalytics: 'nala_analytics',
 } as const;
 
 interface NalaTenantConfiguration {

@@ -30,6 +30,22 @@ function whatsappHref(whatsappNumber: string): string {
   return `https://wa.me/${whatsappNumber.replace(/[^\d]/g, '')}`;
 }
 
+function createClientSessionId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function currentDeviceType(): 'mobile' | 'tablet' | 'desktop' {
+  if (window.matchMedia('(max-width: 767px)').matches) return 'mobile';
+  if (window.matchMedia('(max-width: 1023px)').matches) return 'tablet';
+  return 'desktop';
+}
+
 export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetProps) {
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -39,6 +55,7 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
   const [compactLauncher, setCompactLauncher] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
+  const clientSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -81,6 +98,7 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
     if (!message || loading) return;
 
     const history = turns.slice(-MAX_HISTORY_TURNS);
+    clientSessionIdRef.current ??= createClientSessionId();
     setTurns((prev) => [...prev, { role: 'user', text: message }]);
     setInput('');
     setLoading(true);
@@ -90,7 +108,14 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify({
+          message,
+          history,
+          clientSessionId: clientSessionIdRef.current,
+          sourcePath: window.location.pathname,
+          locale: navigator.language,
+          deviceType: currentDeviceType(),
+        }),
       });
 
       if (!res.ok) {
