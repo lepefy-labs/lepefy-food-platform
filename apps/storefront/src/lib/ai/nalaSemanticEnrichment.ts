@@ -250,6 +250,7 @@ export async function processNalaSemanticEnrichmentBatch(batchSize = 20) {
   async function runWorker() {
     while (cursor < claimed.length) {
       const interaction = claimed[cursor++];
+      if (!interaction) return;
       const result = await processInteraction(interaction);
       summary[result] += 1;
     }
