@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 agosto 2026 — **v6.13 Current-State Snapshot**
+> **Aggiornato:** 1 settembre 2026 — **v6.14 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -209,16 +209,22 @@ Console Platform interna Lepefy:
 
 ## 7. Platform billing
 
-`084_platform_billing_boundary.sql` separa il billing SaaS dal tenant:
+`084_platform_billing_boundary.sql` separa il billing SaaS dal tenant; `094_feature_entitlements_foundation.sql` normalizza il catalogo e la risoluzione delle feature commerciali:
 
 ```text
 platform_billing_settings
 platform_plans
+platform_features
 platform_plan_features
 tenant_subscriptions
+tenant_feature_overrides
 ```
 
-`src/lib/admin/platformBilling.ts` è il resolver canonico; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
+`platform_features` è il catalogo canonico estensibile delle capability commerciali. `platform_plan_features.feature_key` referenzia il catalogo senza CHECK hardcoded. `tenant_feature_overrides` contiene soltanto eccezioni temporali o permanenti al piano (`manual`, `addon`, `trial`, `promotion`); in assenza di una riga il tenant eredita il piano attivo. Catalogo e override sono service-role-only, con RLS e nessuna policy browser.
+
+`src/lib/entitlements/tenantEntitlements.ts` è il resolver canonico server-side: un override applicabile secondo `starts_at` / `expires_at` prevale sull'entitlement del piano. Nala è la prima capability integrata end-to-end e resta disponibile soltanto quando coesistono entitlement commerciale `nala` e configurazione operativa `tenants.ai_chatbox_enabled`. Durante il rollout, un errore infrastrutturale del resolver Nala viene loggato e usa temporaneamente il comportamento legacy; un entitlement risolto a `false` resta invece autoritativo.
+
+`src/lib/admin/platformBilling.ts` resta il resolver dello snapshot billing; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
 
 Le vecchie colonne billing in `tenants` restano compatibilità e non vanno rimosse senza migration dedicata.
 
@@ -394,6 +400,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 091_event_booking_closes_at.sql
 092_event_remaining_places_visibility.sql
 093_event_booking_close_reports.sql
+094_feature_entitlements_foundation.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -409,6 +416,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `092` è additiva: introduce `events.show_remaining_places boolean NOT NULL DEFAULT true`. L'opzione controlla esclusivamente la disclosure pubblica del numero residuo; non modifica capacità, disponibilità reale, checkout o prenotazioni.
 
 `093` è additiva ma operativa: introduce configurazione fallback report, schedule/dispatch/idempotency su `events`, flag destinatario `notify_event_booking_closed_reports`, trigger di calcolo schedule, backfill degli eventi esistenti e RPC di claim service-role-only. Non modifica checkout, prezzi, capacità o pagamenti.
+
+`094` è additiva: introduce il catalogo `platform_features`, sostituisce il CHECK hardcoded di `platform_plan_features.feature_key` con una foreign key, include `nala` nel piano `food-platform` e crea gli override sparsi `tenant_feature_overrides`. Non crea override per i tenant esistenti e non modifica `tenants.ai_chatbox_enabled`, che resta il toggle operativo Nala.
 
 ---
 
@@ -481,8 +490,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.13
+# Fine snapshot v6.14
 
-**Base audit:** `main @ automatic event booking-close reports`  
-**Data:** 28 agosto 2026  
+**Base audit:** `main @ feature entitlements foundation`
+**Data:** 1 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

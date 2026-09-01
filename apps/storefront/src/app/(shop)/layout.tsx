@@ -10,11 +10,13 @@ import { CartSyncProvider } from '@/components/cart/CartSyncProvider';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
+import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const socialLinks = await getTenantSocialLinks(tenant.id);
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
+  const nalaEnabled = await canUseNala(tenant);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -29,7 +31,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <Footer socialLinks={socialLinks} storyEnabled={storyEnabled} />
       <BottomNav />
       <ChatWidgetGate
-        enabled={tenant.ai_chatbox_enabled}
+        enabled={nalaEnabled}
         tenantName={tenant.name}
         whatsappNumber={tenant.whatsapp_number ?? null}
       />

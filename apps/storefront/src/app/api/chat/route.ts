@@ -6,6 +6,7 @@ import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { embedText } from '@/lib/ai/embeddings';
 import { buildSystemPrompt, type ChatTurn, type MatchedProductContext, type KnowledgeSnippet } from '@/lib/ai/chatbox';
 import { matchSmallTalk } from '@/lib/ai/smallTalk';
+import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  if (!tenant.ai_chatbox_enabled) {
+  if (!(await canUseNala(tenant))) {
     return NextResponse.json({ error: 'not_enabled' }, { status: 404 });
   }
 
