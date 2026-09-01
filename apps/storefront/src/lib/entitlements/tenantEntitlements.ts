@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import { isTenantFeatureEnabled } from '@/lib/entitlements/tenantFeatureSettings';
 
 export const PLATFORM_FEATURE_KEYS = {
   shop: 'shop',
@@ -8,11 +9,6 @@ export const PLATFORM_FEATURE_KEYS = {
   nala: 'nala',
   nalaAnalytics: 'nala_analytics',
 } as const;
-
-interface NalaTenantConfiguration {
-  id: string;
-  ai_chatbox_enabled: boolean;
-}
 
 interface TenantFeatureOverride {
   enabled: boolean;
@@ -77,18 +73,29 @@ export async function hasTenantFeature(tenantId: string, featureKey: string): Pr
   return planEntitlement;
 }
 
-export async function canUseNala(tenant: NalaTenantConfiguration): Promise<boolean> {
-  if (!tenant.ai_chatbox_enabled) return false;
-
+export async function canUseNala(tenantId: string): Promise<boolean> {
   try {
-    return await hasTenantFeature(tenant.id, PLATFORM_FEATURE_KEYS.nala);
+    const entitled = await hasTenantFeature(tenantId, PLATFORM_FEATURE_KEYS.nala);
+    if (!entitled) return false;
   } catch (error) {
-    // Compatibility fallback: remove after the entitlement infrastructure rollout is stable.
-    // A resolved false never reaches this branch and therefore remains authoritative.
-    console.error('[entitlements] Unable to resolve Nala entitlement; using legacy operational flag.', {
-      tenantId: tenant.id,
+    console.error('[entitlements] Unable to resolve Nala entitlement; failing closed.', {
+      tenantId,
       error,
     });
-    return tenant.ai_chatbox_enabled;
+    return false;
+  }
+
+  try {
+    return await isTenantFeatureEnabled(
+      tenantId,
+      PLATFORM_FEATURE_KEYS.nala,
+      { defaultEnabled: false },
+    );
+  } catch (error) {
+    console.error('[entitlements] Unable to resolve Nala operational setting; failing closed.', {
+      tenantId,
+      error,
+    });
+    return false;
   }
 }

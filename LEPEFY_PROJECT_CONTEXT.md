@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.15 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.16 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -218,11 +218,12 @@ platform_features
 platform_plan_features
 tenant_subscriptions
 tenant_feature_overrides
+tenant_feature_settings
 ```
 
 `platform_features` è il catalogo canonico estensibile delle capability commerciali. `platform_plan_features.feature_key` referenzia il catalogo senza CHECK hardcoded. `tenant_feature_overrides` contiene soltanto eccezioni temporali o permanenti al piano (`manual`, `addon`, `trial`, `promotion`); in assenza di una riga il tenant eredita il piano attivo. Catalogo e override sono service-role-only, con RLS e nessuna policy browser.
 
-`src/lib/entitlements/tenantEntitlements.ts` è il resolver canonico server-side: un override applicabile secondo `starts_at` / `expires_at` prevale sull'entitlement del piano. Nala è la prima capability integrata end-to-end e resta disponibile soltanto quando coesistono entitlement commerciale `nala` e configurazione operativa `tenants.ai_chatbox_enabled`. Durante il rollout, un errore infrastrutturale del resolver Nala viene loggato e usa temporaneamente il comportamento legacy; un entitlement risolto a `false` resta invece autoritativo.
+`src/lib/entitlements/tenantEntitlements.ts` è il resolver canonico server-side: un override applicabile secondo `starts_at` / `expires_at` prevale sull'entitlement del piano. `tenant_feature_settings` è invece il layer canonico di configurazione operativa, separato da piani, billing e override commerciali. Nala è disponibile soltanto quando coesistono entitlement commerciale `nala` e setting operativo `nala.enabled`; assenza del setting o errori di risoluzione fanno fallire il gating in modo chiuso senza interrompere lo storefront.
 
 `src/lib/admin/platformBilling.ts` resta il resolver dello snapshot billing; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
 
@@ -404,6 +405,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 093_event_booking_close_reports.sql
 094_feature_entitlements_foundation.sql
 095_nala_conversation_analytics.sql
+096_tenant_feature_settings.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -420,9 +422,11 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 `093` è additiva ma operativa: introduce configurazione fallback report, schedule/dispatch/idempotency su `events`, flag destinatario `notify_event_booking_closed_reports`, trigger di calcolo schedule, backfill degli eventi esistenti e RPC di claim service-role-only. Non modifica checkout, prezzi, capacità o pagamenti.
 
-`094` è additiva: introduce il catalogo `platform_features`, sostituisce il CHECK hardcoded di `platform_plan_features.feature_key` con una foreign key, include `nala` nel piano `food-platform` e crea gli override sparsi `tenant_feature_overrides`. Non crea override per i tenant esistenti e non modifica `tenants.ai_chatbox_enabled`, che resta il toggle operativo Nala.
+`094` è additiva: introduce il catalogo `platform_features`, sostituisce il CHECK hardcoded di `platform_plan_features.feature_key` con una foreign key, include `nala` nel piano `food-platform` e crea gli override sparsi `tenant_feature_overrides`.
 
 `095` è additiva: introduce l'entitlement `nala_analytics`, le tabelle service-role-only `nala_sessions` e `nala_interactions`, la risoluzione atomica delle sessioni e la purge raw a 90 giorni. I customer sono referenziati solo per UUID nullable; geografia e metadata sono minimizzati. Lo scheduling giornaliero della purge resta da collegare a infrastruttura approvata.
+
+`096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.
 
 ---
 
@@ -495,8 +499,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.15
+# Fine snapshot v6.16
 
-**Base audit:** `main @ Nala Analytics V1`
+**Base audit:** `main @ tenant feature settings foundation`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

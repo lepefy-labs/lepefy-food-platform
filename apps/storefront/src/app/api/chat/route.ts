@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  if (!(await canUseNala(tenant))) {
+  if (!(await canUseNala(tenant.id))) {
     return NextResponse.json({ error: 'not_enabled' }, { status: 404 });
   }
 

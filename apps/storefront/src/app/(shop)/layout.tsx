@@ -16,7 +16,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const socialLinks = await getTenantSocialLinks(tenant.id);
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
-  const nalaEnabled = await canUseNala(tenant);
+  const nalaEnabled = await canUseNala(tenant.id);
 
   return (
     <div className="min-h-screen flex flex-col">
