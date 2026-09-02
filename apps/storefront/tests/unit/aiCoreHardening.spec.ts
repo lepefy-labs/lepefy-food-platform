@@ -51,10 +51,10 @@ for (const code of ['42P01', 'PGRST205', 'PGRST202']) {
     const gateway = loadServerModule<typeof GatewayModule>('aiGateway', {
       from: () => query({ data: null, error: { code, message: 'private DB detail' } }),
     });
-    await expect(gateway.runAi({ tenantId: 'tenant', endpoint: 'chatbox',
+    await expect(Promise.resolve(gateway.runAi({ tenantId: 'tenant', endpoint: 'chatbox',
       consumer: 'nala', capability: 'structured_chat',
       request: { system: '', messages: [], responseSchema: { type: 'object' }, validate: value => value },
-    })).rejects.toMatchObject({ name: 'AiRoutingError', message: 'ai_routing_failed', reasons: ['policy_load_failed'] });
+    }))).rejects.toMatchObject({ name: 'AiRoutingError', message: 'ai_routing_failed', reasons: ['policy_load_failed'] });
   });
 
   test('conversation RPC unavailable never returns stateless context: ' + code, async () => {
@@ -62,7 +62,7 @@ for (const code of ['42P01', 'PGRST205', 'PGRST202']) {
       rpc: async () => ({ data: null, error: { code, message: 'private DB detail' } }),
       from() { throw new Error('No reads allowed after failed open'); },
     });
-    await expect(context.openConversation({ tenantId: 'tenant', consumer: 'nala', conversationId: null, locale: 'fr' }))
+    await expect(Promise.resolve(context.openConversation({ tenantId: 'tenant', consumer: 'nala', conversationId: null, locale: 'fr' })))
       .rejects.toBeInstanceOf(AiContextError);
   });
 }
@@ -71,9 +71,9 @@ test('registry transport failure is normalized and does not select an adapter', 
   const gateway = loadServerModule<typeof GatewayModule>('aiGateway', {
     from() { throw new Error('private connection information'); },
   });
-  await expect(gateway.runAi({ tenantId: 'tenant', endpoint: 'chatbox', consumer: 'nala', capability: 'structured_chat',
+  await expect(Promise.resolve(gateway.runAi({ tenantId: 'tenant', endpoint: 'chatbox', consumer: 'nala', capability: 'structured_chat',
     request: { system: '', messages: [], responseSchema: { type: 'object' }, validate: value => value },
-  })).rejects.toBeInstanceOf(AiRoutingError);
+  }))).rejects.toBeInstanceOf(AiRoutingError);
 });
 
 test('missing persistent conversation result and transport failure are normalized', async () => {
@@ -82,7 +82,7 @@ test('missing persistent conversation result and transport failure are normalize
     async () => { throw new Error('private connection information'); },
   ]) {
     const context = loadServerModule<typeof ContextModule>('conversationContext', { rpc });
-    await expect(context.openConversation({ tenantId: 'tenant', consumer: 'nala', conversationId: null, locale: 'fr' }))
+    await expect(Promise.resolve(context.openConversation({ tenantId: 'tenant', consumer: 'nala', conversationId: null, locale: 'fr' })))
       .rejects.toMatchObject({ name: 'AiContextError', message: 'conversation_unavailable' });
   }
 });
