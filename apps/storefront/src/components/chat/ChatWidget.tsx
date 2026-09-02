@@ -219,7 +219,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         <section
           role="dialog"
           aria-label="Nala, assistant shopping"
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex h-[min(70dvh,520px)] max-h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] w-[calc(100vw-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-[#E7E3FF] bg-white shadow-2xl md:bottom-6 md:right-6 md:h-[min(70vh,520px)] md:max-h-[calc(100vh-3rem)]"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex max-h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] w-[calc(100vw-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-[#E7E3FF] bg-white shadow-2xl md:bottom-6 md:right-6 md:max-h-[calc(100vh-3rem)]"
         >
           <div
             className="flex shrink-0 items-center justify-between px-4 py-3 text-white"
