@@ -75,8 +75,14 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   const clientSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const messagesContainer = messagesEndRef.current?.parentElement;
+    if (!messagesContainer) return;
+
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    messagesEndRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
+    messagesContainer.scrollTo({
+      top: messagesContainer.scrollHeight,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
   }, [turns, loading]);
 
   useEffect(() => {
