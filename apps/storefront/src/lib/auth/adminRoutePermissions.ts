@@ -27,6 +27,7 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/livraison', permission: 'shipping.view' },
   { prefix: '/admin/loyalty', permission: 'loyalty.manage' },
   { prefix: '/admin/ambassadeurs', permission: 'growth.manage' },
+  { prefix: '/admin/nala-analytics', permission: 'ai_usage.view' },
   { prefix: '/admin/ai-lab', permission: 'ai_knowledge.manage' },
   { prefix: '/admin/parametres', permission: 'tenant_settings.view' },
   { prefix: '/admin/billing', permission: 'billing.view' },
