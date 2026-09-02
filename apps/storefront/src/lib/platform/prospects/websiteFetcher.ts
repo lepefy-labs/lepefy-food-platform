@@ -21,7 +21,7 @@ export function normalizeUrl(input: string): URL {
 }
 export function isPublicAddress(address: string): boolean {
   if (isIP(address) === 4) {
-    const [a,b,c] = address.split('.').map(Number);
+    const [a=0,b=0,c=0] = address.split('.').map(Number);
     return !(a === 0 || a === 10 || a === 127 || a >= 224
       || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254)
       || (a === 172 && b >= 16 && b <= 31) || (a === 192 && (b === 168 || b === 0 || (b === 88 && c === 99)))
@@ -30,7 +30,7 @@ export function isPublicAddress(address: string): boolean {
   }
   if (isIP(address) === 6) {
     const parts = address.split(':');
-    const first = parseInt(parts[0],16), second = parseInt(parts[1] || '0',16);
+    const first = parseInt(parts[0] ?? '',16), second = parseInt(parts[1] || '0',16);
     // Strict global-unicast allowlist, excluding special-use and transition networks.
     return first >= 0x2000 && first <= 0x3fff
       && !(first === 0x2001 && (second <= 0x1ff || second === 0xdb8))
@@ -48,7 +48,8 @@ export async function resolvePublic(host: string, resolver: Resolver = h => look
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new CrawlError('dns_timeout')), CONFIG.requestTimeoutMs); }),
     ]);
     if (!addresses.length || addresses.some(a => !isPublicAddress(a.address))) throw new CrawlError('private_address');
-    return addresses[0];
+    const first = addresses[0]; if (!first) throw new CrawlError('private_address');
+    return first;
   } finally { clearTimeout(timer); }
 }
 export type HttpPage = { url:string; status:number; body:string; contentType:string };
@@ -75,7 +76,7 @@ export async function safeGet(input: string, options: RequestOptions = {}): Prom
       }, res => {
         const status = res.statusCode ?? 0;
         if (status !== 200) { res.resume(); resolve({ status, headers:res.headers, body:'' }); return; }
-        const type = String(res.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
+        const type = (String(res.headers['content-type'] ?? '').split(';')[0] ?? '').trim().toLowerCase();
         if (!(options.contentTypes ?? ['text/html','application/xhtml+xml']).includes(type)) {
           res.destroy(); reject(new CrawlError('unsupported_content', status)); return;
         }

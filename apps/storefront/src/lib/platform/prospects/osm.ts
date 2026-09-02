@@ -7,7 +7,7 @@ import type { Prospect } from './types';
 export type OsmElement = { id:number; type:string; lat?:number; lon?:number; center?:{lat:number;lon:number}; tags?:Record<string,string> };
 export function matchOsm(prospect:Prospect,elements:OsmElement[]):OsmElement | null {
   const exact = elements.filter(e => prospect.siret && e.tags?.['ref:FR:SIRET'] === prospect.siret);
-  if (exact.length === 1) return exact[0];
+  if (exact.length === 1) return exact[0] ?? null;
   const matches = elements.filter(e => {
     const t = e.tags ?? {}, lat = e.lat ?? e.center?.lat, lon = e.lon ?? e.center?.lon;
     if (lat === undefined || lon === undefined || prospect.latitude == null || prospect.longitude == null) return false;
@@ -16,7 +16,7 @@ export function matchOsm(prospect:Prospect,elements:OsmElement[]):OsmElement | n
     return distance <= 100 && normalizeText(t.name ?? '') === normalizeText(prospect.business_name)
       && (!t['addr:postcode'] || t['addr:postcode'] === prospect.postal_code);
   });
-  return matches.length === 1 ? matches[0] : null;
+  return matches.length === 1 ? (matches[0] ?? null) : null;
 }
 export async function enrichOsm(prospect:Prospect):Promise<Partial<Prospect>> {
   if (prospect.latitude == null || prospect.longitude == null || (prospect.website_url && prospect.phone)) return {};

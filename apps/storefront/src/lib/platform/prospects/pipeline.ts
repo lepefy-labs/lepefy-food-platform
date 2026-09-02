@@ -41,7 +41,8 @@ export async function stepRun(id:string,provider:DiscoveryProvider=sireneProvide
         const take = Math.min(CONFIG.discoveryBatch,filters.limit-run.processed,pending.length);
         // Persist a cursor after each candidate. On crash, a replay can only deduplicate.
         for (let i=0;i<take;i++) {
-          if (await insertCandidate(pending[0])) run.inserted++; else run.duplicates++;
+          const candidate = pending[0]; if (!candidate) break;
+          if (await insertCandidate(candidate)) run.inserted++; else run.duplicates++;
           run.processed++; pending = pending.slice(1);
           await patchRun(id,{inserted:run.inserted,duplicates:run.duplicates,processed:run.processed,cursor:{pending,page,exhausted}});
         }

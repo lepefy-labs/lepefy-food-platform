@@ -3,7 +3,7 @@ export function robotsAllows(text: string, pathname: string): boolean {
   const groups: { agents:string[]; rules:{ allow:boolean; path:string }[] }[] = [];
   let current: typeof groups[number] | null = null;
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.split('#')[0].trim(); const colon = line.indexOf(':'); if (colon < 0) continue;
+    const line = (raw.split('#')[0] ?? '').trim(); const colon = line.indexOf(':'); if (colon < 0) continue;
     const key = line.slice(0,colon).trim().toLowerCase(), value = line.slice(colon+1).trim();
     if (key === 'user-agent') {
       if (rulesStarted || !current) { agents = []; current = { agents, rules:[] }; groups.push(current); rulesStarted = false; }

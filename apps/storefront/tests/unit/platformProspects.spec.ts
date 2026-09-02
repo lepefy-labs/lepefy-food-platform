@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -143,7 +144,7 @@ test('HTTP connection uses pinned public address and revalidates redirects',asyn
   const fetcher=load<typeof Fetcher>('lib/platform/prospects/websiteFetcher.ts',{
     'node:http':http.transport,'node:https':http.transport,'node:dns/promises':{lookup:async()=>[{address:'93.184.216.34',family:4}]},
   });
-  await expect(fetcher.safeGet('https://shop.example/')).rejects.toThrow('private_address');
+  await expect(Promise.resolve(fetcher.safeGet('https://shop.example/'))).rejects.toThrow('private_address');
   expect(http.calls).toEqual([{url:'https://shop.example/',address:'93.184.216.34'}]);
 });
 test('HTTP enforces response type, size and 429 backoff',async () => {
@@ -157,13 +158,12 @@ test('HTTP enforces response type, size and 429 backoff',async () => {
     const fetcher=load<typeof Fetcher>('lib/platform/prospects/websiteFetcher.ts',{
       'node:http':http.transport,'node:https':http.transport,'node:dns/promises':{lookup:async()=>[{address:'93.184.216.34',family:4}]},
     });
-    await expect(fetcher.safeGet('https://shop.example/',{maxBytes:5})).rejects.toThrow(code);
+    await expect(Promise.resolve(fetcher.safeGet('https://shop.example/',{maxBytes:5}))).rejects.toThrow(code);
   }
 });
 
 for (const status of [401,403]) {
   test('all prospect HTTP handlers deny before data access: '+status,async () => {
-    const { NextRequest, NextResponse } = await import('next/server');
     const mocks = {
       '@/lib/auth/requirePlatformOwner':{requirePlatformOwner:async()=>NextResponse.json({error:'Denied'},{status})},
       '@/lib/platform/prospects/repository':{},

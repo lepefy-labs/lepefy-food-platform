@@ -8,15 +8,15 @@ export type ParsedPage = {
 export function decodeHtml(value: string) {
   return value.replace(/&(?:amp|quot|apos|lt|gt|nbsp|#39|#x[0-9a-f]+|#\d+);/gi, token => {
     const known:Record<string,string> = { '&amp;':'&','&quot;':'"','&apos;':"'",'&#39;':"'",'&lt;':'<','&gt;':'>','&nbsp;':' ' };
-    if (known[token.toLowerCase()]) return known[token.toLowerCase()];
-    const n = token[2].toLowerCase() === 'x' ? parseInt(token.slice(3,-1),16) : parseInt(token.slice(2,-1),10);
+    const entity = known[token.toLowerCase()]; if (entity !== undefined) return entity;
+    const n = token.charAt(2).toLowerCase() === 'x' ? parseInt(token.slice(3,-1),16) : parseInt(token.slice(2,-1),10);
     return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '';
   });
 }
 export function attributes(tag: string): Record<string,string> {
   const result:Record<string,string> = {};
   for (const match of tag.matchAll(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))/g)) {
-    result[match[1].toLowerCase()] = decodeHtml(match[2] ?? match[3] ?? match[4] ?? '');
+    result[(match[1] ?? '').toLowerCase()] = decodeHtml(match[2] ?? match[3] ?? match[4] ?? '');
   }
   return result;
 }
@@ -54,12 +54,12 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
   for (const match of visible.matchAll(/(?:\+33|0033|0)[1-9](?:[\s.\-]?\d{2}){4}/g)) phone(match[0]);
   const links = new Map<string,number>();
   for (const match of clean.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
-    const a = attributes(match[1]); if (!a.href) continue;
+    const a = attributes(match[1] ?? ''); if (!a.href) continue;
     if (/^mailto:/i.test(a.href)) { email(a.href); continue; }
     if (/^tel:/i.test(a.href)) { phone(a.href); continue; }
     const link = publicLink(a.href,pageUrl); if (!link) continue;
     const key = socialLink(link); if (key) p.social[key] = link;
-    const u = new URL(link); const label = (decodeURIComponentSafe(u.pathname)+' '+plain(match[2])).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    const u = new URL(link); const label = (decodeURIComponentSafe(u.pathname)+' '+plain(match[2] ?? '')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
     if (!key && /\b(commander|commande|order|checkout|panier|cart)\b/.test(label)) mark('has_online_ordering',label);
     if (u.origin !== new URL(pageUrl).origin || /\.(pdf|jpe?g|png|gif|webp|svg|mp4|mp3|zip|xml|css|js)$/i.test(u.pathname)) continue;
     if (/mentions|confidentialite|privacy|legal|conditions|logout/.test(label)) continue;
@@ -84,7 +84,7 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
     if (match && !/\b(pas de|sans|no|not)\s*$/.test(normalized.slice(Math.max(0,match.index-20),match.index))) mark(signal,visible.slice(Math.max(0,match.index-30),match.index+100));
   }
   for (const script of clean.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-    if (attributes(script[1]).type?.toLowerCase() !== 'application/ld+json' || script[2].length > 100000) continue;
+    if (attributes(script[1] ?? '').type?.toLowerCase() !== 'application/ld+json' || (script[2] ?? '').length > 100000) continue;
     try {
       const visit = (obj:unknown,depth=0) => {
         if (depth > 8 || !obj || typeof obj !== 'object') return;
@@ -101,7 +101,7 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
         if (types.includes('Event')) mark('has_events','JSON-LD Event');
         for (const value of Object.values(o).slice(0,100)) if (typeof value === 'object') visit(value,depth+1);
       };
-      visit(JSON.parse(script[2]));
+      visit(JSON.parse(script[2] ?? ''));
     } catch { /* Invalid JSON-LD is not evidence. */ }
   }
   if (p.social.instagram_url) mark('has_instagram',p.social.instagram_url);

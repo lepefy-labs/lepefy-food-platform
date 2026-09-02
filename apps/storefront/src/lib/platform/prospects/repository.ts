@@ -13,7 +13,7 @@ export async function getProspect(id:string):Promise<Prospect | null> {
 }
 export async function insertCandidate(candidate:Identity) {
   const domain = normalizedDomain(candidate.website_url), key = identityKey(candidate);
-  const filters = [candidate.siret ? ['siret',candidate.siret] : null, domain ? ['domain',domain] : null, key ? ['identity_key',key] : null].filter(Boolean) as string[][];
+  const filters = [candidate.siret ? ['siret',candidate.siret] : null, domain ? ['domain',domain] : null, key ? ['identity_key',key] : null].filter(Boolean) as [string,string][];
   for (const [field,value] of filters) {
     const found = await db().from('platform_prospects').select('*').eq(field,value).limit(100);
     if (found.error) throw new StoreError();
