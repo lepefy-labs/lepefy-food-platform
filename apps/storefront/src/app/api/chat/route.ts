@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
@@ -18,6 +18,12 @@ import {
   resolveNalaProductActionLocale,
   type NalaProductActionCandidate,
 } from '@/lib/ai/nalaProductActionContract';
+import {
+  isNalaCartBuilderIntent,
+  normalizeNalaCartPlanExtraction,
+  type NalaCartPlan,
+} from '@/lib/ai/nalaCartPlanContract';
+import { resolveCartPlanIngredients } from '@/lib/ai/nalaCartPlanResolver';
 import { inferNalaRelationshipType } from '@/lib/ai/nalaRelationshipIntent';
 import { getRelatedProducts } from '@/lib/catalog/productRelationships';
 
@@ -50,6 +56,19 @@ interface MatchKnowledgeRow {
   id: string;
   category: string;
   content: string;
+}
+
+interface MainChatResponse {
+  reply: string;
+  cartPlan: unknown;
+}
+
+function parseMainChatResponse(raw: string): MainChatResponse {
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  return {
+    reply: typeof parsed.reply === 'string' ? parsed.reply.trim() : '',
+    cartPlan: parsed.cartPlan,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -96,6 +115,7 @@ export async function POST(req: NextRequest) {
       matchedProductIds: null,
       actionProductIds: null,
       actions: [],
+      cartPlan: null,
     });
   }
 
@@ -123,8 +143,8 @@ export async function POST(req: NextRequest) {
   let matchedKbIds: string[] | null = null;
 
   try {
+    const cartBuilderRequested = isNalaCartBuilderIntent(message);
     const { vector, tokenCount: embedTokens } = await embedText(message);
-
     const supabase = createServiceClient();
     const { data: matches, error: matchError } = await supabase.rpc('match_products', {
       query_embedding: vector,
@@ -146,16 +166,17 @@ export async function POST(req: NextRequest) {
     }));
 
     const anchor = productRows[0] ?? null;
-    const requestedRelationshipType = inferNalaRelationshipType(
-      message,
-      anchor ? { id: anchor.id, stock: anchor.stock } : null,
-    );
+    const requestedRelationshipType = cartBuilderRequested
+      ? null
+      : inferNalaRelationshipType(message, anchor ? { id: anchor.id, stock: anchor.stock } : null);
 
-    let actionCandidates: NalaProductActionCandidate[] = productRows.map((product) => ({
-      id: product.id,
-      similarity: product.similarity,
-      relationshipType: 'direct',
-    }));
+    let actionCandidates: NalaProductActionCandidate[] = cartBuilderRequested
+      ? []
+      : productRows.map((product) => ({
+          id: product.id,
+          similarity: product.similarity,
+          relationshipType: 'direct',
+        }));
     let relationshipSuggestion: {
       type: NonNullable<typeof requestedRelationshipType>;
       sourceProductName: string;
@@ -218,6 +239,7 @@ export async function POST(req: NextRequest) {
       matchedProducts,
       knowledgeSnippets,
       relationshipSuggestion,
+      cartBuilderRequested,
     });
 
     const conversationText = [
@@ -232,33 +254,55 @@ export async function POST(req: NextRequest) {
       config: {
         systemInstruction: systemPrompt,
         temperature: 0.4,
-        maxOutputTokens: 500,
+        maxOutputTokens: 800,
         thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: { type: Type.STRING },
+            cartPlan: {
+              type: Type.OBJECT,
+              nullable: true,
+              properties: {
+                type: { type: Type.STRING, enum: ['recipe'] },
+                title: { type: Type.STRING },
+                ingredients: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      required: { type: Type.BOOLEAN },
+                      quantityHint: { type: Type.STRING, nullable: true },
+                    },
+                    required: ['name', 'required', 'quantityHint'],
+                  },
+                },
+              },
+              required: ['type', 'title', 'ingredients'],
+            },
+          },
+          required: ['reply', 'cartPlan'],
+        },
       },
     });
 
-    const reply = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-    const inputTokens = (response.usageMetadata?.promptTokenCount ?? 0) + (embedTokens ?? 0);
-    const outputTokens = response.usageMetadata?.candidatesTokenCount ?? 0;
+    const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const mainResponse = parseMainChatResponse(raw);
+    if (!mainResponse.reply) throw new Error('Réponse vide de Gemini');
 
-    if (!reply) throw new Error('Réponse vide de Gemini');
-
-    await logAiUsage({
-      tenantId: tenant.id,
-      endpoint: ENDPOINT,
-      provider: 'gemini',
-      model: MODEL,
-      inputTokens,
-      outputTokens,
-      status: 'success',
-    });
-
+    const extraction = normalizeNalaCartPlanExtraction(
+      mainResponse.cartPlan,
+      cartBuilderRequested,
+    );
     const interactionId = await logNalaInteraction({
       context: analyticsContext,
       messageText: message,
-      replyText: reply,
+      replyText: mainResponse.reply,
       aiCallTriggered,
       outcome: matchedProductIds === null && matchedKbIds === null ? 'retrieval_empty' : 'answered',
+      intent: cartBuilderRequested ? 'recipe' : null,
       matchedProductIds,
       matchedKbIds,
     });
@@ -268,7 +312,30 @@ export async function POST(req: NextRequest) {
       tenantLocales: tenant.locales,
       tenantLocale: tenant.locale,
     });
-    const actions = await buildNalaProductActions({
+    let cartPlan: NalaCartPlan | null = null;
+    let cartEmbeddingTokens = 0;
+    if (extraction && interactionId) {
+      try {
+        const resolved = await resolveCartPlanIngredients({
+          supabase,
+          tenantId: tenant.id,
+          interactionId,
+          extraction,
+          currency: tenant.currency ?? 'EUR',
+          locale: actionLocale,
+        });
+        cartPlan = resolved.plan;
+        cartEmbeddingTokens = resolved.tokenCount;
+      } catch (error) {
+        console.error('[nala-cart-builder] Plan resolution failed; omitting proposal.', {
+          tenantId: tenant.id,
+          interactionId,
+          error,
+        });
+      }
+    }
+
+    const actions = cartPlan ? [] : await buildNalaProductActions({
       supabase,
       tenantId: tenant.id,
       interactionId,
@@ -278,18 +345,42 @@ export async function POST(req: NextRequest) {
       candidates: actionCandidates,
     });
 
+    const cartPlanActions = cartPlan?.items.flatMap((item) => item.product ? [{
+      product: { id: item.product.id },
+      relationshipType: item.status === 'substitute' ? 'substitute' : 'direct',
+    }] : []) ?? [];
     await updateNalaInteractionActions({
       tenantId: tenant.id,
       interactionId,
-      actions,
+      actions: cartPlanActions.length > 0 ? cartPlanActions : actions,
+    });
+
+    const actionProductIds = [
+      ...new Set([
+        ...actions.map((action) => action.product.id),
+        ...cartPlanActions.map((action) => action.product.id),
+      ]),
+    ];
+
+    await logAiUsage({
+      tenantId: tenant.id,
+      endpoint: ENDPOINT,
+      provider: 'gemini',
+      model: MODEL,
+      inputTokens: (response.usageMetadata?.promptTokenCount ?? 0)
+        + (embedTokens ?? 0)
+        + cartEmbeddingTokens,
+      outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+      status: 'success',
     });
 
     return NextResponse.json({
-      reply,
+      reply: mainResponse.reply,
       interactionId,
       matchedProductIds: interactionId ? matchedProductIds : null,
-      actionProductIds: interactionId ? actions.map((action) => action.product.id) : null,
+      actionProductIds: interactionId ? actionProductIds : null,
       actions,
+      cartPlan,
     });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';

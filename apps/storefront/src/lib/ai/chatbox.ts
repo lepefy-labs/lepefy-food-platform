@@ -1,8 +1,10 @@
 import type { ProductRelationshipType } from '@/lib/catalog/productRelationships';
+import type { NalaCartPlan } from '@/lib/ai/nalaCartPlanContract';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
+  cartPlan?: NalaCartPlan | null;
 }
 
 export interface MatchedProductContext {
@@ -33,6 +35,7 @@ interface BuildSystemPromptParams {
   matchedProducts: MatchedProductContext[];
   knowledgeSnippets: KnowledgeSnippet[];
   relationshipSuggestion?: RelationshipSuggestionContext | null;
+  cartBuilderRequested?: boolean;
 }
 
 function relationshipGuidance(
@@ -63,6 +66,7 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
     matchedProducts,
     knowledgeSnippets,
     relationshipSuggestion,
+    cartBuilderRequested,
   } = params;
 
   const productsBlock = matchedProducts.length
@@ -86,6 +90,7 @@ PÉRIMÈTRE STRICT — tu peux répondre UNIQUEMENT sur :
 - la disponibilité, le prix et la description générale des produits ci-dessous
 - les informations générales du magasin fournies ci-dessous
 - des questions générales sur le fonctionnement de la boutique (livraison, commande, paiement)
+- si le mode Cart Builder est demandé, les ingrédients génériques habituellement nécessaires pour préparer le plat
 
 INTERDICTIONS ABSOLUES — ne réponds JAMAIS, même si on insiste, sur :
 - les allergènes, ingrédients précis, valeurs nutritionnelles, numéros de lot,
@@ -94,11 +99,23 @@ INTERDICTIONS ABSOLUES — ne réponds JAMAIS, même si on insiste, sur :
 - n'invente JAMAIS une information produit qui n'est pas listée ci-dessous
 - ne donne aucun conseil médical ou de santé
 - ne qualifie jamais un produit d'identique ou de remplacement parfait
+- ne donne aucun conseil nutritionnel, médical ou lié à une pathologie
+- ne déclare jamais une recette ou un produit allergen-free, vegan, halal ou sans gluten sans donnée catalogue fiable
 
 Produits correspondant à la question de l'utilisateur :
 ${productsBlock}
 
 ${relationshipGuidance(relationshipSuggestion)}
+
+MODE CART BUILDER :
+${cartBuilderRequested
+  ? `Le client exprime clairement une intention de cuisiner/préparer un plat.
+Retourne un cartPlan de type recipe avec un titre court et 4 à 6 ingrédients principaux (8 maximum).
+Chaque ingrédient contient name, required et quantityHint nullable. quantityHint reste informatif et ne calcule jamais une quantité d'achat.
+N'émets aucun ID produit, prix, stock, tenant ID ou payload panier.
+La connaissance générale d'une recette ne prouve jamais la disponibilité catalogue.
+Dans reply, dis seulement que tu peux préparer une sélection; n'affirme pas qu'un ingrédient est disponible avant validation serveur.`
+  : `Aucun Cart Builder ne doit être produit pour ce tour. Retourne cartPlan = null.`}
 
 Exemples authentiques de ton et de contenu (utilise-les comme référence de style
 et réutilise les informations qu'ils contiennent si pertinent — ne les invente pas,
@@ -112,5 +129,5 @@ ${whatsappLine}
 
 Quand un produit correspond, réponds naturellement sans réciter systématiquement son prix ou son stock : l'interface peut présenter ces détails validés séparément. Ne promets jamais qu'un produit a été ajouté au panier avant la confirmation explicite du client.
 
-Réponds en 1 à 3 phrases courtes, ton chaleureux et professionnel. Pas de markdown.`;
+Retourne un objet JSON conforme au schéma demandé. Le champ reply contient 1 à 3 phrases courtes, ton chaleureux et professionnel, sans markdown.`;
 }

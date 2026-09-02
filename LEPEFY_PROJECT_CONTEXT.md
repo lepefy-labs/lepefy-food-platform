@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.20 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.30 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -235,7 +235,11 @@ Product Relationships V1 introduce `product_relationships`, layer direzionale te
 
 Il resolver canonico `src/lib/catalog/productRelationships.ts` restituisce prodotti canonici acquistabili. Dopo manual/system, `similar` può completare tramite embedding con preferenza di categoria; `substitute` richiede stessa categoria, alta similarità e disponibilità; `complementary` resta explicit-only. Il fallback semantico non viene persistito. Nala applica guard conversazionali deterministiche, non effettua una seconda AI call e mantiene una sola action per turno. Il type `direct|similar|substitute|complementary` accompagna l'action; il prompt riceve soltanto la relazione già validata e vieta affermazioni “identico” o “sostituto perfetto”.
 
-`nala_interactions.action_product_ids` e `action_relationship_types` mantengono distinti prodotti retrieved e prodotti effettivamente emessi come action. Conversion Attribution qualifica entrambi senza falsificare `matched_product_ids`; cart, checkout e purchase restano invariati e fail-open rispetto all'analytics. Il tenant gestisce le relazioni dal tab “Produits associés” dell'editor catalogo con ricerca reale, add/remove, priority e active toggle. Cart Builder, recipes, multi-product proposal, collaborative filtering, generazione AI persistente e dashboard restano fuori scope.
+`nala_interactions.action_product_ids` e `action_relationship_types` mantengono distinti prodotti retrieved e prodotti effettivamente emessi come action. Conversion Attribution qualifica entrambi senza falsificare `matched_product_ids`; cart, checkout e purchase restano invariati e fail-open rispetto all'analytics. Il tenant gestisce le relazioni dal tab “Produits associés” dell'editor catalogo con ricerca reale, add/remove, priority e active toggle. Nala Cart Builder V1 riconosce intent recipe/meal con guard deterministiche leggere e usa la stessa chiamata Gemini principale per produrre reply + ingredienti strutturati (4–6 preferiti, massimo 8), senza product ID, prezzi o stock generati dall'AI. Il server esegue embedding batch degli ingredienti, risolve in parallelo prodotti canonici tenant-safe e purchasable, quindi applica direct match forte, substitute esplicito/manual-first o fallback semantico conservativo; complementary non viene usato come sostituto e un match incerto resta unavailable.
+
+La proposta è client-safe e legata all'interaction tramite UUID logico. Il flusso richiede due consensi: apertura della preview e bulk add finale dei soli item selezionati; un follow-up “Oui” espande soltanto l'ultima proposta ancora pendente. Quantità sempre 1, massimo 8 SKU, nessun quantity editor o calcolo confezioni. Il bulk add riusa `cartStore.addItem()`, protegge dal doppio click, mantiene i successi in caso di errore parziale e apre il drawer esistente tramite `cartUiStore`. I prodotti proposti restano separati dal retrieval in `action_product_ids`; direct/substitute descrivono il match catalogo mentre recipe resta l'intent/action context. Gli eventi add-to-cart, checkout e purchase continuano nella Conversion Attribution esistente. Locale: storefront/tenant, fallback FR, mai `navigator.language`.
+
+Non esiste un recipe database né una tabella `nala_cart_plans`: V1 mantiene il piano nel turn client-side e usa interaction metadata + conversion events esistenti per misurare proposta/accettazione senza una seconda pipeline. Dashboard, meal planner, automatic quantity optimization, collaborative filtering e persistenza delle ricette restano fuori scope.
 
 Le vecchie colonne billing in `tenants` restano compatibilità e non vanno rimosse senza migration dedicata.
 
@@ -516,8 +520,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.20
+# Fine snapshot v6.30
 
-**Base audit:** `main @ Nala Product Relationships V1`
+**Base audit:** `main @ Nala Cart Builder V1`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

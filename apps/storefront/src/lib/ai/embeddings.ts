@@ -46,6 +46,39 @@ export async function embedText(text: string): Promise<{ vector: number[]; token
 }
 
 /**
+ * Embeds several short queries in one provider request. Cart Builder uses this
+ * to avoid one embedding request per ingredient.
+ */
+export async function embedTexts(texts: string[]): Promise<{
+  vectors: number[][];
+  tokenCount: number;
+}> {
+  if (texts.length === 0) return { vectors: [], tokenCount: 0 };
+  const response = await getClient().models.embedContent({
+    model: EMBEDDING_MODEL,
+    contents: texts,
+    config: {
+      outputDimensionality: EMBEDDING_DIMENSIONS,
+    },
+  });
+
+  const embeddings = response.embeddings ?? [];
+  if (embeddings.length !== texts.length) {
+    throw new Error('Gemini n\'a pas retourné tous les embeddings');
+  }
+
+  const vectors = embeddings.map((embedding) => {
+    if (!embedding.values?.length) throw new Error('Gemini n\'a retourné aucun embedding');
+    return embedding.values;
+  });
+  const tokenCount = embeddings.reduce(
+    (sum, embedding, index) => sum + (embedding.statistics?.tokenCount ?? Math.ceil((texts[index]?.length ?? 0) / 4)),
+    0,
+  );
+  return { vectors, tokenCount };
+}
+
+/**
  * Construit le texte à embedder pour un produit : nom + catégorie + toutes
  * les descriptions présentes (toutes langues, jamais hardcodées).
  */

@@ -4,7 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import { IconSparkles, IconX, IconSend, IconBrandWhatsapp, IconChevronRight } from '@tabler/icons-react';
 import { rememberNalaProductTouch } from '@/lib/ai/nalaAttributionClient';
 import { NalaProductActionCard } from '@/components/chat/NalaProductActionCard';
+import { NalaCartPlanCard } from '@/components/chat/NalaCartPlanCard';
 import type { NalaProductAction } from '@/lib/ai/nalaProductActionContract';
+import {
+  isNalaCartBuilderAffirmative,
+  type NalaCartPlan,
+} from '@/lib/ai/nalaCartPlanContract';
 import { resolveLocale, useLocaleStore } from '@/lib/store/localeStore';
 
 interface ChatWidgetProps {
@@ -19,6 +24,8 @@ interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
   actions?: NalaProductAction[];
+  cartPlan?: NalaCartPlan | null;
+  cartPlanExpanded?: boolean;
 }
 
 const MAX_HISTORY_TURNS = 6;
@@ -29,6 +36,7 @@ const NALA_DARK = '#4B3CC4';
 const SUGGESTED_PROMPTS = [
   'Quels sont vos produits phares ?',
   'Je cherche un produit précis',
+  'Je veux cuisiner du ndolé',
   'Avez-vous des produits sans gluten ?',
   'Informations sur la livraison',
 ];
@@ -106,6 +114,24 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
     const message = (messageOverride ?? input).trim();
     if (!message || loading) return;
 
+    let pendingPlanIndex = -1;
+    for (let index = turns.length - 1; index >= 0; index -= 1) {
+      const turn = turns[index];
+      if (turn?.role !== 'assistant') continue;
+      if (turn.cartPlan && !turn.cartPlanExpanded) pendingPlanIndex = index;
+      break;
+    }
+    if (pendingPlanIndex >= 0 && isNalaCartBuilderAffirmative(message)) {
+      setTurns((current) => [
+        ...current.map((turn, index) => (
+          index === pendingPlanIndex ? { ...turn, cartPlanExpanded: true } : turn
+        )),
+        { role: 'user', text: message },
+      ]);
+      setInput('');
+      return;
+    }
+
     const history = turns.slice(-MAX_HISTORY_TURNS).map(({ role, text }) => ({ role, text }));
     clientSessionIdRef.current ??= createClientSessionId();
     setTurns((prev) => [...prev, { role: 'user', text: message }]);
@@ -147,7 +173,16 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         actionProductIds: data?.actionProductIds,
       });
       const actions = Array.isArray(data?.actions) ? data.actions as NalaProductAction[] : [];
-      setTurns((prev) => [...prev, { role: 'assistant', text: reply, actions }]);
+      const cartPlan = data?.cartPlan && typeof data.cartPlan === 'object'
+        ? data.cartPlan as NalaCartPlan
+        : null;
+      setTurns((prev) => [...prev, {
+        role: 'assistant',
+        text: reply,
+        actions,
+        cartPlan,
+        cartPlanExpanded: false,
+      }]);
     } catch {
       setFailed(true);
     } finally {
@@ -257,6 +292,17 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
                     action={action}
                   />
                 ))}
+                {turn.cartPlan && (
+                  <NalaCartPlanCard
+                    plan={turn.cartPlan}
+                    expanded={turn.cartPlanExpanded === true}
+                    onPrepare={() => {
+                      setTurns((current) => current.map((candidate, index) => (
+                        index === i ? { ...candidate, cartPlanExpanded: true } : candidate
+                      )));
+                    }}
+                  />
+                )}
               </div>
             ))}
 
