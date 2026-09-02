@@ -58,12 +58,15 @@ jobs:
         run: pnpm lint
 
       - name: Unit tests
+        if: ${{ !cancelled() }}
         run: pnpm --filter @lepefy/storefront test:unit
 
       - name: Check diff whitespace
+        if: ${{ !cancelled() }}
         run: git diff --check HEAD^ HEAD
 
       - name: AI Core migration and isolation
+        if: ${{ !cancelled() }}
         env:
           PGPASSWORD: test
         run: |
