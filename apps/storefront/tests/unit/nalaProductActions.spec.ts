@@ -3,6 +3,7 @@ import {
   buildValidatedNalaProductActions,
   getNalaProductActionCopy,
   performNalaAddOnce,
+  resolveNalaProductActionLocale,
   shouldOfferNalaProductAction,
   toNalaCartProduct,
   type NalaCanonicalProduct,
@@ -36,7 +37,7 @@ function build(products: NalaCanonicalProduct[]) {
     interactionId: INTERACTION,
     currency: 'eur',
     locale: 'fr-FR',
-    candidates: [{ id: PRODUCT, similarity: 0.82 }],
+    candidates: [{ id: PRODUCT, similarity: 0.82, relationshipType: 'direct' }],
     products,
   });
 }
@@ -46,6 +47,7 @@ test('un match canonico, tenant-safe e disponible produit une action', async () 
   expect(actions).toHaveLength(1);
   expect(actions[0]).toMatchObject({
     action: 'add_to_cart',
+    relationshipType: 'direct',
     interactionId: INTERACTION,
     product: { id: PRODUCT, available: true, stock: 12, currency: 'EUR' },
   });
@@ -60,7 +62,7 @@ test('cross-tenant, inactive, out-of-stock e match debole non producono action',
     interactionId: INTERACTION,
     currency: 'EUR',
     locale: 'fr',
-    candidates: [{ id: PRODUCT, similarity: 0.31 }],
+    candidates: [{ id: PRODUCT, similarity: 0.31, relationshipType: 'direct' }],
     products: [product()],
   })).toEqual([]);
 });
@@ -109,4 +111,35 @@ test('il guard asincrono impedisce il doppio add e rende disponibile lo stato su
     added: '✓ Ajouté au panier',
     viewCart: 'Voir mon panier',
   });
+});
+
+
+test('la lingua action segue lo storefront e non il browser locale', async () => {
+  expect(resolveNalaProductActionLocale({
+    storefrontLocale: 'fr',
+    conversationLocale: 'it-IT',
+    tenantLocales: ['fr', 'it'],
+    tenantLocale: 'fr-FR',
+  })).toBe('fr');
+  expect(resolveNalaProductActionLocale({
+    storefrontLocale: 'fr',
+    conversationLocale: 'en-US',
+    tenantLocales: ['fr', 'en'],
+    tenantLocale: 'fr-FR',
+  })).toBe('fr');
+  expect(resolveNalaProductActionLocale({
+    storefrontLocale: 'it',
+    tenantLocales: ['fr', 'it'],
+    tenantLocale: 'fr-FR',
+  })).toBe('it');
+  expect(resolveNalaProductActionLocale({
+    storefrontLocale: 'en',
+    tenantLocales: ['fr', 'en'],
+    tenantLocale: 'fr-FR',
+  })).toBe('en');
+  expect(resolveNalaProductActionLocale({
+    storefrontLocale: 'xx-invalid',
+    tenantLocales: ['fr'],
+    tenantLocale: 'fr-FR',
+  })).toBe('fr');
 });

@@ -5,10 +5,13 @@ import { IconSparkles, IconX, IconSend, IconBrandWhatsapp, IconChevronRight } fr
 import { rememberNalaProductTouch } from '@/lib/ai/nalaAttributionClient';
 import { NalaProductActionCard } from '@/components/chat/NalaProductActionCard';
 import type { NalaProductAction } from '@/lib/ai/nalaProductActionContract';
+import { resolveLocale, useLocaleStore } from '@/lib/store/localeStore';
 
 interface ChatWidgetProps {
   enabled: boolean;
   tenantName: string;
+  tenantLocales: string[];
+  tenantLocale: string;
   whatsappNumber: string | null;
 }
 
@@ -50,7 +53,9 @@ function currentDeviceType(): 'mobile' | 'tablet' | 'desktop' {
   return 'desktop';
 }
 
-export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetProps) {
+export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber }: ChatWidgetProps) {
+  const storeLocale = useLocaleStore((state) => state.locale);
+  const storefrontLocale = resolveLocale(storeLocale, tenantLocales) || tenantLocale || 'fr';
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState('');
@@ -117,7 +122,8 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
           history,
           clientSessionId: clientSessionIdRef.current,
           sourcePath: window.location.pathname,
-          locale: navigator.language,
+          locale: storefrontLocale,
+          storefrontLocale,
           deviceType: currentDeviceType(),
         }),
       });
@@ -138,6 +144,7 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
         interactionId: data?.interactionId,
         clientSessionId: clientSessionIdRef.current,
         matchedProductIds: data?.matchedProductIds,
+        actionProductIds: data?.actionProductIds,
       });
       const actions = Array.isArray(data?.actions) ? data.actions as NalaProductAction[] : [];
       setTurns((prev) => [...prev, { role: 'assistant', text: reply, actions }]);

@@ -34,11 +34,14 @@ export function rememberNalaProductTouch(params: {
   interactionId: unknown;
   clientSessionId: unknown;
   matchedProductIds: unknown;
+  actionProductIds?: unknown;
 }): void {
   if (!isUuid(params.interactionId) || !isUuid(params.clientSessionId)) return;
-  if (!Array.isArray(params.matchedProductIds)) return;
 
-  const productIds = [...new Set(params.matchedProductIds.filter(isUuid))].slice(0, MAX_PRODUCTS_PER_TOUCH);
+  const retrieved = Array.isArray(params.matchedProductIds) ? params.matchedProductIds : [];
+  const actions = Array.isArray(params.actionProductIds) ? params.actionProductIds : [];
+  const productIds = [...new Set([...retrieved, ...actions].filter(isUuid))]
+    .slice(0, MAX_PRODUCTS_PER_TOUCH);
   if (productIds.length === 0) return;
 
   const now = Date.now();

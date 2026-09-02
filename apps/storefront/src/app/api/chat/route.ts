@@ -10,9 +10,16 @@ import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 import {
   logNalaInteraction,
   prepareNalaAnalytics,
+  updateNalaInteractionActions,
   type NalaAnalyticsContext,
 } from '@/lib/ai/nalaAnalytics';
 import { buildNalaProductActions } from '@/lib/ai/nalaProductActions';
+import {
+  resolveNalaProductActionLocale,
+  type NalaProductActionCandidate,
+} from '@/lib/ai/nalaProductActionContract';
+import { inferNalaRelationshipType } from '@/lib/ai/nalaRelationshipIntent';
+import { getRelatedProducts } from '@/lib/catalog/productRelationships';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,6 +38,7 @@ interface MatchProductsRow {
   slug: string;
   image_url: string | null;
   price: number;
+  category_id: string | null;
   stock: number | null;
   weight_grams: number | null;
   storage_type: string | null;
@@ -68,7 +76,7 @@ export async function POST(req: NextRequest) {
     tenantId: tenant.id,
     clientSessionId: body?.clientSessionId,
     sourcePath: body?.sourcePath,
-    locale: body?.locale,
+    locale: body?.storefrontLocale,
     deviceType: body?.deviceType,
   });
 
@@ -82,7 +90,13 @@ export async function POST(req: NextRequest) {
       outcome: 'small_talk',
       intent: 'small_talk',
     });
-    return NextResponse.json({ reply: smallTalkReply, interactionId, actions: [] });
+    return NextResponse.json({
+      reply: smallTalkReply,
+      interactionId,
+      matchedProductIds: null,
+      actionProductIds: null,
+      actions: [],
+    });
   }
 
   const allowed = await checkRateLimit(tenant.id, ENDPOINT, true);
@@ -131,6 +145,57 @@ export async function POST(req: NextRequest) {
       categoryName: match.category_name,
     }));
 
+    const anchor = productRows[0] ?? null;
+    const requestedRelationshipType = inferNalaRelationshipType(
+      message,
+      anchor ? { id: anchor.id, stock: anchor.stock } : null,
+    );
+
+    let actionCandidates: NalaProductActionCandidate[] = productRows.map((product) => ({
+      id: product.id,
+      similarity: product.similarity,
+      relationshipType: 'direct',
+    }));
+    let relationshipSuggestion: {
+      type: NonNullable<typeof requestedRelationshipType>;
+      sourceProductName: string;
+      targetProductName: string;
+    } | null = null;
+
+    if (requestedRelationshipType && anchor) {
+      const [relationship] = await getRelatedProducts({
+        supabase,
+        tenantId: tenant.id,
+        sourceProductId: anchor.id,
+        type: requestedRelationshipType,
+        limit: 1,
+        allowSemanticFallback: true,
+      });
+
+      if (relationship) {
+        actionCandidates = [{
+          id: relationship.product.id,
+          relationshipType: requestedRelationshipType,
+          similarity: relationship.similarity ?? undefined,
+        }];
+        relationshipSuggestion = {
+          type: requestedRelationshipType,
+          sourceProductName: anchor.name,
+          targetProductName: relationship.product.name,
+        };
+        matchedProducts.push({
+          name: relationship.product.name,
+          price: relationship.product.price,
+          stock: relationship.product.stock,
+          weightGrams: relationship.product.weightGrams,
+          storageType: relationship.product.storageType,
+          categoryName: null,
+        });
+      } else {
+        actionCandidates = [];
+      }
+    }
+
     const { data: knowledgeMatches } = await supabase.rpc('match_knowledge_base', {
       query_embedding: vector,
       p_tenant_id: tenant.id,
@@ -152,6 +217,7 @@ export async function POST(req: NextRequest) {
       extraContext: tenant.chatbox_extra_context ?? null,
       matchedProducts,
       knowledgeSnippets,
+      relationshipSuggestion,
     });
 
     const conversationText = [
@@ -186,6 +252,7 @@ export async function POST(req: NextRequest) {
       outputTokens,
       status: 'success',
     });
+
     const interactionId = await logNalaInteraction({
       context: analyticsContext,
       messageText: message,
@@ -196,20 +263,32 @@ export async function POST(req: NextRequest) {
       matchedKbIds,
     });
 
+    const actionLocale = resolveNalaProductActionLocale({
+      storefrontLocale: body?.storefrontLocale,
+      tenantLocales: tenant.locales,
+      tenantLocale: tenant.locale,
+    });
     const actions = await buildNalaProductActions({
       supabase,
       tenantId: tenant.id,
       interactionId,
       message,
-      locale: body?.locale,
+      locale: actionLocale,
       currency: tenant.currency ?? 'EUR',
-      candidates: productRows.map((product) => ({ id: product.id, similarity: product.similarity })),
+      candidates: actionCandidates,
+    });
+
+    await updateNalaInteractionActions({
+      tenantId: tenant.id,
+      interactionId,
+      actions,
     });
 
     return NextResponse.json({
       reply,
       interactionId,
       matchedProductIds: interactionId ? matchedProductIds : null,
+      actionProductIds: interactionId ? actions.map((action) => action.product.id) : null,
       actions,
     });
   } catch (err) {

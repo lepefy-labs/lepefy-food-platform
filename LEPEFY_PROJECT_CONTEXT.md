@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.17 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.20 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -229,7 +229,13 @@ tenant_feature_settings
 
 `nala_analytics` è una capability commerciale distinta da `nala`, inclusa nel piano all-inclusive `food-platform`. La raccolta è fail-closed: un errore del resolver analytics non interrompe Nala e non produce scritture. `nala_sessions` e `nala_interactions` conservano conversazioni, associazione cliente nullable, pagina sorgente, locale, device category e geografia approssimativa derivata server-side (country/region/city); non conservano IP, user-agent, fingerprint o cookie analytics. Il target di retention raw è 90 giorni tramite RPC service-role-only, da collegare a uno scheduler giornaliero approvato. Conversion Attribution V1 è implementata come capability commerciale separata `nala_conversion_attribution`. Il browser conserva solo touch minimizzati in `sessionStorage`, con finestra esatta di 30 minuti e last qualifying touch per prodotto. Il server riconvalida tenant, entitlement, interaction/session, finestra temporale e appartenenza del prodotto a `matched_product_ids`; tenant, prezzi, currency e valore assistito non sono mai autorevoli dal browser. La dashboard Nala non è ancora implementata.\n\nIl semantic enrichment Nala è asincrono e separato dal chat path: la migration `097_nala_semantic_enrichment.sql` aggiunge intent/confidence, demand status, retrieval quality, knowledge status, requested product text e stato/versione operativi direttamente a `nala_interactions`. La taxonomy V1 comprende intent prodotto, availability/price/recommendation/substitution, recipe, delivery/store/event information, order/payment help, complaint, small talk, other e unknown. `requested_product_text` è una frase derivata massima di 150 caratteri, non una copia del messaggio, e viene eliminata con la stessa retention della riga.\n\nIl dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`; la dashboard resta fuori scope.
 
-Nala Structured Product Actions V1 estende `/api/chat` con action `add_to_cart` server-validate derivate esclusivamente dai ranked ID di `match_products` e da una rilettura canonica tenant-scoped di `products`. La UI mostra al massimo una card compatta per risposta, solo per il primo prodotto attivo, in stock e sufficientemente rilevante; una guard deterministica esclude small talk e domande operative evidenti senza una seconda AI call. La mutation resta user-confirmed e usa `cartStore.addItem(..., 1)`, quindi riutilizza sync, drawer e Conversion Attribution V1 esistenti. Le action restano metadata UI e non entrano nella history testuale inviata a Gemini. Multi-product builder, recipe basket, substitute/similar/complementary engine e dashboard non sono implementati.
+Nala Structured Product Actions V1 estende `/api/chat` con action `add_to_cart` server-validate e user-confirmed. La UI mostra al massimo una card compatta per risposta e usa `cartStore.addItem(..., 1)`, quindi riutilizza sync, drawer e Conversion Attribution. Le action restano metadata UI e non entrano nella history testuale inviata a Gemini. La copy action usa il locale storefront esplicito risolto da `localeStore` e dalle locale supportate dal tenant; `navigator.language` non è source of truth e il fallback resta francese.
+
+Product Relationships V1 introduce `product_relationships`, layer direzionale tenant-scoped con tipi distinti `similar`, `substitute` e `complementary`. Le relazioni persistenti `manual` precedono `system`; all'interno della stessa source una priority numerica maggiore viene prima. Il trigger DB verifica che source e target appartengano al tenant, vieta self relation e duplicati, e le foreign key eliminano le relazioni con il prodotto. RLS non concede accesso browser: admin e Nala operano server-side con service role e authorization `catalog.view/manage`.
+
+Il resolver canonico `src/lib/catalog/productRelationships.ts` restituisce prodotti canonici acquistabili. Dopo manual/system, `similar` può completare tramite embedding con preferenza di categoria; `substitute` richiede stessa categoria, alta similarità e disponibilità; `complementary` resta explicit-only. Il fallback semantico non viene persistito. Nala applica guard conversazionali deterministiche, non effettua una seconda AI call e mantiene una sola action per turno. Il type `direct|similar|substitute|complementary` accompagna l'action; il prompt riceve soltanto la relazione già validata e vieta affermazioni “identico” o “sostituto perfetto”.
+
+`nala_interactions.action_product_ids` e `action_relationship_types` mantengono distinti prodotti retrieved e prodotti effettivamente emessi come action. Conversion Attribution qualifica entrambi senza falsificare `matched_product_ids`; cart, checkout e purchase restano invariati e fail-open rispetto all'analytics. Il tenant gestisce le relazioni dal tab “Produits associés” dell'editor catalogo con ricerca reale, add/remove, priority e active toggle. Cart Builder, recipes, multi-product proposal, collaborative filtering, generazione AI persistente e dashboard restano fuori scope.
 
 Le vecchie colonne billing in `tenants` restano compatibilità e non vanno rimosse senza migration dedicata.
 
@@ -412,6 +418,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 096_tenant_feature_settings.sql
 097_nala_semantic_enrichment.sql
 098_nala_conversion_attribution.sql
+099_nala_product_relationships.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -435,6 +442,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.\n\n`097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk viene completato senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention.
 
 `098` è additiva e service-role-only: introduce l'entitlement `nala_conversion_attribution`, la lineage prodotto/checkout `nala_checkout_attributions`, gli eventi conversione durevoli e la RPC idempotente `record_nala_purchase_attribution`. La purge delle conversazioni porta a `NULL` solo i riferimenti session/interaction; product ID, checkout/order ID, quantità, prezzi snapshot e gross assisted value restano disponibili per reporting.
+
+`099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
 
 ---
 
@@ -507,8 +516,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.19
+# Fine snapshot v6.20
 
-**Base audit:** `main @ Nala structured product actions V1`
+**Base audit:** `main @ Nala Product Relationships V1`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

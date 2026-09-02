@@ -21,6 +21,7 @@ const WORKFLOW_SECTIONS = [
   { label: 'Média', tab: 'Général', heading: 'Médias' },
   { label: 'Conformité', tab: 'Étiquette', heading: 'Origine et conformité' },
   { label: 'Étiquette', tab: 'Étiquette', heading: "Fond d'étiquette" },
+  { label: 'Associés', tab: 'Produits associés', heading: 'Produits associés' },
 ] as const;
 
 export default function ProductEditWorkspace({
@@ -35,7 +36,7 @@ export default function ProductEditWorkspace({
 }: ProductEditWorkspaceProps) {
   const editorRef = useRef<HTMLDivElement>(null);
 
-  function openSection(tabLabel: 'Général' | 'Étiquette', headingLabel: string) {
+  function openSection(tabLabel: 'Général' | 'Étiquette' | 'Produits associés', headingLabel: string) {
     const root = editorRef.current;
     if (!root) return;
 
@@ -97,7 +98,7 @@ export default function ProductEditWorkspace({
         className="sticky top-0 z-30 -mx-1 overflow-x-auto border-y border-gray-200 bg-white/95 px-1 py-2 shadow-sm backdrop-blur"
       >
         <div className="flex min-w-max items-center gap-1.5">
-          {WORKFLOW_SECTIONS.map((section, index) => (
+          {WORKFLOW_SECTIONS.filter((section) => !isNew || section.tab !== 'Produits associés').map((section, index) => (
             <button
               key={section.label}
               type="button"

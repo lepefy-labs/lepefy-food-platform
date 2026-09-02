@@ -44,6 +44,7 @@ test('il resolver server fail-closed rifiuta entitlement assente e mismatch retr
     id: INTERACTION_NEW,
     session_id: SESSION,
     matched_product_ids: [PRODUCT_A],
+    action_product_ids: null,
     client_session_id: SESSION,
     created_at: new Date(NOW - 1_000).toISOString(),
   }];
@@ -64,4 +65,24 @@ test('il resolver server fail-closed rifiuta entitlement assente e mismatch retr
 test('la chiave purchase è stabile per retry e distinta per prodotto', async () => {
   expect(nalaPurchaseIdempotencyKey(ORDER, PRODUCT_A)).toBe(nalaPurchaseIdempotencyKey(ORDER, PRODUCT_A));
   expect(nalaPurchaseIdempotencyKey(ORDER, PRODUCT_A)).not.toBe(nalaPurchaseIdempotencyKey(ORDER, PRODUCT_B));
+});
+
+
+test('un prodotto action correlato qualifica senza falsificare matched_product_ids', async () => {
+  const interactions = [{
+    id: INTERACTION_NEW,
+    session_id: SESSION,
+    matched_product_ids: [PRODUCT_A],
+    action_product_ids: [PRODUCT_B],
+    client_session_id: SESSION,
+    created_at: new Date(NOW - 1_000).toISOString(),
+  }];
+
+  expect(selectQualifyingNalaAttributions({
+    entitled: true,
+    candidates: [{ productId: PRODUCT_B, interactionId: INTERACTION_NEW, clientSessionId: SESSION }],
+    interactions,
+    cartProductIds: [PRODUCT_B],
+    nowMs: NOW,
+  })).toEqual([{ productId: PRODUCT_B, interactionId: INTERACTION_NEW, sessionId: SESSION }]);
 });

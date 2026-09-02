@@ -18,6 +18,7 @@ export interface NalaInteractionSnapshot {
   id: string;
   session_id: string;
   matched_product_ids: string[] | null;
+  action_product_ids: string[] | null;
   client_session_id: string;
   created_at: string;
 }
@@ -82,7 +83,11 @@ export function selectQualifyingNalaAttributions(params: {
     const interaction = interactions.get(candidate.interactionId);
     if (!interaction || !isUuid(interaction.session_id)) continue;
     if (interaction.client_session_id !== candidate.clientSessionId) continue;
-    if (!interaction.matched_product_ids?.includes(candidate.productId)) continue;
+    const qualifyingProducts = new Set([
+      ...(interaction.matched_product_ids ?? []),
+      ...(interaction.action_product_ids ?? []),
+    ]);
+    if (!qualifyingProducts.has(candidate.productId)) continue;
 
     const createdAt = Date.parse(interaction.created_at);
     if (!Number.isFinite(createdAt) || createdAt > nowMs) continue;

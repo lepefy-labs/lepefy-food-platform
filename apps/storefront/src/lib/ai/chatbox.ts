@@ -1,3 +1,5 @@
+import type { ProductRelationshipType } from '@/lib/catalog/productRelationships';
+
 export interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
@@ -17,6 +19,12 @@ export interface KnowledgeSnippet {
   content: string;
 }
 
+export interface RelationshipSuggestionContext {
+  type: ProductRelationshipType;
+  sourceProductName: string;
+  targetProductName: string;
+}
+
 interface BuildSystemPromptParams {
   tenantName: string;
   locales: string[];
@@ -24,10 +32,38 @@ interface BuildSystemPromptParams {
   extraContext: string | null;
   matchedProducts: MatchedProductContext[];
   knowledgeSnippets: KnowledgeSnippet[];
+  relationshipSuggestion?: RelationshipSuggestionContext | null;
+}
+
+function relationshipGuidance(
+  relationship: RelationshipSuggestionContext | null | undefined,
+): string {
+  if (!relationship) return 'Aucune suggestion relationnelle validée pour cette réponse.';
+
+  const guidance = {
+    similar: 'Présente-le prudemment comme quelque chose de très proche ou comparable.',
+    substitute: 'Présente-le prudemment comme une bonne alternative possible, jamais comme un remplacement identique ou parfait.',
+    complementary: 'Présente-le comme un produit qui va bien avec le produit demandé, sans transformer la réponse en vente agressive.',
+  }[relationship.type];
+
+  return `Suggestion catalogue validée par le serveur :
+- relation: ${relationship.type}
+- produit source: ${relationship.sourceProductName}
+- produit proposé: ${relationship.targetProductName}
+- consigne: ${guidance}
+Ne cite jamais le type technique de relation et n'invente aucun autre produit.`;
 }
 
 export function buildSystemPrompt(params: BuildSystemPromptParams): string {
-  const { tenantName, locales, whatsappNumber, extraContext, matchedProducts, knowledgeSnippets } = params;
+  const {
+    tenantName,
+    locales,
+    whatsappNumber,
+    extraContext,
+    matchedProducts,
+    knowledgeSnippets,
+    relationshipSuggestion,
+  } = params;
 
   const productsBlock = matchedProducts.length
     ? matchedProducts
@@ -57,9 +93,12 @@ INTERDICTIONS ABSOLUES — ne réponds JAMAIS, même si on insiste, sur :
   que tu ne peux pas garantir cette information et redirige vers WhatsApp
 - n'invente JAMAIS une information produit qui n'est pas listée ci-dessous
 - ne donne aucun conseil médical ou de santé
+- ne qualifie jamais un produit d'identique ou de remplacement parfait
 
 Produits correspondant à la question de l'utilisateur :
 ${productsBlock}
+
+${relationshipGuidance(relationshipSuggestion)}
 
 Exemples authentiques de ton et de contenu (utilise-les comme référence de style
 et réutilise les informations qu'ils contiennent si pertinent — ne les invente pas,

@@ -1,5 +1,9 @@
+import type { ProductRelationshipType } from '@/lib/catalog/productRelationships';
+
 export const NALA_PRODUCT_ACTION_MAX = 1;
 export const NALA_PRODUCT_ACTION_MIN_SIMILARITY = 0.4;
+
+export type NalaActionRelationshipType = 'direct' | ProductRelationshipType;
 
 export interface NalaProductActionLabels {
   adding: string;
@@ -13,6 +17,7 @@ export interface NalaProductActionLabels {
 export interface NalaProductAction {
   type: 'product';
   action: 'add_to_cart';
+  relationshipType: NalaActionRelationshipType;
   product: {
     id: string;
     name: string;
@@ -31,9 +36,10 @@ export interface NalaProductAction {
   interactionId: string;
 }
 
-export interface NalaRetrievedProductCandidate {
+export interface NalaProductActionCandidate {
   id: string;
-  similarity: number;
+  similarity?: number;
+  relationshipType: NalaActionRelationshipType;
 }
 
 export interface NalaCanonicalProduct {
@@ -61,6 +67,48 @@ const NON_PRODUCT_ACTION_PATTERNS = [
   /\b(recette|recipe|ricetta)\b/i,
 ];
 
+const ACTION_LANGUAGES = new Set(['fr', 'it', 'en']);
+
+function languageOf(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase().replace(/_/g, '-').split('-')[0] ?? '';
+  return ACTION_LANGUAGES.has(normalized) ? normalized : null;
+}
+
+export function resolveNalaProductActionLocale(params: {
+  storefrontLocale?: unknown;
+  conversationLocale?: unknown;
+  tenantLocales?: unknown;
+  tenantLocale?: unknown;
+}): 'fr' | 'it' | 'en' {
+  const supportedTenantLanguages = new Set(
+    (Array.isArray(params.tenantLocales) ? params.tenantLocales : [])
+      .map(languageOf)
+      .filter((language): language is string => Boolean(language)),
+  );
+
+  const explicit = languageOf(params.storefrontLocale);
+  if (explicit && (supportedTenantLanguages.size === 0 || supportedTenantLanguages.has(explicit))) {
+    return explicit as 'fr' | 'it' | 'en';
+  }
+
+  const conversation = languageOf(params.conversationLocale);
+  if (
+    conversation
+    && (supportedTenantLanguages.size === 0 || supportedTenantLanguages.has(conversation))
+  ) {
+    return conversation as 'fr' | 'it' | 'en';
+  }
+
+  const defaultTenantLanguage =
+    (Array.isArray(params.tenantLocales) ? params.tenantLocales : [])
+      .map(languageOf)
+      .find(Boolean)
+    ?? languageOf(params.tenantLocale);
+
+  return (defaultTenantLanguage ?? 'fr') as 'fr' | 'it' | 'en';
+}
+
 export function shouldOfferNalaProductAction(message: string): boolean {
   const normalized = message.trim();
   if (normalized.length < 2) return false;
@@ -71,7 +119,7 @@ export function getNalaProductActionCopy(locale: unknown): {
   ctaLabel: string;
   labels: NalaProductActionLabels;
 } {
-  const language = typeof locale === 'string' ? locale.toLowerCase().split(/[-_]/)[0] : 'fr';
+  const language = languageOf(locale) ?? 'fr';
 
   if (language === 'it') {
     return {
@@ -119,49 +167,56 @@ export function buildValidatedNalaProductActions(params: {
   interactionId: string;
   currency: string;
   locale: unknown;
-  candidates: NalaRetrievedProductCandidate[];
+  candidates: NalaProductActionCandidate[];
   products: NalaCanonicalProduct[];
 }): NalaProductAction[] {
   const productById = new Map(params.products.map((product) => [product.id, product]));
   const copy = getNalaProductActionCopy(params.locale);
 
-  return params.candidates
-    .filter((candidate) => Number.isFinite(candidate.similarity)
-      && candidate.similarity >= NALA_PRODUCT_ACTION_MIN_SIMILARITY)
-    .flatMap((candidate) => {
-      const product = productById.get(candidate.id);
-      if (
-        !product
-        || product.tenant_id !== params.tenantId
-        || !product.active
-        || !Number.isFinite(product.stock)
-        || product.stock <= 0
-      ) {
-        return [];
-      }
+  return params.candidates.flatMap((candidate) => {
+    if (
+      candidate.relationshipType === 'direct'
+      && (
+        !Number.isFinite(candidate.similarity)
+        || (candidate.similarity ?? 0) < NALA_PRODUCT_ACTION_MIN_SIMILARITY
+      )
+    ) {
+      return [];
+    }
 
-      return [{
-        type: 'product' as const,
-        action: 'add_to_cart' as const,
-        product: {
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          imageUrl: product.image_url,
-          price: Number(product.price),
-          compareAtPrice: product.compare_at_price == null ? null : Number(product.compare_at_price),
-          currency: params.currency.toUpperCase(),
-          available: true as const,
-          stock: product.stock,
-          weightGrams: product.weight_grams,
-          storageType: product.storage_type,
-        },
-        ctaLabel: copy.ctaLabel,
-        labels: copy.labels,
-        interactionId: params.interactionId,
-      }];
-    })
-    .slice(0, NALA_PRODUCT_ACTION_MAX);
+    const product = productById.get(candidate.id);
+    if (
+      !product
+      || product.tenant_id !== params.tenantId
+      || !product.active
+      || !Number.isFinite(product.stock)
+      || product.stock <= 0
+    ) {
+      return [];
+    }
+
+    return [{
+      type: 'product' as const,
+      action: 'add_to_cart' as const,
+      relationshipType: candidate.relationshipType,
+      product: {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        imageUrl: product.image_url,
+        price: Number(product.price),
+        compareAtPrice: product.compare_at_price == null ? null : Number(product.compare_at_price),
+        currency: params.currency.toUpperCase(),
+        available: true as const,
+        stock: product.stock,
+        weightGrams: product.weight_grams,
+        storageType: product.storage_type,
+      },
+      ctaLabel: copy.ctaLabel,
+      labels: copy.labels,
+      interactionId: params.interactionId,
+    }];
+  }).slice(0, NALA_PRODUCT_ACTION_MAX);
 }
 
 export function toNalaCartProduct(action: NalaProductAction) {

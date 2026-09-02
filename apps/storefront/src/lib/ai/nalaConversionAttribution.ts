@@ -45,7 +45,7 @@ export async function resolveNalaAttributions(params: {
     const interactionIds = [...new Set(candidates.map((candidate) => candidate.interactionId))];
     const { data, error } = await params.supabase
       .from('nala_interactions')
-      .select('id, session_id, matched_product_ids, created_at')
+      .select('id, session_id, matched_product_ids, action_product_ids, created_at')
       .eq('tenant_id', params.tenantId)
       .in('id', interactionIds);
 

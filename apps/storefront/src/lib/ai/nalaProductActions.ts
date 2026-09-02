@@ -4,7 +4,7 @@ import {
   shouldOfferNalaProductAction,
   type NalaCanonicalProduct,
   type NalaProductAction,
-  type NalaRetrievedProductCandidate,
+  type NalaProductActionCandidate,
 } from '@/lib/ai/nalaProductActionContract';
 
 export async function buildNalaProductActions(params: {
@@ -14,7 +14,7 @@ export async function buildNalaProductActions(params: {
   message: string;
   locale: unknown;
   currency: string;
-  candidates: NalaRetrievedProductCandidate[];
+  candidates: NalaProductActionCandidate[];
 }): Promise<NalaProductAction[]> {
   if (!params.interactionId || !shouldOfferNalaProductAction(params.message)) return [];
 

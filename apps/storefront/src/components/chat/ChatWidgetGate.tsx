@@ -6,6 +6,8 @@ import { ChatWidget } from './ChatWidget';
 interface ChatWidgetGateProps {
   enabled: boolean;
   tenantName: string;
+  tenantLocales: string[];
+  tenantLocale: string;
   whatsappNumber: string | null;
 }
 

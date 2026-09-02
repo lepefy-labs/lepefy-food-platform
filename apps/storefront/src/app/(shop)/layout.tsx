@@ -33,6 +33,8 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <ChatWidgetGate
         enabled={nalaEnabled}
         tenantName={tenant.name}
+        tenantLocales={tenant.locales ?? ['fr']}
+        tenantLocale={tenant.locale ?? 'fr'}
         whatsappNumber={tenant.whatsapp_number ?? null}
       />
       <CookieConsentBanner />

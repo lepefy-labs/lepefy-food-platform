@@ -164,3 +164,33 @@ export async function logNalaInteraction(params: LogNalaInteractionParams): Prom
     return null;
   }
 }
+
+
+export async function updateNalaInteractionActions(params: {
+  tenantId: string;
+  interactionId: string | null;
+  actions: Array<{ product: { id: string }; relationshipType: string }>;
+}): Promise<void> {
+  if (!params.interactionId || params.actions.length === 0) return;
+
+  try {
+    const actionProductIds = params.actions.map((action) => action.product.id);
+    const actionRelationshipTypes = params.actions.map((action) => action.relationshipType);
+    const { error } = await createServiceClient()
+      .from('nala_interactions')
+      .update({
+        action_product_ids: actionProductIds,
+        action_relationship_types: actionRelationshipTypes,
+      })
+      .eq('id', params.interactionId)
+      .eq('tenant_id', params.tenantId);
+
+    if (error) throw new Error(error.message);
+  } catch (error) {
+    console.error('[nala-analytics] Action metadata write failed; product action remains usable.', {
+      tenantId: params.tenantId,
+      interactionId: params.interactionId,
+      error,
+    });
+  }
+}

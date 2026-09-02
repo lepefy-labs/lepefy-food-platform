@@ -15,6 +15,7 @@ import type { Producer, Importer, NutritionInfo, DurabilityType } from '@lepefy/
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
 import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
+import ProductRelationshipsEditor from './ProductRelationshipsEditor';
 
 interface ProductEditProps {
   product: {
@@ -185,7 +186,7 @@ export default function ProductEditClient({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fromCategory,
 }: ProductEditProps) {
-  const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta'>('generale');
+  const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta' | 'associations'>('generale');
   const [formData, setFormData]         = useState<FormState>(() => initFormState(product, tenantLocales));
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
@@ -550,6 +551,18 @@ export default function ProductEditClient({
           >
             Étiquette
           </button>
+          {!isNew && (
+            <button
+              onClick={() => setActiveTab('associations')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'associations'
+                  ? 'border-[var(--color-primary)] text-gray-900'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              Produits associés
+            </button>
+          )}
         </div>
 
         <div
@@ -844,6 +857,12 @@ export default function ProductEditClient({
             </section>
           </div>
         </div>
+
+        {!isNew && (
+          <div style={{ display: activeTab === 'associations' ? 'block' : 'none' }}>
+            <ProductRelationshipsEditor productId={product.id} />
+          </div>
+        )}
 
         <div
           className="grid grid-cols-1 lg:grid-cols-2 gap-5"
