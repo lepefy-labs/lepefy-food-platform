@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.33 Current-State Snapshot**
+> **Aggiornato:** 3 settembre 2026 — **v6.34 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -199,10 +199,33 @@ Console Platform interna Lepefy:
 /admin/platform/ai-usage
 /admin/platform/ai-routing
 /admin/platform/notifications
+/admin/platform/prospects
+/admin/platform/prospects/[id]
 /admin/team
 ```
 
 `/admin/platform/**` ha guard server-side platform-owner-only aggiuntivo. `/admin/team` resta gestione utenti amministrativi cross-tenant e non è il futuro Team self-service tenant.
+
+/admin/platform/prospects è il modulo interno di acquisizione tenant. Riusa il guard Platform Owner
+esistente su pagine e API e il service client Supabase. DiscoveryProvider separa la discovery francese
+SIRENE (API Recherche d'entreprises) da UI e scoring; OSM/Overpass è enrichment opzionale.
+Il fetch HTTP diretto valida DNS e redirect con IP pubblico fissato per connessione, robots,
+timeout, dimensione e content type; visita homepage più massimo due pagine interne.
+
+La migration 101 introduce solo platform_prospects, platform_prospect_runs, platform_prospect_cache
+e platform_prospect_gates: RLS senza policy/grant browser, claim/release service-role-only,
+nessun tenant/backfill. La presenza della migration non prova l'applicazione remota; schema assente
+restituisce un errore esplicito. Run riprendibili avanzano da UI in batch sequenziali, con lease DB
+cross-instance, idempotenza e cooldown persistenti; nessun nuovo scheduler.
+Cache configurabili: SIRENE 90 giorni, OSM 30, sito 14; errori sito una ora. I risultati SIRENE
+sono bounded e non rappresentano un export completo. Mapping NAF rev. 2 isolato e da aggiornare
+per la transizione 2027. Il codice APE non certifica indipendenza o specializzazione culturale.
+
+Score 0–100 e soglie sono deterministici; segnali unknown non assegnano punti di assenza.
+Problemi e moduli suggeriti derivano da prove minimizzate, senza HTML raw né AI obbligatoria.
+Lista/filtri/KPI sono server-side; pipeline commerciale manuale separata dall'enrichment.
+Suppression impedisce selezione outbound e enrichment dei candidati; rediscovery non la sovrascrive.
+Won non crea tenants. Dettagli operativi e limiti: docs/PLATFORM_PROSPECTS.md.
 
 `public.platform_branding` resta singleton service-role-only.
 
@@ -465,6 +488,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 098_nala_conversion_attribution.sql
 099_nala_product_relationships.sql
 100_lepefy_ai_core.sql
+101_platform_prospects.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -569,8 +593,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.33
+# Fine snapshot v6.34
 
-**Base audit:** `main @ Lepefy AI Core V1.1`
-**Data:** 2 settembre 2026
+**Base audit:** `main + Platform Prospects V1`
+**Data:** 3 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

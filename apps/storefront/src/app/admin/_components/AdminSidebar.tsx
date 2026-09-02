@@ -105,6 +105,7 @@ export default function AdminSidebar({
           <p className={groupLabel}>Plateforme</p>
           <Link href="/admin/platform" className={linkClass(pathname === '/admin/platform')}><IconSettings size={20} />Console Lepefy</Link>
           <Link href="/admin/team" className={linkClass(pathname === '/admin/team')}><IconUsers size={20} />Utilisateurs</Link>
+          <Link href="/admin/platform/prospects" className={linkClass(pathname.startsWith('/admin/platform/prospects'))}><IconBriefcase size={20} />Prospects</Link>
           <Link href="/admin/platform/access" className={linkClass(pathname.startsWith('/admin/platform/access'))}><IconUsers size={20} />Rôles &amp; permissions</Link>
           <Link href="/admin/platform/ai-routing" className={linkClass(pathname.startsWith('/admin/platform/ai-routing'))}><IconSparkles size={20} />Routage IA</Link>
           <Link href="/admin/platform/ai-usage" className={linkClass(pathname.startsWith('/admin/platform/ai-usage'))}><IconSparkles size={20} />Coûts IA</Link>
