@@ -55,7 +55,7 @@ export default function AdminSidebar({
 
   const groupLabel = 'mb-2 mt-5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]/60 dark:text-violet-300/60';
   const linkClass = (active: boolean) => `mx-1 flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all ${navClass(active)}`;
-  const shopVisible = ['orders.view','catalog.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage'].some(has);
+  const shopVisible = ['orders.view','catalog.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage','ai_usage.view'].some(has);
   const eventsVisible = ['events.view','event_reservations.view','event_payments.view','event_content.manage','scan.access'].some(has);
   const commonVisible = ['tenant_settings.view','billing.view','ai_usage.view'].some(has);
 
@@ -75,9 +75,10 @@ export default function AdminSidebar({
           {has('loyalty.scan') && <Link href="/admin/loyalty/scan" className={linkClass(pathname === '/admin/loyalty/scan')}><IconScan size={20} />Scan fidélité</Link>}
           {has('shipping.view') && <Link href="/admin/livraison" className={linkClass(pathname.startsWith('/admin/livraison'))}><IconTruck size={20} />Livraison</Link>}
 
-          {(has('loyalty.manage') || has('growth.manage') || has('ai_knowledge.manage')) && <p className={groupLabel}>Croissance</p>}
+          {(has('loyalty.manage') || has('growth.manage') || has('ai_knowledge.manage') || has('ai_usage.view')) && <p className={groupLabel}>Croissance</p>}
           {has('loyalty.manage') && <Link href="/admin/loyalty" className={linkClass(pathname === '/admin/loyalty')}><IconGift size={20} />Fidélité &amp; parrainage</Link>}
           {has('growth.manage') && <Link href="/admin/ambassadeurs" className={linkClass(pathname === '/admin/ambassadeurs')}><IconStar size={20} />Ambassadeurs</Link>}
+          {has('ai_usage.view') && <Link href="/admin/nala-analytics" className={linkClass(pathname.startsWith('/admin/nala-analytics'))}><IconSparkles size={20} />Nala Analytics</Link>}
           {has('ai_knowledge.manage') && <Link href="/admin/ai-lab" className={linkClass(pathname === '/admin/ai-lab')}><IconSparkles size={20} />IA — Base de connaissance</Link>}
         </>
       ) : workspace === 'events' && eventsVisible ? (
