@@ -252,7 +252,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
             <span>En ligne</span>
           </div>
 
-          <div className="flex flex-1 flex-col gap-2 overflow-y-auto bg-[#F8F7FC] px-3 py-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain bg-[#F8F7FC] px-3 py-3">
             <div className="max-w-[90%] self-start rounded-2xl border border-[#ECEAF5] bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-700 shadow-sm">
               Bonjour ! 👋 Je suis Nala, votre assistant shopping. Je peux vous aider à trouver des produits chez {tenantName} et répondre à vos questions pratiques.
             </div>
