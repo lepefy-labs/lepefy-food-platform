@@ -53,11 +53,6 @@ export interface NalaAnalyticsDashboard {
   daily: NalaDailyMetric[];
 }
 
-interface SessionRow {
-  id: string;
-  started_at: string;
-}
-
 interface InteractionRow {
   id: string;
   intent: string | null;
@@ -81,6 +76,8 @@ interface ConversionRow {
   nala_interaction_id: string | null;
   occurred_at: string;
 }
+
+const PAGE_SIZE = 1000;
 
 const INTENT_LABELS: Record<string, string> = {
   product_search: 'Recherche produit',
@@ -145,6 +142,42 @@ function topDemand(values: Array<string | null>, limit = 8): NalaDemandMetric[] 
     .slice(0, limit);
 }
 
+async function loadInteractions(supabase: SupabaseClient, tenantId: string, since: string): Promise<InteractionRow[]> {
+  const rows: InteractionRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('nala_interactions')
+      .select('id, intent, outcome, demand_status, retrieval_quality, knowledge_status, requested_product_text, action_product_ids, action_relationship_types, semantic_enrichment_status, created_at')
+      .eq('tenant_id', tenantId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw new Error(`Unable to load Nala interactions: ${error.message}`);
+    const page = (data ?? []) as InteractionRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
+
+async function loadConversions(supabase: SupabaseClient, tenantId: string, since: string): Promise<ConversionRow[]> {
+  const rows: ConversionRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('nala_conversion_events')
+      .select('event_type, checkout_session_id, order_id, assisted_value, currency, nala_interaction_id, occurred_at')
+      .eq('tenant_id', tenantId)
+      .gte('occurred_at', since)
+      .order('occurred_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw new Error(`Unable to load Nala conversions: ${error.message}`);
+    const page = (data ?? []) as ConversionRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
+
 export async function loadNalaAnalyticsDashboard(params: {
   supabase: SupabaseClient;
   tenantId: string;
@@ -154,33 +187,18 @@ export async function loadNalaAnalyticsDashboard(params: {
   const sinceDate = new Date(Date.now() - params.rangeDays * 24 * 60 * 60 * 1000);
   const since = sinceDate.toISOString();
 
-  const [sessionsResult, interactionsResult, conversionsResult] = await Promise.all([
+  const [sessionsResult, interactions, conversions] = await Promise.all([
     params.supabase
       .from('nala_sessions')
-      .select('id, started_at')
+      .select('id', { count: 'exact', head: true })
       .eq('tenant_id', params.tenantId)
       .gte('started_at', since),
-    params.supabase
-      .from('nala_interactions')
-      .select('id, intent, outcome, demand_status, retrieval_quality, knowledge_status, requested_product_text, action_product_ids, action_relationship_types, semantic_enrichment_status, created_at')
-      .eq('tenant_id', params.tenantId)
-      .gte('created_at', since)
-      .order('created_at', { ascending: true }),
-    params.supabase
-      .from('nala_conversion_events')
-      .select('event_type, checkout_session_id, order_id, assisted_value, currency, nala_interaction_id, occurred_at')
-      .eq('tenant_id', params.tenantId)
-      .gte('occurred_at', since)
-      .order('occurred_at', { ascending: true }),
+    loadInteractions(params.supabase, params.tenantId, since),
+    loadConversions(params.supabase, params.tenantId, since),
   ]);
 
-  if (sessionsResult.error) throw new Error(`Unable to load Nala sessions: ${sessionsResult.error.message}`);
-  if (interactionsResult.error) throw new Error(`Unable to load Nala interactions: ${interactionsResult.error.message}`);
-  if (conversionsResult.error) throw new Error(`Unable to load Nala conversions: ${conversionsResult.error.message}`);
-
-  const sessions = (sessionsResult.data ?? []) as SessionRow[];
-  const interactions = (interactionsResult.data ?? []) as InteractionRow[];
-  const conversions = (conversionsResult.data ?? []) as ConversionRow[];
+  if (sessionsResult.error) throw new Error(`Unable to count Nala sessions: ${sessionsResult.error.message}`);
+  const sessionCount = sessionsResult.count ?? 0;
 
   const unmetRows = interactions.filter((row) => row.demand_status === 'unmet');
   const knowledgeGapRows = interactions.filter((row) => row.knowledge_status === 'missing');
@@ -236,7 +254,7 @@ export async function loadNalaAnalyticsDashboard(params: {
     rangeDays: params.rangeDays,
     since,
     currency,
-    sessions: sessions.length,
+    sessions: sessionCount,
     interactions: interactions.length,
     unmetDemand: unmetRows.length,
     unmetDemandRate: percent(unmetRows.length, interactions.length),
@@ -246,7 +264,7 @@ export async function loadNalaAnalyticsDashboard(params: {
     checkoutCount: checkoutIds.size,
     orderCount: orderIds.size,
     assistedRevenue: Math.round(assistedRevenue * 100) / 100,
-    assistedOrderRate: percent(orderIds.size, sessions.length),
+    assistedOrderRate: percent(orderIds.size, sessionCount),
     cartBuilderProposals: recipeRows.length,
     cartBuilderAccepted: acceptedRecipeInteractions.size,
     cartBuilderAcceptanceRate: percent(acceptedRecipeInteractions.size, recipeRows.length),
