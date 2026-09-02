@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { IconSparkles, IconX, IconSend, IconBrandWhatsapp, IconChevronRight } from '@tabler/icons-react';
 import { rememberNalaProductTouch } from '@/lib/ai/nalaAttributionClient';
+import { NalaProductActionCard } from '@/components/chat/NalaProductActionCard';
+import type { NalaProductAction } from '@/lib/ai/nalaProductActionContract';
 
 interface ChatWidgetProps {
   enabled: boolean;
@@ -13,6 +15,7 @@ interface ChatWidgetProps {
 interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
+  actions?: NalaProductAction[];
 }
 
 const MAX_HISTORY_TURNS = 6;
@@ -98,7 +101,7 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
     const message = (messageOverride ?? input).trim();
     if (!message || loading) return;
 
-    const history = turns.slice(-MAX_HISTORY_TURNS);
+    const history = turns.slice(-MAX_HISTORY_TURNS).map(({ role, text }) => ({ role, text }));
     clientSessionIdRef.current ??= createClientSessionId();
     setTurns((prev) => [...prev, { role: 'user', text: message }]);
     setInput('');
@@ -136,7 +139,8 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
         clientSessionId: clientSessionIdRef.current,
         matchedProductIds: data?.matchedProductIds,
       });
-      setTurns((prev) => [...prev, { role: 'assistant', text: reply }]);
+      const actions = Array.isArray(data?.actions) ? data.actions as NalaProductAction[] : [];
+      setTurns((prev) => [...prev, { role: 'assistant', text: reply, actions }]);
     } catch {
       setFailed(true);
     } finally {
@@ -227,17 +231,25 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
               </div>
             )}
 
-            {turns.map((turn, i) => (
+            {turns.map((turn, i) => turn.role === 'user' ? (
               <div
                 key={i}
-                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                  turn.role === 'user'
-                    ? 'self-end text-white'
-                    : 'self-start bg-white border border-gray-100 text-gray-700'
-                }`}
-                style={turn.role === 'user' ? { backgroundColor: NALA_PRIMARY } : undefined}
+                className="max-w-[85%] self-end rounded-2xl px-3 py-2 text-sm text-white shadow-sm"
+                style={{ backgroundColor: NALA_PRIMARY }}
               >
                 {turn.text}
+              </div>
+            ) : (
+              <div key={i} className="flex w-[90%] max-w-[320px] flex-col gap-2 self-start">
+                <div className="rounded-2xl border border-gray-100 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm">
+                  {turn.text}
+                </div>
+                {turn.actions?.map((action) => (
+                  <NalaProductActionCard
+                    key={`${action.interactionId}:${action.product.id}`}
+                    action={action}
+                  />
+                ))}
               </div>
             ))}
 

@@ -12,6 +12,7 @@ import {
   prepareNalaAnalytics,
   type NalaAnalyticsContext,
 } from '@/lib/ai/nalaAnalytics';
+import { buildNalaProductActions } from '@/lib/ai/nalaProductActions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,11 +28,14 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? '' });
 interface MatchProductsRow {
   id: string;
   name: string;
+  slug: string;
+  image_url: string | null;
   price: number;
   stock: number | null;
   weight_grams: number | null;
   storage_type: string | null;
   category_name: string | null;
+  similarity: number;
 }
 
 interface MatchKnowledgeRow {
@@ -78,7 +82,7 @@ export async function POST(req: NextRequest) {
       outcome: 'small_talk',
       intent: 'small_talk',
     });
-    return NextResponse.json({ reply: smallTalkReply, interactionId });
+    return NextResponse.json({ reply: smallTalkReply, interactionId, actions: [] });
   }
 
   const allowed = await checkRateLimit(tenant.id, ENDPOINT, true);
@@ -192,10 +196,21 @@ export async function POST(req: NextRequest) {
       matchedKbIds,
     });
 
+    const actions = await buildNalaProductActions({
+      supabase,
+      tenantId: tenant.id,
+      interactionId,
+      message,
+      locale: body?.locale,
+      currency: tenant.currency ?? 'EUR',
+      candidates: productRows.map((product) => ({ id: product.id, similarity: product.similarity })),
+    });
+
     return NextResponse.json({
       reply,
       interactionId,
       matchedProductIds: interactionId ? matchedProductIds : null,
+      actions,
     });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';

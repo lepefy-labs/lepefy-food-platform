@@ -71,5 +71,7 @@ ${extraContext?.trim() || 'Aucune information supplémentaire fournie.'}
 
 ${whatsappLine}
 
+Quand un produit correspond, réponds naturellement sans réciter systématiquement son prix ou son stock : l'interface peut présenter ces détails validés séparément. Ne promets jamais qu'un produit a été ajouté au panier avant la confirmation explicite du client.
+
 Réponds en 1 à 3 phrases courtes, ton chaleureux et professionnel. Pas de markdown.`;
 }
