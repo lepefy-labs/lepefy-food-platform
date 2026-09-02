@@ -1,82 +1,116 @@
-# Lepefy AI Core V1.1
+# Lepefy AI Core V1.2
 
-Foundation: migration 100_lepefy_ai_core.sql, already applied and verified in production by the repository owner. V1.1 requires no new migration and does not modify migration 100.
+Foundation: `100_lepefy_ai_core.sql`, already applied and verified in production by the repository owner. V1.2 requires no new migration and does not modify migration 100.
 
 ## Persistent operation
+
 Registry and server-side conversation persistence are required. Missing schema/RPC, unavailable database, disabled policy and empty routing chain fail closed with normalized errors. There is no temporary Gemini bootstrap or stateless conversation fallback. Context IDs are non-null after a successful open. Conversation load/write failures stop the request; browser history and provider threads are never canonical.
 
 ## Generic retention maintenance
-POST /api/internal/ai-core-maintenance invokes the existing service-role-only purge_expired_ai_context RPC. It uses the same service-role bearer authentication pattern as other internal jobs, returns 401 for invalid authentication, and 503 with ai_core_maintenance_failed on RPC/transport/invalid-result failure. Successful responses contain ok: true and deletedConversations: a nonnegative integer counting deleted conversation rows, not turns or state rows. Logs and script failures exclude credentials and raw database/response details.
 
-.github/workflows/ai-core-maintenance.yml runs hourly at minute 17 UTC and supports workflow_dispatch. It executes scripts/process-ai-core-maintenance.mjs with the existing SUPABASE_SERVICE_ROLE_KEY secret. Configure an HTTPS application root through repository variable AI_CORE_APP_URL, falling back to NALA_ENRICHMENT_APP_URL then EVENT_REPORTS_APP_URL (empty values are skipped). The script rejects redirects and exits nonzero on request failure or malformed results. Operators can manually run “AI Core maintenance” in GitHub Actions and inspect its result; successful deployment alone does not prove the job has executed. Scheduled delivery can be delayed by GitHub.
+`POST /api/internal/ai-core-maintenance` invokes the existing service-role-only `purge_expired_ai_context` RPC. It uses the same service-role bearer authentication pattern as other internal jobs. `.github/workflows/ai-core-maintenance.yml` runs hourly at minute 17 UTC and supports `workflow_dispatch`.
 
-Nala semantic enrichment no longer performs AI Core retention. No duplicate SQL function or migration is introduced.
+Configure an HTTPS application root through repository variable `AI_CORE_APP_URL`, falling back to `NALA_ENRICHMENT_APP_URL` then `EVENT_REPORTS_APP_URL`. The script rejects redirects and exits nonzero on request failure or malformed results. Nala semantic enrichment does not own AI Core retention.
 
 ## Contracts and routing
-Provider adapters are under src/lib/ai/core/providers. Consumers call runAi and supply a structured schema and runtime validator. Lower numeric priority runs first; ties use model key. Only enabled provider/model/policy entries with chat and structured_output capabilities run. The default chain contains the existing gemini-2.5-flash model. OpenAI-compatible endpoints use server fetch and must support Chat Completions JSON object mode; the requested schema is included in the system message and validated locally. Set base_url to the API root (including /v1 as needed), and allow its exact HTTPS origin in LEPEFY_AI_ALLOWED_ORIGINS. Credentials are env variable references ending in _API_KEY. Raw keys cannot be edited in admin.
 
-OpenAI, Anthropic and Lepefy dedicated adapters are deferred. Their provider types are modeled but cannot be enabled through V1 admin. Model costs are metadata; existing ai_pricing remains the estimated-cost source. No billing changes.
+Provider adapters are under `src/lib/ai/core/providers`. Consumers call `runAi` and supply a structured schema and runtime validator. Lower numeric priority runs first; ties use model key. Only enabled provider/model/policy entries with chat and structured-output capabilities run. OpenAI-compatible endpoints use server fetch, exact HTTPS origin allowlisting and local structured-output validation.
 
-Each attempted generation logs normalized provider/model, status, tokens when available, latency and fallback data through logAiUsage. Confidence fallback applies only to meaningful adapter confidence, not generated self-evaluation. All failures normalize into AiRoutingError. Business validation runs afterwards and never retries another model.
+`assertAiRouteReady(consumer, capability)` is the batch-consumer preflight. It verifies that the policy resolves to at least one enabled model/provider with a supported adapter and available configured server credential. Batch consumers use it before claiming retry-limited work, so missing routing configuration does not consume business retry counters.
 
-Routing cache: 30 seconds per runtime. Circuit breaker: best-effort, five consecutive failures pause a model for five minutes, not shared across serverless instances. Provider health is last observed invocation health, not distributed monitoring or an eligibility filter. A degraded provider remains eligible when enabled; the runtime circuit breaker is separate.
+Credentials are environment-variable references ending in `_API_KEY`. Raw keys cannot be edited in admin. OpenAI, Anthropic and Lepefy dedicated adapters remain deferred; their provider types are modeled but do not yet have canonical adapters.
+
+Each attempted generation logs normalized provider/model, status, tokens when available, latency and fallback data through `logAiUsage`. Confidence fallback applies only to meaningful adapter confidence, not generated self-evaluation. Provider health is observational and never an independent eligibility filter.
+
+Routing cache: 30 seconds per runtime. Circuit breaker: best-effort, five consecutive failures pause a model for five minutes, not shared across serverless instances.
+
+## Nala Semantic Enrichment through AI Core
+
+The asynchronous worker in `src/lib/ai/nalaSemanticEnrichment.ts` no longer imports `@google/genai`, reads `GEMINI_API_KEY` directly or hardcodes `gemini-2.5-flash-lite`.
+
+Its canonical AI route is:
+
+```text
+consumer: nala_semantic_enrichment
+capability: classification
+```
+
+The worker preserves the migration-097 taxonomy, prompt minimization, tenant-scoped product/knowledge context, batch size, concurrency, three-attempt interaction retry budget and deterministic small-talk result. The semantic contract version remains `v1`; provider/model identity is recorded separately by AI Core telemetry.
+
+Before `claim_nala_interactions_for_enrichment` runs, the worker calls `assertAiRouteReady`. If the policy, model, adapter or credential is unavailable, the internal endpoint returns HTTP 503 and **no interaction is claimed**, preventing infrastructure configuration errors from exhausting `semantic_enrichment_attempts`.
+
+For claimed non-small-talk rows, `runAi` owns provider selection, timeout, circuit breaker, fallback and telemetry. The model output is checked by a strict semantic validator. Invalid taxonomy, invalid confidence or malformed structured output throws, allowing AI Core to try the next configured model instead of silently normalizing bad model output into analytics data.
+
+The internal route remains service-role-only. Its logs expose only low-cardinality operational codes such as `ai_route_unavailable`, `provider_error`, `context_load_error` and `update_error`; raw provider payloads and secrets are not logged.
+
+### Required routing configuration
+
+Create/enable this policy in `/admin/platform/ai-routing` before rerunning the enrichment workflow:
+
+```text
+consumer: nala_semantic_enrichment
+capability: classification
+enabled: true
+```
+
+Add at least one enabled model that supports the structured classification contract. Recommended rollout while Hugging Face is being evaluated:
+
+```text
+Priority 1: Gemini Flash
+Priority 2: GPT-OSS 20B · Hugging Face
+```
+
+The semantic worker no longer depends on a model name in source code. Changing the chain is an admin configuration operation, not an application deploy.
 
 ## Context and privacy
-UUID v4 generated server-side is an opaque conversation bearer ID. APIs never expose another tenant's conversation; UUID secrecy is required. New conversations cannot use caller-selected IDs. Leases serialize requests, with 90-second crash recovery. Successful user/assistant turns and working memory are committed atomically. New tab with new sessionStorage means new context; duplicated tabs may copy sessionStorage (browser behavior). Refresh restores context for the next message, not the visual transcript. No localStorage, cookies, fingerprint, IP, raw UA or long-term memory.
 
-The inactivity TTL is two hours. Bounded package includes core/tenant/retrieval instructions, working memory, nullable summary, last 10 messages under 8,000 characters, current message. Rolling AI summary is deferred. The dedicated hourly AI Core maintenance job removes expired state and raw turns older than 90 days. Expiry prevents context reuse immediately, independently of physical cleanup timing. The operator must keep the dedicated workflow active.
+UUID v4 generated server-side is an opaque conversation bearer ID. APIs never expose another tenant's conversation; UUID secrecy is required. New conversations cannot use caller-selected IDs. Leases serialize requests, with 90-second crash recovery. Successful user/assistant turns and working memory are committed atomically.
 
-## Hugging Face: prepared configuration, not activated
-The existing generic openai_compatible adapter supports this configuration without a dedicated HF adapter. Hugging Face documents the [OpenAI-compatible Chat Completions endpoint and token permission](https://huggingface.co/docs/inference-providers/tasks/chat-completion), the [GPT-OSS 20B model](https://huggingface.co/openai/gpt-oss-20b), and [the :fastest routing suffix](https://huggingface.co/docs/inference-providers/en/guides/evaluation-inspect-ai). Actual provider availability, account access and structured-output quality require live verification; CI uses no live AI calls.
+The inactivity TTL is two hours. Bounded package includes core/tenant/retrieval instructions, working memory, nullable summary, last 10 messages under 8,000 characters, current message. Rolling AI summary is deferred. The dedicated hourly AI Core maintenance job removes expired state and raw turns older than 90 days.
 
-Before saving/activating the provider:
-1. Add HUGGINGFACE_API_KEY as a server-side Vercel environment variable containing an HF token with Inference Providers permission.
-2. Append the exact origin https://router.huggingface.co to the comma-separated LEPEFY_AI_ALLOWED_ORIGINS, preserving existing allowed origins, and deploy these environment settings. The admin validates origins even when saving a disabled provider.
-3. In /admin/platform/ai-routing, configure the provider, model and policy below. Never paste the token into admin payloads, config JSON, registry rows or source files.
+Nala Semantic Enrichment is an asynchronous analytics consumer and does not use conversation memory. It receives only the current stored interaction plus the already-associated tenant-safe product/knowledge context required by migration 097.
 
-| Provider field | Value |
-| --- | --- |
-| key | huggingface |
-| name | Hugging Face Inference Providers |
-| provider_type | openai_compatible |
-| credential_ref | HUGGINGFACE_API_KEY |
-| base_url | https://router.huggingface.co/v1 |
-| config | {} |
+## Hugging Face: prepared configuration
 
-| Model field | Value |
-| --- | --- |
-| key | hf-gpt-oss-20b |
-| provider_model_id | openai/gpt-oss-20b:fastest |
-| display_name | GPT-OSS 20B · Hugging Face |
-| capabilities | chat: true, structured_output: true, classification: true |
-| config | {}; leave Gemini thinkingBudget blank |
-| cost fields / context_window | Leave unknown values null; do not invent prices |
+The generic `openai_compatible` adapter supports Hugging Face Inference Providers without a dedicated adapter.
 
-For nala / structured_chat, retain Gemini at priority 1. After configuration and manual verification, enable HF provider/model and add its routing entry at priority 2 with timeout_ms 6000 and min_confidence null. This fits the existing total 18-second budget after Gemini's 12-second timeout; remaining budget can be smaller due to elapsed work. JSON object responses still undergo runtime schema and business validation.
+Production prerequisites:
 
-The allowlist requires HTTPS, exact approved origins and no URL credentials, query or fragment. Fetch uses redirect: error; redirects cannot carry credentials to another origin. No environment variable, production registry row or policy is changed by this delivery. Hugging Face is not active merely because these instructions exist.
+1. `HUGGINGFACE_API_KEY` configured server-side in Vercel.
+2. `https://router.huggingface.co` present in `LEPEFY_AI_ALLOWED_ORIGINS`.
+3. Provider base URL `https://router.huggingface.co/v1` configured in `/admin/platform/ai-routing`.
+4. Model such as `openai/gpt-oss-20b:fastest` configured with `chat`, `structured_output` and `classification` capabilities.
+5. Model added to the desired policy chain.
 
-## Semantic acceptance cases
-Automated mocked-adapter tests prove routing and context contracts, not live model semantic accuracy. For live semantic acceptance, verify in the storefront:
-- J’ai envie de quelque chose de camerounais → Le ndolé me tente.
-- Je veux cuisiner du ndolé; J’aimerais manger du ndolé; J’ai envie de ndolé; On se ferait bien un ndolé ce soir.
-- Expected for dish context: meal_preparation / cart_builder.
-- Avez-vous du manioc ? → product_search / product_action.
-- J’ai envie de chocolat → product_search or recommendation, not forced recipe.
-- Je vous prépare le panier ? → Oui: retain dish and resolve pending action.
-- Switch configured model between turns: context is unchanged.
-No AI decision mutates the cart. Existing canonical product/stock/tenant validation and user confirmation remain authoritative.
+Do not store the token in source, database registry values, admin config JSON or logs. Availability, account access, latency and structured-output quality require live verification; CI performs no live paid/provider AI calls.
 
-## Remaining direct-call debt
-- apps/storefront/src/lib/ai/embeddings.ts (shared retrieval and indexing).
-- apps/storefront/src/lib/ai/nalaSemanticEnrichment.ts (097 worker).
-- apps/storefront/src/app/api/admin/generate-product-description/route.ts.
-- apps/storefront/src/app/api/admin/generate-product-image/route.ts.
-- scripts/generate-product-descriptions.mjs.
-- scripts/generate-product-images.mjs.
-- scripts/generate-product-embeddings.mjs.
+For `nala / structured_chat`, retain Gemini as the primary provider until controlled fallback tests are complete. Semantic enrichment has its own `nala_semantic_enrichment / classification` policy so a cheaper classification model can later be prioritized independently from conversational Nala.
 
-Nala initial retrieval times out after four seconds and can degrade to no matches while routed inference proceeds. Ingredient resolution still depends on legacy embeddings and safely omits a failed proposal. No new embedding space or index migration is attempted.
+## Semantic acceptance
+
+Automated mocked-adapter tests prove routing and structured contracts, not live semantic accuracy. For conversational Nala continue validating contextual sequences such as:
+
+```text
+J’ai envie de quelque chose de camerounais
+Le ndolé me tente
+Oui, prépare-moi le panier
+```
+
+For semantic enrichment, verify after policy activation that a manual workflow run moves pending/retry rows to `completed`, that AI usage telemetry contains `consumer=nala_semantic_enrichment` and `capability=classification`, and that provider/model values match the configured chain.
+
+## Remaining direct-provider-call debt
+
+Direct provider calls still to migrate when justified:
+
+- `apps/storefront/src/lib/ai/embeddings.ts` (shared retrieval and indexing);
+- `apps/storefront/src/app/api/admin/generate-product-description/route.ts`;
+- `apps/storefront/src/app/api/admin/generate-product-image/route.ts`;
+- `scripts/generate-product-descriptions.mjs`;
+- `scripts/generate-product-images.mjs`;
+- `scripts/generate-product-embeddings.mjs`.
+
+`nalaSemanticEnrichment.ts` is no longer part of this debt list.
 
 ## Validation
-CI now runs existing unit tests, git diff --check, and migration 100 against an isolated PostgreSQL 16 fixture (tenant isolation, concurrency lease, refresh, provider switch, expiry, retention and grants). Existing typecheck/lint remain. Vercel validates production build. V1.1 adds focused regression coverage for missing schema, persistent context failures, maintenance result normalization, URL allowlisting/redirect rejection and observational provider health. Production migration status is the owner’s verified prerequisite; CI does not establish it. Existing lint may fail on the legacy interactive ESLint setup; report its actual result separately.
+
+CI must continue to run existing unit tests, `git diff --check`, SQL fixtures and typecheck. Vercel validates the production build. V1.2 adds strict semantic-output regression coverage and keeps live provider calls out of automated CI. Existing lint may still fail on the pre-existing interactive ESLint configuration; report its actual result separately rather than treating it as a V1.2 regression.

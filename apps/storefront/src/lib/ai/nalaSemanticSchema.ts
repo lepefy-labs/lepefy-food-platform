@@ -34,14 +34,14 @@ const PRODUCT_INTENTS = new Set<NalaIntent>([
   'product_search', 'product_information', 'availability', 'price', 'recommendation', 'substitution',
 ]);
 
-function controlledValue<T extends string>(
-  value: unknown,
-  allowed: readonly T[],
-  fallback: T,
-): T {
+function controlledValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === 'string' && (allowed as readonly string[]).includes(value)
     ? value as T
     : fallback;
+}
+
+function isAllowed<T extends string>(value: unknown, allowed: readonly T[]): value is T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value);
 }
 
 export function normalizeNalaSemanticEnrichment(value: unknown): NalaSemanticEnrichment {
@@ -65,6 +65,32 @@ export function normalizeNalaSemanticEnrichment(value: unknown): NalaSemanticEnr
     knowledgeStatus: controlledValue(input.knowledgeStatus, KNOWLEDGE_STATUSES, 'unknown'),
     requestedProductText: PRODUCT_INTENTS.has(intent) && productText ? productText : null,
   };
+}
+
+export function validateNalaSemanticEnrichment(value: unknown): NalaSemanticEnrichment {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_semantic_enrichment');
+
+  const input = value as Record<string, unknown>;
+  if (!isAllowed(input.intent, NALA_INTENTS)
+    || !isAllowed(input.demandStatus, DEMAND_STATUSES)
+    || !isAllowed(input.retrievalQuality, RETRIEVAL_QUALITIES)
+    || !isAllowed(input.knowledgeStatus, KNOWLEDGE_STATUSES)) {
+    throw new Error('invalid_semantic_enrichment');
+  }
+
+  if (input.intentConfidence !== null
+    && (typeof input.intentConfidence !== 'number'
+      || !Number.isFinite(input.intentConfidence)
+      || input.intentConfidence < 0
+      || input.intentConfidence > 1)) {
+    throw new Error('invalid_semantic_enrichment');
+  }
+
+  if (input.requestedProductText !== null && typeof input.requestedProductText !== 'string') {
+    throw new Error('invalid_semantic_enrichment');
+  }
+
+  return normalizeNalaSemanticEnrichment(input);
 }
 
 export function deterministicSmallTalkEnrichment(): NalaSemanticEnrichment {

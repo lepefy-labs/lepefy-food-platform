@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 settembre 2026 — **v6.34 Current-State Snapshot**
+> **Aggiornato:** 3 settembre 2026 — **v6.35 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -255,7 +255,7 @@ tenant_feature_settings
 
 Il semantic enrichment Nala è asincrono e separato dal chat path: la migration `097_nala_semantic_enrichment.sql` aggiunge intent/confidence, demand status, retrieval quality, knowledge status, requested product text e stato/versione operativi direttamente a `nala_interactions`. La taxonomy V1 comprende intent prodotto, availability/price/recommendation/substitution, recipe, delivery/store/event information, order/payment help, complaint, small talk, other e unknown. `requested_product_text` è una frase derivata massima di 150 caratteri, non una copia del messaggio, e viene eliminata con la stessa retention della riga.
 
-Il dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`.
+Il dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk resta deterministico senza AI. Le altre righe passano ora dal Lepefy AI Gateway con policy dedicata `nala_semantic_enrichment / classification`: provider, modello, timeout e fallback sono configurati da `/admin/platform/ai-routing`, non hardcoded nel worker. Prima del claim il worker esegue `assertAiRouteReady`, quindi policy/chain/adapter/credential indisponibili producono HTTP 503 senza consumare `semantic_enrichment_attempts`. Lo structured output usa la taxonomy 097 e un validator stretto: output non conforme viene rifiutato dal router e può attivare il provider successivo. Il prompt resta minimizzato a message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. `ai_usage_log` registra endpoint `nala_semantic_enrichment`, consumer `nala_semantic_enrichment`, capability `classification`, provider/model e fallback. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`.
 
 Nala Structured Product Actions V1 estende `/api/chat` con action `add_to_cart` server-validate e user-confirmed. La UI mostra al massimo una card compatta per risposta e usa `cartStore.addItem(..., 1)`, quindi riutilizza sync, drawer e Conversion Attribution. Le action restano metadata UI; la history canonica è ora server-side in AI Core e il browser invia soltanto conversationId e il messaggio corrente. La copy action usa il locale storefront esplicito risolto da `localeStore` e dalle locale supportate dal tenant; `navigator.language` non è source of truth e il fallback resta francese.
 
@@ -417,9 +417,11 @@ Foundation migration `100_lepefy_ai_core.sql`:
 - `ai_conversations`, `ai_conversation_turns`, `ai_conversation_state`: memoria breve Lepefy, separate dalle analytics Nala.
 Tutte le nuove tabelle sono service-role-only, RLS attiva, nessuna policy browser.
 
-`src/lib/ai/core/aiGateway.ts` carica la policy canonica con cache 30s. Nala è il primo consumer (`nala / structured_chat`); seed Gemini `gemini-2.5-flash`, modello realmente usato prima della migrazione. Adapter implementati: Gemini e HTTP OpenAI-compatible; OpenAI, Anthropic e Lepefy sono tipi predisposti senza adapter dedicato attivo. Nessun provider non configurato viene seedato. Gli endpoint OpenAI-compatible richiedono origine HTTPS approvata via `LEPEFY_AI_ALLOWED_ORIGINS`; niente redirect. `credential_ref` contiene soltanto il nome env server-side, mai una API key raw.
+`src/lib/ai/core/aiGateway.ts` carica la policy canonica con cache 30s. Nala chat usa `nala / structured_chat`; semantic enrichment usa `nala_semantic_enrichment / classification`. Adapter implementati: Gemini e HTTP OpenAI-compatible; OpenAI, Anthropic e Lepefy sono tipi predisposti senza adapter dedicato attivo. Nessun provider non configurato viene seedato. Gli endpoint OpenAI-compatible richiedono origine HTTPS approvata via `LEPEFY_AI_ALLOWED_ORIGINS`; niente redirect. `credential_ref` contiene soltanto il nome env server-side, mai una API key raw.
 
 Fallback su timeout, errore provider/rate limit, credenziale assente, modello indisponibile e output strutturato invalido. Budget complessivo routing 18s; min_confidence è ignorata senza confidence calibrata dell'adapter (l'autovalutazione Nala non conta). Business validation resta fuori dal router. Circuit breaker locale best-effort: cinque failure consecutive, pausa cinque minuti, non condiviso tra istanze serverless. `AiRoutingError` normalizzato; UX di errore Nala invariata.
+
+`assertAiRouteReady(consumer, capability)` preflighta i consumer batch prima che acquisiscano lavoro retry-limited: richiede almeno un candidato enabled con adapter implementato e credential server-side disponibile. Semantic enrichment lo esegue prima della RPC di claim, quindi una configurazione routing assente non consuma tentativi delle interazioni.
 
 Conversation ID è UUID v4 casuale generato dal server, bearer opaco conservato in sessionStorage. Ogni accesso DB verifica tenant + consumer; i lease a scadenza serializzano richieste concorrenti. Il browser non invia più history né intercetta “Oui” con regex; il server usa pendingAction e soggetto. Refresh riutilizza il contesto; un nuovo sessionStorage apre una nuova conversazione. La duplicazione esplicita di una scheda può copiare sessionStorage nel browser: non c'è fingerprint o tracking cookie.
 
@@ -429,9 +431,9 @@ Expiry impedisce subito il riuso del contesto; la working memory scaduta viene c
 
 `/admin/platform/ai-routing` riusa il guard Platform Owner per pagina e API, permette creazione/edit/enable di provider e modelli, associazione e priorità numeriche per policy, timeout e confidence. Nessun nuovo RBAC tenant. `ai_usage_log` riusa `logAiUsage` ed estende consumer/capability/latency/fallback; i costi restano telemetry interna. Retrieval embeddings è contabilizzato separatamente come `nala_retrieval`.
 
-AI Core V1.1 richiede registry e contesto persistente: migration 100 è già applicata e verificata dal proprietario. Schema/RPC mancanti, errori DB, policy disabilitate e chain vuote falliscono con errori normalizzati; non esistono bootstrap Gemini né contesto stateless. Nessuna migration 101. Hugging Face è documentato tramite adapter openai_compatible esistente (router.huggingface.co/v1, modello openai/gpt-oss-20b:fastest), ma non attivato. Prima dell’attivazione servono HUGGINGFACE_API_KEY server-side, origin HTTPS esatta in LEPEFY_AI_ALLOWED_ORIGINS e registry/policy configurati. Gemini resta priority 1; HF futuro fallback priority 2. Health osservazionale non esclude candidati dal routing.
+AI Core V1.2 richiede registry e contesto persistente: migration 100 è già applicata e verificata dal proprietario. Schema/RPC mancanti, errori DB, policy disabilitate e chain vuote falliscono con errori normalizzati; non esistono bootstrap Gemini né contesto stateless. Nessuna nuova migration è richiesta da V1.2. Hugging Face usa l'adapter `openai_compatible` esistente (router.huggingface.co/v1, modello iniziale `openai/gpt-oss-20b:fastest`) e richiede `HUGGINGFACE_API_KEY`, origin HTTPS esatta in `LEPEFY_AI_ALLOWED_ORIGINS` e registry/policy configurati. Gemini resta primario per Nala chat durante il rollout; semantic enrichment dispone di policy classification indipendente e può quindi usare in futuro un ordine/costo diverso senza deploy codice. Health osservazionale non esclude candidati dal routing.
 
-Debt V1 verificato: chiamate dirette ancora in embeddings/retrieval, semantic enrichment 097, utility admin immagini/descrizioni e tre script batch generazione immagini/descrizioni/embeddings. Non vengono migrati in questa delivery. Un errore embedding iniziale non impedisce la risposta generativa routed, ma riduce retrieval e proposte prodotto. Nessun training, billing SaaS o modifica a checkout/payment/order.
+Debt V1 verificato: chiamate dirette ancora in embeddings/retrieval, utility admin immagini/descrizioni e tre script batch generazione immagini/descrizioni/embeddings. Semantic enrichment 097 non è più una chiamata provider diretta. Un errore embedding iniziale non impedisce la risposta generativa routed, ma riduce retrieval e proposte prodotto. Nessun training, billing SaaS o modifica a checkout/payment/order.
 
 Accounting tecnico interno: `ai_usage_log`, `ai_pricing`, `ai_usage_monthly_by_tenant`.
 
@@ -511,13 +513,13 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 `096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.
 
-`097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk viene completato senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention.
+`097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk viene completato senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention. Il provider non è più hardcoded: la classificazione passa dalla policy AI Core `nala_semantic_enrichment / classification`, con preflight prima del claim per non consumare tentativi quando il routing non è operativo.
 
 `098` è additiva e service-role-only: introduce l'entitlement `nala_conversion_attribution`, la lineage prodotto/checkout `nala_checkout_attributions`, gli eventi conversione durevoli e la RPC idempotente `record_nala_purchase_attribution`. La purge delle conversazioni porta a `NULL` solo i riferimenti session/interaction; product ID, checkout/order ID, quantità, prezzi snapshot e gross assisted value restano disponibili per reporting.
 
 `099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
 
-`100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. Applicazione Supabase remota completata e verificata dal proprietario come prerequisito V1.1; nessuna nuova migration in V1.1.
+`100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. Applicazione Supabase remota completata e verificata dal proprietario come prerequisito AI Core; V1.2 riusa lo schema esistente e non aggiunge migration.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
@@ -593,8 +595,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.34
+# Fine snapshot v6.35
 
-**Base audit:** `main + Platform Prospects V1`
+**Base audit:** `main + AI Core V1.2 semantic enrichment routing`
 **Data:** 3 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

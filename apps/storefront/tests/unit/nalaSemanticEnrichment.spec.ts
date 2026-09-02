@@ -3,6 +3,7 @@ import {
   deterministicSmallTalkEnrichment,
   nextEnrichmentFailureStatus,
   normalizeNalaSemanticEnrichment,
+  validateNalaSemanticEnrichment,
 } from '@/lib/ai/nalaSemanticSchema';
 
 test('normalizes a fulfilled product search', () => {
@@ -76,6 +77,46 @@ test('invalid classifier output falls back to controlled values only', () => {
     knowledgeStatus: 'unknown',
     requestedProductText: null,
   });
+});
+
+test('strict AI Core validator accepts valid structured output', () => {
+  expect(validateNalaSemanticEnrichment({
+    intent: 'recommendation',
+    intentConfidence: 0.83,
+    demandStatus: 'fulfilled',
+    retrievalQuality: 'strong',
+    knowledgeStatus: 'not_applicable',
+    requestedProductText: 'chocolat noir',
+  })).toEqual({
+    intent: 'recommendation',
+    intentConfidence: 0.83,
+    demandStatus: 'fulfilled',
+    retrievalQuality: 'strong',
+    knowledgeStatus: 'not_applicable',
+    requestedProductText: 'chocolat noir',
+  });
+});
+
+test('strict AI Core validator rejects malformed taxonomy instead of normalizing it', () => {
+  expect(() => validateNalaSemanticEnrichment({
+    intent: 'invented',
+    intentConfidence: 0.5,
+    demandStatus: 'fulfilled',
+    retrievalQuality: 'strong',
+    knowledgeStatus: 'not_applicable',
+    requestedProductText: null,
+  })).toThrow('invalid_semantic_enrichment');
+});
+
+test('strict AI Core validator rejects invalid confidence', () => {
+  expect(() => validateNalaSemanticEnrichment({
+    intent: 'product_search',
+    intentConfidence: 2,
+    demandStatus: 'fulfilled',
+    retrievalQuality: 'strong',
+    knowledgeStatus: 'not_applicable',
+    requestedProductText: 'manioc',
+  })).toThrow('invalid_semantic_enrichment');
 });
 
 test('provider failures retry twice and become terminal on attempt three', () => {

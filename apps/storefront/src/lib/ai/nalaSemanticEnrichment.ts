@@ -1,23 +1,43 @@
-import { GoogleGenAI, Type } from '@google/genai';
 import { createServiceClient } from '@/lib/supabase/server';
-import { logAiUsage } from '@/lib/ai/usageTracking';
+import { assertAiRouteReady, runAi } from '@/lib/ai/core/aiGateway';
+import type { StructuredSchema } from '@/lib/ai/core/types';
 import {
   DEMAND_STATUSES,
   deterministicSmallTalkEnrichment,
   KNOWLEDGE_STATUSES,
   NALA_INTENTS,
   nextEnrichmentFailureStatus,
-  normalizeNalaSemanticEnrichment,
   RETRIEVAL_QUALITIES,
+  validateNalaSemanticEnrichment,
   type NalaSemanticEnrichment,
 } from '@/lib/ai/nalaSemanticSchema';
 
-const MODEL = 'gemini-2.5-flash-lite';
-const PROVIDER = 'gemini';
 const ENDPOINT = 'nala_semantic_enrichment';
+const CONSUMER = 'nala_semantic_enrichment';
+const CAPABILITY = 'classification';
 const VERSION = 'v1';
 const MAX_BATCH_SIZE = 25;
 const CONCURRENCY = 4;
+
+const RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    intent: { type: 'string', enum: [...NALA_INTENTS] },
+    intentConfidence: { type: 'number', nullable: true },
+    demandStatus: { type: 'string', enum: [...DEMAND_STATUSES] },
+    retrievalQuality: { type: 'string', enum: [...RETRIEVAL_QUALITIES] },
+    knowledgeStatus: { type: 'string', enum: [...KNOWLEDGE_STATUSES] },
+    requestedProductText: { type: 'string', nullable: true },
+  },
+  required: [
+    'intent',
+    'intentConfidence',
+    'demandStatus',
+    'retrievalQuality',
+    'knowledgeStatus',
+    'requestedProductText',
+  ],
+} satisfies StructuredSchema;
 
 interface ClaimedInteraction {
   id: string;
@@ -36,14 +56,6 @@ interface SemanticContext {
 }
 
 type ErrorCode = 'context_load_error' | 'provider_error' | 'update_error';
-
-let client: GoogleGenAI | null = null;
-
-function getClient(): GoogleGenAI {
-  if (!process.env.GEMINI_API_KEY) throw new Error('provider_error');
-  if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  return client;
-}
 
 async function loadSemanticContext(interaction: ClaimedInteraction): Promise<SemanticContext> {
   const service = createServiceClient();
@@ -64,23 +76,15 @@ async function loadSemanticContext(interaction: ClaimedInteraction): Promise<Sem
   if (productsResult.error || knowledgeResult.error) throw new Error('context_load_error');
 
   return {
-    productNames: (productsResult.data ?? []).map((row) => String(row.name).slice(0, 150)),
-    knowledgeEntries: (knowledgeResult.data ?? []).map((row) => ({
+    productNames: (productsResult.data ?? []).map(row => String(row.name).slice(0, 150)),
+    knowledgeEntries: (knowledgeResult.data ?? []).map(row => ({
       category: String(row.category).slice(0, 50),
       content: String(row.content).slice(0, 600),
     })),
   };
 }
 
-function buildPrompt(interaction: ClaimedInteraction, context: SemanticContext): string {
-  const payload = {
-    message: interaction.message_text,
-    reply: interaction.reply_text?.slice(0, 1200) ?? null,
-    outcome: interaction.outcome,
-    matchedProducts: context.productNames,
-    matchedKnowledge: context.knowledgeEntries,
-  };
-
+function buildSystemPrompt(): string {
   return `Classify one commerce-assistant interaction for aggregate analytics.
 Return JSON only and use exactly the allowed taxonomy values.
 
@@ -96,81 +100,39 @@ Rules:
 Allowed intents: ${NALA_INTENTS.join(', ')}
 Allowed demandStatus: ${DEMAND_STATUSES.join(', ')}
 Allowed retrievalQuality: ${RETRIEVAL_QUALITIES.join(', ')}
-Allowed knowledgeStatus: ${KNOWLEDGE_STATUSES.join(', ')}
-
-Interaction:
-${JSON.stringify(payload)}`;
+Allowed knowledgeStatus: ${KNOWLEDGE_STATUSES.join(', ')}`;
 }
 
-function parseResponse(raw: string): NalaSemanticEnrichment {
-  try {
-    return normalizeNalaSemanticEnrichment(JSON.parse(raw));
-  } catch {
-    return normalizeNalaSemanticEnrichment(null);
-  }
+function buildInteractionPayload(interaction: ClaimedInteraction, context: SemanticContext): string {
+  return JSON.stringify({
+    message: interaction.message_text,
+    reply: interaction.reply_text?.slice(0, 1200) ?? null,
+    outcome: interaction.outcome,
+    matchedProducts: context.productNames,
+    matchedKnowledge: context.knowledgeEntries,
+  });
 }
 
 async function classifyWithAi(
   interaction: ClaimedInteraction,
   context: SemanticContext,
 ): Promise<NalaSemanticEnrichment> {
-  let inputTokens: number | undefined;
-  let outputTokens: number | undefined;
+  const response = await runAi<NalaSemanticEnrichment>({
+    tenantId: interaction.tenant_id,
+    endpoint: ENDPOINT,
+    consumer: CONSUMER,
+    capability: CAPABILITY,
+    request: {
+      system: buildSystemPrompt(),
+      messages: [{ role: 'user', content: buildInteractionPayload(interaction, context) }],
+      responseSchema: RESPONSE_SCHEMA,
+      validate: validateNalaSemanticEnrichment,
+      temperature: 0,
+      maxOutputTokens: 300,
+    },
+  });
 
-  try {
-    const response = await getClient().models.generateContent({
-      model: MODEL,
-      contents: buildPrompt(interaction, context),
-      config: {
-        temperature: 0,
-        maxOutputTokens: 300,
-        thinkingConfig: { thinkingBudget: 0 },
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            intent: { type: Type.STRING, enum: [...NALA_INTENTS] },
-            intentConfidence: { type: Type.NUMBER, nullable: true },
-            demandStatus: { type: Type.STRING, enum: [...DEMAND_STATUSES] },
-            retrievalQuality: { type: Type.STRING, enum: [...RETRIEVAL_QUALITIES] },
-            knowledgeStatus: { type: Type.STRING, enum: [...KNOWLEDGE_STATUSES] },
-            requestedProductText: { type: Type.STRING, nullable: true },
-          },
-          required: [
-            'intent', 'intentConfidence', 'demandStatus', 'retrievalQuality',
-            'knowledgeStatus', 'requestedProductText',
-          ],
-        },
-      },
-    });
-
-    inputTokens = response.usageMetadata?.promptTokenCount;
-    outputTokens = response.usageMetadata?.candidatesTokenCount;
-    const raw = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const enrichment = parseResponse(raw);
-
-    await logAiUsage({
-      tenantId: interaction.tenant_id,
-      endpoint: ENDPOINT,
-      provider: PROVIDER,
-      model: MODEL,
-      inputTokens,
-      outputTokens,
-      status: 'success',
-    });
-    return enrichment;
-  } catch {
-    await logAiUsage({
-      tenantId: interaction.tenant_id,
-      endpoint: ENDPOINT,
-      provider: PROVIDER,
-      model: MODEL,
-      inputTokens,
-      outputTokens,
-      status: 'error',
-    });
-    throw new Error('provider_error');
-  }
+  return response.structured;
 }
 
 async function markCompleted(
@@ -225,7 +187,9 @@ async function processInteraction(
     const message = error instanceof Error ? error.message : '';
     const code: ErrorCode = message === 'context_load_error'
       ? 'context_load_error'
-      : message === 'update_error' ? 'update_error' : 'provider_error';
+      : message === 'update_error'
+        ? 'update_error'
+        : 'provider_error';
     console.error('[nala-semantic-enrichment] interaction failed', {
       interactionId: interaction.id,
       errorCode: code,
@@ -236,6 +200,9 @@ async function processInteraction(
 }
 
 export async function processNalaSemanticEnrichmentBatch(batchSize = 20) {
+  // Preflight before claim: missing/disabled routing must not consume interaction attempts.
+  await assertAiRouteReady(CONSUMER, CAPABILITY);
+
   const safeBatchSize = Math.max(1, Math.min(Math.trunc(batchSize), MAX_BATCH_SIZE));
   const { data, error } = await createServiceClient().rpc(
     'claim_nala_interactions_for_enrichment',

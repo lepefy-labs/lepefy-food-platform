@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { processNalaSemanticEnrichmentBatch } from '@/lib/ai/nalaSemanticEnrichment';
+import { AiRoutingError } from '@/lib/ai/core/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -30,8 +31,14 @@ export async function POST(request: NextRequest) {
   try {
     const summary = await processNalaSemanticEnrichmentBatch(requestedBatchSize);
     return NextResponse.json({ ok: true, ...summary });
-  } catch {
-    console.error('[nala-semantic-enrichment] batch claim failed');
-    return NextResponse.json({ error: 'Enrichment batch failed' }, { status: 500 });
+  } catch (error) {
+    const routingUnavailable = error instanceof AiRoutingError;
+    console.error('[nala-semantic-enrichment] batch failed', {
+      errorCode: routingUnavailable ? 'ai_route_unavailable' : 'batch_failed',
+    });
+    return NextResponse.json(
+      { error: routingUnavailable ? 'AI routing unavailable' : 'Enrichment batch failed' },
+      { status: routingUnavailable ? 503 : 500 },
+    );
   }
 }
