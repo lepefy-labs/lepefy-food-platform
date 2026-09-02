@@ -10,6 +10,7 @@ import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessi
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
+import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 const MAX_QUANTITY_PER_ITEM = 999;
@@ -42,6 +43,7 @@ interface CheckoutBody {
   externalPaymentMethodId: string;
   termsAccepted?: boolean;
   marketingOptIn?: boolean;
+  nalaAttributions?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +52,7 @@ export async function POST(req: NextRequest) {
     const {
       items: rawItems, shippingAddress, fulfillmentType, email,
       phone, fullName, shippingDetails, quoteToken, externalPaymentMethodId,
-      termsAccepted, marketingOptIn,
+      termsAccepted, marketingOptIn, nalaAttributions,
     } = body;
 
     if (!rawItems?.length || !email || !externalPaymentMethodId) {
@@ -194,6 +196,15 @@ export async function POST(req: NextRequest) {
         consent_terms_doc_version: consentState.showTermsCheckbox ? consentState.termsDocVersion : null,
         consent_marketing_accepted: consentState.showMarketingCheckbox ? marketingOptIn === true : null,
       },
+    });
+
+    await recordNalaCheckoutStarted({
+      supabase,
+      tenantId: tenant.id,
+      checkoutSessionId: active.id,
+      candidates: nalaAttributions,
+      items,
+      currency,
     });
 
     // Switching the active purchase intent away from card payment invalidates

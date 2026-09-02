@@ -8,6 +8,7 @@ export const PLATFORM_FEATURE_KEYS = {
   ai: 'ai',
   nala: 'nala',
   nalaAnalytics: 'nala_analytics',
+  nalaConversionAttribution: 'nala_conversion_attribution',
 } as const;
 
 interface TenantFeatureOverride {

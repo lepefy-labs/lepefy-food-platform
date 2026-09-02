@@ -10,6 +10,7 @@ import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
+import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 
 const MAX_QUANTITY_PER_ITEM = 999;
 
@@ -42,6 +43,7 @@ interface CheckoutBody {
   paymentMethod?: 'stripe' | 'in_store';
   termsAccepted?: boolean;
   marketingOptIn?: boolean;
+  nalaAttributions?: unknown;
 }
 
 export async function POST(req: NextRequest) {
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
     const {
       items: rawItems, shippingAddress, fulfillmentType, email,
       phone, fullName, shippingDetails, quoteToken,
-      paymentMethod = 'stripe', termsAccepted, marketingOptIn,
+      paymentMethod = 'stripe', termsAccepted, marketingOptIn, nalaAttributions,
     } = body;
 
     if (!rawItems?.length || !email) {
@@ -271,6 +273,15 @@ export async function POST(req: NextRequest) {
         consent_terms_doc_version: consentTermsDocVersion,
         consent_marketing_accepted: consentMarketingAccepted,
       },
+    });
+
+    await recordNalaCheckoutStarted({
+      supabase,
+      tenantId: tenant.id,
+      checkoutSessionId: active.id,
+      candidates: nalaAttributions,
+      items,
+      currency: tenant.currency ?? 'EUR',
     });
 
     let paymentIntent = null;

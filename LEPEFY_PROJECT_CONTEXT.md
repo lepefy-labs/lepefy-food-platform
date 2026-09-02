@@ -227,7 +227,7 @@ tenant_feature_settings
 
 `src/lib/admin/platformBilling.ts` resta il resolver dello snapshot billing; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
 
-`nala_analytics` è una capability commerciale distinta da `nala`, inclusa nel piano all-inclusive `food-platform`. La raccolta è fail-closed: un errore del resolver analytics non interrompe Nala e non produce scritture. `nala_sessions` e `nala_interactions` conservano conversazioni, associazione cliente nullable, pagina sorgente, locale, device category e geografia approssimativa derivata server-side (country/region/city); non conservano IP, user-agent, fingerprint o cookie analytics. Il target di retention raw è 90 giorni tramite RPC service-role-only, da collegare a uno scheduler giornaliero approvato. Conversion attribution e dashboard Nala non sono ancora implementate.\n\nIl semantic enrichment Nala è asincrono e separato dal chat path: la migration `097_nala_semantic_enrichment.sql` aggiunge intent/confidence, demand status, retrieval quality, knowledge status, requested product text e stato/versione operativi direttamente a `nala_interactions`. La taxonomy V1 comprende intent prodotto, availability/price/recommendation/substitution, recipe, delivery/store/event information, order/payment help, complaint, small talk, other e unknown. `requested_product_text` è una frase derivata massima di 150 caratteri, non una copia del messaggio, e viene eliminata con la stessa retention della riga.\n\nIl dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. Conversion attribution e dashboard restano fuori scope.
+`nala_analytics` è una capability commerciale distinta da `nala`, inclusa nel piano all-inclusive `food-platform`. La raccolta è fail-closed: un errore del resolver analytics non interrompe Nala e non produce scritture. `nala_sessions` e `nala_interactions` conservano conversazioni, associazione cliente nullable, pagina sorgente, locale, device category e geografia approssimativa derivata server-side (country/region/city); non conservano IP, user-agent, fingerprint o cookie analytics. Il target di retention raw è 90 giorni tramite RPC service-role-only, da collegare a uno scheduler giornaliero approvato. Conversion Attribution V1 è implementata come capability commerciale separata `nala_conversion_attribution`. Il browser conserva solo touch minimizzati in `sessionStorage`, con finestra esatta di 30 minuti e last qualifying touch per prodotto. Il server riconvalida tenant, entitlement, interaction/session, finestra temporale e appartenenza del prodotto a `matched_product_ids`; tenant, prezzi, currency e valore assistito non sono mai autorevoli dal browser. La dashboard Nala non è ancora implementata.\n\nIl semantic enrichment Nala è asincrono e separato dal chat path: la migration `097_nala_semantic_enrichment.sql` aggiunge intent/confidence, demand status, retrieval quality, knowledge status, requested product text e stato/versione operativi direttamente a `nala_interactions`. La taxonomy V1 comprende intent prodotto, availability/price/recommendation/substitution, recipe, delivery/store/event information, order/payment help, complaint, small talk, other e unknown. `requested_product_text` è una frase derivata massima di 150 caratteri, non una copia del messaggio, e viene eliminata con la stessa retention della riga.\n\nIl dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`; la dashboard resta fuori scope.
 
 Le vecchie colonne billing in `tenants` restano compatibilità e non vanno rimosse senza migration dedicata.
 
@@ -240,6 +240,8 @@ Modello canonico:
 ```text
 cart -> checkout_session -> pagamento confermato -> order
 ```
+
+L'attribuzione Nala è un sidecar best-effort e non cambia questo state machine. `nala_checkout_attributions` lega per prodotto il checkout all'ultima interaction qualificante e sopravvive a resume/reuse; `nala_conversion_events` registra solo `add_to_cart`, `checkout_started` e `purchase_completed`. La purchase viene scritta dopo le `order_items` da una RPC idempotente e usa il subtotale lordo reale delle sole righe assistite, prima di sconti order-level e shipping. Errori o schema analytics non disponibile non bloccano carrello, checkout, pagamento o ordine.
 
 Checkout session lifecycle:
 
@@ -406,6 +408,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 094_feature_entitlements_foundation.sql
 095_nala_conversation_analytics.sql
 096_tenant_feature_settings.sql
+097_nala_semantic_enrichment.sql
+098_nala_conversion_attribution.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -427,6 +431,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `095` è additiva: introduce l'entitlement `nala_analytics`, le tabelle service-role-only `nala_sessions` e `nala_interactions`, la risoluzione atomica delle sessioni e la purge raw a 90 giorni. I customer sono referenziati solo per UUID nullable; geografia e metadata sono minimizzati. Lo scheduling giornaliero della purge resta da collegare a infrastruttura approvata.
 
 `096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.\n\n`097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk viene completato senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention.
+
+`098` è additiva e service-role-only: introduce l'entitlement `nala_conversion_attribution`, la lineage prodotto/checkout `nala_checkout_attributions`, gli eventi conversione durevoli e la RPC idempotente `record_nala_purchase_attribution`. La purge delle conversazioni porta a `NULL` solo i riferimenti session/interaction; product ID, checkout/order ID, quantità, prezzi snapshot e gross assisted value restano disponibili per reporting.
 
 ---
 
@@ -499,8 +505,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.17
+# Fine snapshot v6.18
 
-**Base audit:** `main @ Nala semantic enrichment`
+**Base audit:** `main @ Nala conversion attribution V1`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

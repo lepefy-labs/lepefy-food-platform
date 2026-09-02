@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { IconSparkles, IconX, IconSend, IconBrandWhatsapp, IconChevronRight } from '@tabler/icons-react';
+import { rememberNalaProductTouch } from '@/lib/ai/nalaAttributionClient';
 
 interface ChatWidgetProps {
   enabled: boolean;
@@ -130,6 +131,11 @@ export function ChatWidget({ enabled, tenantName, whatsappNumber }: ChatWidgetPr
         return;
       }
 
+      rememberNalaProductTouch({
+        interactionId: data?.interactionId,
+        clientSessionId: clientSessionIdRef.current,
+        matchedProductIds: data?.matchedProductIds,
+      });
       setTurns((prev) => [...prev, { role: 'assistant', text: reply }]);
     } catch {
       setFailed(true);

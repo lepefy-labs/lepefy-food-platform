@@ -5,6 +5,7 @@ import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { Order } from '@lepefy/types';
+import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 
 const stripe = getStripeClient('shop');
 
@@ -170,6 +171,14 @@ export async function createOrderFromCheckoutSession(
       '— id:', session.id, '— order:', order.id);
   } else {
     console.info('[createOrderFromCheckoutSession] checkout_session completed — id:', session.id, '— order:', order.id);
+  }
+
+  if (!stockError && !itemsError) {
+    await recordNalaPurchaseAttribution({
+      supabase,
+      checkoutSessionId: session.id,
+      orderId: order.id,
+    });
   }
 
   const tenantContext = process.env.N8N_WEBHOOK_URL

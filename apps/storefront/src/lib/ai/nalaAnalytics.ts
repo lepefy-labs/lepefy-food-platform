@@ -119,8 +119,8 @@ export async function prepareNalaAnalytics(
   }
 }
 
-export async function logNalaInteraction(params: LogNalaInteractionParams): Promise<void> {
-  if (!params.context) return;
+export async function logNalaInteraction(params: LogNalaInteractionParams): Promise<string | null> {
+  if (!params.context) return null;
 
   try {
     const service = createServiceClient();
@@ -140,7 +140,7 @@ export async function logNalaInteraction(params: LogNalaInteractionParams): Prom
       throw new Error(sessionError?.message ?? 'Nala analytics session was not resolved');
     }
 
-    const { error: interactionError } = await service.from('nala_interactions').insert({
+    const { data: interaction, error: interactionError } = await service.from('nala_interactions').insert({
       tenant_id: params.context.tenantId,
       session_id: sessionId,
       message_text: params.messageText,
@@ -151,14 +151,16 @@ export async function logNalaInteraction(params: LogNalaInteractionParams): Prom
       intent: params.intent ?? null,
       matched_product_ids: params.matchedProductIds ?? null,
       matched_kb_ids: params.matchedKbIds ?? null,
-    });
+    }).select('id').single();
 
-    if (interactionError) throw new Error(interactionError.message);
+    if (interactionError || !interaction) throw new Error(interactionError?.message ?? 'Nala interaction was not created');
+    return interaction.id;
   } catch (error) {
     console.error('[nala-analytics] Best-effort interaction logging failed.', {
       tenantId: params.context.tenantId,
       outcome: params.outcome,
       error,
     });
+    return null;
   }
 }

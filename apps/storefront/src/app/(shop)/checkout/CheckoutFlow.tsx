@@ -32,6 +32,7 @@ import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import type { CheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import { marketingConsentLabel } from '@/lib/legal/consentCopy';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
+import { buildNalaCheckoutAttributions } from '@/lib/ai/nalaAttributionClient';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { formatPrice } from '@/lib/utils/format';
@@ -370,6 +371,7 @@ export default function CheckoutFlow({
         quantity: item.quantity,
         storage_type: item.product.storage_type ?? 'dry',
       })),
+      nalaAttributions: buildNalaCheckoutAttributions(items),
       shippingAddress: isPickup ? null : {
         full_name: `${data.firstName} ${data.lastName}`,
         line1: `${street} ${houseNumber}`.trim(),

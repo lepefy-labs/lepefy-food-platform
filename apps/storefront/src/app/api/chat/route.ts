@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
   const smallTalkReply = matchSmallTalk(message, tenant.name);
   if (smallTalkReply) {
-    await logNalaInteraction({
+    const interactionId = await logNalaInteraction({
       context: analyticsContext,
       messageText: message,
       replyText: smallTalkReply,
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       outcome: 'small_talk',
       intent: 'small_talk',
     });
-    return NextResponse.json({ reply: smallTalkReply });
+    return NextResponse.json({ reply: smallTalkReply, interactionId });
   }
 
   const allowed = await checkRateLimit(tenant.id, ENDPOINT, true);
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
       outputTokens,
       status: 'success',
     });
-    await logNalaInteraction({
+    const interactionId = await logNalaInteraction({
       context: analyticsContext,
       messageText: message,
       replyText: reply,
@@ -192,7 +192,11 @@ export async function POST(req: NextRequest) {
       matchedKbIds,
     });
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({
+      reply,
+      interactionId,
+      matchedProductIds: interactionId ? matchedProductIds : null,
+    });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
     console.error('[chatbox] Erreur:', errorMessage);

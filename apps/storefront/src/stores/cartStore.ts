@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { CartItem } from '@lepefy/types';
 import type { CartMutationInput, CartSyncStatus, PendingMutation } from '@/lib/cart/cartTypes';
 import { enqueueMutation } from '@/lib/cart/cartQueue';
+import { trackNalaAddToCart } from '@/lib/ai/nalaAttributionClient';
 
 interface CartState {
   items: CartItem[];
@@ -96,6 +97,7 @@ export const useCartStore = create<CartState>()(
           };
         });
         flushScheduler();
+        void trackNalaAddToCart(product.id, quantity);
       },
 
       removeItem(productId) {

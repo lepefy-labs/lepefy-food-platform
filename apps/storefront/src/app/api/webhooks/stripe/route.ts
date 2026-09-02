@@ -11,6 +11,7 @@ import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
 import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
 import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
+import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
@@ -321,6 +322,14 @@ export async function POST(req: NextRequest) {
         '— order_id:', order.id);
     } else {
       console.info('[webhook] order_items inserted —', orderItemsPayload.length, 'rows');
+    }
+
+    if (!stockError && !itemsError) {
+      await recordNalaPurchaseAttribution({
+        supabase,
+        checkoutSessionId: checkoutSession.id,
+        orderId: order.id,
+      });
     }
 
     // ── Delete checkout_session ──────────────────────────────────────────────
