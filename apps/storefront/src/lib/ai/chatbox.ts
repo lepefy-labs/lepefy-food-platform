@@ -66,7 +66,6 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
     matchedProducts,
     knowledgeSnippets,
     relationshipSuggestion,
-    cartBuilderRequested,
   } = params;
 
   const productsBlock = matchedProducts.length
@@ -108,14 +107,13 @@ ${productsBlock}
 ${relationshipGuidance(relationshipSuggestion)}
 
 MODE CART BUILDER :
-${cartBuilderRequested
-  ? `Le client exprime clairement une intention de cuisiner/préparer un plat.
-Retourne un cartPlan de type recipe avec un titre court et 4 à 6 ingrédients principaux (8 maximum).
-Chaque ingrédient contient name, required et quantityHint nullable. quantityHint reste informatif et ne calcule jamais une quantité d'achat.
+Interprète le plat et l'intention dans le contexte. Si decision.commerceMode est cart_builder,
+retourne un cartPlan recipe avec un titre court et 4 à 6 ingrédients principaux (8 maximum).
+Chaque ingrédient contient name, required et quantityHint nullable.
 N'émets aucun ID produit, prix, stock, tenant ID ou payload panier.
 La connaissance générale d'une recette ne prouve jamais la disponibilité catalogue.
-Dans reply, dis seulement que tu peux préparer une sélection; n'affirme pas qu'un ingrédient est disponible avant validation serveur.`
-  : `Aucun Cart Builder ne doit être produit pour ce tour. Retourne cartPlan = null.`}
+Dans reply, propose une sélection sans affirmer qu'un ingrédient est disponible.
+Dans tous les autres cas, retourne cartPlan = null.
 
 Exemples authentiques de ton et de contenu (utilise-les comme référence de style
 et réutilise les informations qu'ils contiennent si pertinent — ne les invente pas,

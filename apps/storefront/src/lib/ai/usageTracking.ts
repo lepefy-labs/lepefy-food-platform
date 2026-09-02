@@ -35,6 +35,11 @@ export interface LogAiUsageParams {
   inputTokens?: number;
   outputTokens?: number;
   imagesGenerated?: number;
+  consumer?: string;
+  capability?: string;
+  latencyMs?: number;
+  fallbackUsed?: boolean;
+  fallbackReason?: string | null;
   status: 'success' | 'error' | 'rate_limited';
 }
 
@@ -83,6 +88,9 @@ export async function logAiUsage(params: LogAiUsageParams): Promise<void> {
     const estimatedCostUsd = inputCost + outputCost + imageCost;
 
     const { error: insertError } = await supabase.from('ai_usage_log').insert({
+      ...(params.consumer ? { consumer: params.consumer, capability: params.capability,
+        latency_ms: params.latencyMs, fallback_used: params.fallbackUsed,
+        fallback_reason: params.fallbackReason } : {}),
       tenant_id:           tenantId,
       endpoint,
       provider,

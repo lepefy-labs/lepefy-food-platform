@@ -169,3 +169,10 @@ export async function syncProductEmbedding(tenantId: string, productId: string):
     });
   }
 }
+
+/** Legacy retrieval accounting, separate from routed generation telemetry. */
+export async function logNalaEmbeddingUsage(tenantId: string, tokens: number): Promise<void> {
+  if (tokens <= 0) return;
+  await logAiUsage({ tenantId, endpoint: 'nala_retrieval', provider: 'gemini',
+    model: EMBEDDING_MODEL, inputTokens: tokens, status: 'success' });
+}

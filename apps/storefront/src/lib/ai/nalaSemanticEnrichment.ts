@@ -236,6 +236,10 @@ async function processInteraction(
 }
 
 export async function processNalaSemanticEnrichmentBatch(batchSize = 20) {
+  const { error: purgeError } = await createServiceClient().rpc('purge_expired_ai_context');
+  if (purgeError && purgeError.code !== 'PGRST202') {
+    console.error('[lepefy-ai-core] Context retention purge failed', { code: purgeError.code });
+  }
   const safeBatchSize = Math.max(1, Math.min(Math.trunc(batchSize), MAX_BATCH_SIZE));
   const { data, error } = await createServiceClient().rpc(
     'claim_nala_interactions_for_enrichment',

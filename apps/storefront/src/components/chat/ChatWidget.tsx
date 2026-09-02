@@ -7,7 +7,6 @@ import { NalaProductActionCard } from '@/components/chat/NalaProductActionCard';
 import { NalaCartPlanCard } from '@/components/chat/NalaCartPlanCard';
 import type { NalaProductAction } from '@/lib/ai/nalaProductActionContract';
 import {
-  isNalaCartBuilderAffirmative,
   type NalaCartPlan,
 } from '@/lib/ai/nalaCartPlanContract';
 import { resolveLocale, useLocaleStore } from '@/lib/store/localeStore';
@@ -28,7 +27,7 @@ interface ChatTurn {
   cartPlanExpanded?: boolean;
 }
 
-const MAX_HISTORY_TURNS = 6;
+const CONVERSATION_STORAGE_KEY = 'lepefy:nala:conversation:v1';
 const MOBILE_COMPACT_SCROLL_Y = 64;
 const MOBILE_ONBOARDING_TIMEOUT_MS = 5000;
 const NALA_PRIMARY = '#6D5AF6';
@@ -73,6 +72,11 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const clientSessionIdRef = useRef<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try { conversationIdRef.current = sessionStorage.getItem(CONVERSATION_STORAGE_KEY); } catch { /* memory-only */ }
+  }, []);
 
   useEffect(() => {
     const messagesContainer = messagesEndRef.current?.parentElement;
@@ -120,25 +124,6 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
     const message = (messageOverride ?? input).trim();
     if (!message || loading) return;
 
-    let pendingPlanIndex = -1;
-    for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const turn = turns[index];
-      if (turn?.role !== 'assistant') continue;
-      if (turn.cartPlan && !turn.cartPlanExpanded) pendingPlanIndex = index;
-      break;
-    }
-    if (pendingPlanIndex >= 0 && isNalaCartBuilderAffirmative(message)) {
-      setTurns((current) => [
-        ...current.map((turn, index) => (
-          index === pendingPlanIndex ? { ...turn, cartPlanExpanded: true } : turn
-        )),
-        { role: 'user', text: message },
-      ]);
-      setInput('');
-      return;
-    }
-
-    const history = turns.slice(-MAX_HISTORY_TURNS).map(({ role, text }) => ({ role, text }));
     clientSessionIdRef.current ??= createClientSessionId();
     setTurns((prev) => [...prev, { role: 'user', text: message }]);
     setInput('');
@@ -151,7 +136,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
-          history,
+          conversationId: conversationIdRef.current,
           clientSessionId: clientSessionIdRef.current,
           sourcePath: window.location.pathname,
           locale: storefrontLocale,
@@ -172,6 +157,10 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         return;
       }
 
+      if (typeof data?.conversationId === 'string') {
+        conversationIdRef.current = data.conversationId;
+        try { sessionStorage.setItem(CONVERSATION_STORAGE_KEY, data.conversationId); } catch { /* memory-only */ }
+      }
       rememberNalaProductTouch({
         interactionId: data?.interactionId,
         clientSessionId: clientSessionIdRef.current,
@@ -187,7 +176,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         text: reply,
         actions,
         cartPlan,
-        cartPlanExpanded: false,
+        cartPlanExpanded: data?.cartPlanExpanded === true,
       }]);
     } catch {
       setFailed(true);

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.31 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.32 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -197,6 +197,7 @@ Console Platform interna Lepefy:
 /admin/platform
 /admin/platform/access
 /admin/platform/ai-usage
+/admin/platform/ai-routing
 /admin/platform/notifications
 /admin/team
 ```
@@ -233,15 +234,15 @@ Il semantic enrichment Nala è asincrono e separato dal chat path: la migration 
 
 Il dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`.
 
-Nala Structured Product Actions V1 estende `/api/chat` con action `add_to_cart` server-validate e user-confirmed. La UI mostra al massimo una card compatta per risposta e usa `cartStore.addItem(..., 1)`, quindi riutilizza sync, drawer e Conversion Attribution. Le action restano metadata UI e non entrano nella history testuale inviata a Gemini. La copy action usa il locale storefront esplicito risolto da `localeStore` e dalle locale supportate dal tenant; `navigator.language` non è source of truth e il fallback resta francese.
+Nala Structured Product Actions V1 estende `/api/chat` con action `add_to_cart` server-validate e user-confirmed. La UI mostra al massimo una card compatta per risposta e usa `cartStore.addItem(..., 1)`, quindi riutilizza sync, drawer e Conversion Attribution. Le action restano metadata UI; la history canonica è ora server-side in AI Core e il browser invia soltanto conversationId e il messaggio corrente. La copy action usa il locale storefront esplicito risolto da `localeStore` e dalle locale supportate dal tenant; `navigator.language` non è source of truth e il fallback resta francese.
 
 Product Relationships V1 introduce `product_relationships`, layer direzionale tenant-scoped con tipi distinti `similar`, `substitute` e `complementary`. Le relazioni persistenti `manual` precedono `system`; all'interno della stessa source una priority numerica maggiore viene prima. Il trigger DB verifica che source e target appartengano al tenant, vieta self relation e duplicati, e le foreign key eliminano le relazioni con il prodotto. RLS non concede accesso browser: admin e Nala operano server-side con service role e authorization `catalog.view/manage`.
 
-Il resolver canonico `src/lib/catalog/productRelationships.ts` restituisce prodotti canonici acquistabili. Dopo manual/system, `similar` può completare tramite embedding con preferenza di categoria; `substitute` richiede stessa categoria, alta similarità e disponibilità; `complementary` resta explicit-only. Il fallback semantico non viene persistito. Nala applica guard conversazionali deterministiche, non effettua una seconda AI call e mantiene una sola action per turno. Il type `direct|similar|substitute|complementary` accompagna l'action; il prompt riceve soltanto la relazione già validata e vieta affermazioni “identico” o “sostituto perfetto”.
+Il resolver canonico `src/lib/catalog/productRelationships.ts` restituisce prodotti canonici acquistabili. Dopo manual/system, `similar` può completare tramite embedding con preferenza di categoria; `substitute` richiede stessa categoria, alta similarità e disponibilità; `complementary` resta explicit-only. Il fallback semantico non viene persistito. Nala deriva il commerce mode dalla structured decision AI Core; il server risolve successivamente la relazione con gli stessi vincoli canonici e mantiene una sola action per turno. Il type `direct|similar|substitute|complementary` accompagna l'action; la risposta non può inventare relazioni o promettere sostituti identici.
 
-`nala_interactions.action_product_ids` e `action_relationship_types` mantengono distinti prodotti retrieved e prodotti effettivamente emessi come action. Conversion Attribution qualifica entrambi senza falsificare `matched_product_ids`; cart, checkout e purchase restano invariati e fail-open rispetto all'analytics. Il tenant gestisce le relazioni dal tab “Produits associés” dell'editor catalogo con ricerca reale, add/remove, priority e active toggle. Nala Cart Builder V1 riconosce intent recipe/meal con guard deterministiche leggere e usa la stessa chiamata Gemini principale per produrre reply + ingredienti strutturati (4–6 preferiti, massimo 8), senza product ID, prezzi o stock generati dall'AI. Il server esegue embedding batch degli ingredienti, risolve in parallelo prodotti canonici tenant-safe e purchasable, quindi applica direct match forte, substitute esplicito/manual-first o fallback semantico conservativo; complementary non viene usato come sostituto e un match incerto resta unavailable.
+`nala_interactions.action_product_ids` e `action_relationship_types` mantengono distinti prodotti retrieved e prodotti effettivamente emessi come action. Conversion Attribution qualifica entrambi senza falsificare `matched_product_ids`; cart, checkout e purchase restano invariati e fail-open rispetto all'analytics. Il tenant gestisce le relazioni dal tab “Produits associés” dell'editor catalogo con ricerca reale, add/remove, priority e active toggle. Nala Cart Builder V1 si attiva da `decision.commerceMode === 'cart_builder'` e usa la stessa chiamata AI Core principale per produrre reply + ingredienti strutturati (4–6 preferiti, massimo 8), senza product ID, prezzi o stock generati dall'AI. Il server esegue embedding batch degli ingredienti, risolve in parallelo prodotti canonici tenant-safe e purchasable, quindi applica direct match forte, substitute esplicito/manual-first o fallback semantico conservativo; complementary non viene usato come sostituto e un match incerto resta unavailable.
 
-La proposta è client-safe e legata all'interaction tramite UUID logico. Il flusso richiede due consensi: apertura della preview e bulk add finale dei soli item selezionati; un follow-up “Oui” espande soltanto l'ultima proposta ancora pendente. Quantità sempre 1, massimo 8 SKU, nessun quantity editor o calcolo confezioni. Il bulk add riusa `cartStore.addItem()`, protegge dal doppio click, mantiene i successi in caso di errore parziale e apre il drawer esistente tramite `cartUiStore`. I prodotti proposti restano separati dal retrieval in `action_product_ids`; direct/substitute descrivono il match catalogo mentre recipe resta l'intent/action context. Gli eventi add-to-cart, checkout e purchase continuano nella Conversion Attribution esistente. Locale: storefront/tenant, fallback FR, mai `navigator.language`.
+La proposta è client-safe e legata all'interaction tramite UUID logico. Il flusso richiede due consensi: apertura della preview e bulk add finale dei soli item selezionati; un follow-up “Oui” viene interpretato server-side con working memory e può riproporre una selezione canonica aggiornata; nessun prodotto viene aggiunto senza conferma. Quantità sempre 1, massimo 8 SKU, nessun quantity editor o calcolo confezioni. Il bulk add riusa `cartStore.addItem()`, protegge dal doppio click, mantiene i successi in caso di errore parziale e apre il drawer esistente tramite `cartUiStore`. I prodotti proposti restano separati dal retrieval in `action_product_ids`; direct/substitute descrivono il match catalogo mentre recipe resta l'intent/action context. Gli eventi add-to-cart, checkout e purchase continuano nella Conversion Attribution esistente. Locale: storefront/tenant, fallback FR, mai `navigator.language`.
 
 Non esiste un recipe database né una tabella `nala_cart_plans`: V1 mantiene il piano nel turn client-side e usa interaction metadata + conversion events esistenti per misurare proposta/accettazione senza una seconda pipeline. Meal planner, automatic quantity optimization, collaborative filtering e persistenza delle ricette restano fuori scope.
 
@@ -375,7 +376,39 @@ Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici 
 
 ---
 
-## 11. AI usage
+## 11. AI Core e AI usage
+
+Lepefy AI Core is the canonical AI infrastructure layer.
+
+No application consumer may depend directly on Gemini/OpenAI/Anthropic or other external LLM providers. All inference must pass through Lepefy AI Gateway and platform-configured routing.
+
+Conversation state and memory are owned by Lepefy AI Core, never by an external provider or client-provided history. Providers receive bounded context packages assembled server-side by Lepefy Context Engine.
+
+Queste sono le regole canoniche per nuovi consumer; le eccezioni legacy V1 verificate sono elencate sotto.
+
+Foundation migration `100_lepefy_ai_core.sql`:
+- `ai_providers`: provider type gemini/openai_compatible/openai/anthropic/lepefy, enabled, credential_ref, base_url e health osservata;
+- `ai_models`: ID provider, capabilities, context window e metadata di costo;
+- `ai_routing_policies`: consumer + capability;
+- `ai_routing_policy_models`: modelli ordinati per priority crescente, parità per model key, timeout e min_confidence opzionale;
+- `ai_conversations`, `ai_conversation_turns`, `ai_conversation_state`: memoria breve Lepefy, separate dalle analytics Nala.
+Tutte le nuove tabelle sono service-role-only, RLS attiva, nessuna policy browser.
+
+`src/lib/ai/core/aiGateway.ts` carica la policy canonica con cache 30s. Nala è il primo consumer (`nala / structured_chat`); seed Gemini `gemini-2.5-flash`, modello realmente usato prima della migrazione. Adapter implementati: Gemini e HTTP OpenAI-compatible; OpenAI, Anthropic e Lepefy sono tipi predisposti senza adapter dedicato attivo. Nessun provider non configurato viene seedato. Gli endpoint OpenAI-compatible richiedono origine HTTPS approvata via `LEPEFY_AI_ALLOWED_ORIGINS`; niente redirect. `credential_ref` contiene soltanto il nome env server-side, mai una API key raw.
+
+Fallback su timeout, errore provider/rate limit, credenziale assente, modello indisponibile e output strutturato invalido. Budget complessivo routing 18s; min_confidence è ignorata senza confidence calibrata dell'adapter (l'autovalutazione Nala non conta). Business validation resta fuori dal router. Circuit breaker locale best-effort: cinque failure consecutive, pausa cinque minuti, non condiviso tra istanze serverless. `AiRoutingError` normalizzato; UX di errore Nala invariata.
+
+Conversation ID è UUID v4 casuale generato dal server, bearer opaco conservato in sessionStorage. Ogni accesso DB verifica tenant + consumer; i lease a scadenza serializzano richieste concorrenti. Il browser non invia più history né intercetta “Oui” con regex; il server usa pendingAction e soggetto. Refresh riutilizza il contesto; un nuovo sessionStorage apre una nuova conversazione. La duplicazione esplicita di una scheda può copiare sessionStorage nel browser: non c'è fingerprint o tracking cookie.
+
+TTL: 2 ore di inattività, distinto dalla finestra attribution di 30 minuti. Working memory v1 contiene activeIntent, subject, entities, constraints, referencedProducts, pendingAction/pendingActionContext e locale, con limite DB 4 KB. Si aggiorna dalla risposta corrente senza seconda AI call. Rolling summary è nullable e la compaction AI è differita. Context package: massimo 10 messaggi recenti, 8.000 caratteri recenti, massimo 1.600 per messaggio, system 16.000, summary 2.000, current message 300. Cambio provider a metà conversazione supportato.
+
+Expiry impedisce subito il riuso del contesto; la working memory scaduta viene cancellata dalla purge invocata dal job Nala esistente ogni 10 minuti. Raw turns massimi 90 giorni, eliminati dalla stessa RPC. Nessuna memoria personale cross-session, fingerprint, IP o raw UA nel Core. Stato `customer_id` predisposto nullable, non popolato da dati client.
+
+`/admin/platform/ai-routing` riusa il guard Platform Owner per pagina e API, permette creazione/edit/enable di provider e modelli, associazione e priorità numeriche per policy, timeout e confidence. Nessun nuovo RBAC tenant. `ai_usage_log` riusa `logAiUsage` ed estende consumer/capability/latency/fallback; i costi restano telemetry interna. Retrieval embeddings è contabilizzato separatamente come `nala_retrieval`.
+
+Rollout: il proprietario applica manualmente migration 100 dopo il push. Finché le tabelle/RPC mancano, Nala usa un bootstrap Gemini transitorio e stateless, segnalato con errore esplicito nei log; non legge history dal browser. Dopo la migration passa automaticamente al registry e allo stato persistente. Policy disabilitate, errori DB generici e chain vuote NON attivano il bootstrap. Eliminare il bootstrap dopo rollout verificato.
+
+Debt V1 verificato: chiamate dirette ancora in embeddings/retrieval, semantic enrichment 097, utility admin immagini/descrizioni e tre script batch generazione immagini/descrizioni/embeddings. Non vengono migrati in questa delivery. Un errore embedding iniziale non impedisce la risposta generativa routed, ma riduce retrieval e proposte prodotto. Nessun training, billing SaaS o modifica a checkout/payment/order.
 
 Accounting tecnico interno: `ai_usage_log`, `ai_pricing`, `ai_usage_monthly_by_tenant`.
 
@@ -431,6 +464,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 097_nala_semantic_enrichment.sql
 098_nala_conversion_attribution.sql
 099_nala_product_relationships.sql
+100_lepefy_ai_core.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -458,6 +492,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `098` è additiva e service-role-only: introduce l'entitlement `nala_conversion_attribution`, la lineage prodotto/checkout `nala_checkout_attributions`, gli eventi conversione durevoli e la RPC idempotente `record_nala_purchase_attribution`. La purge delle conversazioni porta a `NULL` solo i riferimenti session/interaction; product ID, checkout/order ID, quantità, prezzi snapshot e gross assisted value restano disponibili per reporting.
 
 `099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
+
+`100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. L'applicazione Supabase remota è manuale a cura del proprietario; la presenza nel repository non prova l'applicazione.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
@@ -533,8 +569,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.31
+# Fine snapshot v6.32
 
-**Base audit:** `main @ Nala Analytics Dashboard V1`
+**Base audit:** `main @ Lepefy AI Core V1`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
