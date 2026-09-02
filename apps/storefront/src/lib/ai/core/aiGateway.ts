@@ -6,8 +6,6 @@ import { AiRoutingError, type AiCandidate, type AiModel, type AiProvider, type A
 import { geminiAdapter } from './providers/geminiAdapter';
 import { openaiCompatibleAdapter } from './providers/openaiCompatibleAdapter';
 
-import { bootstrapCandidate, missingAiSchema } from './bootstrap';
-
 const cache = new Map<string, { expires: number; candidates: AiCandidate[] }>();
 export function invalidateAiRouting() { cache.clear(); }
 async function loadCandidates(consumer: string, capability: string): Promise<AiCandidate[]> {
@@ -17,7 +15,6 @@ async function loadCandidates(consumer: string, capability: string): Promise<AiC
   const db = createServiceClient();
   const { data: policy, error } = await db.from('ai_routing_policies').select('id')
     .eq('consumer', consumer).eq('capability', capability).eq('enabled', true).maybeSingle();
-  if (missingAiSchema(error) && consumer === 'nala') return [bootstrapCandidate()];
   if (error) throw new AiRoutingError(['policy_load_failed']);
   if (!policy) throw new AiRoutingError(['policy_unavailable']);
   const results = await Promise.all([
@@ -39,8 +36,15 @@ async function loadCandidates(consumer: string, capability: string): Promise<AiC
 export async function runAi<T>(params: {
   tenantId: string; endpoint: string; consumer: string; capability: string; request: AiRequest<T>;
 }) {
+  let candidates: AiCandidate[];
+  try {
+    candidates = await loadCandidates(params.consumer, params.capability);
+  } catch (error) {
+    if (error instanceof AiRoutingError) throw error;
+    throw new AiRoutingError(['registry_load_failed']);
+  }
   return routeAi({
-    candidates: await loadCandidates(params.consumer, params.capability), request: params.request,
+    candidates, request: params.request,
     adapter: type => type === 'gemini' ? geminiAdapter
       : type === 'openai_compatible' ? openaiCompatibleAdapter : undefined,
     credential: ref => /^[A-Z][A-Z0-9_]*_API_KEY$/.test(ref) ? process.env[ref] : undefined,
@@ -49,11 +53,10 @@ export async function runAi<T>(params: {
         tenantId: params.tenantId, endpoint: params.endpoint,
         provider: event.candidate.provider.key, model: event.candidate.model.provider_model_id,
         status: event.status, inputTokens: event.inputTokens, outputTokens: event.outputTokens,
-        consumer: event.candidate.provider.id === 'bootstrap' ? undefined : params.consumer,
+        consumer: params.consumer,
         capability: params.capability, latencyMs: event.latencyMs,
         fallbackUsed: event.fallbackUsed, fallbackReason: event.fallbackReason,
       });
-      if (event.candidate.provider.id === 'bootstrap') return;
       await createServiceClient().from('ai_providers').update({
         health_status: event.status === 'success' ? 'healthy' : 'degraded',
         last_health_check_at: new Date().toISOString(),

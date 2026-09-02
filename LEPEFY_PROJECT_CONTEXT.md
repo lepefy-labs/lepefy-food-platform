@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.32 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.33 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -402,11 +402,11 @@ Conversation ID è UUID v4 casuale generato dal server, bearer opaco conservato 
 
 TTL: 2 ore di inattività, distinto dalla finestra attribution di 30 minuti. Working memory v1 contiene activeIntent, subject, entities, constraints, referencedProducts, pendingAction/pendingActionContext e locale, con limite DB 4 KB. Si aggiorna dalla risposta corrente senza seconda AI call. Rolling summary è nullable e la compaction AI è differita. Context package: massimo 10 messaggi recenti, 8.000 caratteri recenti, massimo 1.600 per messaggio, system 16.000, summary 2.000, current message 300. Cambio provider a metà conversazione supportato.
 
-Expiry impedisce subito il riuso del contesto; la working memory scaduta viene cancellata dalla purge invocata dal job Nala esistente ogni 10 minuti. Raw turns massimi 90 giorni, eliminati dalla stessa RPC. Nessuna memoria personale cross-session, fingerprint, IP o raw UA nel Core. Stato `customer_id` predisposto nullable, non popolato da dati client.
+Expiry impedisce subito il riuso del contesto; la working memory scaduta viene cancellata dalla RPC esistente invocata da POST /api/internal/ai-core-maintenance, con bearer service-role. Il workflow AI Core maintenance è orario (minuto 17 UTC), con dispatch manuale e URL AI_CORE_APP_URL → NALA_ENRICHMENT_APP_URL → EVENT_REPORTS_APP_URL. Errori restituiscono 503 normalizzato; il job Nala non esegue più questa purge. Raw turns massimi 90 giorni, eliminati dalla stessa RPC. Nessuna memoria personale cross-session, fingerprint, IP o raw UA nel Core. Stato `customer_id` predisposto nullable, non popolato da dati client.
 
 `/admin/platform/ai-routing` riusa il guard Platform Owner per pagina e API, permette creazione/edit/enable di provider e modelli, associazione e priorità numeriche per policy, timeout e confidence. Nessun nuovo RBAC tenant. `ai_usage_log` riusa `logAiUsage` ed estende consumer/capability/latency/fallback; i costi restano telemetry interna. Retrieval embeddings è contabilizzato separatamente come `nala_retrieval`.
 
-Rollout: il proprietario applica manualmente migration 100 dopo il push. Finché le tabelle/RPC mancano, Nala usa un bootstrap Gemini transitorio e stateless, segnalato con errore esplicito nei log; non legge history dal browser. Dopo la migration passa automaticamente al registry e allo stato persistente. Policy disabilitate, errori DB generici e chain vuote NON attivano il bootstrap. Eliminare il bootstrap dopo rollout verificato.
+AI Core V1.1 richiede registry e contesto persistente: migration 100 è già applicata e verificata dal proprietario. Schema/RPC mancanti, errori DB, policy disabilitate e chain vuote falliscono con errori normalizzati; non esistono bootstrap Gemini né contesto stateless. Nessuna migration 101. Hugging Face è documentato tramite adapter openai_compatible esistente (router.huggingface.co/v1, modello openai/gpt-oss-20b:fastest), ma non attivato. Prima dell’attivazione servono HUGGINGFACE_API_KEY server-side, origin HTTPS esatta in LEPEFY_AI_ALLOWED_ORIGINS e registry/policy configurati. Gemini resta priority 1; HF futuro fallback priority 2. Health osservazionale non esclude candidati dal routing.
 
 Debt V1 verificato: chiamate dirette ancora in embeddings/retrieval, semantic enrichment 097, utility admin immagini/descrizioni e tre script batch generazione immagini/descrizioni/embeddings. Non vengono migrati in questa delivery. Un errore embedding iniziale non impedisce la risposta generativa routed, ma riduce retrieval e proposte prodotto. Nessun training, billing SaaS o modifica a checkout/payment/order.
 
@@ -493,7 +493,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 `099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
 
-`100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. L'applicazione Supabase remota è manuale a cura del proprietario; la presenza nel repository non prova l'applicazione.
+`100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. Applicazione Supabase remota completata e verificata dal proprietario come prerequisito V1.1; nessuna nuova migration in V1.1.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
@@ -569,8 +569,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.32
+# Fine snapshot v6.33
 
-**Base audit:** `main @ Lepefy AI Core V1`
+**Base audit:** `main @ Lepefy AI Core V1.1`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

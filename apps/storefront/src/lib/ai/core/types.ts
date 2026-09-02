@@ -45,3 +45,10 @@ export class AiAttemptError extends Error {
 export class AiRoutingError extends Error {
   constructor(public reasons: string[]) { super('ai_routing_failed'); this.name = 'AiRoutingError'; }
 }
+
+export class AiContextError extends Error {
+  constructor(public code: 'conversation_unavailable' | 'conversation_load_failed' | 'conversation_write_failed') {
+    super(code);
+    this.name = 'AiContextError';
+  }
+}
