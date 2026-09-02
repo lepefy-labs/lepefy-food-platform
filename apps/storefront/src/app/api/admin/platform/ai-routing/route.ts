@@ -38,11 +38,12 @@ export async function POST(req: NextRequest) {
   const db = createServiceClient();
   const table = { provider: 'ai_providers', model: 'ai_models', policy: 'ai_routing_policies',
     policyModel: 'ai_routing_policy_models' }[mutation.kind];
+  const values: Record<string, unknown> = mutation.values;
   const result = mutation.kind === 'policyModel'
-    ? await db.from(table).upsert(mutation.values, { onConflict: 'policy_id,model_id' }).select('model_id')
+    ? await db.from(table).upsert(values, { onConflict: 'policy_id,model_id' }).select('model_id')
     : mutation.id
-      ? await db.from(table).update(mutation.values).eq('id', mutation.id).select('id')
-      : await db.from(table).insert(mutation.values).select('id');
+      ? await db.from(table).update(values).eq('id', mutation.id).select('id')
+      : await db.from(table).insert(values).select('id');
   if (result.error || !result.data?.length) return NextResponse.json({
     error: 'Enregistrement impossible. Vérifiez les références et les clés uniques.',
   }, { status: 400 });
