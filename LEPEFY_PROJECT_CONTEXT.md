@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 settembre 2026 — **v6.30 Current-State Snapshot**
+> **Aggiornato:** 2 settembre 2026 — **v6.31 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -227,7 +227,11 @@ tenant_feature_settings
 
 `src/lib/admin/platformBilling.ts` resta il resolver dello snapshot billing; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
 
-`nala_analytics` è una capability commerciale distinta da `nala`, inclusa nel piano all-inclusive `food-platform`. La raccolta è fail-closed: un errore del resolver analytics non interrompe Nala e non produce scritture. `nala_sessions` e `nala_interactions` conservano conversazioni, associazione cliente nullable, pagina sorgente, locale, device category e geografia approssimativa derivata server-side (country/region/city); non conservano IP, user-agent, fingerprint o cookie analytics. Il target di retention raw è 90 giorni tramite RPC service-role-only, da collegare a uno scheduler giornaliero approvato. Conversion Attribution V1 è implementata come capability commerciale separata `nala_conversion_attribution`. Il browser conserva solo touch minimizzati in `sessionStorage`, con finestra esatta di 30 minuti e last qualifying touch per prodotto. Il server riconvalida tenant, entitlement, interaction/session, finestra temporale e appartenenza del prodotto a `matched_product_ids`; tenant, prezzi, currency e valore assistito non sono mai autorevoli dal browser. La dashboard Nala non è ancora implementata.\n\nIl semantic enrichment Nala è asincrono e separato dal chat path: la migration `097_nala_semantic_enrichment.sql` aggiunge intent/confidence, demand status, retrieval quality, knowledge status, requested product text e stato/versione operativi direttamente a `nala_interactions`. La taxonomy V1 comprende intent prodotto, availability/price/recommendation/substitution, recipe, delivery/store/event information, order/payment help, complaint, small talk, other e unknown. `requested_product_text` è una frase derivata massima di 150 caratteri, non una copia del messaggio, e viene eliminata con la stessa retention della riga.\n\nIl dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`; la dashboard resta fuori scope.
+`nala_analytics` è una capability commerciale distinta da `nala`, inclusa nel piano all-inclusive `food-platform`. La raccolta è fail-closed: un errore del resolver analytics non interrompe Nala e non produce scritture. `nala_sessions` e `nala_interactions` conservano conversazioni, associazione cliente nullable, pagina sorgente, locale, device category e geografia approssimativa derivata server-side (country/region/city); non conservano IP, user-agent, fingerprint o cookie analytics. Il target di retention raw è 90 giorni tramite RPC service-role-only, da collegare a uno scheduler giornaliero approvato. Conversion Attribution V1 è implementata come capability commerciale separata `nala_conversion_attribution`. Il browser conserva solo touch minimizzati in `sessionStorage`, con finestra esatta di 30 minuti e last qualifying touch per prodotto. Il server riconvalida tenant, entitlement, interaction/session, finestra temporale e appartenenza del prodotto a `matched_product_ids`; tenant, prezzi, currency e valore assistito non sono mai autorevoli dal browser.
+
+Il semantic enrichment Nala è asincrono e separato dal chat path: la migration `097_nala_semantic_enrichment.sql` aggiunge intent/confidence, demand status, retrieval quality, knowledge status, requested product text e stato/versione operativi direttamente a `nala_interactions`. La taxonomy V1 comprende intent prodotto, availability/price/recommendation/substitution, recipe, delivery/store/event information, order/payment help, complaint, small talk, other e unknown. `requested_product_text` è una frase derivata massima di 150 caratteri, non una copia del messaggio, e viene eliminata con la stessa retention della riga.
+
+Il dispatcher `.github/workflows/nala-semantic-enrichment.yml` richiama ogni 10 minuti la route service-role-only `/api/internal/nala-semantic-enrichment`. L'RPC `claim_nala_interactions_for_enrichment` usa `FOR UPDATE SKIP LOCKED`, batch massimo 25, recovery claim dopo 15 minuti e massimo tre tentativi (`pending -> processing -> completed | failed`). Small talk è completato deterministicamente senza AI. Le altre righe usano `gemini-2.5-flash-lite`, JSON strutturato validato e solo message/reply/outcome più nomi prodotto e contesto KB associati; identità, sessione, geografia e device non entrano nel prompt. Il costo è tracciato separatamente in `ai_usage_log` con endpoint `nala_semantic_enrichment`. La conversion attribution riusa `matched_product_ids` come source of truth del retrieval e non duplica un evento `product_retrieved`.
 
 Nala Structured Product Actions V1 estende `/api/chat` con action `add_to_cart` server-validate e user-confirmed. La UI mostra al massimo una card compatta per risposta e usa `cartStore.addItem(..., 1)`, quindi riutilizza sync, drawer e Conversion Attribution. Le action restano metadata UI e non entrano nella history testuale inviata a Gemini. La copy action usa il locale storefront esplicito risolto da `localeStore` e dalle locale supportate dal tenant; `navigator.language` non è source of truth e il fallback resta francese.
 
@@ -239,7 +243,11 @@ Il resolver canonico `src/lib/catalog/productRelationships.ts` restituisce prodo
 
 La proposta è client-safe e legata all'interaction tramite UUID logico. Il flusso richiede due consensi: apertura della preview e bulk add finale dei soli item selezionati; un follow-up “Oui” espande soltanto l'ultima proposta ancora pendente. Quantità sempre 1, massimo 8 SKU, nessun quantity editor o calcolo confezioni. Il bulk add riusa `cartStore.addItem()`, protegge dal doppio click, mantiene i successi in caso di errore parziale e apre il drawer esistente tramite `cartUiStore`. I prodotti proposti restano separati dal retrieval in `action_product_ids`; direct/substitute descrivono il match catalogo mentre recipe resta l'intent/action context. Gli eventi add-to-cart, checkout e purchase continuano nella Conversion Attribution esistente. Locale: storefront/tenant, fallback FR, mai `navigator.language`.
 
-Non esiste un recipe database né una tabella `nala_cart_plans`: V1 mantiene il piano nel turn client-side e usa interaction metadata + conversion events esistenti per misurare proposta/accettazione senza una seconda pipeline. Dashboard, meal planner, automatic quantity optimization, collaborative filtering e persistenza delle ricette restano fuori scope.
+Non esiste un recipe database né una tabella `nala_cart_plans`: V1 mantiene il piano nel turn client-side e usa interaction metadata + conversion events esistenti per misurare proposta/accettazione senza una seconda pipeline. Meal planner, automatic quantity optimization, collaborative filtering e persistenza delle ricette restano fuori scope.
+
+Nala Analytics Dashboard V1 è disponibile nel tenant admin su `/admin/nala-analytics`, nel workspace Shop sotto “Croissance”. La route riusa `ai_usage.view` e verifica anche l'entitlement commerciale `nala_analytics`; non introduce nuove capability RBAC, tabelle, view o migration. `src/lib/admin/nalaAnalyticsDashboard.ts` esegue letture service-role tenant-scoped su `nala_sessions`, `nala_interactions` e `nala_conversion_events`, con count/paginazione server-side per non dipendere dal limite PostgREST. Le finestre disponibili sono 7/30/90 giorni.
+
+La dashboard espone soltanto metriche derivate: conversazioni/interazioni, intent, unmet demand e requested product aggregate, knowledge gap, retrieval weak/empty, coverage enrichment, origine delle Product Actions, Cart Builder proposto/accettato, add-to-cart, checkout assistiti, ordini assistiti e gross assisted item value. Non mostra message/reply raw né identità cliente. “Assisted revenue” resta attribution e non causalità; il valore usa i dati durevoli di `nala_conversion_events` e non cambia checkout, ordini o payment state machine.
 
 Le vecchie colonne billing in `tenants` restano compatibilità e non vanno rimosse senza migration dedicata.
 
@@ -371,7 +379,7 @@ Gli export operativi delle prenotazioni evento (CSV, lista fallback A4 e codici 
 
 Accounting tecnico interno: `ai_usage_log`, `ai_pricing`, `ai_usage_monthly_by_tenant`.
 
-`/admin/platform/ai-usage` mostra costi/provider solo Platform. `/admin/ai-usage` mostra al tenant utilizzo prodotto senza provider/model/token/costo tecnico.
+`/admin/platform/ai-usage` mostra costi/provider solo Platform. `/admin/ai-usage` mostra al tenant utilizzo prodotto senza provider/model/token/costo tecnico. `/admin/nala-analytics` è invece la surface business tenant di Nala: usa `ai_usage.view` + entitlement `nala_analytics`, mostra metriche aggregate di domanda, qualità e conversion attribution e non espone costi tecnici o conversazioni raw.
 
 ---
 
@@ -443,11 +451,15 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 `095` è additiva: introduce l'entitlement `nala_analytics`, le tabelle service-role-only `nala_sessions` e `nala_interactions`, la risoluzione atomica delle sessioni e la purge raw a 90 giorni. I customer sono referenziati solo per UUID nullable; geografia e metadata sono minimizzati. Lo scheduling giornaliero della purge resta da collegare a infrastruttura approvata.
 
-`096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.\n\n`097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk viene completato senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention.
+`096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.
+
+`097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk viene completato senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention.
 
 `098` è additiva e service-role-only: introduce l'entitlement `nala_conversion_attribution`, la lineage prodotto/checkout `nala_checkout_attributions`, gli eventi conversione durevoli e la RPC idempotente `record_nala_purchase_attribution`. La purge delle conversazioni porta a `NULL` solo i riferimenti session/interaction; product ID, checkout/order ID, quantità, prezzi snapshot e gross assisted value restano disponibili per reporting.
 
 `099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
+
+Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
 ---
 
@@ -477,6 +489,7 @@ apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
 apps/storefront/src/lib/admin/workspace.ts
 apps/storefront/src/lib/admin/platformBilling.ts
+apps/storefront/src/lib/admin/nalaAnalyticsDashboard.ts
 apps/storefront/src/lib/ai/*
 apps/storefront/src/lib/notifications/*
 apps/storefront/src/app/api/admin/*
@@ -520,8 +533,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.30
+# Fine snapshot v6.31
 
-**Base audit:** `main @ Nala Cart Builder V1`
+**Base audit:** `main @ Nala Analytics Dashboard V1`
 **Data:** 2 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
