@@ -116,13 +116,13 @@ export function NalaCartPlanCard({
   }
 
   return (
-    <article className="w-full overflow-hidden rounded-xl border border-[#DDD8FF] bg-white shadow-sm">
-      <div className="px-3 py-3">
+    <article className="flex max-h-[min(52dvh,360px)] w-full flex-col overflow-hidden rounded-xl border border-[#DDD8FF] bg-white shadow-sm md:max-h-[380px]">
+      <div className="shrink-0 px-3 py-2.5">
         <h3 className="text-sm font-semibold text-gray-900">{plan.labels.basketTitle} {plan.title}</h3>
         <p className="mt-0.5 text-xs text-gray-500">{plan.labels.selectionHelp}</p>
       </div>
 
-      <div className="border-t border-[#EEEAF8]">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#EEEAF8]">
         {plan.items.map((item, index) => {
           const productId = item.product?.id;
           const selected = Boolean(productId && selectedIds.has(productId));
@@ -130,10 +130,10 @@ export function NalaCartPlanCard({
           return (
             <label
               key={`${item.ingredientName}:${productId ?? index}`}
-              className={`flex min-h-14 items-center gap-2.5 border-b border-[#EEEAF8] px-3 py-2 ${unavailable ? 'cursor-default bg-gray-50' : 'cursor-pointer hover:bg-[#FAF9FF]'}`}
+              className={`flex min-h-12 items-center gap-2 border-b border-[#EEEAF8] px-3 py-1.5 ${unavailable ? 'cursor-default bg-gray-50' : 'cursor-pointer hover:bg-[#FAF9FF]'}`}
             >
               {unavailable ? (
-                <IconCircle size={18} aria-hidden="true" className="shrink-0 text-gray-400" />
+                <IconCircle size={17} aria-hidden="true" className="shrink-0 text-gray-400" />
               ) : (
                 <input
                   type="checkbox"
@@ -145,18 +145,18 @@ export function NalaCartPlanCard({
                 />
               )}
 
-              <span className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#F1EFFF]">
+              <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-[#F1EFFF]">
                 {item.product?.imageUrl ? (
                   <Image
                     src={item.product.imageUrl}
                     alt=""
                     fill
-                    sizes="40px"
+                    sizes="36px"
                     className="object-cover"
                   />
                 ) : (
                   <span className="flex h-full w-full items-center justify-center text-[#8B7CF6]">
-                    <IconPhoto size={18} aria-hidden="true" />
+                    <IconPhoto size={17} aria-hidden="true" />
                   </span>
                 )}
               </span>
@@ -166,12 +166,12 @@ export function NalaCartPlanCard({
                   {item.product?.name ?? item.ingredientName}
                 </span>
                 {item.status === 'substitute' && (
-                  <span className="mt-0.5 block text-[11px] font-medium text-amber-700">
+                  <span className="mt-0.5 block text-[10px] font-medium text-amber-700">
                     {plan.labels.substitute}
                   </span>
                 )}
                 {unavailable && (
-                  <span className="mt-0.5 block text-[11px] text-gray-500">
+                  <span className="mt-0.5 block text-[10px] text-gray-500">
                     {plan.labels.unavailable}
                   </span>
                 )}
@@ -185,7 +185,7 @@ export function NalaCartPlanCard({
         })}
       </div>
 
-      <div className="p-3">
+      <div className="shrink-0 border-t border-[#EEEAF8] bg-white p-3">
         <div className="mb-2.5 flex items-center justify-between gap-3 text-xs text-gray-600">
           <span>{selectedItems.length} {plan.labels.productsFound} · {plan.labels.indicativeTotal}</span>
           <strong className="text-sm text-gray-900">
