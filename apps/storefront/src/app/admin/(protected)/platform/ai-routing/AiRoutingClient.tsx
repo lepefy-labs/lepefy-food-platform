@@ -128,6 +128,21 @@ export default function AiRoutingClient() {
         <details className={card}><summary className="min-h-11 cursor-pointer">Ajouter un modèle</summary>{modelForm()}</details>
       </section>
       <section className="space-y-3"><h2 className="text-lg font-semibold">Policies</h2>
+        <details className={card}>
+          <summary className="min-h-11 cursor-pointer font-medium">Ajouter une policy</summary>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={e => {
+            e.preventDefault(); const f = new FormData(e.currentTarget);
+            void save({ kind: 'policy', values: {
+              consumer: text(f, 'consumer'), capability: text(f, 'capability'),
+              enabled: f.has('enabled'), config: {},
+            } });
+          }}>
+            <Field label="Consumer" name="consumer" required />
+            <Field label="Capability" name="capability" required />
+            <Enabled />
+            <button className={button} disabled={busy}>Créer la policy</button>
+          </form>
+        </details>
         {data.policies.map(p => <div key={p.id} className={card}>
           <h3 className="font-semibold">{p.consumer} · {p.capability}</h3>
           <button className={button} disabled={busy} onClick={() => void save({ kind: 'policy', id: p.id,
