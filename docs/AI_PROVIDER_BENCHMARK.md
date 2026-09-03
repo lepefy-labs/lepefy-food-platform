@@ -1,11 +1,11 @@
-# AI Provider Benchmark V1
+# AI Provider Benchmark V1.1
 
 ## Obiettivo
 
 Confrontare modelli AI registrati in Lepefy AI Core senza cambiare le policy di produzione.
 Il primo caso d'uso è `nala_semantic_enrichment / classification`, dove il costo può essere ridotto usando un modello più economico se mantiene qualità e affidabilità sufficienti.
 
-V1 confronta in particolare:
+V1.1 confronta in particolare:
 
 - Gemini 2.5 Flash-Lite;
 - GPT-OSS 20B tramite Hugging Face Inference Providers.
@@ -23,7 +23,7 @@ Il benchmark è manual-only e non modifica:
 
 La route interna `/api/internal/ai-provider-benchmark` usa lo stesso bearer service-role degli altri job interni. I modelli candidati vengono eseguiti singolarmente tramite AI Gateway con consumer telemetry dedicato `platform_ai_benchmark`; non esiste fallback tra candidati durante il benchmark.
 
-Il report non restituisce message/reply raw. Usa interazioni recenti già arricchite come baseline e restituisce solo metriche aggregate.
+Il report non restituisce message/reply raw. Usa interazioni recenti già arricchite come baseline e restituisce solo metriche aggregate e failure code normalizzati a bassa cardinalità.
 
 ## Registrazione modelli
 
@@ -95,6 +95,7 @@ L'URL deve essere HTTPS. `SUPABASE_SERVICE_ROLE_KEY` resta secret GitHub.
 Per ogni modello il report include:
 
 - `attempted`, `succeeded`, `failed`;
+- `failureCodes`: conteggi aggregati di errori normalizzati come `model_unavailable`, `model_capability_unavailable`, `provider_unavailable`, `credential_unavailable`, `invalid_structured_output`, `provider_timeout`, `provider_error`;
 - `schemaSuccessRatePct`;
 - agreement su `intent`, `demandStatus`, `retrievalQuality`, `knowledgeStatus`, `requestedProductText`;
 - agreement complessivo sui cinque campi;
@@ -102,7 +103,9 @@ Per ogni modello il report include:
 - input/output tokens;
 - costo stimato, solo se i metadata costo del modello sono configurati.
 
-L'agreement confronta il candidato con l'enrichment production già persistito. Non è ground truth umana e non deve essere presentato come accuracy assoluta.
+I failure code non includono eccezioni raw, prompt, message o reply. Un errore non riconosciuto viene compattato in `benchmark_failed` oppure `ai_routing_failed`.
+
+L'agreement confronta il candidato con l'enrichment production già persistito. Non è ground truth umana e non deve essere presentato come accuracy assoluta. Le percentuali di agreement sono calcolate sulle sole richieste riuscite, quindi vanno sempre lette insieme a `schemaSuccessRatePct` e `failureCodes`.
 
 ## Decisione di promozione
 

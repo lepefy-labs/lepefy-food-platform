@@ -1,6 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/server';
 import { runAiModel } from '@/lib/ai/core/aiGateway';
+import { AiRoutingError } from '@/lib/ai/core/types';
 import {
   buildNalaSemanticAiRequest,
   loadNalaSemanticContext,
@@ -42,6 +43,17 @@ function estimatedCost(metadata: ModelMetadata | undefined, inputTokens: number,
   if (!metadata || metadata.input_cost_per_million === null || metadata.output_cost_per_million === null) return null;
   return (inputTokens / 1_000_000) * metadata.input_cost_per_million
     + (outputTokens / 1_000_000) * metadata.output_cost_per_million;
+}
+
+function benchmarkFailureCode(error: unknown): string {
+  if (error instanceof AiRoutingError) {
+    const reason = error.reasons.at(-1);
+    return reason && /^[a-z0-9_]+$/.test(reason) ? reason : 'ai_routing_failed';
+  }
+  if (error instanceof Error && error.message === 'benchmark_context_missing') {
+    return 'benchmark_context_missing';
+  }
+  return 'benchmark_failed';
 }
 
 export async function benchmarkNalaSemanticModels(params: {
@@ -93,6 +105,7 @@ export async function benchmarkNalaSemanticModels(params: {
     let retrievalMatches = 0;
     let knowledgeMatches = 0;
     let productTextMatches = 0;
+    const failureCodes: Record<string, number> = {};
     let cursor = 0;
 
     async function worker() {
@@ -122,8 +135,10 @@ export async function benchmarkNalaSemanticModels(params: {
           retrievalMatches += Number(response.structured.retrievalQuality === interaction.retrieval_quality);
           knowledgeMatches += Number(response.structured.knowledgeStatus === interaction.knowledge_status);
           productTextMatches += Number(sameText(response.structured.requestedProductText, interaction.requested_product_text));
-        } catch {
+        } catch (error) {
           failed += 1;
+          const code = benchmarkFailureCode(error);
+          failureCodes[code] = (failureCodes[code] ?? 0) + 1;
         }
       }
     }
@@ -138,6 +153,7 @@ export async function benchmarkNalaSemanticModels(params: {
       attempted: interactions.length,
       succeeded,
       failed,
+      failureCodes: Object.fromEntries(Object.entries(failureCodes).sort(([a], [b]) => a.localeCompare(b))),
       schemaSuccessRatePct: percentage(succeeded, interactions.length),
       agreementPct: {
         overall: percentage(totalMatches, comparedFields),
