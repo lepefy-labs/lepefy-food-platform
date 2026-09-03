@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { assertAiRouteReady, runAi } from '@/lib/ai/core/aiGateway';
-import type { StructuredSchema } from '@/lib/ai/core/types';
+import type { AiRequest, StructuredSchema } from '@/lib/ai/core/types';
 import {
   DEMAND_STATUSES,
   deterministicSmallTalkEnrichment,
@@ -39,7 +39,7 @@ const RESPONSE_SCHEMA = {
   ],
 } satisfies StructuredSchema;
 
-interface ClaimedInteraction {
+export interface NalaSemanticInteractionInput {
   id: string;
   tenant_id: string;
   message_text: string;
@@ -47,17 +47,22 @@ interface ClaimedInteraction {
   outcome: string;
   matched_product_ids: string[] | null;
   matched_kb_ids: string[] | null;
+}
+
+interface ClaimedInteraction extends NalaSemanticInteractionInput {
   semantic_enrichment_attempts: number;
 }
 
-interface SemanticContext {
+export interface NalaSemanticContext {
   productNames: string[];
   knowledgeEntries: Array<{ category: string; content: string }>;
 }
 
 type ErrorCode = 'context_load_error' | 'provider_error' | 'update_error';
 
-async function loadSemanticContext(interaction: ClaimedInteraction): Promise<SemanticContext> {
+export async function loadNalaSemanticContext(
+  interaction: NalaSemanticInteractionInput,
+): Promise<NalaSemanticContext> {
   const service = createServiceClient();
   const productIds = interaction.matched_product_ids ?? [];
   const knowledgeIds = interaction.matched_kb_ids ?? [];
@@ -103,7 +108,10 @@ Allowed retrievalQuality: ${RETRIEVAL_QUALITIES.join(', ')}
 Allowed knowledgeStatus: ${KNOWLEDGE_STATUSES.join(', ')}`;
 }
 
-function buildInteractionPayload(interaction: ClaimedInteraction, context: SemanticContext): string {
+function buildInteractionPayload(
+  interaction: NalaSemanticInteractionInput,
+  context: NalaSemanticContext,
+): string {
   return JSON.stringify({
     message: interaction.message_text,
     reply: interaction.reply_text?.slice(0, 1200) ?? null,
@@ -113,23 +121,30 @@ function buildInteractionPayload(interaction: ClaimedInteraction, context: Seman
   });
 }
 
+export function buildNalaSemanticAiRequest(
+  interaction: NalaSemanticInteractionInput,
+  context: NalaSemanticContext,
+): AiRequest<NalaSemanticEnrichment> {
+  return {
+    system: buildSystemPrompt(),
+    messages: [{ role: 'user', content: buildInteractionPayload(interaction, context) }],
+    responseSchema: RESPONSE_SCHEMA,
+    validate: validateNalaSemanticEnrichment,
+    temperature: 0,
+    maxOutputTokens: 300,
+  };
+}
+
 async function classifyWithAi(
   interaction: ClaimedInteraction,
-  context: SemanticContext,
+  context: NalaSemanticContext,
 ): Promise<NalaSemanticEnrichment> {
   const response = await runAi<NalaSemanticEnrichment>({
     tenantId: interaction.tenant_id,
     endpoint: ENDPOINT,
     consumer: CONSUMER,
     capability: CAPABILITY,
-    request: {
-      system: buildSystemPrompt(),
-      messages: [{ role: 'user', content: buildInteractionPayload(interaction, context) }],
-      responseSchema: RESPONSE_SCHEMA,
-      validate: validateNalaSemanticEnrichment,
-      temperature: 0,
-      maxOutputTokens: 300,
-    },
+    request: buildNalaSemanticAiRequest(interaction, context),
   });
 
   return response.structured;
@@ -180,7 +195,7 @@ async function processInteraction(
   try {
     const enrichment = interaction.outcome === 'small_talk'
       ? deterministicSmallTalkEnrichment()
-      : await classifyWithAi(interaction, await loadSemanticContext(interaction));
+      : await classifyWithAi(interaction, await loadNalaSemanticContext(interaction));
     await markCompleted(interaction, enrichment);
     return 'completed';
   } catch (error) {

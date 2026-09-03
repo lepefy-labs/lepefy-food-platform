@@ -1,7 +1,7 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/server';
 import { logAiUsage } from '@/lib/ai/usageTracking';
-import { orderCandidates, routeAi } from './router';
+import { LocalCircuitBreaker, orderCandidates, routeAi, type AttemptTelemetry } from './router';
 import {
   AiRoutingError,
   type AiCandidate,
@@ -62,6 +62,65 @@ async function loadCandidates(consumer: string, capability: string): Promise<AiC
   return candidates;
 }
 
+async function loadModelCandidate(modelKey: string, capability: string, timeoutMs: number): Promise<AiCandidate> {
+  const db = createServiceClient();
+  const { data: modelRow, error: modelError } = await db.from('ai_models').select('*')
+    .eq('key', modelKey).eq('enabled', true).maybeSingle();
+  if (modelError) throw new AiRoutingError(['model_load_failed']);
+  if (!modelRow) throw new AiRoutingError(['model_unavailable']);
+
+  const model = modelRow as AiModel;
+  if (!model.capabilities?.[capability]) throw new AiRoutingError(['model_capability_unavailable']);
+
+  const { data: providerRow, error: providerError } = await db.from('ai_providers').select('*')
+    .eq('id', model.provider_id).eq('enabled', true).maybeSingle();
+  if (providerError) throw new AiRoutingError(['provider_load_failed']);
+  if (!providerRow) throw new AiRoutingError(['provider_unavailable']);
+
+  const provider = providerRow as AiProvider;
+  if (!adapterFor(provider.provider_type)) throw new AiRoutingError(['adapter_unavailable']);
+  if (provider.credential_ref && !credentialFor(provider.credential_ref)) {
+    throw new AiRoutingError(['credential_unavailable']);
+  }
+
+  return {
+    model,
+    provider,
+    enabled: true,
+    priority: 1,
+    timeout_ms: Math.max(1_000, Math.min(Math.trunc(timeoutMs), 18_000)),
+    min_confidence: null,
+  };
+}
+
+async function recordGatewayTelemetry(params: {
+  tenantId: string;
+  endpoint: string;
+  consumer: string;
+  capability: string;
+}, event: AttemptTelemetry, updateHealth = true) {
+  await logAiUsage({
+    tenantId: params.tenantId,
+    endpoint: params.endpoint,
+    provider: event.candidate.provider.key,
+    model: event.candidate.model.provider_model_id,
+    status: event.status,
+    inputTokens: event.inputTokens,
+    outputTokens: event.outputTokens,
+    consumer: params.consumer,
+    capability: params.capability,
+    latencyMs: event.latencyMs,
+    fallbackUsed: event.fallbackUsed,
+    fallbackReason: event.fallbackReason,
+  });
+  if (updateHealth) {
+    await createServiceClient().from('ai_providers').update({
+      health_status: event.status === 'success' ? 'healthy' : 'degraded',
+      last_health_check_at: new Date().toISOString(),
+    }).eq('id', event.candidate.provider.id);
+  }
+}
+
 /**
  * Fail before a batch consumer claims work when its configured AI route cannot run.
  * This protects retry counters from infrastructure/configuration failures such as a
@@ -105,25 +164,31 @@ export async function runAi<T>(params: {
     request: params.request,
     adapter: adapterFor,
     credential: credentialFor,
-    telemetry: async event => {
-      await logAiUsage({
-        tenantId: params.tenantId,
-        endpoint: params.endpoint,
-        provider: event.candidate.provider.key,
-        model: event.candidate.model.provider_model_id,
-        status: event.status,
-        inputTokens: event.inputTokens,
-        outputTokens: event.outputTokens,
-        consumer: params.consumer,
-        capability: params.capability,
-        latencyMs: event.latencyMs,
-        fallbackUsed: event.fallbackUsed,
-        fallbackReason: event.fallbackReason,
-      });
-      await createServiceClient().from('ai_providers').update({
-        health_status: event.status === 'success' ? 'healthy' : 'degraded',
-        last_health_check_at: new Date().toISOString(),
-      }).eq('id', event.candidate.provider.id);
-    },
+    telemetry: event => recordGatewayTelemetry(params, event),
+  });
+}
+
+/**
+ * Execute exactly one registered model without changing or consulting a production
+ * routing policy. Intended for controlled platform evaluations such as provider
+ * benchmarks; callers must use a distinct consumer/endpoint for telemetry.
+ */
+export async function runAiModel<T>(params: {
+  tenantId: string;
+  endpoint: string;
+  consumer: string;
+  capability: string;
+  modelKey: string;
+  request: AiRequest<T>;
+  timeoutMs?: number;
+}) {
+  const candidate = await loadModelCandidate(params.modelKey, params.capability, params.timeoutMs ?? 10_000);
+  return routeAi({
+    candidates: [candidate],
+    request: params.request,
+    adapter: adapterFor,
+    credential: credentialFor,
+    telemetry: event => recordGatewayTelemetry(params, event, false),
+    circuit: new LocalCircuitBreaker(),
   });
 }

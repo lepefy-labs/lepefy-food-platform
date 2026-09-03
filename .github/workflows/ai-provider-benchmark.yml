@@ -1,0 +1,32 @@
+name: AI provider benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_keys:
+        description: Comma-separated ai_models keys to compare
+        required: true
+        default: gemini-flash-lite,hf-gpt-oss-20b
+      sample_size:
+        description: Recent completed Nala enrichments to compare (1-12)
+        required: true
+        default: '8'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run AI provider benchmark
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AI_BENCHMARK_APP_URL: ${{ vars.AI_BENCHMARK_APP_URL }}
+          NALA_ENRICHMENT_APP_URL: ${{ vars.NALA_ENRICHMENT_APP_URL }}
+          EVENT_REPORTS_APP_URL: ${{ vars.EVENT_REPORTS_APP_URL }}
+          BENCHMARK_MODEL_KEYS: ${{ inputs.model_keys }}
+          BENCHMARK_SAMPLE_SIZE: ${{ inputs.sample_size }}
+        run: node scripts/process-ai-provider-benchmark.mjs
