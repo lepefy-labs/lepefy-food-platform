@@ -1,4 +1,4 @@
-import { AiAttemptError, type LepefyAiProviderAdapter } from '../types';
+import { AiAttemptError, type LepefyAiProviderAdapter, type StructuredSchema } from '../types';
 
 /** Explicit deployment allowlist prevents registry edits from becoming an arbitrary HTTP proxy. */
 export function approvedInferenceUrl(base: string | null): string {
@@ -11,13 +11,40 @@ export function approvedInferenceUrl(base: string | null): string {
 }
 
 export function providerHttpFailureCode(status: number): string {
-  if (status === 429) return 'rate_limit';
   if (status === 400) return 'provider_http_400';
   if (status === 401) return 'provider_http_401';
   if (status === 403) return 'provider_http_403';
   if (status === 404) return 'provider_http_404';
+  if (status === 429) return 'rate_limit';
   if (status >= 500 && status <= 599) return 'provider_http_5xx';
   return 'provider_error';
+}
+
+function jsonSchema(schema: StructuredSchema): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    type: schema.type,
+    ...(schema.enum ? { enum: schema.enum } : {}),
+    ...(schema.required ? { required: schema.required } : {}),
+    ...(schema.properties ? {
+      properties: Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, jsonSchema(value)])),
+      additionalProperties: false,
+    } : {}),
+    ...(schema.items ? { items: jsonSchema(schema.items) } : {}),
+  };
+  return schema.nullable ? { anyOf: [base, { type: 'null' }] } : base;
+}
+
+export function openAiResponseFormat(request: { model: { config: Record<string, unknown> }; responseSchema: StructuredSchema }) {
+  return request.model.config.responseFormat === 'json_schema'
+    ? {
+      type: 'json_schema',
+      json_schema: {
+        name: 'lepefy_response',
+        schema: jsonSchema(request.responseSchema),
+        strict: true,
+      },
+    }
+    : { type: 'json_object' };
 }
 
 export const openaiCompatibleAdapter: LepefyAiProviderAdapter = {
@@ -30,7 +57,7 @@ export const openaiCompatibleAdapter: LepefyAiProviderAdapter = {
         model: request.model.provider_model_id,
         messages: [{ role: 'system', content: request.system + '\nReturn JSON matching this schema: ' + JSON.stringify(request.responseSchema) }, ...request.messages],
         temperature: request.temperature ?? 0.4, max_tokens: request.maxOutputTokens ?? 1200,
-        response_format: { type: 'json_object' },
+        response_format: openAiResponseFormat(request),
       }),
     });
     if (!response.ok) throw new AiAttemptError(providerHttpFailureCode(response.status));
