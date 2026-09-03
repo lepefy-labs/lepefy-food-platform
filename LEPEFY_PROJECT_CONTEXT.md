@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 settembre 2026 — **v6.35 Current-State Snapshot**
+> **Aggiornato:** 4 settembre 2026 — **v6.36 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -431,6 +431,8 @@ Expiry impedisce subito il riuso del contesto; la working memory scaduta viene c
 
 `/admin/platform/ai-routing` riusa il guard Platform Owner per pagina e API, permette creazione/edit/enable di provider e modelli, associazione e priorità numeriche per policy, timeout e confidence. Nessun nuovo RBAC tenant. `ai_usage_log` riusa `logAiUsage` ed estende consumer/capability/latency/fallback; i costi restano telemetry interna. Retrieval embeddings è contabilizzato separatamente come `nala_retrieval`.
 
+Nala Fast Resolver V1 introduce un percorso deterministico prima di retrieval embeddings e inference per `store_information` ad alta confidenza. Il resolver copre inizialmente orari, indirizzo e contatto WhatsApp usando come source of truth i campi tenant canonici `click_collect_hours` / `click_collect_hours_it`, `click_collect_address` e `whatsapp_number`; solo per gli orari può usare come fallback una singola frase schedule-like estratta dal `chatbox_extra_context` curato dall'admin. Se il dato o l'intent non sono sufficientemente certi, il resolver restituisce `null` e il flusso esistente continua invariato verso retrieval + AI Core. Un `pendingAction` conversazionale disabilita il fast path per non interrompere follow-up commerce. Le risposte risolte deterministicamente aggiornano comunque conversation memory, registrano `nala_interactions.ai_call_triggered = false` e telemetry zero-token `provider=lepefy`, `model=fast_store_information`; non chiamano embeddings né provider LLM.
+
 AI Core V1.2 richiede registry e contesto persistente: migration 100 è già applicata e verificata dal proprietario. Schema/RPC mancanti, errori DB, policy disabilitate e chain vuote falliscono con errori normalizzati; non esistono bootstrap Gemini né contesto stateless. Nessuna nuova migration è richiesta da V1.2. Hugging Face usa l'adapter `openai_compatible` esistente (router.huggingface.co/v1, modello iniziale `openai/gpt-oss-20b:fastest`) e richiede `HUGGINGFACE_API_KEY`, origin HTTPS esatta in `LEPEFY_AI_ALLOWED_ORIGINS` e registry/policy configurati. Gemini resta primario per Nala chat durante il rollout; semantic enrichment dispone di policy classification indipendente e può quindi usare in futuro un ordine/costo diverso senza deploy codice. Health osservazionale non esclude candidati dal routing.
 
 Debt V1 verificato: chiamate dirette ancora in embeddings/retrieval, utility admin immagini/descrizioni e tre script batch generazione immagini/descrizioni/embeddings. Semantic enrichment 097 non è più una chiamata provider diretta. Un errore embedding iniziale non impedisce la risposta generativa routed, ma riduce retrieval e proposte prodotto. Nessun training, billing SaaS o modifica a checkout/payment/order.
@@ -595,8 +597,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.35
+# Fine snapshot v6.36
 
-**Base audit:** `main + AI Core V1.2 semantic enrichment routing`
-**Data:** 3 settembre 2026
+**Base audit:** `main + AI Core V1.2 + Nala Fast Resolver V1`
+**Data:** 4 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

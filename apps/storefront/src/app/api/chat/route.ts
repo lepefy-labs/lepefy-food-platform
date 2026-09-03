@@ -27,6 +27,7 @@ import {
 } from '@/lib/ai/nalaCartPlanContract';
 import { resolveCartPlanIngredients } from '@/lib/ai/nalaCartPlanResolver';
 import { getRelatedProducts } from '@/lib/catalog/productRelationships';
+import { resolveNalaFastStoreInformation } from '@/lib/ai/nalaFastResolver';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -123,6 +124,35 @@ export async function POST(req: NextRequest) {
         aiCallTriggered: false, outcome: 'small_talk', intent: 'small_talk',
       });
       return NextResponse.json({ reply: smallTalkReply, conversationId: conversation.id,
+        interactionId, matchedProductIds: null, actionProductIds: null, actions: [], cartPlan: null });
+    }
+    const fastResolution = conversation.memory.pendingAction ? null : resolveNalaFastStoreInformation({
+      message,
+      locale,
+      tenant,
+    });
+    if (fastResolution) {
+      const fastDecision = {
+        intent: 'store_information' as const,
+        commerceMode: 'none' as const,
+        confidence: 1,
+        subject: { type: 'store_information', name: fastResolution.subject },
+        entities: { dish: null, product: null },
+        pendingAction: null,
+      };
+      await logAiUsage({
+        tenantId: tenant.id, endpoint: ENDPOINT, provider: 'lepefy', model: 'fast_store_information',
+        consumer: 'nala', capability: 'deterministic', status: 'success',
+      });
+      await finishConversation(conversation, {
+        message, reply: fastResolution.reply, memory: memoryFromDecision(fastDecision, locale),
+        provider: 'lepefy', model: 'fast_store_information', confidence: 1, commerceMode: 'none',
+      });
+      const interactionId = await logNalaInteraction({
+        context: analyticsContext, messageText: message, replyText: fastResolution.reply,
+        aiCallTriggered: false, outcome: 'answered', intent: 'store_information',
+      });
+      return NextResponse.json({ reply: fastResolution.reply, conversationId: conversation.id,
         interactionId, matchedProductIds: null, actionProductIds: null, actions: [], cartPlan: null });
     }
     // Retrieval remains a legacy embedding consumer in V1; failure must not block routed inference.
