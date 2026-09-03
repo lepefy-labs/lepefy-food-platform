@@ -1,13 +1,13 @@
-# AI Provider Benchmark V1.1
+# AI Provider Benchmark V1.2
 
 ## Obiettivo
 
 Confrontare modelli AI registrati in Lepefy AI Core senza cambiare le policy di produzione.
 Il primo caso d'uso è `nala_semantic_enrichment / classification`, dove il costo può essere ridotto usando un modello più economico se mantiene qualità e affidabilità sufficienti.
 
-V1.1 confronta in particolare:
+V1.2 confronta in particolare:
 
-- Gemini 2.5 Flash-Lite;
+- Gemini 3.1 Flash-Lite;
 - GPT-OSS 20B tramite Hugging Face Inference Providers.
 
 DeepSeek è deliberatamente fuori scope finché pricing e provider strategy non sono stati chiariti.
@@ -29,19 +29,21 @@ Il report non restituisce message/reply raw. Usa interazioni recenti già arricc
 
 Prima del benchmark entrambi i modelli devono essere presenti e attivi in `/admin/platform/ai-routing`.
 
-### Gemini 2.5 Flash-Lite
+### Gemini 3.1 Flash-Lite
 
 Riutilizzare il provider Gemini esistente.
 
 Valori consigliati:
 
 ```text
-key: gemini-flash-lite
-display_name: Gemini 2.5 Flash-Lite
-provider_model_id: gemini-2.5-flash-lite
+key: gemini-3-1-flash-lite
+display_name: Gemini 3.1 Flash-Lite
+provider_model_id: gemini-3.1-flash-lite
 enabled: true
 capabilities: chat, structured_output, classification
 ```
+
+Gemini 3.1 Flash-Lite è il candidato benchmark successivo al 404 osservato su Gemini 2.5 Flash-Lite. Il benchmark non cambia automaticamente il registry: il record deve esistere in `ai_models` prima del run.
 
 Inserire in `input_cost_per_million` e `output_cost_per_million` il pricing corrente verificato del provider. Il benchmark non hardcoda prezzi esterni: se i metadata costo sono nulli, `estimatedCostUsd` sarà null.
 
@@ -74,11 +76,11 @@ GitHub Actions → `AI provider benchmark` → `Run workflow`.
 Default:
 
 ```text
-model_keys: gemini-flash-lite,hf-gpt-oss-20b
+model_keys: gemini-3-1-flash-lite,hf-gpt-oss-20b
 sample_size: 8
 ```
 
-Il sample è limitato a 12 interazioni per run per mantenere il job bounded. Per aumentare confidenza eseguire più run in momenti diversi, invece di trasformare un test economico in una piccola centrale elettrica.
+Il sample è limitato a 12 interazioni per run per mantenere il job bounded. Per aumentare confidenza eseguire più run in momenti diversi.
 
 Il workflow usa:
 
@@ -95,7 +97,7 @@ L'URL deve essere HTTPS. `SUPABASE_SERVICE_ROLE_KEY` resta secret GitHub.
 Per ogni modello il report include:
 
 - `attempted`, `succeeded`, `failed`;
-- `failureCodes`: conteggi aggregati di errori normalizzati come `model_unavailable`, `model_capability_unavailable`, `provider_unavailable`, `credential_unavailable`, `invalid_structured_output`, `provider_timeout`, `provider_error`;
+- `failureCodes`: conteggi aggregati di errori normalizzati;
 - `schemaSuccessRatePct`;
 - agreement su `intent`, `demandStatus`, `retrievalQuality`, `knowledgeStatus`, `requestedProductText`;
 - agreement complessivo sui cinque campi;
@@ -103,7 +105,19 @@ Per ogni modello il report include:
 - input/output tokens;
 - costo stimato, solo se i metadata costo del modello sono configurati.
 
-I failure code non includono eccezioni raw, prompt, message o reply. Un errore non riconosciuto viene compattato in `benchmark_failed` oppure `ai_routing_failed`.
+I failure code non includono eccezioni raw, prompt, message, reply o provider response body. Per provider OpenAI-compatible gli HTTP non riusciti sono distinti con codici a bassa cardinalità:
+
+```text
+provider_http_400
+provider_http_401
+provider_http_403
+provider_http_404
+rate_limit
+provider_http_5xx
+provider_error
+```
+
+Restano inoltre possibili codici AI Core come `model_unavailable`, `model_capability_unavailable`, `provider_unavailable`, `credential_unavailable`, `invalid_structured_output` e `provider_timeout`.
 
 L'agreement confronta il candidato con l'enrichment production già persistito. Non è ground truth umana e non deve essere presentato come accuracy assoluta. Le percentuali di agreement sono calcolate sulle sole richieste riuscite, quindi vanno sempre lette insieme a `schemaSuccessRatePct` e `failureCodes`.
 

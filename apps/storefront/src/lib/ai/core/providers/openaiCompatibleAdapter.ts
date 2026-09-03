@@ -9,6 +9,17 @@ export function approvedInferenceUrl(base: string | null): string {
     || !allowed.includes(url.origin)) throw new AiAttemptError('unapproved_endpoint');
   return url.toString().replace(/\/$/, '') + '/chat/completions';
 }
+
+export function providerHttpFailureCode(status: number): string {
+  if (status === 429) return 'rate_limit';
+  if (status === 400) return 'provider_http_400';
+  if (status === 401) return 'provider_http_401';
+  if (status === 403) return 'provider_http_403';
+  if (status === 404) return 'provider_http_404';
+  if (status >= 500 && status <= 599) return 'provider_http_5xx';
+  return 'provider_error';
+}
+
 export const openaiCompatibleAdapter: LepefyAiProviderAdapter = {
   async generate(request) {
     const response = await fetch(approvedInferenceUrl(request.provider.base_url), {
@@ -22,7 +33,7 @@ export const openaiCompatibleAdapter: LepefyAiProviderAdapter = {
         response_format: { type: 'json_object' },
       }),
     });
-    if (!response.ok) throw new AiAttemptError(response.status === 429 ? 'rate_limit' : 'provider_error');
+    if (!response.ok) throw new AiAttemptError(providerHttpFailureCode(response.status));
     const data = await response.json();
     return {
       text: typeof data?.choices?.[0]?.message?.content === 'string' ? data.choices[0].message.content : '',

@@ -6,7 +6,7 @@ on:
       model_keys:
         description: Comma-separated ai_models keys to compare
         required: true
-        default: gemini-flash-lite,hf-gpt-oss-20b
+        default: gemini-3-1-flash-lite,hf-gpt-oss-20b
       sample_size:
         description: Recent completed Nala enrichments to compare (1-12)
         required: true
