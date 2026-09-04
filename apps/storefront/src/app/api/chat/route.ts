@@ -33,6 +33,11 @@ import {
   resolveNalaFastProductAvailability,
   type NalaFastProductCandidate,
 } from '@/lib/ai/nalaFastProductResolver';
+import {
+  persistNalaResponseMemory,
+  resolveNalaResponseMemory,
+  semanticEnrichmentForNalaResponseMemory,
+} from '@/lib/ai/nalaResponseMemory';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,7 +122,8 @@ export async function POST(req: NextRequest) {
     conversation = await openConversation({
       tenantId: tenant.id, consumer: 'nala', conversationId: body?.conversationId, locale,
     });
-    const smallTalkReply = conversation.memory.pendingAction ? null : matchSmallTalk(message, tenant.name);
+    const hadPendingAction = Boolean(conversation.memory.pendingAction);
+    const smallTalkReply = hadPendingAction ? null : matchSmallTalk(message, tenant.name);
     if (smallTalkReply) {
       await finishConversation(conversation, {
         message, reply: smallTalkReply,
@@ -131,7 +137,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reply: smallTalkReply, conversationId: conversation.id,
         interactionId, matchedProductIds: null, actionProductIds: null, actions: [], cartPlan: null });
     }
-    const fastResolution = conversation.memory.pendingAction ? null : resolveNalaFastStoreInformation({
+    const fastResolution = hadPendingAction ? null : resolveNalaFastStoreInformation({
       message,
       locale,
       tenant,
@@ -166,20 +172,19 @@ export async function POST(req: NextRequest) {
         interactionId, matchedProductIds: null, actionProductIds: null, actions: [], cartPlan: null });
     }
 
-    const fastProductQuery = conversation.memory.pendingAction
-      ? null
-      : extractNalaAvailabilityProductQuery(message);
+    // One service client is enough for catalogue lookup, response memory and retrieval.
+    const supabase = createServiceClient();
+    const fastProductQuery = hadPendingAction ? null : extractNalaAvailabilityProductQuery(message);
     if (fastProductQuery) {
-      const fastSupabase = createServiceClient();
       const lookupPattern = `%${fastProductQuery.replace(/[%_]/g, '').slice(0, 80)}%`;
       const [byName, byAlt] = await Promise.all([
-        fastSupabase.from('products')
+        supabase.from('products')
           .select('id, name, name_alt, stock')
           .eq('tenant_id', tenant.id)
           .eq('active', true)
           .ilike('name', lookupPattern)
           .limit(4),
-        fastSupabase.from('products')
+        supabase.from('products')
           .select('id, name, name_alt, stock')
           .eq('tenant_id', tenant.id)
           .eq('active', true)
@@ -234,7 +239,7 @@ export async function POST(req: NextRequest) {
             },
           });
           const actions = fastProduct.available ? await buildNalaProductActions({
-            supabase: fastSupabase,
+            supabase,
             tenantId: tenant.id,
             interactionId,
             message,
@@ -257,7 +262,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Retrieval remains a legacy embedding consumer in V1; failure must not block routed inference.
+    // Response Memory runs before embeddings/retrieval: a safe learned answer costs no provider call at all.
+    const memoryResolution = hadPendingAction ? null : await resolveNalaResponseMemory({
+      supabase,
+      tenant,
+      locale,
+      message,
+    });
+    if (memoryResolution) {
+      await logAiUsage({
+        tenantId: tenant.id,
+        endpoint: ENDPOINT,
+        provider: 'lepefy',
+        model: 'response_memory_v1',
+        consumer: 'nala',
+        capability: 'deterministic',
+        status: 'success',
+      });
+      await finishConversation(conversation, {
+        message,
+        reply: memoryResolution.reply,
+        memory: memoryFromDecision(memoryResolution.decision, locale),
+        provider: 'lepefy',
+        model: 'response_memory_v1',
+        confidence: memoryResolution.matchScore,
+        commerceMode: 'none',
+      });
+      const interactionId = await logNalaInteraction({
+        context: analyticsContext,
+        messageText: message,
+        replyText: memoryResolution.reply,
+        aiCallTriggered: false,
+        outcome: 'answered',
+        intent: memoryResolution.decision.intent,
+        matchedKbIds: memoryResolution.contextKbIds.length > 0 ? memoryResolution.contextKbIds : null,
+        semanticEnrichment: semanticEnrichmentForNalaResponseMemory(memoryResolution),
+      });
+      return NextResponse.json({
+        reply: memoryResolution.reply,
+        conversationId: conversation.id,
+        interactionId,
+        matchedProductIds: null,
+        actionProductIds: null,
+        actions: [],
+        cartPlan: null,
+      });
+    }
+
+    // Legacy embedding retrieval now runs only after deterministic and learned Lepefy resolvers miss.
     let retrievalTimer: ReturnType<typeof setTimeout> | undefined;
     const retrieval = await Promise.race([
       embedText(message).catch(() => null),
@@ -265,7 +317,6 @@ export async function POST(req: NextRequest) {
     ]).finally(() => { if (retrievalTimer) clearTimeout(retrievalTimer); });
     const vector = retrieval?.vector;
     if (retrieval?.tokenCount) await logNalaEmbeddingUsage(tenant.id, retrieval.tokenCount);
-    const supabase = createServiceClient();
     const { data: matches, error: matchError } = vector ? await supabase.rpc('match_products', {
       query_embedding: vector,
       p_tenant_id: tenant.id,
@@ -306,7 +357,6 @@ export async function POST(req: NextRequest) {
       extraContext: tenant.chatbox_extra_context?.slice(0, 4000) ?? null,
       matchedProducts,
       knowledgeSnippets,
-
     });
 
     const contextPackage = boundedContext({
@@ -412,10 +462,26 @@ export async function POST(req: NextRequest) {
       commerceMode: decision.commerceMode,
     });
 
+    await persistNalaResponseMemory({
+      supabase,
+      tenant,
+      locale,
+      message,
+      reply: mainResponse.reply,
+      decision,
+      cartPlan: mainResponse.cartPlan,
+      hadPendingAction,
+      matchedProductIds,
+      matchedKbIds,
+      interactionId,
+      sourceProvider: response.provider,
+      sourceModel: response.model,
+    });
+
     return NextResponse.json({
       reply: mainResponse.reply,
       conversationId: conversation.id,
-      cartPlanExpanded: conversation.memory.pendingAction === 'cart_builder' && decision.pendingAction === null && cartBuilderRequested,
+      cartPlanExpanded: hadPendingAction && decision.pendingAction === null && cartBuilderRequested,
       interactionId,
       matchedProductIds: interactionId ? matchedProductIds : null,
       actionProductIds: interactionId ? actionProductIds : null,

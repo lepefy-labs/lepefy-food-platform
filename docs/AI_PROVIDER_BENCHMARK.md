@@ -1,16 +1,11 @@
-# AI Provider Benchmark V1.3
+# AI Provider Benchmark V1.4
 
 ## Obiettivo
 
 Confrontare modelli AI registrati in Lepefy AI Core senza cambiare le policy di produzione.
-Il caso d'uso iniziale è `nala_semantic_enrichment / classification`, dove il costo può essere ridotto usando un modello più economico solo se mantiene qualità e affidabilità sufficienti.
+Il caso d'uso iniziale resta `nala_semantic_enrichment / classification`, dove costo e latenza contano solo dopo affidabilità tecnica e qualità semantica.
 
-V1.3 confronta in particolare:
-
-- Gemini 3.1 Flash-Lite;
-- GPT-OSS 20B tramite Hugging Face Inference Providers con provider Fireworks AI fissato e structured output `json_schema`.
-
-DeepSeek resta deliberatamente fuori scope finché pricing e provider strategy non sono stati chiariti.
+Il candidato predefinito corrente è `gemini-3-1-flash-lite`. GPT-OSS 20B via Hugging Face/Fireworks non è più nella shortlist predefinita dopo i run con errori provider; l'infrastruttura benchmark resta generica e permette di inserire manualmente altri `ai_models.key` registrati.
 
 ## Sicurezza e isolamento
 
@@ -23,21 +18,15 @@ Il benchmark è manual-only e non modifica:
 
 La route interna `/api/internal/ai-provider-benchmark` usa lo stesso bearer service-role degli altri job interni. I candidati vengono eseguiti singolarmente tramite AI Gateway con consumer telemetry dedicato `platform_ai_benchmark`; non esiste fallback tra candidati durante il benchmark.
 
-Il report non restituisce message/reply raw. Usa interazioni recenti già arricchite come baseline e restituisce solo metriche aggregate e failure code normalizzati a bassa cardinalità.
+Il report non restituisce message/reply raw. Usa interazioni recenti già arricchite come baseline e restituisce soltanto metriche aggregate e failure code normalizzati a bassa cardinalità.
 
-## Perché un modello HF separato
+## Registrazione candidati
 
-Il modello production `hf-gpt-oss-20b` può restare invariato e collegato alle policy esistenti. Il benchmark usa un record separato per evitare di cambiare provider o response format del fallback production.
-
-Hugging Face raccomanda di fissare provider e modello per gli structured outputs, perché la compatibilità può variare fra provider. Il router HF permette di selezionare il provider con un suffisso nel model id.
-
-## Registrazione modelli
-
-Prima del benchmark entrambi i candidati devono essere presenti e attivi in `/admin/platform/ai-routing`.
+Ogni candidato deve essere presente e attivo in `/admin/platform/ai-routing`, con capability compatibili con il workload benchmark. Il benchmark non richiede che il modello sia collegato a una policy production.
 
 ### Gemini 3.1 Flash-Lite
 
-Riutilizzare il provider Gemini esistente.
+Riutilizzare il provider Gemini esistente:
 
 ```text
 key: gemini-3-1-flash-lite
@@ -49,62 +38,30 @@ capabilities: chat, structured_output, classification
 
 Inserire in `input_cost_per_million` e `output_cost_per_million` il pricing corrente verificato del provider. Il benchmark non hardcoda prezzi esterni: se i metadata costo sono nulli, `estimatedCostUsd` sarà null.
 
-### GPT-OSS 20B · Hugging Face · Fireworks
-
-Creare un record benchmark-only separato dal modello HF già usato nelle policy production:
-
-```text
-key: hf-gpt-oss-20b-fireworks
-display_name: GPT-OSS 20B · HF · Fireworks
-provider_model_id: openai/gpt-oss-20b:fireworks-ai
-enabled: true
-capabilities: chat, structured_output, classification
-config: {"responseFormat":"json_schema"}
-```
-
-Riutilizzare il provider Hugging Face esistente:
-
-```text
-provider_type: openai_compatible
-base_url: https://router.huggingface.co/v1
-credential_ref: HUGGINGFACE_API_KEY
-```
-
-`https://router.huggingface.co` deve essere presente in `LEPEFY_AI_ALLOWED_ORIGINS` e `HUGGINGFACE_API_KEY` deve essere configurata server-side.
-
-Non aggiungere `hf-gpt-oss-20b-fireworks` a una policy production durante la fase benchmark.
-
 ## Structured output configurabile
 
-L'adapter OpenAI-compatible mantiene `json_object` come comportamento di default, quindi i modelli production esistenti non cambiano comportamento.
+L'adapter OpenAI-compatible mantiene `json_object` come comportamento di default, quindi i modelli esistenti non cambiano comportamento.
 
-Solo i modelli con:
+Un modello può optare esplicitamente per:
 
 ```json
 {"responseFormat":"json_schema"}
 ```
 
-usano:
-
-```text
-response_format.type = json_schema
-strict = true
-```
-
-Lo schema Lepefy viene normalizzato in JSON Schema, incluse le proprietà nullable e `additionalProperties: false` sugli oggetti.
+In quel caso Lepefy invia `response_format.type = json_schema` con schema normalizzato e `strict = true`. Questa capacità resta disponibile per futuri candidati anche se GPT-OSS non è più un default del benchmark.
 
 ## Esecuzione
 
 GitHub Actions → `AI provider benchmark` → `Run workflow`.
 
-Default V1.3:
+Default corrente:
 
 ```text
-model_keys: gemini-3-1-flash-lite,hf-gpt-oss-20b-fireworks
+model_keys: gemini-3-1-flash-lite
 sample_size: 12
 ```
 
-Il sample resta limitato a 12 interazioni per run. Per aumentare confidenza eseguire più run in momenti diversi invece di cambiare produzione dopo un singolo campione minuscolo, una pratica sorprendentemente popolare nel mondo AI.
+`model_keys` può contenere più chiavi separate da virgola per confronti controllati. Il sample resta limitato a 12 interazioni per run; per aumentare la confidenza si eseguono più run in momenti diversi invece di promuovere un modello dopo un campione microscopico, sport molto praticato nell'industria AI.
 
 Il workflow usa:
 
@@ -121,7 +78,7 @@ L'URL deve essere HTTPS. `SUPABASE_SERVICE_ROLE_KEY` resta secret GitHub.
 Per ogni modello il report include:
 
 - `attempted`, `succeeded`, `failed`;
-- `failureCodes`, inclusi `provider_http_400`, `provider_http_401`, `provider_http_403`, `provider_http_404`, `provider_http_5xx`, `rate_limit`, `invalid_structured_output`, `provider_timeout`;
+- `failureCodes` normalizzati;
 - `schemaSuccessRatePct`;
 - agreement su `intent`, `demandStatus`, `retrievalQuality`, `knowledgeStatus`, `requestedProductText`;
 - agreement complessivo sui cinque campi;
@@ -131,19 +88,19 @@ Per ogni modello il report include:
 
 I failure code non includono eccezioni raw, prompt, message, reply o provider response body.
 
-L'agreement confronta il candidato con l'enrichment production già persistito. Non è ground truth umana e non deve essere presentato come accuracy assoluta. Le percentuali di agreement sono calcolate sulle sole richieste riuscite, quindi vanno sempre lette insieme a `schemaSuccessRatePct` e `failureCodes`.
+L'agreement confronta il candidato con l'enrichment production già persistito. Non è ground truth umana e non deve essere presentato come accuracy assoluta. Le percentuali vanno lette insieme a `schemaSuccessRatePct` e `failureCodes`.
 
 ## Decisione di promozione
 
-Non cambiare la policy production dopo un singolo run. Il percorso consigliato è:
+Non cambiare la policy production dopo un singolo run. Il percorso consigliato resta:
 
 1. almeno 3-5 run su campioni da 12;
 2. structured-output success vicino al 100%;
 3. agreement intent alto e nessuna regressione evidente sulle classi commerce critiche;
 4. costo e latenza inferiori in modo consistente;
-5. se i candidati divergono ancora molto dalla baseline, costruire un gold set umano separato prima della promozione;
-6. solo allora promuovere il candidato a priority 1 della policy `nala_semantic_enrichment / classification`, mantenendo un modello più forte come fallback.
-
-Un gold set persistente richiede una decisione separata sul data model e non fa parte di V1.3.
+5. se i candidati divergono ancora molto dalla baseline, costruire un gold set umano separato;
+6. solo allora promuovere il candidato nella policy desiderata mantenendo un fallback adeguato.
 
 Per Nala chat (`nala / structured_chat`) la decisione va valutata separatamente: classificazione batch e conversazione commerce non sono lo stesso workload.
+
+Con Response Memory V1, il benchmark provider diventa inoltre una metrica secondaria rispetto all'autonomia: prima si misura quante richieste Lepefy riesce a risolvere senza provider esterno, poi si ottimizza il provider residuo.

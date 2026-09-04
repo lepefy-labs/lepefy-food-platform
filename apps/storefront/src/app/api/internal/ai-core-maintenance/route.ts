@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { runAiCoreMaintenance } from '@/lib/ai/core/maintenance';
+import { purgeExpiredNalaResponseMemory } from '@/lib/ai/nalaResponseMemory';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -25,10 +26,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
   }
   try {
+    const service = createServiceClient();
     const result = await runAiCoreMaintenance(
-      () => createServiceClient().rpc('purge_expired_ai_context'),
+      () => service.rpc('purge_expired_ai_context'),
     );
-    return NextResponse.json({ ok: true, ...result }, { headers });
+    let deletedResponseMemory = 0;
+    try {
+      deletedResponseMemory = await purgeExpiredNalaResponseMemory(service);
+    } catch {
+      // Response Memory retention is auxiliary and must never break canonical AI Core retention.
+      console.error('[lepefy-ai-core] Response memory retention failed');
+    }
+    return NextResponse.json({ ok: true, ...result, deletedResponseMemory }, { headers });
   } catch {
     console.error('[lepefy-ai-core] Retention maintenance failed');
     return NextResponse.json({ error: 'ai_core_maintenance_failed' }, { status: 503, headers });
