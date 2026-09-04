@@ -209,7 +209,7 @@ function containsPotentialSensitiveData(value: string): boolean {
 }
 
 function containsDynamicMoneyValue(value: string): boolean {
-  return /(?:€|£|\$)\s*\d|\b\d+(?:[.,]\d{1,2})?\s*(?:eur|usd|chf|gbp)\b/i.test(value);
+  return /(?:€|£|\$)\s*\d|\d+(?:[.,]\d{1,2})?\s*(?:€|£|\$)|\b\d+(?:[.,]\d{1,2})?\s*(?:eur|usd|chf|gbp)\b/i.test(value);
 }
 
 function containsUncertainAnswer(value: string): boolean {
