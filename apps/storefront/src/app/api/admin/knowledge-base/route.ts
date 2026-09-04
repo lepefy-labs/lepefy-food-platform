@@ -6,6 +6,10 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { embedText } from '@/lib/ai/embeddings';
 import { logAiUsage } from '@/lib/ai/usageTracking';
+import {
+  KNOWLEDGE_SUGGESTION_SOURCE_PREFIX,
+  knowledgeSuggestionSource,
+} from '@/lib/admin/knowledgeSuggestions';
 import type { KnowledgeBaseCategory } from '@lepefy/types';
 
 // Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
@@ -18,6 +22,8 @@ export const runtime = 'nodejs';
 
 const VALID_CATEGORIES: readonly string[] = ['recipe', 'expression', 'greeting', 'cultural_context', 'faq'];
 const MAX_CONTENT_LENGTH = 2000;
+const SUGGESTION_KEY_PATTERN = /^[a-f0-9]{24}$/;
+const ENTRY_SELECT = 'id, category, content, source, reviewed_by, reviewed_at, active, created_at';
 
 /**
  * Récupère l'email de l'admin courant. Requête séparée de `requireAdmin()`
@@ -55,7 +61,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('tenant_knowledge_base')
-    .select('id, category, content, source, reviewed_by, reviewed_at, active, created_at')
+    .select(ENTRY_SELECT)
     .eq('tenant_id', tenant.id)
     .order('created_at', { ascending: false });
 
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const category = typeof body?.category === 'string' ? body.category : '';
   const content = typeof body?.content === 'string' ? body.content.trim() : '';
-  const source = typeof body?.source === 'string' && body.source.trim() ? body.source.trim() : 'manual';
+  const rawSuggestionKey = typeof body?.suggestionKey === 'string' ? body.suggestionKey.trim() : '';
 
   if (!VALID_CATEGORIES.includes(category)) {
     return NextResponse.json({ error: 'invalid_category' }, { status: 400 });
@@ -84,11 +90,35 @@ export async function POST(req: NextRequest) {
   if (!content || content.length > MAX_CONTENT_LENGTH) {
     return NextResponse.json({ error: 'invalid_content' }, { status: 400 });
   }
+  if (rawSuggestionKey && !SUGGESTION_KEY_PATTERN.test(rawSuggestionKey)) {
+    return NextResponse.json({ error: 'invalid_suggestion_key' }, { status: 400 });
+  }
+
+  const manualSource = typeof body?.source === 'string' && body.source.trim()
+    ? body.source.trim()
+    : 'manual';
+  const source = rawSuggestionKey
+    ? knowledgeSuggestionSource(rawSuggestionKey)
+    : manualSource.startsWith(KNOWLEDGE_SUGGESTION_SOURCE_PREFIX) ? 'manual' : manualSource;
 
   const adminEmail = await getAdminEmail();
   const supabase = createServiceClient();
 
   try {
+    if (rawSuggestionKey) {
+      const { data: existing, error: existingError } = await supabase
+        .from('tenant_knowledge_base')
+        .select(ENTRY_SELECT)
+        .eq('tenant_id', tenant.id)
+        .eq('source', source)
+        .maybeSingle();
+
+      if (existingError) throw new Error(existingError.message);
+      if (existing) {
+        return NextResponse.json({ entry: existing, alreadyExists: true });
+      }
+    }
+
     const { vector, tokenCount } = await embedText(content);
 
     const { data, error } = await supabase
@@ -102,7 +132,7 @@ export async function POST(req: NextRequest) {
         reviewed_by: adminEmail,
         reviewed_at: new Date().toISOString(),
       })
-      .select('id, category, content, source, reviewed_by, reviewed_at, active, created_at')
+      .select(ENTRY_SELECT)
       .single();
 
     if (error) throw new Error(error.message);

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 settembre 2026 — **v6.37 Current-State Snapshot**
+> **Aggiornato:** 4 settembre 2026 — **v6.38 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -433,7 +433,9 @@ Expiry impedisce subito il riuso del contesto; la working memory scaduta viene c
 
 Nala Fast Resolver V1 introduce un percorso deterministico prima di retrieval embeddings e inference. Il primo layer copre `store_information` ad alta confidenza: orari, indirizzo e WhatsApp usano i campi tenant canonici `click_collect_hours` / `click_collect_hours_it`, `click_collect_address` e `whatsapp_number`; solo per gli orari può usare come fallback una singola frase schedule-like estratta dal `chatbox_extra_context` curato dall'admin. Product Availability V1 aggiunge un secondo layer per domande esplicite di esistenza/disponibilità prodotto: estrae una frase prodotto bounded, interroga solo prodotti active tenant-scoped tramite match lessicale conservativo su `name` / `name_alt`, richiede un match forte non ambiguo e legge lo stock canonico. Se disponibile genera una risposta breve e riusa la Product Action `add_to_cart`; se stock=0 risponde deterministicamente senza action. Recommendation, substitution, recipe/meal intent, match deboli/ambigui ed errori lookup fanno sempre fall-through verso retrieval + AI Core. Un `pendingAction` conversazionale disabilita i fast path per non interrompere follow-up commerce. Le risposte deterministicamente risolte aggiornano conversation memory, registrano `nala_interactions.ai_call_triggered = false`, telemetry zero-token `provider=lepefy` e semantic enrichment inline `fast_resolver_v1`; non chiamano embeddings, provider LLM né il classifier asincrono 097.
 
-La knowledge base `tenant_knowledge_base` resta intenzionalmente human-reviewed: la migration 033 la definisce come contenuto curato e mai generato/modificato automaticamente dall'IA. Conversazioni ed enrichment producono già segnali utili (`knowledge_status`, unmet demand, requested product, retrieval quality), ma non esiste ancora una pipeline che promuova automaticamente domanda+risposta a conoscenza autorevole. L'evoluzione prevista deve separare discovery da authority: il sistema può generare candidati/cluster e priorità da conversazioni ripetute, ma la promozione nella knowledge base richiede validazione tenant/admin finché non esiste una fonte strutturata autorevole verificabile.
+Knowledge Suggestions V1 estende `/admin/ai-lab` senza nuova migration e mantiene `tenant_knowledge_base` come sola fonte autorevole human-reviewed. La discovery deriva on-demand dagli ultimi 90 giorni di `nala_interactions`, con massimo 500 righe tenant-scoped e massimo 10 proposte: considera solo enrichment completati, intent stabili non sensibili (`product_information`, `recipe`, `delivery`, `store_information`, `event_information`) e segnali `knowledge_status = missing` oppure retrieval `weak/empty`. Esclude supporto ordine/pagamento/reclami e righe con email, telefono o riferimenti ordine riconoscibili; raggruppa per intent + requested product quando disponibile, altrimenti per domanda normalizzata. Usa la domanda e l'ultima risposta Nala soltanto come preview/brouillon bounded e non esegue una seconda inference.
+
+Il tenant con `ai_knowledge.manage` può modificare categoria e contenuto prima di `Valider et ajouter`. Solo l'approvazione esplicita chiama l'endpoint knowledge esistente, genera l'embedding e crea una normale riga `tenant_knowledge_base` con `reviewed_by`, `reviewed_at` e source `nala_suggestion:<fingerprint>`. Il fingerprint rende l'approvazione idempotente e sopprime la stessa proposta nei load successivi; eliminare la knowledge validata la rende nuovamente eleggibile. I brouillon non sono mai recuperati da Nala prima della promozione. V1 non aggiunge tabella di queue/reject, scheduler o stato persistente di dismiss: le proposte restano derivate dai segnali esistenti. `/admin/nala-analytics` continua a esporre solo aggregati senza raw message/reply; `/admin/ai-lab`, protetto dalla capability knowledge, può mostrare una domanda rappresentativa e un draft bounded filtrato per aiutare la revisione editoriale.
 
 AI Core V1.2 richiede registry e contesto persistente: migration 100 è già applicata e verificata dal proprietario. Schema/RPC mancanti, errori DB, policy disabilitate e chain vuote falliscono con errori normalizzati; non esistono bootstrap Gemini né contesto stateless. Nessuna nuova migration è richiesta da V1.2. Hugging Face usa l'adapter `openai_compatible` esistente (router.huggingface.co/v1, modello iniziale `openai/gpt-oss-20b:fastest`) e richiede `HUGGINGFACE_API_KEY`, origin HTTPS esatta in `LEPEFY_AI_ALLOWED_ORIGINS` e registry/policy configurati. Gemini resta primario per Nala chat durante il rollout; semantic enrichment dispone di policy classification indipendente e può quindi usare in futuro un ordine/costo diverso senza deploy codice. Health osservazionale non esclude candidati dal routing.
 
@@ -527,6 +529,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
+Knowledge Suggestions V1 non richiede migration: deriva candidati temporanei dagli stessi segnali 095/097 e li rende persistenti esclusivamente dopo approvazione tenant dentro la tabella `tenant_knowledge_base` già esistente. Nessuna tabella di candidate queue, backfill o modifica retention viene introdotta.
+
 ---
 
 ## 15. UI conventions
@@ -556,6 +560,7 @@ apps/storefront/src/lib/tenant/getTenant.ts
 apps/storefront/src/lib/admin/workspace.ts
 apps/storefront/src/lib/admin/platformBilling.ts
 apps/storefront/src/lib/admin/nalaAnalyticsDashboard.ts
+apps/storefront/src/lib/admin/knowledgeSuggestions.ts
 apps/storefront/src/lib/ai/*
 apps/storefront/src/lib/notifications/*
 apps/storefront/src/app/api/admin/*
@@ -599,8 +604,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.37
+# Fine snapshot v6.38
 
-**Base audit:** `main + AI Core V1.2 + Nala Fast Resolver Product Availability V1`
+**Base audit:** `main + AI Core V1.2 + Nala Fast Resolver Product Availability V1 + Knowledge Suggestions V1`
 **Data:** 4 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

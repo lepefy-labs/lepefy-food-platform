@@ -35,7 +35,7 @@ export interface AiUsageMonthlyByTenant {
 
 export type KnowledgeBaseCategory = 'recipe' | 'expression' | 'greeting' | 'cultural_context' | 'faq';
 
-/** Ligne de tenant_knowledge_base — contenu toujours écrit par un humain, jamais par l'IA. */
+/** Ligne autoritative de tenant_knowledge_base — toujours validée par un humain avant utilisation. */
 export interface KnowledgeBaseEntry {
   id: string;
   category: KnowledgeBaseCategory;
@@ -47,7 +47,21 @@ export interface KnowledgeBaseEntry {
   created_at: string;
 }
 
-/** Ligne renvoyée par la fonction SQL match_products (ricerca semantica). */
+export type KnowledgeSuggestionSignal = 'knowledge_missing' | 'retrieval_weak' | 'retrieval_empty';
+
+/** Brouillon dérivé des signaux Nala, non autoritatif tant qu'un admin tenant ne l'a pas validé. */
+export interface KnowledgeBaseSuggestion {
+  key: string;
+  intent: string;
+  category: KnowledgeBaseCategory;
+  questionPreview: string;
+  proposedContent: string;
+  occurrenceCount: number;
+  signals: KnowledgeSuggestionSignal[];
+  latestAt: string;
+}
+
+/** Ligne renvoyée par la funzione SQL match_products (ricerca semantica). */
 export interface SemanticMatch {
   id: string;
   name: string;

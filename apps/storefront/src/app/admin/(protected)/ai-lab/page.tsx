@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { loadKnowledgeBaseSuggestions } from '@/lib/admin/knowledgeSuggestions';
 import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { KnowledgeBaseClient } from './KnowledgeBaseClient';
@@ -19,16 +20,23 @@ export default async function AiLabPage() {
     .eq('tenant_id', tenant.id)
     .order('created_at', { ascending: false });
 
+  const entries = (data ?? []) as KnowledgeBaseEntry[];
+  const suggestions = await loadKnowledgeBaseSuggestions({
+    supabase,
+    tenantId: tenant.id,
+    existingSources: entries.map((entry) => entry.source),
+  });
+
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
         title="Base de connaissance IA"
-        description="Gérez le contenu culturel et métier validé qui sert de référence à l'assistant, sans le confondre avec du contenu généré automatiquement."
-        meta={`${(data ?? []).length} entrée${(data ?? []).length !== 1 ? 's' : ''}`}
+        description="Validez les suggestions issues des signaux Nala ou ajoutez vos propres connaissances. Rien n'est promu automatiquement dans la base."
+        meta={`${entries.length} validée${entries.length !== 1 ? 's' : ''} · ${suggestions.length} suggestion${suggestions.length !== 1 ? 's' : ''}`}
       />
 
       <AdminBlockAccent tone="primary">
-        <KnowledgeBaseClient initialEntries={(data ?? []) as KnowledgeBaseEntry[]} />
+        <KnowledgeBaseClient initialEntries={entries} initialSuggestions={suggestions} />
       </AdminBlockAccent>
     </div>
   );
