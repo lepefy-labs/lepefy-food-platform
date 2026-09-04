@@ -45,7 +45,7 @@ function cleanRequestedPhrase(value: string): string | null {
   if (!normalized || /^(?:produit|produits|product|products|prodotto|prodotti|quelque chose|something|qualcosa|stock)$/.test(normalized)) {
     return null;
   }
-  if (/\b(?:remplac|substitut|alternativ|similair|similar|conseill|recommend|recette|recipe|ricetta|avec quoi|what goes with)\b/.test(normalized)) {
+  if (/\b(?:remplac\w*|substitut\w*|alternativ\w*|similair\w*|similar\w*|conseill\w*|recommend\w*|recette\w*|recipe\w*|ricetta\w*)\b|\b(?:avec quoi|what goes with)\b/.test(normalized)) {
     return null;
   }
   return cleaned;
