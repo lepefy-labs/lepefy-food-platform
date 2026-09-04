@@ -20,6 +20,18 @@ export interface NalaAnalyticsContext {
   sourcePath: string | null;
 }
 
+export interface NalaDeterministicSemanticEnrichment {
+  intent: 'product_search' | 'product_information' | 'availability' | 'price' | 'recommendation'
+    | 'substitution' | 'recipe' | 'delivery' | 'store_information' | 'event_information'
+    | 'order_help' | 'payment_help' | 'complaint' | 'small_talk' | 'other' | 'unknown';
+  intentConfidence: number | null;
+  demandStatus: 'fulfilled' | 'partially_fulfilled' | 'unmet' | 'not_applicable' | 'unknown';
+  retrievalQuality: 'strong' | 'weak' | 'empty' | 'not_applicable' | 'unknown';
+  knowledgeStatus: 'sufficient' | 'missing' | 'not_applicable' | 'unknown';
+  requestedProductText: string | null;
+  version: string;
+}
+
 interface PrepareNalaAnalyticsParams {
   request: NextRequest;
   tenantId: string;
@@ -38,6 +50,7 @@ interface LogNalaInteractionParams {
   intent?: string | null;
   matchedProductIds?: string[] | null;
   matchedKbIds?: string[] | null;
+  semanticEnrichment?: NalaDeterministicSemanticEnrichment | null;
 }
 
 function cleanText(value: unknown, maxLength: number): string | null {
@@ -140,6 +153,7 @@ export async function logNalaInteraction(params: LogNalaInteractionParams): Prom
       throw new Error(sessionError?.message ?? 'Nala analytics session was not resolved');
     }
 
+    const semantic = params.semanticEnrichment;
     const { data: interaction, error: interactionError } = await service.from('nala_interactions').insert({
       tenant_id: params.context.tenantId,
       session_id: sessionId,
@@ -148,9 +162,21 @@ export async function logNalaInteraction(params: LogNalaInteractionParams): Prom
       source_path: params.context.sourcePath,
       ai_call_triggered: params.aiCallTriggered,
       outcome: params.outcome,
-      intent: params.intent ?? null,
+      intent: semantic?.intent ?? params.intent ?? null,
       matched_product_ids: params.matchedProductIds ?? null,
       matched_kb_ids: params.matchedKbIds ?? null,
+      ...(semantic ? {
+        intent_confidence: semantic.intentConfidence,
+        demand_status: semantic.demandStatus,
+        retrieval_quality: semantic.retrievalQuality,
+        knowledge_status: semantic.knowledgeStatus,
+        requested_product_text: cleanText(semantic.requestedProductText, 150),
+        semantic_enriched_at: new Date().toISOString(),
+        semantic_enrichment_version: cleanText(semantic.version, 30),
+        semantic_enrichment_status: 'completed',
+        semantic_enrichment_claimed_at: null,
+        semantic_enrichment_last_error_code: null,
+      } : {}),
     }).select('id').single();
 
     if (interactionError || !interaction) throw new Error(interactionError?.message ?? 'Nala interaction was not created');

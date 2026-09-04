@@ -28,6 +28,11 @@ import {
 import { resolveCartPlanIngredients } from '@/lib/ai/nalaCartPlanResolver';
 import { getRelatedProducts } from '@/lib/catalog/productRelationships';
 import { resolveNalaFastStoreInformation } from '@/lib/ai/nalaFastResolver';
+import {
+  extractNalaAvailabilityProductQuery,
+  resolveNalaFastProductAvailability,
+  type NalaFastProductCandidate,
+} from '@/lib/ai/nalaFastProductResolver';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -151,10 +156,107 @@ export async function POST(req: NextRequest) {
       const interactionId = await logNalaInteraction({
         context: analyticsContext, messageText: message, replyText: fastResolution.reply,
         aiCallTriggered: false, outcome: 'answered', intent: 'store_information',
+        semanticEnrichment: {
+          intent: 'store_information', intentConfidence: 1, demandStatus: 'not_applicable',
+          retrievalQuality: 'not_applicable', knowledgeStatus: 'sufficient',
+          requestedProductText: null, version: 'fast_resolver_v1',
+        },
       });
       return NextResponse.json({ reply: fastResolution.reply, conversationId: conversation.id,
         interactionId, matchedProductIds: null, actionProductIds: null, actions: [], cartPlan: null });
     }
+
+    const fastProductQuery = conversation.memory.pendingAction
+      ? null
+      : extractNalaAvailabilityProductQuery(message);
+    if (fastProductQuery) {
+      const fastSupabase = createServiceClient();
+      const lookupPattern = `%${fastProductQuery.replace(/[%_]/g, '').slice(0, 80)}%`;
+      const [byName, byAlt] = await Promise.all([
+        fastSupabase.from('products')
+          .select('id, name, name_alt, stock')
+          .eq('tenant_id', tenant.id)
+          .eq('active', true)
+          .ilike('name', lookupPattern)
+          .limit(4),
+        fastSupabase.from('products')
+          .select('id, name, name_alt, stock')
+          .eq('tenant_id', tenant.id)
+          .eq('active', true)
+          .ilike('name_alt', lookupPattern)
+          .limit(4),
+      ]);
+      if (!byName.error && !byAlt.error) {
+        const uniqueProducts = new Map<string, NalaFastProductCandidate>();
+        for (const product of [...(byName.data ?? []), ...(byAlt.data ?? [])] as NalaFastProductCandidate[]) {
+          uniqueProducts.set(product.id, product);
+        }
+        const fastProduct = resolveNalaFastProductAvailability({
+          query: fastProductQuery,
+          locale,
+          products: [...uniqueProducts.values()],
+        });
+        if (fastProduct) {
+          matchedProductIds = [fastProduct.product.id];
+          const commerceMode = fastProduct.available ? 'product_action' as const : 'none' as const;
+          const fastDecision = {
+            intent: 'product_search' as const,
+            commerceMode,
+            confidence: 1,
+            subject: { type: 'product', name: fastProduct.product.name.slice(0, 100) },
+            entities: { dish: null, product: fastProduct.product.name.slice(0, 100) },
+            pendingAction: null,
+          };
+          await logAiUsage({
+            tenantId: tenant.id, endpoint: ENDPOINT, provider: 'lepefy', model: 'fast_product_availability',
+            consumer: 'nala', capability: 'deterministic', status: 'success',
+          });
+          await finishConversation(conversation, {
+            message, reply: fastProduct.reply, memory: memoryFromDecision(fastDecision, locale),
+            provider: 'lepefy', model: 'fast_product_availability', confidence: 1, commerceMode,
+          });
+          const interactionId = await logNalaInteraction({
+            context: analyticsContext,
+            messageText: message,
+            replyText: fastProduct.reply,
+            aiCallTriggered: false,
+            outcome: 'answered',
+            intent: 'availability',
+            matchedProductIds,
+            semanticEnrichment: {
+              intent: 'availability',
+              intentConfidence: 1,
+              demandStatus: fastProduct.available ? 'fulfilled' : 'unmet',
+              retrievalQuality: 'strong',
+              knowledgeStatus: 'not_applicable',
+              requestedProductText: fastProduct.product.name,
+              version: 'fast_resolver_v1',
+            },
+          });
+          const actions = fastProduct.available ? await buildNalaProductActions({
+            supabase: fastSupabase,
+            tenantId: tenant.id,
+            interactionId,
+            message,
+            locale,
+            currency: tenant.currency ?? 'EUR',
+            candidates: [{ id: fastProduct.product.id, similarity: 1, relationshipType: 'direct' }],
+          }) : [];
+          await updateNalaInteractionActions({ tenantId: tenant.id, interactionId, actions });
+          const actionProductIds = actions.map(action => action.product.id);
+          return NextResponse.json({
+            reply: fastProduct.reply,
+            conversationId: conversation.id,
+            interactionId,
+            matchedProductIds: interactionId ? matchedProductIds : null,
+            actionProductIds: interactionId ? actionProductIds : null,
+            actions,
+            cartPlan: null,
+          });
+        }
+      }
+    }
+
     // Retrieval remains a legacy embedding consumer in V1; failure must not block routed inference.
     let retrievalTimer: ReturnType<typeof setTimeout> | undefined;
     const retrieval = await Promise.race([
