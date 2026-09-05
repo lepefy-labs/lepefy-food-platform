@@ -36,6 +36,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     .from('categories')
     .select('*')
     .eq('tenant_id', tenant.id)
+    .eq('catalog_scope', 'shop')
     .order('position');
   const categories: Category[] = categoriesRaw ?? [];
   const searchQuery = searchParams.q?.trim() ?? '';

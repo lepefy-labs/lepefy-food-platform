@@ -1,3 +1,4 @@
+import type { CatalogScope } from '@lepefy/types';
 import { ProductCard, type ProductCardProduct } from '@/components/catalog/ProductCard';
 
 /**
@@ -5,7 +6,7 @@ import { ProductCard, type ProductCardProduct } from '@/components/catalog/Produ
  * già selezionati/ordinati dal Server Component chiamante (page.tsx) —
  * questo componente resta puramente presentazionale, coerente con ProductCard.
  */
-export function RelatedProducts({ products }: { products: ProductCardProduct[] }) {
+export function RelatedProducts({ products, catalogScope = 'shop' }: { products: ProductCardProduct[]; catalogScope?: CatalogScope }) {
   if (products.length === 0) return null;
 
   return (
@@ -17,7 +18,7 @@ export function RelatedProducts({ products }: { products: ProductCardProduct[] }
         md:grid md:grid-cols-4 md:overflow-x-visible md:pb-0
       ">
         {products.map((p) => (
-          <ProductCard key={p.id} product={p} variant="shelf" />
+          <ProductCard key={p.id} product={p} variant="shelf" catalogScope={catalogScope} />
         ))}
       </div>
     </section>

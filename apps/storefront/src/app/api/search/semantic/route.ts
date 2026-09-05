@@ -46,11 +46,17 @@ export async function GET(req: NextRequest) {
     const { vector, tokenCount } = await embedText(query);
 
     const supabase = createServiceClient();
+    const { data: categories, error: categoryError } = await supabase
+      .from('categories').select('id')
+      .eq('tenant_id', tenant.id).eq('catalog_scope', 'shop');
+    if (categoryError) throw new Error(categoryError.message);
     const { data, error } = await supabase.rpc('match_products', {
       query_embedding: vector,
       p_tenant_id:      tenant.id,
-      match_count:      8,
-    });
+      // Apply the scope before the outer result limit, so merchandise cannot
+      // consume the eight semantic slots. SQL LIMIT NULL is unbounded.
+      match_count:      null,
+    }).in('category_id', (categories ?? []).map(category => category.id)).limit(8);
 
     if (error) throw new Error(error.message);
 

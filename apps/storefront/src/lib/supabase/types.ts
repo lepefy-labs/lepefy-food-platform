@@ -1,3 +1,5 @@
+import type { CatalogScope } from '@lepefy/types';
+
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export interface Database {
@@ -21,8 +23,8 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['tenants']['Row']>;
       };
       categories: {
-        Row: { id: string; tenant_id: string; name: string; slug: string; image_url: string | null; position: number; created_at: string };
-        Insert: Omit<Database['public']['Tables']['categories']['Row'], 'id' | 'created_at'>;
+        Row: { id: string; tenant_id: string; name: string; slug: string; image_url: string | null; catalog_scope: CatalogScope; position: number; created_at: string };
+        Insert: Omit<Database['public']['Tables']['categories']['Row'], 'id' | 'created_at' | 'catalog_scope'> & { catalog_scope?: CatalogScope };
         Update: Partial<Database['public']['Tables']['categories']['Row']>;
       };
       products: {

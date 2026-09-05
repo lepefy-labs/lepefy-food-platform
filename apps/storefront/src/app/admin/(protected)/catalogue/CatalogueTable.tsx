@@ -17,7 +17,7 @@ import {
   IconX,
 } from '@tabler/icons-react';
 
-type Category = { id: string; name: string; slug: string };
+import type { CatalogCategoryOption as Category } from '@lepefy/types';
 
 type Product = {
   id: string;
@@ -256,6 +256,7 @@ export default function CatalogueTable({
           </div>
           <p className="mt-1 text-sm text-gray-500">Gérez rapidement disponibilité, stock et contenu.</p>
         </div>
+        <Link href="/admin/catalogue/categories" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold">Gérer les catégories</Link>
         <Link href="/admin/catalogue/nouveau" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90">
           <IconPlus size={18} /> Nouveau produit
         </Link>
@@ -285,7 +286,7 @@ export default function CatalogueTable({
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="min-h-10 rounded-xl border border-gray-200 px-3 text-sm">
             <option value="">Toutes les catégories</option>
-            {categories.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.slug}>{c.name} — {c.catalog_scope === 'gadgets' ? 'Goodies' : 'Catalogue'}</option>)}
           </select>
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="min-h-10 rounded-xl border border-gray-200 px-3 text-sm">
             <option value="position_asc">Ordre catalogue</option>

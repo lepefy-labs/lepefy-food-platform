@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 settembre 2026 — **v6.38 Current-State Snapshot**
+> **Aggiornato:** 6 settembre 2026 — **v6.39 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -61,12 +61,17 @@ Le route storefront canoniche sono:
 /                     -> Catalogue storefront
 /accueil              -> pagina editoriale “Découvrir”
 /products             -> redirect permanente 308 verso /
-/products/[slug]      -> Product Detail, invariato
+/products/[slug]      -> Product Detail condiviso tra Catalogue e Goodies
+/gadgets              -> boutique merchandising tenant (Goodies)
 ```
 
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
 
-La navigazione storefront mobile usa `BottomNav` per le destinazioni operative frequenti e un drawer laterale per esplorazione e servizi secondari. Il drawer è data-driven in base alla configurazione tenant. Su desktop le destinazioni principali restano visibili nell'header e lo stesso drawer è accessibile come menu secondario.
+Le categorie possiedono `catalog_scope: 'shop' | 'gadgets'` (migration additiva e reversibile `103_category_catalog_scope.sql`, default `shop` per tutte le categorie esistenti). Catalogue `/`, paginazione `/api/products` e ricerca semantica pubblica includono soltanto prodotti delle categorie `shop` del tenant; `/gadgets` filtra server-side categorie e prodotti `gadgets`, con filtro `?category=` e paginazione `?page=`. Prodotti senza categoria non appartengono a nessuno scope. Il prodotto phare viene scelto tramite `featured`, poi `position`/`id`; in assenza di prodotti attivi la boutique mostra uno stato vuoto senza dati artificiali.
+
+Goodies riusa `products`, immagini/prezzi/stock, `ProductCard`, l’azione condivisa `useQuickAdd`, cart store/sync/drawer, checkout e ordini. I carrelli misti rimangono supportati. Le card Goodies usano `/products/[slug]?from=gadgets` per la navigazione attiva; breadcrumb e ritorno derivano dallo scope reale della categoria. La canonical resta `/products/[slug]`; le raccomandazioni per merchandise rimangono nella stessa categoria. Admin `/admin/catalogue/categories` e `/api/admin/catalogue/categories` gestiscono nome, slug e destinazione Catalogue/Goodies con le permission esistenti `catalog.view/manage`. Le selezioni categoria nella creazione/modifica prodotto mostrano la destinazione. La migration deve essere applicata prima della promozione del codice che legge la colonna; non viene eseguita dal build Vercel.
+
+La navigazione storefront mobile usa `BottomNav` con esattamente Découvrir / Catalogue / Panier / Goodies / Compte per le destinazioni operative frequenti e un drawer laterale per esplorazione e servizi secondari. Goodies sostituisce Commandes soltanto nella BottomNav; `/orders`, account e voce Mes commandes del drawer restano disponibili. Goodies compare nel drawer Explorer subito dopo Catalogue, senza aggiungere una voce permanente all’header desktop. Il drawer è data-driven in base alla configurazione tenant. Su desktop le destinazioni principali restano visibili nell'header e lo stesso drawer è accessibile come menu secondario.
 
 Il pattern di drawer è condiviso da Shop ed Events tramite `BrandNavigationDrawer`: overlay, Escape/backdrop, body scroll lock, focus ring, safe-area footer, social e legal sono implementati una sola volta; ogni surface passa sezioni e capability proprie.
 

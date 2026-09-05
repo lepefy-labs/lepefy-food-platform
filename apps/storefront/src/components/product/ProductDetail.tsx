@@ -16,6 +16,7 @@ import type { ProductWithCategory } from '@lepefy/types';
 
 export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const tenant = useTenant();
+  const catalogHref = product.category?.catalog_scope === 'gadgets' ? '/gadgets' : '/';
   const { currency } = tenant;
   const storeLocale = useLocaleStore((s) => s.locale);
   const tenantLocales = tenant.locales ?? [];
@@ -45,11 +46,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   return (
     <div>
       <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6" aria-label="Fil d'Ariane">
-        <Link href="/" className="hover:text-gray-600 transition-colors">Catalogue</Link>
+        <Link href={catalogHref} className="hover:text-gray-600 transition-colors">{catalogHref === '/gadgets' ? 'Goodies' : 'Catalogue'}</Link>
         {product.category && (
           <>
             <span>/</span>
-            <Link href={`/?category=${product.category.slug}`} className="hover:text-gray-600 transition-colors">
+            <Link href={`${catalogHref}?category=${encodeURIComponent(product.category.slug)}`} className="hover:text-gray-600 transition-colors">
               {product.category.name}
             </Link>
           </>

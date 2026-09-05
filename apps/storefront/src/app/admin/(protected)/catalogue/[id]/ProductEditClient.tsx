@@ -11,7 +11,7 @@ import {
   IconTrash,
   IconTag,
 } from '@tabler/icons-react';
-import type { Producer, Importer, NutritionInfo, DurabilityType } from '@lepefy/types';
+import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
 import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
@@ -57,7 +57,7 @@ interface ProductEditProps {
     label_background_color: string | null;
     barcode_value: string | null;
   };
-  categories: { id: string; name: string; slug: string }[];
+  categories: CatalogCategoryOption[];
   producers: Producer[];
   importers: Importer[];
   tenantId: string;
@@ -590,7 +590,7 @@ export default function ProductEditClient({
                     className={INPUT_CLS}
                   >
                     {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>{c.name} — {c.catalog_scope === 'gadgets' ? 'Goodies' : 'Catalogue'}</option>
                     ))}
                   </select>
                 </div>

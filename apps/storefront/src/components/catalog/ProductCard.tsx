@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { IconSnowflake } from '@tabler/icons-react';
-import { useCartStore } from '@/stores/cartStore';
+import { IconSnowflake, IconShoppingCart } from '@tabler/icons-react';
+import type { CatalogScope } from '@lepefy/types';
+import { useQuickAdd } from './useQuickAdd';
 import { formatPrice } from '@/lib/utils/format';
 import { useTenant } from '@/providers/TenantProvider';
 import { ShopTag } from '@/components/ui/ShopTag';
@@ -33,6 +33,7 @@ interface ProductCardProps {
   variant?: 'grid' | 'shelf';
   /** Densité mobile réservée à la grille Catalogue ; Home conserve ses proportions. */
   compactMobile?: boolean;
+  catalogScope?: CatalogScope;
 }
 
 const STORAGE_TAG_LABELS: Record<'dry' | 'fresh' | 'frozen', string> = {
@@ -75,14 +76,13 @@ function getDetailLine(product: ProductCardProduct): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-export function ProductCard({ product, variant = 'grid', compactMobile = false }: ProductCardProps) {
+export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop' }: ProductCardProps) {
   const { currency } = useTenant();
-  const addItem = useCartStore((s) => s.addItem);
-  const outOfStock = product.stock === 0;
-  const [added, setAdded] = useState(false);
-  const tagLabel = getTagLabel(product);
+  const { addToCart, added, outOfStock } = useQuickAdd(product);
+  const merchandise = catalogScope === 'gadgets';
+  const tagLabel = merchandise ? product.category?.name : getTagLabel(product);
   const gridStorageLabel = getGridStorageLabel(product);
-  const detailLine = getDetailLine(product);
+  const detailLine = merchandise ? product.category?.name : getDetailLine(product);
   const compactGrid = variant === 'grid' && compactMobile;
   const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
   const discountPercent = hasDiscount
@@ -92,19 +92,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (outOfStock) return;
-    addItem({
-      id:           product.id,
-      name:         product.name,
-      slug:         product.slug,
-      price:        product.price,
-      image_url:    product.image_url,
-      weight_grams: product.weight_grams,
-      stock:        product.stock ?? 999,
-      storage_type: product.storage_type ?? null,
-    });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
+    addToCart();
   }
 
   const imageSizes = variant === 'grid'
@@ -113,10 +101,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
 
   return (
     <Link
-      href={`/products/${product.slug}`}
+      href={`/products/${product.slug}${merchandise ? '?from=gadgets' : ''}`}
       className={
         variant === 'grid'
-          ? 'group relative block'
+          ? 'group relative block min-w-0'
           : 'group relative block flex-shrink-0 w-36 md:w-full md:flex-shrink'
       }
     >
@@ -129,12 +117,12 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
       <div
         className={
           variant === 'grid'
-            ? 'rounded-lg overflow-hidden border border-gray-200 group-hover:border-gray-300 transition-all group-hover:shadow-card'
+            ? merchandise ? 'rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm transition-all group-hover:shadow-card' : 'rounded-lg overflow-hidden border border-gray-200 group-hover:border-gray-300 transition-all group-hover:shadow-card'
             : 'rounded-lg overflow-hidden border border-gray-100 bg-white'
         }
       >
-        <div className={`${compactGrid ? 'aspect-[4/3] sm:aspect-square' : 'aspect-square'} bg-primary-light relative overflow-hidden`}>
-          {variant === 'grid' && gridStorageLabel && (
+        <div className={`${compactGrid && !merchandise ? 'aspect-[4/3] sm:aspect-square' : 'aspect-square'} bg-primary-light relative overflow-hidden`}>
+          {variant === 'grid' && !merchandise && gridStorageLabel && (
             <span className={`absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-gray-200/90 bg-white/95 font-semibold text-gray-800 shadow-sm ${compactGrid ? 'px-2 py-1 text-[11px] sm:text-xs' : 'px-2 py-1 text-xs'}`}>
               {gridStorageLabel === 'Surgelé' && (
                 <IconSnowflake size={13} aria-hidden="true" className="shrink-0" />
@@ -152,7 +140,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
               src={product.image_url}
               alt={product.name}
               fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              className={`${merchandise ? 'object-contain p-2 bg-gray-50' : 'object-cover'} group-hover:scale-105 transition-transform duration-300`}
               sizes={imageSizes}
             />
           ) : variant === 'grid' ? (
@@ -175,9 +163,9 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
           <div className={compactGrid ? 'p-2.5 sm:p-3' : 'p-3'}>
             <p className={`font-medium text-gray-900 line-clamp-2 mb-1 ${compactGrid ? 'min-h-[2.05rem] text-[13px] leading-[1.25] sm:min-h-0 sm:text-sm sm:leading-normal' : 'text-sm'}`}>{product.name}</p>
             {detailLine && <p className={`truncate text-xs text-gray-400 ${compactGrid ? 'mb-1.5 leading-tight sm:mb-2 sm:leading-normal' : 'mb-2'}`}>{detailLine}</p>}
-            <div className="flex items-end justify-between gap-2">
+            <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
-                <span className="block text-base font-bold leading-tight" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
+                <span className="block whitespace-nowrap text-base font-bold leading-tight" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
                 {hasDiscount && <span className="block text-xs text-gray-400 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>}
               </div>
               <button
@@ -187,7 +175,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false }
                 className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 disabled:opacity-40"
                 style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
               >
-                {added ? '✓' : '+'}
+                {added ? '✓' : merchandise ? <IconShoppingCart size={18} aria-hidden="true" /> : '+'}
               </button>
             </div>
           </div>

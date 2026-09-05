@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   IconSmartHome,
   IconCategory,
   IconShoppingBag,
-  IconTruckDelivery,
+  IconGift,
   IconUserCircle,
 } from '@tabler/icons-react';
 import { useCartStore } from '@/stores/cartStore';
@@ -23,6 +23,8 @@ interface Tab {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const goodiesContext = pathname.startsWith('/products/') && searchParams.get('from') === 'gadgets';
   const totalItems = useCartStore((s) => s.totalItems());
   const { customer } = useSessionCustomer();
 
@@ -34,7 +36,7 @@ export function BottomNav() {
       icon: (active) => <IconSmartHome size={24} stroke={active ? 2 : 1.5} />,
     },
     {
-      href: '/', label: 'Catalogue', isActive: (p) => p === '/' || p.startsWith('/products/'),
+      href: '/', label: 'Catalogue', isActive: (p) => p === '/' || (p.startsWith('/products/') && !goodiesContext),
       icon: (active) => <IconCategory size={24} stroke={active ? 2 : 1.5} />,
     },
     {
@@ -42,8 +44,8 @@ export function BottomNav() {
       icon: (active) => <IconShoppingBag size={24} stroke={active ? 2 : 1.5} />, badge: () => totalItems,
     },
     {
-      href: '/orders', label: 'Commandes', isActive: (p) => p === '/orders' || p.startsWith('/orders/'),
-      icon: (active) => <IconTruckDelivery size={24} stroke={active ? 2 : 1.5} />,
+      href: '/gadgets', label: 'Goodies', isActive: (p) => p === '/gadgets' || p.startsWith('/gadgets/') || goodiesContext,
+      icon: (active) => <IconGift size={24} stroke={active ? 2 : 1.5} />,
     },
     {
       href: '/compte/connexion', label: 'Compte', isActive: (p) => p === '/compte' || p.startsWith('/compte/'),
@@ -59,7 +61,7 @@ export function BottomNav() {
           const badgeCount = tab.badge ? tab.badge() : 0;
           const showDot = tab.dot ? tab.dot() : false;
           return (
-            <Link key={tab.href} href={tab.href} className="flex flex-1 flex-col items-center justify-center gap-0.5" style={{ color: active ? 'var(--color-primary)' : '#9ca3af' }}>
+            <Link key={tab.href} href={tab.href} aria-current={active ? 'page' : undefined} className="flex flex-1 flex-col items-center justify-center gap-0.5" style={{ color: active ? 'var(--color-primary)' : '#9ca3af' }}>
               <div className="relative">
                 {tab.icon(active)}
                 {badgeCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-0.5 text-2xs font-bold" style={{ background: 'var(--color-secondary)', color: '#1a1a1a' }}>{badgeCount > 99 ? '99+' : badgeCount}</span>}

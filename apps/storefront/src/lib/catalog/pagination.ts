@@ -52,6 +52,7 @@ export function buildProductsQuery(
     )
     .eq('tenant_id', tenantId)
     .eq('active', true)
+    .in('category_id', categories.map(category => category.id))
     .order('position');
 
   const searchQuery = (filters.q?.trim() ?? '').slice(0, MAX_SEARCH_QUERY_LENGTH);

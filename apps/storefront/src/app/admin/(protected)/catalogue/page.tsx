@@ -20,7 +20,7 @@ export default async function AdminCataloguePage({ searchParams }: PageProps) {
 
   const { data: categories } = await supabase
     .from('categories')
-    .select('id, name, slug')
+    .select('id, name, slug, catalog_scope')
     .eq('tenant_id', tenant.id)
     .order('position');
 

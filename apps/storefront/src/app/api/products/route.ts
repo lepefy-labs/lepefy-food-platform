@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
   const { data: categoriesRaw } = await supabase
     .from('categories')
     .select('id, slug')
-    .eq('tenant_id', tenant.id);
+    .eq('tenant_id', tenant.id)
+    .eq('catalog_scope', 'shop');
   const categories = categoriesRaw ?? [];
 
   const page = parsePageParam(req.nextUrl.searchParams.get('page') ?? undefined);

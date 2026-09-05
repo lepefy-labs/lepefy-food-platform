@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
@@ -22,14 +23,14 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
     <div className="min-h-screen flex flex-col">
       <CartSyncProvider>
       <PWABanner />
-      <Header socialLinks={socialLinks} storyEnabled={storyEnabled} />
+      <Suspense fallback={<div className="h-24" />}><Header socialLinks={socialLinks} storyEnabled={storyEnabled} /></Suspense>
 
       <CheckoutNotificationBarGate />
       <ActiveCheckoutRecovery tenant={tenant} />
 
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
       <Footer socialLinks={socialLinks} storyEnabled={storyEnabled} />
-      <BottomNav />
+      <Suspense><BottomNav /></Suspense>
       <ChatWidgetGate
         enabled={nalaEnabled}
         tenantName={tenant.name}

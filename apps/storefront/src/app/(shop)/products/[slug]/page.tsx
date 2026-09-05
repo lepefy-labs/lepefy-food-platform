@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   const { data } = await supabase.from('products').select('name, description')
     .eq('slug', params.slug).eq('tenant_id', tenant.id).single();
   if (!data) return {};
-  return { title: data.name, description: data.description ?? undefined };
+  return { title: data.name, description: data.description ?? undefined, alternates: { canonical: `/products/${params.slug}` } };
 }
 
 const RELATED_LIMIT = 8;
@@ -170,18 +170,19 @@ export default async function ProductPage({ params }: ProductPageProps) {
       ingredients_text, allergens_text, gluten_free_certified,
       usage_instructions, conservation_instructions, conservation_after_opening,
       country_of_origin, net_quantity_display,
-      category:categories(name, slug)
+      category:categories(name, slug, catalog_scope)
     `)
     .eq('slug', params.slug).eq('tenant_id', tenant.id).eq('active', true).single();
 
   if (!product) notFound();
 
-  const related = await getRelatedProducts(supabase, tenant, product);
+  const goodies = (product as unknown as ProductWithCategory).category?.catalog_scope === 'gadgets';
+  const related = await getRelatedProducts(supabase, goodies ? { ...tenant, ai_semantic_search: false } : tenant, product);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <ProductDetail product={product as unknown as ProductWithCategory} />
-      <RelatedProducts products={related} />
+      <RelatedProducts products={related} catalogScope={goodies ? 'gadgets' : 'shop'} />
     </div>
   );
 }

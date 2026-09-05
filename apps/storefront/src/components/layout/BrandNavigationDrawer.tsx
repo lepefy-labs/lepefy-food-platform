@@ -49,6 +49,7 @@ const ITEM_ICONS = {
   account: IconUserCircle,
   gallery: IconPhoto,
   shop: IconShoppingBag,
+  goodies: IconShoppingBag,
 };
 
 export type BrandNavigationIcon = keyof typeof ITEM_ICONS;
@@ -59,6 +60,7 @@ export interface BrandNavigationItem {
   icon: BrandNavigationIcon;
   external?: boolean;
   activeWhen?: string[];
+  active?: boolean;
 }
 
 export interface BrandNavigationSection {
@@ -120,6 +122,7 @@ export function BrandNavigationDrawer({
 
   function isItemActive(item: BrandNavigationItem) {
     if (item.external) return false;
+    if (item.active !== undefined) return item.active;
     const rules = item.activeWhen ?? [item.href.split('#')[0] || '/'];
     return rules.some((rule) => {
       if (rule === '/') return pathname === '/';

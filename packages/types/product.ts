@@ -1,9 +1,14 @@
+export type CatalogScope = 'shop' | 'gadgets';
+
+export type CatalogCategoryOption = Pick<Category, 'id' | 'name' | 'slug' | 'catalog_scope'>;
+
 export interface Category {
   id: string;
   tenant_id: string;
   name: string;
   slug: string;
   image_url: string | null;
+  catalog_scope: CatalogScope;
   position: number;
   created_at: string;
 }

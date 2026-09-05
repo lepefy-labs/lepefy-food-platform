@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart } from '@tabler/icons-react';
 import type { TenantSocialLink } from '@lepefy/types';
 import { useTenant } from '@/providers/TenantProvider';
@@ -23,6 +23,8 @@ interface HeaderProps {
 export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const goodiesContext = pathname.startsWith('/products/') && searchParams.get('from') === 'gadgets';
   const tenant = useTenant();
   const totalItems = useCartStore((s) => s.totalItems());
   const openCartDrawer = useCartUiStore((s) => s.openDrawer);
@@ -39,7 +41,7 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
   }
 
   function isActive(href: string) {
-    if (href === '/') return pathname === '/' || pathname.startsWith('/products/');
+    if (href === '/') return pathname === '/' || (pathname.startsWith('/products/') && !goodiesContext);
     if (href === '/accueil') return pathname === '/accueil';
     if (href === '/orders') return pathname === '/orders' || pathname.startsWith('/orders/');
     if (href.startsWith('/compte')) return pathname === '/compte' || pathname.startsWith('/compte/');
@@ -56,7 +58,8 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
       label: 'Explorer',
       items: [
         { href: '/accueil', label: 'Découvrir', icon: 'home', activeWhen: ['/accueil'] },
-        { href: '/', label: 'Catalogue', icon: 'category', activeWhen: ['/', '/products'] },
+        { href: '/', label: 'Catalogue', icon: 'category', active: isActive('/') },
+        { href: '/gadgets', label: 'Goodies', icon: 'goodies', active: goodiesContext || pathname === '/gadgets' || pathname.startsWith('/gadgets/') },
       ],
     },
     {
