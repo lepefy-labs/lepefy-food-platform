@@ -5,6 +5,10 @@ import { buildProductsQuery } from '../../src/lib/catalog/pagination';
 async function requestUrl(categories: { id: string; slug: string }[], filters: { q?: string; category?: string }) {
   let captured = '';
   const client = createClient('https://example.supabase.co', 'test-key', {
+    // This test exercises REST only; never initialize a live websocket.
+    realtime: { transport: class OfflineWebSocket {
+      constructor() { throw new Error('Realtime is not used by catalogue queries'); }
+    } as never },
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: async input => {
       captured = String(input);
