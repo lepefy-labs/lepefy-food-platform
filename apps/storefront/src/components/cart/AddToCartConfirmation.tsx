@@ -16,7 +16,9 @@ import { useTenant } from '@/providers/TenantProvider';
 import { formatPrice } from '@/lib/utils/format';
 
 const primary = { backgroundColor: 'var(--color-primary)' };
-const actionClass = 'inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 hover:opacity-90 active:opacity-80';
+const actionFocusClass = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors duration-150 motion-reduce:transition-none';
+const mainActionClass = `inline-flex h-14 w-full items-center justify-center rounded-lg px-5 text-base font-bold ${actionFocusClass}`;
+const recommendationActionClass = `inline-flex min-h-12 w-full items-center justify-center rounded-lg px-2 text-sm font-semibold ${actionFocusClass}`;
 
 function ProductImage({ product, small = false }: { product: ProductCardProduct; small?: boolean }) {
   return (
@@ -36,7 +38,7 @@ function RecommendationItem({ product, onAdded, onClose }: {
   const { currency } = useTenant();
   const { addToCart, added, outOfStock, atLimit } = useQuickAdd(product, true);
   return (
-    <li className="flex w-36 shrink-0 flex-col rounded-xl border border-gray-200 bg-white p-2 sm:w-auto sm:min-w-0">
+    <li className="flex w-36 shrink-0 flex-col rounded-lg border border-gray-300 bg-white p-2 sm:w-auto sm:min-w-0">
       <Link href={`/products/${product.slug}`} onClick={onClose} className="block rounded-lg focus-visible:outline focus-visible:outline-2">
         <ProductImage product={product} small />
         <span className="mt-2 block min-h-10 text-sm font-medium leading-5 text-gray-900 line-clamp-2">{product.name}</span>
@@ -49,7 +51,7 @@ function RecommendationItem({ product, onAdded, onClose }: {
       </div>
       <button type="button" disabled={outOfStock} aria-disabled={atLimit || undefined}
         aria-label={atLimit ? `Stock maximum pour ${product.name}` : `Ajouter ${product.name}`}
-        className={`${actionClass} w-full px-2 text-white disabled:opacity-40 aria-disabled:opacity-60`}
+        className={`${recommendationActionClass} text-white hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-60`}
         style={added ? { backgroundColor: '#16a34a' } : primary}
         onClick={() => { if (addToCart()) onAdded(product.id); }}>
         {added ? 'Ajouté ✓' : atLimit ? 'Stock maximum' : outOfStock ? 'Épuisé' : 'Ajouter'}
@@ -151,31 +153,31 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
               {details && <p className="mt-0.5 truncate text-xs text-gray-500">{details}</p>}
               <p className="mt-1 font-bold text-gray-900">{formatPrice(product.price, currency)}</p>
               <div role="group" aria-label={`Quantité de ${product.name}`}
-                className="mt-2 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-900">
+                className="mt-2 inline-flex h-12 w-36 items-center rounded-lg border border-gray-400 bg-white text-gray-900">
                 <button type="button" onClick={() => changeQuantity(-1)} disabled={quantity <= 1}
                   aria-label={`Diminuer la quantité de ${product.name}`}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-l-lg text-xl font-medium hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:bg-gray-50 disabled:text-gray-400">
+                  className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-l-lg text-2xl font-semibold leading-none hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400">
                   −
                 </button>
                 <span aria-live="polite" aria-atomic="true" data-testid="confirmation-quantity"
-                  className="min-w-10 border-x border-gray-300 px-2 text-center text-sm font-semibold tabular-nums">
+                  className="flex h-12 w-12 items-center justify-center border-x border-gray-400 text-base font-semibold tabular-nums">
                   <span className="sr-only">Quantité dans le panier : </span>{quantity}
                 </span>
                 <button type="button" onClick={() => changeQuantity(1)} disabled={!cartItem || quantity >= maxStock}
                   aria-label={`Augmenter la quantité de ${product.name}`}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-r-lg text-xl font-medium hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:bg-gray-50 disabled:text-gray-400">
+                  className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-r-lg text-2xl font-semibold leading-none hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400">
                   +
                 </button>
               </div>
             </div>
           </div>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Link href="/cart" onClick={onClose} className={`${actionClass} text-white sm:order-2`} style={primary}>Voir mon panier</Link>
-            <button type="button" onClick={onClose} className={`${actionClass} border border-gray-300 text-gray-700 sm:order-1`}>Continuer mes achats</button>
+          <div data-testid="confirmation-actions" className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+            <Link href="/cart" onClick={onClose} className={`${mainActionClass} order-1 text-white hover:opacity-90 active:opacity-80 sm:order-2`} style={primary}>Voir mon panier</Link>
+            <button type="button" onClick={onClose} className={`${mainActionClass} order-2 border border-gray-400 bg-white text-gray-900 hover:bg-gray-50 active:bg-gray-100 sm:order-1`}>Continuer mes achats</button>
           </div>
         </div>
         {(loading || visible.length > 0) && (
-          <section aria-labelledby="add-recommendations-title" aria-busy={loading} className="border-t border-gray-100 px-4 py-4 sm:px-6">
+          <section aria-labelledby="add-recommendations-title" aria-busy={loading} className="border-t border-gray-200 px-4 py-4 sm:px-6">
             <h3 id="add-recommendations-title" className="mb-3 text-base font-semibold text-gray-900">Vous aimerez peut-être aussi</h3>
             {loading ? (
               <div className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-4" role="status" aria-label="Chargement des suggestions">

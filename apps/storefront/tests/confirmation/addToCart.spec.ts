@@ -66,9 +66,26 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     for (const control of [minus, plus]) {
       const box = await control.boundingBox();
       expect(box!.width).toBeGreaterThanOrEqual(44);
-      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(48);
     }
-    await expect(panel.getByRole('link', { name: 'Voir mon panier' })).toBeInViewport();
+    const viewCart = panel.getByRole('link', { name: 'Voir mon panier' });
+    const continueShopping = panel.getByRole('button', { name: 'Continuer mes achats' });
+    await expect(viewCart).toBeInViewport();
+    for (const action of [viewCart, continueShopping]) {
+      const box = await action.boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(54);
+      expect(box!.width).toBeGreaterThan(0);
+    }
+    const viewCartBox = (await viewCart.boundingBox())!;
+    const continueBox = (await continueShopping.boundingBox())!;
+    if (width < 640) {
+      expect(Math.abs(viewCartBox.width - continueBox.width)).toBeLessThanOrEqual(1);
+      expect(viewCartBox.y).toBeLessThan(continueBox.y);
+    } else {
+      expect(Math.abs(viewCartBox.width - continueBox.width)).toBeLessThanOrEqual(1);
+      expect(continueBox.x).toBeLessThan(viewCartBox.x);
+      expect(Math.abs(continueBox.y - viewCartBox.y)).toBeLessThanOrEqual(1);
+    }
     const bounds = await panel.boundingBox();
     expect(bounds!.width).toBeLessThanOrEqual(Math.min(width, 800));
     expect(bounds!.height).toBeLessThanOrEqual(900 * 0.85 + 1);
@@ -80,6 +97,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     }
     await expect(panel.getByRole('heading', { name: 'Vous aimerez peut-être aussi' })).toBeVisible();
     const firstAdd = panel.getByRole('button', { name: 'Ajouter Suggestion one', exact: true });
+    expect((await firstAdd.boundingBox())!.height).toBeGreaterThanOrEqual(48);
     await firstAdd.click();
     const capped = panel.getByRole('button', { name: 'Stock maximum pour Suggestion one', exact: true });
     await expect(capped).toHaveAttribute('aria-disabled', 'true');
