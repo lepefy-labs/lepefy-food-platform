@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 6 settembre 2026 — **v6.39 Current-State Snapshot**
+> **Aggiornato:** 6 settembre 2026 — **v6.40 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -70,6 +70,10 @@ La root `/` possiede ricerca, filtro categoria e paginazione tramite query strin
 Le categorie possiedono `catalog_scope: 'shop' | 'gadgets'` (migration additiva e reversibile `103_category_catalog_scope.sql`, default `shop` per tutte le categorie esistenti). Catalogue `/`, paginazione `/api/products` e ricerca semantica pubblica includono soltanto prodotti delle categorie `shop` del tenant; `/gadgets` filtra server-side categorie e prodotti `gadgets`, con filtro `?category=` e paginazione `?page=`. Prodotti senza categoria non appartengono a nessuno scope. Il prodotto phare viene scelto tramite `featured`, poi `position`/`id`; in assenza di prodotti attivi la boutique mostra uno stato vuoto senza dati artificiali.
 
 Goodies riusa `products`, immagini/prezzi/stock, `ProductCard`, l’azione condivisa `useQuickAdd`, cart store/sync/drawer, checkout e ordini. I carrelli misti rimangono supportati. Le card Goodies usano `/products/[slug]?from=gadgets` per la navigazione attiva; breadcrumb e ritorno derivano dallo scope reale della categoria. La canonical resta `/products/[slug]`; le raccomandazioni per merchandise rimangono nella stessa categoria. Admin `/admin/catalogue/categories` e `/api/admin/catalogue/categories` gestiscono nome, slug e destinazione Catalogue/Goodies con le permission esistenti `catalog.view/manage`. Le selezioni categoria nella creazione/modifica prodotto mostrano la destinazione. La migration deve essere applicata prima della promozione del codice che legge la colonna; non viene eseguita dal build Vercel.
+
+Le ProductCard grid dello shop usano la CTA esplicita **Ajouter au panier**. Dopo l’azione locale esistente, una sola `AddToCartConfirmation` nel layout shop mostra dialog desktop / bottom sheet mobile. `addToCartUiStore` conserva soltanto prodotto e revisione effimeri; quantità e sincronizzazione restano in `cartStore`, senza modifiche al formato persistito o all’attribution. `useQuickAdd` applica il limite stock a ogni clic shop e nelle recommendation; il comportamento visuale Goodies resta invariato.
+
+La utility server `lib/catalog/getRelatedProducts.ts` è condivisa tra Product Detail (8 risultati) e `GET /api/products/[productId]/recommendations?limit=4` (massimo 4). L’endpoint pubblico read-only verifica prodotto attivo e tenant; riusa embedding esistenti / `match_products` e fallback categoria, senza LLM o nuove scritture. La confirmation carica suggerimenti in background con abort/timeout, nasconde gli errori opzionali e filtra i prodotti già nel carrello; le card compatte aggiungono senza aprire altre confirmation. La strategia V1 è `similar`, non co-acquisto. Non esiste un’infrastruttura analytics ecommerce generica riutilizzata da questo flusso; il tracking Nala preesistente resta nello store.
 
 La navigazione storefront mobile usa `BottomNav` con esattamente Découvrir / Catalogue / Panier / Goodies / Compte per le destinazioni operative frequenti e un drawer laterale per esplorazione e servizi secondari. Goodies sostituisce Commandes soltanto nella BottomNav; `/orders`, account e voce Mes commandes del drawer restano disponibili. Goodies compare nel drawer Explorer subito dopo Catalogue, senza aggiungere una voce permanente all’header desktop. Il drawer è data-driven in base alla configurazione tenant. Su desktop le destinazioni principali restano visibili nell'header e lo stesso drawer è accessibile come menu secondario.
 

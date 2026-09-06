@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { IconSnowflake, IconShoppingCart } from '@tabler/icons-react';
 import type { CatalogScope } from '@lepefy/types';
+import { useAddToCartUiStore } from '@/stores/addToCartUiStore';
 import { useQuickAdd } from './useQuickAdd';
 import { formatPrice } from '@/lib/utils/format';
 import { useTenant } from '@/providers/TenantProvider';
@@ -28,7 +29,7 @@ export interface ProductCardProduct {
 
 interface ProductCardProps {
   product: ProductCardProduct;
-  /** `grid` = grille catalogue (bouton "+" circulaire, catégorie/poids visibles).
+  /** `grid` = grille catalogue (CTA explicite pour le shop, catégorie/poids visibles).
    *  `shelf` = shelf horizontale home (carte étroite, bouton "+" flottant). */
   variant?: 'grid' | 'shelf';
   /** Densité mobile réservée à la grille Catalogue ; Home conserve ses proportions. */
@@ -78,8 +79,9 @@ function getDetailLine(product: ProductCardProduct): string | null {
 
 export function ProductCard({ product, variant = 'grid', compactMobile = false, catalogScope = 'shop' }: ProductCardProps) {
   const { currency } = useTenant();
-  const { addToCart, added, outOfStock } = useQuickAdd(product);
   const merchandise = catalogScope === 'gadgets';
+  const { addToCart, added, outOfStock, atLimit } = useQuickAdd(product, !merchandise);
+  const showConfirmation = useAddToCartUiStore(s => s.show);
   const tagLabel = merchandise ? product.category?.name : getTagLabel(product);
   const gridStorageLabel = getGridStorageLabel(product);
   const detailLine = merchandise ? product.category?.name : getDetailLine(product);
@@ -92,7 +94,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    addToCart();
+    if (addToCart() && variant === 'grid' && !merchandise) {
+      (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+      showConfirmation(product);
+    }
   }
 
   const imageSizes = variant === 'grid'
@@ -168,7 +173,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 <span className="block whitespace-nowrap text-base font-bold leading-tight" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
                 {hasDiscount && <span className="block text-xs text-gray-400 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>}
               </div>
-              <button
+              {merchandise && <button
                 onClick={handleAddToCart}
                 aria-label="Ajouter au panier"
                 disabled={outOfStock}
@@ -176,8 +181,21 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
               >
                 {added ? '✓' : merchandise ? <IconShoppingCart size={18} aria-hidden="true" /> : '+'}
-              </button>
+              </button>}
             </div>
+            {!merchandise && (
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={outOfStock}
+                aria-disabled={atLimit || undefined}
+                aria-label={outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum dans le panier' : 'Ajouter au panier'}
+                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg px-1 py-2 text-[11px] font-semibold leading-tight whitespace-nowrap text-white transition-opacity hover:opacity-90 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-disabled:opacity-60 sm:text-sm motion-reduce:transition-none"
+                style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+              >
+                {added ? 'Ajouté ✓' : outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum' : 'Ajouter au panier'}
+              </button>
+            )}
           </div>
         ) : (
           <div className="px-2 pt-1 pb-6">

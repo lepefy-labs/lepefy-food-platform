@@ -1,0 +1,70 @@
+name: Storefront confirmation smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/storefront/src/components/catalog/**'
+      - 'apps/storefront/src/components/cart/AddToCartConfirmation.tsx'
+      - 'apps/storefront/src/stores/addToCartUiStore.ts'
+      - 'apps/storefront/src/lib/catalog/getRelatedProducts.ts'
+      - 'apps/storefront/src/app/api/products/**'
+      - 'apps/storefront/src/app/(shop)/**'
+      - 'apps/storefront/tests/confirmation/**'
+      - '.github/workflows/storefront-confirmation.yml'
+
+permissions:
+  contents: read
+  statuses: read
+
+concurrency:
+  group: storefront-confirmation-main
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @lepefy/storefront exec playwright install --with-deps chromium
+      - name: Wait for matching production deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            for (let attempt = 0; attempt < 40; attempt++) {
+              const { data } = await github.rest.repos.getCombinedStatusForRef({
+                ...context.repo, ref: context.sha,
+              });
+              const deployment = data.statuses.find(status => status.context === 'Vercel');
+              if (deployment?.state === 'success') {
+                const { data: branch } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
+                if (branch.commit.sha !== context.sha) throw new Error('Production moved to another commit');
+                core.info('Matching Vercel deployment succeeded: ' + context.sha);
+                return;
+              }
+              if (deployment?.state === 'failure' || deployment?.state === 'error') throw new Error('Vercel deployment failed');
+              await new Promise(resolve => setTimeout(resolve, 15000));
+            }
+            throw new Error('Matching Vercel deployment did not become ready');
+      - name: Responsive guest confirmation checks
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ vars.STOREFRONT_SMOKE_URL || 'https://shop.chloefood.com' }}
+        run: pnpm --filter @lepefy/storefront exec playwright test --config=tests/confirmation/playwright.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: storefront-confirmation-report
+          path: |
+            apps/storefront/confirmation-report
+            apps/storefront/test-results
+          retention-days: 7

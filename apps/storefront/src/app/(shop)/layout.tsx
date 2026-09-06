@@ -8,6 +8,7 @@ import { ActiveCheckoutRecovery } from '@/components/checkout-session/ActiveChec
 import { ChatWidgetGate } from '@/components/chat/ChatWidgetGate';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { CartSyncProvider } from '@/components/cart/CartSyncProvider';
+import { AddToCartConfirmation } from '@/components/cart/AddToCartConfirmation';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
@@ -40,6 +41,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       />
       <CookieConsentBanner />
       <CartDrawer />
+      <Suspense><AddToCartConfirmation /></Suspense>
       </CartSyncProvider>
     </div>
   );
