@@ -62,7 +62,19 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
   const panelRef = useRef<HTMLDivElement>(null);
   const { currency } = useTenant();
   const items = useCartStore(s => s.items);
-  const quantity = items.find(item => item.product.id === product.id)?.quantity ?? 0;
+  const cartItem = items.find(item => item.product.id === product.id);
+  const quantity = cartItem?.quantity ?? 0;
+  const maxStock = Math.min(product.stock ?? 999, cartItem?.product.stock ?? 999);
+
+  function changeQuantity(delta: -1 | 1) {
+    // Read synchronously for each click, including clicks batched before React renders.
+    const cart = useCartStore.getState();
+    const current = cart.items.find(item => item.product.id === product.id);
+    if (!current) return;
+    const maximum = Math.min(product.stock ?? 999, current.product.stock ?? 999);
+    const next = Math.min(maximum, Math.max(1, current.quantity + delta));
+    if (next >= 1 && next !== current.quantity) cart.updateQuantity(product.id, next);
+  }
   const [recommendations, setRecommendations] = useState<ProductCardProduct[]>([]);
   const [loading, setLoading] = useState(true);
   // Keep newly added cards visible for feedback and consecutive adds in this opening.
@@ -134,10 +146,27 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
           <div className="flex items-center gap-3">
             <ProductImage product={product} />
             <div className="min-w-0">
-              <p className="line-clamp-2 text-sm font-semibold text-gray-900 sm:text-base">{product.name}</p>
+              <Link href={`/products/${product.slug}`} onClick={onClose}
+                className="line-clamp-2 rounded-sm text-sm font-semibold text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:text-base">{product.name}</Link>
               {details && <p className="mt-0.5 truncate text-xs text-gray-500">{details}</p>}
               <p className="mt-1 font-bold text-gray-900">{formatPrice(product.price, currency)}</p>
-              <p className="text-xs text-gray-500" aria-live="polite">Quantité dans le panier : {quantity}</p>
+              <div role="group" aria-label={`Quantité de ${product.name}`}
+                className="mt-2 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-900">
+                <button type="button" onClick={() => changeQuantity(-1)} disabled={quantity <= 1}
+                  aria-label={`Diminuer la quantité de ${product.name}`}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-l-lg text-xl font-medium hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:bg-gray-50 disabled:text-gray-400">
+                  −
+                </button>
+                <span aria-live="polite" aria-atomic="true" data-testid="confirmation-quantity"
+                  className="min-w-10 border-x border-gray-300 px-2 text-center text-sm font-semibold tabular-nums">
+                  <span className="sr-only">Quantité dans le panier : </span>{quantity}
+                </span>
+                <button type="button" onClick={() => changeQuantity(1)} disabled={!cartItem || quantity >= maxStock}
+                  aria-label={`Augmenter la quantité de ${product.name}`}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-r-lg text-xl font-medium hover:bg-gray-50 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 disabled:bg-gray-50 disabled:text-gray-400">
+                  +
+                </button>
+              </div>
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">

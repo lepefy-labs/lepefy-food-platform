@@ -42,6 +42,33 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     expect(await readItems(page)).toHaveLength(1);
     expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
     const panel = dialog(page);
+    const quantity = panel.getByTestId('confirmation-quantity');
+    const minus = panel.getByRole('button', { name: /^Diminuer la quantité de / });
+    const plus = panel.getByRole('button', { name: /^Augmenter la quantité de / });
+    await expect(quantity).toHaveText('Quantité dans le panier : 1');
+    await expect(minus).toBeDisabled();
+    const sourceItem = (await readItems(page))[0]!;
+    if (sourceItem.product.stock > 1) {
+      await plus.click();
+      await expect(quantity).toHaveText('Quantité dans le panier : 2');
+      expect((await readItems(page))[0]!.quantity).toBe(2);
+      await minus.click();
+      await expect(quantity).toHaveText('Quantité dans le panier : 1');
+      await expect(minus).toBeDisabled();
+      // Both clicks happen in one task: no stale React quantity closure.
+      await plus.evaluate(el => { (el as HTMLButtonElement).click(); (el as HTMLButtonElement).click(); });
+      expect((await readItems(page))[0]!.quantity).toBe(Math.min(3, sourceItem.product.stock));
+      await minus.evaluate(el => { for (let i = 0; i < 5; i++) (el as HTMLButtonElement).click(); });
+      await expect(quantity).toHaveText('Quantité dans le panier : 1');
+    } else {
+      await expect(plus).toBeDisabled();
+    }
+    for (const control of [minus, plus]) {
+      const box = await control.boundingBox();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
+    await expect(panel.getByRole('link', { name: 'Voir mon panier' })).toBeInViewport();
     const bounds = await panel.boundingBox();
     expect(bounds!.width).toBeLessThanOrEqual(Math.min(width, 800));
     expect(bounds!.height).toBeLessThanOrEqual(900 * 0.85 + 1);
@@ -138,8 +165,10 @@ test('public endpoint and product detail reuse real available recommendations; G
   expect(body.products.every((p: { id: string; stock: number }) => p.id !== source && p.stock !== 0)).toBe(true);
   expect((await request.get('/api/products/not-a-uuid/recommendations')).status()).toBe(400);
   expect((await request.get('/api/products/00000000-0000-0000-0000-000000000000/recommendations')).status()).toBe(404);
-  await dialog(page).getByRole('button', { name: 'Continuer mes achats' }).click();
-  await page.goto(href!);
+  const productLink = dialog(page).locator('a').filter({ hasText: /.+/ }).filter({ hasNotText: 'Voir mon panier' }).first();
+  await expect(productLink).toHaveAttribute('href', href!);
+  await productLink.click();
+  await expect(page).toHaveURL(new URL(href!, page.url()).href);
   await expect(dialog(page)).toHaveCount(0);
   if (body.products.length) await expect(page.getByRole('heading', { name: 'Vous aimerez aussi' })).toBeVisible();
   await page.goto('/gadgets');
@@ -149,4 +178,35 @@ test('public endpoint and product detail reuse real available recommendations; G
     const box = await card.boundingBox();
     if (box) { expect(box.width).toBe(44); expect(box.height).toBe(44); }
   }
+});
+
+test('stepper respects the cart item stock and a product already in the cart', async ({ page }) => {
+  await page.route('**/api/products/*/recommendations?*', route => route.fulfill({ json: { products: [] } }));
+  await page.goto('/');
+  await trigger(page).click();
+  const item = (await readItems(page))[0]!;
+  // Reuse a real product, with a conservative stock snapshot from an existing cart.
+  expect(item.product.stock).toBeGreaterThan(1);
+  await page.evaluate(() => {
+    const persisted = JSON.parse(localStorage.getItem('lepefy-cart')!);
+    persisted.state.items[0].product.stock = 2;
+    persisted.state.items[0].quantity = 1;
+    localStorage.setItem('lepefy-cart', JSON.stringify(persisted));
+  });
+  await page.reload();
+  await trigger(page).click();
+  const panel = dialog(page);
+  const quantity = panel.getByTestId('confirmation-quantity');
+  const minus = panel.getByRole('button', { name: /^Diminuer la quantité de / });
+  const plus = panel.getByRole('button', { name: /^Augmenter la quantité de / });
+  await expect(quantity).toHaveText('Quantité dans le panier : 2');
+  await expect(plus).toBeDisabled();
+  await minus.click();
+  await expect(quantity).toHaveText('Quantité dans le panier : 1');
+  await expect(minus).toBeDisabled();
+  await plus.evaluate(el => { for (let i = 0; i < 10; i++) (el as HTMLButtonElement).click(); });
+  await expect(quantity).toHaveText('Quantité dans le panier : 2');
+  await expect(plus).toBeDisabled();
+  expect((await readItems(page))[0]!.quantity).toBe(2);
+  await expect(panel).toBeVisible();
 });
