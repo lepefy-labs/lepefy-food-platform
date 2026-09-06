@@ -113,4 +113,3 @@ export async function getRelatedProducts(
 
   return candidates.slice(0, limit);
 }
-
