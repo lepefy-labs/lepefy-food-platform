@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 6 settembre 2026 — **v6.40 Current-State Snapshot**
+> **Aggiornato:** 7 settembre 2026 — **v6.41 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -215,26 +215,46 @@ Console Platform interna Lepefy:
 
 `/admin/platform/**` ha guard server-side platform-owner-only aggiuntivo. `/admin/team` resta gestione utenti amministrativi cross-tenant e non è il futuro Team self-service tenant.
 
-/admin/platform/prospects è il modulo interno di acquisizione tenant. Riusa il guard Platform Owner
-esistente su pagine e API e il service client Supabase. DiscoveryProvider separa la discovery francese
-SIRENE (API Recherche d'entreprises) da UI e scoring; OSM/Overpass è enrichment opzionale.
-Il fetch HTTP diretto valida DNS e redirect con IP pubblico fissato per connessione, robots,
-timeout, dimensione e content type; visita homepage più massimo due pagine interne.
+/admin/platform/prospects è il modulo interno di acquisizione tenant, ora Prospects Enrichment V2.
+Riusa guard Platform Owner, service client, discovery SIRENE e crawler V1; non introduce nuove
+capability, scheduler o migration. La migration 101 resta prerequisito delle quattro tabelle
+platform-only con RLS senza accesso browser.
 
-La migration 101 introduce solo platform_prospects, platform_prospect_runs, platform_prospect_cache
-e platform_prospect_gates: RLS senza policy/grant browser, claim/release service-role-only,
-nessun tenant/backfill. La presenza della migration non prova l'applicazione remota; schema assente
-restituisce un errore esplicito. Run riprendibili avanzano da UI in batch sequenziali, con lease DB
-cross-instance, idempotenza e cooldown persistenti; nessun nuovo scheduler.
-Cache configurabili: SIRENE 90 giorni, OSM 30, sito 14; errori sito una ora. I risultati SIRENE
-sono bounded e non rappresentano un export completo. Mapping NAF rev. 2 isolato e da aggiornare
-per la transizione 2027. Il codice APE non certifica indipendenza o specializzazione culturale.
+La raccolta segue fonti gratuite prima: sito già noto → OSM se necessario → sito scoperto →
+Google Places facoltativo solo senza sito risolto. BusinessLookupProvider separa gli adapter.
+OSM usa normalizzazione trade/legal name e confidence deterministica con SIRET prioritario,
+nome + posizione/categoria/indirizzo, soglia 85 e margine 12; candidati ambigui non vengono adottati.
+Overpass resta bounded (150m/50 risultati), con cache 30 giorni e gate persistente.
 
-Score 0–100 e soglie sono deterministici; segnali unknown non assegnano punti di assenza.
-Problemi e moduli suggeriti derivano da prove minimizzate, senza HTML raw né AI obbligatoria.
-Lista/filtri/KPI sono server-side; pipeline commerciale manuale separata dall'enrichment.
-Suppression impedisce selezione outbound e enrichment dei candidati; rediscovery non la sovrascrive.
-Won non crea tenants. Dettagli operativi e limiti: docs/PLATFORM_PROSPECTS.md.
+Google Places è disabilitato di default e richiede GOOGLE_PLACES_API_KEY +
+PLATFORM_PROSPECTS_GOOGLE_PLACES_ENABLED=true. PLATFORM_PROSPECTS_GOOGLE_PLACES_MONTHLY_LIMIT
+default 900 limita le richieste, non garantisce gratuità. Ogni tentativo prenota atomicamente uno
+slot mensile UTC INSERT-only in platform_prospect_cache (quota:google:YYYY-MM:NNNNNN).
+Collisioni, storage indisponibile o quota esaurita falliscono chiusi; tentativi falliti non
+rimborsano slot. Nessuna cancellazione dei record quota nel mese corrente. Persistono solo
+place ID e diagnostica minimizzata; URL Google transitorio adottato solo dopo analisi diretta
+completa con identità compatibile. Contatti/segnali permanenti provengono dal sito.
+
+“Enrichir les non vérifiés” seleziona stato/cooldown, mai fit >=65; selezione manuale max 10.
+Discovery max 500 e run sequenziali/riprendibili mantengono lease DB 180s e richiesta 60s.
+Cache SIRENE 90 giorni, OSM 30, sito 14, errori sito un'ora. Nessuna scansione live nei test.
+Suppression esclude enrichment e candidati outbound; won non crea tenant.
+
+assessment.ts separa Fit Score, data completeness e maturità digitale/ordine, usando campi e
+evidence JSON esistenti. Identità SIRENE completa tipica: 25% dati, fit ancora provvisorio.
+Valutazione arricchita richiede crawl completo recente e complétude >=65. Unknown non equivale
+a false; punti di assenza richiedono ispezione completata. Frammentazione, ordini su richiesta
+e canali pubblici forniscono opportunità spiegabili senza aumentare arbitrariamente il peso food.
+UI desktop/mobile espone qualità, stato raccolta, filtri/tri e diagnostica provider/quota.
+Metriche dettagliate dei run vivono nel cursor JSON.
+
+Il fetch diretto conserva SSRF, DNS/IP fissato, robots, timeout, redirect e same-origin;
+gzip/deflate/Brotli hanno limiti sia compressi sia decodificati. Redirect robots HTTP→HTTPS/www
+sono consentiti soltanto sullo stesso hostname normalizzato. Eatbu/DISH e link-in-bio non
+provano ecommerce da soli. Recrawl parziale/fallito conserva prove/contatti precedenti;
+updated_at compare-and-set impedisce overwrite di modifiche manuali concorrenti.
+Sito modificato manualmente azzera l'analisi del sito precedente. Note e pipeline commerciale
+restano separate. Dettagli e limiti: docs/PLATFORM_PROSPECTS.md.
 
 `public.platform_branding` resta singleton service-role-only.
 
@@ -613,8 +633,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.38
+# Fine snapshot v6.41
 
-**Base audit:** `main + AI Core V1.2 + Nala Fast Resolver Product Availability V1 + Knowledge Suggestions V1`
-**Data:** 4 settembre 2026
+**Base audit:** `main + Prospects Enrichment V2`
+**Data:** 7 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

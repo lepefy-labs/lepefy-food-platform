@@ -18,7 +18,8 @@ export const CONFIG = {
   requestTimeoutMs: 5000, maxBytes: 1_000_000, maxRedirects: 3, maxPages: 3,
   discoveryBatch: 20, maxDiscovery: 500, maxDiscoveryPages: 100, enrichmentBatch: 10, qualifiedScore: 65,
   pageSize: 25, weights: { food:20, website:5, instagram:5, facebook:3, whatsapp:7,
-    noEcommerce:20, noOrdering:15, catering:10, events:10, delivery:5, multiple:10 },
+    noEcommerce:20, noOrdering:15, catering:10, events:10, delivery:5, multiple:10,
+    requestOrdering:10, fragmented:10, hosted:3, whatsappOrdering:5 },
   levels: { medium:40, high:65, priority:80 },
 };
 export const STATUS_LABELS: Record<string, string> = {

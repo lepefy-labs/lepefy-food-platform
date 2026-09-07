@@ -24,6 +24,11 @@ export default function RunPanel({run,onChange}:{run:Run;onChange:(run:Run)=>voi
   return <section className={card+' space-y-3'} aria-label="Avancement du traitement">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{run.kind === 'discovery' ? 'Découverte' : 'Enrichissement'}</h2><Badge value={run.status} /></div>
     <p role="status" className="text-sm">{run.processed} traités · {run.inserted} ajoutés · {run.duplicates} doublons · {run.succeeded} enrichis · {run.blocked} bloqués · {run.failed} incomplets/échecs</p>
+    {run.cursor.metrics && <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">{Object.entries({
+      osm_matches:'Correspondances OSM',osm_ambiguous:'OSM ambigus',website_discovered:'Sites découverts',
+      website_crawled:'Sites analysés',website_blocked:'Sites bloqués',google_fallback_used:'Recherches Google',
+      google_quota_skipped:'Google suspendu par quota',complete:'Complets',partial:'Partiels',failed:'Échecs',
+    }).map(([key,label])=><div key={key}><dt className="text-gray-500">{label}</dt><dd>{run.cursor.metrics?.[key] ?? 0}</dd></div>)}</dl>}
     {run.error && <p className="text-sm text-amber-700">{run.error}</p>}
     {run.next_attempt_at && <p className="text-sm">Nouvelle tentative après {dateLabel(run.next_attempt_at)}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}

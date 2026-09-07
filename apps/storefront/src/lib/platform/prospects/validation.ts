@@ -19,6 +19,6 @@ export const salesSchema = z.object({
 export const actionSchema = z.discriminatedUnion('action', [
   z.object({ action:z.literal('discover'), filters:discoverySchema }),
   z.object({ action:z.literal('enrich'), ids:z.array(z.string().uuid()).min(1).max(CONFIG.enrichmentBatch).optional(),
-    qualified:z.boolean().optional(), osm:z.boolean().default(true) }),
+    unverified:z.boolean().optional(), qualified:z.boolean().optional(), osm:z.boolean().default(true) }),
   z.object({ action:z.literal('step'), runId:z.string().uuid() }),
 ]);

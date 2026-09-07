@@ -2,6 +2,7 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import http from 'node:http';
 import https from 'node:https';
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib';
 import { CONFIG } from './config';
 export class CrawlError extends Error {
   constructor(public code: string, public status: number | null = null, public retrySeconds = 0) { super(code); }
@@ -71,7 +72,7 @@ export async function safeGet(input: string, options: RequestOptions = {}): Prom
       const req = transport.request(url, {
         method:'GET', agent:false, family:resolved.family,
         headers:{ 'User-Agent':CONFIG.userAgent, Accept:(options.contentTypes ?? ['text/html','application/xhtml+xml']).join(', '),
-          'Accept-Encoding':'identity' },
+          'Accept-Encoding':'gzip, deflate, br' },
         lookup: (_hostname, _options, callback) => callback(null, resolved.address, resolved.family),
       }, res => {
         const status = res.statusCode ?? 0;
@@ -80,7 +81,8 @@ export async function safeGet(input: string, options: RequestOptions = {}): Prom
         if (!(options.contentTypes ?? ['text/html','application/xhtml+xml']).includes(type)) {
           res.destroy(); reject(new CrawlError('unsupported_content', status)); return;
         }
-        if (res.headers['content-encoding'] && res.headers['content-encoding'] !== 'identity') {
+        const encoding=String(res.headers['content-encoding'] ?? 'identity').trim().toLowerCase();
+        if (!['identity','gzip','deflate','br'].includes(encoding)) {
           res.destroy(); reject(new CrawlError('encoded_content', status)); return;
         }
         const max = options.maxBytes ?? CONFIG.maxBytes;
@@ -91,7 +93,19 @@ export async function safeGet(input: string, options: RequestOptions = {}): Prom
           if (bytes > max) { res.destroy(new CrawlError('response_too_large',status)); return; }
           chunks.push(chunk);
         });
-        res.on('end', () => resolve({ status, headers:res.headers, body:Buffer.concat(chunks).toString('utf8') }));
+        res.on('end', () => {
+          try {
+            const input=Buffer.concat(chunks);
+            const body=encoding==='gzip' ? gunzipSync(input,{maxOutputLength:max})
+              : encoding==='deflate' ? inflateSync(input,{maxOutputLength:max})
+              : encoding==='br' ? brotliDecompressSync(input,{maxOutputLength:max}) : input;
+            if (body.length>max) throw new CrawlError('response_too_large',status);
+            resolve({status,headers:res.headers,body:body.toString('utf8')});
+          } catch (error) {
+            reject(error instanceof CrawlError ? error : new CrawlError(
+              (error as {code?:string}).code==='ERR_BUFFER_TOO_LARGE' ? 'response_too_large' : 'invalid_compression',status));
+          }
+        });
         res.on('error',reject);
         res.on('aborted', () => reject(new CrawlError('response_aborted',status)));
       });

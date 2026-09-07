@@ -6,7 +6,7 @@ export const SIGNALS = ['has_website','has_ecommerce','has_online_ordering','has
   'has_delivery','has_events','has_catering','has_loyalty','has_instagram','has_facebook',
   'has_tiktok','has_multiple_locations'] as const;
 export type Signal = typeof SIGNALS[number];
-export type Evidence = { signal: string; source: string; value: string };
+export type Evidence = { signal: string; source: string; value: string; details?: Record<string, unknown> };
 export type Identity = {
   business_name: string; legal_name?: string | null; siren?: string | null; siret?: string | null;
   naf_ape_code?: string | null; business_category?: string | null; country: string;
@@ -38,7 +38,7 @@ export type DiscoveryPage = { candidates: Identity[]; nextPage: number | null };
 export interface DiscoveryProvider { discover(filters: DiscoveryFilters, page: number): Promise<DiscoveryPage> }
 export type Run = {
   id: string; kind: 'discovery' | 'enrichment'; status: 'pending' | 'running' | 'completed' | 'partial' | 'blocked' | 'failed';
-  config: Record<string, unknown>; cursor: { page?: number; pending?: Identity[]; exhausted?: boolean; index?: number };
+  config: Record<string, unknown>; cursor: { page?: number; pending?: Identity[]; exhausted?: boolean; index?: number; metrics?: Record<string,number> };
   processed: number; inserted: number; duplicates: number; succeeded: number; blocked: number; failed: number;
   error: string | null; next_attempt_at: string | null; created_at: string; updated_at: string;
 };

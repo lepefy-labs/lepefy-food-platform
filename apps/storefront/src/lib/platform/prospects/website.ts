@@ -1,3 +1,4 @@
+import { collection, collectionEvidence, fresh } from './assessment';
 import { CONFIG } from './config';
 import { getCache, putCache, claimGate } from './repository';
 import { cacheKey } from './providers';
@@ -5,11 +6,13 @@ import { safeGet, normalizeUrl, CrawlError } from './websiteFetcher';
 import { robotsAllows } from './robots';
 import { parseWebsite, type ParsedPage } from './websiteParser';
 import type { Prospect, Signal } from './types';
-export async function enrichWebsite(prospect:Prospect):Promise<Partial<Prospect>> {
+export async function enrichWebsite(prospect:Prospect,options:{cache?:boolean}={}):Promise<Partial<Prospect>> {
   if (!prospect.website_url) return {};
-  if (prospect.website_checked_at && Date.parse(prospect.website_checked_at) > Date.now()-CONFIG.websiteDays*86400000) return {};
-  const key = cacheKey('website',prospect.website_url);
-  const cached = await getCache<Partial<Prospect>>(key); if (cached) return cached;
+  if (fresh(prospect.website_checked_at,CONFIG.websiteDays)) return {};
+  const previous=collection(prospect,'website');
+  if (previous.retry_at && Date.parse(previous.retry_at)>Date.now()) return {};
+  const key = cacheKey('website:v2',prospect.website_url);
+  const cached = options.cache===false ? null : await getCache<Partial<Prospect>>(key); if (cached) return cached;
   const deadline = Date.now()+40000;
   const pages:ParsedPage[] = []; let partial = false; let lastError:CrawlError | null = null;
   const robots = new Map<string,string>();
@@ -19,7 +22,10 @@ export async function enrichWebsite(prospect:Prospect):Promise<Partial<Prospect>
       const robotsKey = cacheKey('robots',url.origin);
       let text = await getCache<string>(robotsKey);
       if (text === null) {
-        try { text = (await safeGet(url.origin+'/robots.txt',{contentTypes:['text/plain'],maxBytes:64000,redirects:0,deadline})).body; }
+        try { text = (await safeGet(url.origin+'/robots.txt',{contentTypes:['text/plain'],maxBytes:64000,redirects:3,deadline,beforeRequest:async target=>{
+          if (target.hostname.replace(/^www\./,'')!==url.hostname.replace(/^www\./,'')
+            || (url.protocol==='https:' && target.protocol!=='https:')) throw new CrawlError('robots_redirect_refused');
+        }})).body; }
         catch (e) { if (e instanceof CrawlError && e.status === 404) text = ''; else throw new CrawlError('robots_unavailable',e instanceof CrawlError ? e.status : null,e instanceof CrawlError ? e.retrySeconds : 0); }
         await putCache(robotsKey,text,86400);
       }
@@ -53,10 +59,16 @@ export async function enrichWebsite(prospect:Prospect):Promise<Partial<Prospect>
   patch.crawl_error = lastError?.code ?? null;
   const observed:Signal[] = ['has_ecommerce','has_online_ordering','has_delivery','has_events','has_catering','has_loyalty','has_whatsapp_ordering'];
   for (const signal of observed) patch[signal] = pages.some(p => p.signals[signal]) ? true : patch.crawl_status === 'completed' ? false : null;
-  patch.evidence = pages.flatMap(p => p.evidence).slice(0,60);
+  patch.evidence = pages.flatMap(p => p.evidence).slice(0,90);
+  patch.evidence.push(collectionEvidence('website',{checked_at:new Date().toISOString(),status:patch.crawl_status,
+    website_url:prospect.website_url,http_status:patch.crawl_http_status,error:patch.crawl_error,
+    retry_at:patch.crawl_status==='completed' ? undefined : new Date(Date.now()+Math.max(CONFIG.retryMinutes*60,lastError?.retrySeconds ?? 0)*1000).toISOString()}));
   patch.technologies = [...new Set(pages.flatMap(p => p.technologies))];
   for (const page of pages) {
-    Object.assign(patch,page.social);
+    for (const [field,value] of Object.entries(page.social)) {
+      const key=field as keyof ParsedPage['social'];
+      if (!prospect[key] && !patch[key]) patch[key]=value;
+    }
     if (page.emails[0] && !patch.public_email) patch.public_email = page.emails[0];
     if (page.phones[0] && !patch.phone) patch.phone = page.phones[0];
   }
@@ -66,6 +78,6 @@ export async function enrichWebsite(prospect:Prospect):Promise<Partial<Prospect>
   // Failed attempts are cached briefly, not for a successful-crawl refresh window.
   const ttl = patch.crawl_status === 'completed' ? CONFIG.websiteDays*86400 : CONFIG.retryMinutes*60;
   if (patch.crawl_status !== 'completed') patch.website_checked_at = null;
-  await putCache(key,patch,ttl);
+  if (options.cache!==false) await putCache(key,patch,ttl);
   return patch;
 }

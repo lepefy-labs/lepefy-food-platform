@@ -1,21 +1,35 @@
 import { CONFIG } from './config';
-import { normalizedDomain } from './deduplication';
-import { enrichOsm } from './osm';
-import { enrichWebsite } from './website';
+import { enrichProspect } from './enrichment';
+import { assessProspect, collection } from './assessment';
 import { sireneProvider } from './sirene';
-import { scoreProspect } from './scoring';
-import { db, getRun, getProspect, patchRun, patchProspect, insertCandidate, claimGate, releaseGate, StoreError } from './repository';
+import { db, getRun, getProspect, patchRun, patchEnrichment, insertCandidate, claimGate, releaseGate, StoreError } from './repository';
 import { CrawlError } from './websiteFetcher';
-import type { DiscoveryFilters, DiscoveryProvider, Prospect, Run } from './types';
+import type { DiscoveryFilters, DiscoveryProvider, Run } from './types';
 
-export async function selectEnrichment(ids?:string[],qualified=false):Promise<string[]> {
-  let query = db().from('platform_prospects').select('id').eq('do_not_contact',false)
-    .or('website_checked_at.is.null,website_checked_at.lt.'+new Date(Date.now()-CONFIG.websiteDays*86400000).toISOString());
-  if (ids?.length) query = query.in('id',ids);
-  else if (qualified) query = query.gte('fit_score',CONFIG.qualifiedScore).in('status',['discovered','enriched','qualified']);
+export async function selectEnrichment(ids?:string[],unverified=false):Promise<string[]> {
+  let query=db().from('platform_prospects').select('*').eq('do_not_contact',false);
+  if (ids?.length) query=query.in('id',ids);
+  else if (unverified) query=query.in('status',['discovered','enriched','qualified']);
   else throw new Error('Sélectionnez des prospects.');
-  const r = await query.order('fit_score',{ascending:false}).limit(CONFIG.enrichmentBatch);
-  if (r.error) throw new StoreError(); return (r.data ?? []).map(p => p.id as string);
+  // Scan in bounded DB pages so cooling records never starve later candidates.
+  const candidates:string[]=[];
+  for(let offset=0;offset<5000 && candidates.length<CONFIG.enrichmentBatch;offset+=100) {
+    const r=await query.order('last_enriched_at',{ascending:true,nullsFirst:true})
+      .order('has_catering',{ascending:false,nullsFirst:false})
+      .order('has_multiple_locations',{ascending:false,nullsFirst:false})
+      .order('latitude',{ascending:true,nullsFirst:false}).order('id').range(offset,offset+99);
+    if(r.error)throw new StoreError();
+    const rows=(r.data ?? []) as import('./types').Prospect[];
+    for(const p of rows) {
+      const a=assessProspect(p),w=collection(p,'website');
+      if(a.enrichment_status==='complete' || (w.retry_at && Date.parse(w.retry_at)>Date.now()))continue;
+      // No unresolved-website hot loop: at least one hour between attempts.
+      if(p.last_enriched_at && Date.parse(p.last_enriched_at)>Date.now()-CONFIG.retryMinutes*60000)continue;
+      candidates.push(p.id);if(candidates.length===CONFIG.enrichmentBatch)break;
+    }
+    if(rows.length<100 || ids?.length)break;
+  }
+  return candidates;
 }
 export async function stepRun(id:string,provider:DiscoveryProvider=sireneProvider):Promise<Run> {
   // Serverless-safe serialization across all runs. No unattended or unbounded workers.
@@ -52,39 +66,23 @@ export async function stepRun(id:string,provider:DiscoveryProvider=sireneProvide
         const ids = run.config.ids as string[], index = run.cursor.index ?? 0;
         const prospect = ids[index] ? await getProspect(ids[index]) : null;
         if (prospect && !prospect.do_not_contact) {
-          let patch:Partial<Prospect> = {}, osmError = false;
-          if (run.config.osm) {
-            try { patch = await enrichOsm(prospect); } catch { osmError = true; }
-          }
-          try { patch = { ...patch,...await enrichWebsite({...prospect,...patch}) }; }
-          catch { patch.crawl_status = 'failed'; patch.crawl_error = 'request_failed'; }
-          patch.last_enriched_at = new Date().toISOString();
-          patch.domain = normalizedDomain(patch.website_url ?? prospect.website_url);
-          const combined = { ...prospect,...patch };
-          patch.has_instagram = Boolean(combined.instagram_url) || null;
-          patch.has_facebook = Boolean(combined.facebook_url) || null;
-          patch.has_tiktok = Boolean(combined.tiktok_url) || null;
-          if (combined.naf_ape_code === '56.21Z') patch.has_catering = true;
-          if (!patch.crawl_status) patch.crawl_status = combined.website_checked_at ? combined.crawl_status : 'partial';
-          if (osmError && patch.crawl_status === 'completed') patch.crawl_status = 'partial';
-          if (osmError && !patch.crawl_error) patch.crawl_error = 'osm_unavailable';
-          Object.assign(patch,scoreProspect({...combined,...patch}));
-          // Sales fields are never overwritten by enrichment, including concurrent manual edits.
-          await patchProspect(prospect.id,patch);
-          if (['discovered','enriched'].includes(prospect.status)) {
-            const r = await db().from('platform_prospects').update({status:patch.fit_score! >= CONFIG.qualifiedScore ? 'qualified' : 'enriched'})
-              .eq('id',prospect.id).in('status',['discovered','enriched']).eq('do_not_contact',false);
-            if (r.error) throw new StoreError();
-          }
-          if (patch.crawl_status === 'blocked') run.blocked++;
-          else if (patch.crawl_status === 'failed') run.failed++;
-          else if (patch.crawl_status === 'partial') run.failed++;
-          else run.succeeded++;
+          const result=await enrichProspect(prospect,undefined,run.config.osm!==false);
+          const patch={...result.patch};
+          if (['discovered','enriched'].includes(prospect.status)) patch.status=result.assessment.score_state==='enriched'
+            && result.patch.fit_score!>=CONFIG.qualifiedScore ? 'qualified' : 'enriched';
+          // One compare-and-set covers data and qualification; manual edits win.
+          await patchEnrichment(prospect,patch);
+          if(result.assessment.enrichment_status==='complete')run.succeeded++;
+          else if(result.latestWebsiteStatus==='blocked')run.blocked++;
+          else run.failed++;
+          const metrics={...(run.cursor.metrics ?? {})};
+          for(const [key,value] of Object.entries(result.metrics))metrics[key]=(metrics[key] ?? 0)+value;
+          run.cursor.metrics=metrics;
         }
         run.processed++;
         const done = index+1 >= ids.length;
         await patchRun(id,{ processed:run.processed,succeeded:run.succeeded,blocked:run.blocked,failed:run.failed,
-          cursor:{index:index+1},status:done ? (run.failed || run.blocked ? 'partial' : 'completed') : 'running' });
+          cursor:{index:index+1,metrics:run.cursor.metrics},status:done ? (run.failed || run.blocked ? 'partial' : 'completed') : 'running' });
       }
     } catch (e) {
       const wait = e instanceof CrawlError ? e.retrySeconds : 0;

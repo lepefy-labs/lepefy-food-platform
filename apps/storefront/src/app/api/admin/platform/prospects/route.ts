@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { dashboard, listProspects, startRun } from '@/lib/platform/prospects/repository';
+import { googleUsage } from '@/lib/platform/prospects/googlePlaces';
 import { actionSchema } from '@/lib/platform/prospects/validation';
 import { selectEnrichment, stepRun } from '@/lib/platform/prospects/pipeline';
 import { CrawlError } from '@/lib/platform/prospects/websiteFetcher';
@@ -10,8 +11,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(req:NextRequest) {
   const denied = await requirePlatformOwner(); if (denied) return denied;
   try {
-    const [list,summary] = await Promise.all([listProspects(req.nextUrl.searchParams),dashboard()]);
-    return NextResponse.json({...list,...summary},{headers:{'Cache-Control':'no-store'}});
+    const [list,summary,google] = await Promise.all([listProspects(req.nextUrl.searchParams),dashboard(),googleUsage()]);
+    return NextResponse.json({...list,...summary,google},{headers:{'Cache-Control':'no-store'}});
   } catch { return NextResponse.json({error:'Données indisponibles. Vérifiez la migration 101 et réessayez.'},{status:503}); }
 }
 export async function POST(req:NextRequest) {
@@ -24,9 +25,9 @@ export async function POST(req:NextRequest) {
     if (input.action === 'step') run = await stepRun(input.runId);
     else if (input.action === 'discover') run = await startRun('discovery',input.filters);
     else {
-      const ids = await selectEnrichment(input.ids,input.qualified);
+      const ids = await selectEnrichment(input.ids,input.unverified || input.qualified);
       if (!ids.length) return NextResponse.json({error:'Aucun candidat à actualiser : cache récent, opposition ou sélection vide.'},{status:400});
-      run = await startRun('enrichment',{ids:ids.sort(),osm:input.osm});
+      run = await startRun('enrichment',{ids,osm:input.osm});
     }
     return NextResponse.json({run},{headers:{'Cache-Control':'no-store'}});
   } catch (e) {

@@ -40,6 +40,12 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
   const p:ParsedPage = { title:plain(clean.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').slice(0,300) || null,
     description:null, emails:[], phones:[], social:{}, links:[], signals:{}, technologies:[], evidence:[], readable:visible.length >= 80 };
   const mark = (signal:Signal, value:string) => { p.signals[signal] = true; p.evidence.push({ signal, source:pageUrl, value:value.slice(0,180) }); };
+  const observe=(signal:string,value:string)=>p.evidence.push({signal,source:pageUrl,value:value.slice(0,180)});
+  const host=new URL(pageUrl).hostname.replace(/^www\./,'');
+  if (/(^|\.)(eatbu\.com|dish\.co|linktr\.ee|bio\.site)$/.test(host)) {
+    p.technologies.push(host.endsWith('eatbu.com') ? 'Eatbu / DISH' : host.endsWith('dish.co') ? 'DISH' : 'Link-in-bio');
+    observe('hosted_presence',host);
+  }
   for (const meta of clean.matchAll(/<meta\b[^>]*>/gi)) {
     const a = attributes(meta[0]);
     if (a.name?.toLowerCase() === 'description') p.description = a.content?.slice(0,500) ?? null;
@@ -60,7 +66,15 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
     const link = publicLink(a.href,pageUrl); if (!link) continue;
     const key = socialLink(link); if (key) p.social[key] = link;
     const u = new URL(link); const label = (decodeURIComponentSafe(u.pathname)+' '+plain(match[2] ?? '')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-    if (!key && /\b(commander|commande|order|checkout|panier|cart)\b/.test(label)) mark('has_online_ordering',label);
+    const order=!key && /\b(commander|commande|order|checkout|panier|cart)\b/.test(label);
+    if (order) {
+      mark('has_online_ordering',label);
+      if (u.hostname.replace(/^www\./,'')!==new URL(pageUrl).hostname.replace(/^www\./,'')) observe('external_ordering',u.origin+' · '+plain(match[2] ?? ''));
+      if (/\b(checkout|payer|paiement|payment|panier|cart)\b/.test(label)) {
+        observe('ordering_transactional',label);
+        if (u.origin===new URL(pageUrl).origin) observe('owned_checkout',label);
+      }
+    }
     if (u.origin !== new URL(pageUrl).origin || /\.(pdf|jpe?g|png|gif|webp|svg|mp4|mp3|zip|xml|css|js)$/i.test(u.pathname)) continue;
     if (/mentions|confidentialite|privacy|legal|conditions|logout/.test(label)) continue;
     const rank = /contact/.test(label) ? 100 : /boutique|shop|store|commande|order/.test(label) ? 90
@@ -73,8 +87,15 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
     ['PrestaShop',/prestashop(?:\.| =)|name=["']generator["'][^>]*PrestaShop/i,true],
     ['Wix',/static\.wixstatic\.com|wix-site/i,false],
     ['Squarespace',/static\d*\.squarespace\.com|squarespace-cdn\.com/i,false],
+    ['Eatbu / DISH',/(?:https?:)?\/\/[^\s"'<>]*\.(?:eatbu\.com|dish\.co)\//i,false],
   ];
-  for (const [name,pattern,commerce] of tech) if (pattern.test(clean)) { p.technologies.push(name); if (commerce) mark('has_ecommerce',name+' assets'); }
+  for (const [name,pattern,commerce] of tech) if (pattern.test(clean)) { p.technologies.push(name); if (!commerce) observe('hosted_presence',name); if (commerce) mark('has_ecommerce',name+' assets'); }
+  for (const form of clean.matchAll(/<form\b[^>]*>[\s\S]*?<\/form>/gi)) {
+    const text=plain(form[0]).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if (/\b(commande|commander|order)\b/.test(text) && /\b(demande|request|confirmation|confirmer|devis)\b/.test(text)) {
+      observe('ordering_request_based',text); mark('has_online_ordering','Formulaire de demande de commande');
+    }
+  }
   const normalized = visible.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   for (const [signal,pattern] of [
     ['has_delivery',/\b(livraison|delivery)\b/],['has_catering',/\b(traiteur|catering)\b/],
@@ -108,7 +129,11 @@ export function parseWebsite(html: string, pageUrl: string): ParsedPage {
   if (p.social.facebook_url) mark('has_facebook',p.social.facebook_url);
   if (p.social.tiktok_url) mark('has_tiktok',p.social.tiktok_url);
   if (p.social.whatsapp_url && /\b(commander|commande|order)\b.{0,40}whatsapp|whatsapp.{0,40}\b(commander|commande|order)\b/i.test(normalized)) mark('has_whatsapp_ordering','Commande via WhatsApp');
+  if (p.signals.has_whatsapp_ordering) observe('ordering_request_based','Commande par WhatsApp');
+  if (p.evidence.some(e=>e.signal==='owned_checkout') && p.signals.has_ecommerce) observe('ordering_integrated','Checkout sur le site et technologie ecommerce identifiée');
   p.emails = [...new Set(p.emails)].slice(0,3); p.phones = [...new Set(p.phones)].slice(0,3);
+  for(const value of p.emails)observe('public_email',value);
+  for(const value of p.phones)observe('phone',value);
   p.links = [...links].map(([url,rank]) => ({url,rank})).sort((a,b) => b.rank-a.rank || a.url.localeCompare(b.url)).slice(0,10);
   p.evidence = p.evidence.slice(0,30);
   return p;

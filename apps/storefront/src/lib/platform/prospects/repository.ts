@@ -29,6 +29,11 @@ export async function patchProspect(id:string, patch:Partial<Prospect>) {
   const result = await db().from('platform_prospects').update(patch).eq('id',id).select('id');
   if (result.error || !result.data?.length) throw new StoreError();
 }
+export async function patchEnrichment(previous:Prospect,patch:Partial<Prospect>) {
+  const r=await db().from('platform_prospects').update(patch).eq('id',previous.id)
+    .eq('updated_at',previous.updated_at).eq('do_not_contact',false).select('id');
+  if(r.error || !r.data?.length)throw new StoreError();
+}
 export async function getRun(id:string):Promise<Run | null> {
   const r = await db().from('platform_prospect_runs').select('*').eq('id',id).maybeSingle();
   if (r.error) throw new StoreError(); return r.data as Run | null;
@@ -84,16 +89,28 @@ export async function listProspects(params:URLSearchParams) {
   if (params.get('outbound') === 'true') query = query.eq('do_not_contact',false).in('status',['discovered','enriched','qualified']);
   const score = Number(params.get('score') ?? 0);
   query = query.gte('fit_score',Number.isFinite(score) ? Math.min(100,Math.max(0,score)) : 0);
-  const result = await query.order('fit_score',{ascending:false}).order('id').range((page-1)*CONFIG.pageSize,page*CONFIG.pageSize-1);
+  const cutoff=new Date(Date.now()-CONFIG.websiteDays*86400000).toISOString();
+  if(params.get('collection')==='unverified')query=query.or('website_checked_at.is.null,website_checked_at.lt.'+cutoff+',crawl_status.neq.completed');
+  if(params.get('collection')==='enriched' || params.get('qualification_level'))
+    query=query.eq('crawl_status','completed').gte('website_checked_at',cutoff);
+  if(params.get('sort')==='fit')query=query.order('fit_score',{ascending:false});
+  else query=query.order('last_enriched_at',{ascending:true,nullsFirst:true})
+    .order('has_catering',{ascending:false,nullsFirst:false}).order('has_multiple_locations',{ascending:false,nullsFirst:false})
+    .order('latitude',{ascending:true,nullsFirst:false});
+  const result = await query.order('id').range((page-1)*CONFIG.pageSize,page*CONFIG.pageSize-1);
   if (result.error) throw new StoreError();
   return { prospects:result.data as Prospect[], total:result.count ?? 0, page, pageSize:CONFIG.pageSize };
 }
 export async function dashboard() {
+  const cutoff=new Date(Date.now()-CONFIG.websiteDays*86400000).toISOString();
   const counts = await Promise.all([
     db().from('platform_prospects').select('id',{count:'exact',head:true}),
-    db().from('platform_prospects').select('id',{count:'exact',head:true}).gte('fit_score',CONFIG.qualifiedScore).eq('do_not_contact',false),
-    db().from('platform_prospects').select('id',{count:'exact',head:true}).eq('qualification_level','priority').eq('do_not_contact',false),
-    ...['contacted','demo','won'].map(status => db().from('platform_prospects').select('id',{count:'exact',head:true}).eq('status',status)),
+    db().from('platform_prospects').select('id',{count:'exact',head:true}).eq('do_not_contact',false)
+      .or('website_checked_at.is.null,website_checked_at.lt.'+cutoff+',crawl_status.neq.completed'),
+    db().from('platform_prospects').select('id',{count:'exact',head:true}).gte('fit_score',CONFIG.qualifiedScore)
+      .eq('crawl_status','completed').gte('website_checked_at',cutoff).eq('do_not_contact',false),
+    db().from('platform_prospects').select('id',{count:'exact',head:true}).eq('qualification_level','priority').eq('crawl_status','completed').gte('website_checked_at',cutoff).eq('do_not_contact',false),
+    ...['demo','won'].map(status => db().from('platform_prospects').select('id',{count:'exact',head:true}).eq('status',status)),
   ]);
   if (counts.some(r => r.error)) throw new StoreError();
   const runs = await db().from('platform_prospect_runs').select('*').order('created_at',{ascending:false}).limit(5);

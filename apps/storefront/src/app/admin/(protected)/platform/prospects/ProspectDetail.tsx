@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { STATUSES, type Prospect, type Run } from '@/lib/platform/prospects/types';
 import { STATUS_LABELS } from '@/lib/platform/prospects/config';
 import { api, Badge, button, card, dateLabel, ExternalLink, field, secondary } from './ui';
+import { Fit, Completeness, Qualification, CollectionStatus } from './Quality';
+import { assessProspect, collection, QUALITY_LABELS, PROVIDER_LABELS } from '@/lib/platform/prospects/assessment';
 import RunPanel from './RunPanel';
 const localDate = (s:string | null) => { if (!s) return ''; const d = new Date(s); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16); };
 export default function ProspectDetail({id}:{id:string}) {
@@ -36,7 +38,7 @@ export default function ProspectDetail({id}:{id:string}) {
     {!p ? <button className={secondary} onClick={() => void load()}>Charger la fiche</button> : <>
       <header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-violet-600">Plateforme · Prospect</p>
         <h1 className="mt-1 text-2xl font-semibold">{p.business_name}</h1><p className="mt-1 text-sm text-gray-500">{p.business_category ?? 'Catégorie non renseignée'} · {p.city} {p.postal_code}</p>
-        <p className="mt-3 flex flex-wrap items-center gap-2"><strong>{p.fit_score}/100</strong><Badge value={p.qualification_level} /><Badge value={p.status} />{p.do_not_contact && <span className="text-sm font-semibold text-red-700">Ne pas contacter</span>}</p></div>
+        <div className="mt-3 flex flex-wrap items-center gap-3"><Fit p={p} /><Completeness p={p} /><Qualification p={p} /><Badge value={p.status} />{p.do_not_contact && <span className="text-sm font-semibold text-red-700">Ne pas contacter</span>}</div></div>
         <button className={button} disabled={busy || p.do_not_contact} onClick={() => void enrich()}>Enrichir ce prospect</button>
       </header>
       {run && <RunPanel key={run.id} run={run} onChange={r => {setRun(r);if (['completed','partial','failed'].includes(r.status)) void load();}} />}
@@ -55,6 +57,7 @@ export default function ProspectDetail({id}:{id:string}) {
           <dl className="grid grid-cols-2 gap-3 text-sm">
             {([['has_ecommerce','Ecommerce'],['has_online_ordering','Commande en ligne'],['has_delivery','Livraison'],['has_whatsapp_ordering','Commande WhatsApp'],['has_events','Événements'],['has_catering','Traiteur'],['has_loyalty','Fidélité'],['has_multiple_locations','Plusieurs établissements']] as const).map(([key,label]) => <div key={key}><dt className="text-gray-500">{label}</dt><dd>{p[key] === true ? 'Détecté' : p[key] === false ? 'Non détecté' : 'Non vérifié'}</dd></div>)}
           </dl>
+          <p className="text-sm">Maturité digitale : <strong>{QUALITY_LABELS[assessProspect(p).digital_maturity]}</strong> · Commande : <strong>{QUALITY_LABELS[assessProspect(p).ordering_maturity]}</strong></p>
           <p className="text-sm">Technologies : {p.technologies.join(', ') || 'Non identifiées'}</p>
           {p.website_title && <p className="text-sm">{p.website_title}</p>}{p.website_description && <p className="text-sm text-gray-500">{p.website_description}</p>}
         </section>
@@ -86,7 +89,16 @@ export default function ProspectDetail({id}:{id:string}) {
             ['Découverte',dateLabel(p.discovered_at)],['Dernier enrichissement',dateLabel(p.last_enriched_at)],
             ['Dernier site complet',dateLabel(p.website_checked_at)],['Dernier OSM',dateLabel(p.osm_checked_at)],['Opposition',dateLabel(p.suppressed_at)],
           ].map(([k,v]) => <div key={k}><dt className="text-gray-500">{k}</dt><dd>{v || '—'}</dd></div>)}</dl>
-          <p className="text-sm"><Badge value={p.crawl_status} /> HTTP {p.crawl_http_status ?? '—'} {p.crawl_error ?? ''}</p>
+          <p className="text-sm"><CollectionStatus p={p} /> · Dernière analyse complète : <Badge value={p.crawl_status} /> HTTP {p.crawl_http_status ?? '—'} {p.crawl_error ?? ''}</p>
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div><dt className="text-gray-500">Source du site</dt><dd>{p.evidence.find(e=>e.signal==='website_source')?.source ?? (p.website_url ? 'Source antérieure / saisie' : 'Non résolu')}</dd></div>
+            <div><dt className="text-gray-500">Dernière tentative site</dt><dd>{PROVIDER_LABELS[collection(p,'website').status ?? ''] ?? 'Non commencée'} · {dateLabel(collection(p,'website').checked_at)} · HTTP {collection(p,'website').http_status ?? '—'} · {collection(p,'website').error ?? ''}</dd></div>
+            <div><dt className="text-gray-500">OSM · dernière recherche</dt><dd>{PROVIDER_LABELS[collection(p,'osm').status ?? ''] ?? 'Non vérifié'} · {collection(p,'osm').confidence ?? (typeof p.osm_metadata.confidence==='number' ? p.osm_metadata.confidence : '—')}%<p>{(collection(p,'osm').reasons ?? []).join(' · ')}</p></dd></div>
+            <div><dt className="text-gray-500"><span translate="no">Google Maps</span> · recherche facultative</dt><dd>{PROVIDER_LABELS[collection(p,'google').status ?? ''] ?? 'Non utilisé'} · {dateLabel(collection(p,'google').checked_at)}{collection(p,'google').place_id && <p>Place ID : {collection(p,'google').place_id}</p>}<p>{(collection(p,'google').reasons ?? []).join(' · ')}</p></dd></div>
+          </dl>
+          <details><summary className="min-h-11 cursor-pointer text-sm">Calcul de complétude : {assessProspect(p).data_completeness}%</summary>
+            <ul className="space-y-1 text-sm">{assessProspect(p).completeness_breakdown.map(r=><li key={r.label}>{r.label} : {r.known ? r.points : 0}/{r.points}</li>)}</ul>
+          </details>
           {Object.keys(p.osm_metadata).length > 0 && <p className="text-xs text-gray-500">OpenStreetMap contributors · ODbL · {String(p.osm_metadata.id ?? p.osm_metadata.result ?? '')}</p>}
         </section>
       </div>
