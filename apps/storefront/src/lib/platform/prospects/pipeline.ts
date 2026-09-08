@@ -74,15 +74,17 @@ export async function stepRun(id:string,provider:DiscoveryProvider=sireneProvide
           await patchEnrichment(prospect,patch);
           if(result.assessment.enrichment_status==='complete')run.succeeded++;
           else if(result.latestWebsiteStatus==='blocked')run.blocked++;
-          else run.failed++;
+          else if(result.assessment.enrichment_status==='failed')run.failed++;
+          // Partials are tracked separately in metrics; they are not execution failures.
           const metrics={...(run.cursor.metrics ?? {})};
           for(const [key,value] of Object.entries(result.metrics))metrics[key]=(metrics[key] ?? 0)+value;
           run.cursor.metrics=metrics;
         }
         run.processed++;
         const done = index+1 >= ids.length;
+        const partials=run.cursor.metrics?.partial ?? 0;
         await patchRun(id,{ processed:run.processed,succeeded:run.succeeded,blocked:run.blocked,failed:run.failed,
-          cursor:{index:index+1,metrics:run.cursor.metrics},status:done ? (run.failed || run.blocked ? 'partial' : 'completed') : 'running' });
+          cursor:{index:index+1,metrics:run.cursor.metrics},status:done ? (run.failed || run.blocked || partials ? 'partial' : 'completed') : 'running' });
       }
     } catch (e) {
       const wait = e instanceof CrawlError ? e.retrySeconds : 0;
@@ -92,7 +94,8 @@ export async function stepRun(id:string,provider:DiscoveryProvider=sireneProvide
     const result = await getRun(id);
     if (!result) throw new StoreError();
     console.info('platform_prospects_run',{kind:result.kind,status:result.status,processed:result.processed,
-      inserted:result.inserted,duplicates:result.duplicates,succeeded:result.succeeded,blocked:result.blocked,failed:result.failed});
+      inserted:result.inserted,duplicates:result.duplicates,succeeded:result.succeeded,blocked:result.blocked,failed:result.failed,
+      metrics:result.cursor.metrics ?? {}});
     return result;
   } finally { await releaseGate('pipeline',lease); }
 }
