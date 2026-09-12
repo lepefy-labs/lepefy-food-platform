@@ -14,6 +14,7 @@ import {
   IconPlus,
   IconReceipt,
   IconStar,
+  IconTrash,
   IconUser,
   IconUserCircle,
 } from '@tabler/icons-react';
@@ -222,6 +223,17 @@ export function AccountDashboard({
               <IconLogout size={19} stroke={1.7} aria-hidden="true" />
               {isLoggingOut ? 'Déconnexion…' : 'Se déconnecter'}
             </button>
+
+            <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="account-management-heading">
+              <h2 id="account-management-heading" className="text-sm font-semibold text-gray-700">Gestion du compte</h2>
+              <Link
+                href="/supprimer-compte"
+                className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 active:bg-red-100"
+              >
+                <IconTrash size={18} stroke={1.7} aria-hidden="true" />
+                Supprimer mon compte
+              </Link>
+            </section>
           </div>
         </div>
       </div>

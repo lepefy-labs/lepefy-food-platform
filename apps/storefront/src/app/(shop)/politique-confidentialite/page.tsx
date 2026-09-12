@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getTenant } from '@/lib/tenant/getTenant';
 
 export const metadata: Metadata = {
@@ -100,9 +101,11 @@ export default async function PolitiqueConfidentialitePage() {
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-2">6. Durée de conservation</h2>
           <p>
-            Les données de commande sont conservées pendant la durée nécessaire aux obligations
-            légales et comptables. Les données de compte sont conservées tant que le compte est
-            actif, puis supprimées ou anonymisées sur demande.
+            Les données de compte sont conservées tant que le compte est actif. Après suppression,
+            le profil, les adresses, le panier, les points et les conversations liées au compte sont
+            effacés. Les commandes, paiements, preuves de consentement liées à une commande et traces
+            nécessaires aux obligations légales, comptables ou de sécurité sont conservés pendant
+            leur durée applicable, sans lien vers le compte supprimé.
           </p>
         </section>
 
@@ -112,6 +115,15 @@ export default async function PolitiqueConfidentialitePage() {
             Conformément au RGPD, vous disposez d&apos;un droit d&apos;accès, de rectification,
             d&apos;effacement, de limitation et d&apos;opposition sur vos données. Pour exercer ces
             droits, contactez-nous à <MailtoOrFallback email={legalEmail} />.
+          </p>
+          <p className="mt-3">
+            Vous pouvez aussi utiliser la page{' '}
+            <Link href="/supprimer-compte" className="font-semibold underline">
+              Supprimer mon compte
+            </Link>
+            . Elle vérifie votre identité avant toute suppression. Les commandes invitées sans compte
+            portant la même adresse email ne sont pas supprimées automatiquement afin d’éviter une
+            suppression trop large; contactez-nous pour une demande distincte.
           </p>
         </section>
 

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 7 settembre 2026 — **v6.41 Current-State Snapshot**
+> **Aggiornato:** 12 settembre 2026 — **v6.42 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -78,6 +78,12 @@ La utility server `lib/catalog/getRelatedProducts.ts` è condivisa tra Product D
 La navigazione storefront mobile usa `BottomNav` con esattamente Découvrir / Catalogue / Panier / Goodies / Compte per le destinazioni operative frequenti e un drawer laterale per esplorazione e servizi secondari. Goodies sostituisce Commandes soltanto nella BottomNav; `/orders`, account e voce Mes commandes del drawer restano disponibili. Goodies compare nel drawer Explorer subito dopo Catalogue, senza aggiungere una voce permanente all’header desktop. Il drawer è data-driven in base alla configurazione tenant. Su desktop le destinazioni principali restano visibili nell'header e lo stesso drawer è accessibile come menu secondario.
 
 Il pattern di drawer è condiviso da Shop ed Events tramite `BrandNavigationDrawer`: overlay, Escape/backdrop, body scroll lock, focus ring, safe-area footer, social e legal sono implementati una sola volta; ogni surface passa sezioni e capability proprie.
+
+### Suppression de compte client
+
+La route pubblica tenant-aware `/supprimer-compte` è disponibile anche senza sessione. Un cliente non autenticato verifica l’identità tramite un flusso OTP dedicato con `shouldCreateUser: false`; questo flusso non esegue signup, upsert customer, consenso o referral. L’inserimento dell’OTP apre soltanto la conferma finale esplicita.
+
+`src/lib/privacy/deleteCustomerAccount.ts` è il servizio server canonico. Blocca l’automazione per identità admin/staff o commissioni ambassador `CONFIRMED`, registrando `manual_review`. La RPC service-role-only `delete_customer_account_data` elimina in transazione profilo, indirizzi, cart, punti/referral propri, consensi standalone e conversazioni Nala/AI collegate; ordini, pagamenti, checkout durevoli, consensi ordine, audit loyalty/commissioni/frode e conversion attribution sono conservati scollegando il customer. L’identità Supabase Auth viene eliminata solo dopo il cleanup dati e la sessione locale viene invalidata. Nessuna cancellazione avviene per semplice corrispondenza email e i record guest omonimi restano fuori scope.
 
 Sul dominio Events la navigazione pubblica usa URL pulite (`/`, `/evenements/[slug]`, `/services/[slug]`) mentre le route interne `/evenementiel/**` restano l'implementazione App Router raggiunta tramite rewrite host-based. I link verso Traiteur/Location/Galerie sono esposti solo se esistono contenuti pubblici attivi.
 
@@ -526,6 +532,9 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 099_nala_product_relationships.sql
 100_lepefy_ai_core.sql
 101_platform_prospects.sql
+102_nala_response_memory.sql
+103_category_catalog_scope.sql
+104_customer_account_deletion.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -555,6 +564,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
 
 `100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. Applicazione Supabase remota completata e verificata dal proprietario come prerequisito AI Core; V1.2 riusa lo schema esistente e non aggiunge migration.
+
+`104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
@@ -586,6 +597,7 @@ apps/storefront/src/lib/cart/*
 apps/storefront/src/lib/checkout/*
 apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
+apps/storefront/src/lib/privacy/*
 apps/storefront/src/lib/admin/workspace.ts
 apps/storefront/src/lib/admin/platformBilling.ts
 apps/storefront/src/lib/admin/nalaAnalyticsDashboard.ts
@@ -633,8 +645,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.41
+# Fine snapshot v6.42
 
 **Base audit:** `main + Prospects Enrichment V2`
-**Data:** 7 settembre 2026
+**Data:** 12 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

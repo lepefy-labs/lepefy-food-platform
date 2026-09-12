@@ -47,6 +47,9 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
             <Link href="/conditions-generales-vente" className="text-gray-400 hover:text-gray-600 underline">
               Conditions générales de vente
             </Link>
+            <Link href="/supprimer-compte" className="text-gray-400 hover:text-gray-600 underline">
+              Supprimer mon compte
+            </Link>
           </p>
           {tenant.show_powered_by && <PoweredBy />}
         </div>
@@ -120,6 +123,9 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
             </Link>
             <Link href="/conditions-generales-vente" className="text-gray-400 hover:text-gray-600 underline">
               Conditions générales de vente
+            </Link>
+            <Link href="/supprimer-compte" className="text-gray-400 hover:text-gray-600 underline">
+              Supprimer mon compte
             </Link>
           </p>
           {tenant.show_powered_by && <PoweredBy />}
