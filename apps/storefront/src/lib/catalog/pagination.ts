@@ -17,6 +17,12 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
+type CatalogPageResult = {
+  data: unknown[] | null;
+  count: number | null;
+  error: { message: string; code?: string } | null;
+};
+
 interface CategoryFilterInput {
   id: string;
   slug: string;
@@ -95,7 +101,7 @@ export async function getCatalogPage(
   offset: number,
   limit: number,
   rankingDay: string,
-) {
+): Promise<CatalogPageResult> {
   const { createServiceClient } = await import('@/lib/supabase/server');
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const categoryId = !filters.q?.trim()
