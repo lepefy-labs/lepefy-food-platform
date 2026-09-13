@@ -40,5 +40,5 @@ test('réordonne sans muter la galerie source', async () => {
     'https://cdn.test/a.jpg',
     'https://cdn.test/b.jpg',
   ]);
-  expect(images[0].url).toBe('https://cdn.test/a.jpg');
+  expect(images[0]?.url).toBe('https://cdn.test/a.jpg');
 });

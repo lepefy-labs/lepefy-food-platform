@@ -68,6 +68,7 @@ export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGa
         if (controls.length === 0) return;
         const first = controls[0];
         const last = controls[controls.length - 1];
+        if (!first || !last) return;
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last.focus();
@@ -87,7 +88,9 @@ export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGa
 
   function handleTouchEnd(event: React.TouchEvent) {
     if (touchStartX.current == null || gallery.length < 2) return;
-    const delta = event.changedTouches[0].clientX - touchStartX.current;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const delta = touch.clientX - touchStartX.current;
     touchStartX.current = null;
     if (Math.abs(delta) < 48) return;
     if (delta > 0) showPrevious();

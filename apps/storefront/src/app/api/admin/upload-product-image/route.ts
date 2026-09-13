@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       const format = getFileFormat(file);
       if (!format) continue;
 
-      let buffer = Buffer.from(await file.arrayBuffer());
+      let buffer: Buffer = Buffer.from(await file.arrayBuffer());
       let extension = format.extension;
       let contentType = format.contentType;
 
