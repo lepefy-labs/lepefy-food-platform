@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 13 settembre 2026 — **v6.45 Current-State Snapshot**
+> **Aggiornato:** 13 settembre 2026 — **v6.46 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -494,6 +494,14 @@ Le route personali di sicurezza/profilo restano accessibili indipendentemente da
 
 ---
 
+### Feedback testeurs multi-tenant
+
+La route pubblica `/feedback` espone la campagna attiva del tenant senza autenticazione. Il browser invia solo testo, reazione/categoria opzionali, consenso e-mail esplicito e un contesto tecnico ridotto; tenant e campagna vengono sempre risolti lato server. L’API `/api/feedback` usa service role, validazione strict, limite payload, controllo same-origin, honeypot e cooldown breve senza salvare IP raw o fingerprint.
+
+La console Platform Owner `/admin/platform/feedback` gestisce feedback e campagne, filtri server-side, paginazione, KPI, workflow status/priority/note e attivazione atomica di una sola campagna per tenant. Le tabelle non hanno accesso browser diretto e forzano RLS. La migration `106_tester_feedback.sql` è additiva e va applicata manualmente prima dell’uso; il deploy applicativo degrada in modo controllato finché lo schema non è presente.
+
+---
+
 ## 13. Digital Card / shipping / notifiche
 
 `/card` è hub tenant; location usa `tenant.google_maps_url`, senza Google Maps API/iframe.
@@ -538,6 +546,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 103_category_catalog_scope.sql
 104_customer_account_deletion.sql
 105_tenant_app_icon.sql
+106_tester_feedback.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -569,6 +578,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. Applicazione Supabase remota completata e verificata dal proprietario come prerequisito AI Core; V1.2 riusa lo schema esistente e non aggiunge migration.
 
 `105` aggiunge `tenants.app_icon_url` nullable con grant SELECT esclusivamente column-level per `anon` e `authenticated`; non esegue backfill e mantiene `logo_url` come fallback.
+
+`106` introduce campagne e feedback testeurs tenant-scoped, vincolo atomico di una sola campagna attiva, relazione composita anti cross-tenant, RLS forzata e privilegi esclusivamente service-role. Nessun IP raw o fingerprint viene persistito; l’applicazione in Supabase resta manuale.
 
 `104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
@@ -652,8 +663,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.45
+# Fine snapshot v6.46
 
-**Base audit:** `main + Prospects Enrichment V2`
+**Base audit:** `main + Tester Feedback V1`
 **Data:** 13 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
