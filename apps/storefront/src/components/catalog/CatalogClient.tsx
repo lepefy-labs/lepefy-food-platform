@@ -6,6 +6,7 @@ import { ProductGrid } from '@/components/catalog/ProductGrid';
 import { SemanticProductCard } from '@/components/catalog/SemanticProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
+import type { CatalogSort } from '@/lib/catalog/pagination';
 
 interface Props {
   categories:      Category[];
@@ -17,6 +18,8 @@ interface Props {
   totalCount:      number;
   currentPage:     number;
   hasNextPage:     boolean;
+  sort:            CatalogSort;
+  rankingDay:      string;
 }
 
 export function CatalogClient({
@@ -29,6 +32,8 @@ export function CatalogClient({
   totalCount,
   currentPage,
   hasNextPage,
+  sort,
+  rankingDay,
 }: Props) {
   const pathname      = usePathname();
   const router        = useRouter();
@@ -91,7 +96,7 @@ export function CatalogClient({
   const textualIds = new Set(items.map(p => p.id));
   const semanticOnly = semanticResults.filter(p => !textualIds.has(p.id));
 
-  function buildUrl(overrides: { q?: string; category?: string | null }) {
+  function buildUrl(overrides: { q?: string; category?: string | null; sort?: CatalogSort }) {
     const params = new URLSearchParams(searchParams.toString());
     const newQ = overrides.q !== undefined ? overrides.q : query;
     if (newQ.trim()) params.set('q', newQ.trim());
@@ -100,6 +105,12 @@ export function CatalogClient({
       if (overrides.category) params.set('category', overrides.category);
       else params.delete('category');
     }
+    if (overrides.sort !== undefined) {
+      if (overrides.sort === 'recommended') params.delete('sort');
+      else params.set('sort', overrides.sort);
+    }
+    // A new filter/sort starts with today's daily ranking.
+    params.delete('day');
     // Changer de filtre repart toujours de la page 1 — jamais de ?page=
     // résiduel d'une navigation précédente.
     params.delete('page');
@@ -114,6 +125,8 @@ export function CatalogClient({
       const nextPage = page + 1;
       const params = new URLSearchParams();
       params.set('page', String(nextPage));
+      params.set('day', rankingDay);
+      if (sort !== 'recommended') params.set('sort', sort);
       const trimmedQuery = initialQuery.trim();
       if (trimmedQuery) params.set('q', trimmedQuery);
       else if (activeSlug) params.set('category', activeSlug);
@@ -135,6 +148,7 @@ export function CatalogClient({
       // que sur une vraie navigation (lien direct, partage, retour arrière).
       const urlParams = new URLSearchParams(window.location.search);
       urlParams.set('page', String(nextPage));
+      urlParams.set('day', rankingDay);
       window.history.replaceState(null, '', `${window.location.pathname}?${urlParams.toString()}`);
     } catch {
       // Dégradation silencieuse — le bouton reste cliquable pour réessayer.
@@ -234,7 +248,7 @@ export function CatalogClient({
         <CatalogCategoryRow categories={categories} previewImagesByCategory={previewImagesByCategory} activeSlug={activeSlug} onSelect={handleCategorySelect} />
       )}
 
-      {/* Header risultati */}
+      {/* Résultats et tri */}
       <div className="mt-4 mb-4 flex items-end justify-between gap-3 md:mt-6">
         <div>
           <h2 className="font-display text-xl font-bold text-gray-900">{productHeading}</h2>
@@ -249,6 +263,21 @@ export function CatalogClient({
             Effacer
           </button>
         )}
+        <label className="ml-auto flex shrink-0 flex-col gap-1 text-xs font-medium text-gray-600 sm:flex-row sm:items-center sm:gap-2">
+          <span className="sr-only sm:not-sr-only">Trier par</span>
+          <select
+            value={sort}
+            onChange={e => startTransition(() => router.replace(buildUrl({ sort: e.target.value as CatalogSort })))}
+            className="min-h-11 max-w-[155px] rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:max-w-none"
+            aria-label="Trier les produits"
+          >
+            <option value="recommended">Recommandés</option>
+            <option value="bestsellers">Meilleures ventes</option>
+            <option value="newest">Nouveautés</option>
+            <option value="price_asc">Prix croissant</option>
+            <option value="price_desc">Prix décroissant</option>
+          </select>
+        </label>
       </div>
 
       {/* Griglia */}

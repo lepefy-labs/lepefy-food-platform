@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { CatalogClient } from '@/components/catalog/CatalogClient';
-import { buildProductsQuery, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
+import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import type { Category, ProductWithCategory } from '@lepefy/types';
 
 // Toujours dynamique : recherche/filtre/pagination pilotés par ?q=/?category=/
@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 interface ProductsPageProps {
-  searchParams: { category?: string; q?: string; page?: string };
+  searchParams: { category?: string; q?: string; page?: string; sort?: string; day?: string };
 }
 
 type CategoryPreviewRow = {
@@ -41,6 +41,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const categories: Category[] = categoriesRaw ?? [];
   const searchQuery = searchParams.q?.trim() ?? '';
   const page = parsePageParam(searchParams.page);
+  const sort = parseCatalogSort(searchParams.sort);
+  const rankingDay = catalogRankingDay(searchParams.day);
 
   // Une seule requête pour toutes les catégories sans visuel configuré :
   // le regroupement et la limite de 3 images restent côté serveur.
@@ -66,10 +68,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   // des catégories : les deux requêtes partent ensemble pour limiter la latence.
   const [previewRows, { data: productsRaw, count }] = await Promise.all([
     previewRowsPromise,
-    buildProductsQuery(supabase, tenant.id, categories, {
+    getCatalogPage(supabase, tenant.id, categories, {
       q: searchQuery,
       category: searchParams.category,
-    }).range(0, page * PRODUCTS_PAGE_SIZE - 1),
+      sort,
+    }, 0, page * PRODUCTS_PAGE_SIZE, rankingDay),
   ]);
 
   const previewImagesByCategory: Record<string, string[]> = {};
@@ -97,6 +100,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       totalCount={totalCount}
       currentPage={page}
       hasNextPage={hasNextPage}
+      sort={sort}
+      rankingDay={rankingDay}
     />
   );
 }

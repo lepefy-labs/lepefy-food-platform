@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
-import { buildProductsQuery, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
+import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 
 // Toujours dynamique : dépend de ?page=/?q=/?category=, jamais cacheable
 // comme une réponse unique. Explicite depuis que getTenant() n'utilise plus
@@ -31,10 +31,12 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q') ?? undefined;
   const category = req.nextUrl.searchParams.get('category') ?? undefined;
 
-  const { data: productsRaw, count, error } = await buildProductsQuery(supabase, tenant.id, categories, {
+  const { data: productsRaw, count, error } = await getCatalogPage(supabase, tenant.id, categories, {
     q,
     category,
-  }).range((page - 1) * PRODUCTS_PAGE_SIZE, page * PRODUCTS_PAGE_SIZE - 1);
+    sort: parseCatalogSort(req.nextUrl.searchParams.get('sort') ?? undefined),
+  }, (page - 1) * PRODUCTS_PAGE_SIZE, PRODUCTS_PAGE_SIZE,
+  catalogRankingDay(req.nextUrl.searchParams.get('day') ?? undefined));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
