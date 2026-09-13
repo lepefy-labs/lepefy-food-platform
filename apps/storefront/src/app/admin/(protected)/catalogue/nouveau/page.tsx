@@ -51,6 +51,7 @@ export default async function AdminNouveauProduitPage() {
     featured:                    false,
     storage_type:                'dry',
     image_url:                   null,
+    images:                      [],
     warehouse_location:          null,
     category_id:                 categories?.[0]?.id ?? '',
     producer_id:                 null,

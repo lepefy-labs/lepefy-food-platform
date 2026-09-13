@@ -24,7 +24,7 @@ export default async function AdminProductEditPage({
     .select(`
       id, name, name_alt, slug, description, descriptions, description_source,
       price, weight_grams, stock,
-      active, featured, storage_type, image_url,
+      active, featured, storage_type, image_url, images,
       warehouse_location, category_id,
       producer_id, importer_id, ingredients_text, allergens_text,
       gluten_free_certified, usage_instructions, conservation_instructions,

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { syncProductEmbedding } from '@/lib/ai/embeddings';
+import { normalizeProductImages } from '@/lib/catalog/productImages';
 
 export const runtime = 'nodejs';
 
@@ -57,6 +58,11 @@ export async function PATCH(
   if ('category_id'        in body) updatePayload.category_id        = body.category_id;
   if ('warehouse_location' in body) updatePayload.warehouse_location = body.warehouse_location ? String(body.warehouse_location).trim() : null;
   if ('image_url'          in body) updatePayload.image_url          = body.image_url ?? null;
+  if ('images'             in body) {
+    const images = normalizeProductImages(body.images);
+    updatePayload.images = images;
+    if (!('image_url' in body)) updatePayload.image_url = images[0]?.url ?? null;
+  }
 
   if ('producer_id'                in body) updatePayload.producer_id                = body.producer_id || null;
   if ('importer_id'                in body) updatePayload.importer_id                = body.importer_id || null;

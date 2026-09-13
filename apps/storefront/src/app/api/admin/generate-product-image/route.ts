@@ -1,9 +1,11 @@
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
+import { normalizeProductImages } from '@/lib/catalog/productImages';
 
 const ENDPOINT = 'generate-product-image';
 
@@ -139,25 +141,22 @@ async function generateImage(photoPrompt: string): Promise<ImageGenerationResult
 
 async function uploadToStorage(
   base64Data: string,
-  slug: string,
+  tenantId: string,
+  productId: string,
 ): Promise<string> {
   const supabase = createServiceClient();
   const buffer   = Buffer.from(base64Data, 'base64');
-  const path     = `products/${slug}-ai.jpg`;
+  const path     = `tenants/${tenantId}/products/${productId}/ai-${randomUUID()}.jpg`;
 
   const { error } = await supabase.storage
     .from('assets')
     .upload(path, buffer, {
       contentType: 'image/jpeg',
-      upsert:      true,
+      upsert:      false,
     });
 
   if (error) throw new Error(`Storage upload: ${error.message}`);
 
-  // Cache-busting : même path à chaque régénération (upsert:true), donc sans
-  // ce paramètre l'ancienne image resterait servie depuis le cache CDN/Next
-  // Image jusqu'à minimumCacheTTL (7 jours) — même risque que
-  // upload-product-image/route.ts (Prompt 2), même correctif.
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}?v=${Date.now()}`;
 }
 
@@ -234,14 +233,26 @@ export async function POST(req: NextRequest) {
     const { base64Data, model, inputTokens, outputTokens } = await generateImage(photoPrompt);
 
     console.log('[generate-image] Step 3: upload su Supabase Storage');
-    const imageUrl = await uploadToStorage(base64Data, productSlug);
+    const imageUrl = await uploadToStorage(base64Data, tenant.id, productId);
 
     const supabase = createServiceClient();
-    await supabase
+    const { data: product } = await supabase
       .from('products')
-      .update({ image_url: imageUrl })
+      .select('name, image_url, images')
+      .eq('id', productId)
+      .eq('tenant_id', tenant.id)
+      .single();
+    if (!product) throw new Error('Produit introuvable');
+
+    const images = normalizeProductImages(
+      [{ url: imageUrl, alt: product.name }, ...normalizeProductImages(product.images, product.image_url, product.name)],
+    );
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ image_url: imageUrl, images })
       .eq('id', productId)
       .eq('tenant_id', tenant.id);
+    if (updateError) throw new Error(updateError.message);
 
     console.log(`[generate-image] Completato: ${imageUrl}`);
 
@@ -260,6 +271,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       imageUrl,
+      images,
       prompt:    photoPrompt,
       simulated: false,
     });

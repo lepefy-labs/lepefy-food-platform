@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 13 settembre 2026 — **v6.49 Current-State Snapshot**
+> **Aggiornato:** 13 settembre 2026 — **v6.50 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -72,6 +72,8 @@ Il branding PWA usa `tenants.app_icon_url` come artwork quadrato dedicato per ma
 Le categorie possiedono `catalog_scope: 'shop' | 'gadgets'` (migration additiva e reversibile `103_category_catalog_scope.sql`, default `shop` per tutte le categorie esistenti). Catalogue `/`, paginazione `/api/products` e ricerca semantica pubblica includono soltanto prodotti delle categorie `shop` del tenant; `/gadgets` filtra server-side categorie e prodotti `gadgets`, con filtro `?category=` e paginazione `?page=`. Prodotti senza categoria non appartengono a nessuno scope. Il prodotto phare viene scelto tramite `featured`, poi `position`/`id`; in assenza di prodotti attivi la boutique mostra uno stato vuoto senza dati artificiali.
 
 Goodies riusa `products`, immagini/prezzi/stock, `ProductCard`, l’azione condivisa `useQuickAdd`, cart store/sync/drawer, checkout e ordini. I carrelli misti rimangono supportati. Le card Goodies usano `/products/[slug]?from=gadgets` per la navigazione attiva; breadcrumb e ritorno derivano dallo scope reale della categoria. La canonical resta `/products/[slug]`; le raccomandazioni per merchandise rimangono nella stessa categoria. Admin `/admin/catalogue/categories` e `/api/admin/catalogue/categories` gestiscono nome, slug e destinazione Catalogue/Goodies con le permission esistenti `catalog.view/manage`. Le selezioni categoria nella creazione/modifica prodotto mostrano la destinazione. La migration deve essere applicata prima della promozione del codice che legge la colonna; non viene eseguita dal build Vercel.
+
+La Product Detail normalizza `image_url` e il JSONB `images` in una galleria ordinata (massimo 8 immagini): la prima immagine resta la copertina retrocompatibile usata dalle card. Il click apre un lightbox accessibile con chiusura Escape, navigazione tastiera, controlli precedente/successivo e swipe mobile. L’editor admin consente upload multiplo, riordino, scelta della copertina ed eliminazione; i nuovi asset usano path Storage univoci tenant/product-scoped e le API verificano sempre `tenant_id`. Non è richiesta una nuova migration perché `products.images` esiste dallo schema iniziale.
 
 Le ProductCard grid dello shop usano la CTA esplicita **Ajouter au panier**. Dopo l’azione locale esistente, una sola `AddToCartConfirmation` nel layout shop mostra dialog desktop / bottom sheet mobile. `addToCartUiStore` conserva soltanto prodotto e revisione effimeri; quantità e sincronizzazione restano in `cartStore`, senza modifiche al formato persistito o all’attribution. `useQuickAdd` applica il limite stock a ogni clic shop e nelle recommendation; il comportamento visuale Goodies resta invariato.
 

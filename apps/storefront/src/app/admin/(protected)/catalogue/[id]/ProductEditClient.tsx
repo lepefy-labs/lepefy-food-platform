@@ -11,11 +11,12 @@ import {
   IconTrash,
   IconTag,
 } from '@tabler/icons-react';
-import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption } from '@lepefy/types';
+import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption, ProductImage } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
 import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
 import ProductRelationshipsEditor from './ProductRelationshipsEditor';
+import ProductMediaManager from './ProductMediaManager';
 
 interface ProductEditProps {
   product: {
@@ -33,6 +34,7 @@ interface ProductEditProps {
     featured: boolean;
     storage_type: string;
     image_url: string | null;
+    images: ProductImage[];
     warehouse_location: string | null;
     category_id: string;
     producer_id: string | null;
@@ -84,6 +86,7 @@ interface FormState {
   category_id: string;
   warehouse_location: string;
   image_url: string | null;
+  images: ProductImage[];
   producer_id: string;
   importer_id: string;
   ingredients_text: string;
@@ -151,6 +154,11 @@ function initFormState(product: ProductEditProps['product'], tenantLocales: stri
     category_id:                 product.category_id,
     warehouse_location:          product.warehouse_location ?? '',
     image_url:                   product.image_url,
+    images:                      product.images?.length
+      ? product.images
+      : product.image_url
+        ? [{ url: product.image_url, alt: product.name }]
+        : [],
     producer_id:                 product.producer_id ?? '',
     importer_id:                 product.importer_id ?? '',
     ingredients_text:            product.ingredients_text ?? '',
@@ -188,13 +196,10 @@ export default function ProductEditClient({
 }: ProductEditProps) {
   const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta' | 'associations'>('generale');
   const [formData, setFormData]         = useState<FormState>(() => initFormState(product, tenantLocales));
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
-  const [isDragging, setIsDragging]     = useState(false);
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
   const [isUploadingLabelBg, setIsUploadingLabelBg] = useState(false);
-  const [removeBgOnUpload, setRemoveBgOnUpload]     = useState(false);
   const [isRegeneratingBarcode, setIsRegeneratingBarcode] = useState(false);
   const [displayBarcode, setDisplayBarcode]         = useState(product.barcode_value ?? null);
   const [barcodeConfirmOpen, setBarcodeConfirmOpen] = useState(false);
@@ -204,7 +209,6 @@ export default function ProductEditClient({
     type: 'success' | 'error';
   } | null>(null);
 
-  const fileInputRef        = useRef<HTMLInputElement>(null);
   const labelBgFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -253,6 +257,7 @@ export default function ProductEditClient({
         category_id:        formData.category_id,
         warehouse_location: formData.warehouse_location,
         image_url:          formData.image_url,
+        images:             formData.images,
 
         producer_id:                 formData.producer_id || null,
         importer_id:                 formData.importer_id || null,
@@ -320,41 +325,6 @@ export default function ProductEditClient({
     }
   }
 
-  async function handleGenerateAI() {
-    setIsGenerating(true);
-    try {
-      const currentCategory = categories.find(c => c.id === formData.category_id);
-
-      const res = await fetch('/api/admin/generate-product-image', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId:    product.id,
-          productName:  product.name,
-          productSlug:  product.slug,
-          categorySlug: currentCategory?.slug ?? '',
-          categoryName: currentCategory?.name ?? '',
-        }),
-      });
-
-      if (!res.ok) {
-        const { error } = await res.json() as { error?: string };
-        throw new Error(error ?? 'Génération échouée');
-      }
-
-      const { imageUrl: newUrl } = await res.json() as { imageUrl: string };
-      setField('image_url', newUrl);
-      showToast('Image générée avec succès', 'success');
-    } catch (err) {
-      const message = err instanceof Error
-        ? err.message
-        : 'Erreur lors de la génération';
-      showToast(message, 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
   function setDescriptionLocale(locale: string, value: string) {
     setFormData((prev) => ({
       ...prev,
@@ -400,55 +370,6 @@ export default function ProductEditClient({
     } finally {
       setIsGeneratingDescriptions(false);
     }
-  }
-
-  async function handleFileUpload(file: File) {
-    const localUrl = URL.createObjectURL(file);
-    setField('image_url', localUrl);
-
-    try {
-      const uploadData = new FormData();
-      uploadData.append('file', file);
-      uploadData.append('productId', product.id);
-      uploadData.append('slug', product.slug);
-      if (removeBgOnUpload) uploadData.append('removeBackground', 'true');
-
-      const res = await fetch('/api/admin/upload-product-image', {
-        method: 'POST',
-        body: uploadData,
-      });
-      if (!res.ok) {
-        const { error } = await res.json() as { error?: string };
-        throw new Error(error ?? 'Upload échoué');
-      }
-      const { imageUrl: uploadedUrl } = await res.json() as { imageUrl: string };
-      setField('image_url', uploadedUrl);
-      showToast('Image mise à jour', 'success');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erreur lors de l\'upload', 'error');
-    }
-  }
-
-  async function handleDeleteImage() {
-    setField('image_url', null);
-    try {
-      const res = await fetch(`/api/admin/catalogue/${product.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: null }),
-      });
-      if (!res.ok) throw new Error('Erreur');
-      showToast('Image supprimée', 'success');
-    } catch {
-      showToast('Erreur lors de la suppression', 'error');
-    }
-  }
-
-  function handleFileDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) handleFileUpload(file);
   }
 
   async function handleLabelBgUpload(file: File) {
@@ -714,91 +635,25 @@ export default function ProductEditClient({
           </div>
 
           <div className="space-y-5">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className={SECTION_TITLE_CLS}>Médias</h2>
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100 mb-4">
-                {formData.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={formData.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                    <IconPhoto size={32} className="text-gray-300" />
-                    <span className="text-xs text-gray-400">Aucune image</span>
-                  </div>
-                )}
-
-                {isGenerating && (
-                  <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center gap-3 rounded-lg">
-                    <div className="w-8 h-8 border-2 border-[var(--color-primary-light)] border-t-[var(--color-primary)] rounded-full animate-spin" />
-                    <div className="text-center px-4">
-                      <p className="text-xs font-medium text-[var(--color-primary)]">Génération en cours...</p>
-                      <p className="text-[10px] text-gray-400 mt-1">Analyse du produit puis création de l&apos;image</p>
-                      <p className="text-[10px] text-gray-300 mt-0.5">(5 à 15 secondes)</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {formData.image_url && (
-                <button
-                  onClick={handleDeleteImage}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mt-2 mb-3"
-                >
-                  <IconTrash size={14} />
-                  Supprimer l&apos;image
-                </button>
-              )}
-
-              <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={removeBgOnUpload}
-                  onChange={(e) => setRemoveBgOnUpload(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                Supprimer le fond automatiquement (IA)
-              </label>
-
-              <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleFileDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-lg p-4 text-center mb-3 transition-colors cursor-pointer ${
-                  isDragging
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <IconUpload size={20} className="mx-auto mb-1 text-gray-400" />
-                <p className="text-xs text-gray-500">Glisser une image ici</p>
-                <span className="text-xs text-gray-400">ou cliquer pour parcourir</span>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file);
-                }}
-              />
-
-              {aiEnabled && (
-                <>
-                  <Button onClick={handleGenerateAI} loading={isGenerating} className="w-full">
-                    {!isGenerating && <IconSparkles size={16} stroke={2} />}
-                    Générer avec l&apos;IA
-                  </Button>
-                  <p className="text-xs text-gray-400 text-center mt-2">Photo générée automatiquement via IA</p>
-                </>
-              )}
-            </section>
+            <ProductMediaManager
+              productId={product.id}
+              productName={product.name}
+              productSlug={product.slug}
+              categorySlug={categories.find((category) => category.id === formData.category_id)?.slug ?? ''}
+              categoryName={categories.find((category) => category.id === formData.category_id)?.name ?? ''}
+              initialImageUrl={formData.image_url}
+              initialImages={formData.images}
+              aiEnabled={aiEnabled}
+              isNew={isNew}
+              onChange={(imageUrl, images) => {
+                setFormData((previous) => ({
+                  ...previous,
+                  image_url: imageUrl,
+                  images,
+                }));
+              }}
+              onToast={showToast}
+            />
 
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className={SECTION_TITLE_CLS}>Statut</h2>
