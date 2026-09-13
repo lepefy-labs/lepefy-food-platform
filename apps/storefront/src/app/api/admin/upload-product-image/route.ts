@@ -14,7 +14,7 @@ import type { ProductImage } from '@lepefy/types';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const MAX_FILE_BYTES = 12 * 1024 * 1024;
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 function getFileFormat(file: File): { extension: string; contentType: string } | null {
   if (file.type === 'image/png') return { extension: 'png', contentType: 'image/png' };
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   const invalidFile = files.find((file) => !getFileFormat(file) || file.size > MAX_FILE_BYTES);
   if (invalidFile) {
     return NextResponse.json(
-      { error: 'Formats acceptés : JPG, PNG ou WebP, 12 Mo maximum par image' },
+      { error: 'Formats acceptés : JPG, PNG ou WebP, 4 Mo maximum par image' },
       { status: 415 },
     );
   }

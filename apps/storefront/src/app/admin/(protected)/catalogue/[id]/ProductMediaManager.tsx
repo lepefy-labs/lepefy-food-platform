@@ -20,6 +20,8 @@ import {
 import Button from '../../../_components/ui/Button';
 import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
 
+const MAX_UPLOAD_FILE_BYTES = 4 * 1024 * 1024;
+
 interface ProductMediaManagerProps {
   productId: string;
   productName: string;
@@ -51,6 +53,7 @@ export default function ProductMediaManager({
     normalizeProductImages(initialImages, initialImageUrl, productName),
   );
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -99,31 +102,47 @@ export default function ProductMediaManager({
       return;
     }
 
+    const oversized = selected.find((file) => file.size > MAX_UPLOAD_FILE_BYTES);
+    if (oversized) {
+      onToast(oversized.name + ' dépasse la limite de 4 Mo', 'error');
+      return;
+    }
+
     setIsUploading(true);
     try {
-      const uploadData = new FormData();
-      selected.forEach((file) => uploadData.append('files', file));
-      uploadData.append('productId', productId);
-      uploadData.append('slug', productSlug);
-      if (removeBackground) uploadData.append('removeBackground', 'true');
+      for (const [index, file] of selected.entries()) {
+        setUploadProgress({ current: index + 1, total: selected.length });
 
-      const res = await fetch('/api/admin/upload-product-image', {
-        method: 'POST',
-        body: uploadData,
-      });
-      const data = await res.json() as {
-        images?: ProductImage[];
-        imageUrl?: string | null;
-        error?: string;
-      };
-      if (!res.ok || !data.images) throw new Error(data.error || 'Téléversement échoué');
+        const uploadData = new FormData();
+        uploadData.append('files', file);
+        uploadData.append('productId', productId);
+        uploadData.append('slug', productSlug);
+        if (removeBackground) uploadData.append('removeBackground', 'true');
 
-      applyGallery(data.images);
+        const res = await fetch('/api/admin/upload-product-image', {
+          method: 'POST',
+          body: uploadData,
+        });
+        const data = await res.json().catch(() => ({
+          error: res.status === 413
+            ? 'Image trop volumineuse pour le téléversement'
+            : 'Réponse serveur invalide',
+        })) as {
+          images?: ProductImage[];
+          imageUrl?: string | null;
+          error?: string;
+        };
+        if (!res.ok || !data.images) throw new Error(data.error || 'Téléversement échoué');
+
+        applyGallery(data.images);
+      }
+
       onToast(selected.length > 1 ? 'Images ajoutées' : 'Image ajoutée', 'success');
     } catch (error) {
       onToast(error instanceof Error ? error.message : 'Téléversement échoué', 'error');
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
@@ -312,7 +331,9 @@ export default function ProductMediaManager({
             >
               <IconUpload size={20} className="mx-auto mb-1 text-gray-400" aria-hidden="true" />
               <p className="text-xs text-gray-500">
-                {isUploading ? 'Téléversement en cours…' : 'Glisser une ou plusieurs images ici'}
+                {isUploading && uploadProgress
+                  ? 'Téléversement ' + uploadProgress.current + ' / ' + uploadProgress.total + '…'
+                  : 'Glisser une ou plusieurs images ici'}
               </p>
               <span className="text-xs text-gray-400">
                 ou cliquer pour parcourir · {remaining} emplacement(s) disponible(s)
