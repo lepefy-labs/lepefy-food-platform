@@ -13,7 +13,8 @@ type TestEvent =
   | 'payment-reminder'
   | 'external-payment-awaiting-verification'
   | 'event-external-payment-awaiting-verification'
-  | 'event-reservation-confirmed';
+  | 'event-reservation-confirmed'
+  | 'tester-feedback-invite';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -28,12 +29,14 @@ const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'order-stock-conflict', label: 'Conflit de stock', description: 'Notification opérationnelle de test.' },
   { value: 'event-external-payment-awaiting-verification', label: 'Événement · Paiement externe à vérifier', description: 'Alerte tenant Événementiel avec contexte réel et payload synthétique.' },
   { value: 'event-reservation-confirmed', label: 'Événement · Réservation confirmée', description: 'Confirmation client Événementiel sans créer de réservation.' },
+  { value: 'tester-feedback-invite', label: 'Invitation testeur · Feedback', description: 'Teste l’e-mail d’invitation avec les CTA Google Play et feedback sans créer d’invitation réelle.' },
 ];
 
 interface Props {
   defaultEmail: string;
   tenantName: string;
   tenantSlug: string;
+  defaultGooglePlayTestUrl?: string;
 }
 
 interface TestResult {
@@ -45,7 +48,7 @@ interface TestResult {
   error?: string;
 }
 
-export default function NotificationTestConsole({ defaultEmail, tenantName, tenantSlug }: Props) {
+export default function NotificationTestConsole({ defaultEmail, tenantName, tenantSlug, defaultGooglePlayTestUrl }: Props) {
   const [event, setEvent] = useState<TestEvent>('order-confirmed');
   const [email, setEmail] = useState(defaultEmail);
   const [fullName, setFullName] = useState('Robertin');
@@ -58,6 +61,9 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const [postalCode, setPostalCode] = useState('00000');
   const [city, setCity] = useState('Reggio Emilia');
   const [country, setCountry] = useState('IT');
+  const [googlePlayTestUrl, setGooglePlayTestUrl] = useState(
+    defaultGooglePlayTestUrl || 'https://play.google.com/store/apps/details?id=com.lepefy.notification-test',
+  );
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
 
@@ -71,6 +77,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const isShopExternalPaymentTenantAlert = event === 'external-payment-awaiting-verification';
   const isEventExternalPaymentTenantAlert = event === 'event-external-payment-awaiting-verification';
   const isEventReservationConfirmed = event === 'event-reservation-confirmed';
+  const isTesterFeedbackInvite = event === 'tester-feedback-invite';
   const isTenantAlert = isShopExternalPaymentTenantAlert || isEventExternalPaymentTenantAlert;
   const isEventTest = isEventExternalPaymentTenantAlert || isEventReservationConfirmed;
   const needsFulfillment = event === 'order-confirmed'
@@ -94,6 +101,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           shippingTotal: Number(shippingTotal),
           trackingCode,
           trackingCarrier,
+          googlePlayTestUrl,
           address: {
             line1,
             postal_code: postalCode,
@@ -120,7 +128,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           </div>
           <h1 className="text-2xl font-bold text-gray-950 dark:text-white">Console de test des notifications</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-            Envoie un payload de test au vrai workflow n8n sans créer de commande, réservation, modifier le stock, la capacité, la fidélité ou un paiement.
+            Envoie un payload de test au vrai workflow n8n sans créer de commande, réservation ou invitation testeur, ni modifier le stock, la capacité, la fidélité ou un paiement.
           </p>
         </div>
         <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
@@ -146,14 +154,23 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             </label>
 
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {isTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
+              {isTesterFeedbackInvite ? 'Destinataire testeur de test' : isTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
             </label>
 
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Nom client
-              <input value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
-            </label>
+            {!isTesterFeedbackInvite && (
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Nom client
+                <input value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+              </label>
+            )}
+
+            {isTesterFeedbackInvite && (
+              <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                URL du test fermé Google Play
+                <input type="url" value={googlePlayTestUrl} onChange={e => setGooglePlayTestUrl(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+              </label>
+            )}
 
             {needsFulfillment && (
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -250,13 +267,19 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
                 Le payload reprend le contrat réel de confirmation Événementiel avec billet factice. Aucune réservation n’est enregistrée et aucune capacité n’est consommée.
               </div>
             )}
+
+            {isTesterFeedbackInvite && (
+              <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+                L’e-mail réutilise le template réel avec une campagne et un lien feedback non autorisant entièrement synthétiques. Aucun invite, token, feedback ou état de campagne n’est créé ou modifié.
+              </div>
+            )}
           </div>
 
           <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
             Le payload est marqué <strong>testMode=true</strong>. Le webhook, le branding et les coordonnées du tenant sont résolus côté serveur et ne peuvent pas être remplacés depuis ce formulaire.
           </div>
 
-          <button type="button" onClick={sendTest} disabled={sending || !email.trim()} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={sendTest} disabled={sending || !email.trim() || (isTesterFeedbackInvite && !googlePlayTestUrl.trim())} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50">
             <IconSend size={18} /> {sending ? 'Envoi…' : 'Envoyer le test'}
           </button>
         </section>

@@ -500,7 +500,7 @@ La route pubblica `/feedback` espone la campagna attiva del tenant senza autenti
 
 La console Platform Owner `/admin/platform/feedback` gestisce feedback e campagne, filtri server-side, paginazione, KPI, workflow status/priority/note e attivazione atomica di una sola campagna per tenant. Ogni campagna può conservare l’URL HTTPS ufficiale `play.google.com` del test chiuso e una lista deduplicata di tester invitati. L’import crea soltanto gli inviti; invio singolo, retry/resend con rotazione token e invio bulk restano azioni esplicite.
 
-L’invito tenant-branded usa `/webhook/tester-feedback-invite` sul canale n8n esistente e contiene CTA Google Play e URL personale `/feedback/invite/<token>`. Il token one-time e la successiva credenziale di sessione sono casuali e persistiti soltanto come SHA-256. Il GET dell’invito non consuma credenziali: l’attivazione avviene esclusivamente via POST, crea un cookie HttpOnly SameSite=Lax e collega i feedback successivi tramite `tester_feedback_entries.tester_invite_id`. La revoca annulla sia link sia sessione senza cancellare i feedback storici. “Attivato” significa soltanto invito Lepefy attivato; conteggio e requisito dei testeur Google Play restano autorevoli in Google Play.
+L’invito tenant-branded usa `/webhook/tester-feedback-invite` sul canale n8n esistente e contiene CTA Google Play e URL personale `/feedback/invite/<token>`. La console Platform Owner delle notifiche può inviare allo stesso webhook un payload `testMode: true` che riusa il template e-mail reale con campagna e URL feedback sintetici non autorizzanti; legge soltanto l’eventuale URL Google Play della campagna attiva e non crea inviti, token o feedback. Il token one-time e la successiva credenziale di sessione sono casuali e persistiti soltanto come SHA-256. Il GET dell’invito non consuma credenziali: l’attivazione avviene esclusivamente via POST, crea un cookie HttpOnly SameSite=Lax e collega i feedback successivi tramite `tester_feedback_entries.tester_invite_id`. La revoca annulla sia link sia sessione senza cancellare i feedback storici. “Attivato” significa soltanto invito Lepefy attivato; conteggio e requisito dei testeur Google Play restano autorevoli in Google Play.
 
 Le tabelle feedback/inviti non hanno accesso browser diretto e forzano RLS. Le migration additive `106_tester_feedback.sql` e `107_tester_feedback_invites.sql` vanno applicate manualmente in ordine; il deploy applicativo mantiene il feedback pubblico compatibile finché la nuova sessione invito non viene usata.
 
@@ -670,8 +670,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.47
+# Fine snapshot v6.48
 
-**Base audit:** `main + Tester Invitation Workflow`
+**Base audit:** `main + Tester Invitation Notification Test`
 **Data:** 13 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

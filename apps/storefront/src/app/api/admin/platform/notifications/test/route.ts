@@ -4,6 +4,12 @@ import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getEventsBaseUrl, getTicketUrl } from '@/lib/events/ticketUrl';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import {
+  buildTesterFeedbackInviteEmail,
+  LEPEFY_PLATFORM_SIGNATURE,
+  LEPEFY_PLATFORM_TAGLINE,
+  TESTER_FEEDBACK_INVITE_WEBHOOK,
+} from '@/lib/notifications/testerFeedbackInviteEmail';
 
 type TestEvent =
   | 'order-confirmed'
@@ -15,7 +21,8 @@ type TestEvent =
   | 'payment-reminder'
   | 'external-payment-awaiting-verification'
   | 'event-external-payment-awaiting-verification'
-  | 'event-reservation-confirmed';
+  | 'event-reservation-confirmed'
+  | 'tester-feedback-invite';
 
 type FulfillmentType = 'delivery' | 'pickup';
 
@@ -30,6 +37,7 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'external-payment-awaiting-verification': '/webhook/external-payment-awaiting-verification',
   'event-external-payment-awaiting-verification': '/webhook/event-external-payment-awaiting-verification',
   'event-reservation-confirmed': '/webhook/event-reservation-confirmed',
+  'tester-feedback-invite': TESTER_FEEDBACK_INVITE_WEBHOOK,
 };
 
 interface TestRequestBody {
@@ -41,6 +49,7 @@ interface TestRequestBody {
   shippingTotal?: number;
   trackingCode?: string;
   trackingCarrier?: string;
+  googlePlayTestUrl?: string;
   address?: {
     line1?: string;
     line2?: string;
@@ -56,6 +65,15 @@ function isTestEvent(value: unknown): value is TestEvent {
 
 function isEmail(value: unknown): value is string {
   return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isGooglePlayTestUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'play.google.com';
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -113,7 +131,47 @@ export async function POST(req: NextRequest) {
 
   let payload: Record<string, unknown> = commonPayload;
 
-  if (body.event === 'order-confirmed') {
+  if (body.event === 'tester-feedback-invite') {
+    const googlePlayTestUrl = body.googlePlayTestUrl?.trim()
+      || 'https://play.google.com/store/apps/details?id=com.lepefy.notification-test';
+    if (!isGooglePlayTestUrl(googlePlayTestUrl)) {
+      return NextResponse.json({ error: 'URL Google Play de test invalide.' }, { status: 400 });
+    }
+
+    const feedbackInviteUrl = 'https://example.invalid/lepefy-feedback-invite-test';
+    const invitationEmail = buildTesterFeedbackInviteEmail(
+      tenantContext.tenantName,
+      tenantContext.branding.logoUrl,
+      googlePlayTestUrl,
+      feedbackInviteUrl,
+    );
+    payload = {
+      type: 'tester_feedback_invite',
+      tenant: {
+        id: tenantContext.tenantId,
+        name: tenantContext.tenantName,
+        logo_url: tenantContext.branding.logoUrl,
+      },
+      campaign: {
+        id: testId,
+        name: 'Campagne synthétique · Console notifications',
+        version_label: 'TEST',
+      },
+      recipient: { email: body.email.trim() },
+      links: {
+        google_play_test_url: googlePlayTestUrl,
+        feedback_invite_url: feedbackInviteUrl,
+      },
+      email: {
+        subject: invitationEmail.subject,
+        html: invitationEmail.html,
+        text: invitationEmail.text,
+        platform_signature: LEPEFY_PLATFORM_SIGNATURE,
+        platform_tagline: LEPEFY_PLATFORM_TAGLINE,
+      },
+      testMode: true,
+    };
+  } else if (body.event === 'order-confirmed') {
     payload = {
       ...commonPayload,
       total,
