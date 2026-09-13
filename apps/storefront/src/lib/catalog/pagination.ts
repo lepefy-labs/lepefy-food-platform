@@ -131,7 +131,7 @@ export async function getCatalogPage(
       if (result.error) return { data: null, count: null, error: result.error };
       const byId = new Map((result.data ?? []).map(product => [product.id, product]));
       return { data: ids.map(id => byId.get(id)).filter((product): product is NonNullable<typeof product> => Boolean(product)),
-        count: Number(rows[0].total_count), error: null };
+        count: Number(rows[0]?.total_count ?? 0), error: null };
     }
     // An absent RPC during deployment is expected; other errors deserve a log.
     if (error && error.code !== 'PGRST202' && error.code !== '42883') {
