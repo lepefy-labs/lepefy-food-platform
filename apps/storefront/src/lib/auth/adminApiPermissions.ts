@@ -39,7 +39,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/orders')) return read ? 'orders.view' : 'orders.manage';
   if (path.startsWith('/api/admin/catalogue')) return read ? 'catalog.view' : 'catalog.manage';
   if (path.startsWith('/api/admin/hero-slides') || path.startsWith('/api/admin/social-links') || path.startsWith('/api/admin/labels') || path === '/api/admin/upload-label-asset' || path === '/api/admin/upload-product-image' || path === '/api/admin/generate-product-image' || path === '/api/admin/generate-product-description') return 'catalog.manage';
-  if (path === '/api/admin/card/poster' || path === '/api/admin/upload-story-photo') return 'tenant_settings.manage';
+  if (path === '/api/admin/card/poster' || path === '/api/admin/upload-story-photo' || path === '/api/admin/app-icon') return 'tenant_settings.manage';
   if (path.startsWith('/api/admin/knowledge-base')) return 'ai_knowledge.manage';
   if (path.startsWith('/api/admin/loyalty/scan')) return 'loyalty.scan';
   if (path.startsWith('/api/admin/loyalty')) return 'loyalty.manage';

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateIconBuffer } from '@/lib/tenant/generateIconBuffer';
+import { resolveTenantAppIconSource } from '@/lib/tenant/appIcon';
 
 function clampSize(raw: string | null): number {
   const n = parseInt(raw ?? '512', 10);
@@ -20,46 +21,27 @@ export async function GET(req: NextRequest) {
 
   try {
     const tenant = await getTenant(slug);
-
-    if (!tenant.logo_url) {
-      return new NextResponse(null, { status: 404 });
-    }
+    const source = resolveTenantAppIconSource(tenant.app_icon_url, tenant.logo_url);
+    if (!source) return new NextResponse(null, { status: 404 });
 
     let output: Buffer;
-
-    if (purpose === 'maskable') {
-      // Safe-zone ~62% (même proportion que card/pwa-icon), logo centré sur
-      // un fond plein à la couleur du tenant — une icône maskable transparente
-      // hors safe-zone rend mal sur les launchers qui masquent sans gérer l'alpha.
+    if (source.dedicated) {
+      // Finished square artwork: never apply the legacy logo/background composition.
+      output = await generateIconBuffer({ logoUrl: source.url, size });
+    } else if (purpose === 'maskable') {
       const logoSize = Math.round(size * 0.80);
-      const logoBuffer = await generateIconBuffer({ logoUrl: tenant.logo_url, size: logoSize });
+      const logoBuffer = await generateIconBuffer({ logoUrl: source.url, size: logoSize });
       const logoOffset = Math.round((size - logoSize) / 2);
-
       output = await sharp({
-        create: {
-          width: size,
-          height: size,
-          channels: 4,
-          background: tenant.primary_color ?? '#1D9E75',
-        },
-      })
-        .composite([{ input: logoBuffer, left: logoOffset, top: logoOffset }])
-        .png()
-        .toBuffer();
+        create: { width: size, height: size, channels: 4, background: tenant.primary_color ?? '#1D9E75' },
+      }).composite([{ input: logoBuffer, left: logoOffset, top: logoOffset }]).png().toBuffer();
     } else {
-      // Le manifeste déclare des `sizes` exactes (192x192, 512x512) pour cette
-      // même route : servir l'asset source tel quel, sans le redimensionner à
-      // ce que `size` demande, produit un mismatch déclaré/réel que Chrome
-      // peut rejeter silencieusement au moment de générer le WebAPK Android.
-      output = await generateIconBuffer({ logoUrl: tenant.logo_url, size });
+      output = await generateIconBuffer({ logoUrl: source.url, size });
     }
 
     return new NextResponse(new Uint8Array(output), {
       status: 200,
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
-      },
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' },
     });
   } catch (err) {
     console.error('[pwa-icon] Error:', err);

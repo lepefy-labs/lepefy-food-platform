@@ -9,6 +9,7 @@ import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
 import { NotificationRecipientsSection } from './NotificationRecipientsSection';
+import { AppIconSection } from './AppIconSection';
 import type { TenantSocialLink, TenantNotificationRecipient } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,10 @@ export default async function ParametresPage() {
           story_image_url={tenant.story_image_url}
           countries_served={tenant.countries_served}
         />
+
+        <div className="xl:col-span-2">
+          <AppIconSection initialAppIconUrl={tenant.app_icon_url} hasLogoFallback={Boolean(tenant.logo_url)} />
+        </div>
 
         <LegalInfoSection legal_name={tenant.legal_name} legal_address={tenant.legal_address} legal_email={tenant.legal_email} />
         <NotificationRecipientsSection initialRecipients={(notificationRecipients ?? []) as TenantNotificationRecipient[]} />

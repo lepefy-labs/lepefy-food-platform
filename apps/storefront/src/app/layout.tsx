@@ -3,6 +3,7 @@ import { Inter, Bricolage_Grotesque } from 'next/font/google';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { TenantProvider } from '@/providers/TenantProvider';
 import { PWARegister } from '@/components/PWARegister';
+import { buildPwaIconPath, getAppIconRevision } from '@/lib/tenant/appIcon';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
@@ -49,6 +50,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+  const appIconRevision = getAppIconRevision(tenant.app_icon_url);
 
   // Client Components need tenant branding/configuration, but they must never
   // receive provider credentials or private assistant instructions. Keep the
@@ -70,7 +72,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             --color-secondary: ${tenant.secondary_color};
           }
         `}</style>
-        <link rel="apple-touch-icon" href="/api/pwa-icon?size=180" />
+        <link rel="apple-touch-icon" href={buildPwaIconPath(180, undefined, appIconRevision)} />
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
       <body className={`${inter.variable} ${bricolage.variable}`}>

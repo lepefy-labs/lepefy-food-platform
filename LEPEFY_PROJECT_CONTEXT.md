@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 12 settembre 2026 — **v6.42 Current-State Snapshot**
+> **Aggiornato:** 13 settembre 2026 — **v6.43 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -66,6 +66,8 @@ Le route storefront canoniche sono:
 ```
 
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
+
+Il branding PWA usa `tenants.app_icon_url` come artwork quadrato dedicato per manifest, Apple touch icon e futuri wrapper native/TWA; `NULL` mantiene il fallback compatibile su `logo_url`. L’upload admin è PNG-only, 512×512, massimo 1 MB, tenant-scoped e versionato per invalidare le cache. L’icona Digital Card resta separata e continua a usare `logo_url`; Digital Asset Links resta configurato tramite `android_package_name` e `android_sha256_fingerprint`. Nel repository non è presente una pipeline Android/Gradle/AAB: un nuovo launcher icon richiede la rigenerazione esterna del wrapper/AAB dal manifest live e un nuovo `versionCode`.
 
 Le categorie possiedono `catalog_scope: 'shop' | 'gadgets'` (migration additiva e reversibile `103_category_catalog_scope.sql`, default `shop` per tutte le categorie esistenti). Catalogue `/`, paginazione `/api/products` e ricerca semantica pubblica includono soltanto prodotti delle categorie `shop` del tenant; `/gadgets` filtra server-side categorie e prodotti `gadgets`, con filtro `?category=` e paginazione `?page=`. Prodotti senza categoria non appartengono a nessuno scope. Il prodotto phare viene scelto tramite `featured`, poi `position`/`id`; in assenza di prodotti attivi la boutique mostra uno stato vuoto senza dati artificiali.
 
@@ -535,6 +537,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 102_nala_response_memory.sql
 103_category_catalog_scope.sql
 104_customer_account_deletion.sql
+105_tenant_app_icon.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -564,6 +567,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `099` è additiva e service-role-only: introduce `product_relationships` con semantica direzionale, vincoli same-tenant/self/duplicate, priority e source manual/system. Estende `nala_interactions` con metadata action separati dal retrieval per qualificare correttamente similar/substitute/complementary nelle conversioni. Non effettua backfill e la tabella può restare vuota; in quel caso il direct retrieval continua, similar/substitute possono usare fallback sicuri e complementary non viene inventato.
 
 `100` è additiva: registry, routing, context server-side, telemetry e RPC di lease/retention. Applicazione Supabase remota completata e verificata dal proprietario come prerequisito AI Core; V1.2 riusa lo schema esistente e non aggiunge migration.
+
+`105` aggiunge `tenants.app_icon_url` nullable con grant SELECT esclusivamente column-level per `anon` e `authenticated`; non esegue backfill e mantiene `logo_url` come fallback.
 
 `104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
@@ -597,6 +602,8 @@ apps/storefront/src/lib/cart/*
 apps/storefront/src/lib/checkout/*
 apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
+apps/storefront/src/app/api/pwa-icon/route.ts
+apps/storefront/src/app/api/admin/app-icon/route.ts
 apps/storefront/src/lib/privacy/*
 apps/storefront/src/lib/admin/workspace.ts
 apps/storefront/src/lib/admin/platformBilling.ts
@@ -645,8 +652,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.42
+# Fine snapshot v6.43
 
 **Base audit:** `main + Prospects Enrichment V2`
-**Data:** 12 settembre 2026
+**Data:** 13 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

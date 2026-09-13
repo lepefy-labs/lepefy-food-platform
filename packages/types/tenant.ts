@@ -9,6 +9,7 @@ export interface Tenant {
   name: string;
   tagline: string | null;
   logo_url: string | null;
+  app_icon_url: string | null;
   hero_image_url: string | null;
   primary_color: string;
   secondary_color: string;
