@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 13 settembre 2026 — **v6.47 Current-State Snapshot**
+> **Aggiornato:** 13 settembre 2026 — **v6.49 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -498,11 +498,11 @@ Le route personali di sicurezza/profilo restano accessibili indipendentemente da
 
 La route pubblica `/feedback` espone la campagna attiva del tenant senza autenticazione. Il browser invia solo testo, reazione/categoria opzionali, consenso e-mail esplicito e un contesto tecnico ridotto; tenant e campagna vengono sempre risolti lato server. L’API `/api/feedback` usa service role, validazione strict, limite payload, controllo same-origin, honeypot e cooldown breve senza salvare IP raw o fingerprint.
 
-La console Platform Owner `/admin/platform/feedback` gestisce feedback e campagne, filtri server-side, paginazione, KPI, workflow status/priority/note e attivazione atomica di una sola campagna per tenant. Ogni campagna può conservare l’URL HTTPS ufficiale `play.google.com` del test chiuso e una lista deduplicata di tester invitati. L’import crea soltanto gli inviti; invio singolo, retry/resend con rotazione token e invio bulk restano azioni esplicite.
+La console Platform Owner `/admin/platform/feedback` gestisce feedback e campagne, filtri server-side, paginazione, KPI, workflow status/priority/note e attivazione atomica di una sola campagna per tenant. Ogni campagna può conservare l’URL HTTPS ufficiale `play.google.com` del test chiuso e una lista deduplicata di tester invitati. L’import crea soltanto gli inviti; invio singolo, retry/resend con rotazione token e invio bulk restano azioni esplicite. Ogni invito può inoltre conservare un `phone` opzionale per il contatto operativo WhatsApp/telefono e uno `installation_status` manuale (`unknown | installed | problem`); entrambi sono metadata operativi Platform e non costituiscono prova di opt-in o installazione Google Play.
 
 L’invito tenant-branded usa `/webhook/tester-feedback-invite` sul canale n8n esistente e contiene CTA Google Play e URL personale `/feedback/invite/<token>`. La console Platform Owner delle notifiche può inviare allo stesso webhook un payload `testMode: true` che riusa il template e-mail reale con campagna e URL feedback sintetici non autorizzanti; legge soltanto l’eventuale URL Google Play della campagna attiva e non crea inviti, token o feedback. Il token one-time e la successiva credenziale di sessione sono casuali e persistiti soltanto come SHA-256. Il GET dell’invito non consuma credenziali: l’attivazione avviene esclusivamente via POST, crea un cookie HttpOnly SameSite=Lax e collega i feedback successivi tramite `tester_feedback_entries.tester_invite_id`. La revoca annulla sia link sia sessione senza cancellare i feedback storici. “Attivato” significa soltanto invito Lepefy attivato; conteggio e requisito dei testeur Google Play restano autorevoli in Google Play.
 
-Le tabelle feedback/inviti non hanno accesso browser diretto e forzano RLS. Le migration additive `106_tester_feedback.sql` e `107_tester_feedback_invites.sql` vanno applicate manualmente in ordine; il deploy applicativo mantiene il feedback pubblico compatibile finché la nuova sessione invito non viene usata.
+Le tabelle feedback/inviti non hanno accesso browser diretto e forzano RLS. Le migration additive `106_tester_feedback.sql`, `107_tester_feedback_invites.sql` e `108_tester_feedback_contact_status.sql` vanno applicate manualmente in ordine; il deploy applicativo non applica automaticamente lo schema Supabase.
 
 ---
 
@@ -552,6 +552,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 105_tenant_app_icon.sql
 106_tester_feedback.sql
 107_tester_feedback_invites.sql
+108_tester_feedback_contact_status.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -587,6 +588,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `106` introduce campagne e feedback testeurs tenant-scoped, vincolo atomico di una sola campagna attiva, relazione composita anti cross-tenant, RLS forzata e privilegi esclusivamente service-role. Nessun IP raw o fingerprint viene persistito; l’applicazione in Supabase resta manuale.
 
 `107` estende le campagne con l’URL del test Google Play, introduce gli inviti tester tenant/campaign-scoped e collega opzionalmente i feedback a un invito attivato. Token invito/sessione sono hashati, email normalizzate uniche per campagna, relazioni cross-tenant impedite da foreign key composite e accesso limitato al service role. Invio n8n accettato, attivazione Lepefy e partecipazione ufficiale Google Play restano stati distinti; l’applicazione Supabase resta manuale.
+
+`108` aggiunge agli inviti tester un numero di telefono/WhatsApp opzionale e uno stato installazione manuale `unknown | installed | problem`. I campi sono soltanto metadata operativi per il follow-up Platform, non vengono usati per autenticazione e non rendono Lepefy autorevole sull’installazione Google Play; l’applicazione Supabase resta manuale.
 
 `104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
@@ -670,8 +673,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.48
+# Fine snapshot v6.49
 
-**Base audit:** `main + Tester Invitation Notification Test`
+**Base audit:** `main + Tester Contact & Installation Status`
 **Data:** 13 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
