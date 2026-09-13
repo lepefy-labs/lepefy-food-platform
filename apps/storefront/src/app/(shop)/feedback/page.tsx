@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import FeedbackForm from './FeedbackForm';
+import { hashOpaqueToken, isOpaqueToken, TESTER_SESSION_COOKIE } from '@/lib/feedback/testerInviteTokens';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +32,14 @@ export default async function FeedbackPage() {
     .eq('active', true)
     .maybeSingle();
   const campaign = error ? null : data as Campaign | null;
+  const sessionToken = cookies().get(TESTER_SESSION_COOKIE)?.value;
+  let invitedTester = false;
+  if (campaign && sessionToken && isOpaqueToken(sessionToken)) {
+    const { data: invite } = await service.from('tester_feedback_invites').select('id')
+      .eq('tenant_id', tenant.id).eq('campaign_id', campaign.id).eq('session_token_hash', hashOpaqueToken(sessionToken))
+      .not('activated_at', 'is', null).is('revoked_at', null).maybeSingle();
+    invitedTester = Boolean(invite);
+  }
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
@@ -47,6 +57,7 @@ export default async function FeedbackPage() {
             <FeedbackForm
               campaign={{ headline: campaign.headline, intro: campaign.intro, thankYouMessage: campaign.thank_you_message }}
               accentColor={tenant.primary_color}
+              invitedTester={invitedTester}
             />
           ) : (
             <div className="py-8 text-center">
@@ -58,6 +69,10 @@ export default async function FeedbackPage() {
           )}
         </div>
       </section>
+      <footer className="mt-6 text-center text-[11px] leading-5 text-gray-500">
+        <strong className="font-semibold">Propulsé par Lepefy</strong><br />
+        Solutions numériques sur mesure pour faire grandir votre activité
+      </footer>
     </main>
   );
 }

@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     headline: parsed.data.headline,
     intro: parsed.data.intro || null,
     thank_you_message: parsed.data.thankYouMessage || null,
+    ...(parsed.data.googlePlayTestUrl ? { google_play_test_url: parsed.data.googlePlayTestUrl } : {}),
     active: false,
   }).select('*').single();
   if (error || !data) return NextResponse.json({ error: 'Création impossible.' }, { status: 503 });

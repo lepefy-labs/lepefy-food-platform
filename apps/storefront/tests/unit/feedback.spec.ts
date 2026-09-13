@@ -4,7 +4,9 @@ import {
   campaignPatchSchema,
   feedbackUpdateSchema,
   publicFeedbackSchema,
+  testerImportSchema,
 } from '../../src/lib/feedback/contracts';
+import { createOpaqueToken, hashOpaqueToken, isOpaqueToken } from '../../src/lib/feedback/testerInviteTokens';
 
 const valid = {
   message: 'Une idée utile',
@@ -25,7 +27,29 @@ test('rejects blank messages, unknown fields and invalid enums', () => {
   expect(publicFeedbackSchema.safeParse({ ...valid, message: '   ' }).success).toBe(false);
   expect(publicFeedbackSchema.safeParse({ ...valid, reaction: 'angry' }).success).toBe(false);
   expect(publicFeedbackSchema.safeParse({ ...valid, tenantId: crypto.randomUUID() }).success).toBe(false);
+  expect(publicFeedbackSchema.safeParse({ ...valid, testerInviteId: crypto.randomUUID() }).success).toBe(false);
+  expect(publicFeedbackSchema.safeParse({ ...valid, verifiedTester: true }).success).toBe(false);
   expect(publicFeedbackSchema.safeParse({ ...valid, context: { ...valid.context, userAgent: 'secret' } }).success).toBe(false);
+});
+
+test('accepts only official HTTPS Google Play campaign URLs', () => {
+  expect(campaignPatchSchema.safeParse({ googlePlayTestUrl: null }).success).toBe(true);
+  expect(campaignPatchSchema.safeParse({ googlePlayTestUrl: 'https://play.google.com/store/apps/details?id=example' }).success).toBe(true);
+  expect(campaignPatchSchema.safeParse({ googlePlayTestUrl: 'http://play.google.com/test' }).success).toBe(false);
+  expect(campaignPatchSchema.safeParse({ googlePlayTestUrl: 'https://play.google.com.evil.test/test' }).success).toBe(false);
+});
+
+test('normalizes and deduplicates tester emails', () => {
+  const parsed = testerImportSchema.parse({ emails: [' Tester@Example.com ', 'tester@example.com', 'other@example.com'] });
+  expect(parsed.emails).toEqual(['tester@example.com', 'other@example.com']);
+});
+
+test('creates high-entropy opaque credentials and deterministic hashes', () => {
+  const token = createOpaqueToken();
+  expect(isOpaqueToken(token)).toBe(true);
+  expect(token).not.toContain('=');
+  expect(hashOpaqueToken(token)).toMatch(/^[0-9a-f]{64}$/);
+  expect(hashOpaqueToken(token)).toBe(hashOpaqueToken(token));
 });
 
 test('requires an email only when contact consent is granted', () => {

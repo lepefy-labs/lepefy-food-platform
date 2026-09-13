@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import TesterCampaignPanel from './TesterCampaignPanel';
 import {
   CATEGORY_LABELS,
   FEEDBACK_CATEGORIES,
@@ -17,16 +18,16 @@ import {
 type Entry = {
   id: string; tenant_id: string; tenant_name: string; campaign_id: string;
   campaign: { id: string; name: string; version_label: string | null } | null;
-  message: string; reaction: string | null; category: string | null; status: string; priority: string; created_at: string;
+  tester_invite_id: string | null; message: string; reaction: string | null; category: string | null; status: string; priority: string; created_at: string;
 };
 type Detail = Entry & {
   contact_allowed: boolean; contact_email: string | null; internal_note: string | null;
-  context: Record<string, unknown>; updated_at: string;
+  tester_invite_email: string | null; context: Record<string, unknown>; updated_at: string;
 };
 type Campaign = {
   id: string; tenant_id: string; tenant_name: string; name: string; version_label: string | null;
-  headline: string; intro: string | null; thank_you_message: string | null; active: boolean;
-  feedback_count: number; created_at: string; closed_at: string | null;
+  headline: string; intro: string | null; thank_you_message: string | null; google_play_test_url: string | null; active: boolean;
+  feedback_count: number; invited_count: number; sent_count: number; activated_count: number; with_feedback_count: number; created_at: string; closed_at: string | null;
 };
 type Tenant = { id: string; name: string };
 type Listing = {
@@ -56,13 +57,14 @@ export default function FeedbackAdminClient() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [filters, setFilters] = useState({ tenant: '', campaign: '', status: '', priority: '', reaction: '', category: '' });
+  const [filters, setFilters] = useState({ tenant: '', campaign: '', source: '', status: '', priority: '', reaction: '', category: '' });
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [testerCampaign, setTesterCampaign] = useState<Campaign | null>(null);
 
   const loadCampaigns = useCallback(async () => {
     const data = await api<{ campaigns: Campaign[]; tenants: Tenant[] }>('/api/admin/platform/feedback/campaigns');
@@ -118,6 +120,7 @@ export default function FeedbackAdminClient() {
       headline: String(form.get('headline')),
       intro: String(form.get('intro') || '') || null,
       thankYouMessage: String(form.get('thankYouMessage') || '') || null,
+      googlePlayTestUrl: String(form.get('googlePlayTestUrl') || '') || null,
       active: form.has('active'),
     };
     setBusy('campaign'); setError('');
@@ -129,6 +132,7 @@ export default function FeedbackAdminClient() {
           headline: payload.headline,
           intro: payload.intro,
           thankYouMessage: payload.thankYouMessage,
+          ...(editingCampaign.google_play_test_url !== undefined ? { googlePlayTestUrl: payload.googlePlayTestUrl } : {}),
           active: payload.active,
         };
         await api('/api/admin/platform/feedback/campaigns/' + editingCampaign.id, {
@@ -188,12 +192,15 @@ export default function FeedbackAdminClient() {
       {tab === 'feedback' ? (
         <>
           <section className={card + ' p-4'}>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
               <select aria-label="Tenant" className={input} value={filters.tenant} onChange={event => { setFilters({ ...filters, tenant: event.target.value }); setPage(1); }}>
                 <option value="">Tous les tenants</option>{tenants.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
               <select aria-label="Campagne" className={input} value={filters.campaign} onChange={event => { setFilters({ ...filters, campaign: event.target.value }); setPage(1); }}>
                 <option value="">Toutes campagnes</option>{campaigns.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              <select aria-label="Source" className={input} value={filters.source} onChange={event => { setFilters({ ...filters, source: event.target.value }); setPage(1); }}>
+                <option value="">Toutes sources</option><option value="invited">Testeurs invités</option><option value="public">Public</option>
               </select>
               <select aria-label="Statut" className={input} value={filters.status} onChange={event => { setFilters({ ...filters, status: event.target.value }); setPage(1); }}>
                 <option value="">Tous statuts</option>{FEEDBACK_STATUSES.map(value => <option key={value} value={value}>{STATUS_LABELS[value]}</option>)}
@@ -215,10 +222,11 @@ export default function FeedbackAdminClient() {
               <>
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-950"><tr><th className="p-3">Date</th><th className="p-3">Tenant / campagne</th><th className="p-3">Retour</th><th className="p-3">Statut</th><th className="p-3">Priorité</th><th className="p-3" /></tr></thead>
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-950"><tr><th className="p-3">Date</th><th className="p-3">Tenant / campagne</th><th className="p-3">Source</th><th className="p-3">Retour</th><th className="p-3">Statut</th><th className="p-3">Priorité</th><th className="p-3" /></tr></thead>
                     <tbody>{listing.entries.map(entry => <tr key={entry.id} className="border-t border-gray-100 dark:border-gray-800">
                       <td className="whitespace-nowrap p-3 text-xs text-gray-500">{shortDate(entry.created_at)}</td>
                       <td className="p-3"><p className="font-medium">{entry.tenant_name}</p><p className="text-xs text-gray-500">{entry.campaign?.name ?? 'Campagne'}</p></td>
+                      <td className="p-3"><span className={entry.tester_invite_id ? 'rounded-full bg-violet-100 px-2 py-1 text-xs font-semibold text-violet-800' : 'text-xs text-gray-500'}>{entry.tester_invite_id ? '✓ Testeur invité' : 'Feedback public'}</span></td>
                       <td className="max-w-md p-3"><p className="line-clamp-2">{entry.reaction ? REACTION_EMOJI[entry.reaction as keyof typeof REACTION_EMOJI] + ' ' : ''}{entry.message}</p></td>
                       <td className="p-3">{STATUS_LABELS[entry.status as keyof typeof STATUS_LABELS] ?? entry.status}</td>
                       <td className="p-3">{PRIORITY_LABELS[entry.priority as keyof typeof PRIORITY_LABELS] ?? entry.priority}</td>
@@ -229,7 +237,7 @@ export default function FeedbackAdminClient() {
                 <div className="divide-y divide-gray-100 md:hidden">{listing.entries.map(entry => <button key={entry.id} type="button" onClick={() => openDetail(entry.id)} className="block w-full p-4 text-left">
                   <div className="flex justify-between gap-3"><p className="font-semibold">{entry.tenant_name}</p><span className="text-xs text-gray-500">{shortDate(entry.created_at)}</span></div>
                   <p className="mt-2 line-clamp-3 text-sm text-gray-700">{entry.message}</p>
-                  <p className="mt-2 text-xs text-gray-500">{STATUS_LABELS[entry.status as keyof typeof STATUS_LABELS]} · {PRIORITY_LABELS[entry.priority as keyof typeof PRIORITY_LABELS]}</p>
+                  <p className="mt-2 text-xs text-gray-500">{entry.tester_invite_id ? '✓ Testeur invité' : 'Feedback public'} · {STATUS_LABELS[entry.status as keyof typeof STATUS_LABELS]} · {PRIORITY_LABELS[entry.priority as keyof typeof PRIORITY_LABELS]}</p>
                 </button>)}</div>
               </>
             )}
@@ -247,8 +255,9 @@ export default function FeedbackAdminClient() {
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {campaigns.map(campaign => <article key={campaign.id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div><div className="flex items-center gap-2"><h3 className="font-semibold">{campaign.name}</h3>{campaign.active ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Active</span> : null}</div><p className="mt-1 text-xs text-gray-500">{campaign.tenant_name} · {campaign.version_label || 'Sans version'} · {campaign.feedback_count} retours</p><p className="mt-2 text-sm">{campaign.headline}</p></div>
-                  <div className="flex gap-2">
+                  <div><div className="flex items-center gap-2"><h3 className="font-semibold">{campaign.name}</h3>{campaign.active ? <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">Active</span> : null}</div><p className="mt-1 text-xs text-gray-500">{campaign.tenant_name} · {campaign.version_label || 'Sans version'} · {campaign.feedback_count} retours</p><p className="mt-2 text-sm">{campaign.headline}</p><p className="mt-3 text-xs text-gray-600">Invités {campaign.invited_count ?? 0} · Invitations envoyées {campaign.sent_count ?? 0} · Activés {campaign.activated_count ?? 0} · Avec feedback {campaign.with_feedback_count ?? 0}</p></div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setTesterCampaign(campaign)} className={secondary}>Testeurs</button>
                     <button type="button" onClick={() => setEditingCampaign(campaign)} className={secondary}>Modifier</button>
                     <button type="button" disabled={busy === campaign.id} onClick={() => setCampaignActive(campaign, !campaign.active)} className={campaign.active ? secondary : button}>{campaign.active ? 'Clore' : 'Activer'}</button>
                   </div>
@@ -262,12 +271,14 @@ export default function FeedbackAdminClient() {
             <label className="block text-sm font-medium">Tenant<select name="tenantId" required disabled={Boolean(editingCampaign)} defaultValue={editingCampaign?.tenant_id ?? ''} className={input + ' mt-1 w-full'}><option value="">Choisir…</option>{tenants.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className="block text-sm font-medium">Nom<input name="name" required maxLength={160} defaultValue={editingCampaign?.name ?? ''} className={input + ' mt-1 w-full'} /></label>
             <label className="block text-sm font-medium">Version<input name="versionLabel" maxLength={80} defaultValue={editingCampaign?.version_label ?? ''} className={input + ' mt-1 w-full'} placeholder="ex. beta-2" /></label>
+            <label className="block text-sm font-medium">URL du test Google Play<input name="googlePlayTestUrl" type="url" maxLength={2048} defaultValue={editingCampaign?.google_play_test_url ?? ''} className={input + ' mt-1 w-full'} placeholder="https://play.google.com/…" /><span className="mt-1 block text-xs font-normal text-gray-500">Lien officiel fourni par Google Play pour rejoindre ou installer le test fermé.</span></label>
             <label className="block text-sm font-medium">Titre public<input name="headline" required maxLength={240} defaultValue={editingCampaign?.headline ?? 'Aidez-nous à améliorer votre expérience'} className={input + ' mt-1 w-full'} /></label>
             <label className="block text-sm font-medium">Introduction<textarea name="intro" maxLength={2000} rows={3} defaultValue={editingCampaign?.intro ?? ''} className={input + ' mt-1 w-full'} /></label>
             <label className="block text-sm font-medium">Message de remerciement<textarea name="thankYouMessage" maxLength={1000} rows={3} defaultValue={editingCampaign?.thank_you_message ?? ''} className={input + ' mt-1 w-full'} /></label>
             <label className="flex items-center gap-2 text-sm"><input name="active" type="checkbox" defaultChecked={editingCampaign?.active ?? false} /> Activer immédiatement</label>
             <button type="submit" disabled={busy === 'campaign'} className={button + ' w-full'}>{busy === 'campaign' ? 'Enregistrement…' : 'Enregistrer'}</button>
           </form>
+          {testerCampaign ? <div className="lg:col-span-2"><TesterCampaignPanel campaign={testerCampaign} onRefresh={loadCampaigns} /></div> : null}
         </div>
       )}
 
@@ -276,7 +287,7 @@ export default function FeedbackAdminClient() {
           <form onSubmit={saveDetail} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl dark:bg-gray-900 sm:rounded-3xl">
             <div className="flex items-start justify-between gap-4"><div><h2 id="feedback-detail-title" className="text-xl font-semibold">Détail du feedback</h2><p className="mt-1 text-xs text-gray-500">{detail.tenant_name} · {detail.campaign?.name}</p></div><button type="button" onClick={() => setDetail(null)} className={secondary}>Fermer</button></div>
             <p className="mt-6 whitespace-pre-wrap rounded-2xl bg-gray-50 p-4 text-sm leading-6 dark:bg-gray-950">{detail.message}</p>
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-gray-500">Réaction</dt><dd>{detail.reaction ? REACTION_LABELS[detail.reaction as keyof typeof REACTION_LABELS] : '—'}</dd></div><div><dt className="text-gray-500">Catégorie</dt><dd>{detail.category ? CATEGORY_LABELS[detail.category as keyof typeof CATEGORY_LABELS] : '—'}</dd></div><div><dt className="text-gray-500">Contact autorisé</dt><dd>{detail.contact_allowed ? detail.contact_email : 'Non'}</dd></div><div><dt className="text-gray-500">Contexte sûr</dt><dd className="break-all text-xs">{JSON.stringify(detail.context)}</dd></div></dl>
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-gray-500">Source</dt><dd>{detail.tester_invite_id ? '✓ Testeur invité' : 'Feedback public'}</dd></div>{detail.tester_invite_email ? <div><dt className="text-gray-500">Invitation</dt><dd>{detail.tester_invite_email}</dd></div> : null}<div><dt className="text-gray-500">Réaction</dt><dd>{detail.reaction ? REACTION_LABELS[detail.reaction as keyof typeof REACTION_LABELS] : '—'}</dd></div><div><dt className="text-gray-500">Catégorie</dt><dd>{detail.category ? CATEGORY_LABELS[detail.category as keyof typeof CATEGORY_LABELS] : '—'}</dd></div><div><dt className="text-gray-500">Contact autorisé</dt><dd>{detail.contact_allowed ? detail.contact_email : 'Non'}</dd></div><div><dt className="text-gray-500">Contexte sûr</dt><dd className="break-all text-xs">{JSON.stringify(detail.context)}</dd></div></dl>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-medium">Statut<select name="status" defaultValue={detail.status} className={input + ' mt-1 w-full'}>{FEEDBACK_STATUSES.map(value => <option key={value} value={value}>{STATUS_LABELS[value]}</option>)}</select></label>
               <label className="text-sm font-medium">Priorité<select name="priority" defaultValue={detail.priority} className={input + ' mt-1 w-full'}>{FEEDBACK_PRIORITIES.map(value => <option key={value} value={value}>{PRIORITY_LABELS[value]}</option>)}</select></label>

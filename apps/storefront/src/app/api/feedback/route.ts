@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildFeedbackInsert, publicFeedbackSchema } from '@/lib/feedback/contracts';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { hashOpaqueToken, isOpaqueToken, TESTER_SESSION_COOKIE } from '@/lib/feedback/testerInviteTokens';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -59,12 +60,27 @@ export async function POST(request: NextRequest) {
 
     if (campaignError || !campaign) return jsonError('Cette campagne n’est plus disponible.', 409);
 
+    let testerInviteId: string | null = null;
+    const sessionToken = request.cookies.get(TESTER_SESSION_COOKIE)?.value;
+    if (sessionToken && isOpaqueToken(sessionToken)) {
+      const { data: invite } = await service.from('tester_feedback_invites').select('id')
+        .eq('session_token_hash', hashOpaqueToken(sessionToken))
+        .eq('tenant_id', tenant.id).eq('campaign_id', campaign.id)
+        .not('activated_at', 'is', null).is('revoked_at', null).maybeSingle();
+      testerInviteId = invite?.id ?? null;
+    }
+
     const { error } = await service.from('tester_feedback_entries').insert({
       tenant_id: tenant.id,
       campaign_id: campaign.id,
+      ...(testerInviteId ? { tester_invite_id: testerInviteId } : {}),
       ...buildFeedbackInsert(parsed.data, campaign.version_label),
     });
     if (error) return jsonError('Envoi impossible. Réessayez dans un instant.', 503);
+    if (testerInviteId) {
+      await service.from('tester_feedback_invites').update({ last_feedback_at: new Date().toISOString() })
+        .eq('id', testerInviteId).eq('tenant_id', tenant.id).eq('campaign_id', campaign.id).is('revoked_at', null);
+    }
 
     const response = NextResponse.json({ ok: true }, { status: 201 });
     response.cookies.set(COOLDOWN_COOKIE, '1', {

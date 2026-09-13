@@ -28,6 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     ...(fields.headline !== undefined ? { headline: fields.headline } : {}),
     ...(fields.intro !== undefined ? { intro: fields.intro || null } : {}),
     ...(fields.thankYouMessage !== undefined ? { thank_you_message: fields.thankYouMessage || null } : {}),
+    ...(fields.googlePlayTestUrl !== undefined ? { google_play_test_url: fields.googlePlayTestUrl || null } : {}),
   };
   if (Object.keys(update).length) {
     const { error } = await service.from('tester_feedback_campaigns').update(update).eq('id', params.id);

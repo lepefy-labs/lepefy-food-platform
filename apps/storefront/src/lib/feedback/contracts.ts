@@ -4,6 +4,7 @@ export const FEEDBACK_REACTIONS = ['great', 'good', 'neutral', 'difficult', 'bad
 export const FEEDBACK_CATEGORIES = ['bug', 'idea', 'confusing', 'like', 'other'] as const;
 export const FEEDBACK_STATUSES = ['new', 'review', 'planned', 'resolved', 'archived'] as const;
 export const FEEDBACK_PRIORITIES = ['normal', 'important', 'blocking'] as const;
+export const FEEDBACK_SOURCES = ['invited', 'public'] as const;
 
 export const REACTION_LABELS: Record<(typeof FEEDBACK_REACTIONS)[number], string> = {
   great: 'Super',
@@ -90,6 +91,17 @@ const campaignFields = {
   headline: z.string().trim().min(1).max(240),
   intro: z.string().trim().max(2000).nullable(),
   thankYouMessage: z.string().trim().max(1000).nullable(),
+  googlePlayTestUrl: z.string().trim().max(2048).nullable().superRefine((value, issue) => {
+    if (!value) return;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'https:' || url.hostname !== 'play.google.com') {
+        issue.addIssue({ code: z.ZodIssueCode.custom, message: 'Utilisez une URL HTTPS officielle play.google.com.' });
+      }
+    } catch {
+      issue.addIssue({ code: z.ZodIssueCode.custom, message: 'URL Google Play invalide.' });
+    }
+  }).optional().default(null),
   active: z.boolean(),
 };
 
@@ -100,8 +112,14 @@ export const campaignPatchSchema = z.object({
   headline: campaignFields.headline.optional(),
   intro: campaignFields.intro.optional(),
   thankYouMessage: campaignFields.thankYouMessage.optional(),
+  googlePlayTestUrl: campaignFields.googlePlayTestUrl.optional(),
   active: campaignFields.active.optional(),
 }).strict().refine(value => Object.keys(value).length > 0, 'Aucune modification.');
+
+const testerEmail = z.string().trim().toLowerCase().max(254).email();
+export const testerImportSchema = z.object({
+  emails: z.array(testerEmail).min(1).max(500).transform(values => [...new Set(values)]),
+}).strict();
 export const feedbackUpdateSchema = z.object({
   status: z.enum(FEEDBACK_STATUSES).optional(),
   priority: z.enum(FEEDBACK_PRIORITIES).optional(),

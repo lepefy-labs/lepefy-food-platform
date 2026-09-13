@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   let query = service
     .from('tester_feedback_entries')
-    .select('id, tenant_id, campaign_id, message, reaction, category, status, priority, created_at', { count: 'exact' })
+    .select('id, tenant_id, campaign_id, tester_invite_id, message, reaction, category, status, priority, created_at', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, from + pageSize - 1);
   const tenantId = params.get('tenant');
@@ -36,6 +36,9 @@ export async function GET(request: NextRequest) {
   if (priority) query = query.eq('priority', priority);
   if (reaction) query = query.eq('reaction', reaction);
   if (category) query = query.eq('category', category);
+  const source = params.get('source');
+  if (source === 'invited') query = query.not('tester_invite_id', 'is', null);
+  if (source === 'public') query = query.is('tester_invite_id', null);
 
   const [entriesResult, totalResult, newResult, blockingResult, activeCampaignsResult] = await Promise.all([
     query,

@@ -12,9 +12,10 @@ import {
 type Props = {
   campaign: { headline: string; intro: string | null; thankYouMessage: string | null };
   accentColor: string;
+  invitedTester: boolean;
 };
 
-export default function FeedbackForm({ campaign, accentColor }: Props) {
+export default function FeedbackForm({ campaign, accentColor, invitedTester }: Props) {
   const startedAt = useRef(Date.now());
   const [reaction, setReaction] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
@@ -95,7 +96,7 @@ export default function FeedbackForm({ campaign, accentColor }: Props) {
       {campaign.intro ? <p className="mt-3 text-sm leading-6 text-gray-600">{campaign.intro}</p> : null}
       <form onSubmit={submit} className="mt-8 space-y-7">
         <fieldset>
-          <legend className="text-sm font-semibold text-gray-900">Comment s’est passée votre expérience ? <span className="font-normal text-gray-500">(facultatif)</span></legend>
+          <legend className="text-sm font-semibold text-gray-900">Comment s’est passée votre expérience ?</legend>
           <div className="mt-3 grid grid-cols-5 gap-2">
             {FEEDBACK_REACTIONS.map(value => (
               <button
@@ -114,7 +115,7 @@ export default function FeedbackForm({ campaign, accentColor }: Props) {
         </fieldset>
 
         <fieldset>
-          <legend className="text-sm font-semibold text-gray-900">Votre retour concerne <span className="font-normal text-gray-500">(facultatif)</span></legend>
+          <legend className="text-sm font-semibold text-gray-900">Votre retour concerne</legend>
           <div className="mt-3 flex flex-wrap gap-2">
             {FEEDBACK_CATEGORIES.map(value => (
               <button
@@ -174,6 +175,7 @@ export default function FeedbackForm({ campaign, accentColor }: Props) {
         </button>
         <p className="text-center text-xs leading-5 text-gray-500">
           Votre message est utilisé uniquement pour améliorer le service. Votre e-mail n’est enregistré qu’avec votre accord.
+          {invitedTester ? <span className="mt-1 block">Votre retour peut être associé à votre invitation afin de distinguer les testeurs invités.</span> : null}
         </p>
       </form>
     </>

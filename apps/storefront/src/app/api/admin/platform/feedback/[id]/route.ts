@@ -26,12 +26,16 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     service.from('tenants').select('id, name').eq('id', entry.tenant_id).single(),
     service.from('tester_feedback_campaigns').select('id, name, version_label').eq('id', entry.campaign_id).single(),
   ]);
+  const inviteResult = entry.tester_invite_id
+    ? await service.from('tester_feedback_invites').select('email').eq('id', entry.tester_invite_id).eq('tenant_id', entry.tenant_id).maybeSingle()
+    : { data: null };
   return NextResponse.json({
     entry: {
       ...entry,
       contact_email: entry.contact_allowed ? entry.contact_email : null,
       tenant_name: tenantResult.data?.name ?? 'Tenant',
       campaign: campaignResult.data ?? null,
+      tester_invite_email: inviteResult.data?.email ?? null,
     },
   });
 }
