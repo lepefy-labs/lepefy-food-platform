@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 13 settembre 2026 — **v6.44 Current-State Snapshot**
+> **Aggiornato:** 13 settembre 2026 — **v6.45 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -67,7 +67,7 @@ Le route storefront canoniche sono:
 
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
 
-Il branding PWA usa `tenants.app_icon_url` come artwork quadrato dedicato per manifest, Apple touch icon e futuri wrapper native/TWA; `NULL` mantiene il fallback compatibile su `logo_url`. L’upload admin è PNG-only, 512×512, massimo 1 MB, tenant-scoped e versionato per invalidare le cache. Gli artwork dedicati trasparenti sono composti sul canvas pieno `primary_color`; gli artwork quadrati già opachi sono preservati senza cornici annidate. L’icona Digital Card resta separata e continua a usare `logo_url`; Digital Asset Links resta configurato tramite `android_package_name` e `android_sha256_fingerprint`. Nel repository non è presente una pipeline Android/Gradle/AAB: un nuovo launcher icon richiede la rigenerazione esterna del wrapper/AAB dal manifest live e un nuovo `versionCode`.
+Il branding PWA usa `tenants.app_icon_url` come artwork quadrato dedicato per manifest, Apple touch icon e futuri wrapper native/TWA; `NULL` mantiene il fallback compatibile su `logo_url`. L’upload admin è PNG-only, 512×512, massimo 1 MB, tenant-scoped e versionato per invalidare le cache. Sia `app_icon_url` sia il fallback `logo_url` sono sorgenti grafiche: la pipeline rimuove il padding uniforme, conserva le proporzioni e centra l’artwork sul canvas pieno `primary_color`, con scala più prudente per il purpose maskable. L’icona Digital Card resta separata e continua a usare `logo_url`; Digital Asset Links resta configurato tramite `android_package_name` e `android_sha256_fingerprint`. Nel repository non è presente una pipeline Android/Gradle/AAB: un nuovo launcher icon richiede la rigenerazione esterna del wrapper/AAB dal manifest live e un nuovo `versionCode`.
 
 Le categorie possiedono `catalog_scope: 'shop' | 'gadgets'` (migration additiva e reversibile `103_category_catalog_scope.sql`, default `shop` per tutte le categorie esistenti). Catalogue `/`, paginazione `/api/products` e ricerca semantica pubblica includono soltanto prodotti delle categorie `shop` del tenant; `/gadgets` filtra server-side categorie e prodotti `gadgets`, con filtro `?category=` e paginazione `?page=`. Prodotti senza categoria non appartengono a nessuno scope. Il prodotto phare viene scelto tramite `featured`, poi `position`/`id`; in assenza di prodotti attivi la boutique mostra uno stato vuoto senza dati artificiali.
 
@@ -652,7 +652,7 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.44
+# Fine snapshot v6.45
 
 **Base audit:** `main + Prospects Enrichment V2`
 **Data:** 13 settembre 2026

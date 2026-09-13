@@ -9,6 +9,7 @@ interface GenerateTenantAppIconBufferParams {
   imageUrl: string;
   size: number;
   backgroundColor: string;
+  artworkScale: number;
 }
 
 async function fetchImageBuffer(imageUrl: string): Promise<Buffer> {
@@ -19,7 +20,7 @@ async function fetchImageBuffer(imageUrl: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
-// Generic transparent "contain" resize retained for normal logos and the card icon.
+// Generic transparent "contain" resize retained for the independent card icon.
 export async function generateIconBuffer({ logoUrl, size }: GenerateIconBufferParams): Promise<Buffer> {
   const imageBuffer = await fetchImageBuffer(logoUrl);
   return sharp(imageBuffer)
@@ -28,22 +29,44 @@ export async function generateIconBuffer({ logoUrl, size }: GenerateIconBufferPa
     .toBuffer();
 }
 
-// Dedicated app artwork stays untouched when fully opaque. Transparent artwork
-// is centered without crop/stretch, then flattened onto the tenant-color canvas.
+// app_icon_url and logo_url are artwork sources, not finished launcher icons.
+// Transparent/uniform edge padding is trimmed, proportions are preserved, and
+// the centered artwork is composed onto the full tenant-color canvas.
 export async function generateTenantAppIconBuffer({
   imageUrl,
   size,
   backgroundColor,
+  artworkScale,
 }: GenerateTenantAppIconBufferParams): Promise<Buffer> {
   const imageBuffer = await fetchImageBuffer(imageUrl);
-  const stats = await sharp(imageBuffer, { failOn: 'error' }).stats();
+  const artworkSize = Math.max(1, Math.round(size * artworkScale));
+  const artwork = await sharp(imageBuffer, { failOn: 'error' })
+    .trim({ threshold: 10 })
+    .resize(artworkSize, artworkSize, {
+      fit: 'inside',
+      withoutEnlargement: false,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+  const metadata = await sharp(artwork).metadata();
+  const width = metadata.width ?? artworkSize;
+  const height = metadata.height ?? artworkSize;
 
-  const resized = sharp(imageBuffer, { failOn: 'error' })
-    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } });
-
-  if (stats.isOpaque) {
-    return resized.png().toBuffer();
-  }
-
-  return resized.flatten({ background: backgroundColor }).png().toBuffer();
+  return sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: backgroundColor,
+    },
+  })
+    .composite([{
+      input: artwork,
+      left: Math.round((size - width) / 2),
+      top: Math.round((size - height) / 2),
+    }])
+    .flatten({ background: backgroundColor })
+    .png()
+    .toBuffer();
 }

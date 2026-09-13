@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { generateIconBuffer, generateTenantAppIconBuffer } from '@/lib/tenant/generateIconBuffer';
+import { generateTenantAppIconBuffer } from '@/lib/tenant/generateIconBuffer';
 import { resolveTenantAppIconSource } from '@/lib/tenant/appIcon';
+
+const STANDARD_ARTWORK_SCALE = 0.82;
+const MASKABLE_ARTWORK_SCALE = 0.62;
 
 function clampSize(raw: string | null): number {
   const n = parseInt(raw ?? '512', 10);
@@ -24,29 +26,19 @@ export async function GET(req: NextRequest) {
     const source = resolveTenantAppIconSource(tenant.app_icon_url, tenant.logo_url);
     if (!source) return new NextResponse(null, { status: 404 });
 
-    let output: Buffer;
-    if (source.dedicated) {
-      // Opaque finished artwork is preserved. Transparent artwork is flattened
-      // onto the full tenant-color canvas without crop, stretch or nested frame.
-      output = await generateTenantAppIconBuffer({
-        imageUrl: source.url,
-        size,
-        backgroundColor: tenant.primary_color ?? '#1D9E75',
-      });
-    } else if (purpose === 'maskable') {
-      const logoSize = Math.round(size * 0.80);
-      const logoBuffer = await generateIconBuffer({ logoUrl: source.url, size: logoSize });
-      const logoOffset = Math.round((size - logoSize) / 2);
-      output = await sharp({
-        create: { width: size, height: size, channels: 4, background: tenant.primary_color ?? '#1D9E75' },
-      }).composite([{ input: logoBuffer, left: logoOffset, top: logoOffset }]).png().toBuffer();
-    } else {
-      output = await generateIconBuffer({ logoUrl: source.url, size });
-    }
+    const output = await generateTenantAppIconBuffer({
+      imageUrl: source.url,
+      size,
+      backgroundColor: tenant.primary_color ?? '#1D9E75',
+      artworkScale: purpose === 'maskable' ? MASKABLE_ARTWORK_SCALE : STANDARD_ARTWORK_SCALE,
+    });
 
     return new NextResponse(new Uint8Array(output), {
       status: 200,
-      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' },
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      },
     });
   } catch (err) {
     console.error('[pwa-icon] Error:', err);
