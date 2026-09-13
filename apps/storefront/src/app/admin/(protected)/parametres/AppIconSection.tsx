@@ -82,8 +82,8 @@ export function AppIconSection({ initialAppIconUrl, hasLogoFallback }: Props) {
           </div>
         </div>
         {canPreview && <div className="flex items-end gap-4 rounded-xl border border-gray-200 bg-[var(--admin-surface-subtle)] p-4 dark:border-gray-800 dark:bg-gray-950/30">
-          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(192, 'any', revision)} alt="Aperçu de l’icône standard" width={96} height={96} className="h-24 w-24 rounded-2xl bg-white object-contain shadow-sm" /><figcaption className="mt-2 text-[11px] text-gray-500">Standard</figcaption></figure>
-          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(512, 'maskable', revision)} alt="Aperçu de l’icône maskable" width={96} height={96} className="h-24 w-24 rounded-full bg-white object-contain shadow-sm" /><figcaption className="mt-2 text-[11px] text-gray-500">Maskable</figcaption></figure>
+          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(192, 'any', revision)} alt="Aperçu de l’icône standard" width={96} height={96} className="h-24 w-24 rounded-2xl object-contain shadow-sm" /><figcaption className="mt-2 text-[11px] text-gray-500">Standard</figcaption></figure>
+          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(512, 'maskable', revision)} alt="Aperçu de l’icône maskable" width={96} height={96} className="h-24 w-24 rounded-full object-contain shadow-sm" /><figcaption className="mt-2 text-[11px] text-gray-500">Maskable</figcaption></figure>
         </div>}
       </div>
     </section>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { generateIconBuffer } from '@/lib/tenant/generateIconBuffer';
+import { generateIconBuffer, generateTenantAppIconBuffer } from '@/lib/tenant/generateIconBuffer';
 import { resolveTenantAppIconSource } from '@/lib/tenant/appIcon';
 
 function clampSize(raw: string | null): number {
@@ -26,8 +26,13 @@ export async function GET(req: NextRequest) {
 
     let output: Buffer;
     if (source.dedicated) {
-      // Finished square artwork: never apply the legacy logo/background composition.
-      output = await generateIconBuffer({ logoUrl: source.url, size });
+      // Opaque finished artwork is preserved. Transparent artwork is flattened
+      // onto the full tenant-color canvas without crop, stretch or nested frame.
+      output = await generateTenantAppIconBuffer({
+        imageUrl: source.url,
+        size,
+        backgroundColor: tenant.primary_color ?? '#1D9E75',
+      });
     } else if (purpose === 'maskable') {
       const logoSize = Math.round(size * 0.80);
       const logoBuffer = await generateIconBuffer({ logoUrl: source.url, size: logoSize });
