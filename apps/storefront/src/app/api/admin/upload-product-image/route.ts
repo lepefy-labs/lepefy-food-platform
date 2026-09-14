@@ -38,6 +38,7 @@ function managedStoragePath(imageUrl: string, tenantId: string, productId: strin
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const denied = await requireAdmin(tenant.id);
@@ -91,6 +92,13 @@ export async function POST(req: NextRequest) {
 
   const uploadedPaths: string[] = [];
   const uploadedImages: ProductImage[] = [];
+
+  console.info('[product-images] Upload started', {
+    productId,
+    fileCount: files.length,
+    inputBytes: files.reduce((total, file) => total + file.size, 0),
+    removeBackground: shouldRemoveBg,
+  });
 
   try {
     for (const file of files) {
@@ -150,11 +158,23 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw new Error(updateError.message);
 
+    console.info('[product-images] Upload completed', {
+      productId,
+      fileCount: uploadedImages.length,
+      outputCount: nextImages.length,
+      durationMs: Date.now() - startedAt,
+    });
+
     return NextResponse.json({
       images: nextImages,
       imageUrl: nextImages[0]?.url ?? null,
     });
   } catch (error) {
+    console.error('[product-images] Upload failed', {
+      productId,
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+    });
     if (uploadedPaths.length > 0) {
       await supabase.storage.from('assets').remove(uploadedPaths);
     }

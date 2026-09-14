@@ -21,6 +21,39 @@ import Button from '../../../_components/ui/Button';
 import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
 
 const MAX_UPLOAD_FILE_BYTES = 4 * 1024 * 1024;
+const MAX_UPLOAD_EDGE = 1600;
+const UPLOAD_WEBP_QUALITY = 0.92;
+
+async function optimizeImageForUpload(file: File): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    try {
+      const scale = Math.min(1, MAX_UPLOAD_EDGE / bitmap.width, MAX_UPLOAD_EDGE / bitmap.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const context = canvas.getContext('2d');
+      if (!context) return file;
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      const optimized = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, 'image/webp', UPLOAD_WEBP_QUALITY);
+      });
+      if (!optimized || optimized.size >= file.size) return file;
+
+      const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+      return new File([optimized], baseName + '.webp', {
+        type: 'image/webp',
+        lastModified: file.lastModified,
+      });
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    return file;
+  }
+}
 
 interface ProductMediaManagerProps {
   productId: string;
@@ -102,16 +135,17 @@ export default function ProductMediaManager({
       return;
     }
 
-    const oversized = selected.find((file) => file.size > MAX_UPLOAD_FILE_BYTES);
-    if (oversized) {
-      onToast(oversized.name + ' dépasse la limite de 4 Mo', 'error');
-      return;
-    }
-
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: selected.length });
     try {
-      for (const [index, file] of selected.entries()) {
-        setUploadProgress({ current: index + 1, total: selected.length });
+      const optimizedFiles = await Promise.all(selected.map(optimizeImageForUpload));
+      const oversized = optimizedFiles.find((file) => file.size > MAX_UPLOAD_FILE_BYTES);
+      if (oversized) {
+        throw new Error(oversized.name + ' dépasse la limite de 4 Mo après optimisation');
+      }
+
+      for (const [index, file] of optimizedFiles.entries()) {
+        setUploadProgress({ current: index + 1, total: optimizedFiles.length });
 
         const uploadData = new FormData();
         uploadData.append('files', file);
@@ -332,7 +366,9 @@ export default function ProductMediaManager({
               <IconUpload size={20} className="mx-auto mb-1 text-gray-400" aria-hidden="true" />
               <p className="text-xs text-gray-500">
                 {isUploading && uploadProgress
-                  ? 'Téléversement ' + uploadProgress.current + ' / ' + uploadProgress.total + '…'
+                  ? uploadProgress.current === 0
+                    ? 'Optimisation des images…'
+                    : 'Téléversement ' + uploadProgress.current + ' / ' + uploadProgress.total + '…'
                   : 'Glisser une ou plusieurs images ici'}
               </p>
               <span className="text-xs text-gray-400">
