@@ -21,7 +21,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   const { data: campaign } = await service.from('tester_feedback_campaigns').select('id, tenant_id, google_play_test_url').eq('id', params.id).maybeSingle();
   if (!campaign) return NextResponse.json({ error: 'Campagne introuvable.' }, { status: 404 });
   const { data: invites, error } = await service.from('tester_feedback_invites')
-    .select('id, email, delivery_status, sent_at, delivery_failed_at, activated_at, revoked_at, last_feedback_at, created_at')
+    .select('id, email, phone, installation_status, delivery_status, sent_at, delivery_failed_at, activated_at, revoked_at, last_feedback_at, created_at')
     .eq('campaign_id', campaign.id).eq('tenant_id', campaign.tenant_id).order('created_at');
   if (error) return NextResponse.json({ error: 'Testeurs indisponibles.' }, { status: 503 });
   const inviteIds = (invites ?? []).map((invite: { id: string }) => invite.id);
