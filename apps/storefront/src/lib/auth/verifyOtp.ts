@@ -1,12 +1,13 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/server';
+import { resolveOrCreateCustomer } from '@/lib/customers/resolveOrCreateCustomer';
 
 export async function verifyOtp(
   supabase: SupabaseClient,
   email: string,
   token: string,
   tenantId: string,
-): Promise<{ session: Session | null; error?: string; isNewCustomer?: boolean }> {
+): Promise<{ session: Session | null; error?: string; isNewCustomer?: boolean; customerId?: string }> {
   // signInWithOtp({ shouldCreateUser: true }) verifica normalmente con
   // type: 'email' sia per un utente nuovo che esistente. Per sicurezza —
   // alcune versioni/configurazioni GoTrue instradano il primo login di un
@@ -42,43 +43,13 @@ export async function verifyOtp(
   // su customers, solo authenticated e service_role). Questo è un controllo
   // interno pre-upsert, non un'azione per conto dell'utente — non c'è motivo
   // di farla dipendere dal timing della sessione.
-  const { data: existingCustomer } = await createServiceClient()
-    .from('customers')
-    .select('id')
-    .eq('id', data.session.user.id)
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
+  const resolved = await resolveOrCreateCustomer({
+    tenantId,
+    authUserId: data.session.user.id,
+    email,
+    source: 'signup',
+    supabase: createServiceClient(),
+  });
 
-  const isNewCustomer = !existingCustomer;
-
-  // Upsert su `customers` — ON CONFLICT (tenant_id, email) DO NOTHING: se un
-  // customer con questa email esisteva già (es. da un checkout guest
-  // precedente), non sovrascriviamo full_name/phone già raccolti.
-  //
-  // Stesso motivo del service client usato sopra per existingCustomer: il
-  // client `supabase` passato a questa funzione non ha garanzia di avere la
-  // sessione appena verificata già attaccata per questa richiesta, quindi un
-  // upsert su di esso può fallire con lo stesso "permission denied for table
-  // customers" (mascherato finché la query precedente falliva per prima).
-  // Anche questo è un write interno di sistema (creazione riga customers a
-  // fronte di un signup riuscito), non un'azione the utente esegue "come sé
-  // stesso" — nessuna ragione per dipendere dal timing della sessione qui.
-  const { error: upsertError } = await createServiceClient()
-    .from('customers')
-    .upsert(
-      { id: data.session.user.id, tenant_id: tenantId, email },
-      { onConflict: 'tenant_id,email', ignoreDuplicates: true },
-    );
-
-  if (upsertError) {
-    // Non un fallimento da loggare e ignorare: se questa riga non viene
-    // scritta, l'account auth esiste ma il customer no. Propagare l'errore
-    // impedisce alla route di trattare il login come riuscito (e quindi di
-    // procedere a registerWithReferral / consumare il cookie referral_code
-    // su un signup che in realtà non si è completato).
-    console.error('[auth] customers upsert error:', upsertError.message);
-    throw upsertError;
-  }
-
-  return { session: data.session, isNewCustomer };
+  return { session: data.session, isNewCustomer: resolved.created, customerId: resolved.id };
 }

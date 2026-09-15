@@ -32,12 +32,12 @@ export async function POST(req: NextRequest) {
       try {
         await registerSignupConsent({
           tenantId: tenant.id,
-          customerId: result.session.user.id,
+          customerId: result.customerId!,
           marketingOptIn: marketingOptIn === true,
         });
       } catch (consentErr) {
         console.error('[api/auth/verify-otp] registerSignupConsent failed:', consentErr,
-          '— customer_id:', result.session.user.id);
+          '— customer_id:', result.customerId);
       }
     }
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         // retry entro la finestra dei 30 giorni già prevista.
         await registerWithReferral({
           tenantId: tenant.id,
-          newCustomerId: result.session.user.id,
+          newCustomerId: result.customerId!,
           referralCode: referralCookie,
           signupIp,
           // Nessun device fingerprinting esiste altrove nel progetto — non
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
         response.cookies.delete('referral_code');
       } catch (referralErr) {
         console.error('[api/auth/verify-otp] registerWithReferral failed:', referralErr,
-          '— customer_id:', result.session.user.id);
+          '— customer_id:', result.customerId);
       }
     }
 

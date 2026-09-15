@@ -6,6 +6,7 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { Order } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
+import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 
 const stripe = getStripeClient('shop');
 
@@ -174,6 +175,19 @@ export async function createOrderFromCheckoutSession(
   }
 
   if (!stockError && !itemsError) {
+    await recordOrderCustomerEvents({
+      tenantId: session.tenant_id,
+      customerId: session.customer_id,
+      orderId: order.id,
+      total,
+      source: isStripe ? 'stripe_webhook' : 'external_payment_confirmation',
+      items: items.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        subtotal: item.price * item.quantity,
+      })),
+    });
     await recordNalaPurchaseAttribution({
       supabase,
       checkoutSessionId: session.id,

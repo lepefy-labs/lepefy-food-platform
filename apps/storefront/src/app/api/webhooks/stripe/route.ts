@@ -12,6 +12,7 @@ import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from
 import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
 import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
+import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
@@ -325,6 +326,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!stockError && !itemsError) {
+      await recordOrderCustomerEvents({
+        tenantId: resolvedTenantId,
+        customerId: checkoutSession.customer_id,
+        orderId: order.id,
+        total,
+        source: 'stripe_webhook',
+        items: items.map((item) => ({ productId: item.productId, name: item.name, quantity: item.quantity, subtotal: item.price * item.quantity })),
+      });
       await recordNalaPurchaseAttribution({
         supabase,
         checkoutSessionId: checkoutSession.id,

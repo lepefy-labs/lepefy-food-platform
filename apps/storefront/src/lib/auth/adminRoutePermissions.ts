@@ -19,6 +19,9 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/evenementiel/galerie', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel', permission: 'events.view' },
   { prefix: '/admin/orders', permission: 'orders.view' },
+  { prefix: '/admin/clients/campagnes', permission: 'campaigns.view' },
+  { prefix: '/admin/clients/segments', permission: 'customers.view' },
+  { prefix: '/admin/clients', permission: 'customers.view' },
   { prefix: '/admin/checkout-funnel', permission: 'orders.view' },
   { prefix: '/admin/paiements-en-attente', permission: 'orders.view' },
   { prefix: '/admin/catalogue', permission: 'catalog.view' },
@@ -57,6 +60,7 @@ export function defaultAdminDestination(permissions: string[], workspace: AdminW
   } else {
     if (has('orders.view')) return '/admin';
     if (has('catalog.view')) return '/admin/catalogue';
+    if (has('customers.view')) return '/admin/clients';
     if (has('loyalty.scan')) return '/admin/loyalty/scan';
     if (has('shipping.view')) return '/admin/livraison';
     if (has('billing.view')) return '/admin/billing';

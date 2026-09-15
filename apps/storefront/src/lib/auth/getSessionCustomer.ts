@@ -17,9 +17,9 @@ export async function getSessionCustomer(tenantId: string): Promise<SessionCusto
   const { data: customer } = await supabase
     .from('customers')
     .select('id, email, full_name')
-    .eq('id', user.id)
+    .eq('auth_user_id', user.id)
     .eq('tenant_id', tenantId)
     .maybeSingle();
 
-  return customer ?? null;
+  return customer ? { ...customer, email: customer.email ?? user.email ?? '' } : null;
 }

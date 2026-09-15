@@ -39,7 +39,7 @@ function tenantInitials(name: string) {
 export default function AdminHeader({ platformName, platformLogoUrl, tenantName, tenantLogoUrl, categories, workspace, shopAdminUrl, eventsAdminUrl, isPlatformOwner = false, permissions = [], adminEmail, adminDisplayName, pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0 }: AdminHeaderProps) {
   const workspaceLabel = workspace === 'events' ? 'Événementiel' : 'Boutique';
   const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
-  const canShop = has('orders.view') || has('catalog.view') || has('shipping.view') || has('loyalty.scan');
+  const canShop = has('orders.view') || has('catalog.view') || has('customers.view') || has('shipping.view') || has('loyalty.scan');
   const canEvents = has('events.view') || has('event_reservations.view') || has('event_payments.view') || has('event_content.manage') || has('scan.access');
 
   return (

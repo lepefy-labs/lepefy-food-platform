@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getLatestLegalDocument } from './getLatestLegalDocument';
+import { getCurrentCustomerConsent } from '@/lib/customers/getCurrentCustomerConsent';
 
 export interface CheckoutConsentState {
   showTermsCheckbox:    boolean;
@@ -32,7 +33,7 @@ export async function resolveCheckoutConsentState(
 
   const supabase = createServiceClient();
 
-  const [{ data: termsConsent }, { data: marketingConsent }] = await Promise.all([
+  const [{ data: termsConsent }, marketingConsent] = await Promise.all([
     termsDocVersion === null
       ? Promise.resolve({ data: null })
       : supabase
@@ -44,21 +45,14 @@ export async function resolveCheckoutConsentState(
           .eq('doc_version', termsDocVersion)
           .limit(1)
           .maybeSingle(),
-    supabase
-      .from('user_consents')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('user_id', customerId)
-      .eq('consent_type', 'marketing')
-      .limit(1)
-      .maybeSingle(),
+    getCurrentCustomerConsent(tenantId, customerId),
   ]);
 
   return {
     // Sans version courante, rien à faire accepter — même raisonnement que
     // pour un guest ci-dessus.
     showTermsCheckbox:     termsDocVersion !== null && !termsConsent,
-    showMarketingCheckbox: !marketingConsent,
+    showMarketingCheckbox: !marketingConsent.granted,
     termsDocVersion,
   };
 }

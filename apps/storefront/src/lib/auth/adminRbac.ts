@@ -22,7 +22,7 @@ export interface AdminAccessContext {
 }
 
 const LEGACY_TENANT_ADMIN_PERMISSIONS = [
-  'orders.view','orders.manage','shop_payments.confirm','catalog.view','catalog.manage','shipping.view','shipping.manage','loyalty.manage','loyalty.scan','growth.manage','growth.payouts.manage','ai_knowledge.manage',
+  'orders.view','orders.manage','shop_payments.confirm','catalog.view','catalog.manage','customers.view','customers.manage','segments.manage','campaigns.view','campaigns.manage','shipping.view','shipping.manage','loyalty.manage','loyalty.scan','growth.manage','growth.payouts.manage','ai_knowledge.manage',
   'events.view','events.manage','event_reservations.view','event_reservations.manage','event_payments.view','event_payments.confirm','event_payments.cancel','event_payments.refund','event_content.manage',
   'scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own','scan.undo_any',
   'tenant_settings.view','tenant_settings.manage','billing.view','ai_usage.view',

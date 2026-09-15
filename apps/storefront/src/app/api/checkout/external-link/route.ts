@@ -4,6 +4,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
+import { resolveOrCreateCustomer } from '@/lib/customers/resolveOrCreateCustomer';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
 import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
@@ -155,6 +156,17 @@ export async function POST(req: NextRequest) {
     }
 
     const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
+    let customerId = sessionCustomer?.id ?? null;
+    if (!customerId) {
+      try {
+        customerId = (await resolveOrCreateCustomer({
+          tenantId: tenant.id, email, phone, fullName, source: 'guest_checkout', supabase,
+        })).id;
+      } catch (identityError) {
+        console.warn('[checkout/external-link] customer resolution failed:', identityError);
+        return NextResponse.json({ error: 'Ces coordonnées correspondent à plusieurs profils. Contactez-nous pour continuer.' }, { status: 409 });
+      }
+    }
     const ambassadorDiscount = await resolveCheckoutAmbassadorDiscount({
       tenant: {
         id: tenant.id,
@@ -165,7 +177,7 @@ export async function POST(req: NextRequest) {
         ambassador_first_order_discount_type: tenant.ambassador_first_order_discount_type,
         ambassador_first_order_discount_value: tenant.ambassador_first_order_discount_value,
       },
-      customerId: sessionCustomer?.id ?? null,
+      customerId,
       subtotal,
     });
     const total = parseFloat((subtotal + shippingTotal - ambassadorDiscount).toFixed(2));
@@ -177,7 +189,7 @@ export async function POST(req: NextRequest) {
     const active = await upsertActiveCheckoutSession({
       supabase,
       tenantId: tenant.id,
-      customerId: sessionCustomer?.id ?? null,
+      customerId,
       payload: {
         email,
         full_name: fullName ?? null,
@@ -228,9 +240,9 @@ export async function POST(req: NextRequest) {
         .eq('tenant_id', tenant.id);
     }
 
-    if (sessionCustomer) {
+    if (customerId) {
       await saveCheckoutProfile({
-        customerId: sessionCustomer.id,
+        customerId,
         tenantId: tenant.id,
         fullName,
         phone,

@@ -13,7 +13,7 @@ const SCOPE_PERMISSION: Record<Scope, string> = {
   orders: 'orders.view',
   products: 'catalog.view',
   events: 'events.view',
-  customers: 'orders.view',
+  customers: 'customers.view',
 };
 
 interface SearchResultItem {
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
           type CustomerRow = { id: string; full_name: string | null; email: string; phone: string | null };
           const merged = new Map<string, CustomerRow>();
           for (const row of [...(byName.data ?? []), ...(byEmail.data ?? [])] as CustomerRow[]) merged.set(row.id, row);
-          results.customers = [...merged.values()].slice(0, LIMIT).map((customer) => ({ id: customer.id, label: customer.full_name ?? customer.email, sublabel: customer.full_name ? customer.email : customer.phone, href: `mailto:${customer.email}` }));
+          results.customers = [...merged.values()].slice(0, LIMIT).map((customer) => ({ id: customer.id, label: customer.full_name ?? customer.email ?? customer.phone ?? 'Client', sublabel: customer.full_name ? customer.email : customer.phone, href: `/admin/clients/${customer.id}` }));
         })()
       : Promise.resolve(),
   ]);

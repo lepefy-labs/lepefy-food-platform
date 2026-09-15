@@ -15,13 +15,13 @@ export async function requestAccountDeletionOtp(
 
   const { data: customer, error: customerError } = await createServiceClient()
     .from('customers')
-    .select('id')
+    .select('id, auth_user_id')
     .eq('tenant_id', tenantId)
     .ilike('email', email)
     .maybeSingle();
 
   if (customerError) throw customerError;
-  if (!customer) return { sent: true };
+  if (!customer?.auth_user_id) return { sent: true };
 
   const { error } = await createClient().auth.signInWithOtp(buildAccountDeletionOtpRequest(email));
   if (error) throw error;
@@ -43,14 +43,14 @@ export async function verifyAccountDeletionOtp(
 
   const { data: customer, error: customerError } = await createServiceClient()
     .from('customers')
-    .select('id')
+    .select('id, auth_user_id')
     .eq('tenant_id', tenantId)
-    .eq('id', data.session.user.id)
+    .eq('auth_user_id', data.session.user.id)
     .ilike('email', email)
     .maybeSingle();
 
   if (customerError) throw customerError;
-  if (!deletionOtpBelongsToCustomer(data.session.user.id, customer?.id ?? null)) {
+  if (!deletionOtpBelongsToCustomer(data.session.user.id, customer?.auth_user_id ?? null)) {
     await sessionClient.auth.signOut({ scope: 'local' });
     return { session: null };
   }

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 13 settembre 2026 — **v6.50 Current-State Snapshot**
+> **Aggiornato:** 15 settembre 2026 — **v6.51 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -195,6 +195,26 @@ platform.*
 Le capability money-moving/manual-financial sono isolate e `critical`. La creazione di una prenotazione Events già incassata in negozio è mappata esplicitamente a `event_payments.confirm`, non alla generica `event_reservations.manage`.
 
 La modifica della capacità vendabile di un evento è isolata nella capability `event_capacity.manage`. Il CRUD generico `events.manage` non può più modificare `capacity_total`; l'unico percorso applicativo supportato è l'endpoint dedicato `/api/admin/evenementiel/events/[id]/capacity`, che usa l'RPC atomica `adjust_event_capacity`.
+
+---
+
+## 4.1 CRM tenant / Customer 360
+
+Il CRM tenant è disponibile su `/admin/clients`, con Customer 360 su `/admin/clients/[id]`, segmenti su `/admin/clients/segments` e campagne su `/admin/clients/campagnes`. Le surface usano ricerca e paginazione server-side, filtri URL, KPI tenant-scoped, tabella desktop e card mobile. Le capability dedicate sono `customers.view`, `customers.manage`, `segments.manage`, `campaigns.view` e `campaigns.manage`; vengono assegnate ai soli system role `platform_owner` e `tenant_admin`, non a `tenant_cashier` o ruoli custom.
+
+`customers` è una business entity indipendente da Supabase Auth. `customers.id` resta la PK storica invariata; `auth_user_id` nullable è il collegamento login con `ON DELETE SET NULL`. Il backfill della migration `109_tenant_crm_foundation.sql` copia gli ID Auth esistenti senza rigenerare UUID o modificare FK da ordini, indirizzi, loyalty/referral e analytics. Le RLS account-owned risolvono ora `auth.uid() -> customers.auth_user_id -> customers.id`.
+
+`resolveOrCreateCustomer()` è il resolver centrale tenant-scoped per signup, guest checkout, admin ed Events. L'ordine è Auth ID, e-mail normalizzata, telefono sufficientemente affidabile e creazione. Non usa fuzzy matching sul nome. Un guest viene collegato all'account dopo OTP solo se l'identità è univoca nello stesso tenant; collisioni storiche non vengono fuse. Il backfill valorizza `normalized_email` / `normalized_phone` soltanto per valori univoci e lascia le collisioni a revisione manuale; il trigger impedisce nuove collisioni.
+
+Checkout Shop Stripe/external-link/in-store continua a usare prezzi, stock, pagamento e state machine preesistenti, ma risolve anche i guest nel CRM e propaga sempre il `customer_id` quando l'identità è sicura. `event_reservations.customer_id` collega allo stesso customer le prenotazioni realmente riconducibili. `customer_events` è append-only e usa `event_key` tenant-scoped per gli eventi retryable; ordini, loyalty manuale, prenotazioni e consensi restano anche nelle rispettive fonti autorevoli e la timeline Customer 360 le unifica senza creare ordini fittizi.
+
+Il read model `customer_crm_overview` deriva in una query aggregata ordini, valore, panier moyen, spesa online/in-store, saldo loyalty, ultima attività, partecipazioni Events, prodotto/categoria preferiti e consenso marketing corrente. RFM mantiene valori raw e score tecnici separati dal segmento umano; la UI mostra le etichette francesi VIP, Fidèle, Potentiel fidèle, Nouveau, À risque, Inactif e Perdu. Le soglie V1 sono centralizzate nel read model.
+
+Segmenti custom conservano soltanto `definition_json` strutturato e vengono tradotti da un engine applicativo whitelist-based; nessun SQL utente viene persistito o eseguito. I segmenti di sistema vengono seedati per tenant e non sono eliminabili dall'UI. Note e tag CRM sono concetti tenant-scoped distinti da `orders.notes`.
+
+Le campagne V1 supportano il solo canale e-mail realmente instradabile tramite l'adapter centrale n8n `/webhook/marketing-campaign-recipient`. Al dispatch il backend ricalcola l'audience, applica il consenso marketing corrente, richiede una destinazione valida e crea uno snapshot idempotente per recipient prima di inviare payload granulari. SMS, WhatsApp e push sono predisposti nello schema ma rifiutati finché non esiste un provider configurato. I test sopprimono ogni delivery reale. Metriche delivered/opened/clicked/converted vengono mostrate solo quando esistono eventi provider; la finestra di attribution iniziale documentata è 14 giorni.
+
+L'export CSV riusa i filtri correnti, resta tenant-scoped e non include Auth ID, IP, token o metadata tecnici. L'import CSV resta predisposto ma non implementato: richiede preview, mapping, dry-run e gestione collisioni prima di poter essere abilitato in sicurezza.
 
 ---
 
@@ -555,6 +575,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 106_tester_feedback.sql
 107_tester_feedback_invites.sql
 108_tester_feedback_contact_status.sql
+109_tenant_crm_foundation.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -591,7 +612,9 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 `107` estende le campagne con l’URL del test Google Play, introduce gli inviti tester tenant/campaign-scoped e collega opzionalmente i feedback a un invito attivato. Token invito/sessione sono hashati, email normalizzate uniche per campagna, relazioni cross-tenant impedite da foreign key composite e accesso limitato al service role. Invio n8n accettato, attivazione Lepefy e partecipazione ufficiale Google Play restano stati distinti; l’applicazione Supabase resta manuale.
 
-`108` aggiunge agli inviti tester un numero di telefono/WhatsApp opzionale e uno stato installazione manuale `unknown | installed | problem`. I campi sono soltanto metadata operativi per il follow-up Platform, non vengono usati per autenticazione e non rendono Lepefy autorevole sull’installazione Google Play; l’applicazione Supabase resta manuale.
+`108` aggiunge agli inviti tester un numero di telefono/WhatsApp opzionale e uno stato installazione manuale `unknown | installed | problem`. I campi sono soltanto metadata operativi per il follow-up Platform, non vengono usati per autenticazione e non rendono Lepefy autorevole sull'installazione Google Play; l'applicazione Supabase resta manuale.
+
+`109` introduce il CRM tenant e il disaccoppiamento identity sopra descritto. È una migration additiva e ID-preserving, ma operativamente significativa: deve essere applicata manualmente prima del codice applicativo perché il build Vercel non esegue migration Supabase. Crea read model CRM, RFM, eventi, note, tag, segmenti e campagne service-role-only con RLS forzata e vincoli compositi anti cross-tenant.
 
 `104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
@@ -675,8 +698,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.49
+# Fine snapshot v6.51
 
-**Base audit:** `main + Tester Contact & Installation Status`
-**Data:** 13 settembre 2026
+**Base audit:** `main + Tenant CRM / Customer 360`
+**Data:** 15 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

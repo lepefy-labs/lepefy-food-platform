@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
+import { recordCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 
 interface ManualPurchaseRpcRow {
   points_awarded: number;
@@ -67,6 +68,14 @@ export async function POST(req: NextRequest) {
   }
 
   const row = data[0] as ManualPurchaseRpcRow;
+  const { data: purchase } = await supabase.from('loyalty_manual_purchases').select('id,created_at')
+    .eq('tenant_id', tenant.id).eq('customer_id', customer.id).eq('staff_admin_id', adminId)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (purchase) await recordCustomerEvents([{
+    tenantId: tenant.id, customerId: customer.id, eventType: 'in_store_purchase', source: 'loyalty_scan',
+    entityType: 'loyalty_manual_purchase', entityId: purchase.id, eventKey: `in_store_purchase:${purchase.id}`,
+    occurredAt: purchase.created_at, metadata: { amount: Math.round(amount * 100) / 100, points_awarded: row.points_awarded },
+  }]);
 
   return NextResponse.json({
     customerName: customer.full_name,

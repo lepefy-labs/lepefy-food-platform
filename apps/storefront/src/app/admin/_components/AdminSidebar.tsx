@@ -56,7 +56,7 @@ export default function AdminSidebar({
 
   const groupLabel = 'mb-2 mt-5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]/60 dark:text-violet-300/60';
   const linkClass = (active: boolean) => `mx-1 flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all ${navClass(active)}`;
-  const shopVisible = ['orders.view','catalog.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage','ai_usage.view'].some(has);
+  const shopVisible = ['orders.view','catalog.view','customers.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage','ai_usage.view'].some(has);
   const eventsVisible = ['events.view','event_reservations.view','event_payments.view','event_content.manage','scan.access'].some(has);
   const commonVisible = ['tenant_settings.view','billing.view','ai_usage.view'].some(has);
 
@@ -68,7 +68,7 @@ export default function AdminSidebar({
           {has('orders.view') && <Link href="/admin" className={linkClass(pathname === '/admin')}><IconShoppingBag size={20} /><span className="flex-1">Commandes</span>{pendingPaymentsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{pendingPaymentsCount}</span>}</Link>}
           {has('orders.view') && <Link href="/admin/checkout-funnel" className={linkClass(pathname === '/admin/checkout-funnel')}><IconChartBar size={20} />Funnel checkout</Link>}
           {has('catalog.view') && <Link href="/admin/catalogue" className={linkClass(pathname.startsWith('/admin/catalogue'))}><IconPackage size={20} />Catalogue</Link>}
-          {has('orders.view') && <div className="mx-1 flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-300 dark:text-gray-600"><IconUsers size={20} /><span className="flex-1">Clients</span><span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">Bientôt</span></div>}
+          {has('customers.view') && <Link href="/admin/clients" className={linkClass(pathname.startsWith('/admin/clients'))}><IconUsers size={20} />Clients</Link>}
           {has('growth.manage') && <div className="mx-1 flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-300 dark:text-gray-600"><IconTag size={20} /><span className="flex-1">Promotions</span><span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">Bientôt</span></div>}
           {has('catalog.manage') && <Link href="/admin/accueil-slides" className={linkClass(pathname === '/admin/accueil-slides')}><IconPhoto size={20} />Slides d&apos;accueil</Link>}
 

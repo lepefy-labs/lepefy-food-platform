@@ -4,10 +4,15 @@ import type { AmbassadorPaymentMethod } from './ambassador';
 export interface Customer {
   id: string;
   tenant_id: string;
-  email: string;
+  auth_user_id: string | null;
+  email: string | null;
+  normalized_email: string | null;
   full_name: string | null;
   phone: string | null;
+  normalized_phone: string | null;
+  source: 'signup' | 'guest_checkout' | 'admin' | 'in_store' | 'event' | 'import' | 'other';
   created_at: string;
+  updated_at: string;
   // Carta fedeltà virtuale (047)
   loyalty_card_number: string | null;
   // Loyalty & referral

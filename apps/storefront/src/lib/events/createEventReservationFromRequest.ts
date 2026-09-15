@@ -6,6 +6,8 @@ import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventReservationPaymentMethod, EventReservationSource } from '@lepefy/types';
+import { resolveOrCreateCustomer } from '@/lib/customers/resolveOrCreateCustomer';
+import { recordCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 
 export interface CreateEventReservationInput {
   eventId: string;
@@ -69,6 +71,18 @@ export async function createEventReservationFromRequest(
 
   const reservationId = crypto.randomUUID();
   const qrToken = generateEventQrToken(reservationId, eventId);
+  let customerId: string | null = null;
+  try {
+    customerId = (await resolveOrCreateCustomer({
+      tenantId,
+      email: customerEmail,
+      phone: customerPhone,
+      fullName: customerName,
+      source: 'event',
+    })).id;
+  } catch (error) {
+    console.warn('[createEventReservationFromRequest] CRM resolution skipped:', error);
+  }
 
   const { data: capacityResult, error: capacityError } = await supabase
     .rpc('reserve_event_capacity', { p_event_id: eventId, p_quantity: totalQuantity })
@@ -116,6 +130,7 @@ export async function createEventReservationFromRequest(
       id: reservationId,
       tenant_id: tenantId,
       event_id: eventId,
+      customer_id: customerId,
       customer_name: customerName,
       customer_email: customerEmail,
       customer_phone: customerPhone || null,
@@ -151,6 +166,15 @@ export async function createEventReservationFromRequest(
   const { error: itemsError } = await supabase.from('event_reservation_items').insert(itemsPayload);
   if (itemsError) {
     console.error('[createEventReservationFromRequest] Failed to insert reservation items:', itemsError, '— reservation:', reservationId);
+  }
+
+  if (customerId) {
+    await recordCustomerEvents([{
+      tenantId, customerId, eventType: 'event_reserved', source,
+      entityType: 'event_reservation', entityId: reservationId,
+      eventKey: `event_reserved:${reservationId}`,
+      metadata: { event_id: eventId, quantity: totalQuantity, amount_paid: amountPaid },
+    }]);
   }
 
   console.info('[createEventReservationFromRequest] Reservation created — id:', reservationId, '— event:', eventId, '— qty:', totalQuantity, '— source:', source);

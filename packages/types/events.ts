@@ -61,6 +61,7 @@ export interface EventReservation {
   id: string;
   tenant_id: string;
   event_id: string;
+  customer_id: string | null;
   customer_name: string;
   customer_email: string;
   customer_phone: string | null;

@@ -18,6 +18,7 @@ function assertNoError(error: { message: string } | null, operation: string) {
 function createOperations(
   tenantId: string,
   userId: string,
+  customerId: string | null,
   sessionClient: SupabaseClient,
   service: ServiceClient,
 ): AccountDeletionOperations {
@@ -34,14 +35,7 @@ function createOperations(
 
   return {
     async customerExists() {
-      const { data, error } = await service
-        .from('customers')
-        .select('id')
-        .eq('id', userId)
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-      assertNoError(error, 'resolve customer');
-      return !!data;
+      return !!customerId;
     },
 
     findRequest,
@@ -52,7 +46,7 @@ function createOperations(
 
       const { data, error } = await service
         .from('account_deletion_requests')
-        .insert({ tenant_id: tenantId, customer_id: userId, auth_user_id: userId, status: 'processing' })
+        .insert({ tenant_id: tenantId, customer_id: customerId, auth_user_id: userId, status: 'processing' })
         .select('id, status, reason_code')
         .single();
 
@@ -79,7 +73,7 @@ function createOperations(
         .from('ambassador_commissions')
         .select('id')
         .eq('tenant_id', tenantId)
-        .eq('ambassador_customer_id', userId)
+        .eq('ambassador_customer_id', customerId ?? '')
         .eq('status', 'CONFIRMED')
         .limit(1)
         .maybeSingle();
@@ -105,7 +99,7 @@ function createOperations(
     async deleteCustomerData() {
       const { data, error } = await service.rpc('delete_customer_account_data', {
         p_tenant_id: tenantId,
-        p_customer_id: userId,
+        p_customer_id: customerId,
       });
       assertNoError(error, 'delete customer data');
       if (data !== true) throw new Error('delete customer data: customer not found');
@@ -128,5 +122,8 @@ export async function deleteCustomerAccount(sessionClient: SupabaseClient): Prom
 
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const service = createServiceClient();
-  return executeAccountDeletion(user.id, createOperations(tenant.id, user.id, sessionClient, service));
+  const { data: customer, error } = await service.from('customers').select('id')
+    .eq('tenant_id', tenant.id).eq('auth_user_id', user.id).maybeSingle();
+  assertNoError(error, 'resolve customer');
+  return executeAccountDeletion(user.id, createOperations(tenant.id, user.id, customer?.id ?? null, sessionClient, service));
 }
