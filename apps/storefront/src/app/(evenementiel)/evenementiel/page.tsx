@@ -94,7 +94,6 @@ export default async function EvenementielHubPage() {
   const featuredHref = featuredEvent ? `/evenements/${featuredEvent.slug}` : '#evenements';
 
   const solutions = [
-    tenant.events_enabled ? { href: '#evenements', title: 'Événements', description: 'Soirées, rencontres et expériences à réserver.', image: featuredEvent?.banner_image_url ?? heroImages[0], icon: <IconCalendarEvent size={24} /> } : null,
     traiteur ? { href: `/services/${traiteur.slug}`, title: 'Traiteur', description: traiteur.description ?? 'Une cuisine généreuse pour tous vos événements.', image: traiteur.cover_image_url, icon: <IconChefHat size={24} /> } : null,
     location ? { href: `/services/${location.slug}`, title: 'Location de matériel', description: location.description ?? 'Mobilier et matériel pour recevoir simplement.', image: location.cover_image_url, icon: <IconTools size={24} /> } : null,
   ].filter(Boolean) as Array<{ href: string; title: string; description: string; image: string | null | undefined; icon: React.ReactNode }>;
@@ -151,7 +150,7 @@ export default async function EvenementielHubPage() {
               <p className="text-xs font-extrabold uppercase tracking-[.18em] text-[var(--color-primary)]">Nos solutions</p>
               <h2 className="mt-2 font-display text-3xl font-bold leading-tight text-[var(--color-primary-dark)] sm:text-4xl">Pour vos événements, nous avons <span className="text-[var(--color-secondary)]">des solutions.</span></h2>
             </div>
-            <div className={`grid gap-4 ${solutions.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+            <div className="grid gap-4 md:grid-cols-2">
               {solutions.map((solution) => (
                 <Link id={solution.title === 'Traiteur' ? 'traiteur' : solution.title.startsWith('Location') ? 'location' : undefined} key={solution.title} href={solution.href} className="group relative min-h-[235px] overflow-hidden rounded-[26px] bg-[var(--color-primary-dark)] text-white shadow-[0_16px_42px_rgba(27,21,81,.16)]">
                   {solution.image && <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.04]" style={{ backgroundImage: `url(${solution.image})` }} />}
