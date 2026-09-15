@@ -153,7 +153,11 @@ export async function getCustomers(tenantId: string, filters: CustomerListFilter
   return { customers: (data ?? []) as CrmCustomerListItem[], count: count ?? 0, page, pageSize };
 }
 
-export async function applyCustomSegment(tenantId: string, definition: SegmentDefinition, limit = CRM_PAGE_SIZE) {
+export async function applyCustomSegment(
+  tenantId: string,
+  definition: SegmentDefinition,
+  limit = CRM_PAGE_SIZE,
+): Promise<{ customers: CrmCustomerListItem[]; count: number }> {
   const supabase = createServiceClient();
   const valid = validateSegmentDefinition(definition);
   if (valid.operator === 'or' && valid.conditions.length > 1) {
