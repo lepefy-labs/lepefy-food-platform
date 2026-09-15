@@ -79,7 +79,7 @@ export function EventsHeader({ tenant, socialLinks, featuredEventSlug, hasTraite
             {featuredEventSlug ? 'Découvrir' : 'Organiser un événement'} <IconArrowRight size={17} />
           </Link>
 
-          <button type="button" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} aria-controls="events-navigation-drawer" aria-label="Ouvrir le menu" className="ml-auto flex size-11 items-center justify-center rounded-full border border-black/10 bg-white text-[var(--color-primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:ml-0 lg:hidden">
+          <button type="button" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} aria-controls="events-navigation-drawer" aria-label="Ouvrir le menu" className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[var(--color-primary-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:ml-0">
             <IconMenu2 size={23} />
           </button>
         </div>
