@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const phrases = ['POUR VOUS', 'AVEC VOUS', 'QUI RASSEMBLENT', 'À VOTRE IMAGE'];
+const qualifiers = ['AVEC', 'POUR'];
 
 export function EventHeroAccent() {
   const [index, setIndex] = useState(0);
@@ -12,17 +12,20 @@ export function EventHeroAccent() {
     if (media.matches) return;
 
     const timer = window.setInterval(() => {
-      setIndex((current) => (current + 1) % phrases.length);
+      setIndex((current) => (current + 1) % qualifiers.length);
     }, 3200);
 
     return () => window.clearInterval(timer);
   }, []);
 
   return (
-    <span className="relative block min-h-[1.05em] overflow-hidden text-[var(--color-secondary)]" aria-live="polite">
-      <span key={phrases[index]} className="block animate-[eventHeroWord_.45s_ease-out]">
-        {phrases[index]}
+    <span className="block text-[var(--color-secondary)]" aria-live="polite">
+      <span className="relative block min-h-[1.05em] overflow-hidden">
+        <span key={qualifiers[index]} className="block animate-[eventHeroWord_.45s_ease-out]">
+          {qualifiers[index]}
+        </span>
       </span>
+      <span className="block">VOUS</span>
       <style jsx>{`
         @keyframes eventHeroWord {
           from { opacity: 0; transform: translateY(18px); }
