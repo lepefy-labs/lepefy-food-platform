@@ -1,0 +1,29 @@
+name: Shipping sync
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: shipping-sync
+  cancel-in-progress: false
+jobs:
+  sync-active-shipments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Synchronize active provider shipments
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SHIPPING_SYNC_APP_URL: ${{ vars.SHIPPING_SYNC_APP_URL }}
+          AI_CORE_APP_URL: ${{ vars.AI_CORE_APP_URL }}
+          NALA_ENRICHMENT_APP_URL: ${{ vars.NALA_ENRICHMENT_APP_URL }}
+          EVENT_REPORTS_APP_URL: ${{ vars.EVENT_REPORTS_APP_URL }}
+        run: node scripts/process-shipping-sync.mjs

@@ -41,6 +41,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
 
   if (/^\/api\/admin\/checkout-sessions\/[^/]+\/confirm-payment$/.test(path)) return 'shop_payments.confirm';
   if (path.startsWith('/api/admin/checkout-sessions')) return read ? 'orders.view' : 'orders.manage';
+  if (/^\/api\/admin\/orders\/[^/]+\/shipment\/(attach|sync|manual)$/.test(path)) return method.toUpperCase() === 'POST' ? 'orders.manage' : null;
   if (path.startsWith('/api/admin/orders')) return read ? 'orders.view' : 'orders.manage';
   if (path.startsWith('/api/admin/catalogue')) return read ? 'catalog.view' : 'catalog.manage';
   if (path.startsWith('/api/admin/clients/segments')) return 'segments.manage';

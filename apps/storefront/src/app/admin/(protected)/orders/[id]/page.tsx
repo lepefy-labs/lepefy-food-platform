@@ -21,6 +21,7 @@ import PickingList from '../../../orders/[id]/PickingList'
 import StatusBadge from '../../../_components/ui/StatusBadge'
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent'
 import type { Order, OrderItem } from '@lepefy/types'
+import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -159,7 +160,9 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const ageMs = Date.now() - new Date(order.created_at).getTime()
   const needsAttention = activeOrder && ageMs >= 24 * 60 * 60 * 1000
   const pickingNeedsAttention = order.status === 'preparing' && !pickingComplete
-  const nextAction = nextActionLabel(order.status, isPickup)
+  const managedProvider = managedShippingProviderInfo(order.shipping_provider_key ?? tenant.shipping_provider)
+  const nextAction = !isPickup && managedProvider && order.shipping_tracking_mode !== 'manual' && ['preparing', 'shipped'].includes(order.status)
+    ? 'Gérer l’expédition' : nextActionLabel(order.status, isPickup)
   const mapQuery = address
     ? [address.line1, address.postal_code, address.city, address.country].filter(Boolean).join(', ')
     : ''
@@ -355,6 +358,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
               carriers={carriers}
               shippingDetails={shippingDetails}
               shippingProvider={tenant.shipping_provider ?? 'flat_rate'}
+              managedProvider={managedProvider}
               coldChain={{ fresh: freshQty, frozen: frozenQty }}
               pickingProgress={pickingProgress}
             />

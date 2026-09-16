@@ -23,6 +23,8 @@ import {
   type FulfillmentKind,
 } from '@/lib/orders/orderStatus';
 import CopyButton from './CopyButton';
+import type { NormalizedShipmentStatus, ShipmentTrackingEvent } from '@lepefy/types';
+import { safeShipmentTrackingUrl, shipmentDate, shipmentEventLabel, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -66,6 +68,12 @@ interface OrderRow {
   picking_started_at: string | null;
   shipping_address: ShippingAddress | null;
   shipping_details: ShippingDetails | null;
+  shipping_tracking_mode?: 'managed' | 'manual' | null;
+  shipping_provider_reference?: string | null;
+  shipping_normalized_status?: NormalizedShipmentStatus | null;
+  shipping_tracking_url?: string | null;
+  shipping_estimated_delivery_at?: string | null;
+  shipping_tracking_events?: ShipmentTrackingEvent[] | null;
 }
 
 const CARRIER_URLS: Record<string, string> = {
@@ -112,7 +120,9 @@ function stepTimestamp(stage: CustomerOrderStage, order: OrderRow) {
   if (stage === 'confirmed') return order.created_at;
   if (stage === 'preparing') return order.picking_started_at;
   if (stage === 'shipped') return order.shipped_at;
-  if (stage === 'delivered' && order.status === 'delivered') return order.updated_at;
+  if (stage === 'delivered' && order.status === 'delivered') {
+    return shipmentEventsNewestFirst(order.shipping_tracking_events).find(event => event.status === 'delivered')?.occurredAt ?? order.updated_at;
+  }
   if (stage === 'ready_for_pickup' && order.status === 'ready_for_pickup') return order.updated_at;
   return null;
 }
@@ -130,10 +140,8 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
 
   const { data: order } = await supabase
     .from('orders')
-    .select(
-      'id, tenant_id, status, created_at, updated_at, email, full_name, total, shipping_cost, fulfillment_type, ' +
-      'tracking_code, tracking_carrier, shipped_at, picking_started_at, shipping_address, shipping_details',
-    )
+    // Additive fields remain optional until migration 111; legacy/manual tracking still loads.
+    .select('*')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .maybeSingle() as { data: OrderRow | null };
@@ -174,7 +182,10 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
   const trackingCode = order.tracking_code ?? sd.trackingCode ?? null;
   const trackingCarrier = order.tracking_carrier ?? sd.trackingCarrier ?? sd.carrierName ?? null;
   const carrierUrl = trackingBaseUrl(trackingCarrier);
-  const showTracking = !isPickup && (presentation.stage === 'shipped' || presentation.stage === 'delivered') && Boolean(trackingCode);
+  const managedTracking = order.shipping_tracking_mode === 'managed' && Boolean(order.shipping_provider_reference);
+  const events = shipmentEventsNewestFirst(order.shipping_tracking_events);
+  const externalUrl = safeShipmentTrackingUrl(order.shipping_tracking_url);
+  const showTracking = !isPickup && !isCancelled && (managedTracking || ((presentation.stage === 'shipped' || presentation.stage === 'delivered') && Boolean(trackingCode)));
   const address = order.shipping_address;
 
   return (
@@ -251,7 +262,7 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
         </section>
       )}
 
-      {showTracking && trackingCode && (
+      {showTracking && (
         <section className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-emerald-700"><IconTruck size={18} /></span>
@@ -260,11 +271,28 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
               <p className="text-xs text-gray-500">{trackingCarrier ?? 'Transporteur'}</p>
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3">
+          {trackingCode && <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3">
             <p className="min-w-0 break-all font-mono text-sm font-semibold text-gray-900">{trackingCode}</p>
             <CopyButton text={trackingCode} />
-          </div>
-          {carrierUrl && (
+          </div>}
+          {managedTracking && (
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl bg-white p-3">
+                <p className="text-sm font-semibold text-emerald-800">{shipmentStatusLabel(order.shipping_normalized_status)}</p>
+                {events[0] && <p className="mt-1 text-xs text-gray-500">{shipmentDate(events[0].occurredAt)}</p>}
+                {order.shipping_estimated_delivery_at && order.shipping_normalized_status !== 'delivered' && <p className="mt-2 text-xs text-gray-500">Livraison estimée : {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Rome' }).format(new Date(order.shipping_estimated_delivery_at))}</p>}
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900">Historique</h3>
+              {events.length ? <ol className="space-y-3 border-l-2 border-emerald-200 pl-4">
+                {events.map((event, index) => <li key={`${event.occurredAt}-${index}`}>
+                  <p className="text-sm font-medium text-gray-800">{shipmentEventLabel(event)}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{shipmentDate(event.occurredAt)}</p>
+                </li>)}
+              </ol> : <p className="text-xs text-gray-500">Le transporteur n’a pas encore publié d’événement de suivi.</p>}
+              {externalUrl && <a href={externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs font-medium text-gray-600 underline">Voir sur le site du transporteur</a>}
+            </div>
+          )}
+          {!managedTracking && carrierUrl && trackingCode && (
             <a
               href={`${carrierUrl}${encodeURIComponent(trackingCode)}`}
               target="_blank"
@@ -275,7 +303,7 @@ export default async function OrderTrackingPage({ params, searchParams }: PagePr
               Ouvrir le suivi {trackingCarrier ? `· ${trackingCarrier}` : ''}
             </a>
           )}
-          {!carrierUrl && <p className="mt-3 text-xs text-gray-500">Copiez le numéro ci-dessus pour le consulter sur le site du transporteur.</p>}
+          {!managedTracking && !carrierUrl && <p className="mt-3 text-xs text-gray-500">Copiez le numéro ci-dessus pour le consulter sur le site du transporteur.</p>}
         </section>
       )}
 

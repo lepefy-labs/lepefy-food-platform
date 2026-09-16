@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 import PackingPanel from './PackingPanel';
+import ManagedShipmentPanel from './ManagedShipmentPanel';
 import type { Order, OrderStatus } from '@lepefy/types';
 
 interface ShippingDetails {
@@ -37,6 +38,7 @@ interface Props {
   carriers: { name: string }[];
   shippingDetails: ShippingDetails | null;
   shippingProvider: string;
+  managedProvider?: { key: string; displayName: string } | null;
   coldChain?: { fresh: number; frozen: number };
   pickingProgress: PickingProgress;
 }
@@ -83,6 +85,7 @@ export default function OrderDetail({
   carriers,
   shippingDetails,
   shippingProvider,
+  managedProvider,
   coldChain = { fresh: 0, frozen: 0 },
   pickingProgress,
 }: Props) {
@@ -100,8 +103,15 @@ export default function OrderDetail({
   const [saveError, setSaveError] = useState(false);
   const [isPaid, setIsPaid] = useState(!isInStorePending);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // Provider refreshes may update snapshots while the form component remains mounted.
+  useEffect(() => {
+    setCarrier(originalCarrier);
+    setTrackingCode(order.tracking_code ?? '');
+  }, [originalCarrier, order.tracking_code]);
 
-  const action = nextAction(order.status, isPickup);
+  const managed = !isPickup && order.shipping_tracking_mode !== 'manual' && Boolean(managedProvider);
+  const candidateAction = nextAction(order.status, isPickup);
+  const action = managed && (candidateAction?.status === 'shipped' || candidateAction?.status === 'delivered') ? null : candidateAction;
   const needsTracking = action?.status === 'shipped';
   const finishingPreparation = order.status === 'preparing'
     && (action?.status === 'shipped' || action?.status === 'ready_for_pickup');
@@ -140,7 +150,7 @@ export default function OrderDetail({
   async function saveNotesAndLogistics() {
     await patchOrder({
       notes: notes.trim() || null,
-      ...(!isPickup ? {
+      ...(!isPickup && !managed ? {
         tracking_carrier: carrier.trim() || null,
         tracking_code: trackingCode.trim() || null,
       } : {}),
@@ -152,7 +162,7 @@ export default function OrderDetail({
     await patchOrder({
       status: action.status,
       notes: notes.trim() || null,
-      ...(!isPickup ? {
+      ...(!isPickup && !managed ? {
         tracking_carrier: carrier.trim() || null,
         tracking_code: trackingCode.trim() || null,
       } : {}),
@@ -182,6 +192,10 @@ export default function OrderDetail({
           initialColdChecked={Boolean(order.cold_chain_packing_checked_at)}
           initialComplete={packingProgress.complete}
         />
+      )}
+
+      {managed && managedProvider && order.status !== 'new' && order.status !== 'cancelled' && (
+        <ManagedShipmentPanel order={order} provider={managedProvider} ready={pickingProgress.complete && packingProgress.complete} />
       )}
 
       {action && (
@@ -259,7 +273,7 @@ export default function OrderDetail({
               </div>
             )}
 
-            {!isPickup && (
+            {!isPickup && !managed && (
               <>
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-gray-500">Transporteur effectif</label>

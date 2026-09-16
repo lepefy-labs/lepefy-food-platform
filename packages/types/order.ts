@@ -11,6 +11,14 @@ export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'stripe' | 'satispay' | 'cash' | 'in_store' | 'external_link';
 export type FulfillmentType = 'delivery' | 'pickup';
 
+export type NormalizedShipmentStatus = 'pending' | 'ready_for_collection' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned' | 'cancelled' | 'unknown';
+export interface ShipmentTrackingEvent {
+  occurredAt: string;
+  description: string;
+  providerStatus: string | null;
+  status: NormalizedShipmentStatus;
+}
+
 export interface Order {
   id: string;
   tenant_id: string;
@@ -35,6 +43,16 @@ export interface Order {
   tracking_code: string | null;
   tracking_carrier: string | null;
   shipped_at: string | null;
+  shipping_tracking_mode?: 'managed' | 'manual' | null;
+  shipping_provider_key?: string | null;
+  shipping_provider_reference?: string | null;
+  shipping_provider_status?: string | null;
+  shipping_normalized_status?: NormalizedShipmentStatus | null;
+  shipping_provider_synced_at?: string | null;
+  shipping_sync_error?: string | null;
+  shipping_tracking_url?: string | null;
+  shipping_estimated_delivery_at?: string | null;
+  shipping_tracking_events?: ShipmentTrackingEvent[] | null;
   /** Timestamp set when operational picking starts. */
   picking_started_at: string | null;
   /** Timestamp set only while every item is picked and all cold-chain checks are validated. */

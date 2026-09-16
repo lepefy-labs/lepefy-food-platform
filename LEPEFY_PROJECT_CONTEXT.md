@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 16 settembre 2026 — **v6.54 Current-State Snapshot**
+> **Aggiornato:** 17 settembre 2026 — **v6.55 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -536,7 +536,17 @@ Le tabelle feedback/inviti non hanno accesso browser diretto e forzano RLS. Le m
 
 `/card` è hub tenant; location usa `tenant.google_maps_url`, senza Google Maps API/iframe.
 
-Packlink resta provider shipping principale. `shipping.view` separa consultazione/operazioni da `shipping.manage` per le regole di configurazione.
+Il tracking operativo post-ordine è provider-neutral: `src/lib/shipping/providers/types.ts` definisce `ShippingProviderAdapter` e il modello canonico snapshot/eventi; il registry server-side espone capability e metadata UI serializzabili. Packlink è il primo adapter, con credenziale tenant `packlink_api_key` e fallback server `PACKLINK_API_KEY`, API shipment + track bounded, tracking primario `carrier_shipment_tracking_number` e fallback `trackings[]`. Il diagnostic read-only Admin → Livraison resta indipendente e invariato. Nessuna conversione MyBRT, scraping o callback provider non verificata viene introdotta.
+
+Per provider con capability provider-reference, l’admin termina picking, controlli freddo e packing, quindi verifica e associa la reference tramite POST `/api/admin/orders/[id]/shipment/attach`. `/shipment/sync` consente aggiornamento manuale; `/shipment/manual` è il fallback esplicito per ordine. Tutte le route sono tenant-scoped, protette da `orders.manage` e fail-closed. La modalità manuale disassocia la reference, mantiene gli snapshot compatibili `tracking_code/carrier` e impedisce aggiornamenti automatici; provider senza adapter conservano il flusso manuale. `shipping.view` separa consultazione da `shipping.manage` per le regole di configurazione.
+
+Migration `111_managed_shipping_tracking.sql` aggiunge alle sole `orders` metadata provider/reference/status/sync, normalized status, tracking URL/eventi, stima consegna, errore sanitizzato e modalità nullable managed/manual. `shipping_details` resta snapshot/preventivo checkout. Gli ordini storici non ricevono backfill; RLS e grant esistenti non cambiano. Indice parziale sulle spedizioni attive e unicità reference per tenant/provider rendono il contratto queryable. Il codice non è production-ready per managed tracking finché lo schema 111 non è applicato e verificato nel Supabase remoto: attach e worker falliscono chiusi se lo schema manca, mentre letture/manual/pickup legacy rimangono compatibili. Vercel non applica migration automaticamente.
+
+`syncOrderShipment` carica ordine e il suo tenant, usa l’adapter associato, persiste lo snapshot e normalizza verso la state machine Lepefy: ready-for-collection mantiene preparing; in-transit/out-for-delivery porta preparing a shipped; delivered porta shipped a delivered. Stati exception/returned/cancelled/unknown non inventano cancellazioni ordine o azioni finanziarie. Picking e packing restano precondizioni canoniche. Manual admin e provider convergono in `orderTransitionService` per validazione, timestamps, compare-and-set tenant/status/updated_at e side effects del workflow esistente. Solo l’update vincente può emettere notifiche/loyalty; stati ripetuti non duplicano side effects. Catch-up delivered da preparing valida entrambe le tappe ma persiste direttamente delivered ed emette soltanto completion, mai due e-mail spedito+consegnato retroattive. Notifiche restano best-effort come nel workflow precedente, senza nuovo outbox/retry delivery: un errore dopo la transizione non provoca reinvio automatico.
+
+La pagina cliente `/orders/[id]` mostra timeline Lepefy sincronizzata più recente prima, descrizioni francesi note/raw fallback, carrier e tracking copiabile. Il link HTTPS risolto dal provider è secondario; managed tracking non usa il VAS BRT legacy. Il tracking manuale e il token/customer access esistenti non cambiano. Le notifiche `/webhook/order-shipped` e `/webhook/order-completed` (`completionType=delivered`) e le regole loyalty restano originate esclusivamente da Lepefy tramite `adminOrderWorkflow`, mai dall’adapter.
+
+`.github/workflows/shipping-sync.yml` richiama ogni 15 minuti (anche workflow_dispatch) `scripts/process-shipping-sync.mjs` → POST `/api/internal/shipping-sync`, autenticato bearer service-role con confronto timing-safe. `SHIPPING_SYNC_APP_URL` è la URL preferita; fallback AI_CORE_APP_URL → NALA_ENRICHMENT_APP_URL → EVENT_REPORTS_APP_URL solo sullo stesso deployment storefront. Il worker DB multi-tenant seleziona al massimo 6 spedizioni managed con reference, adapter supportato, ordini preparing/shipped e shipment non terminale, in ordine di ultimo sync. Due worker limitati isolano i failure per ordine; nessuna scansione dello storico, payload provider raw o secret viene persistito/esposto. Le credenziali di ciascun ordine provengono dal suo tenant.
 
 `docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth destinatari interni. Gli alert pagamento esterno Shop/Events condividono `notify_external_payment_pending` ma webhook/payload distinti. Gli eventi aggiungono `notify_event_booking_closed_reports` per i tre report automatici di chiusura.
 
@@ -581,6 +591,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 108_tester_feedback_contact_status.sql
 109_tenant_crm_foundation.sql
 110_event_gallery_editorial.sql
+111_managed_shipping_tracking.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -705,8 +716,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.54
+# Fine snapshot v6.55
 
-**Base audit:** `main + Événementiel editorial media library and catering conversion landing`
-**Data:** 16 settembre 2026
+**Base audit:** `main + provider-neutral managed shipping tracking V1`
+**Data:** 17 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

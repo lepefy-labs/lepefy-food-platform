@@ -119,12 +119,12 @@ export async function runOrderTransitionSideEffects({
   fulfillmentType: FulfillmentType;
   trackingCode?: string | null;
   trackingCarrier?: string | null;
-}) {
+}, dependencies = { processOrderPointsOnDelivery, notifyN8n, getTenantNotificationContext }) {
   if (nextStatus === previousStatus) return;
 
   if (nextStatus === 'delivered') {
     try {
-      await processOrderPointsOnDelivery(orderId);
+      await dependencies.processOrderPointsOnDelivery(orderId);
     } catch (error) {
       console.error('[admin order workflow] loyalty processing failed:', error, '— order_id:', orderId);
     }
@@ -132,7 +132,7 @@ export async function runOrderTransitionSideEffects({
 
   if (!process.env.N8N_WEBHOOK_URL) return;
 
-  const tenant = await getTenantNotificationContext(tenantId);
+  const tenant = await dependencies.getTenantNotificationContext(tenantId);
   if (!tenant) {
     console.warn('[admin order workflow] tenant notification context unavailable — skipping webhook — tenant_id:', tenantId);
     return;
@@ -150,7 +150,7 @@ export async function runOrderTransitionSideEffects({
   };
 
   if (nextStatus === 'shipped') {
-    await notifyN8n('/webhook/order-shipped', {
+    await dependencies.notifyN8n('/webhook/order-shipped', {
       ...commonPayload,
       trackingCode: trackingCode ?? null,
       trackingCarrier: trackingCarrier ?? null,
@@ -159,12 +159,12 @@ export async function runOrderTransitionSideEffects({
   }
 
   if (nextStatus === 'ready_for_pickup') {
-    await notifyN8n('/webhook/order-ready-for-pickup', commonPayload);
+    await dependencies.notifyN8n('/webhook/order-ready-for-pickup', commonPayload);
     return;
   }
 
   if (nextStatus === 'delivered') {
-    await notifyN8n('/webhook/order-completed', {
+    await dependencies.notifyN8n('/webhook/order-completed', {
       ...commonPayload,
       completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered',
     });
@@ -172,6 +172,6 @@ export async function runOrderTransitionSideEffects({
   }
 
   if (nextStatus === 'cancelled') {
-    await notifyN8n('/webhook/order-cancelled', commonPayload);
+    await dependencies.notifyN8n('/webhook/order-cancelled', commonPayload);
   }
 }
