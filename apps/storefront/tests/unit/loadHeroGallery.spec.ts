@@ -35,16 +35,16 @@ test('editorial queries are tenant-scoped, independently bounded and determinist
     expect(query.limit).toBe(6);
     expect(query.orders).toEqual(['hero_eligible', 'hero_priority', 'sort_order', 'created_at', 'id']);
   }
-  expect(queries[1].filters).toContainEqual(['event_id', null]);
-  expect(queries[2].filters).toContainEqual(['event_id', null]);
+  expect(queries[1]?.filters).toContainEqual(['event_id', null]);
+  expect(queries[2]?.filters).toContainEqual(['event_id', null]);
 });
 
 test('a schema unavailable during rollout retries a bounded legacy gallery query', async () => {
   const { client, queries } = fakeClient(true);
   expect(await loadHeroGallery(client, 'tenant-b', ['traiteur', 'general'])).toEqual([{ id: 'legacy', event_id: null, image_url: 'https://images.example/legacy' }]);
   expect(queries).toHaveLength(3);
-  expect(queries[2].filters).toEqual([['tenant_id', 'tenant-b'], ['event_id', null]]);
-  expect(queries[2].limit).toBe(6);
+  expect(queries[2]?.filters).toEqual([['tenant_id', 'tenant-b'], ['event_id', null]]);
+  expect(queries[2]?.limit).toBe(6);
 });
 
 test('no requested candidates do not trigger a gallery fetch', async () => {
