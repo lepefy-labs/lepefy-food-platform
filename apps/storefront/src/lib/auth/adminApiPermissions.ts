@@ -56,6 +56,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/ambassador')) return 'growth.manage';
   if (path.startsWith('/api/admin/shipping-rules')) return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-simulator') return 'shipping.view';
+  if (path === '/api/admin/packlink-inspector') return 'shipping.view';
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/payment-methods')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
