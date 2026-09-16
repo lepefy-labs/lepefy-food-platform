@@ -154,3 +154,13 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/111_managed_shipping_tracking.fixture.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/111_managed_shipping_tracking.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/111_managed_shipping_tracking.test.sql
+
+      - name: Category server write grants and customer read-only access
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/112_category_service_writes.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/112_category_service_writes.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/112_category_service_writes.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/112_category_service_writes.test.sql
