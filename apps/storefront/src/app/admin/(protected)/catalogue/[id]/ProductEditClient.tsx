@@ -292,7 +292,12 @@ export default function ProductEditClient({
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error('Erreur lors de l\'enregistrement');
+      if (!res.ok) {
+        const failure = await res.json().catch(() => null) as { error?: unknown } | null;
+        throw new Error(typeof failure?.error === 'string' && failure.error.trim()
+          ? failure.error
+          : 'Erreur lors de l\'enregistrement');
+      }
 
       if (isNew) {
         const { id } = await res.json() as { id: string };
@@ -300,8 +305,8 @@ export default function ProductEditClient({
       } else {
         showToast('Produit enregistré', 'success');
       }
-    } catch {
-      showToast('Erreur lors de l\'enregistrement', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erreur lors de l\'enregistrement', 'error');
     } finally {
       setIsSaving(false);
     }
