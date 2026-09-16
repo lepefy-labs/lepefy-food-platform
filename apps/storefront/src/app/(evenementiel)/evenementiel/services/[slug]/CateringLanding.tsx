@@ -53,7 +53,7 @@ export default function CateringLanding({ serviceSlug, description, heroImages, 
   return (
     <div className="bg-[#f7f3eb] pb-24 text-[#20231f] lg:pb-0">
       <section className="relative isolate overflow-hidden bg-[var(--color-primary-dark)]">
-        <div className="relative mx-auto grid max-w-[1180px] lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-10 lg:px-6 lg:py-12">
+        <div className="mx-auto grid max-w-[1180px] lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-10 lg:px-6 lg:py-12">
           <div className="relative flex min-h-[470px] flex-col justify-center px-4 py-10 text-white sm:px-6 lg:static lg:px-0 lg:py-8">
             <EventImageFader images={heroImages} fallbackColor="var(--color-primary-dark)" className="absolute inset-0 h-full w-full" />
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(8,27,16,.92),rgba(8,27,16,.65),rgba(8,27,16,.25))]" />
