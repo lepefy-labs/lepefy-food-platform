@@ -11,6 +11,9 @@ import {
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
+import { EventImageFader } from '@/components/evenementiel/EventImageFader';
+import { loadHeroGallery } from '@/lib/events/loadHeroGallery';
+import { selectCateringHeroMedia } from '@/lib/events/selectHeroMedia';
 import DevisForm from './DevisForm';
 import RentalCheckoutClient from './RentalCheckoutClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
@@ -80,15 +83,16 @@ export default async function ServiceDetailPage({ params }: PageProps) {
   );
 
   if (serviceOffering.cta_type === 'devis') {
+    const cateringPhotos = await loadHeroGallery(supabase, tenant.id, ['traiteur']);
+    const cateringHeroImages = selectCateringHeroMedia(cateringPhotos, serviceOffering.cover_image_url);
+
     return (
       <div className="bg-[#f7f3eb] text-[#20231f]">
         <section className="relative isolate min-h-[430px] overflow-hidden sm:min-h-[500px]">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: serviceOffering.cover_image_url ? `url(${serviceOffering.cover_image_url})` : undefined,
-              backgroundColor: serviceOffering.cover_image_url ? undefined : 'var(--color-primary-dark)',
-            }}
+          <EventImageFader
+            images={cateringHeroImages}
+            fallbackColor="var(--color-primary-dark)"
+            className="absolute inset-0 h-full w-full"
           />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,27,16,.9),rgba(8,27,16,.56),rgba(8,27,16,.12))]" />
           <div className="relative mx-auto flex min-h-[430px] max-w-[1180px] items-center px-4 py-14 sm:min-h-[500px] sm:px-6">

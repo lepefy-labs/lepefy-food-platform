@@ -34,6 +34,15 @@ function comparePhotos(a: HeroPhoto, b: HeroPhoto) {
     || a.id.localeCompare(b.id);
 }
 
+/** Catering detail pages rotate only their editorial category; the cover is an empty-pool fallback. */
+export function selectCateringHeroMedia(photos: readonly HeroPhoto[], coverImageUrl: string | null): string[] {
+  const urls = photos.filter((photo) => categoryOf(photo) === 'traiteur').slice().sort(comparePhotos)
+    .map((photo) => photo.image_url.trim()).filter(Boolean);
+  const images = Array.from(new Set(urls)).slice(0, MAX_HERO_IMAGES);
+  const cover = coverImageUrl?.trim();
+  return images.length ? images : cover ? [cover] : [];
+}
+
 /** Stable editorial rotation. Inputs are tenant-scoped by the caller; never mutated. */
 export function selectHeroMedia({
   events,

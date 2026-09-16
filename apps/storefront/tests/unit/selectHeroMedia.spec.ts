@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { EventGalleryPhoto, EventRow, ServiceOffering } from '@lepefy/types';
-import { getHeroContext, MAX_HERO_IMAGES, selectHeroMedia } from '../../src/lib/events/selectHeroMedia';
+import { getHeroContext, MAX_HERO_IMAGES, selectCateringHeroMedia, selectHeroMedia } from '../../src/lib/events/selectHeroMedia';
 
 const now = new Date('2026-09-16T12:00:00Z');
 type HeroPhoto = Parameters<typeof selectHeroMedia>[0]['photos'][number];
@@ -143,4 +143,49 @@ test('shared editorial and event contracts remain compatible', () => {
   const published: PersistedEvent = { status: 'published' };
   expect(media.hero_eligible).toBe(false);
   expect(published.status).toBe('published');
+});
+
+test('catering detail excludes ambiance, rental, event and general photos even when hero-approved', () => {
+  expect(selectCateringHeroMedia([
+    photo('ambiance', 'ambiance'), photo('rental', 'location_materiel'),
+    photo('event', 'event'), photo('general'), photo('catering', 'traiteur'),
+  ], 'https://images.example/cover')).toEqual(['https://images.example/catering']);
+});
+
+test('catering detail ranks eligibility and priority deterministically without changing inputs', () => {
+  const photos = [
+    photo('legacy', 'traiteur', { hero_eligible: false, hero_priority: 100 }),
+    photo('normal', 'traiteur'), photo('high', 'traiteur', { hero_priority: 75 }),
+  ];
+  const original = photos.slice();
+  const expected = ['high', 'normal', 'legacy'].map((id) => 'https://images.example/' + id);
+  expect(selectCateringHeroMedia(photos, null)).toEqual(expected);
+  expect(selectCateringHeroMedia(photos.slice().reverse(), null)).toEqual(expected);
+  expect(photos).toEqual(original);
+});
+
+test('catering detail deduplicates trimmed URLs, skips blanks and limits rotation to six', () => {
+  const photos = [
+    photo('blank', 'traiteur', { image_url: ' ' }),
+    photo('one', 'traiteur', { image_url: ' https://images.example/shared ' }),
+    photo('two', 'traiteur', { image_url: 'https://images.example/shared' }),
+    ...Array.from({ length: 8 }, (_, i) => photo('food-' + i, 'traiteur', { sort_order: i + 1 })),
+  ];
+  const images = selectCateringHeroMedia(photos, null);
+  expect(images).toHaveLength(MAX_HERO_IMAGES);
+  expect(images[0]).toBe('https://images.example/shared');
+  expect(new Set(images).size).toBe(MAX_HERO_IMAGES);
+});
+
+test('catering detail uses its cover only when no usable catering photo exists', () => {
+  expect(selectCateringHeroMedia([photo('other', 'ambiance')], ' https://images.example/cover '))
+    .toEqual(['https://images.example/cover']);
+  expect(selectCateringHeroMedia([photo('catering', 'traiteur')], 'https://images.example/cover'))
+    .toEqual(['https://images.example/catering']);
+});
+
+test('catering detail leaves the color fallback possible for empty and legacy-only pools', () => {
+  expect(selectCateringHeroMedia([], null)).toEqual([]);
+  expect(selectCateringHeroMedia([{ id: 'old', event_id: null, image_url: 'https://images.example/old' }], ' '))
+    .toEqual([]);
 });
