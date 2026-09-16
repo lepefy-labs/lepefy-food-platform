@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 15 settembre 2026 — **v6.51 Current-State Snapshot**
+> **Aggiornato:** 16 settembre 2026 — **v6.52 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -415,7 +415,7 @@ Il dispatcher invoca `/api/events/internal/booking-close-reports` con `eventId` 
 
 ```text
 pending -> sending -> sent
-             |       
+             |
              -> error -> retry dispatcher
 ```
 
@@ -450,7 +450,11 @@ Scanner canonico `/scan?event_id=<id>` usa ledger `event_reservation_item_redemp
 
 La surface pubblica Events ha `EventsHeader`/`EventsFooter` propri ma usa il drawer cross-surface condiviso con lo Shop. L'header ricava le capability di navigazione dai record pubblici attivi. La CTA header punta al prossimo evento quando esiste, altrimenti al contatto; il footer privilegia WhatsApp rispetto all'e-mail quando configurato.
 
-La home Events tratta il prossimo evento come primary conversion object: hero contestuale, disponibilità reale, data/ora e CTA verso il dettaglio. Gallery e servizi restano data-driven.
+La home Événementiel distingue tre contesti editoriali con soglia imminente nominata di 14 giorni: evento imminente, evento futuro non imminente e nessun evento futuro. Il prossimo evento resta la card featured con disponibilità, prezzi, deadline e social sharing invariati. Il hero usa il selettore deterministico `selectHeroMedia`, massimo 6 URL deduplicati: immagini associate all'evento imminente (hero-approved prima delle altre, poi banner; al massimo una ambiance neutra quando l'evento domina), mix evento/Traiteur/ambiance per gli eventi più lontani e Traiteur/Location/ambiance/general quando non esistono eventi futuri. Le immagini dei servizi sono promosse solo per offering attivi; `cover_image_url` resta la cover canonica delle card/pagine servizio e una sorgente fallback del hero. Data/ora/luogo nel hero compaiono solo nel contesto imminente, mentre il mix editoriale usa copy generale. Senza eventi la CTA primaria privilegia servizi attivi o contatto, mai una sezione eventi vuota. Layout Vimeet, overlay, `EventImageFader` e animazione AVEC/POUR con VOUS statico restano invariati.
+
+La Gallery appartiene all'intero modulo (`events_enabled || services_enabled`), inclusa la discovery della navigazione pubblica. Migration `110_event_gallery_editorial.sql` aggiunge `category` (event/traiteur/location_materiel/ambiance/general), `hero_eligible` default false e `hero_priority` 0–100 default 50. Il backfill classifica le immagini associate come event e le altre come general senza cambiare associazioni, sort order o social sharing. L'admin offre filtri categoria/Hero, configurazione upload ed editor espandibile con priorità Basse/Normale/Haute (25/50/75); `is_social_share` resta indipendente e legato a una foto associata a un evento. Le API mantengono `event_content.manage` e verificano l'associazione evento nel tenant corrente, senza modifiche RBAC. La selezione hero carica candidati limitati per categoria separatamente dalle 10 immagini della sezione Gallery; le immagini evento delle card e i kit social sono limitati agli eventi futuri caricati. Il dettaglio di un evento mantiene esclusivamente la propria associazione e i servizi mantengono devis/rental checkout invariati.
+
+La migration 110 deve essere applicata manualmente nel Supabase remoto: Vercel non esegue migration. Durante il rollout la lettura hero può ripiegare su una query legacy limitata se i nuovi campi non sono disponibili; le nuove impostazioni editoriali richiedono lo schema 110. CI esegue test selector/validazione/query e fixture PostgreSQL per sintassi, backfill, default, vincoli e conservazione dei dati storici.
 
 Gli eventi possono avere una `on_site_price_list_image_url`: carta prezzi informativa per piatti/bevande acquistabili e pagabili sul posto, separata da `event_ticket_types`, checkout e capacità prenotabile.
 
@@ -576,6 +580,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 107_tester_feedback_invites.sql
 108_tester_feedback_contact_status.sql
 109_tenant_crm_foundation.sql
+110_event_gallery_editorial.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -613,6 +618,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `107` estende le campagne con l’URL del test Google Play, introduce gli inviti tester tenant/campaign-scoped e collega opzionalmente i feedback a un invito attivato. Token invito/sessione sono hashati, email normalizzate uniche per campagna, relazioni cross-tenant impedite da foreign key composite e accesso limitato al service role. Invio n8n accettato, attivazione Lepefy e partecipazione ufficiale Google Play restano stati distinti; l’applicazione Supabase resta manuale.
 
 `108` aggiunge agli inviti tester un numero di telefono/WhatsApp opzionale e uno stato installazione manuale `unknown | installed | problem`. I campi sono soltanto metadata operativi per il follow-up Platform, non vengono usati per autenticazione e non rendono Lepefy autorevole sull'installazione Google Play; l'applicazione Supabase resta manuale.
+
+`110` estende la Gallery all'editorial media library Événementiel come descritto sopra. Migration additiva, rollback delle sole tre colonne editoriali e indice documentato nel SQL; i campi storici e RLS non cambiano. L'applicazione in Supabase resta manuale.
 
 `109` introduce il CRM tenant e il disaccoppiamento identity sopra descritto. È una migration additiva e ID-preserving, ma operativamente significativa: deve essere applicata manualmente prima del codice applicativo perché il build Vercel non esegue migration Supabase. Crea read model CRM, RFM, eventi, note, tag, segmenti e campagne service-role-only con RLS forzata e vincoli compositi anti cross-tenant.
 
@@ -698,8 +705,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.51
+# Fine snapshot v6.52
 
-**Base audit:** `main + Tenant CRM / Customer 360`
-**Data:** 15 settembre 2026
+**Base audit:** `main + Événementiel editorial media library`
+**Data:** 16 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

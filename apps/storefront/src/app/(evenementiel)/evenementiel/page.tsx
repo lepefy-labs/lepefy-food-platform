@@ -12,13 +12,15 @@ import {
 } from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getHeroContext, MAX_HERO_IMAGES, selectHeroMedia } from '@/lib/events/selectHeroMedia';
+import { loadHeroGallery } from '@/lib/events/loadHeroGallery';
 import { formatEventDayDate, formatEventTime, formatPrice } from '@/lib/utils/format';
 import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import EventSocialShareButton, { type EventSocialPhoto } from '@/components/evenementiel/EventSocialShareButton';
 import { EventHeroAccent } from '../_components/EventHeroAccent';
 import type { EventRow, ServiceOffering, EventGalleryPhoto } from '@lepefy/types';
 
-type EventPhotoRef = Pick<EventGalleryPhoto, 'id' | 'event_id' | 'image_url' | 'caption'> & { is_social_share?: boolean };
+type EventPhotoRef = EventGalleryPhoto;
 type EventPriceRef = { event_id: string; price: number };
 type BookingUrgency = { label: string; className: string; closed: boolean };
 
@@ -78,24 +80,34 @@ export default async function EvenementielHubPage() {
   if (!tenant.events_enabled && !tenant.services_enabled) notFound();
 
   const supabase = createPublicClient();
-  const [eventsRes, servicesRes, galleryRes, eventPhotosRes] = await Promise.all([
+  const now = new Date();
+  const [eventsRes, servicesRes, galleryRes] = await Promise.all([
     tenant.events_enabled
-      ? supabase.from('events').select('*').eq('tenant_id', tenant.id).eq('status', 'published').gte('date_start', new Date().toISOString()).order('date_start', { ascending: true })
+      ? supabase.from('events').select('*').eq('tenant_id', tenant.id).eq('status', 'published').gte('date_start', now.toISOString()).order('date_start', { ascending: true }).order('id', { ascending: true })
       : Promise.resolve({ data: [] as EventRow[] }),
     tenant.services_enabled
       ? supabase.from('service_offerings').select('*').eq('tenant_id', tenant.id).eq('active', true).order('sort_order', { ascending: true })
       : Promise.resolve({ data: [] as ServiceOffering[] }),
-    tenant.events_enabled
+    tenant.events_enabled || tenant.services_enabled
       ? supabase.from('event_gallery_photos').select('*').eq('tenant_id', tenant.id).order('sort_order', { ascending: true }).limit(10)
       : Promise.resolve({ data: [] as EventGalleryPhoto[] }),
-    tenant.events_enabled
-      ? supabase.from('event_gallery_photos').select('*').eq('tenant_id', tenant.id).not('event_id', 'is', null).order('sort_order', { ascending: true })
-      : Promise.resolve({ data: [] as EventPhotoRef[] }),
   ]);
 
   const events = (eventsRes.data ?? []) as EventRow[];
   const services = (servicesRes.data ?? []) as ServiceOffering[];
   const gallery = (galleryRes.data ?? []) as EventGalleryPhoto[];
+  const { context: heroContext, nextEvent, imminentEvent } = getHeroContext(events, now);
+  const eventIds = events.map((event) => event.id);
+  const heroCategories: EventGalleryPhoto['category'][] = heroContext === 'imminent_event'
+    ? ['ambiance', 'general']
+    : ['event', 'traiteur', 'location_materiel', 'ambiance', 'general'];
+  const [eventPhotosRes, editorialPhotos] = await Promise.all([
+    eventIds.length
+      ? supabase.from('event_gallery_photos').select('*').eq('tenant_id', tenant.id)
+          .in('event_id', eventIds).order('sort_order', { ascending: true }).order('id', { ascending: true })
+      : Promise.resolve({ data: [] as EventPhotoRef[] }),
+    loadHeroGallery(supabase, tenant.id, heroCategories),
+  ]);
   const photosByEvent = new Map<string, string[]>();
   const socialPhotosByEvent = new Map<string, EventSocialPhoto[]>();
 
@@ -111,7 +123,6 @@ export default async function EvenementielHubPage() {
     }
   }
 
-  const eventIds = events.map((event) => event.id);
   const ticketPricesRes = eventIds.length > 0
     ? await supabase.from('event_ticket_types').select('event_id, price').in('event_id', eventIds).eq('active', true)
     : { data: [] as EventPriceRef[] };
@@ -121,15 +132,34 @@ export default async function EvenementielHubPage() {
     if (current == null || ticket.price < current) minPriceByEvent.set(ticket.event_id, ticket.price);
   }
 
-  const featuredEvent = events[0] ?? null;
-  const secondaryEvents = events.slice(1);
+  const featuredEvent = nextEvent;
+  const secondaryEvents = events.filter((event) => event.id !== featuredEvent?.id);
   const featuredUrgency = featuredEvent ? bookingUrgency(featuredEvent) : null;
-  const heroImages = featuredEvent
-    ? (photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : []))
-    : gallery.slice(0, 4).map((photo) => photo.image_url);
+  const heroImages = selectHeroMedia({
+    events,
+    photos: [...editorialPhotos, ...((eventPhotosRes.data ?? []) as EventPhotoRef[])],
+    services,
+    now,
+  });
   const traiteur = services.find((service) => service.type === 'traiteur') ?? services.find((service) => service.cta_type === 'devis') ?? null;
   const location = services.find((service) => service.type === 'location_materiel') ?? services.find((service) => service.cta_type === 'reservation') ?? null;
-  const featuredHref = featuredEvent ? `/evenements/${featuredEvent.slug}` : '#evenements';
+  const whatsappHref = tenant.whatsapp_number ? `https://wa.me/${tenant.whatsapp_number.replace(/\D/g, '')}` : null;
+  const contactHref = whatsappHref ?? (tenant.legal_email ? `mailto:${tenant.legal_email}` : '/#contact');
+  const heroPrimaryHref = imminentEvent ? `/evenements/${imminentEvent.slug}`
+    : heroContext === 'upcoming_event' ? '#evenements'
+    : services.length ? '#services' : contactHref;
+  const heroPrimaryLabel = imminentEvent ? 'Découvrir l’événement'
+    : heroContext === 'upcoming_event' ? 'Découvrir les événements'
+    : services.length ? 'Découvrir nos services' : 'Parlons de votre projet';
+  const heroSecondaryHref = heroContext === 'no_events'
+    ? traiteur ? `/services/${traiteur.slug}` : location ? `/services/${location.slug}` : contactHref
+    : services.length ? '#services' : contactHref;
+  const heroSecondaryLabel = heroContext === 'no_events'
+    ? traiteur ? 'Découvrir le traiteur' : location ? 'Découvrir la location' : 'Nous contacter'
+    : services.length ? 'Nos services' : 'Nous contacter';
+  const serviceLabels = [traiteur ? 'Traiteur' : null, location ? 'location de matériel' : null].filter(Boolean).join(', ');
+
+
 
   return (
     <div className="min-h-screen bg-[#f7f3eb] text-[#20231f]">
@@ -144,8 +174,10 @@ export default async function EvenementielHubPage() {
           <div className="max-w-[730px] text-white">
             <p className="text-2xl font-bold leading-[1.05] sm:text-3xl lg:text-[2.55rem]">Nous créons<br />des événements</p>
             <h1 className="mt-2 font-display text-[3.55rem] font-black uppercase leading-[.9] tracking-[-.045em] sm:text-[5rem] lg:text-[6.5rem]"><EventHeroAccent /></h1>
-            <p className="mt-5 max-w-[620px] text-base leading-relaxed text-white/88 sm:text-lg">Événements, traiteur et expériences conçus pour rassembler vos invités avec style et simplicité.</p>
-            {featuredEvent && (
+            <p className="mt-5 max-w-[620px] text-base leading-relaxed text-white/88 sm:text-lg">{heroContext === 'no_events'
+              ? serviceLabels ? `${serviceLabels} et expériences pour organiser vos réceptions avec style et simplicité.` : 'Des expériences et des événements conçus pour rassembler vos invités avec style et simplicité.'
+              : 'Événements, traiteur et expériences conçus pour rassembler vos invités avec style et simplicité.'}</p>
+            {imminentEvent && featuredEvent && (
               <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold text-white/80">
                 <span className="inline-flex items-center gap-1.5"><IconCalendarEvent size={16} />{formatEventDayDate(featuredEvent.date_start)}</span>
                 <span className="inline-flex items-center gap-1.5"><IconClock size={16} />{formatEventTime(featuredEvent.date_start)}</span>
@@ -153,10 +185,10 @@ export default async function EvenementielHubPage() {
               </div>
             )}
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href={featuredHref} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[var(--color-secondary)] px-6 text-sm font-extrabold text-[var(--color-primary-dark)] shadow-lg transition-transform hover:-translate-y-0.5">
-                {featuredEvent ? 'Découvrir les événements' : 'Voir les événements'} <IconArrowRight size={18} />
+              <Link href={heroPrimaryHref} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[var(--color-secondary)] px-6 text-sm font-extrabold text-[var(--color-primary-dark)] shadow-lg transition-transform hover:-translate-y-0.5">
+                {heroPrimaryLabel} <IconArrowRight size={18} />
               </Link>
-              <a href="#services" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/70 bg-white/5 px-6 text-sm font-bold text-white backdrop-blur-sm hover:bg-white/10">Organiser un événement</a>
+              <a href={heroSecondaryHref} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/70 bg-white/5 px-6 text-sm font-bold text-white backdrop-blur-sm hover:bg-white/10">{heroSecondaryLabel}</a>
             </div>
           </div>
         </div>
@@ -220,7 +252,7 @@ export default async function EvenementielHubPage() {
               <div className="space-y-5">
                 <div className="relative">
                   <Link href={`/evenements/${featuredEvent.slug}`} className="group grid overflow-hidden rounded-[28px] border border-black/[0.06] bg-white shadow-[0_18px_45px_rgba(50,37,20,.08)] md:grid-cols-[1.15fr_.85fr]">
-                    <EventImageFader images={photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="min-h-[250px] md:min-h-[330px]">
+                    <EventImageFader images={(photosByEvent.get(featuredEvent.id) ?? (featuredEvent.banner_image_url ? [featuredEvent.banner_image_url] : [])).slice(0, MAX_HERO_IMAGES)} fallbackColor="var(--color-primary-light)" className="min-h-[250px] md:min-h-[330px]">
                       <span className="absolute left-4 top-4 rounded-full bg-[var(--color-secondary)] px-3 py-1.5 text-[11px] font-extrabold tracking-wide text-[var(--color-primary-dark)]">À LA UNE</span>
                     </EventImageFader>
                     <div className="flex flex-col justify-between p-5 sm:p-6 md:p-7">
@@ -269,7 +301,7 @@ export default async function EvenementielHubPage() {
                       return (
                         <div key={event.id} className="relative min-w-[78vw] snap-start sm:min-w-0">
                           <Link href={`/evenements/${event.slug}`} className="group block h-full overflow-hidden rounded-3xl border border-black/[0.06] bg-white shadow-sm">
-                            <EventImageFader images={photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : [])} fallbackColor="var(--color-primary-light)" className="aspect-[16/10]">
+                            <EventImageFader images={(photosByEvent.get(event.id) ?? (event.banner_image_url ? [event.banner_image_url] : [])).slice(0, MAX_HERO_IMAGES)} fallbackColor="var(--color-primary-light)" className="aspect-[16/10]">
                               {urgency && <span className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold shadow-sm ${urgency.className}`}><IconClock size={12} /> {urgency.label}</span>}
                             </EventImageFader>
                             <div className="p-4">

@@ -26,14 +26,17 @@ export default async function AdminGalleryPage() {
 
   const normalizedPhotos = (photos ?? []).map((photo) => ({
     ...photo,
-    is_social_share: Boolean((photo as { is_social_share?: boolean }).is_social_share),
+    is_social_share: Boolean(photo.is_social_share),
+    category: photo.category ?? (photo.event_id ? 'event' : 'general'),
+    hero_eligible: Boolean(photo.hero_eligible),
+    hero_priority: photo.hero_priority ?? 50,
   })) as EventGalleryPhoto[];
 
   return (
     <div className="max-w-5xl">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">Galerie & kit social</h1>
+      <h1 className="mb-1 text-xl font-semibold text-gray-900">Galerie événementielle</h1>
       <p className="mb-6 max-w-2xl text-sm text-gray-500">
-        Gérez les photos de vos événements et choisissez celles que les visiteurs peuvent transformer en story 9:16 pour WhatsApp, Instagram, TikTok et les autres apps installées.
+        Classez vos photos d’événements, de traiteur et de location, choisissez celles à mettre en avant dans le hero et gérez le kit social des événements.
       </p>
 
       <GalleryClient
