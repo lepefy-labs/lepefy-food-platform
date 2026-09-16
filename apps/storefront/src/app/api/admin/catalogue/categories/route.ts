@@ -36,7 +36,15 @@ async function saveCategory(req: NextRequest, update: boolean) {
     ? supabase.from('categories').update(values).eq('id', body.id).eq('tenant_id', tenant.id)
     : supabase.from('categories').insert({ ...values, tenant_id: tenant.id });
   const { data, error } = await query.select('id, name, slug, catalog_scope').maybeSingle();
-  if (error) return NextResponse.json({ error: error.code === '23505' ? 'Cette adresse de catégorie existe déjà.' : 'Impossible d’enregistrer la catégorie.' }, { status: error.code === '23505' ? 409 : 500 });
+  if (error) {
+    // Keep database details server-side; never log the submitted row or credentials.
+    console.error('[catalogue/categories] save failed', {
+      operation: update ? 'update' : 'insert',
+      code: error.code,
+      message: error.message,
+    });
+    return NextResponse.json({ error: error.code === '23505' ? 'Cette adresse de catégorie existe déjà.' : 'Impossible d’enregistrer la catégorie.' }, { status: error.code === '23505' ? 409 : 500 });
+  }
   if (!data) return NextResponse.json({ error: 'Catégorie introuvable.' }, { status: 404 });
   revalidatePath('/');
   revalidatePath('/gadgets');
