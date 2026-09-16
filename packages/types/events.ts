@@ -210,6 +210,8 @@ export interface RentalReservationItem {
   unit_price: number;
 }
 
+export type EventGalleryCategory = 'event' | 'traiteur' | 'location_materiel' | 'ambiance' | 'general';
+
 export interface EventGalleryPhoto {
   id: string;
   tenant_id: string;
@@ -218,6 +220,9 @@ export interface EventGalleryPhoto {
   caption: string | null;
   sort_order: number;
   is_social_share: boolean;
+  category: EventGalleryCategory;
+  hero_eligible: boolean;
+  hero_priority: number;
   created_at: string;
 }
 

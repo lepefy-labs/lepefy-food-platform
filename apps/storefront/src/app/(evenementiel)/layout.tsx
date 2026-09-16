@@ -34,7 +34,7 @@ export default async function EvenementielLayout({ children }: { children: React
           .eq('tenant_id', tenant.id)
           .eq('active', true)
       : Promise.resolve({ data: [] as ServiceCapabilityRow[] }),
-    tenant.events_enabled
+    tenant.events_enabled || tenant.services_enabled
       ? supabase
           .from('event_gallery_photos')
           .select('id')
