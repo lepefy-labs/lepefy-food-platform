@@ -1,20 +1,11 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import {
-  IconArrowDown,
-  IconCalendarEvent,
-  IconChefHat,
-  IconLeaf,
-  IconSparkles,
-  IconUsers,
-} from '@tabler/icons-react';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
-import { EventImageFader } from '@/components/evenementiel/EventImageFader';
 import { loadHeroGallery } from '@/lib/events/loadHeroGallery';
 import { selectCateringHeroMedia } from '@/lib/events/selectHeroMedia';
-import DevisForm from './DevisForm';
+import CateringLanding from './CateringLanding';
 import RentalCheckoutClient from './RentalCheckoutClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
 
@@ -24,13 +15,6 @@ export const fetchCache = 'force-no-store';
 interface PageProps {
   params: { slug: string };
 }
-
-const cateringBenefits = [
-  { Icon: IconUsers, title: 'Sur mesure', text: 'Une proposition adaptée au format et aux besoins de votre événement.' },
-  { Icon: IconLeaf, title: 'Produits frais', text: 'Une approche simple et soignée, pensée autour du plaisir de recevoir.' },
-  { Icon: IconSparkles, title: 'Service soigné', text: 'Une expérience claire, de la demande initiale jusqu’au jour J.' },
-  { Icon: IconCalendarEvent, title: 'Privé & professionnel', text: 'Des formats flexibles pour vos réceptions et événements.' },
-];
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -85,69 +69,19 @@ export default async function ServiceDetailPage({ params }: PageProps) {
   if (serviceOffering.cta_type === 'devis') {
     const cateringPhotos = await loadHeroGallery(supabase, tenant.id, ['traiteur']);
     const cateringHeroImages = selectCateringHeroMedia(cateringPhotos, serviceOffering.cover_image_url);
+    const whatsappNumber = tenant.whatsapp_number?.replace(/\D/g, '');
+    const whatsappHref = whatsappNumber
+      ? 'https://wa.me/' + whatsappNumber + '?text=' + encodeURIComponent('Bonjour, je souhaite échanger sur une prestation traiteur.')
+      : null;
 
     return (
-      <div className="bg-[#f7f3eb] text-[#20231f]">
-        <section className="relative isolate min-h-[430px] overflow-hidden sm:min-h-[500px]">
-          <EventImageFader
-            images={cateringHeroImages}
-            fallbackColor="var(--color-primary-dark)"
-            className="absolute inset-0 h-full w-full"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,27,16,.9),rgba(8,27,16,.56),rgba(8,27,16,.12))]" />
-          <div className="relative mx-auto flex min-h-[430px] max-w-[1180px] items-center px-4 py-14 sm:min-h-[500px] sm:px-6">
-            <div className="max-w-[620px] text-white">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-secondary)]">Service traiteur</p>
-              <h1 className="mt-3 font-display text-4xl font-semibold leading-[1.02] sm:text-6xl">Votre événement,<br />notre cuisine.</h1>
-              {serviceOffering.description && (
-                <p className="mt-5 max-w-xl whitespace-pre-line text-base leading-relaxed text-white/80 sm:text-lg">{serviceOffering.description}</p>
-              )}
-              <a href="#devis" className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--color-secondary)] px-5 text-sm font-bold text-[var(--color-primary-dark)] shadow-lg">
-                Demander un devis <IconArrowDown size={17} />
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <main className="mx-auto max-w-[1180px] px-4 py-12 sm:px-6 sm:py-16">
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {cateringBenefits.map(({ Icon, title, text }) => (
-              <div key={title} className="rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm">
-                <Icon size={24} className="text-[var(--color-primary)]" />
-                <h2 className="mt-4 font-display text-xl font-semibold">{title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">{text}</p>
-              </div>
-            ))}
-          </section>
-
-          <section className="py-14 sm:py-18">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-primary)]">Simple & clair</p>
-            <h2 className="mt-1 font-display text-3xl font-semibold sm:text-4xl">Comment ça marche</h2>
-            <div className="mt-8 grid gap-5 md:grid-cols-3">
-              {[
-                ['01', 'Échangeons', 'Partagez votre date, votre format et vos besoins.'],
-                ['02', 'Nous proposons', 'Nous préparons une réponse adaptée à votre projet.'],
-                ['03', 'Nous réalisons', 'Une fois validé, nous organisons la prestation avec vous.'],
-              ].map(([number, title, text]) => (
-                <div key={number} className="relative rounded-3xl bg-[#efe5d1] p-6">
-                  <span className="text-xs font-extrabold tracking-[0.18em] text-[var(--color-primary)]">{number}</span>
-                  <h3 className="mt-3 font-display text-2xl font-semibold">{title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-600">{text}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section id="devis" className="scroll-mt-24 grid gap-8 lg:grid-cols-[1fr_430px] lg:items-start">
-            <div className="pt-2">
-              <IconChefHat size={34} className="text-[var(--color-primary)]" />
-              <h2 className="mt-4 font-display text-3xl font-semibold sm:text-4xl">Parlons de votre projet.</h2>
-              <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-600">Indiquez-nous les informations essentielles. Le formulaire conserve le fonctionnement et les données déjà utilisés par le service.</p>
-            </div>
-            <DevisForm serviceSlug={serviceOffering.slug} />
-          </section>
-        </main>
-      </div>
+      <CateringLanding
+        serviceSlug={serviceOffering.slug}
+        description={serviceOffering.description}
+        heroImages={cateringHeroImages}
+        photos={cateringPhotos.filter((photo) => photo.category === 'traiteur').map(({ id, image_url, caption }) => ({ id, image_url, caption }))}
+        whatsappHref={whatsappHref}
+      />
     );
   }
 
