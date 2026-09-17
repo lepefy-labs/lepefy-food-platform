@@ -25,8 +25,8 @@ test('Wallet pass identities isolate both tenant and customer; QR encodes the re
   expect(googleObject({ ...card, tenantId: 'tenant-b' }, '12345').id).not.toBe(first.id);
   expect(googleObject({ ...card, customerId: 'customer-b' }, '12345').id).not.toBe(first.id);
   const pass = applePassJson(card, { passTypeId: 'pass.com.example.loyalty', teamId: 'EXAMPLE' });
-  expect(pass.barcodes[0].message).toBe(card.cardNumber);
-  expect(pass.storeCard.headerFields[0].value).toBe(240);
+  expect(pass.barcodes[0]!.message).toBe(card.cardNumber);
+  expect(pass.storeCard.headerFields[0]!.value).toBe(240);
   expect(pass.serialNumber).not.toBe(applePassJson({ ...card, tenantId: 'tenant-b' },
     { passTypeId: 'pass.com.example.loyalty', teamId: 'EXAMPLE' }).serialNumber);
 });
@@ -44,7 +44,7 @@ test('Google JWT signature validates independently with the public key', () => {
   const jwt = signJwt({ aud: 'google', payload: { loyaltyObjects: [{ id: '12345.card' }] } }, key);
   const [header, payload, signature] = jwt.split('.');
   expect(verify('RSA-SHA256', Buffer.from(header + '.' + payload), keys.publicKey,
-    Buffer.from(signature, 'base64url'))).toBe(true);
+    Buffer.from(signature!, 'base64url'))).toBe(true);
   expect(verify('RSA-SHA256', Buffer.from(header + '.' + payload + 'x'), keys.publicKey,
     Buffer.from(signature, 'base64url'))).toBe(false);
 });
@@ -76,7 +76,7 @@ test('Google re-add updates an existing object and issues a short reference-only
     const url = await issueGoogleWallet(card, config);
     expect(calls.map(c => c.init?.method)).toEqual(['POST', 'POST', 'POST', 'PATCH']);
     const jwt = url.split('/').pop()!;
-    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString());
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1]!, 'base64url').toString());
     expect(payload.payload.loyaltyObjects).toEqual([{ id: googleObject(card, config.issuerId).id }]);
     expect(JSON.stringify(payload)).not.toContain(card.fullName);
     expect(JSON.stringify(payload)).not.toContain(card.cardNumber);

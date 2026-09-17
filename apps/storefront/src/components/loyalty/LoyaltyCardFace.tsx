@@ -56,4 +56,3 @@ export function LoyaltyCardFace({ brand, fullName, points, cardNumberDisplay, ba
     </div>
   );
 }
-

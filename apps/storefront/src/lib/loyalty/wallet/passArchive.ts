@@ -24,13 +24,13 @@ const rsa = seq(oid('2a864886f70d010101'), der(0x05));
 
 function element(buffer: Buffer, offset: number) {
   const start = offset;
-  const tag = buffer[offset++];
-  let length = buffer[offset++];
+  const tag = buffer.readUInt8(offset++);
+  let length = buffer.readUInt8(offset++);
   if (length & 0x80) {
     const count = length & 0x7f;
     if (count === 0 || count > 4) throw new Error('Invalid DER length');
     length = 0;
-    for (let i = 0; i < count; i++) length = length * 256 + buffer[offset++];
+    for (let i = 0; i < count; i++) length = length * 256 + buffer.readUInt8(offset++);
   }
   const end = offset + length;
   if (end > buffer.length) throw new Error('Truncated DER');
