@@ -14,9 +14,11 @@ type TestEvent =
   | 'external-payment-awaiting-verification'
   | 'event-external-payment-awaiting-verification'
   | 'event-reservation-confirmed'
+  | 'review-invite'
   | 'tester-feedback-invite';
 
 type FulfillmentType = 'delivery' | 'pickup';
+type ReviewInviteKind = 'initial' | 'reminder';
 
 const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'order-confirmed', label: 'Commande confirmée', description: 'Confirmation après paiement.' },
@@ -29,6 +31,7 @@ const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'order-stock-conflict', label: 'Conflit de stock', description: 'Notification opérationnelle de test.' },
   { value: 'event-external-payment-awaiting-verification', label: 'Événement · Paiement externe à vérifier', description: 'Alerte tenant Événementiel avec contexte réel et payload synthétique.' },
   { value: 'event-reservation-confirmed', label: 'Événement · Réservation confirmée', description: 'Confirmation client Événementiel sans créer de réservation.' },
+  { value: 'review-invite', label: 'Avis · Invitation', description: 'Teste l’e-mail initial ou le rappel de demande d’avis sans créer d’invitation ni de token réel.' },
   { value: 'tester-feedback-invite', label: 'Invitation testeur · Feedback', description: 'Teste l’e-mail d’invitation avec les CTA Google Play et feedback sans créer d’invitation réelle.' },
 ];
 
@@ -53,6 +56,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const [email, setEmail] = useState(defaultEmail);
   const [fullName, setFullName] = useState('Robertin');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery');
+  const [reviewInviteKind, setReviewInviteKind] = useState<ReviewInviteKind>('initial');
   const [total, setTotal] = useState('79.90');
   const [shippingTotal, setShippingTotal] = useState('8.90');
   const [trackingCode, setTrackingCode] = useState('TEST-TRACKING-001');
@@ -77,6 +81,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const isShopExternalPaymentTenantAlert = event === 'external-payment-awaiting-verification';
   const isEventExternalPaymentTenantAlert = event === 'event-external-payment-awaiting-verification';
   const isEventReservationConfirmed = event === 'event-reservation-confirmed';
+  const isReviewInvite = event === 'review-invite';
   const isTesterFeedbackInvite = event === 'tester-feedback-invite';
   const isTenantAlert = isShopExternalPaymentTenantAlert || isEventExternalPaymentTenantAlert;
   const isEventTest = isEventExternalPaymentTenantAlert || isEventReservationConfirmed;
@@ -97,6 +102,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           email,
           fullName,
           fulfillmentType,
+          reviewInviteKind,
           total: Number(total),
           shippingTotal: Number(shippingTotal),
           trackingCode,
@@ -128,7 +134,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           </div>
           <h1 className="text-2xl font-bold text-gray-950 dark:text-white">Console de test des notifications</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-            Envoie un payload de test au vrai workflow n8n sans créer de commande, réservation ou invitation testeur, ni modifier le stock, la capacité, la fidélité ou un paiement.
+            Envoie un payload de test au vrai workflow n8n sans créer de commande, réservation, invitation d’avis ou invitation testeur, ni modifier le stock, la capacité, la fidélité ou un paiement.
           </p>
         </div>
         <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
@@ -169,6 +175,16 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                 URL du test fermé Google Play
                 <input type="url" value={googlePlayTestUrl} onChange={e => setGooglePlayTestUrl(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+              </label>
+            )}
+
+            {isReviewInvite && (
+              <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Type d’invitation
+                <select value={reviewInviteKind} onChange={e => setReviewInviteKind(e.target.value as ReviewInviteKind)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-950">
+                  <option value="initial">Invitation initiale</option>
+                  <option value="reminder">Rappel</option>
+                </select>
               </label>
             )}
 
@@ -265,6 +281,12 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             {isEventReservationConfirmed && (
               <div className="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
                 Le payload reprend le contrat réel de confirmation Événementiel avec billet factice. Aucune réservation n’est enregistrée et aucune capacité n’est consommée.
+              </div>
+            )}
+
+            {isReviewInvite && (
+              <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+                Le payload reprend le contrat réel <code>/webhook/review-invite</code> avec commande et token entièrement synthétiques. Aucun <code>review_invite</code>, token ou avis n’est créé ou modifié.
               </div>
             )}
 

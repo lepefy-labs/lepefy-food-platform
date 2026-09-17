@@ -22,9 +22,11 @@ type TestEvent =
   | 'external-payment-awaiting-verification'
   | 'event-external-payment-awaiting-verification'
   | 'event-reservation-confirmed'
+  | 'review-invite'
   | 'tester-feedback-invite';
 
 type FulfillmentType = 'delivery' | 'pickup';
+type ReviewInviteKind = 'initial' | 'reminder';
 
 const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'order-confirmed': '/webhook/order-confirmed',
@@ -37,6 +39,7 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'external-payment-awaiting-verification': '/webhook/external-payment-awaiting-verification',
   'event-external-payment-awaiting-verification': '/webhook/event-external-payment-awaiting-verification',
   'event-reservation-confirmed': '/webhook/event-reservation-confirmed',
+  'review-invite': '/webhook/review-invite',
   'tester-feedback-invite': TESTER_FEEDBACK_INVITE_WEBHOOK,
 };
 
@@ -45,6 +48,7 @@ interface TestRequestBody {
   email?: string;
   fullName?: string;
   fulfillmentType?: FulfillmentType;
+  reviewInviteKind?: ReviewInviteKind;
   total?: number;
   shippingTotal?: number;
   trackingCode?: string;
@@ -99,6 +103,7 @@ export async function POST(req: NextRequest) {
   }
 
   const fulfillmentType: FulfillmentType = body.fulfillmentType === 'pickup' ? 'pickup' : 'delivery';
+  const reviewInviteKind: ReviewInviteKind = body.reviewInviteKind === 'reminder' ? 'reminder' : 'initial';
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const tenantContext = await getTenantNotificationContext(tenant.id);
@@ -170,6 +175,25 @@ export async function POST(req: NextRequest) {
         platform_tagline: LEPEFY_PLATFORM_TAGLINE,
       },
       testMode: true,
+    };
+  } else if (body.event === 'review-invite') {
+    if (!tenantContext.storefrontUrl) {
+      return NextResponse.json({ error: 'URL storefront du tenant indisponible.' }, { status: 500 });
+    }
+    const storefrontUrl = tenantContext.storefrontUrl.replace(/\/$/, '');
+    payload = {
+      ...tenantContext,
+      testMode: true,
+      testSource: 'platform_notification_console',
+      testSentAt,
+      kind: reviewInviteKind,
+      orderId: testId,
+      orderNumber: `#TEST-${shortId}`,
+      email: body.email.trim(),
+      fullName: body.fullName?.trim() || 'Client test',
+      reviewUrl: `${storefrontUrl}/avis/donner?token=notification-test`,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      verifiedPurchase: true,
     };
   } else if (body.event === 'order-confirmed') {
     payload = {
