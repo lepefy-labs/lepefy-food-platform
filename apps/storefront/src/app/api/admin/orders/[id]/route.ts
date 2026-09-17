@@ -4,6 +4,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { isOrderStatus } from '@/lib/orders/adminOrderWorkflow';
 import { loadWorkflowOrder, OrderWorkflowError, updateWorkflowOrder } from '@/lib/orders/orderTransitionService';
+import { ensureReviewInviteForOrder } from '@/lib/reviews/reviewInvites';
 import type { PaymentStatus } from '@lepefy/types';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -29,7 +30,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (status === undefined && Object.keys(patch).length === 0) return NextResponse.json({ error: 'Aucun champ à mettre à jour.' }, { status: 400 });
     const service = createServiceClient();
     const order = await loadWorkflowOrder(service, tenant.id, params.id);
-    await updateWorkflowOrder({ service, order, nextStatus: isOrderStatus(status) ? status : undefined, patch });
+    const saved = await updateWorkflowOrder({ service, order, nextStatus: isOrderStatus(status) ? status : undefined, patch });
+    if (saved.status === 'delivered' && saved.payment_status === 'paid') {
+      try {
+        await ensureReviewInviteForOrder(tenant.id, saved.id);
+      } catch (reviewError) {
+        console.error('[admin/orders PATCH] review invite scheduling failed', reviewError, '— order_id:', saved.id);
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof OrderWorkflowError) return NextResponse.json({ error: error.message }, { status: error.httpStatus });

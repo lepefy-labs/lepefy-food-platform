@@ -22,6 +22,7 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/clients/campagnes', permission: 'campaigns.view' },
   { prefix: '/admin/clients/segments', permission: 'customers.view' },
   { prefix: '/admin/clients', permission: 'customers.view' },
+  { prefix: '/admin/avis', permission: 'reviews.view' },
   { prefix: '/admin/checkout-funnel', permission: 'orders.view' },
   { prefix: '/admin/paiements-en-attente', permission: 'orders.view' },
   { prefix: '/admin/catalogue', permission: 'catalog.view' },
@@ -42,9 +43,7 @@ export function isPersonalAdminPath(pathname: string): boolean {
 }
 
 export function permissionForAdminPath(pathname: string, workspace: AdminWorkspace): string | null {
-  if (pathname === '/admin' || pathname === '/admin/') {
-    return workspace === 'events' ? 'events.view' : 'orders.view';
-  }
+  if (pathname === '/admin' || pathname === '/admin/') return workspace === 'events' ? 'events.view' : 'orders.view';
   const rule = RULES.find((candidate) => candidate.exact ? pathname === candidate.prefix : pathname.startsWith(candidate.prefix));
   return rule?.permission ?? null;
 }
@@ -61,6 +60,7 @@ export function defaultAdminDestination(permissions: string[], workspace: AdminW
     if (has('orders.view')) return '/admin';
     if (has('catalog.view')) return '/admin/catalogue';
     if (has('customers.view')) return '/admin/clients';
+    if (has('reviews.view')) return '/admin/avis';
     if (has('loyalty.scan')) return '/admin/loyalty/scan';
     if (has('shipping.view')) return '/admin/livraison';
     if (has('billing.view')) return '/admin/billing';
