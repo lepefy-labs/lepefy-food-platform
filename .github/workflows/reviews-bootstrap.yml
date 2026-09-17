@@ -18,6 +18,8 @@ jobs:
           cat .reviews-bootstrap/part-* > /tmp/reviews.b64
           base64 -d /tmp/reviews.b64 > /tmp/reviews.tar.gz
           tar -xzf /tmp/reviews.tar.gz -C .
+          git checkout HEAD -- .github/workflows/ci.yml
+          rm -f .github/workflows/review-invites.yml
       - name: Update current-state project context
         shell: python
         run: |
@@ -38,11 +40,9 @@ jobs:
           text = text.replace('# Fine snapshot v6.55', '# Fine snapshot v6.56')
           text = text.replace('**Base audit:** `main + provider-neutral managed shipping tracking V1`', '**Base audit:** `main + verified service reviews V1`')
           p.write_text(text)
-      - name: Commit staged delivery and remove bootstrap
+      - name: Commit normal staged delivery
         shell: bash
         run: |
-          git rm .github/workflows/reviews-bootstrap.yml
-          rm -rf .reviews-bootstrap
           git config user.name "Lepefy Automation"
           git config user.email "automation@lepefy.invalid"
           git add -A
