@@ -2,107 +2,27 @@
 
 import Link from 'next/link';
 import { IconMaximize } from '@tabler/icons-react';
+import { LoyaltyCardFace } from '@/components/loyalty/LoyaltyCardFace';
+import type { LoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 
 interface LoyaltyCardWidgetProps {
-  tenantName: string;
+  brand: LoyaltyBrand;
   fullName: string | null;
   confirmedPoints: number;
   cardNumberDisplay: string | null;
   barcodeSvg: string | null;
-  textColor: string;
 }
 
-const pointsFormatter = new Intl.NumberFormat('fr-FR');
-
-/**
- * Widget "tessera fisica" — sostituisce la banda punti generica. Un solo
- * elemento con `overflow-hidden` + background multi-gradient direttamente
- * sulla box (niente layer decorativo assoluto separato): se il contenuto
- * richiedesse più altezza dell'aspect-ratio target su schermi molto stretti,
- * il gradiente continua comunque a coprire l'intera box reale — nessuna
- * "cucitura" visibile tra sfondo e contenuto (vedi rapport final).
- *
- * cardTextColor è calcolato lato server (contrastRatio, lib/utils/color.ts —
- * stesso pattern già usato da CategoryBlock) e passato già risolto: nessun
- * calcolo di contrasto lato client qui.
- */
-export function LoyaltyCardWidget({
-  tenantName, fullName, confirmedPoints, cardNumberDisplay, barcodeSvg, textColor,
-}: LoyaltyCardWidgetProps) {
-  const mutedOpacity = textColor === '#ffffff' ? 0.78 : 0.62;
-
+export function LoyaltyCardWidget({ brand, fullName, confirmedPoints, cardNumberDisplay, barcodeSvg }: LoyaltyCardWidgetProps) {
   return (
-    <Link
-      href="/compte/carte-fidelite"
-      aria-label={`Voir ma carte de fidélité ${tenantName} en grand`}
-      className="group relative block aspect-[1.66] w-full overflow-hidden rounded-3xl transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] active:shadow-md sm:aspect-[1.586]"
-      style={{
-        background: `
-          linear-gradient(115deg,
-            color-mix(in srgb, white 25%, transparent) 0%,
-            transparent 32%,
-            transparent 68%,
-            color-mix(in srgb, black 10%, transparent) 100%),
-          linear-gradient(135deg,
-            color-mix(in srgb, var(--color-primary) 85%, white) 0%,
-            var(--color-primary) 48%,
-            color-mix(in srgb, var(--color-primary) 78%, black) 100%)
-        `,
-        boxShadow: '0 8px 20px -6px color-mix(in srgb, var(--color-primary) 45%, transparent)',
-        color: textColor,
-      }}
-    >
-      <div className="relative flex h-full flex-col p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider" style={{ opacity: mutedOpacity }}>
-            {tenantName}
-          </span>
-          <span
-            className="flex items-center gap-1 text-[10px] font-medium shrink-0"
-            style={{ opacity: mutedOpacity }}
-          >
-            <IconMaximize size={12} stroke={2} />
-            <span className="hidden sm:inline">Toucher pour agrandir</span>
-          </span>
-        </div>
-
-        <div className="mt-auto flex items-end justify-between gap-2 pb-2 sm:pb-2.5">
-          <div className="min-w-0">
-            <div className="text-[9px] uppercase tracking-wide mb-0.5" style={{ opacity: mutedOpacity }}>
-              Membre
-            </div>
-            <div
-              className="font-display font-semibold uppercase truncate"
-              style={{ letterSpacing: '0.05em', fontSize: 'clamp(12px, 3.6vw, 15px)' }}
-            >
-              {fullName || 'Client'}
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-[9px] uppercase tracking-wide mb-0.5" style={{ opacity: mutedOpacity }}>
-              Points
-            </div>
-            <div className="font-extrabold leading-none" style={{ fontSize: 'clamp(17px, 5vw, 21px)' }}>
-              {pointsFormatter.format(confirmedPoints)}
-            </div>
-          </div>
-        </div>
-
-        {barcodeSvg && (
-          <div className="rounded-lg bg-white px-2 py-1 flex flex-col items-center gap-0.5">
-            <div
-              className="w-full [&>svg]:block [&>svg]:w-full [&>svg]:h-auto"
-              // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: barcodeSvg }}
-            />
-            {cardNumberDisplay && (
-              <span className="font-mono text-[9px] text-gray-500 tracking-widest">
-                {cardNumberDisplay}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+    <Link href="/compte/carte-fidelite"
+      aria-label={`Voir ma carte de fidélité ${brand.name} et l’ajouter à mon Wallet`}
+      className="group block rounded-3xl transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+      <LoyaltyCardFace brand={brand} fullName={fullName} points={confirmedPoints}
+        cardNumberDisplay={cardNumberDisplay} barcodeSvg={barcodeSvg} />
+      <span className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-gray-700">
+        <IconMaximize size={17} aria-hidden="true" /> Présenter ma carte · Wallet
+      </span>
     </Link>
   );
 }

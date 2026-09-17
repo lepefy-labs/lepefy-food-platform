@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 17 settembre 2026 — **v6.58 Current-State Snapshot**
+> **Aggiornato:** 18 settembre 2026 — **v6.59 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -33,6 +33,16 @@ scripts/
 AGENTS.md
 LEPEFY_PROJECT_CONTEXT.md
 ```
+
+---
+
+### Carta fedeltà cliente e Wallet
+
+Le superfici `/compte` e `/compte/carte-fidelite` condividono `LoyaltyCardFace`, logo tenant e palette ChloéFood blu/giallo; gli altri tenant mantengono i colori configurati. QR nero su bianco con quiet zone e barcode continuano a codificare il numero tessera reale per lo scanner esistente.
+
+`GET /api/loyalty/wallet/[provider]` emette Google Wallet tramite API issuer + save JWT RS256 oppure Apple Wallet come storeCard `.pkpass` con CMS detached, WWDR, signing-time e manifest SHA-1. Sessione cliente, tenant, loyalty enabled, consenso CGV e dati canonici sono verificati server-side; nessuna migrazione DB. Credenziali server-side vincolate esplicitamente con `LOYALTY_WALLET_TENANT_SLUG`; i provider non configurati non espongono pulsanti. Configurazione e collaudo su device: `docs/LOYALTY_WALLET.md`.
+
+Il saldo del pass è aggiornato al ri-aggiungimento della carta, con identità stabile tenant/client; non sono implementati push APNs o sync per ordine. Il saldo corrente resta nella pagina cliente. L'attivazione reale richiede account issuer Google/publishing access e certificati Apple configurati su Vercel.
 
 ---
 
@@ -745,6 +755,6 @@ Prima di consegnare codice:
 
 # Fine snapshot v6.58
 
-**Base audit:** `main + verified service reviews V1`
+**Base audit:** `main + verified service reviews V1 + loyalty Wallet issuance`
 **Data:** 17 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

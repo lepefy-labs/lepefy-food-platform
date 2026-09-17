@@ -20,6 +20,7 @@ import {
 } from '@tabler/icons-react';
 import type { Icon as TablerIcon } from '@tabler/icons-react';
 import type { Address } from '@lepefy/types';
+import type { LoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 import { LoyaltyCardWidget } from './LoyaltyCardWidget';
 
 interface AccountDashboardProps {
@@ -33,7 +34,7 @@ interface AccountDashboardProps {
   ambassadorProfileCompleted: boolean;
   loyaltyCardNumberDisplay: string | null;
   loyaltyCardBarcodeSvg: string | null;
-  loyaltyCardTextColor: string;
+  loyaltyBrand: LoyaltyBrand;
   accountAccentForeground: string;
 }
 
@@ -132,7 +133,7 @@ function AddressesSection({ addresses }: { addresses: Address[] }) {
 export function AccountDashboard({
   tenant, email, fullName, confirmedPoints, addresses,
   isAmbassador, ambassadorProfileCompleted,
-  loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyCardTextColor, accountAccentForeground,
+  loyaltyCardNumberDisplay, loyaltyCardBarcodeSvg, loyaltyBrand, accountAccentForeground,
 }: AccountDashboardProps) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -184,7 +185,7 @@ export function AccountDashboard({
                 </h2>
               </div>
               <div className="max-w-lg">
-                <LoyaltyCardWidget tenantName={tenant.name} fullName={fullName} confirmedPoints={confirmedPoints} cardNumberDisplay={loyaltyCardNumberDisplay} barcodeSvg={loyaltyCardBarcodeSvg} textColor={loyaltyCardTextColor} />
+                <LoyaltyCardWidget brand={loyaltyBrand} fullName={fullName} confirmedPoints={confirmedPoints} cardNumberDisplay={loyaltyCardNumberDisplay} barcodeSvg={loyaltyCardBarcodeSvg} />
               </div>
             </section>
           )}

@@ -4,6 +4,7 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { getCustomerProfile } from '@/lib/customers/getCustomerProfile';
 import { createServiceClient } from '@/lib/supabase/server';
 import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
+import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
 import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import type { Address } from '@lepefy/types';
@@ -78,12 +79,6 @@ export default async function ComptePage() {
     loyaltyCardBarcodeSvg = cardNumber ? renderBarcodeSVG(cardNumber, { widthMm: 60 }) : null;
   }
 
-  // Couleur de texte lisible sur le gradient de la tessera — même
-  // raisonnement que CategoryBlock.tsx (contrastRatio contre blanc, repli sur
-  // un texte sombre si le primary_color du tenant est trop clair). Calculé
-  // ici (valeurs hex réelles disponibles côté serveur) et transmis déjà
-  // résolu, pas de recalcul côté client.
-  const loyaltyCardTextColor = contrastRatio(tenant.primary_color, '#ffffff') >= 4.5 ? '#ffffff' : '#1a1a1a';
   const primaryDarkApprox = mixWithBlack(tenant.primary_color, 75);
   const accountAccentForeground = contrastRatio(tenant.accent_light, primaryDarkApprox) >= 3
     ? primaryDarkApprox
@@ -104,7 +99,7 @@ export default async function ComptePage() {
       ambassadorProfileCompleted={!!ambassadorRow?.ambassador_profile_completed_at}
       loyaltyCardNumberDisplay={loyaltyCardNumberDisplay}
       loyaltyCardBarcodeSvg={loyaltyCardBarcodeSvg}
-      loyaltyCardTextColor={loyaltyCardTextColor}
+      loyaltyBrand={getLoyaltyBrand(tenant)}
       accountAccentForeground={accountAccentForeground}
     />
   );

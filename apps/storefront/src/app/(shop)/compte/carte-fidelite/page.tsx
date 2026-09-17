@@ -5,6 +5,8 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
 import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
+import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
+import { getWalletAvailability } from '@/lib/loyalty/wallet/config';
 import { LoyaltyCardClient } from './LoyaltyCardClient';
 
 // Session obligatoire — même garde que /compte/parrainage.
@@ -25,21 +27,25 @@ export default async function CarteFideliteePage() {
 
   const supabase = createServiceClient();
 
-  const { data: customerRow } = await supabase
+  const { data: customerRow, error: customerError } = await supabase
     .from('customers')
     .select('loyalty_card_number')
     .eq('id', customer.id)
     .eq('tenant_id', tenant.id)
     .single();
 
+  if (customerError) throw new Error('Unable to load loyalty card');
+
   const cardNumber = customerRow?.loyalty_card_number ?? null;
 
-  const { data: balanceRow } = await supabase
+  const { data: balanceRow, error: balanceError } = await supabase
     .from('customer_points_balance')
     .select('confirmed_balance')
     .eq('tenant_id', tenant.id)
     .eq('customer_id', customer.id)
     .maybeSingle();
+
+  if (balanceError) throw new Error('Unable to load loyalty balance');
 
   // QR code — encode uniquement le numéro de carte (pas d'URL), scanné en
   // caisse par /admin/loyalty/scan. Même package `qrcode` déjà utilisé par
@@ -48,8 +54,8 @@ export default async function CarteFideliteePage() {
     ? await QRCode.toString(cardNumber, {
         type: 'svg',
         errorCorrectionLevel: 'M',
-        margin: 1,
-        color: { dark: tenant.primary_color, light: '#ffffff' },
+        margin: 4,
+        color: { dark: '#000000', light: '#ffffff' },
       })
     : null;
 
@@ -65,7 +71,8 @@ export default async function CarteFideliteePage() {
       confirmedBalance={balanceRow?.confirmed_balance ?? 0}
       qrSvg={qrSvg}
       barcodeSvg={barcodeSvg}
-      tenantName={tenant.name}
+      brand={getLoyaltyBrand(tenant)}
+      wallets={getWalletAvailability(tenant.slug, tenant.logo_url)}
     />
   );
 }
