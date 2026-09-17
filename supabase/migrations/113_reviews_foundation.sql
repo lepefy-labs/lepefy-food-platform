@@ -126,7 +126,7 @@ create table if not exists public.review_moderation_events (
 create index if not exists review_moderation_events_review_idx on public.review_moderation_events (tenant_id, review_id, created_at desc);
 
 create or replace function public.validate_review_invite()
-returns trigger language plpgsql set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   purchase public.orders%rowtype;
   customer_tenant uuid;
@@ -144,6 +144,7 @@ begin
   return new;
 end
 $$;
+revoke all on function public.validate_review_invite() from public, anon, authenticated;
 
 drop trigger if exists review_invites_validate on public.review_invites;
 create trigger review_invites_validate before insert or update of tenant_id, order_id, customer_id, eligible_at, reminder_at, expires_at on public.review_invites
@@ -168,7 +169,7 @@ grant select, insert, update, delete on table public.review_invite_tokens to ser
 grant select, insert on table public.review_moderation_events to service_role;
 
 create or replace function public.validate_review_purchase()
-returns trigger language plpgsql set search_path = public as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 declare
   purchase public.orders%rowtype;
 begin
@@ -184,6 +185,7 @@ begin
   return new;
 end
 $$;
+revoke all on function public.validate_review_purchase() from public, anon, authenticated;
 
 drop trigger if exists reviews_validate_purchase on public.reviews;
 create trigger reviews_validate_purchase before insert on public.reviews
