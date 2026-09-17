@@ -187,6 +187,23 @@ export interface RentalItem {
 }
 
 export type RentalReservationStatus = 'confirmed' | 'cancelled' | 'refunded';
+export type RentalFulfillmentType = 'pickup' | 'delivery';
+export type RentalDeliveryFeeStatus = 'not_applicable' | 'pending_quote' | 'quoted' | 'paid';
+
+export interface RentalDeliveryZone {
+  id: string;
+  tenant_id: string;
+  label: string;
+  postal_code_prefixes: string[] | null;
+  city: string | null;
+  country: string | null;
+  fee_amount: number;
+  note: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface RentalReservation {
   id: string;
@@ -200,6 +217,17 @@ export interface RentalReservation {
   amount_paid: number;
   status: RentalReservationStatus;
   created_at: string;
+  fulfillment_type: RentalFulfillmentType;
+  delivery_street: string | null;
+  delivery_house_number: string | null;
+  delivery_city: string | null;
+  delivery_postal_code: string | null;
+  delivery_country: string | null;
+  delivery_zone_id: string | null;
+  delivery_fee_status: RentalDeliveryFeeStatus;
+  delivery_fee_amount: number | null;
+  delivery_fee_quoted_at: string | null;
+  delivery_fee_paid_at: string | null;
 }
 
 export interface RentalReservationItem {
@@ -255,6 +283,14 @@ export interface RentalPaymentIntentMetadata {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  fulfillment_type: RentalFulfillmentType;
+  delivery_street: string;
+  delivery_house_number: string;
+  delivery_city: string;
+  delivery_postal_code: string;
+  delivery_country: string;
+  delivery_zone_id: string;
+  delivery_fee_amount: string;
 }
 
 export type RentalReservationRequestStatus = 'pending' | 'confirmed' | 'stock_conflict';
@@ -277,4 +313,12 @@ export interface RentalReservationRequest {
   created_at: string;
   confirmed_at: string | null;
   reservation_id: string | null;
+  fulfillment_type: RentalFulfillmentType;
+  delivery_street: string | null;
+  delivery_house_number: string | null;
+  delivery_city: string | null;
+  delivery_postal_code: string | null;
+  delivery_country: string | null;
+  delivery_zone_id: string | null;
+  delivery_fee_amount: number | null;
 }

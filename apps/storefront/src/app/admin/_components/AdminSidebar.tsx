@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconCalendarEvent, IconBell, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle } from '@tabler/icons-react';
+import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconBell, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle } from '@tabler/icons-react';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 
 interface AdminSidebarProps {
@@ -52,6 +52,7 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
       {has('events.view') && <Link href="/admin/evenementiel/devis" className={linkClass(pathname.startsWith('/admin/evenementiel/devis'))}><IconBriefcase size={20}/><span className="flex-1">Demandes traiteur</span>{newInquiriesCount > 0 && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-800">{newInquiriesCount}</span>}</Link>}
       {has('events.view') && <Link href="/admin/evenementiel/reservations-materiel" className={linkClass(pathname.startsWith('/admin/evenementiel/reservations-materiel'))}><IconToolsKitchen2 size={20}/><span className="flex-1">Locations</span>{pendingRentalRequestsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{pendingRentalRequestsCount}</span>}</Link>}
       {has('event_content.manage') && <Link href="/admin/evenementiel/contenu" className={linkClass(pathname.startsWith('/admin/evenementiel/contenu') || pathname.startsWith('/admin/evenementiel/services') || pathname.startsWith('/admin/evenementiel/galerie'))}><IconPhoto size={20}/>Galerie / Contenu</Link>}
+      {has('event_content.manage') && <Link href="/admin/evenementiel/livraison-materiel" className={linkClass(pathname.startsWith('/admin/evenementiel/livraison-materiel'))}><IconTruckDelivery size={20}/>Livraison matériel</Link>}
       {has('scan.access') && <><p className={groupLabel}>Service sur place</p><Link href="/scan" className={`${linkClass(pathname === '/scan')} border border-violet-200 bg-violet-50/70 text-violet-800 hover:bg-violet-100 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-200`}><IconScan size={20}/>Service repas / Scan</Link></>}
     </> : null}
     {commonVisible && <p className={groupLabel}>Commun</p>}

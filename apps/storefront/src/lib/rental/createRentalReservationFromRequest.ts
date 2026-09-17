@@ -24,6 +24,14 @@ export interface CreateRentalReservationInput {
   amountPaid:        number;
   /** intent.id — présent uniquement pour le flux Stripe. undefined pour external_link. */
   stripePaymentIntentId?: string;
+  fulfillmentType:        'pickup' | 'delivery';
+  deliveryStreet?:        string | null;
+  deliveryHouseNumber?:   string | null;
+  deliveryCity?:          string | null;
+  deliveryPostalCode?:    string | null;
+  deliveryCountry?:       string | null;
+  deliveryZoneId?:        string | null;
+  deliveryFeeAmount?:     number | null;
 }
 
 export type CreateRentalReservationResult =
@@ -101,6 +109,11 @@ export async function createRentalReservationFromRequest(
     return { error: 'stock_conflict' };
   }
 
+  const deliveryFeeStatus =
+    input.fulfillmentType !== 'delivery' ? 'not_applicable'
+    : input.deliveryFeeAmount != null ? 'quoted'
+    : 'pending_quote';
+
   const { data: reservation, error: reservationError } = await supabase
     .from('rental_reservations')
     .insert({
@@ -113,6 +126,16 @@ export async function createRentalReservationFromRequest(
       stripe_payment_intent_id:  input.stripePaymentIntentId ?? null,
       amount_paid:               amountPaid,
       status:                    'confirmed',
+      fulfillment_type:          input.fulfillmentType,
+      delivery_street:           input.deliveryStreet ?? null,
+      delivery_house_number:     input.deliveryHouseNumber ?? null,
+      delivery_city:             input.deliveryCity ?? null,
+      delivery_postal_code:      input.deliveryPostalCode ?? null,
+      delivery_country:          input.deliveryCountry ?? null,
+      delivery_zone_id:          input.deliveryZoneId ?? null,
+      delivery_fee_status:       deliveryFeeStatus,
+      delivery_fee_amount:       input.deliveryFeeAmount ?? null,
+      delivery_fee_quoted_at:    deliveryFeeStatus === 'quoted' ? new Date().toISOString() : null,
     })
     .select('id')
     .single();
@@ -142,11 +165,25 @@ export async function createRentalReservationFromRequest(
   console.info('[createRentalReservationFromRequest] Reservation created — id:', reservation.id, '— service:', serviceOfferingId);
 
   const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
+  const adminLink = `${storefrontUrl}/admin/evenementiel/reservations-materiel`;
+
   await notifyN8n('/webhook/rental-reservation-confirmed', {
     reservationId: reservation.id, serviceOfferingId, customerName, customerEmail, customerPhone,
     pickupDate, amountPaid, items: itemsPayload,
-    adminLink: `${storefrontUrl}/admin/evenementiel/reservations-materiel`,
+    fulfillmentType: input.fulfillmentType, deliveryFeeStatus,
+    adminLink,
   });
+
+  if (deliveryFeeStatus === 'pending_quote') {
+    await notifyN8n('/webhook/rental-delivery-quote-pending', {
+      reservationId: reservation.id, serviceOfferingId, customerName, customerEmail, customerPhone,
+      deliveryAddress: {
+        street: input.deliveryStreet, houseNumber: input.deliveryHouseNumber,
+        city: input.deliveryCity, postalCode: input.deliveryPostalCode, country: input.deliveryCountry,
+      },
+      adminLink,
+    });
+  }
 
   return { reservationId: reservation.id };
 }

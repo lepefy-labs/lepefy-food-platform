@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "storefront-dev",
+      "runtimeExecutable": "corepack",
+      "runtimeArgs": ["pnpm", "--dir", "apps/storefront", "dev"],
+      "port": 3000
+    }
+  ]
+}

@@ -81,6 +81,9 @@ export interface Tenant {
   // Module Événementiel (052)
   events_enabled: boolean;
   services_enabled: boolean;
+  // Livraison location matériel (114)
+  rental_delivery_enabled: boolean;
+  rental_delivery_countries: string[] | null;
   created_at: string;
   updated_at: string;
 }

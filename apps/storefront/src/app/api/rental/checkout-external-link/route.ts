@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import type { RentalCheckoutItemInput, TenantPaymentMethod } from '@lepefy/types';
+import { isCountryAllowedForDelivery, matchDeliveryZone } from '@/lib/rental/matchDeliveryZone';
+import type { RentalCheckoutItemInput, RentalDeliveryZone, TenantPaymentMethod } from '@lepefy/types';
 
 const MAX_QUANTITY_PER_ITEM = 999;
 
@@ -13,6 +14,12 @@ interface RentalExternalLinkCheckoutBody {
   customer_email:          string;
   customer_phone?:         string | null;
   externalPaymentMethodId: string;
+  fulfillment_type?:       'pickup' | 'delivery';
+  street?:                 string;
+  house_number?:           string;
+  city?:                   string;
+  postal_code?:            string;
+  country?:                string;
 }
 
 // Phase 3 — paiement via lien externe (PayPal/Revolut/autre) pour la
@@ -34,11 +41,20 @@ export async function POST(req: NextRequest) {
     const {
       service_offering_id, items: rawItems, pickup_date,
       customer_name, customer_email, customer_phone, externalPaymentMethodId,
+      fulfillment_type, street, house_number, city, postal_code, country,
     } = body;
 
     if (!service_offering_id || !rawItems?.length || !pickup_date
       || !customer_name?.trim() || !customer_email?.trim() || !externalPaymentMethodId) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
+    }
+
+    const isDelivery = fulfillment_type === 'delivery';
+    if (isDelivery && (!street?.trim() || !house_number?.trim() || !city?.trim() || !postal_code?.trim() || !country?.trim())) {
+      return NextResponse.json({ error: 'Adresse de livraison incomplète.' }, { status: 400 });
+    }
+    if (isDelivery && !isCountryAllowedForDelivery(tenant, country!)) {
+      return NextResponse.json({ error: 'Livraison indisponible pour ce pays.' }, { status: 400 });
     }
 
     for (const i of rawItems) {
@@ -116,9 +132,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const total = parseFloat(
-      rawItems.reduce((sum, i) => sum + itemById.get(i.rental_item_id)!.price_per_unit * i.quantity, 0).toFixed(2),
-    );
+    const itemsTotal = rawItems.reduce((sum, i) => sum + itemById.get(i.rental_item_id)!.price_per_unit * i.quantity, 0);
+
+    // Ricalcolo sempre server-side — mai fidarsi di un importo inviato dal client.
+    let matchedZone: RentalDeliveryZone | null = null;
+    if (isDelivery) {
+      const { data: zones } = await supabase
+        .from('rental_delivery_zones')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .eq('active', true);
+      matchedZone = matchDeliveryZone((zones ?? []) as RentalDeliveryZone[], { country: country!, postal_code: postal_code!, city: city! });
+    }
+    const deliveryFee = matchedZone ? matchedZone.fee_amount : 0;
+    const total = parseFloat((itemsTotal + deliveryFee).toFixed(2));
 
     // ── Construction du lien (même règle que Phase 1/2 — Décision 4) ────────
     const currency = (tenant.currency ?? 'EUR').toUpperCase();
@@ -142,6 +169,14 @@ export async function POST(req: NextRequest) {
         payment_method_type:     method.method,
         payment_method_label:    method.label ?? method.method,
         payment_link:            finalLink,
+        fulfillment_type:        isDelivery ? 'delivery' : 'pickup',
+        delivery_street:         isDelivery ? street!.trim() : null,
+        delivery_house_number:   isDelivery ? house_number!.trim() : null,
+        delivery_city:           isDelivery ? city!.trim() : null,
+        delivery_postal_code:    isDelivery ? postal_code!.trim() : null,
+        delivery_country:        isDelivery ? country!.trim() : null,
+        delivery_zone_id:        matchedZone?.id ?? null,
+        delivery_fee_amount:     isDelivery ? deliveryFee : null,
       })
       .select('id')
       .single();

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconCreditCard, IconMinus, IconPlus, IconShoppingBag } from '@tabler/icons-react';
+import { IconCreditCard, IconMinus, IconPlus, IconSearch, IconShoppingBag, IconTruckDelivery, IconBuildingStore } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import {
@@ -37,6 +37,21 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
+  const [street, setStreet] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('');
+  const [deliveryQuote, setDeliveryQuote] = useState<{
+    status: 'idle' | 'loading' | 'quoted' | 'pending_quote' | 'unavailable';
+    feeAmount: number | null;
+    reason?: 'country_not_allowed' | 'delivery_disabled';
+  }>({ status: 'idle', feeAmount: null });
+
   usePaymentRedirectRecovery('rental', () => {
     router.push(`${window.location.pathname}/confirmation`);
   });
@@ -60,8 +75,56 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionCustomer]);
 
+  const categories = useMemo(
+    () => [...new Set(rentalItems.map((item) => item.category).filter((c): c is string => Boolean(c)))],
+    [rentalItems],
+  );
+
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return rentalItems.filter((item) => {
+      if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
+      if (query && !item.name.toLowerCase().includes(query)) return false;
+      return true;
+    });
+  }, [rentalItems, selectedCategory, searchQuery]);
+
+  // Devis d'affichage uniquement — l'aperçu du supplément pendant que le
+  // client remplit son adresse. Le montant réel est recalculé côté serveur
+  // (voir matchDeliveryZone.ts) au moment du paiement, jamais fait confiance
+  // à cette valeur.
+  useEffect(() => {
+    if (fulfillmentType !== 'delivery' || !country.trim() || !postalCode.trim() || !city.trim()) {
+      setDeliveryQuote({ status: 'idle', feeAmount: null });
+      return;
+    }
+    setDeliveryQuote((previous) => ({ ...previous, status: 'loading' }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/rental/delivery-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ service_offering_id: service.id, country, postal_code: postalCode, city }),
+        });
+        const result = await res.json();
+        if (!result.available) {
+          setDeliveryQuote({ status: 'unavailable', feeAmount: null, reason: result.reason });
+        } else if (result.zoneMatched) {
+          setDeliveryQuote({ status: 'quoted', feeAmount: result.feeAmount });
+        } else {
+          setDeliveryQuote({ status: 'pending_quote', feeAmount: null });
+        }
+      } catch {
+        setDeliveryQuote({ status: 'idle', feeAmount: null });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fulfillmentType, country, postalCode, city, service.id]);
+
   const totalQuantity = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
-  const total = rentalItems.reduce((sum, item) => sum + (quantities[item.id] ?? 0) * item.price_per_unit, 0);
+  const itemsTotal = rentalItems.reduce((sum, item) => sum + (quantities[item.id] ?? 0) * item.price_per_unit, 0);
+  const deliveryFeePreview = deliveryQuote.status === 'quoted' ? deliveryQuote.feeAmount ?? 0 : 0;
+  const total = itemsTotal + deliveryFeePreview;
   const selectedItems = rentalItems.filter((item) => (quantities[item.id] ?? 0) > 0);
 
   function setQuantity(itemId: string, delta: number, max: number) {
@@ -76,7 +139,27 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
     if (totalQuantity === 0) return setError('Sélectionnez au moins un article.');
     if (!pickupDate) return setError('Indiquez une date de retrait.');
     if (!name.trim() || !email.trim()) return setError('Nom et email sont obligatoires.');
+    if (fulfillmentType === 'delivery') {
+      if (!street.trim() || !houseNumber.trim() || !city.trim() || !postalCode.trim() || !country.trim()) {
+        return setError('Renseignez votre adresse de livraison complète.');
+      }
+      if (deliveryQuote.status === 'unavailable') {
+        return setError('Livraison indisponible pour cette adresse — choisissez le retrait en boutique.');
+      }
+    }
     setStep('choose-payment');
+  }
+
+  function deliveryPayload() {
+    if (fulfillmentType !== 'delivery') return { fulfillment_type: 'pickup' as const };
+    return {
+      fulfillment_type: 'delivery' as const,
+      street: street.trim(),
+      house_number: houseNumber.trim(),
+      city: city.trim(),
+      postal_code: postalCode.trim(),
+      country: country.trim(),
+    };
   }
 
   async function createIntent() {
@@ -92,6 +175,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           customer_name: name.trim(),
           customer_email: email.trim(),
           customer_phone: phone.trim() || null,
+          ...deliveryPayload(),
         }),
       });
       const result = await res.json();
@@ -119,6 +203,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
             customer_email: email.trim(),
             customer_phone: phone.trim() || null,
             externalPaymentMethodId: selectedExternalMethodId,
+            ...deliveryPayload(),
           }),
         });
         const result = await res.json();
@@ -227,6 +312,18 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
               <span className="shrink-0 font-semibold">{formatPrice(item.price_per_unit * (quantities[item.id] ?? 0), tenant.currency)}</span>
             </div>
           ))}
+          {fulfillmentType === 'delivery' && deliveryQuote.status === 'quoted' && (
+            <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span className="min-w-0 truncate">Livraison</span>
+              <span className="shrink-0 font-semibold">{formatPrice(deliveryQuote.feeAmount ?? 0, tenant.currency)}</span>
+            </div>
+          )}
+          {fulfillmentType === 'delivery' && deliveryQuote.status === 'pending_quote' && (
+            <div className="flex items-center justify-between gap-3 py-2.5 text-sm text-gray-500">
+              <span className="min-w-0 truncate">Livraison</span>
+              <span className="shrink-0 text-xs">Supplément à confirmer</span>
+            </div>
+          )}
         </div>
       )}
       <div className="mt-4 flex items-center justify-between border-t border-black/[0.08] pt-4">
@@ -240,8 +337,32 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
     <div className="pb-[108px] lg:pb-0">
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div>
+          {(categories.length > 1 || rentalItems.length > 6) && (
+            <div className="mb-4 space-y-3">
+              <div className="relative">
+                <IconSearch size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher un article…"
+                  className="min-h-11 w-full rounded-xl border border-black/10 bg-white py-2.5 pl-10 pr-3.5 text-sm outline-none focus:border-[var(--color-primary)]"
+                />
+              </div>
+              {categories.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setSelectedCategory('all')} className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${selectedCategory === 'all' ? 'bg-[var(--color-primary)] text-white' : 'bg-white text-gray-600 border border-black/10'}`}>Tous</button>
+                  {categories.map((cat) => (
+                    <button key={cat} type="button" onClick={() => setSelectedCategory(cat)} className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${selectedCategory === cat ? 'bg-[var(--color-primary)] text-white' : 'bg-white text-gray-600 border border-black/10'}`}>{cat}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {filteredItems.length === 0 ? (
+            <p className="rounded-3xl border border-black/[0.06] bg-white p-8 text-center text-sm text-gray-500">Aucun article ne correspond à votre recherche.</p>
+          ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {rentalItems.map((item) => {
+            {filteredItems.map((item) => {
               const quantity = quantities[item.id] ?? 0;
               const soldOut = item.stock_quantity <= 0;
               return (
@@ -271,14 +392,62 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
               );
             })}
           </div>
+          )}
 
           <section className="mt-7 rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
             <h2 className="font-display text-2xl font-semibold">Retrait et coordonnées</h2>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFulfillmentType('pickup')}
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${fulfillmentType === 'pickup' ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]' : 'border-black/10 text-gray-600'}`}
+              >
+                <IconBuildingStore size={16} /> Retrait en boutique
+              </button>
+              <button
+                type="button"
+                onClick={() => setFulfillmentType('delivery')}
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${fulfillmentType === 'delivery' ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]' : 'border-black/10 text-gray-600'}`}
+              >
+                <IconTruckDelivery size={16} /> Livraison
+              </button>
+            </div>
+
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-medium text-gray-600 sm:col-span-2">Date de retrait souhaitée<input value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} type="date" className={`${inputClass} mt-1.5`} /></label>
               <label className="text-xs font-medium text-gray-600">Nom complet<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
               <label className="text-xs font-medium text-gray-600">Email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" className={`${inputClass} mt-1.5`} /></label>
               <label className="text-xs font-medium text-gray-600 sm:col-span-2">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
+
+              {fulfillmentType === 'delivery' && (
+                <>
+                  <label className="text-xs font-medium text-gray-600">Rue<input value={street} onChange={(e) => setStreet(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="text-xs font-medium text-gray-600">Numéro<input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="text-xs font-medium text-gray-600">Code postal<input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="text-xs font-medium text-gray-600">Ville<input value={city} onChange={(e) => setCity(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="text-xs font-medium text-gray-600 sm:col-span-2">Pays<input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Ex. IT, FR" className={`${inputClass} mt-1.5`} /></label>
+
+                  <div className="sm:col-span-2">
+                    {deliveryQuote.status === 'loading' && <p className="text-xs text-gray-500">Vérification de la disponibilité…</p>}
+                    {deliveryQuote.status === 'quoted' && (
+                      <p className="rounded-xl bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)] px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
+                        Supplément de livraison : {formatPrice(deliveryQuote.feeAmount ?? 0, tenant.currency)} — inclus dans le total.
+                      </p>
+                    )}
+                    {deliveryQuote.status === 'pending_quote' && (
+                      <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Aucun supplément n&apos;est facturé maintenant. Il sera confirmé par l&apos;établissement selon votre localisation et payé séparément.
+                      </p>
+                    )}
+                    {deliveryQuote.status === 'unavailable' && (
+                      <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+                        Livraison indisponible pour cette adresse — choisissez le retrait en boutique.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

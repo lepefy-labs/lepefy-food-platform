@@ -55,5 +55,6 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/evenementiel/events') || path.startsWith('/api/admin/evenementiel/ticket-types')) return read ? 'events.view' : 'events.manage';
   if (path.startsWith('/api/admin/evenementiel/inquiries')) return read ? 'event_reservations.view' : 'event_reservations.manage';
   if (path.startsWith('/api/admin/evenementiel/rental-items') || path.includes('/rental-items') || path.startsWith('/api/admin/evenementiel/gallery') || path.startsWith('/api/admin/evenementiel/services') || path === '/api/admin/evenementiel/upload-image' || path === '/api/admin/evenementiel/settings') return 'event_content.manage';
+  if (path.startsWith('/api/admin/evenementiel/rental-delivery-zones')) return 'event_content.manage';
   return null;
 }

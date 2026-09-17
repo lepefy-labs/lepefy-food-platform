@@ -13,11 +13,18 @@ export async function PATCH(req: NextRequest) {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const body  = await req.json() as { events_enabled?: boolean; services_enabled?: boolean };
-  const patch: Record<string, boolean> = {};
+  const body  = await req.json() as {
+    events_enabled?: boolean; services_enabled?: boolean;
+    rental_delivery_enabled?: boolean; rental_delivery_countries?: string[];
+  };
+  const patch: Record<string, boolean | string[]> = {};
 
   if (typeof body.events_enabled === 'boolean') patch.events_enabled = body.events_enabled;
   if (typeof body.services_enabled === 'boolean') patch.services_enabled = body.services_enabled;
+  if (typeof body.rental_delivery_enabled === 'boolean') patch.rental_delivery_enabled = body.rental_delivery_enabled;
+  if (Array.isArray(body.rental_delivery_countries)) {
+    patch.rental_delivery_countries = body.rental_delivery_countries.map((c) => c.trim().toUpperCase()).filter(Boolean);
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'Aucun champ valide à mettre à jour.' }, { status: 400 });
@@ -29,7 +36,7 @@ export async function PATCH(req: NextRequest) {
     .from('tenants')
     .update(patch)
     .eq('id', tenant.id)
-    .select('events_enabled, services_enabled')
+    .select('events_enabled, services_enabled, rental_delivery_enabled, rental_delivery_countries')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

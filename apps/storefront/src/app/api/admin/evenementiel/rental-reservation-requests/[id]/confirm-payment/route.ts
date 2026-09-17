@@ -49,6 +49,14 @@ export async function POST(
     customerEmail:     request.customer_email,
     customerPhone:     request.customer_phone ?? '',
     amountPaid:        request.amount,
+    fulfillmentType:      request.fulfillment_type,
+    deliveryStreet:       request.delivery_street,
+    deliveryHouseNumber:  request.delivery_house_number,
+    deliveryCity:         request.delivery_city,
+    deliveryPostalCode:   request.delivery_postal_code,
+    deliveryCountry:      request.delivery_country,
+    deliveryZoneId:       request.delivery_zone_id,
+    deliveryFeeAmount:    request.delivery_fee_amount,
   });
 
   if ('error' in result) {

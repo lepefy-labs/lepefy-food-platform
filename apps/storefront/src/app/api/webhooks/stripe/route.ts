@@ -7,10 +7,11 @@ import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
+import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
 import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
-import type { ShippingAddress, EventCheckoutItemInput } from '@lepefy/types';
+import type { ShippingAddress, EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 
@@ -128,6 +129,13 @@ export async function POST(req: NextRequest) {
     // routé avant la logique commande existante, jamais mélangé avec elle.
     if (intent.metadata?.type === 'event_reservation') {
       return handleEventReservationPaymentSucceeded(intent, isE2EEvent);
+    }
+
+    // Réservation location matériel payée par carte (Stripe Elements sur
+    // /evenementiel/services/[slug]) — même isolation que event_reservation
+    // ci-dessus, routé avant la logique commande existante.
+    if (intent.metadata?.type === 'rental_reservation') {
+      return handleRentalReservationPaymentSucceeded(intent);
     }
 
     const sessionId = intent.metadata?.session_id;
@@ -626,6 +634,88 @@ async function handleEventReservationPaymentSucceeded(intent: Stripe.PaymentInte
     console.info('[webhook] Event reservation already created by concurrent retry — intent:', intent.id);
   } else {
     console.error('[webhook] Failed to create event reservation:', result.error, '— intent:', intent.id);
+  }
+
+  return NextResponse.json({ received: true });
+}
+
+async function handleRentalReservationPaymentSucceeded(intent: Stripe.PaymentIntent): Promise<NextResponse> {
+  const serviceOfferingId = intent.metadata?.service_offering_id;
+  const tenantId          = intent.metadata?.tenant_id;
+  const rawItems          = intent.metadata?.items;
+  const pickupDate        = intent.metadata?.pickup_date;
+  const customerName      = intent.metadata?.customer_name ?? '';
+  const customerEmail     = intent.metadata?.customer_email ?? '';
+  const customerPhone     = intent.metadata?.customer_phone ?? '';
+  const fulfillmentType   = intent.metadata?.fulfillment_type === 'delivery' ? 'delivery' : 'pickup';
+  const deliveryFeeAmount = intent.metadata?.delivery_fee_amount;
+
+  console.info('[webhook] rental_reservation succeeded — intent:', intent.id,
+    '— service_offering_id:', serviceOfferingId, '— tenant_id:', tenantId);
+
+  if (!serviceOfferingId || !tenantId || !rawItems || !pickupDate) {
+    console.error('[webhook] Missing service_offering_id/tenant_id/items/pickup_date in PaymentIntent metadata — intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  let items: RentalCheckoutItemInput[];
+  try {
+    items = JSON.parse(rawItems) as RentalCheckoutItemInput[];
+  } catch (parseErr) {
+    console.error('[webhook] Failed to parse items JSON in PaymentIntent metadata — intent:', intent.id, '— error:', parseErr);
+    return NextResponse.json({ received: true });
+  }
+
+  const supabase = createServiceClient();
+
+  // ── Idempotency: check if reservation already exists ────────────────────
+  const { data: existing } = await supabase
+    .from('rental_reservations')
+    .select('id')
+    .eq('stripe_payment_intent_id', intent.id)
+    .maybeSingle();
+
+  if (existing) {
+    console.info('[webhook] Rental reservation already exists for intent:', intent.id, '— skipping');
+    return NextResponse.json({ received: true });
+  }
+
+  const result = await createRentalReservationFromRequest(supabase, {
+    serviceOfferingId,
+    tenantId,
+    items,
+    pickupDate,
+    customerName,
+    customerEmail,
+    customerPhone,
+    amountPaid:             intent.amount / 100,
+    stripePaymentIntentId:  intent.id,
+    fulfillmentType,
+    deliveryStreet:         intent.metadata?.delivery_street || null,
+    deliveryHouseNumber:    intent.metadata?.delivery_house_number || null,
+    deliveryCity:           intent.metadata?.delivery_city || null,
+    deliveryPostalCode:     intent.metadata?.delivery_postal_code || null,
+    deliveryCountry:        intent.metadata?.delivery_country || null,
+    deliveryZoneId:         intent.metadata?.delivery_zone_id || null,
+    deliveryFeeAmount:      deliveryFeeAmount ? Number(deliveryFeeAmount) : null,
+  });
+
+  if ('reservationId' in result) {
+    console.info('[webhook] Rental reservation created — id:', result.reservationId, '— intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  // stock_conflict et already_exists sont déjà entièrement gérés dans
+  // createRentalReservationFromRequest (remboursement automatique + n8n pour
+  // stock_conflict ; simple no-op pour already_exists) — on se contente de
+  // logguer ici, jamais de faire réessayer Stripe indéfiniment pour une
+  // erreur applicative interne.
+  if (result.error === 'stock_conflict') {
+    console.info('[webhook] Rental reservation stock conflict handled — intent:', intent.id);
+  } else if (result.error === 'already_exists') {
+    console.info('[webhook] Rental reservation already created by concurrent retry — intent:', intent.id);
+  } else {
+    console.error('[webhook] Failed to create rental reservation:', result.error, '— intent:', intent.id);
   }
 
   return NextResponse.json({ received: true });

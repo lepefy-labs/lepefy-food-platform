@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import RentalReservationsClient from './RentalReservationsClient';
-import type { RentalReservationRequest } from '@lepefy/types';
+import type { RentalReservationRequest, RentalFulfillmentType, RentalDeliveryFeeStatus } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -17,6 +18,15 @@ interface RentalReservationWithDetails {
   created_at: string;
   service_offerings: { title: string; slug: string } | null;
   items: { quantity: number; unit_price: number; rental_items: { name: string } | null }[];
+  fulfillment_type: RentalFulfillmentType;
+  delivery_street: string | null;
+  delivery_house_number: string | null;
+  delivery_city: string | null;
+  delivery_postal_code: string | null;
+  delivery_country: string | null;
+  delivery_fee_status: RentalDeliveryFeeStatus;
+  delivery_fee_amount: number | null;
+  delivery_fee_paid_at: string | null;
 }
 
 export default async function AdminRentalReservationsPage() {
@@ -70,6 +80,12 @@ export default async function AdminRentalReservationsPage() {
     : { data: [] };
   const rentalItemNameById = new Map(((pendingRentalItems ?? []) as { id: string; name: string }[]).map((r) => [r.id, r.name]));
 
+  const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
+  const externalPaymentMethods = allPaymentMethods.filter(
+    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+      && m.enabled_modules.includes('rental'),
+  );
+
   return (
     <div className="max-w-4xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -81,7 +97,7 @@ export default async function AdminRentalReservationsPage() {
       <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
         Retraits confirmés à venir en priorité, puis historique des réservations.
       </p>
-      <RentalReservationsClient initialReservations={result} initialPendingRequests={pendingRequests} rentalItemNameById={Object.fromEntries(rentalItemNameById)} currency={tenant.currency} />
+      <RentalReservationsClient initialReservations={result} initialPendingRequests={pendingRequests} rentalItemNameById={Object.fromEntries(rentalItemNameById)} currency={tenant.currency} externalPaymentMethods={externalPaymentMethods} />
     </div>
   );
 }

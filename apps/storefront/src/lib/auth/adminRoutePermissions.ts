@@ -14,6 +14,7 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/evenementiel/evenements', permission: 'events.view' },
   { prefix: '/admin/evenementiel/devis', permission: 'events.view' },
   { prefix: '/admin/evenementiel/reservations-materiel', permission: 'events.view' },
+  { prefix: '/admin/evenementiel/livraison-materiel', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/contenu', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/services', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/galerie', permission: 'event_content.manage' },
