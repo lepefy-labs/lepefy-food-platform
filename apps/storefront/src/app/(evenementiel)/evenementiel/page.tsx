@@ -143,6 +143,22 @@ export default async function EvenementielHubPage() {
   });
   const traiteur = services.find((service) => service.type === 'traiteur') ?? services.find((service) => service.cta_type === 'devis') ?? null;
   const location = services.find((service) => service.type === 'location_materiel') ?? services.find((service) => service.cta_type === 'reservation') ?? null;
+  const rentalPhotosRes = location
+    ? await supabase.from('rental_items').select('name, image_url')
+        .eq('tenant_id', tenant.id).eq('service_offering_id', location.id).eq('active', true)
+        .not('image_url', 'is', null).order('sort_order', { ascending: true })
+        .order('id', { ascending: true }).limit(12)
+    : { data: [] };
+  const rentalPhotos = (rentalPhotosRes.data ?? []).filter(
+    (photo): photo is { name: string; image_url: string } => Boolean(photo.image_url?.trim()),
+  );
+  const uniqueRentalPhotos = rentalPhotos.filter(
+    (photo, index, photos) => photos.findIndex((candidate) => candidate.image_url === photo.image_url) === index,
+  );
+  const rentalPreviewPhotos = [...new Set([
+    0, Math.floor((uniqueRentalPhotos.length - 1) / 2), uniqueRentalPhotos.length - 1,
+  ])].flatMap((index) => uniqueRentalPhotos[index] ? [uniqueRentalPhotos[index]] : []);
+
   const whatsappHref = tenant.whatsapp_number ? `https://wa.me/${tenant.whatsapp_number.replace(/\D/g, '')}` : null;
   const contactHref = whatsappHref ?? (tenant.legal_email ? `mailto:${tenant.legal_email}` : '/#contact');
   const heroPrimaryHref = imminentEvent ? `/evenements/${imminentEvent.slug}`
@@ -211,26 +227,45 @@ export default async function EvenementielHubPage() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {traiteur && (
-                <Link id="traiteur" href={`/services/${traiteur.slug}`} className="group relative min-h-[310px] overflow-hidden rounded-[28px] bg-[var(--color-primary-dark)] text-white shadow-lg">
-                  {traiteur.cover_image_url && <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundImage: `url(${traiteur.cover_image_url})` }} />}
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/50 to-black/20" />
-                  <div className="relative flex h-full min-h-[310px] max-w-md flex-col justify-end p-6 sm:p-8">
-                    <IconChefHat size={30} className="mb-4 text-[var(--color-secondary)]" />
-                    <h3 className="font-display text-3xl font-semibold">Traiteur</h3>
-                    {traiteur.description && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/75">{traiteur.description}</p>}
-                    <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--color-secondary)]">Découvrir <IconArrowRight size={16} /></span>
+                <Link id="traiteur" href={`/services/${traiteur.slug}`} className="group flex flex-col overflow-hidden rounded-[28px] border border-black/[.06] bg-white text-[var(--color-primary-dark)] shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-primary)]">
+                  <div className="relative h-[180px] overflow-hidden bg-gray-100 md:h-[220px]">
+                    {traiteur.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={traiteur.cover_image_url} alt="Une réception avec notre service traiteur" loading="lazy" decoding="async" className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.03]" />
+                    ) : <div className="flex h-full items-center justify-center"><IconChefHat size={56} aria-hidden="true" /></div>}
+                    <span className="absolute left-3.5 top-3.5 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-bold"><IconChefHat size={16} aria-hidden="true" />Traiteur</span>
+                  </div>
+                  <div className="flex flex-1 flex-col p-5 sm:p-6">
+                    <h3 className="font-display text-[28px] font-semibold leading-tight">Traiteur</h3>
+                    <p className="mt-2 min-h-[72px] text-sm leading-relaxed text-gray-600 md:min-h-[48px]">Buffets et cuisine africaine pour vos réceptions privées et professionnelles.</p>
+                    <div className="mt-auto pt-5">
+                      <span className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">Demander un devis <IconArrowRight size={18} aria-hidden="true" /></span>
+                    </div>
                   </div>
                 </Link>
               )}
               {location && (
-                <Link id="location" href={`/services/${location.slug}`} className="group relative min-h-[310px] overflow-hidden rounded-[28px] bg-[#e9dcc1] text-[#1f281f] shadow-lg">
-                  {location.cover_image_url && <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundImage: `url(${location.cover_image_url})` }} />}
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#f3e8d1]/95 via-[#f3e8d1]/78 to-[#f3e8d1]/25" />
-                  <div className="relative flex h-full min-h-[310px] max-w-md flex-col justify-end p-6 sm:p-8">
-                    <IconTools size={30} className="mb-4 text-[var(--color-primary)]" />
-                    <h3 className="font-display text-3xl font-semibold">Location de matériel</h3>
-                    {location.description && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-[#374139]">{location.description}</p>}
-                    <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[var(--color-primary-dark)]">Découvrir <IconArrowRight size={16} /></span>
+                <Link id="location" href={`/services/${location.slug}`} className="group flex flex-col overflow-hidden rounded-[28px] border border-black/[.06] bg-white text-[var(--color-primary-dark)] shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-primary)]">
+                  <div className="relative h-[180px] overflow-hidden bg-gray-100 md:h-[220px]">
+                    {rentalPreviewPhotos.length > 0 ? (
+                      <div className={`grid h-full gap-2 p-4 ${rentalPreviewPhotos.length > 1 ? 'grid-cols-2 grid-rows-2' : 'grid-cols-1'}`}>
+                        {rentalPreviewPhotos.map((photo, index) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={photo.image_url} src={photo.image_url} alt={photo.name} loading="lazy" decoding="async" className={`h-full min-h-0 w-full object-contain ${index === 0 || rentalPreviewPhotos.length === 2 ? 'row-span-2' : ''}`} />
+                        ))}
+                      </div>
+                    ) : location.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={location.cover_image_url} alt="Matériel proposé à la location" loading="lazy" decoding="async" className="h-full w-full object-contain p-4" />
+                    ) : <div className="flex h-full items-center justify-center"><IconTools size={56} aria-hidden="true" /></div>}
+                    <span className="absolute left-3.5 top-3.5 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-bold"><IconTools size={16} aria-hidden="true" />Location</span>
+                  </div>
+                  <div className="flex flex-1 flex-col p-5 sm:p-6">
+                    <h3 className="font-display text-[28px] font-semibold leading-tight">Location de matériel</h3>
+                    <p className="mt-2 min-h-[72px] text-sm leading-relaxed text-gray-600 md:min-h-[48px]">Chauffe-plats et barbecue pour équiper vos buffets et vos réceptions.</p>
+                    <div className="mt-auto pt-5">
+                      <span className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-[var(--color-primary)] px-4 py-3 text-sm font-bold text-white transition-colors group-hover:bg-[var(--color-primary-dark)]">Voir le matériel <IconArrowRight size={18} aria-hidden="true" /></span>
+                    </div>
                   </div>
                 </Link>
               )}
