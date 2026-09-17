@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 17 settembre 2026 — **v6.55 Current-State Snapshot**
+> **Aggiornato:** 17 settembre 2026 — **v6.56 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -168,6 +168,9 @@ loyalty.manage
 loyalty.scan
 growth.manage
 growth.payouts.manage
+reviews.view
+reviews.moderate
+reviews.manage
 ai_knowledge.manage
 events.view
 events.manage
@@ -215,6 +218,24 @@ Segmenti custom conservano soltanto `definition_json` strutturato e vengono trad
 Le campagne V1 supportano il solo canale e-mail realmente instradabile tramite l'adapter centrale n8n `/webhook/marketing-campaign-recipient`. Al dispatch il backend ricalcola l'audience, applica il consenso marketing corrente, richiede una destinazione valida e crea uno snapshot idempotente per recipient prima di inviare payload granulari. SMS, WhatsApp e push sono predisposti nello schema ma rifiutati finché non esiste un provider configurato. I test sopprimono ogni delivery reale. Metriche delivered/opened/clicked/converted vengono mostrate solo quando esistono eventi provider; la finestra di attribution iniziale documentata è 14 giorni.
 
 L'export CSV riusa i filtri correnti, resta tenant-scoped e non include Auth ID, IP, token o metadata tecnici. L'import CSV resta predisposto ma non implementato: richiede preview, mapping, dry-run e gestione collisioni prima di poter essere abilitato in sicurezza.
+
+---
+
+## 4.2 Avis clients vérifiés
+
+Il modulo Reviews V1 introduce recensioni complessive del servizio legate a una singola commande Shop verificata. Le surface canoniche sono `/avis` e `/avis/donner` lato storefront e `/admin/avis` lato tenant admin. L'accesso commerciale usa la feature `reviews` in `platform_features`/`platform_plan_features`; l'attivazione operativa e la configurazione tenant restano in `tenant_feature_settings`, separate dal billing. Le capability dedicate sono `reviews.view`, `reviews.moderate` e `reviews.manage`; i system role `platform_owner` e `tenant_admin` le ricevono dalla migration, mentre i custom role non vengono ampliati automaticamente.
+
+Una recensione V1 è sempre di tipo `service`, una sola per `(tenant_id, order_id, review_type)`, e può essere creata soltanto per un ordine dello stesso tenant con `status = delivered` e `payment_status = paid`. Il cliente autenticato deve coincidere con `orders.customer_id`; il percorso guest usa un token invito casuale 32-byte, persistito esclusivamente come SHA-256 e legato a tenant/ordine/invito. Il nome pubblico viene minimizzato (`Prénom I.`) e, in assenza di nome affidabile, usa `Client vérifié` senza derivare dati dall'e-mail.
+
+Tutte le recensioni entrano obbligatoriamente in `pending_moderation`. Voto e testo cliente sono immutabili dopo l'invio; il tenant non può riscriverli. Le transizioni `publish | reject | hide | restore` passano dall'RPC `moderate_review`, che registra un audit append-only in `review_moderation_events`; reject/hide richiedono un reason code. Un voto basso non è mai un criterio di rifiuto. La blacklist tenant è deterministica e normalizzata rispetto a maiuscole, accenti e punteggiatura: genera flag `blocked_term:*` visibili al moderatore ma non pubblica, rifiuta o cancella automaticamente. Anche URL, possibili dati personali e pattern spam producono soltanto flag.
+
+La moderazione AI è predisposta solo semanticamente in `tenant_feature_settings.config`, ma V1 la forza `false` e non effettua alcuna inference. Una futura implementazione dovrà passare dal Lepefy AI Gateway; la decisione umana resterà comunque separata.
+
+Alla consegna di un ordine eleggibile viene creato idempotentemente un `review_invite`; il caso ordine già `delivered` che diventa `paid` successivamente è coperto anche dal PATCH admin ordine. Default: invio dopo 24 ore, reminder dopo 7 giorni, scadenza dopo 30 giorni. `.github/workflows/review-invites.yml` richiama ogni 30 minuti `scripts/process-review-invites.mjs`, che seleziona gli inviti dovuti e chiama `/api/internal/review-invites` sul dominio canonico tenant. La route usa claim retry-safe, token hashato e webhook n8n `/webhook/review-invite`. `notifyN8n()` è trattato come booleano autorevole: `false` non imposta `sent_at`/`reminder_sent_at`, cancella il token creato per quel tentativo e lascia il lavoro ritentabile.
+
+`reviews`, `review_invites`, `review_invite_tokens` e `review_moderation_events` sono service-role-only con RLS forzata e nessuna policy browser diretta. `tenant_review_stats` aggrega esclusivamente recensioni `published`; la media pubblica può essere nascosta fino a `min_public_count` (default 3), mentre `/avis` mostra soltanto righe pubblicate con badge `Commande vérifiée`. L'historique autenticato `/orders` mostra una CTA per gli ordini delivered+paid ancora senza recensione. Una submission anticipata completa l'invito eventualmente esistente per evitare e-mail successive inutili.
+
+La migration additiva `113_reviews_foundation.sql` deve essere applicata manualmente in Supabase prima dell'attivazione: Vercel non applica migration. Prima dello schema/setting, i resolver falliscono chiusi e il modulo resta invisibile/inattivo.
 
 ---
 
@@ -637,6 +658,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
 `104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
+`113` introduce Reviews V1 verificato: entitlement/settings tenant, capability RBAC dedicate, recensioni service one-per-order paid+delivered, inviti token-hashati, moderazione umana obbligatoria con contenuto immutabile e audit append-only, blacklist deterministica, statistiche pubbliche sulle sole recensioni published e dispatcher retry-safe. L’AI moderation resta disabilitata in V1. La migration è additiva e richiede applicazione manuale in Supabase prima dell’attivazione del modulo.
+
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
 Knowledge Suggestions V1 non richiede migration: deriva candidati temporanei dagli stessi segnali 095/097 e li rende persistenti esclusivamente dopo approvazione tenant dentro la tabella `tenant_knowledge_base` già esistente. Nessuna tabella di candidate queue, backfill o modifica retention viene introdotta.
@@ -717,8 +740,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.55
+# Fine snapshot v6.56
 
-**Base audit:** `main + provider-neutral managed shipping tracking V1`
+**Base audit:** `main + verified service reviews V1`
 **Data:** 17 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

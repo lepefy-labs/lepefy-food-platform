@@ -2,9 +2,17 @@ import { processOrderPointsOnDelivery } from '@/lib/loyalty/processOrderPointsOn
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { ensureReviewInviteForOrder } from '@/lib/reviews/reviewInvites';
 import type { OrderStatus } from '@lepefy/types';
 
 export type FulfillmentType = 'delivery' | 'pickup';
+
+type OrderTransitionSideEffectDependencies = {
+  processOrderPointsOnDelivery: typeof processOrderPointsOnDelivery;
+  notifyN8n: typeof notifyN8n;
+  getTenantNotificationContext: typeof getTenantNotificationContext;
+  ensureReviewInviteForOrder?: typeof ensureReviewInviteForOrder;
+};
 
 const VALID_STATUSES: OrderStatus[] = [
   'new',
@@ -64,36 +72,17 @@ export function validateOrderTransition({
   trackingCode?: string | null;
 }): { ok: true } | { ok: false; error: string } {
   if (current === next) return { ok: true };
-
   const allowed = getAllowedNextStatuses(current, fulfillmentType);
-  if (!allowed.includes(next)) {
-    return {
-      ok: false,
-      error: `Transition de statut non autorisée : ${current} → ${next}.`,
-    };
-  }
-
+  if (!allowed.includes(next)) return { ok: false, error: `Transition de statut non autorisée : ${current} → ${next}.` };
   if (next === 'shipped') {
-    if (fulfillmentType !== 'delivery') {
-      return { ok: false, error: 'Une commande Click & Collect ne peut pas être expédiée.' };
-    }
-    if (!trackingCode?.trim()) {
-      return { ok: false, error: 'Le code de suivi est requis avant expédition.' };
-    }
+    if (fulfillmentType !== 'delivery') return { ok: false, error: 'Une commande Click & Collect ne peut pas être expédiée.' };
+    if (!trackingCode?.trim()) return { ok: false, error: 'Le code de suivi est requis avant expédition.' };
   }
-
-  if (next === 'ready_for_pickup' && fulfillmentType !== 'pickup') {
-    return { ok: false, error: 'Ce statut est réservé au Click & Collect.' };
-  }
-
+  if (next === 'ready_for_pickup' && fulfillmentType !== 'pickup') return { ok: false, error: 'Ce statut est réservé au Click & Collect.' };
   return { ok: true };
 }
 
-function buildTrackingLink(
-  orderId: string,
-  email: string,
-  storefrontUrl: string,
-): string | null {
+function buildTrackingLink(orderId: string, email: string, storefrontUrl: string): string | null {
   if (!process.env.TRACKING_SECRET || !storefrontUrl) return null;
   const trackingToken = generateTrackingToken(orderId, email);
   return `${storefrontUrl}/orders/${orderId}?token=${trackingToken}`;
@@ -119,7 +108,7 @@ export async function runOrderTransitionSideEffects({
   fulfillmentType: FulfillmentType;
   trackingCode?: string | null;
   trackingCarrier?: string | null;
-}, dependencies = { processOrderPointsOnDelivery, notifyN8n, getTenantNotificationContext }) {
+}, dependencies: OrderTransitionSideEffectDependencies = { processOrderPointsOnDelivery, notifyN8n, getTenantNotificationContext, ensureReviewInviteForOrder }) {
   if (nextStatus === previousStatus) return;
 
   if (nextStatus === 'delivered') {
@@ -128,10 +117,14 @@ export async function runOrderTransitionSideEffects({
     } catch (error) {
       console.error('[admin order workflow] loyalty processing failed:', error, '— order_id:', orderId);
     }
+    try {
+      await dependencies.ensureReviewInviteForOrder?.(tenantId, orderId);
+    } catch (error) {
+      console.error('[admin order workflow] review invite scheduling failed:', error, '— order_id:', orderId);
+    }
   }
 
   if (!process.env.N8N_WEBHOOK_URL) return;
-
   const tenant = await dependencies.getTenantNotificationContext(tenantId);
   if (!tenant) {
     console.warn('[admin order workflow] tenant notification context unavailable — skipping webhook — tenant_id:', tenantId);
@@ -150,28 +143,16 @@ export async function runOrderTransitionSideEffects({
   };
 
   if (nextStatus === 'shipped') {
-    await dependencies.notifyN8n('/webhook/order-shipped', {
-      ...commonPayload,
-      trackingCode: trackingCode ?? null,
-      trackingCarrier: trackingCarrier ?? null,
-    });
+    await dependencies.notifyN8n('/webhook/order-shipped', { ...commonPayload, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null });
     return;
   }
-
   if (nextStatus === 'ready_for_pickup') {
     await dependencies.notifyN8n('/webhook/order-ready-for-pickup', commonPayload);
     return;
   }
-
   if (nextStatus === 'delivered') {
-    await dependencies.notifyN8n('/webhook/order-completed', {
-      ...commonPayload,
-      completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered',
-    });
+    await dependencies.notifyN8n('/webhook/order-completed', { ...commonPayload, completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered' });
     return;
   }
-
-  if (nextStatus === 'cancelled') {
-    await dependencies.notifyN8n('/webhook/order-cancelled', commonPayload);
-  }
+  if (nextStatus === 'cancelled') await dependencies.notifyN8n('/webhook/order-cancelled', commonPayload);
 }
