@@ -249,7 +249,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
                   <div className="aspect-[4/3] bg-[#eee8dc]">
                     {item.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />
+                      <img src={item.image_url} alt={item.name} className="h-full w-full bg-white object-contain p-4" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-sm text-gray-400">Photo indisponible</div>
                     )}

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import RentalReservationsClient from './RentalReservationsClient';
@@ -71,7 +72,12 @@ export default async function AdminRentalReservationsPage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-xl font-semibold text-gray-950 dark:text-white">Locations</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold text-gray-950 dark:text-white">Locations</h1>
+        <Link href="/admin/evenementiel/services" className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+          Gérer le catalogue
+        </Link>
+      </div>
       <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
         Retraits confirmés à venir en priorité, puis historique des réservations.
       </p>
