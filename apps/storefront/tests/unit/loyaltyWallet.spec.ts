@@ -46,7 +46,7 @@ test('Google JWT signature validates independently with the public key', () => {
   expect(verify('RSA-SHA256', Buffer.from(header + '.' + payload), keys.publicKey,
     Buffer.from(signature!, 'base64url'))).toBe(true);
   expect(verify('RSA-SHA256', Buffer.from(header + '.' + payload + 'x'), keys.publicKey,
-    Buffer.from(signature, 'base64url'))).toBe(false);
+    Buffer.from(signature!, 'base64url'))).toBe(false);
 });
 
 test('Wallet configuration never enables a different tenant', () => {
