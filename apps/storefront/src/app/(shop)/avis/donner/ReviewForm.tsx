@@ -63,7 +63,7 @@ export default function ReviewForm({ orderId, token }: { orderId: string; token:
       <fieldset disabled={pending} aria-describedby={id + '-rating-feedback'} aria-invalid={ratingError || undefined}>
         <legend className="text-sm font-semibold text-slate-950">Votre note <span className="font-normal text-slate-600">(obligatoire)</span></legend>
         <p className="mt-2 text-sm text-slate-600">Comment s’est passée votre expérience ?</p>
-        <div className="mx-auto mt-4 grid max-w-xs grid-cols-5 gap-2">
+        <div className="mx-auto mt-4 grid max-w-xs grid-cols-5 gap-1 sm:gap-2">
           {[1, 2, 3, 4, 5].map((value) => (
             <label key={value} className="relative block min-w-0 cursor-pointer">
               <input

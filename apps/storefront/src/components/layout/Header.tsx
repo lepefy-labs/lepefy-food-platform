@@ -111,9 +111,9 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
       <header className="border-b border-slate-200 bg-white" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:h-[72px] sm:px-6">
           <Link href="/" aria-label={tenant.name}>
-            <TenantLogo variant="compact" priority className="h-11 w-[120px] max-w-[36vw]" />
+            <TenantLogo variant="compact" priority className="h-11 w-20 max-w-[30vw] sm:w-[120px]" />
           </Link>
-          <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-600 hover:text-slate-950 sm:text-sm">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg px-1 text-xs font-medium text-slate-600 hover:text-slate-950 sm:text-sm">
             <IconArrowLeft size={16} aria-hidden="true" /> Retour à la boutique
           </Link>
         </div>
