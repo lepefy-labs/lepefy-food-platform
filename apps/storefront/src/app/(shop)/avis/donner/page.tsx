@@ -31,7 +31,7 @@ export default async function GiveReviewPage({ searchParams }: { searchParams: {
       <div className="mb-6 text-center">
         <span className="mx-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700"><IconRosetteDiscountCheck size={16} /> Commande vérifiée</span>
         <h1 className="mt-4 text-3xl font-bold tracking-tight text-gray-950">Comment s’est passée votre expérience ?</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">Une seule note globale du service pour cette première version. Pas de questionnaire olympique en douze disciplines.</p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">Votre avis nous aide à améliorer votre expérience et à guider les prochains clients. Vous pouvez aussi nous dire en quelques mots ce que vous avez apprécié ou ce que nous pouvons améliorer.</p>
       </div>
       <ReviewForm orderId={context.orderId} token={context.token} />
     </div>

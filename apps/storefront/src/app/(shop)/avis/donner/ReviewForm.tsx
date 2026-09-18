@@ -46,7 +46,7 @@ export default function ReviewForm({ orderId, token }: { orderId: string; token:
         </div>
       </div>
       <label className="block">
-        <span className="text-sm font-semibold text-gray-950">Votre expérience <span className="font-normal text-gray-400">(facultatif)</span></span>
+        <span className="text-sm font-semibold text-gray-950">Votre expérience</span>
         <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} rows={6} placeholder="Service, accueil, livraison, retrait…" className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]" />
         <span className="mt-1 block text-right text-xs text-gray-400">{body.length}/2000</span>
       </label>
