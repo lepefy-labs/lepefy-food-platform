@@ -43,8 +43,14 @@ export async function GET(req: NextRequest) {
   const darkParam = searchParams.get('dark');
   const darkColor = darkParam && /^[0-9a-fA-F]{6}$/.test(darkParam) ? `#${darkParam}` : tenant.primary_color;
 
-  const origin = req.nextUrl.origin;
-  const targetUrl = `${origin}/card`;
+  // Dominio canonico : storefront_url du tenant (override per-tenant, même
+  // pattern que EventsHeader/EventsFooter/loyalty wallet) > NEXT_PUBLIC_APP_URL
+  // > host ayant servi la requête en dernier recours. Jamais nextUrl.origin
+  // en premier (même bug que l'ancien api/shop/qr-code/route.tsx) — sinon le
+  // QR encode l'URL Vercel brute si la génération transite par ce host
+  // plutôt que le domaine custom.
+  const origin = tenant.storefront_url || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const targetUrl = `${origin.replace(/\/+$/, '')}/card`;
 
   const qrOptions = {
     errorCorrectionLevel: 'H' as const,
