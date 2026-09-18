@@ -3,14 +3,16 @@ import type { LoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 interface Props {
   brand: LoyaltyBrand;
   fullName: string | null;
-  points: number;
+  points: number | null;
   cardNumberDisplay: string | null;
   barcodeSvg?: string | null;
+  variant?: 'full' | 'compact';
 }
 
-export function LoyaltyCardFace({ brand, fullName, points, cardNumberDisplay, barcodeSvg }: Props) {
+export function LoyaltyCardFace({ brand, fullName, points, cardNumberDisplay, barcodeSvg, variant = 'full' }: Props) {
+  const compact = variant === 'compact';
   return (
-    <div className="relative flex min-h-[240px] flex-col overflow-hidden rounded-3xl shadow-lg"
+    <div className={`relative flex flex-col overflow-hidden rounded-3xl shadow-lg ${compact ? 'min-h-[156px]' : 'min-h-[240px]'}`}
       style={{ backgroundColor: brand.background, color: brand.foreground }}>
       <svg aria-hidden="true" viewBox="0 0 200 240"
         className="pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-[0.08]" fill="none" stroke="currentColor">
@@ -18,18 +20,18 @@ export function LoyaltyCardFace({ brand, fullName, points, cardNumberDisplay, ba
         <circle cx="180" cy="80" r="90" strokeWidth="2" />
         <path d="M100 0l25 25L100 50l25 25-25 25 25 25-25 25 25 25-25 25" strokeWidth="5" />
       </svg>
-      <div className="relative flex flex-1 flex-col gap-5 p-5 sm:p-6">
+      <div className={compact ? "relative flex flex-1 flex-col gap-2 p-4" : "relative flex flex-1 flex-col gap-5 p-5 sm:p-6"}>
         <div className="flex items-start justify-between gap-3">
           {brand.logoUrl ? (
             // Tenant logo is a public brand asset; keep the original artwork.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt={brand.name} className="h-16 w-28 rounded-lg object-contain" />
+            <img src={brand.logoUrl} alt={brand.name} className={compact ? "h-8 w-16 object-contain" : "h-16 w-28 rounded-lg object-contain"} />
           ) : <span className="max-w-[60%] break-words text-xl font-bold">{brand.name}</span>}
           <span className="pt-1 text-right text-[10px] font-semibold uppercase tracking-[0.15em]">
             Carte de fidélité
           </span>
         </div>
-        <p className="text-2xl font-bold tracking-tight sm:text-3xl">
+        <p className={compact ? "text-xl font-bold tracking-tight" : "text-2xl font-bold tracking-tight sm:text-3xl"}>
           {brand.name} <span style={{ color: brand.textAccent }}>Club</span>
         </p>
         <div className="mt-auto flex items-end justify-between gap-4">
@@ -40,7 +42,7 @@ export function LoyaltyCardFace({ brand, fullName, points, cardNumberDisplay, ba
           </div>
           <div className="shrink-0 text-right">
             <p className="text-[10px] uppercase tracking-widest opacity-80">Points confirmés</p>
-            <p className="text-2xl font-extrabold leading-tight">{new Intl.NumberFormat('fr-FR').format(points)}</p>
+            <p className="text-2xl font-extrabold leading-tight">{points === null ? '—' : new Intl.NumberFormat('fr-FR').format(points)}</p>
           </div>
         </div>
         {barcodeSvg && (

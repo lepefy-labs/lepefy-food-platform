@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 18 settembre 2026 — **v6.59 Current-State Snapshot**
+> **Aggiornato:** 18 settembre 2026 — **v6.60 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -35,6 +35,14 @@ LEPEFY_PROJECT_CONTEXT.md
 ```
 
 ---
+
+### Tableau de bord client `/compte`
+
+L’account mostra profilo con modifica esplicita, anteprima compatta della carta, ultimo ordine e storico, parrainage/ambassador, informazioni e indirizzi leggibili. Su mobile l’ordine delle sezioni è carta → ordini → vantaggi → informazioni/indirizzi; su desktop carta/vantaggi e ordini/informazioni occupano due colonne. Il QR/barcode rimane nella pagina carta dedicata; il link Wallet nel riepilogo appare solo se un provider configurato è disponibile.
+
+Le letture account sono parallele e tenant/customer-scoped. L’ultimo ordine reale è letto con `limit(1)`, riusa `getCustomerOrderPresentation` e il token tracking canonico senza alterare ordini o autorizzazioni. Errori saldo/indirizzi/ordini mostrano feedback e retry per sezione; un errore profilo canonico attiva l’error boundary e non simula privilegi/eligibilità. Il saldo non leggibile è `null` (—), distinto da zero; nessun ordine è distinto da errore di lettura.
+
+L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, coerente con la pagina canonica; non genera codici o cambia l’accesso. Il logout UI verifica risposta HTTP e conferma `ok` prima di notificare e reindirizzare; sessione e provider auth restano invariati. La cancellazione resta raggiungibile in `Gestion du compte`, senza modifica al flusso dedicato. Nessuna migrazione DB.
 
 ### Carta fedeltà cliente e Wallet
 

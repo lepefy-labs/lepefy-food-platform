@@ -1,106 +1,86 @@
 import { redirect } from 'next/navigation';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
-import { getCustomerProfile } from '@/lib/customers/getCustomerProfile';
 import { createServiceClient } from '@/lib/supabase/server';
-import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
+import { formatBarcodeDisplay } from '@/lib/barcode';
 import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
+import { getWalletAvailability } from '@/lib/loyalty/wallet/config';
 import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
 import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
+import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
+import { accountReferralState, type AccountOrderSummary } from '@/lib/account/dashboard';
 import type { Address } from '@lepefy/types';
 import { AccountDashboard } from './AccountDashboard';
 
-// Tableau de bord "Mon compte" — lit la session à chaque requête (comme
-// connexion/page.tsx et parrainage/page.tsx), jamais statique/ISR. Le check
-// de consentement (Ciclo 6) peut aussi changer entre deux requêtes.
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export default async function ComptePage() {
-  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
-  const tenant     = await getTenant(tenantSlug);
-  const customer   = await getSessionCustomer(tenant.id);
-
+  const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  const customer = await getSessionCustomer(tenant.id);
   if (!customer) redirect('/compte/connexion');
   await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte');
 
-  const profile = await getCustomerProfile(customer.id, tenant.id);
-
   const supabase = createServiceClient();
-
-  const { data: ambassadorRow } = await supabase
-    .from('customers')
-    .select('is_ambassador, ambassador_profile_completed_at')
-    .eq('id', customer.id)
-    .eq('tenant_id', tenant.id)
-    .maybeSingle();
-
-  const { data: addresses } = await supabase
-    .from('addresses')
-    .select('*')
-    .eq('customer_id', customer.id)
-    .eq('tenant_id', tenant.id)
-    .order('is_default', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  // Le solde de points et le numéro de carte ne sont interrogés que si le
-  // programme est actif pour ce tenant — un tenant qui n'a pas activé
-  // loyalty_enabled n'a pas de ledger pertinent à afficher (cf. rapport
-  // final : aucun "niveau" fictif n'est affiché non plus, la notion n'existe
-  // nulle part côté données réelles), et le widget tessera n'est pas rendu.
-  let confirmedPoints = 0;
-  let loyaltyCardNumberDisplay: string | null = null;
-  let loyaltyCardBarcodeSvg: string | null = null;
-
-  if (tenant.loyalty_enabled) {
-    const [{ data: balance }, { data: customerCard }] = await Promise.all([
-      supabase
-        .from('customer_points_balance')
-        .select('confirmed_balance')
-        .eq('tenant_id', tenant.id)
-        .eq('customer_id', customer.id)
-        .maybeSingle(),
-      supabase
-        .from('customers')
-        .select('loyalty_card_number')
-        .eq('id', customer.id)
-        .eq('tenant_id', tenant.id)
-        .maybeSingle(),
-    ]);
-
-    confirmedPoints = balance?.confirmed_balance ?? 0;
-
-    // Réutilise renderBarcodeSVG (lib/barcode.ts) et formatBarcodeDisplay —
-    // mêmes fonctions déjà utilisées par /compte/carte-fidelite, aucune
-    // logique de rendu dupliquée. Le SVG est généré ici côté serveur (bwip-js
-    // dépend de Node) puis passé en chaîne jusqu'au widget client.
-    const cardNumber = customerCard?.loyalty_card_number ?? null;
-    loyaltyCardNumberDisplay = cardNumber ? formatBarcodeDisplay(cardNumber) : null;
-    loyaltyCardBarcodeSvg = cardNumber ? renderBarcodeSVG(cardNumber, { widthMm: 60 }) : null;
+  const [member, addresses, points, orders] = await Promise.all([
+    supabase.from('customers')
+      .select('full_name, phone, loyalty_card_number, is_ambassador, ambassador_profile_completed_at, referral_access_granted, referral_suspended')
+      .eq('tenant_id', tenant.id).eq('id', customer.id).single(),
+    supabase.from('addresses').select('*')
+      .eq('tenant_id', tenant.id).eq('customer_id', customer.id)
+      .order('is_default', { ascending: false }).order('created_at', { ascending: false }),
+    tenant.loyalty_enabled
+      ? supabase.from('customer_points_balance').select('confirmed_balance')
+        .eq('tenant_id', tenant.id).eq('customer_id', customer.id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from('orders').select('id, status, created_at, total, email, fulfillment_type')
+      .eq('tenant_id', tenant.id).eq('customer_id', customer.id)
+      .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  // Core profile failure must not silently downgrade an ambassador or invent
+  // referral eligibility. Other sections fail independently and can retry.
+  if (member.error || !member.data) throw new Error('Unable to load account profile');
+  const row = member.data;
+  const lastOrder = orders.data;
+  let latestOrder: AccountOrderSummary | null = null;
+  let orderError = !!orders.error;
+  if (!orderError && lastOrder) {
+    try {
+      latestOrder = {
+        id: lastOrder.id, status: lastOrder.status, createdAt: lastOrder.created_at,
+        total: Number(lastOrder.total),
+        fulfillmentType: lastOrder.fulfillment_type === 'pickup' ? 'pickup' : 'delivery',
+        trackingToken: generateTrackingToken(lastOrder.id, lastOrder.email),
+      };
+    } catch { orderError = true; }
   }
-
+  const brand = getLoyaltyBrand(tenant);
+  const wallets = tenant.loyalty_enabled ? getWalletAvailability(tenant.slug, tenant.logo_url) : { google: false, apple: false };
   const primaryDarkApprox = mixWithBlack(tenant.primary_color, 75);
-  const accountAccentForeground = contrastRatio(tenant.accent_light, primaryDarkApprox) >= 3
-    ? primaryDarkApprox
-    : '#374151';
+  const accountAccentForeground = contrastRatio(tenant.accent_light, primaryDarkApprox) >= 3 ? primaryDarkApprox : '#374151';
+  const cardNumber = row.loyalty_card_number ?? null;
 
   return (
     <AccountDashboard
-      tenant={{
-        name:            tenant.name,
-        loyaltyEnabled:  tenant.loyalty_enabled,
-      }}
+      tenant={{ name: tenant.name, loyaltyEnabled: tenant.loyalty_enabled, currency: tenant.currency }}
       email={customer.email}
-      fullName={profile?.fullName ?? customer.full_name}
-      phone={profile?.phone ?? null}
-      confirmedPoints={confirmedPoints}
-      addresses={(addresses ?? []) as Address[]}
-      isAmbassador={ambassadorRow?.is_ambassador ?? false}
-      ambassadorProfileCompleted={!!ambassadorRow?.ambassador_profile_completed_at}
-      loyaltyCardNumberDisplay={loyaltyCardNumberDisplay}
-      loyaltyCardBarcodeSvg={loyaltyCardBarcodeSvg}
-      loyaltyBrand={getLoyaltyBrand(tenant)}
+      fullName={row.full_name ?? customer.full_name}
+      phone={row.phone}
+      confirmedPoints={points.error ? null : points.data?.confirmed_balance ?? 0}
+      addresses={(addresses.data ?? []) as Address[]}
+      isAmbassador={row.is_ambassador ?? false}
+      ambassadorProfileCompleted={!!row.ambassador_profile_completed_at}
+      loyaltyCardNumberDisplay={cardNumber ? formatBarcodeDisplay(cardNumber) : null}
+      loyaltyBrand={brand}
+      walletAvailable={wallets.google || wallets.apple}
       accountAccentForeground={accountAccentForeground}
+      latestOrder={latestOrder}
+      errors={{ points: !!points.error, addresses: !!addresses.error, orders: orderError }}
+      referral={{
+        state: accountReferralState(tenant.loyalty_enabled, row.referral_access_granted, row.referral_suspended),
+        mode: tenant.referral_availability_mode,
+        threshold: tenant.referral_unlock_spending_threshold,
+      }}
     />
   );
 }
