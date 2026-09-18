@@ -14,8 +14,11 @@ interface LoyaltyCardWidgetProps {
 export function LoyaltyCardWidget({ brand, fullName, confirmedPoints, cardNumberDisplay, walletAvailable }: LoyaltyCardWidgetProps) {
   return (
     <div>
-      <LoyaltyCardFace brand={brand} fullName={fullName} points={confirmedPoints}
-        cardNumberDisplay={cardNumberDisplay} variant="compact" />
+      <Link href="/compte/carte-fidelite" aria-label="Présenter ma carte de fidélité"
+        className="block rounded-3xl transition-shadow hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+        <LoyaltyCardFace brand={brand} fullName={fullName} points={confirmedPoints}
+          cardNumberDisplay={cardNumberDisplay} variant="compact" />
+      </Link>
       <Link href="/compte/carte-fidelite"
         className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50">
         <IconMaximize size={18} aria-hidden="true" /> Présenter ma carte
