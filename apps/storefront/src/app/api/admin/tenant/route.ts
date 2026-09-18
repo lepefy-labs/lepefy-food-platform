@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 const EDITABLE_TENANT_FIELDS = [
   'tagline',
   'storefront_url',
+  'google_review_url',
   'whatsapp_number',
   'click_collect_address',
   'google_maps_url',
@@ -113,6 +114,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'L’URL de la boutique doit commencer par https://.' }, { status: 400 });
     }
     body.storefront_url = storefrontUrl ? storefrontUrl.replace(/\/+$/, '') : '';
+  }
+
+  if ('google_review_url' in body) {
+    const rawReviewUrl = body.google_review_url;
+    if (rawReviewUrl != null && typeof rawReviewUrl !== 'string') {
+      return NextResponse.json({ error: 'Le lien d’avis Google doit être une URL HTTPS valide.' }, { status: 400 });
+    }
+    const reviewUrl = typeof rawReviewUrl === 'string' ? rawReviewUrl.trim() : '';
+    if (reviewUrl && !isHttpsUrl(reviewUrl)) {
+      return NextResponse.json({ error: 'Le lien d’avis Google doit commencer par https://.' }, { status: 400 });
+    }
   }
 
   const updatePayload = EDITABLE_TENANT_FIELDS.reduce<Record<string, unknown>>((acc, field) => {

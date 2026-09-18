@@ -12,6 +12,7 @@ import {
   IconBrandYoutube,
   IconBrandLinkedin,
   IconBrandX,
+  IconBrandWhatsapp,
 } from '@tabler/icons-react';
 import { methodColor } from './methodColor';
 
@@ -29,13 +30,15 @@ interface PosterTemplateProps {
     primary_color: string;
     click_collect_address: string | null;
     click_collect_hours: string | null;
+    whatsapp_number: string | null;
   };
   paymentMethods: TenantPaymentMethod[];
   socialLinks: TenantSocialLink[];
   qrUrl: string;
+  readableUrl: string;
 }
 
-export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl }: PosterTemplateProps) {
+export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl, readableUrl }: PosterTemplateProps) {
   return (
     <div className="poster">
       <div className="header" style={{ backgroundColor: tenant.primary_color }}>
@@ -52,9 +55,20 @@ export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl }: P
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qrUrl} alt="QR code" className="qr" />
+        <p className="qr-url">{readableUrl}</p>
+
+        {tenant.whatsapp_number && (
+          <div className="whatsapp">
+            <IconBrandWhatsapp size={18} stroke={1.5} color="#25D366" />
+            <span>{tenant.whatsapp_number}</span>
+          </div>
+        )}
 
         {paymentMethods.length > 0 && (
-          <div className="methods">
+          <div className="methods-block">
+            <p className="methods-label">Moyens de paiement acceptés</p>
+            <p className="methods-label-it">Metodi di pagamento accettati</p>
+            <div className="methods">
             {paymentMethods.map((pm) => {
               const meta = PAYMENT_METHOD_REGISTRY[pm.method];
               const Icon = ICONS[meta.iconName];
@@ -65,6 +79,7 @@ export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl }: P
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 

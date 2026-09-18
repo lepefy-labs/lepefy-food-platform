@@ -31,7 +31,12 @@ export async function GET(req: NextRequest) {
   // scanne le QR code.
   const paymentMethods = allPaymentMethods.filter((m) => m.enabled_modules.includes('card'));
 
-  const qrUrl = `${req.nextUrl.origin}/api/card/qr-code?format=png&size=900`;
+  const qrUrl = `${req.nextUrl.origin}/api/card/qr-code?format=png&size=900&src=poster_affiche`;
+
+  // URL lisible affichée sous le QR (fallback pour qui ne peut/veut pas
+  // scanner) — même source canonique que api/card/qr-code/route.ts.
+  const readableUrl = (tenant.storefront_url || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin)
+    .replace(/\/+$/, '').replace(/^https?:\/\//, '') + '/card';
 
   const html = buildPosterHtml({
     tenant: {
@@ -40,7 +45,9 @@ export async function GET(req: NextRequest) {
       primary_color: tenant.primary_color,
       click_collect_address: tenant.click_collect_address,
       click_collect_hours: tenant.click_collect_hours,
+      whatsapp_number: tenant.whatsapp_number,
     },
+    readableUrl,
     paymentMethods,
     socialLinks,
     qrUrl,

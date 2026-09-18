@@ -9,15 +9,17 @@ interface BuildPosterHtmlParams {
     primary_color: string;
     click_collect_address: string | null;
     click_collect_hours: string | null;
+    whatsapp_number: string | null;
   };
   paymentMethods: TenantPaymentMethod[];
   socialLinks: TenantSocialLink[];
   qrUrl: string;
+  readableUrl: string;
 }
 
-export function buildPosterHtml({ tenant, paymentMethods, socialLinks, qrUrl }: BuildPosterHtmlParams): string {
+export function buildPosterHtml({ tenant, paymentMethods, socialLinks, qrUrl, readableUrl }: BuildPosterHtmlParams): string {
   const bodyHtml = renderToStaticMarkup(
-    PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl })
+    PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl, readableUrl })
   );
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8" />
@@ -33,10 +35,15 @@ export function buildPosterHtml({ tenant, paymentMethods, socialLinks, qrUrl }: 
   .headline { font-size: 14pt; font-weight: 600; margin: 0; color: #111; }
   .headline-it { font-size: 9pt; color: #888; margin: 0; font-style: italic; }
   .qr { width: 70mm; height: 70mm; }
+  .qr-url { font-size: 9pt; color: #555; margin: -1mm 0 0; word-break: break-all; }
+  .whatsapp { display: flex; align-items: center; gap: 2mm; font-size: 9.5pt; font-weight: 600; color: #111; }
+  .methods-block { display: flex; flex-direction: column; align-items: center; gap: 1mm; }
+  .methods-label { font-size: 8.5pt; font-weight: 600; color: #444; margin: 0; }
+  .methods-label-it { font-size: 7.5pt; font-style: italic; color: #999; margin: 0 0 1mm; }
   .methods { display: flex; gap: 6mm; flex-wrap: wrap; justify-content: center; }
   .method { display: flex; flex-direction: column; align-items: center; gap: 1mm; font-size: 8pt; color: #444; }
   .social-row { display: flex; gap: 3mm; justify-content: center; margin-top: 2mm; }
   .social-badge { width: 8mm; height: 8mm; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-  .footer { font-size: 8pt; color: #666; margin-top: 4mm; }
+  .footer { font-size: 10pt; color: #444; margin-top: 4mm; }
 </style></head><body>${bodyHtml}</body></html>`;
 }

@@ -3,6 +3,7 @@ import { Manrope, DM_Sans } from 'next/font/google';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
+import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
 import { DigitalCard } from '@/components/card/DigitalCard';
 
 const manrope = Manrope({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-card-heading', display: 'swap' });
@@ -17,9 +18,10 @@ export const metadata: Metadata = {
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const [socialLinks, allPaymentMethods] = await Promise.all([
+  const [socialLinks, allPaymentMethods, reviewsEnabled] = await Promise.all([
     getTenantSocialLinks(tenant.id),
     getTenantPaymentMethods(tenant.id),
+    canUseReviews(tenant.id),
   ]);
   const paymentMethods = allPaymentMethods.filter((m) => m.enabled_modules.includes('card'));
 
@@ -40,9 +42,11 @@ export default async function CardPage() {
           whatsapp_number: tenant.whatsapp_number,
           storefront_ready: tenant.storefront_ready,
           currency: tenant.currency,
+          google_review_url: tenant.google_review_url,
         }}
         socialLinks={socialLinks}
         paymentMethods={paymentMethods}
+        reviewsEnabled={reviewsEnabled}
       />
     </div>
   );

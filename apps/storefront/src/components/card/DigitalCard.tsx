@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   IconClock, IconShoppingBag, IconUserPlus, IconBrandWhatsapp,
   IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBrandYoutube,
-  IconBrandLinkedin, IconBrandX, IconCreditCard, IconExternalLink,
+  IconBrandLinkedin, IconBrandX, IconCreditCard, IconExternalLink, IconStar,
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink, type TenantPaymentMethod } from '@lepefy/types';
 import { TenantLogo } from '@/components/branding/TenantLogo';
@@ -22,12 +22,16 @@ const COPY = {
     followUs: 'Suivez-nous', whatsapp: 'Contacter sur WhatsApp', products: 'Découvrir notre boutique',
     addContact: 'Ajouter aux contacts', comingSoon: 'Boutique en ligne bientôt disponible', payTitle: 'Comment payer ?',
     payText: 'Plusieurs méthodes sûres et rapides sont disponibles pour régler vos commandes.', payCta: 'Voir les moyens de paiement',
+    reviewsTitle: 'Votre avis compte', reviewsText: 'Découvrez les avis de nos clients vérifiés, ou partagez le vôtre si vous avez déjà commandé.', reviewsCta: 'Voir les avis',
+    googleReviewText: 'Acheté en boutique ? Laissez-nous un avis Google.', googleReviewCta: 'Avis Google',
   },
   it: {
     descriptor: 'Card digitale', heroSupport: 'Tutte le informazioni, i servizi e i pagamenti sempre a portata di mano.',
     followUs: 'Seguici', whatsapp: 'Contatta su WhatsApp', products: 'Scopri il nostro negozio', addContact: 'Aggiungi ai contatti',
     comingSoon: 'Negozio online in arrivo', payTitle: 'Come pagare?', payText: 'Sono disponibili diversi metodi sicuri e rapidi per effettuare i tuoi pagamenti.',
     payCta: 'Vedi i metodi di pagamento',
+    reviewsTitle: 'La tua opinione conta', reviewsText: 'Scopri le recensioni dei nostri clienti verificati, o lascia la tua se hai già ordinato.', reviewsCta: 'Vedi le recensioni',
+    googleReviewText: 'Hai acquistato in negozio? Lasciaci una recensione Google.', googleReviewCta: 'Recensione Google',
   },
 } as const;
 
@@ -36,9 +40,11 @@ interface Props {
     name: string; tagline: string | null; logo_url: string | null; primary_color: string; secondary_color: string; accent_light: string;
     click_collect_address: string | null; google_maps_url: string | null; click_collect_hours: string | null; click_collect_hours_it: string | null;
     whatsapp_number: string | null; storefront_ready: boolean; currency: string;
+    google_review_url: string | null;
   };
   socialLinks: TenantSocialLink[];
   paymentMethods: TenantPaymentMethod[];
+  reviewsEnabled: boolean;
 }
 
 function readableForeground(hex: string): '#111827' | '#ffffff' {
@@ -49,7 +55,7 @@ function readableForeground(hex: string): '#111827' | '#ffffff' {
   return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b) > 0.42 ? '#111827' : '#ffffff';
 }
 
-export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
+export function DigitalCard({ tenant, socialLinks, paymentMethods, reviewsEnabled }: Props) {
   const [lang, setLang] = useState<Lang>(() => typeof window !== 'undefined' ? ((localStorage.getItem('lepefy-card-lang') as Lang) ?? 'fr') : 'fr');
   const [inPayment, setInPayment] = useState(false);
   const t = COPY[lang]; const initials = tenant.name.slice(0, 2).toUpperCase(); const secondaryForeground = readableForeground(tenant.secondary_color);
@@ -66,12 +72,19 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods }: Props) {
         <h1 className="relative mt-0.5 text-xl font-extrabold text-white" style={{fontFamily:'var(--font-card-heading)'}}>{tenant.name}</h1><p className="relative mt-0.5 text-sm font-bold text-white/95" style={{fontFamily:'var(--font-card-heading)'}}>{t.descriptor}</p><p className="relative mx-auto mt-0.5 max-w-xs text-[13px] leading-snug text-white/75">{t.heroSupport}</p><div className="relative mx-auto mt-2 h-0.5 w-8 rounded-full" style={{backgroundColor:tenant.secondary_color}}/>
       </header>}
       <div className={inPayment?'p-5 sm:p-7':'relative -mt-4 rounded-t-[1.75rem] bg-white px-4 pb-28 pt-5 sm:px-5'}>{inPayment?<PaymentMethodsAccordion paymentMethods={paymentMethods} primaryColor={tenant.primary_color} currency={tenant.currency} lang={lang} onClose={()=>setInPayment(false)}/>:<>
+        {paymentMethods.length>0&&<section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.035)]"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" style={{backgroundColor:tenant.primary_color}}><IconCreditCard size={18}/></div><div className="min-w-0 flex-1"><h2 className="font-bold text-gray-900" style={{fontFamily:'var(--font-card-heading)'}}>{t.payTitle}</h2><div className="mt-1 h-0.5 w-7 rounded-full" style={{backgroundColor:tenant.secondary_color}}/><p className="mt-2 text-sm leading-relaxed text-gray-500">{t.payText}</p></div></div><button type="button" onClick={()=>setInPayment(true)} className="mt-3.5 min-h-12 w-full rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.primary_color,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}>{t.payCta}</button></section>}
         <section className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.035)]">
           {tenant.whatsapp_number&&<div className="p-2.5"><a href={`https://wa.me/${tenant.whatsapp_number}`} target="_blank" rel="noopener noreferrer" className="flex min-h-12 w-full items-center justify-center gap-2.5 rounded-[11px] px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.secondary_color,color:secondaryForeground,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><IconBrandWhatsapp size={20} stroke={2}/>{t.whatsapp}</a></div>}
           <CardLocation address={tenant.click_collect_address} googleMapsUrl={tenant.google_maps_url} lang={lang} primaryColor={tenant.primary_color} secondaryColor={tenant.secondary_color}/>
           {hours&&<div className="flex items-start gap-3 border-t border-gray-100 px-4 py-3.5"><IconClock size={18} className="mt-0.5 shrink-0" style={{color:tenant.primary_color}}/><span className="text-sm leading-5 text-gray-700">{hours}</span></div>}
         </section>
-        {paymentMethods.length>0&&<section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.035)]"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" style={{backgroundColor:tenant.primary_color}}><IconCreditCard size={18}/></div><div className="min-w-0 flex-1"><h2 className="font-bold text-gray-900" style={{fontFamily:'var(--font-card-heading)'}}>{t.payTitle}</h2><div className="mt-1 h-0.5 w-7 rounded-full" style={{backgroundColor:tenant.secondary_color}}/><p className="mt-2 text-sm leading-relaxed text-gray-500">{t.payText}</p></div></div><button type="button" onClick={()=>setInPayment(true)} className="mt-3.5 min-h-12 w-full rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.primary_color,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}>{t.payCta}</button></section>}
+        {(reviewsEnabled||tenant.google_review_url)&&<section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.035)]"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" style={{backgroundColor:tenant.primary_color}}><IconStar size={18}/></div><div className="min-w-0 flex-1"><h2 className="font-bold text-gray-900" style={{fontFamily:'var(--font-card-heading)'}}>{t.reviewsTitle}</h2><div className="mt-1 h-0.5 w-7 rounded-full" style={{backgroundColor:tenant.secondary_color}}/>{reviewsEnabled&&<p className="mt-2 text-sm leading-relaxed text-gray-500">{t.reviewsText}</p>}</div></div>
+          {reviewsEnabled&&<Link href="/avis" className="mt-3.5 flex min-h-12 w-full items-center justify-center rounded-xl px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{backgroundColor:tenant.primary_color,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}>{t.reviewsCta}</Link>}
+          {tenant.google_review_url&&<div className={reviewsEnabled?'mt-2.5 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5':'mt-3.5'}>
+            {reviewsEnabled&&<span className="text-xs leading-snug text-gray-500">{t.googleReviewText}</span>}
+            <a href={tenant.google_review_url} target="_blank" rel="noopener noreferrer" className={reviewsEnabled?'inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700':'flex min-h-12 w-full items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-bold text-gray-800'}>{t.googleReviewCta}</a>
+          </div>}
+        </section>}
         <section className="mb-4">{tenant.storefront_ready?<Link href="/" className="flex min-h-12 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.025)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><IconShoppingBag size={18} style={{color:tenant.primary_color}}/><span className="flex-1">{t.products}</span><IconExternalLink size={16} className="text-gray-400"/></Link>:<div className="flex min-h-12 items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-sm italic text-gray-500"><IconShoppingBag size={18} style={{color:tenant.primary_color}}/>{t.comingSoon}</div>}</section>
         {socialLinks.length>0&&<section className="mb-1 px-1"><h2 className="mb-2.5 text-sm font-bold text-gray-800" style={{fontFamily:'var(--font-card-heading)'}}>{t.followUs}</h2><div className="flex flex-wrap gap-3">{socialLinks.map(link=>{const meta=SOCIAL_PLATFORM_REGISTRY[link.platform];const Icon=ICONS[meta.iconName];return <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={meta.label} className="flex h-11 w-11 items-center justify-center rounded-full shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{background:meta.badgeBackground,'--tw-ring-color':tenant.primary_color} as React.CSSProperties}><Icon size={19} style={{color:'#fff'}}/></a>})}</div></section>}
       </>}</div>

@@ -11,6 +11,7 @@ const LABEL_CLS = 'mb-1 block text-xs font-medium text-gray-600 dark:text-gray-3
 interface BoutiqueInfoSectionProps {
   tagline: string | null;
   storefront_url: string | null;
+  google_review_url: string | null;
   whatsapp_number: string | null;
   click_collect_address: string | null;
   google_maps_url: string | null;
@@ -21,6 +22,7 @@ interface BoutiqueInfoSectionProps {
 export function BoutiqueInfoSection({
   tagline,
   storefront_url,
+  google_review_url,
   whatsapp_number,
   click_collect_address,
   google_maps_url,
@@ -30,6 +32,7 @@ export function BoutiqueInfoSection({
   const [form, setForm] = useState({
     tagline: tagline ?? '',
     storefront_url: storefront_url ?? '',
+    google_review_url: google_review_url ?? '',
     whatsapp_number: whatsapp_number ?? '',
     click_collect_address: click_collect_address ?? '',
     google_maps_url: google_maps_url ?? '',
@@ -101,6 +104,11 @@ export function BoutiqueInfoSection({
           <div>
             <label className={LABEL_CLS}>Lien Google Maps</label>
             <input type="url" value={form.google_maps_url} onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })} placeholder="https://maps.app.goo.gl/..." className={INPUT_CLS} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={LABEL_CLS}>Lien "laisser un avis" Google</label>
+            <input type="url" value={form.google_review_url} onChange={(e) => setForm({ ...form, google_review_url: e.target.value })} placeholder="https://g.page/r/.../review" className={INPUT_CLS} />
+            <p className="mt-1 text-xs text-gray-500">Récupérable depuis votre fiche Google Business Profile (bouton "Obtenir plus d'avis"). Affiché sur la card digitale pour les clients sans commande dans le système.</p>
           </div>
           <div className="sm:col-span-2">
             <label className={LABEL_CLS}>Adresse click & collect</label>

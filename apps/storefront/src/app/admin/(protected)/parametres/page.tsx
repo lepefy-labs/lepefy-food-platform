@@ -58,6 +58,7 @@ export default async function ParametresPage() {
         <BoutiqueInfoSection
           tagline={tenant.tagline}
           storefront_url={tenant.storefront_url}
+          google_review_url={tenant.google_review_url}
           whatsapp_number={tenant.whatsapp_number}
           click_collect_address={tenant.click_collect_address}
           google_maps_url={tenant.google_maps_url}

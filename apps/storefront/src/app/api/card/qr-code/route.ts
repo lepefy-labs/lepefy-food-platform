@@ -85,7 +85,12 @@ export async function GET(req: NextRequest) {
   // QR encode l'URL Vercel brute si la génération transite par ce host
   // plutôt que le domaine custom.
   const origin = tenant.storefront_url || process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-  const targetUrl = `${origin.replace(/\/+$/, '')}/card`;
+  // src optionnel — traçabilité par support (ex. src=poster_affiche depuis
+  // api/admin/card/poster) : le paramètre survit jusqu'au navigateur (pas de
+  // redirect intermédiaire, contrairement à /go) donc tout outil d'analytics
+  // déjà branché sur /card le capte sans code supplémentaire côté serveur.
+  const src = searchParams.get('src');
+  const targetUrl = `${origin.replace(/\/+$/, '')}/card${src ? `?src=${encodeURIComponent(src)}` : ''}`;
 
   const qrOptions = {
     errorCorrectionLevel: 'H' as const,
