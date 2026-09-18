@@ -87,6 +87,13 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const detailLine = merchandise ? product.category?.name : getDetailLine(product);
   const compactGrid = variant === 'grid' && compactMobile;
   const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
+  const savings = hasDiscount ? (product.compare_at_price as number) - product.price : 0;
+  // Pack quantities come only from the explicit product name, never inferred from weight.
+  const cartonMatch = !merchandise
+    ? product.name.match(/carton de (\d+) paquets\s*\((\d+) bâtons\)/i)
+    : null;
+  const cartonDetail = cartonMatch ? `${cartonMatch[1]} paquets · ${cartonMatch[2]} bâtons` : null;
+  const displayName = cartonMatch ? product.name.split(/\s*[—–-]\s*carton de/i)[0] : product.name;
   const discountPercent = hasDiscount
     ? Math.round((1 - product.price / (product.compare_at_price as number)) * 100)
     : null;
@@ -137,7 +144,9 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
           )}
 
           {variant === 'grid' && discountPercent != null && (
-            <span className={`absolute z-10 rounded-md bg-white/95 font-bold text-gray-900 shadow-sm ${compactGrid ? 'right-1.5 top-1.5 px-1 py-0.5 text-[11px] sm:right-2 sm:top-2 sm:px-1.5 sm:py-1 sm:text-xs' : 'right-2 top-2 px-1.5 py-1 text-xs'}`}>−{discountPercent}%</span>
+            <span className="absolute bottom-2 left-2 right-2 z-10 rounded-lg bg-red-700 px-2 py-1.5 text-center text-[11px] font-bold leading-tight text-white shadow-sm sm:text-xs">
+              {cartonDetail ? `OFFRE CARTON · −${formatPrice(savings, currency)}` : `OFFRE · −${discountPercent}%`}
+            </span>
           )}
 
           {product.image_url ? (
@@ -166,12 +175,16 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
 
         {variant === 'grid' ? (
           <div className={compactGrid ? 'p-2.5 sm:p-3' : 'p-3'}>
-            <p className={`font-medium text-gray-900 line-clamp-2 mb-1 ${compactGrid ? 'min-h-[2.05rem] text-[13px] leading-[1.25] sm:min-h-0 sm:text-sm sm:leading-normal' : 'text-sm'}`}>{product.name}</p>
+            <p className={`font-medium text-gray-900 line-clamp-2 mb-1 ${compactGrid ? 'min-h-[2.05rem] text-[13px] leading-[1.25] sm:min-h-0 sm:text-sm sm:leading-normal' : 'text-sm'}`}>{displayName}</p>
+            {cartonDetail && <p className="mb-1.5 text-xs font-semibold leading-snug text-gray-700">{cartonDetail}</p>}
             {detailLine && <p className={`truncate text-xs text-gray-400 ${compactGrid ? 'mb-1.5 leading-tight sm:mb-2 sm:leading-normal' : 'mb-2'}`}>{detailLine}</p>}
             <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
-                <span className="block whitespace-nowrap text-base font-bold leading-tight" style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
-                {hasDiscount && <span className="block text-xs text-gray-400 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>}
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className={`whitespace-nowrap font-bold leading-tight ${hasDiscount ? 'text-xl sm:text-2xl' : 'text-base'}`} style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
+                  {hasDiscount && <span className="whitespace-nowrap text-sm font-medium text-gray-600 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>}
+                </div>
+                {hasDiscount && <p className="mt-1 text-xs font-semibold leading-snug text-red-700">Économisez {formatPrice(savings, currency)}</p>}
               </div>
               {merchandise && <button
                 onClick={handleAddToCart}

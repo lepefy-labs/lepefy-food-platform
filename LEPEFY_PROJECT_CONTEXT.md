@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 18 settembre 2026 — **v6.61 Current-State Snapshot**
+> **Aggiornato:** 19 settembre 2026 — **v6.61 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -72,6 +72,8 @@ Resolver canonico: `src/lib/admin/workspace.ts`.
 La navigazione admin e la ricerca globale sono permission-aware. Lo switch workspace è mostrato solo se l'utente possiede almeno una capability della surface destinazione.
 
 ### Storefront routing, Catalogue, navigation e PWA
+
+Le card Catalogue in promozione mostrano badge rosso, prezzo attuale e barrato affiancati e risparmio monetario derivato da `compare_at_price - price`. Per i cartoni con quantità esplicite nel nome prodotto, mostrano una riga confezioni/bastoncini senza dedurle dal peso. Prezzi, stock e azioni carrello restano canonici.
 
 L'editor prodotto admin espone `compare_at_price` (prezzo barrato, superiore al prezzo di vendita) e `position`, con validazione nelle API create/update. Nel Catalogue raccomandato, le posizioni negative promuovono i prodotti attivi e in stock prima del ranking; filtri, isolamento tenant e paginazione SSR/API restano condivisi. Gli ordinamenti espliciti scelti dal cliente restano rispettati. Nessuna nuova colonna o migration è necessaria.
 
@@ -770,5 +772,5 @@ Prima di consegnare codice:
 # Fine snapshot v6.61
 
 **Base audit:** `main + product discount editor and recommended catalogue priority`;  `main + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI`
-**Data:** 18 settembre 2026
+**Data:** 19 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
