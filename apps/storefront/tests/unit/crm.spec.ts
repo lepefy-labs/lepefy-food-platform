@@ -10,7 +10,14 @@ import path from 'node:path';
 test('customer identity normalization remains conservative', () => {
   expect(normalizeCustomerEmail('  Marie@Example.COM ')).toBe('marie@example.com');
   expect(normalizeCustomerPhone('00 33 (0)6 12 34 56 78')).toBe('+330612345678');
-  expect(normalizeCustomerPhone('06 12 34')).toBe(null);
+  // Normalization preserves the SQL contract (6–15 digits); it does not
+  // validate a national numbering plan. Phone-only resolution requires 8 digits.
+  expect(normalizeCustomerPhone('06 12 34')).toBe('061234');
+  expect(normalizeCustomerPhone('06 12 3')).toBeNull();
+  expect(normalizeCustomerPhone('123456789012345')).toBe('123456789012345');
+  expect(normalizeCustomerPhone('1234567890123456')).toBeNull();
+  expect(normalizeCustomerPhone('call 06 12 34 56 78')).toBeNull();
+  expect(normalizeCustomerPhone('++33612345678')).toBeNull();
 });
 
 test('customer resolver selects an existing tenant-scoped guest and ignores another tenant', () => {
@@ -94,7 +101,7 @@ test('campaign snapshot includes only consented destinations and prevents duplic
 });
 
 test('migration preserves customer ids and existing business foreign keys', () => {
-  const migration = readFileSync(path.resolve(process.cwd(), 'supabase/migrations/109_tenant_crm_foundation.sql'), 'utf8');
+  const migration = readFileSync(path.resolve(__dirname, '../../../../supabase/migrations/109_tenant_crm_foundation.sql'), 'utf8');
   expect(migration).toContain('set auth_user_id = id');
   expect(migration).toContain('drop constraint if exists customers_id_fkey');
   expect(migration).not.toMatch(/update\s+public\.(orders|addresses|points_ledger)\s+set\s+customer_id/i);
