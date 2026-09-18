@@ -106,9 +106,9 @@ export function BoutiqueInfoSection({
             <input type="url" value={form.google_maps_url} onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })} placeholder="https://maps.app.goo.gl/..." className={INPUT_CLS} />
           </div>
           <div className="sm:col-span-2">
-            <label className={LABEL_CLS}>Lien "laisser un avis" Google</label>
+            <label className={LABEL_CLS}>Lien &quot;laisser un avis&quot; Google</label>
             <input type="url" value={form.google_review_url} onChange={(e) => setForm({ ...form, google_review_url: e.target.value })} placeholder="https://g.page/r/.../review" className={INPUT_CLS} />
-            <p className="mt-1 text-xs text-gray-500">Récupérable depuis votre fiche Google Business Profile (bouton "Obtenir plus d'avis"). Affiché sur la card digitale pour les clients sans commande dans le système.</p>
+            <p className="mt-1 text-xs text-gray-500">Récupérable depuis votre fiche Google Business Profile (bouton &quot;Obtenir plus d&apos;avis&quot;). Affiché sur la card digitale pour les clients sans commande dans le système.</p>
           </div>
           <div className="sm:col-span-2">
             <label className={LABEL_CLS}>Adresse click & collect</label>
