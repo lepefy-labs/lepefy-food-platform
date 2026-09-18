@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 18 settembre 2026 — **v6.60 Current-State Snapshot**
+> **Aggiornato:** 18 settembre 2026 — **v6.61 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -240,6 +240,8 @@ L'export CSV riusa i filtri correnti, resta tenant-scoped e non include Auth ID,
 ---
 
 ## 4.2 Avis clients vérifiés
+
+La route `/avis/donner` usa un percorso dedicato e compatto: header con logo tenant e ritorno Boutique, sfondo chiaro, Inter per il form e Bricolage per i titoli, footer legal essenziale. Ticker promozionale, BottomNav e Nala sono sospesi soltanto su questa route; il resto dello storefront conserva la propria navigazione. Le stelle sono radio native accessibili da tastiera con voto/etichetta visibile, il commento è esplicitamente facoltativo e limitato a 2000 caratteri. Errori di valutazione sono contestuali; in caso di errore di invio il testo resta nello stato del form e può essere ritentato. Durante l’invio i campi e la CTA sono disabilitati; la conferma comunica soltanto l’avvenuta registrazione. Non sono mostrati messaggi esplicativi sulla moderazione admin; API, token, eligibilità e moderazione server restano invariati. Nessuna migration aggiuntiva.
 
 Il modulo Reviews V1 introduce recensioni complessive del servizio legate a una singola commande Shop verificata. Le surface canoniche sono `/avis` e `/avis/donner` lato storefront e `/admin/avis` lato tenant admin. L'accesso commerciale usa la feature `reviews` in `platform_features`/`platform_plan_features`; l'attivazione operativa e la configurazione tenant restano in `tenant_feature_settings`, separate dal billing. Le capability dedicate sono `reviews.view`, `reviews.moderate` e `reviews.manage`; i system role `platform_owner` e `tenant_admin` le ricevono dalla migration, mentre i custom role non vengono ampliati automaticamente.
 
@@ -763,8 +765,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.58
+# Fine snapshot v6.61
 
-**Base audit:** `main + verified service reviews V1 + loyalty Wallet issuance`
-**Data:** 17 settembre 2026
+**Base audit:** `main + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI`
+**Data:** 18 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

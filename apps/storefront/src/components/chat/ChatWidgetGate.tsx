@@ -13,7 +13,7 @@ interface ChatWidgetGateProps {
 
 export function ChatWidgetGate(props: ChatWidgetGateProps) {
   const pathname = usePathname();
-  const hidden = pathname === '/cart' || pathname.startsWith('/checkout') || pathname.startsWith('/order-confirmation');
+  const hidden = pathname === '/avis/donner' || pathname === '/cart' || pathname.startsWith('/checkout') || pathname.startsWith('/order-confirmation');
 
   if (hidden) return null;
   return <ChatWidget {...props} />;

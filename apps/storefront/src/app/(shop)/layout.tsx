@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { ShopMain } from '@/components/layout/ShopMain';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PWABanner } from '@/components/PWABanner';
@@ -29,7 +30,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <CheckoutNotificationBarGate />
       <ActiveCheckoutRecovery tenant={tenant} />
 
-      <main className="flex-1 pb-20 md:pb-0">{children}</main>
+      <Suspense fallback={<main className="flex-1 pb-20 md:pb-0">{children}</main>}><ShopMain>{children}</ShopMain></Suspense>
       <Footer socialLinks={socialLinks} storyEnabled={storyEnabled} />
       <Suspense><BottomNav /></Suspense>
       <ChatWidgetGate

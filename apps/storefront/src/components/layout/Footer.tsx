@@ -32,6 +32,21 @@ export function Footer({ socialLinks = [], storyEnabled = false }: FooterProps) 
   const pathname = usePathname();
   const isHome = pathname === '/';
 
+  if (pathname === '/avis/donner') {
+    return (
+      <footer className="mt-auto border-t border-slate-200 bg-white text-center text-xs text-slate-600" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="mx-auto max-w-3xl px-4 py-4">
+          <p>© {new Date().getFullYear()} {tenant.name}.</p>
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4">
+            <Link href="/politique-confidentialite" className="inline-flex min-h-11 items-center underline underline-offset-2 hover:text-slate-950">Confidentialité</Link>
+            <Link href="/conditions-generales-vente" className="inline-flex min-h-11 items-center underline underline-offset-2 hover:text-slate-950">Conditions générales de vente</Link>
+          </div>
+          {tenant.show_powered_by && <PoweredBy />}
+        </div>
+      </footer>
+    );
+  }
+
   if (!isHome) {
     return (
       <footer className="bg-gray-50 border-t border-gray-200 mt-auto">

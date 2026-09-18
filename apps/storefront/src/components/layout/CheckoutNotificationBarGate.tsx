@@ -5,6 +5,6 @@ import { ShopNotificationBar } from './ShopNotificationBar';
 
 export function CheckoutNotificationBarGate() {
   const pathname = usePathname();
-  if (pathname.startsWith('/checkout')) return null;
+  if (pathname === '/avis/donner' || pathname.startsWith('/checkout')) return null;
   return <ShopNotificationBar />;
 }

@@ -106,6 +106,21 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
     },
   ];
 
+  if (pathname === '/avis/donner') {
+    return (
+      <header className="border-b border-slate-200 bg-white" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between gap-3 px-4 sm:h-[72px] sm:px-6">
+          <Link href="/" aria-label={tenant.name}>
+            <TenantLogo variant="compact" priority className="h-11 w-[120px] max-w-[36vw]" />
+          </Link>
+          <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-600 hover:text-slate-950 sm:text-sm">
+            <IconArrowLeft size={16} aria-hidden="true" /> Retour à la boutique
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
   if (isCheckout) {
     return (
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur">

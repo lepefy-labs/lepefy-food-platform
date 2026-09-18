@@ -28,7 +28,7 @@ export function BottomNav() {
   const totalItems = useCartStore((s) => s.totalItems());
   const { customer } = useSessionCustomer();
 
-  if (pathname === '/checkout' || pathname.startsWith('/checkout/')) return null;
+  if (pathname === '/avis/donner' || pathname === '/checkout' || pathname.startsWith('/checkout/')) return null;
 
   const tabs: Tab[] = [
     {
