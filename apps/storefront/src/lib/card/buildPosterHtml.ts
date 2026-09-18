@@ -29,14 +29,14 @@ export function buildPosterHtml({ tenant, paymentMethods, socialLinks, qrUrl, re
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { margin: 0; height: 210mm; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
   .poster { width: 148mm; height: 210mm; display: flex; flex-direction: column; overflow: hidden; page-break-after: avoid; page-break-inside: avoid; }
-  .header { padding: 10mm 8mm 8mm; text-align: center; color: #fff; }
-  .logo { width: 24mm; height: 24mm; border-radius: 50%; background: #fff; object-fit: contain; margin-bottom: 4mm; }
+  .header { padding: 7mm 8mm 5mm; text-align: center; color: #fff; }
+  .logo { width: 22mm; height: 22mm; border-radius: 50%; background: #fff; object-fit: contain; margin-bottom: 2mm; }
   h1 { margin: 0; font-size: 16pt; }
-  .header-accent { width: 12mm; height: 1mm; border-radius: 1mm; margin: 3mm auto 0; }
-  .body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4mm; padding: 6mm; text-align: center; }
+  .header-accent { width: 12mm; height: 1mm; border-radius: 1mm; margin: 2mm auto 0; }
+  .body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5mm; padding: 4mm; text-align: center; }
   .headline { font-size: 14pt; font-weight: 600; margin: 0; color: #111; }
   .headline-it { font-size: 9pt; color: #888; margin: 0; font-style: italic; }
-  .qr-frame { padding: 4mm; border: 0.6mm solid; border-radius: 4mm; }
+  .qr-frame { padding: 1mm; border: 0.4mm solid; border-radius: 3mm; }
   .qr { display: block; width: 70mm; height: 70mm; }
   .qr-url { font-size: 9pt; color: #555; margin: -1mm 0 0; word-break: break-all; }
   .whatsapp { display: flex; align-items: center; gap: 2mm; font-size: 9.5pt; font-weight: 600; color: #111; }
@@ -46,8 +46,8 @@ export function buildPosterHtml({ tenant, paymentMethods, socialLinks, qrUrl, re
   .methods-label-it { font-size: 7.5pt; font-style: italic; color: #999; margin: 0 0 1mm; }
   .methods { display: flex; gap: 6mm; flex-wrap: wrap; justify-content: center; }
   .method { display: flex; flex-direction: column; align-items: center; gap: 1mm; font-size: 8pt; color: #444; }
-  .social-row { display: flex; gap: 3mm; justify-content: center; margin-top: 2mm; }
+  .social-row { display: flex; gap: 3mm; justify-content: center; margin-top: 1mm; }
   .social-badge { width: 8mm; height: 8mm; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-  .footer { font-size: 10pt; color: #444; margin-top: 4mm; }
+  .footer { font-size: 10pt; color: #444; margin-top: 2mm; }
 </style></head><body>${bodyHtml}</body></html>`;
 }
