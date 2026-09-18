@@ -28,6 +28,7 @@ interface PosterTemplateProps {
     name: string;
     logo_url: string | null;
     primary_color: string;
+    secondary_color: string;
     click_collect_address: string | null;
     click_collect_hours: string | null;
     whatsapp_number: string | null;
@@ -47,14 +48,17 @@ export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl, rea
           <img src={tenant.logo_url} alt="" className="logo" />
         )}
         <h1>{tenant.name}</h1>
+        <div className="header-accent" style={{ backgroundColor: tenant.secondary_color }} />
       </div>
 
       <div className="body">
         <p className="headline">Scannez pour nous contacter &amp; payer</p>
         <p className="headline-it">Scansiona per contattarci e pagare</p>
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qrUrl} alt="QR code" className="qr" />
+        <div className="qr-frame" style={{ borderColor: tenant.secondary_color }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrUrl} alt="QR code" className="qr" />
+        </div>
         <p className="qr-url">{readableUrl}</p>
 
         {tenant.whatsapp_number && (
@@ -67,6 +71,7 @@ export function PosterTemplate({ tenant, paymentMethods, socialLinks, qrUrl, rea
         {paymentMethods.length > 0 && (
           <div className="methods-block">
             <p className="methods-label">Moyens de paiement acceptés</p>
+            <div className="methods-accent" style={{ backgroundColor: tenant.secondary_color }} />
             <p className="methods-label-it">Metodi di pagamento accettati</p>
             <div className="methods">
             {paymentMethods.map((pm) => {
