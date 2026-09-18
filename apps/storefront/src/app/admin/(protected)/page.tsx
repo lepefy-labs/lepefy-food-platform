@@ -11,7 +11,6 @@ import {
   IconCurrencyEuro,
   IconPackage,
   IconSearch,
-  IconSnowflake,
   IconTruck,
   IconX,
 } from '@tabler/icons-react'
@@ -45,23 +44,6 @@ interface PageProps {
     view?: string
     sort?: string
   }
-}
-
-interface OperationalOrderRow {
-  id: string
-  status: string
-  created_at: string
-  fulfillment_type: string
-  payment_status: string
-  tracking_code: string | null
-  packing_completed_at: string | null
-  cold_chain_packing_checked_at: string | null
-  order_items: Array<{
-    storage_type: string | null
-    quantity: number
-    picked_at: string | null
-    cold_chain_checked_at: string | null
-  }> | null
 }
 
 const STATUS_TABS = [
@@ -146,17 +128,14 @@ function buildSortHref(searchParams: PageProps['searchParams'], sort: SortKey) {
   return query ? `/admin?${query}` : '/admin'
 }
 
-function hasColdChain(order: OperationalOrderRow) {
-  return (order.order_items ?? []).some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')
-}
-
-function pickingComplete(order: OperationalOrderRow) {
-  const items = order.order_items ?? []
-  return items.length > 0 && items.every(item => {
-    if (!item.picked_at) return false
-    if (item.storage_type === 'fresh' || item.storage_type === 'frozen') return Boolean(item.cold_chain_checked_at)
-    return true
-  })
+// Les flags opérationnels (picking, packing, tracking, chaîne du froid,
+// ancienneté) sont désormais calculés côté SQL — voir la vue
+// order_operational_status (migration 118) — plus de scan JS ici.
+const OPERATIONAL_FLAG_COLUMN: Partial<Record<OrderView, string>> = {
+  cold_chain: 'has_cold_chain_action',
+  picking_incomplete: 'is_picking_incomplete',
+  packing_pending: 'is_packing_pending',
+  tracking_missing: 'is_tracking_missing',
 }
 
 export default async function AdminPage({ searchParams }: PageProps) {
@@ -175,26 +154,18 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const requestedPage = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
   const agedCutoffIso = new Date(Date.now() - AGED_MS).toISOString()
 
-  const [{ data: kpiOrders }, { data: allOrdersRaw }, { data: carriersRaw }, { data: pendingPaymentsRaw }] = await Promise.all([
+  // Toutes les valeurs pour les KPI et la file opérationnelle viennent d'une
+  // seule ligne agrégée (migration 118, vue admin_order_dashboard_stats) —
+  // remplace les deux anciennes requêtes "select * from orders" (tout
+  // l'historique du tenant) + le scan JS derrière.
+  const operationalFlagColumn = OPERATIONAL_FLAG_COLUMN[filterView]
+
+  const [{ data: stats }, { data: carriersRaw }, { data: pendingPaymentsRaw }, operationalIdsResult] = await Promise.all([
     supabase
-      .from('orders')
-      .select('total, created_at, status')
+      .from('admin_order_dashboard_stats')
+      .select('*')
       .eq('tenant_id', tenant.id)
-      .in('payment_status', ['paid'])
-      // Safety cap, not a real fix: these two queries pull the whole
-      // tenant order history into JS for in-memory aggregation (KPIs,
-      // operational queue). Fine at today's volume; will need a SQL
-      // aggregate/materialized view once order counts grow into the
-      // thousands — flagged separately, not done here to avoid silently
-      // changing business-critical dashboard numbers without review.
-      .order('created_at', { ascending: false })
-      .limit(10000),
-    supabase
-      .from('orders')
-      .select('id, status, created_at, fulfillment_type, payment_status, tracking_code, packing_completed_at, cold_chain_packing_checked_at, order_items(storage_type, quantity, picked_at, cold_chain_checked_at)')
-      .eq('tenant_id', tenant.id)
-      .order('created_at', { ascending: false })
-      .limit(10000),
+      .maybeSingle(),
     supabase
       .from('carriers')
       .select('name')
@@ -207,50 +178,39 @@ export default async function AdminPage({ searchParams }: PageProps) {
       .eq('tenant_id', tenant.id)
       .eq('payment_method', 'external_link')
       .order('created_at', { ascending: true }),
+    // Seulement quand une carte "file opérationnelle" est active — la vue
+    // n'est interrogée pour ses ids que si on en a réellement besoin pour
+    // filtrer la liste paginée ci-dessous.
+    operationalFlagColumn
+      ? supabase.from('order_operational_status').select('id').eq('tenant_id', tenant.id).eq(operationalFlagColumn, true)
+      : Promise.resolve({ data: null as { id: string }[] | null }),
   ])
   const carriers = ((carriersRaw ?? []) as { name: string }[]).map(carrier => carrier.name)
   const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
-  const kpiData = kpiOrders ?? []
-  const now = new Date()
-  const thisMonthRevenue = kpiData
-    .filter(order => {
-      const date = new Date(order.created_at)
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
-    })
-    .reduce((sum, order) => sum + order.total, 0)
+  const thisMonthRevenue = Number(stats?.this_month_revenue ?? 0)
+  const totalCount = Number(stats?.total_count ?? 0)
+  const newCount = Number(stats?.new_count ?? 0)
+  const toPrepare = Number(stats?.preparing_count ?? 0)
+  const readyForPickup = Number(stats?.ready_for_pickup_count ?? 0)
+  const toShipCount = Number(stats?.to_ship_count ?? 0)
+  const pendingPaymentCount = Number(stats?.pending_payment_count ?? 0)
+  const agedCount = Number(stats?.aged_count ?? 0)
+  const pickingIncompleteCount = Number(stats?.picking_incomplete_count ?? 0)
+  const packingPendingCount = Number(stats?.packing_pending_count ?? 0)
+  const trackingMissingCount = Number(stats?.tracking_missing_count ?? 0)
+  const coldChainActionCount = Number(stats?.cold_chain_action_count ?? 0)
 
-  const allData = (allOrdersRaw ?? []) as OperationalOrderRow[]
-  const totalCount = allData.length
-  const newCount = allData.filter(order => order.status === 'new').length
-  const toPrepare = allData.filter(order => order.status === 'preparing').length
-  const readyForPickup = allData.filter(order => order.status === 'ready_for_pickup').length
-  const toShipCount = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery').length
-  const pendingPaymentCount = allData.filter(order => order.payment_status === 'pending').length
-  const agedOrders = allData.filter(order => !['delivered', 'cancelled'].includes(order.status) && new Date(order.created_at).getTime() <= new Date(agedCutoffIso).getTime())
-  const coldChainOrders = allData.filter(hasColdChain)
-  const pickingIncompleteOrders = allData.filter(order => order.status === 'preparing' && !pickingComplete(order))
-  const packingPendingOrders = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery' && pickingComplete(order) && !order.packing_completed_at)
-  const trackingMissingOrders = allData.filter(order => order.status === 'preparing' && order.fulfillment_type === 'delivery' && pickingComplete(order) && Boolean(order.packing_completed_at) && !order.tracking_code)
-  const coldChainActionOrders = allData.filter(order => {
-    if (!['new', 'preparing', 'ready_for_pickup'].includes(order.status) || !hasColdChain(order)) return false
-    const coldItems = (order.order_items ?? []).filter(item => item.storage_type === 'fresh' || item.storage_type === 'frozen')
-    const lineCheckMissing = coldItems.some(item => !item.cold_chain_checked_at)
-    const packingCheckMissing = order.fulfillment_type === 'delivery' && order.status === 'preparing' && pickingComplete(order) && !order.cold_chain_packing_checked_at
-    return lineCheckMissing || packingCheckMissing
-  })
-
-  const operationalIds: Record<Exclude<OrderView, '' | 'to_ship' | 'pickup_ready' | 'payment_pending' | 'aged'>, string[]> = {
-    cold_chain: coldChainOrders.map(order => order.id),
-    picking_incomplete: pickingIncompleteOrders.map(order => order.id),
-    packing_pending: packingPendingOrders.map(order => order.id),
-    tracking_missing: trackingMissingOrders.map(order => order.id),
+  const statusCounts: Record<string, number> = {
+    new: newCount,
+    preparing: toPrepare,
+    ready_for_pickup: readyForPickup,
+    shipped: Number(stats?.shipped_count ?? 0),
+    delivered: Number(stats?.delivered_count ?? 0),
+    cancelled: Number(stats?.cancelled_count ?? 0),
   }
 
-  const statusCounts = allData.reduce<Record<string, number>>((acc, order) => {
-    acc[order.status] = (acc[order.status] ?? 0) + 1
-    return acc
-  }, {})
+  const operationalIds = (operationalIdsResult.data ?? []).map(row => row.id)
 
   let query = supabase
     .from('orders')
@@ -270,9 +230,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
     query = query.eq('payment_status', 'pending')
   } else if (filterView === 'aged') {
     query = query.lte('created_at', agedCutoffIso).not('status', 'in', '(delivered,cancelled)')
-  } else if (filterView === 'cold_chain' || filterView === 'picking_incomplete' || filterView === 'packing_pending' || filterView === 'tracking_missing') {
-    const ids = operationalIds[filterView]
-    query = query.in('id', ids.length > 0 ? ids : [EMPTY_UUID])
+  } else if (operationalFlagColumn) {
+    query = query.in('id', operationalIds.length > 0 ? operationalIds : [EMPTY_UUID])
   } else {
     if (filterStatus) query = query.eq('status', filterStatus)
     if (filterFulfillment) query = query.eq('fulfillment_type', filterFulfillment)
@@ -322,24 +281,26 @@ export default async function AdminPage({ searchParams }: PageProps) {
     { label: 'Nouvelles', value: String(newCount), helper: 'À prendre en charge', href: '/admin?status=new', icon: IconPackage, tone: 'text-violet-700 bg-violet-50 dark:text-violet-300 dark:bg-violet-950/40' },
     { label: 'À préparer', value: String(toPrepare), helper: 'Préparation en cours', href: '/admin?status=preparing', icon: IconTruck, tone: 'text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950/40' },
     { label: 'Prêtes au retrait', value: String(readyForPickup), helper: 'Client attendu', href: '/admin?status=ready_for_pickup', icon: IconBuildingStore, tone: 'text-sky-700 bg-sky-50 dark:text-sky-300 dark:bg-sky-950/40' },
-    { label: 'À surveiller +24 h', value: String(agedOrders.length), helper: 'Commandes actives anciennes', href: '/admin?view=aged', icon: IconAlertTriangle, tone: 'text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40' },
+    { label: 'À surveiller +24 h', value: String(agedCount), helper: 'Commandes actives anciennes', href: '/admin?view=aged', icon: IconAlertTriangle, tone: 'text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-950/40' },
     { label: 'CA ce mois', value: formatPrice(thisMonthRevenue, tenant.currency), helper: 'Commandes payées', href: '/admin', icon: IconCurrencyEuro, tone: 'text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-950/40' },
   ]
 
   const operationalViews: { key: OrderView; label: string; count: number; helper: string; tone: string }[] = [
-    { key: 'picking_incomplete', label: 'Picking incomplet', count: pickingIncompleteOrders.length, helper: 'Produits ou contrôle froid à valider', tone: pickingIncompleteOrders.length > 0 ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' : '' },
-    { key: 'packing_pending', label: 'Packing à terminer', count: packingPendingOrders.length, helper: 'Picking fini · colis à préparer', tone: packingPendingOrders.length > 0 ? 'border-violet-200 bg-violet-50/70 dark:border-violet-900 dark:bg-violet-950/20' : '' },
-    { key: 'tracking_missing', label: 'Tracking manquant', count: trackingMissingOrders.length, helper: 'Packing fini · suivi requis', tone: trackingMissingOrders.length > 0 ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' : '' },
-    { key: 'cold_chain', label: 'Chaîne du froid', count: coldChainActionOrders.length, helper: 'Contrôle froid encore requis', tone: coldChainActionOrders.length > 0 ? 'border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20' : '' },
-    { key: 'aged', label: 'Commandes +24 h', count: agedOrders.length, helper: 'Workflow à surveiller', tone: agedOrders.length > 0 ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' : '' },
+    { key: 'picking_incomplete', label: 'Picking incomplet', count: pickingIncompleteCount, helper: 'Produits ou contrôle froid à valider', tone: pickingIncompleteCount > 0 ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' : '' },
+    { key: 'packing_pending', label: 'Packing à terminer', count: packingPendingCount, helper: 'Picking fini · colis à préparer', tone: packingPendingCount > 0 ? 'border-violet-200 bg-violet-50/70 dark:border-violet-900 dark:bg-violet-950/20' : '' },
+    { key: 'tracking_missing', label: 'Tracking manquant', count: trackingMissingCount, helper: 'Packing fini · suivi requis', tone: trackingMissingCount > 0 ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' : '' },
+    { key: 'cold_chain', label: 'Chaîne du froid', count: coldChainActionCount, helper: 'Contrôle froid encore requis', tone: coldChainActionCount > 0 ? 'border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20' : '' },
+    { key: 'aged', label: 'Commandes +24 h', count: agedCount, helper: 'Workflow à surveiller', tone: agedCount > 0 ? 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' : '' },
     { key: 'payment_pending', label: 'Paiements commande', count: pendingPaymentCount, helper: 'Paiement interne non confirmé', tone: pendingPaymentCount > 0 ? 'border-orange-200 bg-orange-50/70 dark:border-orange-900 dark:bg-orange-950/20' : '' },
   ]
 
+  // "Toutes froid / surgelé" et "Paiements commande" retirés d'ici : le
+  // premier faisait doublon avec la carte "Chaîne du froid" ci-dessus (même
+  // donnée, deux endroits), le second était un doublon exact de sa propre
+  // carte dans operationalViews — audit UX avec Robertin.
   const quickViews: { key: OrderView; label: string; count: number; helper: string }[] = [
     { key: 'to_ship', label: 'Livraisons en préparation', count: toShipCount, helper: 'Workflow delivery en cours' },
     { key: 'pickup_ready', label: 'Retraits prêts', count: readyForPickup, helper: 'Client attendu en boutique' },
-    { key: 'cold_chain', label: 'Toutes froid / surgelé', count: coldChainOrders.length, helper: 'Commandes avec chaîne du froid' },
-    { key: 'payment_pending', label: 'Paiements commande', count: pendingPaymentCount, helper: 'Action de paiement requise' },
   ]
 
   return (
@@ -393,12 +354,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
       <section className="mb-3 overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="border-b border-[var(--admin-border)] p-3 dark:border-gray-800">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2">
             {quickViews.map(view => {
               const active = filterView === view.key
               return (
-                <Link key={view.key} href={buildViewHref(searchParams, active ? '' : view.key)} className={`rounded-xl border px-3 py-2.5 transition-colors ${active ? 'border-[#C9C1FF] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : view.key === 'cold_chain' && view.count > 0 ? 'border-sky-200 bg-sky-50/60 text-sky-800 hover:bg-sky-50 dark:border-sky-900 dark:bg-sky-950/20 dark:text-sky-200' : 'border-gray-200 bg-gray-50/70 text-gray-700 hover:border-[#D9D3FF] hover:bg-[#FAF9FF] dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-200'}`}>
-                  <span className="flex items-center justify-between gap-3"><span className="flex items-center gap-1.5 text-xs font-semibold">{view.key === 'cold_chain' && <IconSnowflake size={13} />}{view.label}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${active ? 'bg-white/80' : 'bg-white dark:bg-gray-900'}`}>{view.count}</span></span>
+                <Link key={view.key} href={buildViewHref(searchParams, active ? '' : view.key)} className={`rounded-xl border px-3 py-2.5 transition-colors ${active ? 'border-[#C9C1FF] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'border-gray-200 bg-gray-50/70 text-gray-700 hover:border-[#D9D3FF] hover:bg-[#FAF9FF] dark:border-gray-700 dark:bg-gray-950/50 dark:text-gray-200'}`}>
+                  <span className="flex items-center justify-between gap-3"><span className="flex items-center gap-1.5 text-xs font-semibold">{view.label}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${active ? 'bg-white/80' : 'bg-white dark:bg-gray-900'}`}>{view.count}</span></span>
                   <span className="mt-1 block text-[11px] text-gray-400">{view.helper}</span>
                 </Link>
               )
