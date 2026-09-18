@@ -100,28 +100,29 @@ export default async function EventDetailPage({ params }: PageProps) {
       && !Number.isNaN(new Date(eventRow.booking_closes_at).getTime())
       && new Date(eventRow.booking_closes_at).getTime() <= Date.now(),
   );
-  const { data: ticketTypesRaw } = await supabase
-    .from('event_ticket_types')
-    .select('*')
-    .eq('event_id', eventRow.id)
-    .eq('active', true)
-    .order('sort_order', { ascending: true });
+  const [{ data: ticketTypesRaw }, allPaymentMethods, { data: eventPhotosRaw }] = await Promise.all([
+    supabase
+      .from('event_ticket_types')
+      .select('*')
+      .eq('event_id', eventRow.id)
+      .eq('active', true)
+      .order('sort_order', { ascending: true }),
+    getTenantPaymentMethods(tenant.id),
+    supabase
+      .from('event_gallery_photos')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .eq('event_id', eventRow.id)
+      .order('sort_order', { ascending: true }),
+  ]);
   const ticketTypes = (ticketTypesRaw ?? []) as EventTicketType[];
   const minPrice = ticketTypes.length > 0 ? Math.min(...ticketTypes.map((ticket) => ticket.price)) : null;
   const soldOut = eventRow.capacity_remaining <= 0;
 
-  const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
   const externalPaymentMethods = allPaymentMethods.filter(
     (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
       && m.enabled_modules.includes('event'),
   );
-
-  const { data: eventPhotosRaw } = await supabase
-    .from('event_gallery_photos')
-    .select('*')
-    .eq('tenant_id', tenant.id)
-    .eq('event_id', eventRow.id)
-    .order('sort_order', { ascending: true });
 
   const eventPhotos = (eventPhotosRaw ?? []) as EventGalleryPhoto[];
   const eventImages = eventPhotos.length > 0

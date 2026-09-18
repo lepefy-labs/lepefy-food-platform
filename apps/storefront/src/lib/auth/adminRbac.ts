@@ -44,13 +44,14 @@ function legacyPermissions(role: string): string[] {
 
 export async function getAdminAccessContext(userId: string, tenantId: string | null): Promise<AdminAccessContext | null> {
   const service = createServiceClient();
-  const { data: admin } = await service.from('admin_users').select('id, email, role, tenant_id, active').eq('id', userId).eq('active', true).maybeSingle();
+  const { data: admin } = await service.from('admin_users')
+    .select('id, email, role, tenant_id, active, first_name, last_name, nickname, profile_completed_at')
+    .eq('id', userId).eq('active', true).maybeSingle();
   if (!admin) return null;
-  const { data: profile, error: profileError } = await service.from('admin_users').select('first_name, last_name, nickname, profile_completed_at').eq('id', userId).maybeSingle();
-  const profileCompleted = profileError ? true : Boolean(profile?.profile_completed_at);
-  const firstName = profileError ? null : profile?.first_name ?? null;
-  const lastName = profileError ? null : profile?.last_name ?? null;
-  const nickname = profileError ? null : profile?.nickname ?? null;
+  const profileCompleted = Boolean(admin.profile_completed_at);
+  const firstName = admin.first_name ?? null;
+  const lastName = admin.last_name ?? null;
+  const nickname = admin.nickname ?? null;
 
   const membershipQuery = service.from('admin_memberships').select('id, tenant_id, role_id, active').eq('user_id', userId).eq('active', true);
   if (tenantId) membershipQuery.eq('tenant_id', tenantId); else membershipQuery.is('tenant_id', null);

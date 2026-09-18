@@ -10,12 +10,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function CheckoutPage() {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const allMethods = await getTenantPaymentMethods(tenant.id);
+  const [allMethods, sessionCustomer] = await Promise.all([
+    getTenantPaymentMethods(tenant.id),
+    getSessionCustomer(tenant.id),
+  ]);
   const externalPaymentMethods = allMethods.filter(
     (method) => method.method !== 'bank_transfer' && method.method !== 'cash' && !!method.extra?.link
       && method.enabled_modules.includes('shop'),
   );
-  const sessionCustomer = await getSessionCustomer(tenant.id);
   const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
 
   return (

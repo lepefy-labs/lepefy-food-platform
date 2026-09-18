@@ -38,33 +38,59 @@ export default async function HomePage() {
   const tenant   = await getTenant(slug);
   const supabase = createPublicClient();
 
-  // 1. Categorie
-  const { data: categoriesRaw } = await supabase
-    .from('categories')
-    .select('id, name, slug')
-    .eq('tenant_id', tenant.id)
-    .order('position', { ascending: true });
+  // Ces 5 lectures ne dépendent que de tenant.id — aucune ne dépend du
+  // résultat d'une autre, elles partent toutes en parallèle.
+  const [
+    { data: categoriesRaw },
+    { data: featuredRaw },
+    { count: activeProductsCount },
+    { data: discountCandidatesRaw },
+    { data: heroSlidesRaw },
+  ] = await Promise.all([
+    // 1. Categorie
+    supabase
+      .from('categories')
+      .select('id, name, slug')
+      .eq('tenant_id', tenant.id)
+      .order('position', { ascending: true }),
+    // 2. Prodotti featured
+    supabase
+      .from('products')
+      .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .eq('featured', true)
+      .order('position', { ascending: true })
+      .limit(8),
+    // 2bis. Compte réel de produits actifs — alimente la statistique "Notre
+    // origine" (Task B) : jamais un nombre codé en dur, toujours la vraie
+    // cardinalité au moment du rendu.
+    supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('active', true),
+    // 4. Suggestions (Feature 3) — étiquettes honnêtes uniquement, jamais de
+    // personnalisation inventée (pas de login client actif côté storefront).
+    supabase
+      .from('products')
+      .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .not('compare_at_price', 'is', null)
+      .order('position', { ascending: true })
+      .limit(50),
+    // 5. Hero slides (Feature 1) — fallback obligatoire si le tenant n'a
+    // encore configuré aucune slide : l'hero ne doit jamais disparaître.
+    supabase
+      .from('tenant_hero_slides')
+      .select('id, badge_text, title, subtitle, cta_primary_label, cta_primary_url, cta_secondary_label, cta_secondary_url, background_variant')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .order('position', { ascending: true }),
+  ]);
   const categories = categoriesRaw ?? [];
-
-  // 2. Prodotti featured
-  const { data: featuredRaw } = await supabase
-    .from('products')
-    .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
-    .eq('tenant_id', tenant.id)
-    .eq('active', true)
-    .eq('featured', true)
-    .order('position', { ascending: true })
-    .limit(8);
   const featuredProducts: HomeProduct[] = (featuredRaw as unknown as HomeProduct[] | null) ?? [];
-
-  // 2bis. Compte réel de produits actifs — alimente la statistique "Notre
-  // origine" (Task B) : jamais un nombre codé en dur, toujours la vraie
-  // cardinalité au moment du rendu.
-  const { count: activeProductsCount } = await supabase
-    .from('products')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenant.id)
-    .eq('active', true);
 
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
 
@@ -75,8 +101,19 @@ export default async function HomePage() {
     ? featuredIds
     : ['00000000-0000-0000-0000-000000000000'];
 
-  const categoryProducts: Record<string, HomeProduct[]> = Object.fromEntries(
-    await Promise.all(
+  const offerProducts: SuggestionProduct[] = (
+    (discountCandidatesRaw as unknown as SuggestionProduct[] | null) ?? []
+  )
+    .filter(p => p.compare_at_price != null && p.compare_at_price > p.price)
+    .slice(0, 6);
+  const offerIds = offerProducts.map(p => p.id);
+  const excludeForRecent = offerIds.length > 0 ? offerIds : ['00000000-0000-0000-0000-000000000000'];
+
+  // categoryProducts, categoryCounts et recentRaw sont mutuellement
+  // indépendants (aucun ne dépend du résultat d'un autre) — un seul
+  // Promise.all au lieu de 3 étapes séquentielles.
+  const [categoryProductsEntries, categoryCountsEntries, { data: recentRaw }] = await Promise.all([
+    Promise.all(
       categories.map(async (cat) => {
         const { data: catRaw } = await supabase
           .from('products')
@@ -90,12 +127,9 @@ export default async function HomePage() {
         return [cat.id, (catRaw as unknown as HomeProduct[] | null) ?? []] as const;
       }),
     ),
-  );
-
-  // Compte total réel par catégorie (indépendant de la limite de 4 ci-dessus)
-  // — alimente le sous-titre "N produits" du bloc-catégorie.
-  const categoryCounts: Record<string, number> = Object.fromEntries(
-    await Promise.all(
+    // Compte total réel par catégorie (indépendant de la limite de 4
+    // ci-dessus) — alimente le sous-titre "N produits" du bloc-catégorie.
+    Promise.all(
       categories.map(async (cat) => {
         const { count } = await supabase
           .from('products')
@@ -106,7 +140,18 @@ export default async function HomePage() {
         return [cat.id, count ?? 0] as const;
       }),
     ),
-  );
+    supabase
+      .from('products')
+      .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .not('id', 'in', `(${excludeForRecent.join(',')})`)
+      .order('created_at', { ascending: false })
+      .limit(6),
+  ]);
+  const categoryProducts: Record<string, HomeProduct[]> = Object.fromEntries(categoryProductsEntries);
+  const categoryCounts: Record<string, number> = Object.fromEntries(categoryCountsEntries);
+  const recentProducts: SuggestionProduct[] = (recentRaw as unknown as SuggestionProduct[] | null) ?? [];
 
   // Catégories réellement rendables (au moins 1 produit) — calculé une seule
   // fois ici pour piloter à la fois le rendu JSX et la durée de l'autoscroll
@@ -114,45 +159,6 @@ export default async function HomePage() {
   const renderableCategories = categories
     .map((cat, index) => ({ cat, index, products: categoryProducts[cat.id] ?? [] }))
     .filter((entry) => entry.products.length > 0);
-
-  // 4. Suggestions (Feature 3) — étiquettes honnêtes uniquement, jamais de
-  // personnalisation inventée (pas de login client actif côté storefront).
-  const { data: discountCandidatesRaw } = await supabase
-    .from('products')
-    .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
-    .eq('tenant_id', tenant.id)
-    .eq('active', true)
-    .not('compare_at_price', 'is', null)
-    .order('position', { ascending: true })
-    .limit(50);
-
-  const offerProducts: SuggestionProduct[] = (
-    (discountCandidatesRaw as unknown as SuggestionProduct[] | null) ?? []
-  )
-    .filter(p => p.compare_at_price != null && p.compare_at_price > p.price)
-    .slice(0, 6);
-
-  const offerIds = offerProducts.map(p => p.id);
-  const excludeForRecent = offerIds.length > 0 ? offerIds : ['00000000-0000-0000-0000-000000000000'];
-
-  const { data: recentRaw } = await supabase
-    .from('products')
-    .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
-    .eq('tenant_id', tenant.id)
-    .eq('active', true)
-    .not('id', 'in', `(${excludeForRecent.join(',')})`)
-    .order('created_at', { ascending: false })
-    .limit(6);
-  const recentProducts: SuggestionProduct[] = (recentRaw as unknown as SuggestionProduct[] | null) ?? [];
-
-  // 5. Hero slides (Feature 1) — fallback obligatoire si le tenant n'a
-  // encore configuré aucune slide : l'hero ne doit jamais disparaître.
-  const { data: heroSlidesRaw } = await supabase
-    .from('tenant_hero_slides')
-    .select('id, badge_text, title, subtitle, cta_primary_label, cta_primary_url, cta_secondary_label, cta_secondary_url, background_variant')
-    .eq('tenant_id', tenant.id)
-    .eq('active', true)
-    .order('position', { ascending: true });
 
   const heroSlides: HeroSlideData[] = heroSlidesRaw && heroSlidesRaw.length > 0
     ? (heroSlidesRaw as HeroSlideData[])

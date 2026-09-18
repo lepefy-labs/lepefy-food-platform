@@ -44,17 +44,25 @@ export default async function OrdersListPage() {
 
   const supabase = createServiceClient();
   const nowIso = new Date().toISOString();
-  await supabase.from('checkout_sessions').update({ status: 'expired', updated_at: nowIso })
-    .eq('tenant_id', tenant.id).eq('customer_id', sessionCustomer.id).eq('status', 'open').lte('expires_at', nowIso);
+  const customerId = sessionCustomer.id;
 
-  const { data: orders } = await supabase.from('orders')
-    .select('id, status, payment_status, created_at, total, email, fulfillment_type, tracking_code, tracking_carrier')
-    .eq('tenant_id', tenant.id).eq('customer_id', sessionCustomer.id).order('created_at', { ascending: false }) as { data: OrderRow[] | null };
+  // orders is independent of checkout_sessions state, so it runs alongside
+  // the expire-then-read pair instead of after both.
+  async function expireAndLoadPendingSessions() {
+    await supabase.from('checkout_sessions').update({ status: 'expired', updated_at: nowIso })
+      .eq('tenant_id', tenant.id).eq('customer_id', customerId).eq('status', 'open').lte('expires_at', nowIso);
+    return supabase.from('checkout_sessions')
+      .select('id, full_name, fulfillment_type, shipping_total, ambassador_discount_amount, payment_method, external_payment_label, items, created_at')
+      .eq('tenant_id', tenant.id).eq('customer_id', customerId).eq('status', 'open').gt('expires_at', nowIso)
+      .order('last_activity_at', { ascending: false }).limit(1) as unknown as Promise<{ data: PendingSessionRow[] | null }>;
+  }
 
-  const { data: pendingSessions } = await supabase.from('checkout_sessions')
-    .select('id, full_name, fulfillment_type, shipping_total, ambassador_discount_amount, payment_method, external_payment_label, items, created_at')
-    .eq('tenant_id', tenant.id).eq('customer_id', sessionCustomer.id).eq('status', 'open').gt('expires_at', nowIso)
-    .order('last_activity_at', { ascending: false }).limit(1) as { data: PendingSessionRow[] | null };
+  const [{ data: orders }, { data: pendingSessions }] = await Promise.all([
+    supabase.from('orders')
+      .select('id, status, payment_status, created_at, total, email, fulfillment_type, tracking_code, tracking_carrier')
+      .eq('tenant_id', tenant.id).eq('customer_id', customerId).order('created_at', { ascending: false }) as unknown as Promise<{ data: OrderRow[] | null }>,
+    expireAndLoadPendingSessions(),
+  ]);
 
   const pendingItems: PendingSessionListItem[] = (pendingSessions ?? []).map((s) => {
     const itemCount = s.items.reduce((sum, i) => sum + i.quantity, 0);

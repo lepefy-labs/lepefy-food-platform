@@ -37,27 +37,29 @@ export default async function AmbassadeurPage() {
 
   if (!customerRow?.is_ambassador) redirect('/compte');
 
-  // Le lien /invite/[code] est le même que pour le parrainage classique — un
-  // ambassadeur utilise le même mécanisme de code, voir 046 (rien de nouveau
-  // côté referral_codes).
-  const code = await generateReferralCode({
-    tenantId: tenant.id,
-    customerId: customer.id,
-    fullName: customer.full_name,
-    email: customer.email,
-  });
-
-  // Profondeur 1 uniquement : le programme ambassadeur ne concerne que les
-  // clients invités DIRECTEMENT (pas de commission multi-niveaux comme le
-  // parrainage par points).
-  const downline = await resolveReferralDownline(tenant.id, customer.id, 1);
+  // code, downline et commissions ne dépendent que de tenant.id/customer.id
+  // — indépendants entre eux, lancés en parallèle.
+  const [code, downline, { data: commissions }] = await Promise.all([
+    // Le lien /invite/[code] est le même que pour le parrainage classique —
+    // un ambassadeur utilise le même mécanisme de code, voir 046 (rien de
+    // nouveau côté referral_codes).
+    generateReferralCode({
+      tenantId: tenant.id,
+      customerId: customer.id,
+      fullName: customer.full_name,
+      email: customer.email,
+    }),
+    // Profondeur 1 uniquement : le programme ambassadeur ne concerne que les
+    // clients invités DIRECTEMENT (pas de commission multi-niveaux comme le
+    // parrainage par points).
+    resolveReferralDownline(tenant.id, customer.id, 1),
+    supabase
+      .from('ambassador_commissions')
+      .select('referred_customer_id, commission_amount, status')
+      .eq('tenant_id', tenant.id)
+      .eq('ambassador_customer_id', customer.id),
+  ]);
   const directInvitees = downline.filter((n) => n.level === 1);
-
-  const { data: commissions } = await supabase
-    .from('ambassador_commissions')
-    .select('referred_customer_id, commission_amount, status')
-    .eq('tenant_id', tenant.id)
-    .eq('ambassador_customer_id', customer.id);
 
   const commissionByReferred = new Map(
     (commissions ?? []).map((c) => [c.referred_customer_id as string, c]),

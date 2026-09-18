@@ -22,34 +22,60 @@ export default async function ParrainagePage() {
 
   const supabase = createServiceClient();
 
-  const { data: customerRow } = await supabase
-    .from('customers')
-    .select('referral_access_granted, referral_suspended')
-    .eq('id', customer.id)
-    .eq('tenant_id', tenant.id)
-    .single();
+  const [{ data: customerRow }, { data: balanceRow }] = await Promise.all([
+    supabase
+      .from('customers')
+      .select('referral_access_granted, referral_suspended')
+      .eq('id', customer.id)
+      .eq('tenant_id', tenant.id)
+      .single(),
+    supabase
+      .from('customer_points_balance')
+      .select('confirmed_balance, pending_balance')
+      .eq('tenant_id', tenant.id)
+      .eq('customer_id', customer.id)
+      .maybeSingle(),
+  ]);
 
   const eligible = (customerRow?.referral_access_granted ?? false) && !customerRow?.referral_suspended;
 
   let code: string | null = null;
-  if (eligible) {
-    code = await generateReferralCode({
-      tenantId: tenant.id,
-      customerId: customer.id,
-      fullName: customer.full_name,
-      email: customer.email,
-    });
-  }
-
-  const { data: balanceRow } = await supabase
-    .from('customer_points_balance')
-    .select('confirmed_balance, pending_balance')
-    .eq('tenant_id', tenant.id)
-    .eq('customer_id', customer.id)
-    .maybeSingle();
-
   let progress: { currentSpend: number; threshold: number | null } | null = null;
-  if (!eligible && tenant.referral_availability_mode === 'SPENDING_THRESHOLD') {
+  let nodes: { customerId: string; level: number; points: number }[] = [];
+
+  if (eligible) {
+    // code generation and downline resolution only need tenant/customer —
+    // independent of each other, run in parallel.
+    const [generatedCode, downline] = await Promise.all([
+      generateReferralCode({
+        tenantId: tenant.id,
+        customerId: customer.id,
+        fullName: customer.full_name,
+        email: customer.email,
+      }),
+      resolveReferralDownline(tenant.id, customer.id, tenant.referral_max_depth),
+    ]);
+    code = generatedCode;
+
+    // One batched points_ledger query for the whole downline instead of one
+    // query per node — was a real N+1 (a referral tree of N people issued N
+    // sequential queries here).
+    const downlineIds = downline.map((n) => n.customerId);
+    const { data: rows } = downlineIds.length > 0
+      ? await supabase
+        .from('points_ledger')
+        .select('amount, reference_customer_id')
+        .eq('tenant_id', tenant.id)
+        .eq('customer_id', customer.id)
+        .eq('transaction_type', 'REFERRAL_EARNED')
+        .in('reference_customer_id', downlineIds)
+      : { data: [] as { amount: number; reference_customer_id: string }[] };
+    const pointsByReferredId = new Map<string, number>();
+    for (const row of rows ?? []) {
+      pointsByReferredId.set(row.reference_customer_id, (pointsByReferredId.get(row.reference_customer_id) ?? 0) + row.amount);
+    }
+    nodes = downline.map(({ customerId, level }) => ({ customerId, level, points: pointsByReferredId.get(customerId) ?? 0 }));
+  } else if (tenant.referral_availability_mode === 'SPENDING_THRESHOLD') {
     const { data: orders } = await supabase
       .from('orders')
       .select('total')
@@ -58,24 +84,6 @@ export default async function ParrainagePage() {
       .eq('status', 'delivered');
     const currentSpend = (orders ?? []).reduce((sum, o) => sum + Number(o.total), 0);
     progress = { currentSpend, threshold: tenant.referral_unlock_spending_threshold };
-  }
-
-  let nodes: { customerId: string; level: number; points: number }[] = [];
-  if (eligible) {
-    const downline = await resolveReferralDownline(tenant.id, customer.id, tenant.referral_max_depth);
-    nodes = await Promise.all(
-      downline.map(async ({ customerId, level }) => {
-        const { data: rows } = await supabase
-          .from('points_ledger')
-          .select('amount')
-          .eq('tenant_id', tenant.id)
-          .eq('customer_id', customer.id)
-          .eq('transaction_type', 'REFERRAL_EARNED')
-          .eq('reference_customer_id', customerId);
-        const points = (rows ?? []).reduce((sum, r) => sum + r.amount, 0);
-        return { customerId, level, points };
-      }),
-    );
   }
 
   return (

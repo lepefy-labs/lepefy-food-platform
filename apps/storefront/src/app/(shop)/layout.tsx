@@ -17,9 +17,11 @@ import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const socialLinks = await getTenantSocialLinks(tenant.id);
+  const [socialLinks, nalaEnabled] = await Promise.all([
+    getTenantSocialLinks(tenant.id),
+    canUseNala(tenant.id),
+  ]);
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
-  const nalaEnabled = await canUseNala(tenant.id);
 
   return (
     <div className="min-h-screen flex flex-col">

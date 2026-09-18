@@ -175,11 +175,41 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const requestedPage = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
   const agedCutoffIso = new Date(Date.now() - AGED_MS).toISOString()
 
-  const { data: kpiOrders } = await supabase
-    .from('orders')
-    .select('total, created_at, status')
-    .eq('tenant_id', tenant.id)
-    .in('payment_status', ['paid'])
+  const [{ data: kpiOrders }, { data: allOrdersRaw }, { data: carriersRaw }, { data: pendingPaymentsRaw }] = await Promise.all([
+    supabase
+      .from('orders')
+      .select('total, created_at, status')
+      .eq('tenant_id', tenant.id)
+      .in('payment_status', ['paid'])
+      // Safety cap, not a real fix: these two queries pull the whole
+      // tenant order history into JS for in-memory aggregation (KPIs,
+      // operational queue). Fine at today's volume; will need a SQL
+      // aggregate/materialized view once order counts grow into the
+      // thousands — flagged separately, not done here to avoid silently
+      // changing business-critical dashboard numbers without review.
+      .order('created_at', { ascending: false })
+      .limit(10000),
+    supabase
+      .from('orders')
+      .select('id, status, created_at, fulfillment_type, payment_status, tracking_code, packing_completed_at, cold_chain_packing_checked_at, order_items(storage_type, quantity, picked_at, cold_chain_checked_at)')
+      .eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: false })
+      .limit(10000),
+    supabase
+      .from('carriers')
+      .select('name')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true)
+      .order('position', { ascending: true }),
+    supabase
+      .from('checkout_sessions')
+      .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
+      .eq('tenant_id', tenant.id)
+      .eq('payment_method', 'external_link')
+      .order('created_at', { ascending: true }),
+  ])
+  const carriers = ((carriersRaw ?? []) as { name: string }[]).map(carrier => carrier.name)
+  const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
   const kpiData = kpiOrders ?? []
   const now = new Date()
@@ -189,11 +219,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
     })
     .reduce((sum, order) => sum + order.total, 0)
-
-  const { data: allOrdersRaw } = await supabase
-    .from('orders')
-    .select('id, status, created_at, fulfillment_type, payment_status, tracking_code, packing_completed_at, cold_chain_packing_checked_at, order_items(storage_type, quantity, picked_at, cold_chain_checked_at)')
-    .eq('tenant_id', tenant.id)
 
   const allData = (allOrdersRaw ?? []) as OperationalOrderRow[]
   const totalCount = allData.length
@@ -288,22 +313,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
     const corrected = await query.range(from, from + PAGE_SIZE - 1) as { data: ListOrder[] | null }
     orderList = corrected.data ?? []
   }
-
-  const { data: carriersRaw } = await supabase
-    .from('carriers')
-    .select('name')
-    .eq('tenant_id', tenant.id)
-    .eq('active', true)
-    .order('position', { ascending: true })
-  const carriers = ((carriersRaw ?? []) as { name: string }[]).map(carrier => carrier.name)
-
-  const { data: pendingPaymentsRaw } = await supabase
-    .from('checkout_sessions')
-    .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
-    .eq('tenant_id', tenant.id)
-    .eq('payment_method', 'external_link')
-    .order('created_at', { ascending: true })
-  const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
   const activeFilterCount = [filterDateFrom, filterDateTo, filterFulfillment, filterPayment, filterView].filter(Boolean).length
   const pageStart = filteredCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1

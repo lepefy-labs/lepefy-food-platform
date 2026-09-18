@@ -58,8 +58,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   }
 
   const adminClient = createServiceClient();
-  const { data: categories } = await adminClient.from('categories').select('id, name, slug').eq('tenant_id', tenant.id).order('position');
-  const [pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
+  const [{ data: categories }, pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
+    adminClient.from('categories').select('id, name, slug').eq('tenant_id', tenant.id).order('position'),
     adminClient.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('payment_method', 'external_link').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
     adminClient.from('event_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('rental_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
