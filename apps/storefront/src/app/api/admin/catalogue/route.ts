@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { syncProductEmbedding } from '@/lib/ai/embeddings';
 import { assignBarcodeToProduct } from '@/lib/barcode';
 
+import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
+
 export const runtime = 'nodejs';
 
 const SORT_MAP: Record<string, { column: string; ascending: boolean }> = {
@@ -108,6 +110,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = createServiceClient();
 
+  let compareAtPrice: number | null;
+  let position: number;
+  try {
+    compareAtPrice = parseCompareAtPrice(body.compare_at_price, parseFloat(body.price) || 0);
+    position = parseCatalogPosition(body.position);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Tarification invalide.' }, { status: 400 });
+  }
+
   const slugProd = (body.name as string)
     .toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -140,7 +151,8 @@ export async function POST(req: NextRequest) {
       storage_type: body.storage_type ?? 'dry',
       category_id: body.category_id,
       warehouse_location: body.warehouse_location || null,
-      position: 9999,
+      position,
+      compare_at_price: compareAtPrice,
       producer_id: body.producer_id || null,
       importer_id: body.importer_id || null,
       ingredients_text: body.ingredients_text ? String(body.ingredients_text).trim() : null,

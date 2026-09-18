@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { syncProductEmbedding } from '@/lib/ai/embeddings';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
 
+import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
+
 export const runtime = 'nodejs';
 
 function cleanNutrition(raw: unknown): Record<string, number> | null {
@@ -38,6 +40,20 @@ export async function PATCH(
   const supabase = createServiceClient();
 
   const updatePayload: Record<string, unknown> = {};
+
+  try {
+    if ('compare_at_price' in body || 'price' in body) {
+      const { data: current, error } = await supabase.from('products')
+        .select('price, compare_at_price').eq('tenant_id', tenant.id).eq('id', params.id).single();
+      if (error || !current) return NextResponse.json({ error: 'Produit introuvable.' }, { status: 404 });
+      const price = 'price' in body ? parseFloat(String(body.price)) || 0 : Number(current.price);
+      updatePayload.compare_at_price = parseCompareAtPrice(
+        'compare_at_price' in body ? body.compare_at_price : current.compare_at_price, price);
+    }
+    if ('position' in body) updatePayload.position = parseCatalogPosition(body.position);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Tarification invalide.' }, { status: 400 });
+  }
 
   if ('name'               in body) updatePayload.name               = String(body.name).trim();
   if ('name_alt'           in body) updatePayload.name_alt           = body.name_alt ? String(body.name_alt).trim() : null;

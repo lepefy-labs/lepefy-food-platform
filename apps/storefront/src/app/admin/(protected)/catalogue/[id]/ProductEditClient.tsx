@@ -28,6 +28,8 @@ interface ProductEditProps {
     descriptions: Record<string, string> | null;
     description_source: 'ai' | 'human' | null;
     price: number;
+    compare_at_price: number | null;
+    position: number;
     weight_grams: number | null;
     stock: number;
     active: boolean;
@@ -78,6 +80,8 @@ interface FormState {
   descriptions: Record<string, string>;
   descriptionSource: 'ai' | 'human' | null;
   price: string;
+  compare_at_price: string;
+  position: string;
   weight_grams: string;
   stock: string;
   active: boolean;
@@ -146,6 +150,8 @@ function initFormState(product: ProductEditProps['product'], tenantLocales: stri
     descriptions,
     descriptionSource:           product.description_source ?? null,
     price:                       product.price.toFixed(2),
+    compare_at_price:            product.compare_at_price?.toFixed(2) ?? '',
+    position:                    String(product.position ?? 9999),
     weight_grams:                product.weight_grams != null ? String(product.weight_grams) : '',
     stock:                       String(product.stock),
     active:                      product.active,
@@ -249,6 +255,8 @@ export default function ProductEditClient({
         descriptions:       formData.descriptions,
         description_source: formData.descriptionSource,
         price:              formData.price,
+        compare_at_price:   formData.compare_at_price,
+        position:           formData.position,
         weight_grams:       formData.weight_grams,
         stock:              formData.stock,
         active:             formData.active,
@@ -571,6 +579,18 @@ export default function ProductEditClient({
 
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className={SECTION_TITLE_CLS}>Tarification &amp; Logistique</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="compare-at-price" className={LABEL_CLS}>Prix avant remise (€)</label>
+                  <input id="compare-at-price" type="number" step="0.01" min="0" value={formData.compare_at_price} onChange={(e) => setField('compare_at_price', e.target.value)} className={INPUT_CLS} />
+                  <p className="text-xs text-gray-500 mt-1">Laisser vide sans remise. Doit dépasser le prix de vente.</p>
+                </div>
+                <div>
+                  <label htmlFor="catalog-position" className={LABEL_CLS}>Position catalogue</label>
+                  <input id="catalog-position" type="number" step="1" value={formData.position} onChange={(e) => setField('position', e.target.value)} className={INPUT_CLS} />
+                  <p className="text-xs text-gray-500 mt-1">Une position négative donne priorité au classement recommandé, si le produit est en stock.</p>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className={LABEL_CLS}>Prix (€)</label>

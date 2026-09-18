@@ -45,6 +45,8 @@ export default async function AdminNouveauProduitPage() {
     descriptions:                null,
     description_source:          null,
     price:                       0,
+    compare_at_price:             null,
+    position:                    9999,
     weight_grams:                null,
     stock:                       0,
     active:                      false,

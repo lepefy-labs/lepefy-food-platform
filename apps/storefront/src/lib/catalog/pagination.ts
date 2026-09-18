@@ -1,3 +1,4 @@
+import { prioritizedCatalogIds } from './productMerchandising';
 import type { createClient } from '@/lib/supabase/server';
 
 /** Taille de page de plateforme — pas de valeur par tenant, cf. contrainte
@@ -107,6 +108,13 @@ export async function getCatalogPage(
     const categoryId = !filters.q?.trim()
       ? categories.find(category => category.slug === filters.category)?.id ?? null
       : null;
+    const recommended = !filters.sort || filters.sort === 'recommended';
+    const pins = recommended
+      ? await buildProductsQuery(supabase, tenantId, categories, filters).lt('position', 0).gt('stock', 0).range(0, 2399)
+      : { data: null, error: null };
+    if (pins.error) return { data: null, count: null, error: pins.error };
+    const pinnedIds = (pins.data ?? []).map(product => product.id);
+    const hasPins = pinnedIds.length > 0;
     const service = createServiceClient();
     const { data: ranking, error } = await service.rpc('catalog_ranked_product_ids', {
       p_tenant_id: tenantId,
@@ -114,12 +122,13 @@ export async function getCatalogPage(
       p_query: (filters.q?.trim() ?? '').slice(0, MAX_SEARCH_QUERY_LENGTH),
       p_sort: filters.sort ?? 'recommended',
       p_day: rankingDay,
-      p_offset: offset,
-      p_limit: limit,
+      p_offset: hasPins ? 0 : offset,
+      p_limit: hasPins ? Math.min(2400, offset + limit + pinnedIds.length) : limit,
     });
     if (!error && ranking) {
       const rows = ranking as { product_id: string; total_count: number }[];
-      const ids = rows.map(row => row.product_id);
+      const rankedIds = rows.map(row => row.product_id);
+      const ids = hasPins ? prioritizedCatalogIds(rankedIds, pinnedIds, offset, limit) : rankedIds;
       if (!ids.length) {
         // Even a deep-link past the last page retains the real result count.
         const { count, error: countError } = await buildProductsQuery(supabase, tenantId, categories, filters).range(0, 0);

@@ -73,6 +73,8 @@ La navigazione admin e la ricerca globale sono permission-aware. Lo switch works
 
 ### Storefront routing, Catalogue, navigation e PWA
 
+L'editor prodotto admin espone `compare_at_price` (prezzo barrato, superiore al prezzo di vendita) e `position`, con validazione nelle API create/update. Nel Catalogue raccomandato, le posizioni negative promuovono i prodotti attivi e in stock prima del ranking; filtri, isolamento tenant e paginazione SSR/API restano condivisi. Gli ordinamenti espliciti scelti dal cliente restano rispettati. Nessuna nuova colonna o migration è necessaria.
+
 Le route storefront canoniche sono:
 
 ```text
@@ -767,6 +769,6 @@ Prima di consegnare codice:
 
 # Fine snapshot v6.61
 
-**Base audit:** `main + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI`
+**Base audit:** `main + product discount editor and recommended catalogue priority`;  `main + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI`
 **Data:** 18 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
