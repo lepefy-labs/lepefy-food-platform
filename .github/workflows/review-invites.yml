@@ -3,7 +3,24 @@ name: Review invites
 on:
   schedule:
     - cron: '*/30 * * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/review-invites.yml'
+      - 'scripts/backfill-review-invites.mjs'
+      - 'scripts/process-review-invites.mjs'
+      - 'apps/storefront/src/app/api/internal/review-invites/route.ts'
   workflow_dispatch:
+    inputs:
+      tenant_slug:
+        description: 'Tenant slug for an optional historical backfill'
+        required: false
+        default: 'chloefood'
+      backfill_days:
+        description: 'Historical lookback in days (0 = no backfill, max 30)'
+        required: false
+        default: '0'
 
 permissions:
   contents: read
@@ -13,7 +30,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  backfill-review-invites:
+    if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[review-backfill-14d]')) || (github.event_name == 'workflow_dispatch' && inputs.backfill_days != '0') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout4v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Backfill recent eligible review invitations
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REVIEW_BACKFILL_TENANT_SLUG: ${{ github.event_name == 'push' && 'chloefood' || inputs.tenant_slug }}
+          REVIEW_BACKFILL_DAYS: ${{ github.event_name == 'push' && '14' || inputs.backfill_days }}
+        run: node scripts/backfill-review-invites.mjs
+
   dispatch-review-invites:
+    needs: backfill-review-invites
+    if: ${{ always() && needs.backfill-review-invites.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -29,4 +67,5 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           REVIEW_INVITES_APP_URL: ${{ vars.REVIEW_INVITES_APP_URL }}
           SHIPPING_SYNC_APP_URL: ${{ vars.SHIPPING_SYNC_APP_URL }}
+          REVIEW_INVITES_MAX_PER_RUN: ${{ ((github.event_name == 'push' && contains(github.event.head_commit.message, '[review-backfill-14d]')) || (github.event_name == 'workflow_dispatch' && inputs.backfill_days != '0')) && '100' || '25' }}
         run: node scripts/process-review-invites.mjs

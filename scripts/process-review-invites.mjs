@@ -22,12 +22,14 @@ if (rows === null) {
   process.exit(0);
 }
 const staleBefore = now.getTime() - 15 * 60 * 1000;
+const requestedMaxPerRun = Number.parseInt(process.env.REVIEW_INVITES_MAX_PER_RUN ?? '25', 10);
+const maxPerRun = Number.isFinite(requestedMaxPerRun) ? Math.min(100, Math.max(1, requestedMaxPerRun)) : 25;
 const due = rows.filter((row) => {
   const unlocked = !row.processing_started_at || new Date(row.processing_started_at).getTime() <= staleBefore;
   if (!unlocked) return false;
   if (!row.sent_at) return new Date(row.eligible_at).getTime() <= now.getTime();
   return !row.reminder_sent_at && new Date(row.reminder_at).getTime() <= now.getTime();
-}).slice(0, 25);
+}).slice(0, maxPerRun);
 
 if (!due.length) {
   console.log('No due review invitations.');

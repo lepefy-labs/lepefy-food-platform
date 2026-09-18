@@ -253,6 +253,8 @@ Alla consegna di un ordine eleggibile viene creato idempotentemente un `review_i
 
 `reviews`, `review_invites`, `review_invite_tokens` e `review_moderation_events` sono service-role-only con RLS forzata e nessuna policy browser diretta. `tenant_review_stats` aggrega esclusivamente recensioni `published`; la media pubblica può essere nascosta fino a `min_public_count` (default 3), mentre `/avis` mostra soltanto righe pubblicate con badge `Commande vérifiée`. L'historique autenticato `/orders` mostra una CTA per gli ordini delivered+paid ancora senza recensione. Una submission anticipata completa l'invito eventualmente esistente per evitare e-mail successive inutili.
 
+Per recovery/rollout esiste un backfill manuale tenant-scoped, bounded a 1–30 giorni e idempotente: crea soltanto inviti per ordini `delivered + paid` che non hanno già né review né invito e non abilita mai feature/settings al posto del tenant. Poiché `orders` non persiste ancora un `delivered_at`, la finestra storica usa `orders.updated_at` come miglior proxy disponibile; il dispatcher ricontrolla inoltre l'assenza di una review immediatamente prima dell'invio, evitando mail tardive a chi ha già recensito.
+
 La migration additiva `113_reviews_foundation.sql` deve essere applicata manualmente in Supabase prima dell'attivazione: Vercel non applica migration. Prima dello schema/setting, i resolver falliscono chiusi e il modulo resta invisibile/inattivo.
 
 ---

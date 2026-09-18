@@ -45,6 +45,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: 'ineligible' }, { status: 202 });
   }
 
+  const { data: existingReview, error: reviewLookupError } = await db.from('reviews')
+    .select('id')
+    .eq('tenant_id', invite.tenant_id)
+    .eq('order_id', invite.order_id)
+    .eq('review_type', 'service')
+    .maybeSingle();
+  if (reviewLookupError) {
+    await clearProcessing('review_lookup_failed');
+    return NextResponse.json({ error: 'review_lookup_failed' }, { status: 503 });
+  }
+  if (existingReview) {
+    await clearProcessing('review_already_submitted', true);
+    return NextResponse.json({ ok: true, skipped: 'review_exists' }, { status: 202 });
+  }
+
   const tenant = await getTenantNotificationContext(invite.tenant_id);
   if (!tenant?.storefrontUrl) {
     await clearProcessing('tenant_storefront_unavailable');
