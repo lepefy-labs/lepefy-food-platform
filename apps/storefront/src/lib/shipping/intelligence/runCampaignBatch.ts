@@ -15,6 +15,7 @@ type ServiceClient = ReturnType<typeof createServiceClient>;
 const ITEMS_PER_TICK = 8;
 const WORKER_COUNT = 2;
 const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
+const STALE_RUNNING_ITEM_MS = 10 * 60 * 1000;
 
 /**
  * Traite un lot borné d'éléments de campagne "pending" pour le tenant, en
@@ -26,6 +27,7 @@ const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
 export async function runCampaignBatch(
   supabase: ServiceClient,
   tenant: Tenant,
+  options?: { campaignId?: string },
 ): Promise<{ processed: number; succeeded: number; failed: number; skipped: number }> {
   if (tenant.shipping_provider !== 'packlink') {
     return { processed: 0, succeeded: 0, failed: 0, skipped: 0 };
@@ -34,11 +36,17 @@ export async function runCampaignBatch(
   if (!resolvedApiKey) return { processed: 0, succeeded: 0, failed: 0, skipped: 0 };
   const packlinkApiKey: string = resolvedApiKey;
 
-  const { data: activeCampaigns } = await supabase
+  let activeCampaignQuery = supabase
     .from('shipping_simulation_campaigns')
     .select('*')
     .eq('tenant_id', tenant.id)
-    .in('status', ['queued', 'running'])
+    .in('status', ['queued', 'running']);
+
+  if (options?.campaignId) {
+    activeCampaignQuery = activeCampaignQuery.eq('id', options.campaignId);
+  }
+
+  const { data: activeCampaigns } = await activeCampaignQuery
     .order('created_at', { ascending: true });
 
   const campaigns = (activeCampaigns ?? []) as ShippingSimulationCampaignRow[];
@@ -50,9 +58,23 @@ export async function runCampaignBatch(
     if (campaign.status === 'queued') {
       await supabase.from('shipping_simulation_campaigns')
         .update({ status: 'running', started_at: new Date().toISOString() })
-        .eq('id', campaign.id);
+        .eq('id', campaign.id)
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'queued');
     }
   }
+
+  // Un tick interrompu après le claim ne doit pas bloquer une campagne pour
+  // toujours. Le timeout Vercel est de 60 s ; 10 minutes laisse une marge
+  // généreuse avant de rendre un item "running" à nouveau disponible.
+  const staleBefore = new Date(Date.now() - STALE_RUNNING_ITEM_MS).toISOString();
+  await supabase
+    .from('shipping_simulation_campaign_items')
+    .update({ status: 'pending' })
+    .eq('tenant_id', tenant.id)
+    .in('campaign_id', campaignIds)
+    .eq('status', 'running')
+    .lt('attempted_at', staleBefore);
 
   const { data: pendingItems } = await supabase
     .from('shipping_simulation_campaign_items')
@@ -72,6 +94,7 @@ export async function runCampaignBatch(
 
   const campaignsById = new Map(campaigns.map((c) => [c.id, c]));
 
+  let processed = 0;
   let succeeded = 0;
   let failed = 0;
   let skipped = 0;
@@ -82,11 +105,27 @@ export async function runCampaignBatch(
     while (index < items.length) {
       const item = items[index++];
       if (!item) break;
+
+      // Claim CAS: cron et déclenchement admin peuvent se chevaucher sans
+      // traiter deux fois le même scénario.
+      const claimTime = new Date().toISOString();
+      const { data: claimedItem } = await supabase
+        .from('shipping_simulation_campaign_items')
+        .update({ status: 'running', attempted_at: claimTime })
+        .eq('id', item.id)
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
+
+      if (!claimedItem) continue;
+
+      processed++;
       touchedCampaignIds.add(item.campaign_id);
       const profile = profilesById.get(item.scenario.packagingProfileId);
       if (!profile) {
         await supabase.from('shipping_simulation_campaign_items')
-          .update({ status: 'failed', error: 'packaging_profile_not_found', attempted_at: new Date().toISOString() })
+          .update({ status: 'failed', error: 'packaging_profile_not_found', attempted_at: claimTime })
           .eq('id', item.id);
         failed++;
         continue;
@@ -116,7 +155,7 @@ export async function runCampaignBatch(
 
         if (equivalent) {
           await supabase.from('shipping_simulation_campaign_items')
-            .update({ status: 'skipped_duplicate', observation_id: equivalent.id, attempted_at: new Date().toISOString() })
+            .update({ status: 'skipped_duplicate', observation_id: equivalent.id, attempted_at: claimTime })
             .eq('id', item.id);
           skipped++;
           continue;
@@ -135,18 +174,18 @@ export async function runCampaignBatch(
 
         if (result.ok) {
           await supabase.from('shipping_simulation_campaign_items')
-            .update({ status: 'succeeded', observation_id: result.chosenObservationId, attempted_at: new Date().toISOString() })
+            .update({ status: 'succeeded', observation_id: result.chosenObservationId, attempted_at: claimTime })
             .eq('id', item.id);
           succeeded++;
         } else {
           await supabase.from('shipping_simulation_campaign_items')
-            .update({ status: 'failed', error: result.error ?? 'unknown_error', attempted_at: new Date().toISOString() })
+            .update({ status: 'failed', error: result.error ?? 'unknown_error', attempted_at: claimTime })
             .eq('id', item.id);
           failed++;
         }
       } catch (err) {
         await supabase.from('shipping_simulation_campaign_items')
-          .update({ status: 'failed', error: err instanceof Error ? err.message : 'unexpected_error', attempted_at: new Date().toISOString() })
+          .update({ status: 'failed', error: err instanceof Error ? err.message : 'unexpected_error', attempted_at: claimTime })
           .eq('id', item.id);
         failed++;
       }
@@ -171,12 +210,25 @@ export async function runCampaignBatch(
       failed_scenarios: failedCount,
       skipped_scenarios: skippedCount,
     };
-    if (pendingCount === 0) {
+
+    // Relire l'état évite qu'un lot en vol ne réécrive une annulation admin.
+    const { data: currentCampaign } = await supabase
+      .from('shipping_simulation_campaigns')
+      .select('status')
+      .eq('id', campaignId)
+      .eq('tenant_id', tenant.id)
+      .maybeSingle();
+
+    if (currentCampaign?.status !== 'cancelled' && pendingCount === 0) {
       update.status = failedCount > 0 ? 'completed_with_errors' : 'completed';
       update.completed_at = new Date().toISOString();
     }
-    await supabase.from('shipping_simulation_campaigns').update(update).eq('id', campaignId);
+
+    await supabase.from('shipping_simulation_campaigns')
+      .update(update)
+      .eq('id', campaignId)
+      .eq('tenant_id', tenant.id);
   }
 
-  return { processed: items.length, succeeded, failed, skipped };
+  return { processed, succeeded, failed, skipped };
 }

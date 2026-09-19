@@ -28,13 +28,16 @@ const STATUS_CLS: Record<string, string> = {
 };
 
 interface DestinationRow { country: string; postalCode: string; zoneCode: string | null }
+type CampaignNotice = { tone: 'success' | 'warning'; text: string };
 
 export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagingProfileRow[]; zones: ShippingZoneRow[] }) {
   const [campaigns, setCampaigns] = useState<ShippingSimulationCampaignRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [creating, setCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CampaignNotice | null>(null);
 
   const [name, setName] = useState('');
   const [weightsInput, setWeightsInput] = useState(DEFAULT_WEIGHTS);
@@ -58,8 +61,56 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
     setDestinations((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
   }
 
+  async function processCampaign(id: string, automatic = false) {
+    setProcessingId(id);
+    if (!automatic) setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/shipping-simulation-campaigns/${id}/process`, { method: 'POST' });
+      const data = await res.json() as {
+        error?: string;
+        retryAfterSeconds?: number;
+        result?: { processed: number; succeeded: number; failed: number; skipped: number };
+      };
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          setNotice({
+            tone: 'warning',
+            text: 'Un lot vient déjà d’être lancé. Le traitement automatique reste actif ; réessayez dans quelques secondes.',
+          });
+          return;
+        }
+        throw new Error(data.error ?? 'Erreur');
+      }
+
+      const result = data.result;
+      if ((result?.processed ?? 0) > 0) {
+        setNotice({
+          tone: 'success',
+          text: `Lot immédiat traité : ${result?.processed ?? 0} scénario(s), ${result?.succeeded ?? 0} réussi(s), ${result?.skipped ?? 0} doublon(s), ${result?.failed ?? 0} échec(s). Le worker automatique poursuivra la campagne si nécessaire.`,
+        });
+      } else {
+        setNotice({
+          tone: 'warning',
+          text: 'Aucun scénario n’a été pris dans ce lot. La campagne est peut-être terminée ou déjà prise en charge par le worker automatique.',
+        });
+      }
+    } catch {
+      setNotice({
+        tone: 'warning',
+        text: automatic
+          ? 'La campagne est bien créée et reste en file. Le worker automatique prendra le relais.'
+          : 'Impossible de lancer ce lot immédiatement. Le worker automatique reste actif.',
+      });
+    } finally {
+      setProcessingId(null);
+      await loadCampaigns();
+    }
+  }
+
   async function handleCreate() {
     setError(null);
+    setNotice(null);
     const weightsKg = weightsInput.split(',').map((w) => Number(w.trim())).filter((w) => Number.isFinite(w) && w > 0);
     if (weightsKg.length === 0) { setError('Indiquez au moins un poids valide.'); return; }
     if (selectedProfiles.length === 0) { setError('Sélectionnez au moins un profil d\'emballage.'); return; }
@@ -78,11 +129,12 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
           destinations: validDestinations.map((d) => ({ country: d.country, postalCode: d.postalCode.trim(), zoneCode: d.zoneCode })),
         }),
       });
-      const data = await res.json();
+      const data = await res.json() as ShippingSimulationCampaignRow & { error?: string };
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       setCreating(false);
       setName('');
       await loadCampaigns();
+      void processCampaign(data.id, true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création de la campagne.');
     } finally {
@@ -106,8 +158,14 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
         <button onClick={() => void loadCampaigns()} className="min-h-8 px-2 py-1.5 text-xs rounded-lg border border-gray-200 flex items-center gap-1 text-gray-500"><IconRefresh size={14} stroke={1.5} />Actualiser</button>
       </div>
       <p className="text-xs text-gray-400 mb-4">
-        Traitées par lots bornés (2 requêtes Packlink simultanées maximum, toutes les 5 minutes) — jamais en rafale. Les scénarios déjà couverts par une observation récente ne redemandent pas Packlink.
+        Le lancement déclenche immédiatement un lot borné (2 requêtes Packlink simultanées maximum), puis le worker automatique reprend toutes les 5 minutes si nécessaire. Les scénarios déjà couverts par une observation récente ne redemandent pas Packlink.
       </p>
+
+      {notice && (
+        <div className={`mb-4 px-3 py-2 rounded-lg text-xs border ${notice.tone === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
+          {notice.text}
+        </div>
+      )}
 
       {loadingList ? (
         <p className="text-sm text-gray-400 mb-4">Chargement…</p>
@@ -130,7 +188,22 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                   <td className="py-2.5 pr-3 text-gray-400">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
                   <td className="py-2.5 pr-3 text-right">
                     {(c.status === 'queued' || c.status === 'running') && (
-                      <button onClick={() => void handleCancel(c.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600">Annuler</button>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          onClick={() => void processCampaign(c.id)}
+                          disabled={processingId !== null}
+                          className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50"
+                        >
+                          {processingId === c.id ? 'Traitement…' : 'Traiter maintenant'}
+                        </button>
+                        <button
+                          onClick={() => void handleCancel(c.id)}
+                          disabled={processingId === c.id}
+                          className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 disabled:opacity-50"
+                        >
+                          Annuler
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
