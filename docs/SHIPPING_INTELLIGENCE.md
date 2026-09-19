@@ -1,9 +1,9 @@
 # Shipping Intelligence — documentazione tecnica e operativa
 
-> **Modulo:** Admin → Livraison / Shipping Intelligence  
-> **Repository:** `lepefy-labs/lepefy-food-platform`  
-> **Base codice verificata:** `main@04ed6c69e22a44fab1d59cd7934e319cb94d0d71`  
-> **Ultima verifica:** 19 settembre 2026  
+> **Modulo:** Admin → Livraison / Shipping Intelligence
+> **Repository:** `lepefy-labs/lepefy-food-platform`
+> **Base codice verificata:** `main@04ed6c69e22a44fab1d59cd7934e319cb94d0d71`
+> **Ultima verifica:** 19 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql`
 >
 > Questo documento descrive lo **stato corrente** del modulo. Il codice rimane la source of truth.
