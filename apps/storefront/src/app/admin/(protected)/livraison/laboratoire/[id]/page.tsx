@@ -61,7 +61,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   for (const item of typedItems) {
     const observation = item.observation_id ? observationById.get(item.observation_id) : null;
     if (!observation?.total_provider_cost) continue;
-    const destination = observation.destination_zone_code ?? `${observation.destination_country} ${observation.destination_postal_code}`;
+    const destination = `${observation.destination_country} ${observation.destination_postal_code}`;
     const profileName = profilesById.get(item.scenario.packagingProfileId) ?? 'Profil supprimé';
     const key = `${destination}::${profileName}`;
     const existing = groups.get(key);
@@ -95,7 +95,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
       </section>
 
       <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Coût médian par profil × destination</h2>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Coût médian par CAP × profil</h2>
         {resultRows.length === 0 ? (
           <p className="text-sm text-gray-400">Pas encore de résultats — la campagne est peut-être encore en file d&apos;attente (traitement toutes les 5 minutes).</p>
         ) : (
