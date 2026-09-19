@@ -42,6 +42,14 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/ambassador')) return 'growth.manage';
   if (path.startsWith('/api/admin/shipping-rules')) return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-simulator' || path === '/api/admin/packlink-inspector') return 'shipping.view';
+  if (path.startsWith('/api/admin/shipping-packaging-profiles')) return read ? 'shipping.view' : 'shipping.manage';
+  if (path.startsWith('/api/admin/shipping-zones')) return read ? 'shipping.view' : 'shipping.manage';
+  if (/^\/api\/admin\/shipping-simulation-campaigns\/[^/]+\/cancel$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
+  if (path.startsWith('/api/admin/shipping-simulation-campaigns')) return read ? 'shipping.view' : 'shipping.manage';
+  if (path.startsWith('/api/admin/shipping-observations')) return 'shipping.view';
+  if (path === '/api/admin/shipping-advisor') return 'shipping.view';
+  if (/^\/api\/admin\/shipping-tariff-drafts\/[^/]+\/simulate$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.view' : null;
+  if (path.startsWith('/api/admin/shipping-tariff-drafts')) return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/payment-methods') || path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
 

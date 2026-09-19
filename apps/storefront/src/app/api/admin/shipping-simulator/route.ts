@@ -38,6 +38,8 @@ import {
   applyCountryRule,
   type ShippingCountryRule,
 } from '@/lib/shipping/resolveCountryRule';
+import { computeRequestHash } from '@/lib/shipping/intelligence/requestHash';
+import { resolveZoneCode } from '@/lib/shipping/intelligence/resolveZone';
 
 export const runtime = 'nodejs';
 
@@ -236,6 +238,66 @@ export async function POST(req: NextRequest) {
       chosen:          cheapest !== null && s.id === cheapest.id,
     };
   });
+
+  // ── Intelligence expédition — persistance best-effort ────────────────────
+  // Chaque test manuel alimente le dataset d'observations au lieu d'être
+  // jeté (contrairement au comportement d'avant l'intelligence expédition).
+  // N'affecte jamais la réponse : un échec d'écriture est loggé, jamais
+  // renvoyé au client.
+  try {
+    const [{ data: defaultProfile }, zoneCode] = await Promise.all([
+      supabase
+        .from('shipping_packaging_profiles')
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('is_default', true)
+        .maybeSingle(),
+      resolveZoneCode(supabase, tenant.id, country, postalCode),
+    ]);
+
+    const requestHash = computeRequestHash({
+      provider: 'packlink',
+      originCountry: FROM_ADDRESS.country,
+      originPostalCode: FROM_ADDRESS.zip_code,
+      destinationCountry: country,
+      destinationPostalCode: postalCode,
+      numParcels,
+      parcels: parcelWeightsG.map((g) => ({
+        weightG: g, lengthCm: boxDimensions.length, widthCm: boxDimensions.width, heightCm: boxDimensions.height,
+      })),
+    });
+
+    await supabase.from('shipping_quote_observations').insert(
+      simulatorServices.map((s) => ({
+        tenant_id:               tenant.id,
+        provider:                'packlink',
+        source:                  'synthetic_simulation' as const,
+        campaign_id:             null,
+        origin_country:          FROM_ADDRESS.country,
+        origin_postal_code:      FROM_ADDRESS.zip_code,
+        destination_country:     country,
+        destination_postal_code: postalCode,
+        destination_zone_code:   zoneCode,
+        num_parcels:             numParcels,
+        parcels:                 parcelWeightsG.map((g) => ({
+          weight_g: g, length_cm: boxDimensions.length, width_cm: boxDimensions.width, height_cm: boxDimensions.height,
+        })),
+        total_weight_g:          totalWeightG,
+        packaging_profile_id:    (defaultProfile as { id: string } | null)?.id ?? null,
+        service_id:              String(s.id),
+        carrier:                 s.carrierName || null,
+        service_name:            s.serviceName || null,
+        base_price:              s.basePrice,
+        tax_price:               s.taxPrice,
+        total_provider_cost:     parseFloat((s.basePrice + s.taxPrice).toFixed(2)),
+        eligible:                s.eligible,
+        exclusion_reason:        s.exclusionReason,
+        request_hash:            requestHash,
+      })),
+    );
+  } catch (persistErr) {
+    console.error('[admin/shipping-simulator] observation persistence failed (non-blocking):', persistErr);
+  }
 
   // ── Règle pays — appliquée sur le service choisi, comme le flux réel ─────
   // Le simulateur ne modélise pas de panier (pas de champ montant dans le

@@ -598,6 +598,8 @@ La pagina cliente `/orders/[id]` mostra timeline Lepefy sincronizzata più recen
 
 `.github/workflows/shipping-sync.yml` richiama ogni 15 minuti (anche workflow_dispatch) `scripts/process-shipping-sync.mjs` → POST `/api/internal/shipping-sync`, autenticato bearer service-role con confronto timing-safe. `SHIPPING_SYNC_APP_URL` è la URL preferita; fallback AI_CORE_APP_URL → NALA_ENRICHMENT_APP_URL → EVENT_REPORTS_APP_URL solo sullo stesso deployment storefront. Il worker DB multi-tenant seleziona al massimo 6 spedizioni managed con reference, adapter supportato, ordini preparing/shipped e shipment non terminale, in ordine di ultimo sync. Due worker limitati isolano i failure per ordine; nessuna scansione dello storico, payload provider raw o secret viene persistito/esposto. Le credenziali di ciascun ordine provengono dal suo tenant.
 
+**Shipping Intelligence (V1A–V1D)** sépare trois concepts auparavant fusionnés dans `tenants.shipping_provider` : le provider logistique (inchangé), la stratégie de tarification client (non introduite — aucune colonne `customer_pricing_strategy` n'existe, aucun changement de checkout) et l'intelligence expédition (nouveau, décrit ici). Cinq tables additives (migration `119`) : `shipping_packaging_profiles` (catalogue de boîtes par tenant, un profil `is_default` seedé depuis `packaging_surcharges.box_*` existant — `calculateShipping.ts` continue de lire `packaging_surcharges` directement, aucun changement de comportement checkout), `shipping_zones` (zones tenant par préfixe postal, saisie manuelle — aucun mapping code postal→région n'est fourni par la plateforme), `shipping_quote_observations` (dataset normalisé provider-neutral d'observations de devis : `source` distingue `synthetic_simulation | real_quote | real_shipment`, `eligible`/`exclusion_reason` par service Packlink retourné, jamais de clé API ni de payload brut — `real_shipment` n'est jamais peuplé en V1 car le coût final réel d'une expédition n'est pas capturé séparément du devis dans le schéma actuel), `shipping_simulation_campaigns`/`shipping_simulation_campaign_items` (campagnes bornées et reprenables, état `draft→queued→running→completed|completed_with_errors|cancelled`, traitées par `runCampaignBatch` — même motif 2-workers-bornés que `shippingSyncBatch.ts` — via `.github/workflows/shipping-campaign-worker.yml` (cron 5 min, `SUPABASE_SERVICE_ROLE_KEY` bearer, jamais un long appel HTTP synchrone)), `shipping_tariff_drafts` (brouillons de tarifs commerciaux, **jamais lus par le checkout**, rétrotestés via `/api/admin/shipping-tariff-drafts/:id/simulate` qui distingue toujours métriques scénario-pondérées et commande-pondérées, jamais moyennées ensemble). L'onglet Admin → Livraison passe de 3 à 7 : Tarification (ex-Règles par pays, inchangé), Emballages, Laboratoire (absorbe l'ancien Simulateur en mode « Test rapide », qui persiste désormais chaque service Packlink retourné comme observation au lieu de le jeter, + campagnes), Assistant expédition (estimation déterministe par similarité — aucune IA/embedding — toujours accompagnée d'un niveau de confiance et d'une taille d'échantillon, jamais présentée comme un prix garanti), Historique des coûts, Analyse tarifaire, Diagnostic Packlink (inchangé). Toutes les nouvelles tables suivent le pattern RLS-backstop + GRANT explicite déjà établi par `shipping_country_rules` ; `shipping_quote_observations`/`shipping_simulation_campaigns`/`shipping_simulation_campaign_items`/`shipping_tariff_drafts` n'ont aucune policy publique (coûts fournisseur internes, service-role uniquement).
+
 `docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth destinatari interni. Gli alert pagamento esterno Shop/Events condividono `notify_external_payment_pending` ma webhook/payload distinti. Gli eventi aggiungono `notify_event_booking_closed_reports` per i tre report automatici di chiusura.
 
 ---
@@ -643,6 +645,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 109_tenant_crm_foundation.sql
 110_event_gallery_editorial.sql
 111_managed_shipping_tracking.sql
+119_shipping_intelligence_foundation.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -690,6 +693,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `113` introduce Reviews V1 verificato: entitlement/settings tenant, capability RBAC dedicate, recensioni service one-per-order paid+delivered, inviti token-hashati, moderazione umana obbligatoria con contenuto immutabile e audit append-only, blacklist deterministica, statistiche pubbliche sulle sole recensioni published e dispatcher retry-safe. L’AI moderation resta disabilitata in V1. La migration è additiva e richiede applicazione manuale in Supabase prima dell’attivazione del modulo.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
+
+`119` è additiva : 5 nuove tabelle (Shipping Intelligence, vedi sezione 13), zero colonne modificate su `tenants`/`orders`/`packaging_surcharges`/`shipping_country_rules`, zero impatto checkout. Seed non distruttivo: un `shipping_packaging_profiles` di default per tenant derivato da `packaging_surcharges` esistente. L'applicazione in Supabase resta manuale.
 
 Knowledge Suggestions V1 non richiede migration: deriva candidati temporanei dagli stessi segnali 095/097 e li rende persistenti esclusivamente dopo approvazione tenant dentro la tabella `tenant_knowledge_base` già esistente. Nessuna tabella di candidate queue, backfill o modifica retention viene introdotta.
 
@@ -751,6 +756,7 @@ supabase/migrations/*
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;
 - le API admin legacy mantengono il nome helper `requireAdmin()` per compatibilità, ma l'enforcement è già capability-driven tramite `adminApiPermissions.ts`;
+- Shipping Intelligence : nessun mapping code postal→region/zona è fornito dalla piattaforma (`shipping_zones.postal_prefixes` è data entry tenant); `shipping_quote_observations.source = 'real_shipment'` non è mai popolato in V1 perché il costo finale reale di una spedizione non è catturato separatamente dal preventivo; `customer_pricing_strategy` (V1E, pricing cliente/checkout) non è implementato — Tarification/checkout restano interamente sul flusso `shipping_country_rules` esistente;
 - AI credits predisposti semanticamente ma non monetizzati/applicati.
 
 ---

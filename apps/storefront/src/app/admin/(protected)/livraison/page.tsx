@@ -4,7 +4,8 @@ import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { LivraisonTabs } from './LivraisonTabs';
 import { ShippingCountryRulesSection } from './ShippingCountryRulesSection';
-import type { ShippingCountryRuleRow } from '@lepefy/types';
+import { ZonesSection } from './ZonesSection';
+import type { ShippingCountryRuleRow, ShippingZoneRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -21,6 +22,12 @@ export default async function AdminLivraisonPage() {
     .eq('tenant_id', tenant.id)
     .order('position', { ascending: true }) as unknown as { data: ShippingCountryRuleRow[] | null };
 
+  const { data: zones } = await supabase
+    .from('shipping_zones')
+    .select('*')
+    .eq('tenant_id', tenant.id)
+    .order('position', { ascending: true }) as unknown as { data: ShippingZoneRow[] | null };
+
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
@@ -34,6 +41,8 @@ export default async function AdminLivraisonPage() {
       <AdminBlockAccent tone="info">
         <ShippingCountryRulesSection initialRules={rules ?? []} currency={tenant.currency} />
       </AdminBlockAccent>
+
+      <ZonesSection initialZones={zones ?? []} />
     </div>
   );
 }

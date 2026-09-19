@@ -12,5 +12,6 @@ export * from './crm';
 export * from './heroSlides';
 export * from './ambassador';
 export * from './shippingCountryRule';
+export * from './shippingIntelligence';
 export * from './events';
 export * from './notificationRecipients';
