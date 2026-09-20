@@ -195,15 +195,23 @@ export async function runCampaignBatch(
   await Promise.all(Array.from({ length: WORKER_COUNT }, () => worker()));
 
   for (const campaignId of touchedCampaignIds) {
-    const { data: counts } = await supabase
-      .from('shipping_simulation_campaign_items')
-      .select('status')
-      .eq('campaign_id', campaignId);
-    const rows = (counts ?? []) as { status: string }[];
-    const succeededCount = rows.filter((r) => r.status === 'succeeded').length;
-    const failedCount = rows.filter((r) => r.status === 'failed').length;
-    const skippedCount = rows.filter((r) => r.status === 'skipped_duplicate').length;
-    const pendingCount = rows.filter((r) => r.status === 'pending' || r.status === 'running').length;
+    // COUNT agrégat (head: true) et non un SELECT de lignes : un select('status')
+    // sans .range() est plafonné par PostgREST (1000 lignes par défaut), et les
+    // lignes récemment mises à jour (donc physiquement déplacées par MVCC) se
+    // retrouvent hors de cet échantillon — un vrai bug observé en production
+    // (32 items réellement skipped_duplicate, complétés jamais reflétés côté
+    // shipping_simulation_campaigns.completed_scenarios). Les agrégats COUNT
+    // ne sont pas concernés par cette limite de lignes retournées.
+    const [succeededResult, failedResult, skippedResult, pendingResult] = await Promise.all([
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).eq('status', 'succeeded'),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).eq('status', 'failed'),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).eq('status', 'skipped_duplicate'),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).in('status', ['pending', 'running']),
+    ]);
+    const succeededCount = succeededResult.count ?? 0;
+    const failedCount = failedResult.count ?? 0;
+    const skippedCount = skippedResult.count ?? 0;
+    const pendingCount = pendingResult.count ?? 0;
 
     const update: Record<string, unknown> = {
       completed_scenarios: succeededCount + skippedCount,

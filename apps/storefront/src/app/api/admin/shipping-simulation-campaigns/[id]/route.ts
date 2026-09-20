@@ -26,11 +26,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   if (error || !campaign) return NextResponse.json({ error: 'Campagne introuvable.' }, { status: 404 });
 
+  // Une campagne compte au plus MAX_CAMPAIGN_SCENARIOS (2000) items — la
+  // limite explicite doit couvrir ce plafond, sinon PostgREST tronque
+  // silencieusement à 1000 lignes.
   const { data: items } = await supabase
     .from('shipping_simulation_campaign_items')
     .select('*')
     .eq('campaign_id', params.id)
-    .limit(1000);
+    .limit(2500);
 
   const observationIds = (items as ShippingSimulationCampaignItemRow[] | null ?? [])
     .map((i) => i.observation_id)
@@ -41,7 +44,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     const { data } = await supabase
       .from('shipping_quote_observations')
       .select('*')
-      .in('id', observationIds);
+      .in('id', observationIds)
+      .limit(2500);
     observations = (data as ShippingQuoteObservationRow[] | null) ?? [];
   }
 
