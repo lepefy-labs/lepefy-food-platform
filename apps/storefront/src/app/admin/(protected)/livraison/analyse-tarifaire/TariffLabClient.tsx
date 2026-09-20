@@ -75,23 +75,24 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     }
   }
 
-  function renderMetrics(label: string, metrics: BacktestMetrics, warn?: boolean) {
+  function renderMetrics(label: string, metrics: BacktestMetrics, subtitle: string, warn?: boolean) {
     return (
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{label} <span className="normal-case font-normal text-gray-400">(n = {metrics.sampleSize})</span></h3>
-        {warn && <p className="text-xs text-amber-600 mb-2">Échantillon faible — interpréter avec prudence.</p>}
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label} <span className="normal-case font-normal text-gray-400">(n = {metrics.sampleSize})</span></h3>
+        <p className="text-xs text-gray-400 mb-3">{subtitle}</p>
+        {warn && <p className="text-xs text-amber-600 mb-2">Échantillon faible (moins de 30) — interprétez ces chiffres avec prudence, ils peuvent changer beaucoup avec quelques observations de plus.</p>}
         {metrics.sampleSize === 0 ? (
           <p className="text-sm text-gray-400">Aucune donnée disponible.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <div><p className="text-2xs text-gray-400">Coût moyen</p><p className="font-medium">{metrics.avgProviderCost?.toFixed(2)} €</p></div>
-            <div><p className="text-2xs text-gray-400">Médiane</p><p className="font-medium">{metrics.medianProviderCost?.toFixed(2)} €</p></div>
-            <div><p className="text-2xs text-gray-400">P90</p><p className="font-medium">{metrics.p90ProviderCost?.toFixed(2)} €</p></div>
-            <div><p className="text-2xs text-gray-400">P95</p><p className="font-medium">{metrics.p95ProviderCost?.toFixed(2)} €</p></div>
-            <div><p className="text-2xs text-gray-400">Marge moyenne</p><p className={`font-medium ${((metrics.avgMargin ?? 0) < 0) ? 'text-red-600' : 'text-green-600'}`}>{metrics.avgMargin?.toFixed(2)} €</p></div>
-            <div><p className="text-2xs text-gray-400">% marge négative</p><p className="font-medium">{metrics.negativeMarginPct}%</p></div>
-            <div><p className="text-2xs text-gray-400">Perte max</p><p className="font-medium text-red-600">{metrics.maxLoss?.toFixed(2)} €</p></div>
-            <div><p className="text-2xs text-gray-400">Marge agrégée</p><p className="font-medium">{metrics.aggregateMargin?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="Ce que Packlink vous facture en moyenne pour ces livraisons">Coût Packlink moyen</p><p className="font-medium">{metrics.avgProviderCost?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="La moitié des livraisons coûtent moins que ça, l'autre moitié plus">Médiane</p><p className="font-medium">{metrics.medianProviderCost?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="90% des livraisons coûtent moins que ce montant">P90 (cas cher, 1 sur 10)</p><p className="font-medium">{metrics.p90ProviderCost?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="95% des livraisons coûtent moins que ce montant">P95 (cas très cher, 1 sur 20)</p><p className="font-medium">{metrics.p95ProviderCost?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="Prix client (bandes ci-dessus) moins coût Packlink, en moyenne">Marge moyenne</p><p className={`font-medium ${((metrics.avgMargin ?? 0) < 0) ? 'text-red-600' : 'text-green-600'}`}>{metrics.avgMargin?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="Part des livraisons où vous perdez de l'argent avec ce forfait">% de commandes à perte</p><p className="font-medium">{metrics.negativeMarginPct}%</p></div>
+            <div><p className="text-2xs text-gray-400" title="La pire perte constatée sur une seule livraison de cet échantillon">Pire perte (1 commande)</p><p className="font-medium text-red-600">{metrics.maxLoss?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title="Somme des marges sur tout l'échantillon — le résultat net si ce forfait avait couvert ces livraisons">Marge totale sur l&apos;échantillon</p><p className="font-medium">{metrics.aggregateMargin?.toFixed(2)} €</p></div>
           </div>
         )}
       </div>
@@ -100,6 +101,18 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
   return (
     <div className="space-y-6">
+      <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <h2 className="text-sm font-semibold mb-2">À quoi sert cet écran ?</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+          Le Laboratoire (via ses campagnes) interroge automatiquement Packlink PRO sur des combinaisons poids × emballage × destination
+          pour construire une base de coûts réels, sans intervention manuelle. Ici, vous testez un <b>forfait client</b> (ex. « 10,50 € jusqu&apos;à 10 kg »)
+          contre cette base : le rétrotest calcule la marge que vous feriez réellement, avant d&apos;activer quoi que ce soit en caisse.
+        </p>
+        <p className="text-xs text-gray-400">
+          Rien ici n&apos;affecte le prix payé par vos clients — un brouillon reste un brouillon tant qu&apos;il n&apos;est pas explicitement activé (fonctionnalité future, hors périmètre actuel).
+        </p>
+      </section>
+
       {drafts.length > 0 && (
         <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <h2 className="text-sm font-semibold mb-3">Brouillons existants</h2>
@@ -124,6 +137,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
         <div className="mb-4">
           <label className={LABEL_CLS}>Bandes de poids</label>
+          <p className="text-xs text-gray-400 mb-2">Le prix que <b>le client</b> paierait pour une commande dont le poids tombe dans cette tranche — pas le coût Packlink. Ex. « 0 à 10 = 10,50 € » : un client de 8 kg paie 10,50 €.</p>
           <div className="space-y-2">
             {bands.map((band, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -141,6 +155,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
         <div className="mb-4">
           <label className={LABEL_CLS}>Surcharges de zone (code=montant, séparés par des virgules)</label>
+          <p className="text-xs text-gray-400 mb-2">Montant additionnel facturé au client pour une zone donnée (ex. îles, régions éloignées) — s&apos;ajoute au prix de la bande de poids. Les codes de zone viennent de l&apos;onglet « Tarification ».</p>
           <input type="text" value={zoneSurchargesText} onChange={(e) => setZoneSurchargesText(e.target.value)} className={INPUT_CLS} placeholder="IT_SICILY=2" />
         </div>
 
@@ -151,10 +166,19 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
       {results && (
         <section className="space-y-4">
-          {renderMetrics('Scénarios synthétiques (laboratoire)', results.scenarioWeighted)}
-          {renderMetrics('Commandes réelles', results.orderWeighted, !results.orderWeightedReliable)}
+          {renderMetrics(
+            'Scénarios synthétiques (laboratoire)',
+            results.scenarioWeighted,
+            "Basé sur les campagnes de simulation (grille de poids/emballages/destinations testée uniformément — pas la fréquence réelle de vos commandes).",
+          )}
+          {renderMetrics(
+            'Commandes réelles',
+            results.orderWeighted,
+            'Basé sur vos vraies commandes livrées — reflète la distribution réelle de poids/destinations de votre clientèle.',
+            !results.orderWeightedReliable,
+          )}
           <p className="text-xs text-gray-400">
-            Les deux métriques ne sont jamais moyennées ensemble — les commandes réelles reflètent la distribution effective, les scénarios synthétiques une grille de test uniforme.
+            Les deux métriques ne sont jamais moyennées ensemble : les scénarios synthétiques disent « que se passerait-il sur toute la gamme de poids/destinations couverte », les commandes réelles disent « qu&apos;est-ce que cela aurait changé sur ce que vous avez réellement vendu ».
           </p>
         </section>
       )}
