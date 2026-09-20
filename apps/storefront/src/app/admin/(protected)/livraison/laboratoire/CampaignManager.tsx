@@ -13,7 +13,11 @@ import {
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
 const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
-const DEFAULT_WEIGHTS = '1, 2, 3, 5, 7.5, 9, 9.5, 10, 10.5, 11, 12.5, 14, 14.5, 15, 15.5, 16, 20';
+// Densité accrue autour de chaque multiple de 15 kg (max_weight_g par défaut
+// du profil "Standard") : c'est là que le nombre de colis change (1→2→3→4),
+// donc là que le coût fait ses plus gros sauts, pas seulement en fonction du
+// poids brut.
+const DEFAULT_WEIGHTS = '1, 2, 3, 5, 7.5, 9, 9.5, 10, 10.5, 11, 12.5, 14, 14.5, 15, 15.5, 16, 18, 20, 22.5, 25, 27.5, 29, 29.5, 30, 30.5, 31, 33, 35, 38, 40, 44, 44.5, 45, 45.5, 46, 48, 50';
 const MAX_CAMPAIGN_SCENARIOS = 2000;
 
 const STATUS_LABEL: Record<string, string> = {

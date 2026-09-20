@@ -1,3 +1,8 @@
+import type { createServiceClient } from '@/lib/supabase/server';
+import { normalizePlaceName } from './postalCodeImport';
+
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
 export interface ShippingCityCandidate {
   country: string;
   city: string;
@@ -11,6 +16,77 @@ export interface ShippingCityPostalCodes {
   city: string;
   stateCode: string;
   postalCodes: string[];
+}
+
+interface PostalIndexRow {
+  place_name: string;
+  place_name_normalized: string;
+  admin_name1: string | null;
+  admin_code1: string | null;
+  admin_name2: string | null;
+  admin_code2: string | null;
+  postal_code: string;
+}
+
+/**
+ * Recherche dans l'index interne (shipping_postal_code_index, importé
+ * statiquement depuis GeoNames — voir postalCodeImport.ts) avant tout appel
+ * réseau. Retourne [] si l'index n'a simplement pas encore été peuplé pour
+ * ce pays, pas juste si aucune ville ne correspond — le distinguo est fait
+ * par l'appelant pour décider s'il vaut la peine de retomber sur Nominatim.
+ */
+export async function searchCitiesFromIndex(
+  supabase: ServiceClient,
+  country: string,
+  query: string,
+): Promise<ShippingCityCandidate[]> {
+  const normalizedQuery = normalizePlaceName(query);
+  const { data } = await supabase
+    .from('shipping_postal_code_index')
+    .select('place_name, place_name_normalized, admin_name1, admin_code1, admin_name2, admin_code2, postal_code')
+    .eq('country', country)
+    .ilike('place_name_normalized', `${normalizedQuery}%`)
+    .limit(200);
+
+  const rows = (data ?? []) as PostalIndexRow[];
+  const seen = new Map<string, ShippingCityCandidate>();
+
+  for (const row of rows) {
+    const stateCodes = [row.admin_code2, row.admin_code1].filter((c): c is string => Boolean(c?.trim()));
+    const stateName = row.admin_name2 || row.admin_name1 || '';
+    const key = `${row.place_name_normalized}|${stateCodes.join(',')}`;
+    if (seen.has(key)) continue;
+    seen.set(key, {
+      country,
+      city: row.place_name,
+      stateName,
+      stateCodes,
+      label: [row.place_name, stateName, country].filter(Boolean).join(' · '),
+    });
+  }
+
+  return Array.from(seen.values()).slice(0, 8);
+}
+
+/**
+ * Résout directement les codes postaux depuis l'index interne — aucun appel
+ * réseau si l'index couvre ce pays/cette ville.
+ */
+export async function resolvePostalCodesFromIndex(
+  supabase: ServiceClient,
+  country: string,
+  city: string,
+): Promise<string[]> {
+  const normalizedCity = normalizePlaceName(city);
+  const { data } = await supabase
+    .from('shipping_postal_code_index')
+    .select('postal_code')
+    .eq('country', country)
+    .eq('place_name_normalized', normalizedCity)
+    .limit(1000);
+
+  const codes = ((data ?? []) as { postal_code: string }[]).map((r) => r.postal_code);
+  return Array.from(new Set(codes)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
 interface NominatimAddress extends Record<string, string | undefined> {
