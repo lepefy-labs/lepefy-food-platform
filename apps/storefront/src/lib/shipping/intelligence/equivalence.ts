@@ -55,11 +55,17 @@ export async function findEquivalentObservation(
 
   const rows = data as ShippingQuoteObservationRow[];
 
-  const zoneFiltered = query.destinationZoneCode
+  // Filtre destination STRICT, sans repli sur `rows` non filtrées : contrairement
+  // à l'estimation de similarity.ts (où élargir la recherche est acceptable —
+  // le résultat reste étiqueté avec sa taille d'échantillon et sa confiance),
+  // ici un repli aurait fait considérer N'IMPORTE QUELLE observation italienne
+  // à un poids proche comme "équivalente" dès qu'un nouveau code postal
+  // (encore jamais observé) était testé — ce qui a fait passer une campagne de
+  // 1406 scénarios en 100% "doublon", 0% appel Packlink réel, sans construire
+  // la moindre nouvelle donnée pour les nouvelles villes couvertes.
+  const candidates = query.destinationZoneCode
     ? rows.filter((r) => r.destination_zone_code === query.destinationZoneCode)
     : rows.filter((r) => r.destination_postal_code === query.destinationPostalCode);
-
-  const candidates = zoneFiltered.length > 0 ? zoneFiltered : rows;
 
   const match = candidates.find((r) => {
     // Volume moyen par colis, pas somme totale — num_parcels est déjà
