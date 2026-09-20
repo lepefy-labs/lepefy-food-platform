@@ -85,9 +85,16 @@ export async function estimateForProfile(
   const pool = zoneFiltered.length > 0 ? zoneFiltered : rows;
 
   const candidates = pool.filter((r) => {
-    const volume = r.parcels.reduce((sum, p) => sum + p.length_cm * p.width_cm * p.height_cm, 0);
-    if (volume === 0 || targetVolume === 0) return true;
-    return Math.abs(volume - targetVolume) / targetVolume <= VOLUME_DIFF_MAX_RATIO;
+    // Comparaison par colis (volume moyen), pas par somme totale : deux
+    // observations à num_parcels différent ont déjà été exclues par le
+    // .eq('num_parcels', ...) ci-dessus, donc comparer le volume total
+    // gonflerait artificiellement l'écart avec le volume par colis du
+    // profil cible dès que num_parcels > 1.
+    const perParcelVolume = r.parcels.length > 0
+      ? r.parcels.reduce((sum, p) => sum + p.length_cm * p.width_cm * p.height_cm, 0) / r.parcels.length
+      : 0;
+    if (perParcelVolume === 0 || targetVolume === 0) return true;
+    return Math.abs(perParcelVolume - targetVolume) / targetVolume <= VOLUME_DIFF_MAX_RATIO;
   }).filter((r) => r.total_provider_cost != null);
 
   const costs = candidates.map((r) => r.total_provider_cost as number);

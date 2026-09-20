@@ -62,11 +62,14 @@ export async function findEquivalentObservation(
   const candidates = zoneFiltered.length > 0 ? zoneFiltered : rows;
 
   const match = candidates.find((r) => {
-    const volume = r.parcels.reduce(
-      (sum, p) => sum + p.length_cm * p.width_cm * p.height_cm, 0,
-    );
-    if (volume === 0 || query.volumeCm3 === 0) return true;
-    const volumeDiff = Math.abs(volume - query.volumeCm3) / query.volumeCm3;
+    // Volume moyen par colis, pas somme totale — num_parcels est déjà
+    // exact-matché ci-dessus ; comparer le volume total gonflerait l'écart
+    // avec le volume par colis (query.volumeCm3) dès que num_parcels > 1.
+    const perParcelVolume = r.parcels.length > 0
+      ? r.parcels.reduce((sum, p) => sum + p.length_cm * p.width_cm * p.height_cm, 0) / r.parcels.length
+      : 0;
+    if (perParcelVolume === 0 || query.volumeCm3 === 0) return true;
+    const volumeDiff = Math.abs(perParcelVolume - query.volumeCm3) / query.volumeCm3;
     return volumeDiff <= VOLUME_TOLERANCE_RATIO;
   });
 
