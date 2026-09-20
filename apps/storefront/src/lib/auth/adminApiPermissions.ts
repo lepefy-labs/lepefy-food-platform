@@ -50,6 +50,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/shipping-advisor') return 'shipping.view';
   if (/^\/api\/admin\/shipping-tariff-drafts\/[^/]+\/simulate$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.view' : null;
   if (path.startsWith('/api/admin/shipping-tariff-drafts')) return read ? 'shipping.view' : 'shipping.manage';
+  if (path === '/api/admin/shipping-postal-code-import') return 'shipping.manage';
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/payment-methods') || path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
 

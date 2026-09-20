@@ -4,6 +4,7 @@ import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import { LivraisonTabs } from '../LivraisonTabs';
 import { ShippingSimulator } from '../simulateur/ShippingSimulator';
 import { CampaignManager } from './CampaignManager';
+import { PostalCodeIndexAdmin } from './PostalCodeIndexAdmin';
 import type { ShippingPackagingProfileRow, ShippingZoneRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,10 @@ export default async function AdminLaboratoirePage() {
         profiles={(profiles as ShippingPackagingProfileRow[] | null) ?? []}
         zones={(zones as ShippingZoneRow[] | null) ?? []}
       />
+
+      <div className="mt-6">
+        <PostalCodeIndexAdmin />
+      </div>
     </div>
   );
 }
