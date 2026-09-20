@@ -9,8 +9,20 @@ const HIGH_CONFIDENCE_MIN_SAMPLES = 8;
 const HIGH_CONFIDENCE_MAX_AGE_DAYS = 60;
 const MEDIUM_CONFIDENCE_MIN_SAMPLES = 3;
 const INSUFFICIENT_DATA_MAX_SAMPLES = 1;
+const MAX_CARRIERS_RETURNED = 5;
 
 export type EstimationConfidence = 'insufficient_data' | 'low' | 'medium' | 'high';
+
+export interface CarrierEstimation {
+  carrier: string;
+  sampleSize: number;
+  confidence: EstimationConfidence;
+  minCost: number;
+  medianCost: number;
+  maxCost: number;
+  mostRecentObservedAt: string;
+  freshnessDays: number;
+}
 
 export interface ProfileEstimation {
   packagingProfileId: string;
@@ -23,6 +35,11 @@ export interface ProfileEstimation {
   mostRecentObservedAt: string | null;
   freshnessDays: number | null;
   nextBoundary: { deltaKg: number; nextCost: number } | null;
+  /** Décomposé par transporteur, trié du moins cher au plus cher — c'est
+   *  cette liste, pas la plage agrégée ci-dessus, qui doit être présentée en
+   *  premier : mélanger tous les transporteurs éligibles produit une plage
+   *  large et peu actionnable (ex. 9,82–20,69 € sur un même scénario). */
+  byCarrier: CarrierEstimation[];
 }
 
 function median(values: number[]): number {
@@ -39,11 +56,20 @@ function volumeOf(profile: Pick<ShippingPackagingProfileRow, 'box_length_cm' | '
   return profile.box_length_cm * profile.box_width_cm * profile.box_height_cm;
 }
 
+function confidenceFor(sampleSize: number, mostRecentObservedAt: string | null): EstimationConfidence {
+  if (sampleSize <= INSUFFICIENT_DATA_MAX_SAMPLES) return 'insufficient_data';
+  const freshEnough = mostRecentObservedAt ? daysSince(mostRecentObservedAt) < HIGH_CONFIDENCE_MAX_AGE_DAYS : false;
+  if (sampleSize >= HIGH_CONFIDENCE_MIN_SAMPLES && freshEnough) return 'high';
+  if (sampleSize >= MEDIUM_CONFIDENCE_MIN_SAMPLES) return 'medium';
+  return 'low';
+}
+
 /**
  * Moteur de similarité déterministe (aucune IA/embedding) : filtre les
  * observations "choisies" (éligibles) par contraintes dures, puis calcule
- * une plage de coût + un niveau de confiance explicite. Voir §6 de la
- * proposition. Jamais présenté comme un prix garanti.
+ * une plage de coût + un niveau de confiance explicite, décomposée par
+ * transporteur. Voir §6 de la proposition. Jamais présenté comme un prix
+ * garanti.
  */
 export async function estimateForProfile(
   supabase: ServiceClient,
@@ -99,18 +125,36 @@ export async function estimateForProfile(
 
   const costs = candidates.map((r) => r.total_provider_cost as number);
   const sampleSize = costs.length;
-
-  let confidence: EstimationConfidence;
-  if (sampleSize <= INSUFFICIENT_DATA_MAX_SAMPLES) confidence = 'insufficient_data';
-  else {
-    const mostRecent = candidates[0]?.observed_at;
-    const freshEnough = mostRecent ? daysSince(mostRecent) < HIGH_CONFIDENCE_MAX_AGE_DAYS : false;
-    if (sampleSize >= HIGH_CONFIDENCE_MIN_SAMPLES && freshEnough) confidence = 'high';
-    else if (sampleSize >= MEDIUM_CONFIDENCE_MIN_SAMPLES) confidence = 'medium';
-    else confidence = 'low';
-  }
-
   const mostRecentObservedAt = candidates[0]?.observed_at ?? null;
+  const confidence = confidenceFor(sampleSize, mostRecentObservedAt);
+
+  // Décomposition par transporteur — voir doc-comment de ProfileEstimation.
+  const carrierGroups = new Map<string, ShippingQuoteObservationRow[]>();
+  for (const row of candidates) {
+    const key = row.carrier?.trim() || 'Transporteur inconnu';
+    const group = carrierGroups.get(key);
+    if (group) group.push(row);
+    else carrierGroups.set(key, [row]);
+  }
+  const byCarrier: CarrierEstimation[] = Array.from(carrierGroups.entries())
+    .map(([carrier, carrierRows]) => {
+      const carrierCosts = carrierRows.map((r) => r.total_provider_cost as number);
+      const carrierMostRecent = carrierRows.reduce(
+        (latest, r) => (r.observed_at > latest ? r.observed_at : latest), carrierRows[0]!.observed_at,
+      );
+      return {
+        carrier,
+        sampleSize: carrierRows.length,
+        confidence: confidenceFor(carrierRows.length, carrierMostRecent),
+        minCost: Math.min(...carrierCosts),
+        medianCost: parseFloat(median(carrierCosts).toFixed(2)),
+        maxCost: Math.max(...carrierCosts),
+        mostRecentObservedAt: carrierMostRecent,
+        freshnessDays: daysSince(carrierMostRecent),
+      };
+    })
+    .sort((a, b) => a.medianCost - b.medianCost)
+    .slice(0, MAX_CARRIERS_RETURNED);
 
   // Prochain palier : observation la moins chère au-dessus du poids cible
   // dont le coût médian diffère significativement de la plage courante.
@@ -140,5 +184,6 @@ export async function estimateForProfile(
     mostRecentObservedAt,
     freshnessDays: mostRecentObservedAt ? daysSince(mostRecentObservedAt) : null,
     nextBoundary,
+    byCarrier,
   };
 }

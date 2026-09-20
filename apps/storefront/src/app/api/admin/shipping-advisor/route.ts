@@ -69,24 +69,35 @@ export async function POST(req: NextRequest) {
     }),
   );
 
-  const withSufficientData = estimations.filter((e) => e.confidence !== 'insufficient_data' && e.medianCost != null);
+  // Le classement/recommandation se base sur le transporteur le moins cher
+  // de chaque profil (byCarrier[0]), pas sur la plage agrégée tous
+  // transporteurs confondus — sinon un profil avec un seul transporteur
+  // cher paraîtrait équivalent à un profil qui a aussi une option bon
+  // marché noyée dans la plage.
+  const bestCarrierCost = (e: (typeof estimations)[number]) => e.byCarrier[0]?.medianCost ?? null;
+
+  const withSufficientData = estimations.filter((e) => bestCarrierCost(e) != null);
   const cheapest = withSufficientData.length > 0
-    ? withSufficientData.reduce((min, e) => (e.medianCost! < min.medianCost! ? e : min))
+    ? withSufficientData.reduce((min, e) => (bestCarrierCost(e)! < bestCarrierCost(min)! ? e : min))
     : null;
 
   const ranked = [...estimations].sort((a, b) => {
-    if (a.medianCost == null) return 1;
-    if (b.medianCost == null) return -1;
-    return a.medianCost - b.medianCost;
+    const costA = bestCarrierCost(a);
+    const costB = bestCarrierCost(b);
+    if (costA == null) return 1;
+    if (costB == null) return -1;
+    return costA - costB;
   });
+
+  const cheapestCost = cheapest ? bestCarrierCost(cheapest) : null;
 
   return NextResponse.json({
     input: { weightKg, country, postalCode, zoneCode },
     recommendations: ranked.map((e) => ({
       ...e,
       recommended: cheapest !== null && e.packagingProfileId === cheapest.packagingProfileId,
-      costDeltaVsRecommended: cheapest?.medianCost != null && e.medianCost != null
-        ? parseFloat((e.medianCost - cheapest.medianCost).toFixed(2))
+      costDeltaVsRecommended: cheapestCost != null && bestCarrierCost(e) != null
+        ? parseFloat((bestCarrierCost(e)! - cheapestCost).toFixed(2))
         : null,
     })),
   });

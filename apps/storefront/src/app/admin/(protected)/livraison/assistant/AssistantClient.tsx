@@ -14,6 +14,16 @@ const CONFIDENCE_CLS: Record<string, string> = {
   low: 'bg-red-50 text-red-700', insufficient_data: 'bg-gray-100 text-gray-500',
 };
 
+interface CarrierEstimation {
+  carrier: string;
+  sampleSize: number;
+  confidence: string;
+  minCost: number;
+  medianCost: number;
+  maxCost: number;
+  freshnessDays: number;
+}
+
 interface Recommendation {
   packagingProfileId: string;
   packagingProfileName: string;
@@ -26,6 +36,7 @@ interface Recommendation {
   nextBoundary: { deltaKg: number; nextCost: number } | null;
   recommended: boolean;
   costDeltaVsRecommended: number | null;
+  byCarrier: CarrierEstimation[];
 }
 
 export function AssistantClient() {
@@ -86,17 +97,30 @@ export function AssistantClient() {
                   <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${CONFIDENCE_CLS[r.confidence] ?? ''}`}>{CONFIDENCE_LABEL[r.confidence] ?? r.confidence}</span>
                 </div>
               </div>
-              {r.medianCost != null ? (
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Estimation {r.minCost?.toFixed(2)}–{r.maxCost?.toFixed(2)} € (médiane {r.medianCost.toFixed(2)} €)
-                  {!r.recommended && r.costDeltaVsRecommended != null && r.costDeltaVsRecommended > 0 && <span> · +{r.costDeltaVsRecommended.toFixed(2)} € vs recommandé</span>}
-                </p>
+              {!r.recommended && r.costDeltaVsRecommended != null && r.costDeltaVsRecommended > 0 && (
+                <p className="text-xs text-gray-400 mb-2">+{r.costDeltaVsRecommended.toFixed(2)} € vs le meilleur transporteur recommandé</p>
+              )}
+
+              {r.byCarrier.length > 0 ? (
+                <div className="space-y-1.5">
+                  {r.byCarrier.map((c, i) => (
+                    <div key={c.carrier} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-[var(--color-primary-light)]/40' : 'bg-gray-50 dark:bg-gray-800/40'}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-2xs font-semibold text-gray-400 w-4 shrink-0">#{i + 1}</span>
+                        <span className="truncate text-gray-700 dark:text-gray-200">{c.carrier}</span>
+                        <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${CONFIDENCE_CLS[c.confidence] ?? ''}`}>{CONFIDENCE_LABEL[c.confidence] ?? c.confidence}</span>
+                      </div>
+                      <div className="text-right shrink-0 pl-2">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{c.medianCost.toFixed(2)} €</span>
+                        <span className="text-gray-400"> ({c.minCost.toFixed(2)}–{c.maxCost.toFixed(2)})</span>
+                        <span className="text-gray-400"> · {c.sampleSize} obs.</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-sm text-gray-400">Pas assez d&apos;observations pour ce profil et cette destination — demandez un devis Packlink à jour.</p>
               )}
-              <p className="text-xs text-gray-400 mt-1">
-                {r.sampleSize} observation(s) comparable(s){r.freshnessDays != null && ` · la plus récente il y a ${r.freshnessDays} j`}
-              </p>
               {r.nextBoundary && (
                 <p className="text-xs text-gray-500 mt-2">
                   Vous pouvez ajouter environ <b>{r.nextBoundary.deltaKg} kg</b> avant d&apos;atteindre le prochain palier de coût observé ({r.nextBoundary.nextCost.toFixed(2)} €).
