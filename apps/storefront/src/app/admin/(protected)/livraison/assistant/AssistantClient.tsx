@@ -37,6 +37,17 @@ interface Recommendation {
   recommended: boolean;
   costDeltaVsRecommended: number | null;
   byCarrier: CarrierEstimation[];
+  boxDimensions: { length: number; width: number; height: number };
+  parcelWeightsG: number[];
+}
+
+function formatParcels(parcelWeightsG: number[]): string {
+  const kg = parcelWeightsG.map((g) => g / 1000);
+  if (kg.length === 1) return `1 colis de ${kg[0]!.toFixed(1)} kg`;
+  const allEqual = kg.every((w) => Math.abs(w - kg[0]!) < 0.01);
+  return allEqual
+    ? `${kg.length} colis × ${kg[0]!.toFixed(1)} kg`
+    : `${kg.length} colis (${kg.map((w) => w.toFixed(1)).join(' + ')} kg)`;
 }
 
 export function AssistantClient() {
@@ -90,13 +101,16 @@ export function AssistantClient() {
         <div className="space-y-3">
           {recommendations.map((r) => (
             <div key={r.packagingProfileId} className={`rounded-xl border p-4 ${r.recommended ? 'border-[var(--color-primary)]' : 'border-gray-200 dark:border-gray-800'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{r.packagingProfileName}</p>
+              <div className="flex items-center justify-between mb-0.5">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {r.packagingProfileName} <span className="font-normal text-gray-400">({r.boxDimensions.length}×{r.boxDimensions.width}×{r.boxDimensions.height} cm)</span>
+                </p>
                 <div className="flex items-center gap-2">
                   {r.recommended && <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">RECOMMANDÉ</span>}
                   <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${CONFIDENCE_CLS[r.confidence] ?? ''}`}>{CONFIDENCE_LABEL[r.confidence] ?? r.confidence}</span>
                 </div>
               </div>
+              <p className="text-xs text-gray-400 mb-2">{formatParcels(r.parcelWeightsG)} — prix ci-dessous pour l&apos;expédition complète</p>
               {!r.recommended && r.costDeltaVsRecommended != null && r.costDeltaVsRecommended > 0 && (
                 <p className="text-xs text-gray-400 mb-2">+{r.costDeltaVsRecommended.toFixed(2)} € vs le meilleur transporteur recommandé</p>
               )}

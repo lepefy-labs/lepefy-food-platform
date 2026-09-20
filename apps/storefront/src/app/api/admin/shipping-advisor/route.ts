@@ -13,6 +13,7 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { estimateForProfile } from '@/lib/shipping/intelligence/similarity';
 import { resolveZoneCode } from '@/lib/shipping/intelligence/resolveZone';
 import { INTELLIGENCE_FROM_ADDRESS } from '@/lib/shipping/intelligence/quoteScenario';
+import { splitIntoParcels } from '@/lib/shipping/calculateShipping';
 import type { ShippingPackagingProfileRow } from '@lepefy/types';
 
 export const runtime = 'nodejs';
@@ -51,6 +52,19 @@ export async function POST(req: NextRequest) {
 
   const zoneCode = await resolveZoneCode(supabase, tenant.id, country, postalCode);
   const totalWeightG = Math.round(weightKg * 1000);
+
+  // Découpage en colis réel (même formule que le flux de calcul de
+  // livraison) affiché à l'écran, pour que le prix indiqué ne soit jamais
+  // ambigu sur le nombre/poids des colis effectivement quotés.
+  const packagingByProfileId = new Map(
+    profiles.map((profile) => {
+      const parcelWeightsG = splitIntoParcels(totalWeightG, profile.max_weight_g / 1000);
+      return [profile.id, {
+        boxDimensions: { length: profile.box_length_cm, width: profile.box_width_cm, height: profile.box_height_cm },
+        parcelWeightsG,
+      }] as const;
+    }),
+  );
 
   const estimations = await Promise.all(
     profiles.map((profile) => {
@@ -95,6 +109,7 @@ export async function POST(req: NextRequest) {
     input: { weightKg, country, postalCode, zoneCode },
     recommendations: ranked.map((e) => ({
       ...e,
+      ...packagingByProfileId.get(e.packagingProfileId),
       recommended: cheapest !== null && e.packagingProfileId === cheapest.packagingProfileId,
       costDeltaVsRecommended: cheapestCost != null && bestCarrierCost(e) != null
         ? parseFloat((bestCarrierCost(e)! - cheapestCost).toFixed(2))
