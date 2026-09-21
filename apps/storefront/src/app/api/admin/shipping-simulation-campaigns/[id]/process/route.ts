@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const MANUAL_TICK_COOLDOWN_MS = 10_000;
+// Un admin qui clique "Traiter maintenant" attend le résultat et peut
+// absorber un tick plus long que le cron silencieux (8 par défaut) — reste
+// sous le budget maxDuration=60s même si Packlink répond lentement.
+const MANUAL_ITEMS_PER_TICK = 20;
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -59,7 +63,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     }
   }
 
-  const result = await runCampaignBatch(supabase, tenant, { campaignId: params.id });
+  const result = await runCampaignBatch(supabase, tenant, { campaignId: params.id, itemsPerTick: MANUAL_ITEMS_PER_TICK });
 
   const { data: updatedCampaign } = await supabase
     .from('shipping_simulation_campaigns')

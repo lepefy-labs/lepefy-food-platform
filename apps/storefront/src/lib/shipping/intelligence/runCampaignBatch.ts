@@ -12,7 +12,7 @@ import { quoteScenarioAndPersist, INTELLIGENCE_FROM_ADDRESS } from './quoteScena
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-const ITEMS_PER_TICK = 8;
+const DEFAULT_ITEMS_PER_TICK = 8;
 const WORKER_COUNT = 2;
 const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
 const STALE_RUNNING_ITEM_MS = 10 * 60 * 1000;
@@ -21,13 +21,17 @@ const STALE_RUNNING_ITEM_MS = 10 * 60 * 1000;
  * Traite un lot borné d'éléments de campagne "pending" pour le tenant, en
  * réutilisant le motif éprouvé de shippingSyncBatch.ts (2 workers bornés
  * puisant dans une file partagée). Appelé par un tick cron
- * (/api/internal/shipping-campaign-worker), jamais par une requête HTTP
- * longue — chaque campagne est donc naturellement reprenable.
+ * (/api/internal/shipping-campaign-worker, toujours avec le lot par défaut
+ * — 8, conservateur car non supervisé) ou par le déclenchement manuel admin
+ * "Traiter maintenant" (/api/admin/shipping-simulation-campaigns/:id/process,
+ * qui peut passer un lot plus large : un admin qui clique et attend peut
+ * absorber un tick plus long, contrairement au cron silencieux). Chaque
+ * campagne reste reprenable quel que soit le déclencheur.
  */
 export async function runCampaignBatch(
   supabase: ServiceClient,
   tenant: Tenant,
-  options?: { campaignId?: string },
+  options?: { campaignId?: string; itemsPerTick?: number },
 ): Promise<{ processed: number; succeeded: number; failed: number; skipped: number }> {
   if (tenant.shipping_provider !== 'packlink') {
     return { processed: 0, succeeded: 0, failed: 0, skipped: 0 };
@@ -76,13 +80,15 @@ export async function runCampaignBatch(
     .eq('status', 'running')
     .lt('attempted_at', staleBefore);
 
+  const itemsPerTick = Math.min(Math.max(options?.itemsPerTick ?? DEFAULT_ITEMS_PER_TICK, 1), 50);
+
   const { data: pendingItems } = await supabase
     .from('shipping_simulation_campaign_items')
     .select('*')
     .in('campaign_id', campaignIds)
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
-    .limit(ITEMS_PER_TICK);
+    .limit(itemsPerTick);
 
   const items = (pendingItems ?? []) as ShippingSimulationCampaignItemRow[];
 
