@@ -17,6 +17,8 @@ export interface RelationshipProduct {
   active: boolean;
   weightGrams: number | null;
   storageType: 'dry' | 'fresh' | 'frozen' | null;
+  minOrderQuantity: number;
+  orderQuantityStep: number;
 }
 
 export interface ResolvedProductRelationship {
@@ -41,6 +43,8 @@ interface CanonicalProductRow {
   active: boolean;
   weight_grams: number | null;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  min_order_quantity?: number;
+  order_quantity_step?: number;
   embedding?: unknown;
 }
 
@@ -59,7 +63,7 @@ interface SemanticRow {
 }
 
 const PRODUCT_SELECT =
-  'id, tenant_id, category_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type';
+  'id, tenant_id, category_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type, min_order_quantity, order_quantity_step';
 
 export function isProductRelationshipType(value: unknown): value is ProductRelationshipType {
   return typeof value === 'string'
@@ -117,6 +121,8 @@ function toProduct(row: CanonicalProductRow): RelationshipProduct {
     active: row.active,
     weightGrams: row.weight_grams,
     storageType: row.storage_type,
+    minOrderQuantity: Math.max(1, Math.trunc(row.min_order_quantity ?? 1) || 1),
+    orderQuantityStep: Math.max(1, Math.trunc(row.order_quantity_step ?? 1) || 1),
   };
 }
 

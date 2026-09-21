@@ -24,7 +24,7 @@ export async function buildNalaProductActions(params: {
   try {
     const { data, error } = await params.supabase
       .from('products')
-      .select('id, tenant_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type')
+      .select('id, tenant_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type, min_order_quantity, order_quantity_step')
       .eq('tenant_id', params.tenantId)
       .eq('active', true)
       .in('id', candidateIds);

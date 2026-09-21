@@ -48,7 +48,7 @@ export function NalaCartPlanCard({
     item.product && selectedIds.has(item.product.id)
   ));
   const selectedSubtotal = selectedItems.reduce(
-    (sum, item) => sum + (item.product?.price ?? 0),
+    (sum, item) => sum + (item.product?.price ?? 0) * item.quantity,
     0,
   );
   const failedItems = result
@@ -78,7 +78,7 @@ export function NalaCartPlanCard({
       addItem: (item) => {
         const product = toNalaCartPlanProduct(item);
         if (!product) throw new Error('unavailable');
-        addItem(product, 1);
+        addItem(product, item.quantity);
       },
     });
     if (nextResult) {
@@ -175,10 +175,15 @@ export function NalaCartPlanCard({
                     {plan.labels.unavailable}
                   </span>
                 )}
+                {!unavailable && item.quantity > 1 && (
+                  <span className="mt-0.5 block text-[10px] font-medium text-gray-500">
+                    Minimum {item.quantity}
+                  </span>
+                )}
               </span>
 
               <span className="shrink-0 text-xs font-semibold text-[#5947E8]">
-                {item.product ? formatPrice(item.product.price, item.product.currency) : '—'}
+                {item.product ? formatPrice(item.product.price * item.quantity, item.product.currency) : '—'}
               </span>
             </label>
           );

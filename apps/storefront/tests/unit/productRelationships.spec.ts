@@ -115,6 +115,8 @@ function canonical(id: string, stock = 5): NalaCanonicalProduct {
     active: true,
     weight_grams: 500,
     storage_type: 'dry',
+    min_order_quantity: 1,
+    order_quantity_step: 1,
   };
 }
 

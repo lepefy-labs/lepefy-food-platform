@@ -35,6 +35,8 @@ function product(
     active: true,
     weight_grams: 500,
     storage_type: 'fresh',
+    min_order_quantity: 1,
+    order_quantity_step: 1,
     ...overrides,
   };
 }
@@ -109,6 +111,8 @@ test('un direct non disponibile usa il substitute esplicito e lo segnala', async
         active: true,
         weightGrams: 500,
         storageType: 'fresh',
+        minOrderQuantity: 1,
+        orderQuantityStep: 1,
       },
       source: 'manual',
       similarity: null,
@@ -158,8 +162,10 @@ function planItems(): NalaCartPlanItem[] {
       stock: 10,
       weightGrams: 500,
       storageType: 'fresh' as const,
+      minOrderQuantity: 1,
+      orderQuantityStep: 1,
     },
-    quantity: 1 as const,
+    quantity: 1,
   }));
 }
 

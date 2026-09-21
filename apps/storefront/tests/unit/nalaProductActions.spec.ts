@@ -27,6 +27,8 @@ function product(overrides: Partial<NalaCanonicalProduct> = {}): NalaCanonicalPr
     active: true,
     weight_grams: 500,
     storage_type: 'fresh',
+    min_order_quantity: 1,
+    order_quantity_step: 1,
     ...overrides,
   };
 }
@@ -87,8 +89,28 @@ test('la mappatura usa il contratto cart reale e mantiene l’interaction', asyn
     weight_grams: 500,
     stock: 12,
     storage_type: 'fresh',
+    min_order_quantity: 1,
+    order_quantity_step: 1,
   });
   expect(action!.interactionId).toBe(INTERACTION);
+});
+
+test('un prodotto con minimo di vendita propone e aggiunge direttamente questa quantità', async () => {
+  const actions = build([product({ min_order_quantity: 4, order_quantity_step: 1 })]);
+  expect(actions).toHaveLength(1);
+  expect(actions[0]).toMatchObject({
+    quantity: 4,
+    product: { minOrderQuantity: 4, orderQuantityStep: 1 },
+  });
+  expect(actions[0]!.ctaLabel).toContain('4');
+  expect(toNalaCartProduct(actions[0]!)).toMatchObject({
+    min_order_quantity: 4,
+    order_quantity_step: 1,
+  });
+});
+
+test('un stock insuffisant pour atteindre le minimum ne produit aucune action', async () => {
+  expect(build([product({ min_order_quantity: 4, stock: 2 })])).toEqual([]);
 });
 
 test('il guard asincrono impedisce il doppio add e rende disponibile lo stato success', async () => {

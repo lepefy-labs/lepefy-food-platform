@@ -53,8 +53,11 @@ export interface NalaCartPlanItem {
     stock: number;
     weightGrams: number | null;
     storageType: 'dry' | 'fresh' | 'frozen' | null;
+    minOrderQuantity: number;
+    orderQuantityStep: number;
   };
-  quantity: 1;
+  /** Respecte le minimum de vente du produit choisi (cf. purchaseQuantityRules.ts) — jamais 1 littéral. */
+  quantity: number;
 }
 
 export interface NalaCartPlan {
@@ -89,6 +92,8 @@ export interface CartIngredientSubstitute {
     active: boolean;
     weightGrams: number | null;
     storageType: 'dry' | 'fresh' | 'frozen' | null;
+    minOrderQuantity: number;
+    orderQuantityStep: number;
   };
   source: 'manual' | 'system' | 'semantic';
   similarity: number | null;
@@ -220,11 +225,15 @@ export function getNalaCartPlanCopy(locale: unknown): NalaCartPlanLabels {
 }
 
 function isPurchasable(product: NalaCanonicalProduct, tenantId: string): boolean {
+  const minOrderQuantity = Math.max(1, Math.trunc(product.min_order_quantity ?? 1) || 1);
   return product.tenant_id === tenantId
     && product.active
     && Number.isFinite(product.price)
     && Number.isFinite(product.stock)
-    && product.stock > 0;
+    // Stock insuffisant pour atteindre le minimum de vente : ce n'est pas un
+    // candidat valide, cf. purchaseQuantityRules.ts — Nala ne doit jamais
+    // proposer une quantité que le checkout rejettera ensuite.
+    && product.stock >= minOrderQuantity;
 }
 
 function productPayload(
@@ -241,6 +250,8 @@ function productPayload(
     stock: product.stock,
     weightGrams: product.weight_grams,
     storageType: product.storage_type,
+    minOrderQuantity: Math.max(1, Math.trunc(product.min_order_quantity ?? 1) || 1),
+    orderQuantityStep: Math.max(1, Math.trunc(product.order_quantity_step ?? 1) || 1),
   };
 }
 
@@ -257,6 +268,7 @@ export function selectNalaCartPlanItem(params: {
   ));
 
   if (direct) {
+    const minOrderQuantity = Math.max(1, Math.trunc(direct.product.min_order_quantity ?? 1) || 1);
     return {
       ingredientName: params.ingredient.name,
       required: params.ingredient.required,
@@ -265,16 +277,21 @@ export function selectNalaCartPlanItem(params: {
       confidence: direct.similarity,
       selectedByDefault: params.ingredient.required,
       product: productPayload(direct.product, params.currency),
-      quantity: 1,
+      quantity: minOrderQuantity,
     };
   }
 
   const substitute = params.substitute;
+  const substituteMinOrderQuantity = substitute
+    ? Math.max(1, Math.trunc(substitute.product.minOrderQuantity ?? 1) || 1)
+    : 1;
   if (
     substitute
     && substitute.product.tenantId === params.tenantId
     && substitute.product.active
-    && substitute.product.stock > 0
+    // Stock insuffisant pour atteindre le minimum de vente : même principe
+    // que isPurchasable() ci-dessus, cf. purchaseQuantityRules.ts.
+    && substitute.product.stock >= substituteMinOrderQuantity
     && Number.isFinite(substitute.product.price)
   ) {
     const confidence = substitute.similarity ?? 1;
@@ -297,8 +314,10 @@ export function selectNalaCartPlanItem(params: {
         stock: substitute.product.stock,
         weightGrams: substitute.product.weightGrams,
         storageType: substitute.product.storageType,
+        minOrderQuantity: substituteMinOrderQuantity,
+        orderQuantityStep: Math.max(1, Math.trunc(substitute.product.orderQuantityStep ?? 1) || 1),
       },
-      quantity: 1,
+      quantity: substituteMinOrderQuantity,
     };
   }
 
@@ -333,7 +352,7 @@ export function finalizeNalaCartPlan(params: {
     totals: {
       availableItems: available.length,
       unavailableItems: items.length - available.length,
-      subtotal: Math.round(available.reduce((sum, item) => sum + (item.product?.price ?? 0), 0) * 100) / 100,
+      subtotal: Math.round(available.reduce((sum, item) => sum + (item.product?.price ?? 0) * item.quantity, 0) * 100) / 100,
     },
     labels: getNalaCartPlanCopy(params.locale),
   };
@@ -350,6 +369,8 @@ export function toNalaCartPlanProduct(item: NalaCartPlanItem) {
     weight_grams: item.product.weightGrams,
     stock: item.product.stock,
     storage_type: item.product.storageType,
+    min_order_quantity: item.product.minOrderQuantity,
+    order_quantity_step: item.product.orderQuantityStep,
   };
 }
 

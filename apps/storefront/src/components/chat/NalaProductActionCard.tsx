@@ -30,7 +30,7 @@ export function NalaProductActionCard({ action }: { action: NalaProductAction })
       const added = await performNalaAddOnce(
         inFlightRef.current,
         action.product.id,
-        () => addItem(toNalaCartProduct(action), 1),
+        () => addItem(toNalaCartProduct(action), action.quantity),
       );
       if (added) setStatus('added');
     } catch {

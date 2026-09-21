@@ -30,7 +30,11 @@ export interface NalaProductAction {
     stock: number;
     weightGrams: number | null;
     storageType: 'dry' | 'fresh' | 'frozen' | null;
+    minOrderQuantity: number;
+    orderQuantityStep: number;
   };
+  /** Quantité que Nala ajoute réellement — respecte le minimum de vente (cf. purchaseQuantityRules.ts), jamais 1 littéral. */
+  quantity: number;
   ctaLabel: string;
   labels: NalaProductActionLabels;
   interactionId: string;
@@ -54,6 +58,8 @@ export interface NalaCanonicalProduct {
   active: boolean;
   weight_grams: number | null;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  min_order_quantity: number;
+  order_quantity_step: number;
 }
 
 const NON_PRODUCT_ACTION_PATTERNS = [
@@ -115,18 +121,24 @@ export function shouldOfferNalaProductAction(message: string): boolean {
   return !NON_PRODUCT_ACTION_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
-export function getNalaProductActionCopy(locale: unknown): {
+/**
+ * `quantity` reflète le minimum de vente du produit (cf. purchaseQuantityRules.ts).
+ * Au-delà de 1, le texte doit le dire explicitement — Nala ne doit jamais
+ * proposer "je vous l'ajoute ?" pour un produit qui exige un minimum de 4.
+ */
+export function getNalaProductActionCopy(locale: unknown, quantity = 1): {
   ctaLabel: string;
   labels: NalaProductActionLabels;
 } {
   const language = languageOf(locale) ?? 'fr';
+  const n = Math.max(1, Math.trunc(quantity) || 1);
 
   if (language === 'it') {
     return {
-      ctaLabel: 'Te lo metto nel carrello?',
+      ctaLabel: n > 1 ? `Il minimo per questo prodotto è ${n} — te li metto nel carrello?` : 'Te lo metto nel carrello?',
       labels: {
         adding: 'Aggiungo…',
-        added: '✓ Aggiunto al carrello',
+        added: n > 1 ? `✓ ${n} aggiunti al carrello` : '✓ Aggiunto al carrello',
         viewCart: 'Vedi il carrello',
         error: 'Non sono riuscita ad aggiungerlo.',
         retry: 'Riprova',
@@ -137,10 +149,10 @@ export function getNalaProductActionCopy(locale: unknown): {
 
   if (language === 'en') {
     return {
-      ctaLabel: 'Shall I add it to your cart?',
+      ctaLabel: n > 1 ? `This product has a minimum of ${n} — shall I add them to your cart?` : 'Shall I add it to your cart?',
       labels: {
         adding: 'Adding…',
-        added: '✓ Added to cart',
+        added: n > 1 ? `✓ ${n} added to cart` : '✓ Added to cart',
         viewCart: 'View cart',
         error: 'I couldn’t add it.',
         retry: 'Try again',
@@ -150,10 +162,10 @@ export function getNalaProductActionCopy(locale: unknown): {
   }
 
   return {
-    ctaLabel: 'Je vous le mets au panier ?',
+    ctaLabel: n > 1 ? `Ce produit a un minimum de ${n} — je vous les ajoute ?` : 'Je vous le mets au panier ?',
     labels: {
       adding: 'J’ajoute…',
-      added: '✓ Ajouté au panier',
+      added: n > 1 ? `✓ ${n} ajoutés au panier` : '✓ Ajouté au panier',
       viewCart: 'Voir mon panier',
       error: 'Je n’ai pas pu l’ajouter.',
       retry: 'Réessayer',
@@ -171,7 +183,6 @@ export function buildValidatedNalaProductActions(params: {
   products: NalaCanonicalProduct[];
 }): NalaProductAction[] {
   const productById = new Map(params.products.map((product) => [product.id, product]));
-  const copy = getNalaProductActionCopy(params.locale);
 
   return params.candidates.flatMap((candidate) => {
     if (
@@ -195,6 +206,15 @@ export function buildValidatedNalaProductActions(params: {
       return [];
     }
 
+    const minOrderQuantity = Math.max(1, Math.trunc(product.min_order_quantity ?? 1) || 1);
+    const orderQuantityStep = Math.max(1, Math.trunc(product.order_quantity_step ?? 1) || 1);
+    // Stock insuffisant pour atteindre le minimum de vente : Nala ne doit
+    // jamais proposer une quantité que le checkout rejettera ensuite.
+    if (product.stock < minOrderQuantity) return [];
+
+    const quantity = minOrderQuantity;
+    const copy = getNalaProductActionCopy(params.locale, quantity);
+
     return [{
       type: 'product' as const,
       action: 'add_to_cart' as const,
@@ -211,7 +231,10 @@ export function buildValidatedNalaProductActions(params: {
         stock: product.stock,
         weightGrams: product.weight_grams,
         storageType: product.storage_type,
+        minOrderQuantity,
+        orderQuantityStep,
       },
+      quantity,
       ctaLabel: copy.ctaLabel,
       labels: copy.labels,
       interactionId: params.interactionId,
@@ -229,6 +252,8 @@ export function toNalaCartProduct(action: NalaProductAction) {
     weight_grams: action.product.weightGrams,
     stock: action.product.stock,
     storage_type: action.product.storageType,
+    min_order_quantity: action.product.minOrderQuantity,
+    order_quantity_step: action.product.orderQuantityStep,
   };
 }
 
