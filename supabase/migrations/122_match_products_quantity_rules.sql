@@ -7,7 +7,11 @@
 -- à la source : tous les consommateurs de la RPC héritent des colonnes
 -- sans requête supplémentaire ni changement de temps de réponse.
 
-create or replace function public.match_products(
+-- Postgres refuse un CREATE OR REPLACE qui change la forme de la table de
+-- retour (nouvelles colonnes de sortie) : DROP explicite d'abord.
+drop function if exists public.match_products(vector, uuid, int, float);
+
+create function public.match_products(
   query_embedding vector(768),
   p_tenant_id     uuid,
   match_count     int   default 8,
