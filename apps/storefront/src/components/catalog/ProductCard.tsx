@@ -190,14 +190,15 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             {cartonDetail && <p className="mb-1.5 text-xs font-semibold leading-snug text-gray-700">{cartonDetail}</p>}
             {detailLine && <p className={`truncate text-xs text-gray-400 ${compactGrid ? 'mb-1.5 leading-tight sm:mb-2 sm:leading-normal' : 'mb-2'}`}>{detailLine}</p>}
             {hasMinRule && (
-              <p className="mb-1.5 text-xs font-semibold leading-snug text-gray-600">
+              <span className="mb-1.5 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold leading-snug text-amber-800">
                 Minimum {minOrderQuantity}{product.order_quantity_step && product.order_quantity_step > 1 ? ` · par ${product.order_quantity_step}` : ''}
-              </p>
+              </span>
             )}
             <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                   <span className={`whitespace-nowrap font-bold leading-tight ${hasDiscount ? 'text-xl sm:text-2xl' : 'text-base'}`} style={{ color: 'var(--color-primary)' }}>{formatPrice(product.price, currency)}</span>
+                  <span className="whitespace-nowrap text-xs font-medium text-gray-400">/ unité</span>
                   {hasDiscount && <span className="whitespace-nowrap text-sm font-medium text-gray-600 line-through">{formatPrice(product.compare_at_price as number, currency)}</span>}
                 </div>
                 {hasDiscount && <p className="mt-1 text-xs font-semibold leading-snug text-red-700">Économisez {formatPrice(savings, currency)}</p>}
@@ -229,13 +230,16 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
         ) : (
           <div className="px-2 pt-1 pb-6">
             <p className="text-xs font-medium line-clamp-2 text-gray-900">{product.name}</p>
-            <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--color-primary)' }}>
-              {formatPrice(product.price, currency)}
+            <p className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>
+                {formatPrice(product.price, currency)}
+              </span>
+              <span className="text-[10px] font-medium text-gray-400">/ unité</span>
             </p>
             {hasMinRule && (
-              <p className="mt-0.5 text-[10px] font-semibold leading-tight text-gray-500">
+              <span className="mt-1 inline-flex items-center rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-amber-800">
                 Minimum {minOrderQuantity}
-              </p>
+              </span>
             )}
           </div>
         )}

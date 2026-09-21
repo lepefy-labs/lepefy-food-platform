@@ -95,7 +95,7 @@ export function CartItem({
               {weightLabel && <span>{weightLabel}</span>}
               <span className="font-medium">{formatPrice(product.price, currency)} / unité</span>
               {(product.min_order_quantity ?? 1) > 1 && (
-                <span className="font-medium text-gray-600">
+                <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800">
                   Minimum {product.min_order_quantity}{(product.order_quantity_step ?? 1) > 1 ? ` · par ${product.order_quantity_step}` : ''}
                 </span>
               )}

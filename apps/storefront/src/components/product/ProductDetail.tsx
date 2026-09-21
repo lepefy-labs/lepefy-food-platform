@@ -76,10 +76,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
             </p>
           )}
           <ProductTitle product={product} />
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-baseline gap-2">
             <span className="font-display text-3xl font-semibold" style={{ color: 'var(--color-primary)' }}>
               {formatPrice(product.price, currency)}
             </span>
+            <span className="text-sm font-medium text-gray-400">/ unité</span>
             {product.compare_at_price && product.compare_at_price > product.price && (
               <span className="text-lg text-gray-400 line-through">{formatPrice(product.compare_at_price, currency)}</span>
             )}
@@ -113,7 +114,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                   <span className="text-sm font-medium text-gray-700">Quantité</span>
                   <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={product.stock} onChange={setQuantity} />
                   {minOrderQuantity > 1 && (
-                    <span className="text-xs text-gray-400">
+                    <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
                       Minimum {minOrderQuantity}{orderQuantityStep > 1 ? ` · par ${orderQuantityStep}` : ''}
                     </span>
                   )}
