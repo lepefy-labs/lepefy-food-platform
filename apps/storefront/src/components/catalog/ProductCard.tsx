@@ -99,6 +99,8 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const discountPercent = hasDiscount
     ? Math.round((1 - product.price / (product.compare_at_price as number)) * 100)
     : null;
+  const minOrderQuantity = product.min_order_quantity ?? 1;
+  const hasMinRule = !merchandise && minOrderQuantity > 1;
 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
@@ -180,6 +182,11 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             <p className={`font-medium text-gray-900 line-clamp-2 mb-1 ${compactGrid ? 'min-h-[2.05rem] text-[13px] leading-[1.25] sm:min-h-0 sm:text-sm sm:leading-normal' : 'text-sm'}`}>{displayName}</p>
             {cartonDetail && <p className="mb-1.5 text-xs font-semibold leading-snug text-gray-700">{cartonDetail}</p>}
             {detailLine && <p className={`truncate text-xs text-gray-400 ${compactGrid ? 'mb-1.5 leading-tight sm:mb-2 sm:leading-normal' : 'mb-2'}`}>{detailLine}</p>}
+            {hasMinRule && (
+              <p className="mb-1.5 text-xs font-semibold leading-snug text-gray-600">
+                Minimum {minOrderQuantity}{product.order_quantity_step && product.order_quantity_step > 1 ? ` · par ${product.order_quantity_step}` : ''}
+              </p>
+            )}
             <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -204,11 +211,11 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 onClick={handleAddToCart}
                 disabled={outOfStock}
                 aria-disabled={atLimit || undefined}
-                aria-label={outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum dans le panier' : 'Ajouter au panier'}
+                aria-label={outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum dans le panier' : hasMinRule ? `Ajouter ${minOrderQuantity} au panier` : 'Ajouter au panier'}
                 className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg px-1 py-2 text-[11px] font-semibold leading-tight whitespace-nowrap text-white transition-opacity hover:opacity-90 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-disabled:opacity-60 sm:text-sm motion-reduce:transition-none"
                 style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
               >
-                {added ? 'Ajouté ✓' : outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum' : 'Ajouter au panier'}
+                {added ? 'Ajouté ✓' : outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum' : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter au panier'}
               </button>
             )}
           </div>

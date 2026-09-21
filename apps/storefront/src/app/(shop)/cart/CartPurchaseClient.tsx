@@ -6,10 +6,12 @@ import { IconArrowLeft, IconArrowRight, IconLock } from '@tabler/icons-react';
 import { CartEmpty } from '@/components/cart/CartEmpty';
 import { CartItem } from '@/components/cart/CartItem';
 import { CartUndoToast } from '@/components/cart/CartUndoToast';
+import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
+import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
 import { useEffect, useState } from 'react';
 
@@ -28,6 +30,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   const removeItem = useCartStore((state) => state.removeItem);
   const addItem = useCartStore((state) => state.addItem);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
+  const quantityGroups = useQuantityGroups();
 
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
 
@@ -75,6 +78,8 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
             </div>
             <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement 100 % sécurisé</p>
           </section>
+
+          <QuantityGroupProgress groups={quantityGroups} items={items} />
 
           <section aria-label="Articles du panier">
             <ul className="space-y-3">

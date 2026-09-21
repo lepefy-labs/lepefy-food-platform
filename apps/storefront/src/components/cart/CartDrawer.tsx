@@ -17,6 +17,8 @@ import { CartDrawerFooter } from './CartDrawerFooter';
 import { CartDrawerEmpty } from './CartDrawerEmpty';
 import { CartItem } from './CartItem';
 import { CartUndoToast } from './CartUndoToast';
+import { QuantityGroupProgress } from './QuantityGroupProgress';
+import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import type { CartItem as CartItemType } from '@lepefy/types';
 
 const TITLE_ID = 'cart-drawer-title';
@@ -50,6 +52,7 @@ export function CartDrawer() {
   const decrementItem = useCartStore((s) => s.decrementItem);
   const removeItem = useCartStore((s) => s.removeItem);
   const addItem = useCartStore((s) => s.addItem);
+  const quantityGroups = useQuantityGroups();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
@@ -128,20 +131,23 @@ export function CartDrawer() {
         {isEmpty ? (
           <CartDrawerEmpty onNavigate={closeDrawer} />
         ) : (
-          <ul className="flex-1 overflow-y-auto px-5">
-            {items.map((item) => (
-              <CartItem
-                key={item.product.id}
-                item={item}
-                currency={tenant.currency}
-                unavailableProductIds={unavailableProductIds}
-                pendingProductIds={pendingProductIds}
-                onIncrement={handleIncrement}
-                onDecrement={handleDecrement}
-                onRemove={handleRemove}
-              />
-            ))}
-          </ul>
+          <div className="flex-1 overflow-y-auto px-5">
+            <QuantityGroupProgress groups={quantityGroups} items={items} />
+            <ul>
+              {items.map((item) => (
+                <CartItem
+                  key={item.product.id}
+                  item={item}
+                  currency={tenant.currency}
+                  unavailableProductIds={unavailableProductIds}
+                  pendingProductIds={pendingProductIds}
+                  onIncrement={handleIncrement}
+                  onDecrement={handleDecrement}
+                  onRemove={handleRemove}
+                />
+              ))}
+            </ul>
+          </div>
         )}
 
         {/* Flux normal, jamais en overlay par-dessus le footer — cf.

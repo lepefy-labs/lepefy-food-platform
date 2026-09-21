@@ -94,6 +94,11 @@ export function CartItem({
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
               {weightLabel && <span>{weightLabel}</span>}
               <span className="font-medium">{formatPrice(product.price, currency)} / unité</span>
+              {(product.min_order_quantity ?? 1) > 1 && (
+                <span className="font-medium text-gray-600">
+                  Minimum {product.min_order_quantity}{(product.order_quantity_step ?? 1) > 1 ? ` · par ${product.order_quantity_step}` : ''}
+                </span>
+              )}
               {(state === 'unavailable' || state === 'out_of_stock') && (
                 <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
                   {isPage ? 'Produit actuellement indisponible' : STATE_BADGE[state]}
