@@ -31,6 +31,8 @@ export type HomeProduct = {
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
   category: { name: string } | null;
   compare_at_price?: number | null;
+  min_order_quantity?: number;
+  order_quantity_step?: number;
 };
 
 export default async function HomePage() {
@@ -56,7 +58,7 @@ export default async function HomePage() {
     // 2. Prodotti featured
     supabase
       .from('products')
-      .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+      .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, category:categories(name)')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .eq('featured', true)
@@ -74,7 +76,7 @@ export default async function HomePage() {
     // personnalisation inventée (pas de login client actif côté storefront).
     supabase
       .from('products')
-      .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+      .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, category:categories(name)')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .not('compare_at_price', 'is', null)
@@ -117,7 +119,7 @@ export default async function HomePage() {
       categories.map(async (cat) => {
         const { data: catRaw } = await supabase
           .from('products')
-          .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+          .select('id, name, price, image_url, slug, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, category:categories(name)')
           .eq('tenant_id', tenant.id)
           .eq('active', true)
           .eq('category_id', cat.id)
@@ -142,7 +144,7 @@ export default async function HomePage() {
     ),
     supabase
       .from('products')
-      .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, category:categories(name)')
+      .select('id, name, price, compare_at_price, image_url, slug, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, category:categories(name)')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .not('id', 'in', `(${excludeForRecent.join(',')})`)

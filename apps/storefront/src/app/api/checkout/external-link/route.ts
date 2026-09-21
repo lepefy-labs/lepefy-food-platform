@@ -12,9 +12,15 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
+import { validatePurchaseQuantityRules, type QuantityRuleViolation } from '@/lib/purchaseQuantityRules';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 const MAX_QUANTITY_PER_ITEM = 999;
+
+function formatQuantityViolationMessage(violation: QuantityRuleViolation): string {
+  const label = violation.groupName ?? violation.productName ?? 'Un article';
+  return `${label} : quantité minimale ${violation.requiredMinimum}${violation.step > 1 ? ` par ${violation.step}` : ''}. Ajoutez encore ${violation.missingQuantity} unité(s).`;
+}
 
 interface CartItemPayload {
   productId: string;
@@ -95,11 +101,14 @@ export async function POST(req: NextRequest) {
     const productIds = [...new Set(rawItems.map((item) => item.productId))];
     const { data: dbProducts, error: productsError } = await supabase
       .from('products')
-      .select('id, name, price, storage_type, stock')
+      .select('id, name, price, storage_type, stock, min_order_quantity, order_quantity_step')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .in('id', productIds) as {
-        data: Array<{ id: string; name: string; price: number; storage_type: 'dry' | 'fresh' | 'frozen' | null; stock: number }> | null;
+        data: Array<{
+          id: string; name: string; price: number; storage_type: 'dry' | 'fresh' | 'frozen' | null; stock: number;
+          min_order_quantity: number; order_quantity_step: number;
+        }> | null;
         error: unknown;
       };
 
@@ -117,6 +126,43 @@ export async function POST(req: NextRequest) {
     for (const item of rawItems) {
       quantityByProduct.set(item.productId, (quantityByProduct.get(item.productId) ?? 0) + item.quantity);
     }
+
+    const { data: groupRows, error: groupsError } = await supabase
+      .from('purchase_quantity_groups')
+      .select('id, name, min_quantity, quantity_step, purchase_quantity_group_products(product_id)')
+      .eq('tenant_id', tenant.id)
+      .eq('active', true) as {
+        data: Array<{
+          id: string; name: string; min_quantity: number; quantity_step: number;
+          purchase_quantity_group_products: Array<{ product_id: string }>;
+        }> | null;
+        error: unknown;
+      };
+
+    if (groupsError) {
+      console.error('[checkout/external-link] purchase quantity groups lookup error:', groupsError);
+      return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
+    }
+
+    const quantityViolations = validatePurchaseQuantityRules(
+      quantityByProduct,
+      dbProducts,
+      (groupRows ?? []).map((group) => ({
+        id: group.id,
+        name: group.name,
+        min_quantity: group.min_quantity,
+        quantity_step: group.quantity_step,
+        productIds: group.purchase_quantity_group_products.map((row) => row.product_id),
+      })),
+    );
+    if (quantityViolations.length > 0) {
+      return NextResponse.json({
+        error: formatQuantityViolationMessage(quantityViolations[0]!),
+        code: 'QUANTITY_RULE_VIOLATION',
+        violations: quantityViolations,
+      }, { status: 400 });
+    }
+
     const insufficientStock: string[] = [];
     for (const [productId, requestedQty] of quantityByProduct) {
       const product = productById.get(productId)!;

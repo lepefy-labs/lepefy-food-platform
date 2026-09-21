@@ -23,7 +23,8 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   const isEmpty = useCartStore(selectCartIsEmpty);
   const pendingProductIds = useCartStore(selectPendingProductIds);
   const unavailableProductIds = useCartStore((state) => state.unavailableProductIds);
-  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const incrementItem = useCartStore((state) => state.incrementItem);
+  const decrementItem = useCartStore((state) => state.decrementItem);
   const removeItem = useCartStore((state) => state.removeItem);
   const addItem = useCartStore((state) => state.addItem);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
@@ -33,13 +34,11 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   if (isEmpty) return <div className="flex min-h-[60vh]"><CartEmpty headingLevel="h1" /></div>;
 
   function increment(productId: string) {
-    const item = items.find((entry) => entry.product.id === productId);
-    if (item) updateQuantity(productId, Math.min(item.quantity + 1, item.product.stock));
+    incrementItem(productId);
   }
 
   function decrement(productId: string) {
-    const item = items.find((entry) => entry.product.id === productId);
-    if (item) updateQuantity(productId, item.quantity - 1);
+    decrementItem(productId);
   }
 
   function remove(productId: string) {

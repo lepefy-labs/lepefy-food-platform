@@ -30,7 +30,7 @@ export default async function GoodiesPage({ searchParams }: { searchParams: { ca
 
   function merchandiseQuery() {
     return supabase.from('products')
-      .select('id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, description, category:categories!inner(name)', { count: 'exact' })
+      .select('id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, description, category:categories!inner(name)', { count: 'exact' })
       .eq('tenant_id', tenant.id).eq('active', true)
       .eq('category.tenant_id', tenant.id).eq('category.catalog_scope', 'gadgets');
   }

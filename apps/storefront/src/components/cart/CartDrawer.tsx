@@ -46,7 +46,8 @@ export function CartDrawer() {
   const pendingProductIds = useCartStore(selectPendingProductIds);
   const unavailableProductIds = useCartStore((s) => s.unavailableProductIds);
   const syncStatus = useCartStore((s) => s.syncStatus);
-  const updateQuantity = useCartStore((s) => s.updateQuantity);
+  const incrementItem = useCartStore((s) => s.incrementItem);
+  const decrementItem = useCartStore((s) => s.decrementItem);
   const removeItem = useCartStore((s) => s.removeItem);
   const addItem = useCartStore((s) => s.addItem);
 
@@ -75,15 +76,11 @@ export function CartDrawer() {
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
 
   function handleIncrement(productId: string) {
-    const item = items.find((i) => i.product.id === productId);
-    if (!item) return;
-    updateQuantity(productId, Math.min(item.quantity + 1, item.product.stock));
+    incrementItem(productId);
   }
 
   function handleDecrement(productId: string) {
-    const item = items.find((i) => i.product.id === productId);
-    if (!item) return;
-    updateQuantity(productId, item.quantity - 1);
+    decrementItem(productId);
   }
 
   function handleRemove(productId: string) {

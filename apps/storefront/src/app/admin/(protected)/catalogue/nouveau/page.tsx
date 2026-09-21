@@ -49,6 +49,8 @@ export default async function AdminNouveauProduitPage() {
     position:                    9999,
     weight_grams:                null,
     stock:                       0,
+    min_order_quantity:          1,
+    order_quantity_step:         1,
     active:                      false,
     featured:                    false,
     storage_type:                'dry',

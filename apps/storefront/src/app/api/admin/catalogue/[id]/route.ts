@@ -68,6 +68,8 @@ export async function PATCH(
   if ('price'              in body) updatePayload.price              = parseFloat(String(body.price)) || 0;
   if ('weight_grams'       in body) updatePayload.weight_grams       = body.weight_grams ? parseInt(String(body.weight_grams), 10) : null;
   if ('stock'              in body) updatePayload.stock              = parseInt(String(body.stock ?? 0), 10) || 0;
+  if ('min_order_quantity' in body) updatePayload.min_order_quantity = Math.max(1, parseInt(String(body.min_order_quantity ?? 1), 10) || 1);
+  if ('order_quantity_step' in body) updatePayload.order_quantity_step = Math.max(1, parseInt(String(body.order_quantity_step ?? 1), 10) || 1);
   if ('active'             in body) updatePayload.active             = Boolean(body.active);
   if ('featured'           in body) updatePayload.featured           = Boolean(body.featured);
   if ('storage_type'       in body) updatePayload.storage_type       = body.storage_type;

@@ -73,9 +73,10 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
     const cart = useCartStore.getState();
     const current = cart.items.find(item => item.product.id === product.id);
     if (!current) return;
-    const maximum = Math.min(product.stock ?? 999, current.product.stock ?? 999);
-    const next = Math.min(maximum, Math.max(1, current.quantity + delta));
-    if (next >= 1 && next !== current.quantity) cart.updateQuantity(product.id, next);
+    // incrementItem/decrementItem respectent le pas de la règle de quantité
+    // du produit (ex. min=4/step=4 : 4 → 8, jamais 5).
+    if (delta === 1) cart.incrementItem(product.id);
+    else cart.decrementItem(product.id);
   }
   const [recommendations, setRecommendations] = useState<ProductCardProduct[]>([]);
   const [loading, setLoading] = useState(true);

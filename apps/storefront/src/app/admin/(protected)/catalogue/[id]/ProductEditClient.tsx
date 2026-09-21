@@ -32,6 +32,8 @@ interface ProductEditProps {
     position: number;
     weight_grams: number | null;
     stock: number;
+    min_order_quantity: number;
+    order_quantity_step: number;
     active: boolean;
     featured: boolean;
     storage_type: string;
@@ -84,6 +86,8 @@ interface FormState {
   position: string;
   weight_grams: string;
   stock: string;
+  min_order_quantity: string;
+  order_quantity_step: string;
   active: boolean;
   featured: boolean;
   storage_type: string;
@@ -154,6 +158,8 @@ function initFormState(product: ProductEditProps['product'], tenantLocales: stri
     position:                    String(product.position ?? 9999),
     weight_grams:                product.weight_grams != null ? String(product.weight_grams) : '',
     stock:                       String(product.stock),
+    min_order_quantity:          String(product.min_order_quantity ?? 1),
+    order_quantity_step:         String(product.order_quantity_step ?? 1),
     active:                      product.active,
     featured:                    product.featured,
     storage_type:                product.storage_type,
@@ -259,6 +265,8 @@ export default function ProductEditClient({
         position:           formData.position,
         weight_grams:       formData.weight_grams,
         stock:              formData.stock,
+        min_order_quantity: formData.min_order_quantity,
+        order_quantity_step: formData.order_quantity_step,
         active:             formData.active,
         featured:           formData.featured,
         storage_type:       formData.storage_type,
@@ -734,6 +742,39 @@ export default function ProductEditClient({
                   className={INPUT_CLS}
                 />
               </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className={SECTION_TITLE_CLS}>Règles de vente</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={LABEL_CLS}>Quantité minimale</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.min_order_quantity}
+                    onChange={(e) => setField('min_order_quantity', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label className={LABEL_CLS}>Incrément après le minimum</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.order_quantity_step}
+                    onChange={(e) => setField('order_quantity_step', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-gray-400">
+                Quantités autorisées : {(() => {
+                  const min = Math.max(1, parseInt(formData.min_order_quantity, 10) || 1);
+                  const step = Math.max(1, parseInt(formData.order_quantity_step, 10) || 1);
+                  return Array.from({ length: 5 }, (_, i) => min + i * step).join(' · ');
+                })()}...
+              </p>
             </section>
           </div>
         </div>

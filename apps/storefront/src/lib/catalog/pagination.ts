@@ -50,7 +50,7 @@ export function catalogRankingDay(value?: string): string {
 
 const PRODUCT_SELECT = `
   id, name, slug, price, compare_at_price, image_url,
-  weight_grams, stock, storage_type,
+  weight_grams, stock, storage_type, min_order_quantity, order_quantity_step,
   category:categories(name)
 `;
 

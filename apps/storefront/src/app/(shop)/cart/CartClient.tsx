@@ -41,7 +41,8 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   const pendingProductIds = useCartStore(selectPendingProductIds);
   const unavailableProductIds = useCartStore((state) => state.unavailableProductIds);
   const syncStatus = useCartStore((state) => state.syncStatus);
-  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const incrementItem = useCartStore((state) => state.incrementItem);
+  const decrementItem = useCartStore((state) => state.decrementItem);
   const removeItem = useCartStore((state) => state.removeItem);
   const addItem = useCartStore((state) => state.addItem);
   const shippingPayload = useCartStore((state) => state.shippingPayload);
@@ -165,13 +166,11 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
 
   function handleIncrement(productId: string) {
-    const item = items.find((entry) => entry.product.id === productId);
-    if (item) updateQuantity(productId, Math.min(item.quantity + 1, item.product.stock));
+    incrementItem(productId);
   }
 
   function handleDecrement(productId: string) {
-    const item = items.find((entry) => entry.product.id === productId);
-    if (item) updateQuantity(productId, item.quantity - 1);
+    decrementItem(productId);
   }
 
   function handleRemove(productId: string) {

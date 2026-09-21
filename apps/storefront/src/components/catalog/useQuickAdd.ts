@@ -30,6 +30,8 @@ export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = fal
       weight_grams: product.weight_grams,
       stock: product.stock ?? 999,
       storage_type: product.storage_type ?? null,
+      min_order_quantity: product.min_order_quantity,
+      order_quantity_step: product.order_quantity_step,
     });
     clearTimeout(timer.current);
     setAdded(true);

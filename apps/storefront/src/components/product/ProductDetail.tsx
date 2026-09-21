@@ -23,7 +23,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const activeLocale = resolveLocale(storeLocale, tenantLocales);
 
   const addItem = useCartStore((s) => s.addItem);
-  const [quantity, setQuantity] = useState(1);
+  const minOrderQuantity = product.min_order_quantity ?? 1;
+  const orderQuantityStep = product.order_quantity_step ?? 1;
+  const [quantity, setQuantity] = useState(minOrderQuantity);
   const [added, setAdded] = useState(false);
   const outOfStock = product.stock === 0;
   const totalPrice = product.price * quantity;
@@ -109,7 +111,12 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
               <div className="hidden flex-col gap-3 md:flex">
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium text-gray-700">Quantité</span>
-                  <QuantitySelector value={quantity} min={1} max={product.stock} onChange={setQuantity} />
+                  <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={product.stock} onChange={setQuantity} />
+                  {minOrderQuantity > 1 && (
+                    <span className="text-xs text-gray-400">
+                      Minimum {minOrderQuantity}{orderQuantityStep > 1 ? ` · par ${orderQuantityStep}` : ''}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={handleAddToCart}
@@ -124,7 +131,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5">
                   <div className="shrink-0">
                     <span className="sr-only">Quantité</span>
-                    <QuantitySelector value={quantity} min={1} max={product.stock} onChange={setQuantity} />
+                    <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={product.stock} onChange={setQuantity} />
                   </div>
                   <button
                     onClick={handleAddToCart}

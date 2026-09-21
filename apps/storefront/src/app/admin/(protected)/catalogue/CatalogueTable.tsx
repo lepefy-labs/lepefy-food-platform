@@ -257,6 +257,7 @@ export default function CatalogueTable({
           <p className="mt-1 text-sm text-gray-500">Gérez rapidement disponibilité, stock et contenu.</p>
         </div>
         <Link href="/admin/catalogue/categories" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold">Gérer les catégories</Link>
+        <Link href="/admin/catalogue/quantity-groups" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold">Règles de quantité</Link>
         <Link href="/admin/catalogue/nouveau" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90">
           <IconPlus size={18} /> Nouveau produit
         </Link>

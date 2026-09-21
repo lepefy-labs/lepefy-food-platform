@@ -4,6 +4,7 @@ import type { CartItem } from '@lepefy/types';
 import type { CartMutationInput, CartSyncStatus, PendingMutation } from '@/lib/cart/cartTypes';
 import { enqueueMutation } from '@/lib/cart/cartQueue';
 import { trackNalaAddToCart } from '@/lib/ai/nalaAttributionClient';
+import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
 
 interface CartState {
   items: CartItem[];
@@ -33,6 +34,13 @@ interface CartState {
   addItem: (product: CartItem['product'], quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
+  /**
+   * +/- centralisés pour les contrôles de quantité du panier (CartDrawer,
+   * CartClient…) : contrairement à un +1/-1 littéral, respectent le pas de
+   * la règle de quantité du produit (ex. min=4/step=4 : 4 → 8, jamais 5).
+   */
+  incrementItem: (productId: string) => void;
+  decrementItem: (productId: string) => void;
   clearCart: () => void;
   totalItems: () => number;
   totalPrice: () => number;
@@ -79,25 +87,38 @@ export const useCartStore = create<CartState>()(
       unavailableProductIds: [],
 
       addItem(product, quantity = 1) {
+        let mutationQuantity = quantity;
         set((state) => {
           const existing = state.items.find((i) => i.product.id === product.id);
-          const items = existing
-            ? state.items.map((i) =>
-                i.product.id === product.id
-                  ? { ...i, quantity: Math.min(i.quantity + quantity, product.stock) }
-                  : i,
-              )
-            : [...state.items, { product, quantity }];
+          const minimum = product.min_order_quantity ?? 1;
+          const step = product.order_quantity_step ?? 1;
+
+          let items: CartItem[];
+          if (existing) {
+            // Un prodotto già in carrello rispetta lo step ad ogni aggiunta
+            // (min=4/step=4 : 4 → 8 → 12, non 4 → 5). Il "+1" della UI diventa
+            // quindi "+step" quando serve, mai una quantità intermedia invalida.
+            const rawTotal = Math.min(existing.quantity + quantity, product.stock);
+            const total = Math.min(computeQuantityRuleState(rawTotal, minimum, step).nextValidQuantity, product.stock);
+            mutationQuantity = total - existing.quantity;
+            items = state.items.map((i) => (i.product.id === product.id ? { ...i, quantity: total } : i));
+          } else {
+            // Premier ajout : va directement au minimum de vente (jamais 1
+            // unité isolée si le produit exige un minimum supérieur).
+            const total = Math.min(Math.max(quantity, minimum), product.stock);
+            mutationQuantity = total;
+            items = [...state.items, { product, quantity: total }];
+          }
 
           // Operazione RELATIVA: due "+1" da due device diversi si sommano lato
           // server invece di sovrascriversi (cf. lib/cart/cartTypes.ts).
           return {
             items,
-            ...queueMutation(state, { type: 'add', productId: product.id, quantity }),
+            ...queueMutation(state, { type: 'add', productId: product.id, quantity: mutationQuantity }),
           };
         });
         flushScheduler();
-        void trackNalaAddToCart(product.id, quantity);
+        void trackNalaAddToCart(product.id, mutationQuantity);
       },
 
       removeItem(productId) {
@@ -119,6 +140,28 @@ export const useCartStore = create<CartState>()(
           ...queueMutation(state, { type: 'set_quantity', productId, quantity }),
         }));
         flushScheduler();
+      },
+
+      incrementItem(productId) {
+        const item = get().items.find((i) => i.product.id === productId);
+        if (!item) return;
+        const minimum = item.product.min_order_quantity ?? 1;
+        const step = item.product.order_quantity_step ?? 1;
+        const next = Math.min(
+          computeQuantityRuleState(item.quantity + 1, minimum, step).nextValidQuantity,
+          item.product.stock,
+        );
+        get().updateQuantity(productId, next);
+      },
+
+      decrementItem(productId) {
+        const item = get().items.find((i) => i.product.id === productId);
+        if (!item) return;
+        const minimum = item.product.min_order_quantity ?? 1;
+        const step = item.product.order_quantity_step ?? 1;
+        const next = item.quantity - step;
+        if (next < minimum) { get().removeItem(productId); return; }
+        get().updateQuantity(productId, next);
       },
 
       clearCart() {

@@ -25,6 +25,8 @@ export interface ProductCardProduct {
   stock: number | null;
   storage_type?: 'dry' | 'fresh' | 'frozen' | null;
   category?: { name: string } | null;
+  min_order_quantity?: number;
+  order_quantity_step?: number;
 }
 
 interface ProductCardProps {

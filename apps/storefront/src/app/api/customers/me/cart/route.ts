@@ -65,10 +65,10 @@ async function rehydrateItems(
   const productIds = [...new Set(rawItems.map((i) => i.product_id))];
   const { data: dbProducts, error: productsError } = await supabase
     .from('products')
-    .select('id, name, slug, price, storage_type, stock, image_url, weight_grams, active')
+    .select('id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step')
     .eq('tenant_id', tenantId)
     .in('id', productIds) as {
-      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active'>> | null;
+      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step'>> | null;
       error: unknown;
     };
 
@@ -82,14 +82,16 @@ async function rehydrateItems(
     if (!p || !p.active) continue;
     items.push({
       product: {
-        id:           p.id,
-        name:         p.name,
-        slug:         p.slug,
-        price:        p.price,
-        image_url:    p.image_url,
-        weight_grams: p.weight_grams,
-        stock:        p.stock,
-        storage_type: p.storage_type,
+        id:                   p.id,
+        name:                 p.name,
+        slug:                 p.slug,
+        price:                p.price,
+        image_url:            p.image_url,
+        weight_grams:         p.weight_grams,
+        stock:                p.stock,
+        storage_type:         p.storage_type,
+        min_order_quantity:   p.min_order_quantity,
+        order_quantity_step:  p.order_quantity_step,
       },
       quantity: Math.min(row.quantity, p.stock),
     });

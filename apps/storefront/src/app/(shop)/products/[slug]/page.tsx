@@ -59,6 +59,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     .select(`
       id, name, name_alt, slug, price, compare_at_price, image_url, images,
       weight_grams, stock, storage_type, category_id, is_homemade,
+      min_order_quantity, order_quantity_step,
       description, descriptions,
       ingredients_text, allergens_text, gluten_free_certified,
       usage_instructions, conservation_instructions, conservation_after_opening,

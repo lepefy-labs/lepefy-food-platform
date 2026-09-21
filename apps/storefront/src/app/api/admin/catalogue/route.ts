@@ -146,6 +146,8 @@ export async function POST(req: NextRequest) {
       price: parseFloat(body.price) || 0,
       weight_grams: body.weight_grams ? parseInt(body.weight_grams, 10) : null,
       stock: parseInt(body.stock, 10) || 0,
+      min_order_quantity: Math.max(1, parseInt(body.min_order_quantity, 10) || 1),
+      order_quantity_step: Math.max(1, parseInt(body.order_quantity_step, 10) || 1),
       active: Boolean(body.active),
       featured: Boolean(body.featured),
       storage_type: body.storage_type ?? 'dry',
