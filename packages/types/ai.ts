@@ -73,5 +73,7 @@ export interface SemanticMatch {
   stock: number;
   weight_grams: number | null;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  min_order_quantity: number;
+  order_quantity_step: number;
   similarity: number;
 }

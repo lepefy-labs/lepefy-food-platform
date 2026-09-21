@@ -25,8 +25,15 @@ export interface ProductCardProduct {
   stock: number | null;
   storage_type?: 'dry' | 'fresh' | 'frozen' | null;
   category?: { name: string } | null;
-  min_order_quantity?: number;
-  order_quantity_step?: number;
+  /**
+   * Obligatoires (pas `?:`) — volontairement : toute fonction qui construit
+   * un `ProductCardProduct` doit fournir explicitement la règle de quantité
+   * minimale du produit (migration 121), jamais l'oublier silencieusement.
+   * Une source de données qui n'a pas encore la règle passe `1` (aucune
+   * contrainte), jamais `undefined`.
+   */
+  min_order_quantity: number;
+  order_quantity_step: number;
 }
 
 interface ProductCardProps {
@@ -225,6 +232,11 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
             <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--color-primary)' }}>
               {formatPrice(product.price, currency)}
             </p>
+            {hasMinRule && (
+              <p className="mt-0.5 text-[10px] font-semibold leading-tight text-gray-500">
+                Minimum {minOrderQuantity}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -232,7 +244,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
       {variant === 'shelf' && (
         <button
           onClick={handleAddToCart}
-          aria-label="Ajouter au panier"
+          aria-label={hasMinRule ? `Ajouter ${minOrderQuantity} au panier` : 'Ajouter au panier'}
           disabled={outOfStock}
           className="absolute bottom-2 right-2 w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 shadow-card disabled:opacity-40"
           style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}

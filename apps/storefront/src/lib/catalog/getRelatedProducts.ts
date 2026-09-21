@@ -1,6 +1,7 @@
 import type { createPublicClient } from '@/lib/supabase/public';
 import type { SemanticMatch } from '@lepefy/types';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
+import { PRODUCT_CARD_SELECT } from '@/lib/catalog/productCardSelect';
 
 // Server utility: imported only by the product page and public recommendation route.
 const RELATED_LIMIT = 8;
@@ -82,6 +83,8 @@ export async function getRelatedProducts(
             stock:        p.stock,
             storage_type: p.storage_type,
             category:     p.category_name ? { name: p.category_name } : null,
+            min_order_quantity:  p.min_order_quantity,
+            order_quantity_step: p.order_quantity_step,
           }));
       }
     }
@@ -95,7 +98,7 @@ export async function getRelatedProducts(
 
     let fallbackQuery = supabase
       .from('products')
-      .select('id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, category:categories(name)')
+      .select(PRODUCT_CARD_SELECT)
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .neq('stock', 0)

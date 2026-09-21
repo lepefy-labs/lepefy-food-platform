@@ -23,15 +23,12 @@ interface MatchProductsRow {
   active?: boolean;
   weight_grams: number | null;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  min_order_quantity: number;
+  order_quantity_step: number;
   similarity: number;
 }
 
-function toCanonical(
-  row: MatchProductsRow,
-  tenantId: string,
-  quantityRuleById: Map<string, { min_order_quantity: number; order_quantity_step: number }>,
-): NalaCanonicalProduct & { category_id: string | null } {
-  const quantityRule = quantityRuleById.get(row.id);
+function toCanonical(row: MatchProductsRow, tenantId: string): NalaCanonicalProduct & { category_id: string | null } {
   return {
     id: row.id,
     tenant_id: row.tenant_id ?? tenantId,
@@ -45,8 +42,8 @@ function toCanonical(
     active: row.active !== false,
     weight_grams: row.weight_grams,
     storage_type: row.storage_type,
-    min_order_quantity: quantityRule?.min_order_quantity ?? 1,
-    order_quantity_step: quantityRule?.order_quantity_step ?? 1,
+    min_order_quantity: row.min_order_quantity ?? 1,
+    order_quantity_step: row.order_quantity_step ?? 1,
   };
 }
 
@@ -68,29 +65,11 @@ export async function resolveCartPlanIngredients(params: {
     min_similarity: 0.42,
   })));
 
-  // match_products() ne renvoie pas les règles de quantité minimale — un
-  // second aller simple les récupère pour tous les candidats en une fois,
-  // sans toucher à la fonction SQL (cf. purchaseQuantityRules.ts).
-  const allCandidateIds = [...new Set(
-    matchResults.flatMap((result) => (result?.error ? [] : (result?.data ?? []) as MatchProductsRow[]))
-      .map((row) => row.id),
-  )];
-  const quantityRuleById = new Map<string, { min_order_quantity: number; order_quantity_step: number }>();
-  if (allCandidateIds.length > 0) {
-    const { data: quantityRuleRows } = await params.supabase
-      .from('products')
-      .select('id, min_order_quantity, order_quantity_step')
-      .in('id', allCandidateIds);
-    for (const row of (quantityRuleRows ?? []) as Array<{ id: string; min_order_quantity: number; order_quantity_step: number }>) {
-      quantityRuleById.set(row.id, { min_order_quantity: row.min_order_quantity, order_quantity_step: row.order_quantity_step });
-    }
-  }
-
   const items = await Promise.all(ingredients.map(async (ingredient, index) => {
     const result = matchResults[index];
     const rows = result?.error ? [] : (result?.data ?? []) as MatchProductsRow[];
     const directCandidates: CartIngredientCandidate[] = rows.map((row) => ({
-      product: toCanonical(row, params.tenantId, quantityRuleById),
+      product: toCanonical(row, params.tenantId),
       similarity: Number(row.similarity),
     }));
 

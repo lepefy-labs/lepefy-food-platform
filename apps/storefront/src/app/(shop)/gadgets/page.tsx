@@ -4,6 +4,7 @@ import { IconShoppingBag } from '@tabler/icons-react';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
+import { PRODUCT_CARD_BASE_COLUMNS } from '@/lib/catalog/productCardSelect';
 import { ProductCard, type ProductCardProduct } from '@/components/catalog/ProductCard';
 import { GoodiesHero } from '@/components/goodies/GoodiesHero';
 import type { Category } from '@lepefy/types';
@@ -30,7 +31,7 @@ export default async function GoodiesPage({ searchParams }: { searchParams: { ca
 
   function merchandiseQuery() {
     return supabase.from('products')
-      .select('id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, description, category:categories!inner(name)', { count: 'exact' })
+      .select(`${PRODUCT_CARD_BASE_COLUMNS}, description, category:categories!inner(name)`, { count: 'exact' })
       .eq('tenant_id', tenant.id).eq('active', true)
       .eq('category.tenant_id', tenant.id).eq('category.catalog_scope', 'gadgets');
   }

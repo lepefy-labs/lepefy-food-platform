@@ -1,4 +1,5 @@
 import { prioritizedCatalogIds } from './productMerchandising';
+import { PRODUCT_CARD_SELECT } from './productCardSelect';
 import type { createClient } from '@/lib/supabase/server';
 
 /** Taille de page de plateforme — pas de valeur par tenant, cf. contrainte
@@ -48,11 +49,7 @@ export function catalogRankingDay(value?: string): string {
   return value === yesterday ? yesterday : today;
 }
 
-const PRODUCT_SELECT = `
-  id, name, slug, price, compare_at_price, image_url,
-  weight_grams, stock, storage_type, min_order_quantity, order_quantity_step,
-  category:categories(name)
-`;
+const PRODUCT_SELECT = PRODUCT_CARD_SELECT;
 
 /**
  * Construit la requête `products` filtrée (tenant, active, recherche

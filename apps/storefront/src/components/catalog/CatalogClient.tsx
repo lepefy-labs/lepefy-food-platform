@@ -3,8 +3,9 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition, useEffect, useRef } from 'react';
 import { ProductGrid } from '@/components/catalog/ProductGrid';
-import { SemanticProductCard } from '@/components/catalog/SemanticProductCard';
+import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
+import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 import type { CatalogSort } from '@/lib/catalog/pagination';
 
@@ -312,8 +313,10 @@ export function CatalogClient({
       {!isSemanticLoading && semanticOnly.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Résultats similaires</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {semanticOnly.map(product => <SemanticProductCard key={product.id} product={product} />)}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
+            {semanticOnly.map(product => (
+              <ProductCard key={product.id} product={semanticMatchToProductCardProduct(product)} compactMobile />
+            ))}
           </div>
         </div>
       )}

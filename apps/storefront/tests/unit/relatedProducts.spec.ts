@@ -5,7 +5,7 @@ import { getRelatedProducts } from '../../src/lib/catalog/getRelatedProducts';
 const source = { id: 'source', category_id: 'category-a' };
 const tenant = { id: 'tenant-a', ai_semantic_search: true };
 function product(id: string, stock = 5) {
-  return { id, name: id, slug: id, price: 5, stock, image_url: null, weight_grams: null, storage_type: 'dry', category_name: 'Food' };
+  return { id, name: id, slug: id, price: 5, stock, image_url: null, weight_grams: null, storage_type: 'dry', category_name: 'Food', min_order_quantity: 1, order_quantity_step: 1 };
 }
 
 function fixture(options: { embedding?: unknown; semantic?: unknown[]; rpcError?: boolean; fallback?: unknown[] } = {}) {
@@ -62,6 +62,19 @@ test('product detail retains eight suggestions while popup is capped at four', a
   const { client } = fixture({ embedding: [0.1], semantic: products });
   expect(await getRelatedProducts(client, tenant, source)).toHaveLength(8);
   expect(await getRelatedProducts(client, tenant, source, 4)).toHaveLength(4);
+});
+
+test('la règle de quantité minimale est propagée depuis les deux branches (sémantique et repli catégorie)', async () => {
+  const { client } = fixture({
+    embedding: [0.1],
+    semantic: [{ ...product('semantic'), min_order_quantity: 4, order_quantity_step: 1 }],
+    fallback: [{ ...product('fallback'), min_order_quantity: 2, order_quantity_step: 1 }],
+  });
+  const result = await getRelatedProducts(client, tenant, source, 4);
+  expect(result).toEqual([
+    expect.objectContaining({ id: 'semantic', min_order_quantity: 4, order_quantity_step: 1 }),
+    expect.objectContaining({ id: 'fallback', min_order_quantity: 2, order_quantity_step: 1 }),
+  ]);
 });
 
 test('malformed embedding and empty category results are a valid empty enhancement', async () => {
