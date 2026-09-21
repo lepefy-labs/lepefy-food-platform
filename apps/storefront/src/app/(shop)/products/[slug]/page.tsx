@@ -73,7 +73,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const related = await getRelatedProducts(supabase, goodies ? { ...tenant, ai_semantic_search: false } : tenant, product);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 pt-8 pb-20 md:py-8">
       <ProductDetail product={product as unknown as ProductWithCategory} />
       <RelatedProducts products={related} catalogScope={goodies ? 'gadgets' : 'shop'} />
     </div>

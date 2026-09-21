@@ -94,21 +94,50 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           <ProductDescription product={product} />
 
           {outOfStock ? (
-            <div className="py-3 px-4 bg-gray-100 rounded-lg text-gray-500 text-sm font-medium text-center">Produit épuisé</div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700">Quantité</span>
-                <QuantitySelector value={quantity} min={1} max={product.stock} onChange={setQuantity} />
+            <>
+              <div className="hidden py-3 px-4 bg-gray-100 rounded-lg text-gray-500 text-sm font-medium text-center md:block">Produit épuisé</div>
+              <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
+                <div className="mx-auto max-w-7xl px-3 py-2.5">
+                  <div className="flex min-h-12 items-center justify-center rounded-xl bg-gray-100 px-4 text-sm font-semibold text-gray-500">
+                    Produit épuisé
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={handleAddToCart}
-                className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
-                style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
-              >
-                {added ? '✓ Ajouté au panier' : `Ajouter au panier — ${formatPrice(totalPrice, currency)}`}
-              </button>
-            </div>
+            </>
+          ) : (
+            <>
+              <div className="hidden flex-col gap-3 md:flex">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-gray-700">Quantité</span>
+                  <QuantitySelector value={quantity} min={1} max={product.stock} onChange={setQuantity} />
+                </div>
+                <button
+                  onClick={handleAddToCart}
+                  className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+                >
+                  {added ? '✓ Ajouté au panier' : `Ajouter au panier — ${formatPrice(totalPrice, currency)}`}
+                </button>
+              </div>
+
+              <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
+                <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5">
+                  <div className="shrink-0">
+                    <span className="sr-only">Quantité</span>
+                    <QuantitySelector value={quantity} min={1} max={product.stock} onChange={setQuantity} />
+                  </div>
+                  <button
+                    onClick={handleAddToCart}
+                    aria-live="polite"
+                    className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98]"
+                    style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
+                  >
+                    <span className="max-w-full truncate text-sm">{added ? '✓ Ajouté au panier' : 'Ajouter au panier'}</span>
+                    {!added && <span className="text-xs font-medium opacity-90">{formatPrice(totalPrice, currency)}</span>}
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
           <TrustBadges storageType={product.storage_type} />

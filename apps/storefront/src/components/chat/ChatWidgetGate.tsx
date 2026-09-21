@@ -15,6 +15,8 @@ export function ChatWidgetGate(props: ChatWidgetGateProps) {
   const pathname = usePathname();
   const hidden = pathname === '/avis/donner' || pathname === '/cart' || pathname.startsWith('/checkout') || pathname.startsWith('/order-confirmation');
 
+  const raiseForProductPurchaseBar = pathname.startsWith('/products/');
+
   if (hidden) return null;
-  return <ChatWidget {...props} />;
+  return <ChatWidget {...props} raiseForProductPurchaseBar={raiseForProductPurchaseBar} />;
 }

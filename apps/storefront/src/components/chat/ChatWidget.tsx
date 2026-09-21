@@ -17,6 +17,7 @@ interface ChatWidgetProps {
   tenantLocales: string[];
   tenantLocale: string;
   whatsappNumber: string | null;
+  raiseForProductPurchaseBar?: boolean;
 }
 
 interface ChatTurn {
@@ -60,7 +61,7 @@ function currentDeviceType(): 'mobile' | 'tablet' | 'desktop' {
   return 'desktop';
 }
 
-export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber }: ChatWidgetProps) {
+export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber, raiseForProductPurchaseBar = false }: ChatWidgetProps) {
   const storeLocale = useLocaleStore((state) => state.locale);
   const storefrontLocale = resolveLocale(storeLocale, tenantLocales) || tenantLocale || 'fr';
   const [open, setOpen] = useState(false);
@@ -73,6 +74,12 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
   const launcherRef = useRef<HTMLButtonElement>(null);
   const clientSessionIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  const mobileBottomClass = raiseForProductPurchaseBar
+    ? 'bottom-[calc(9rem+env(safe-area-inset-bottom))]'
+    : 'bottom-[calc(5rem+env(safe-area-inset-bottom))]';
+  const mobileDialogMaxHeightClass = raiseForProductPurchaseBar
+    ? 'max-h-[calc(100dvh-10rem-env(safe-area-inset-bottom))]'
+    : 'max-h-[calc(100dvh-6rem-env(safe-area-inset-bottom))]';
 
   useEffect(() => {
     try { conversationIdRef.current = sessionStorage.getItem(CONVERSATION_STORAGE_KEY); } catch { /* memory-only */ }
@@ -203,7 +210,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
             setOpen(true);
           }}
           aria-label="Ouvrir Nala, assistant shopping"
-          className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex h-12 items-center justify-center gap-2 overflow-hidden rounded-full bg-[#6D5AF6] px-4 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(109,90,246,0.35)] transition-[width,padding,background-color] duration-200 hover:bg-[#4B3CC4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5AF6] focus-visible:ring-offset-2 active:bg-[#4B3CC4] motion-reduce:transition-none md:bottom-6 md:right-6 ${compactLauncher ? 'w-12 px-0' : 'w-[164px]'}`}
+          className={`fixed ${mobileBottomClass} right-3 z-[60] flex h-12 items-center justify-center gap-2 overflow-hidden rounded-full bg-[#6D5AF6] px-4 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(109,90,246,0.35)] transition-[width,padding,background-color] duration-200 hover:bg-[#4B3CC4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5AF6] focus-visible:ring-offset-2 active:bg-[#4B3CC4] motion-reduce:transition-none md:bottom-6 md:right-6 ${compactLauncher ? 'w-12 px-0' : 'w-[164px]'}`}
         >
           <IconSparkles size={22} aria-hidden="true" className="shrink-0" />
           {!compactLauncher && <span className="whitespace-nowrap">Demander à Nala</span>}
@@ -214,7 +221,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
         <section
           role="dialog"
           aria-label="Nala, assistant shopping"
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex max-h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] w-[calc(100vw-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-[#E7E3FF] bg-white shadow-2xl md:bottom-6 md:right-6 md:max-h-[calc(100vh-3rem)]"
+          className={`fixed ${mobileBottomClass} right-3 z-[60] flex ${mobileDialogMaxHeightClass} w-[calc(100vw-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-[#E7E3FF] bg-white shadow-2xl md:bottom-6 md:right-6 md:max-h-[calc(100vh-3rem)]`}
         >
           <div
             className="flex shrink-0 items-center justify-between px-4 py-3 text-white"
