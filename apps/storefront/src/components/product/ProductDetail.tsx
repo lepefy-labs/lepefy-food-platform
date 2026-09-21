@@ -40,6 +40,8 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       weight_grams: product.weight_grams,
       stock:        product.stock,
       storage_type: product.storage_type ?? null,
+      min_order_quantity:  product.min_order_quantity,
+      order_quantity_step: product.order_quantity_step,
     }, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);

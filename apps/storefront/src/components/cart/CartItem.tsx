@@ -117,6 +117,7 @@ export function CartItem({
           <div className="relative z-20 flex items-center gap-1.5 pointer-events-auto">
             <CartQuantityControl
               quantity={quantity}
+              min={product.min_order_quantity ?? 1}
               max={Math.max(product.stock, 0)}
               productName={product.name}
               disabled={blocked}
