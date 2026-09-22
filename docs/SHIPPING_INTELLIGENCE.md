@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@04ed6c69e22a44fab1d59cd7934e319cb94d0d71`
-> **Ultima verifica:** 19 settembre 2026
+> **Base codice verificata:** `main@5ba18710bcdde340775641e235bb9bb55806aa83`
+> **Ultima verifica:** 22 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql`
 >
 > Questo documento descrive lo **stato corrente** del modulo. Il codice rimane la source of truth.
@@ -307,7 +307,7 @@ Nominatim / OpenStreetMap
         ↓
 città disambiguata + codici amministrativi
         ↓
-Zippopotam.us / dataset GeoNames
+indice postale GeoNames interno (migration 120), se importato
         ↓
 insieme dei CAP conosciuti della città
         ↓
@@ -328,7 +328,7 @@ Fallback:
 
 L'obiettivo non è rappresentare una città con un solo CAP arbitrario.
 
-Ogni CAP viene trattato separatamente per individuare:
+Ogni CAP genera uno scenario distinto per individuare:
 
 - differenze di costo intra-città;
 - eventuali discontinuità provider;
@@ -336,7 +336,7 @@ Ogni CAP viene trattato separatamente per individuare:
 
 ### Limite operativo
 
-L'espansione città→CAP dipende da servizi geografici esterni. In caso di mancata risoluzione, l'utente deve poter continuare con inserimento CAP manuale.
+La ricerca città usa Nominatim e, quando importato, l'indice GeoNames interno per il mapping CAP. In caso di mancata risoluzione, l'utente deve poter continuare con inserimento CAP manuale.
 
 Non considerare il servizio geografico autorevole per pricing o checkout.
 
@@ -387,7 +387,7 @@ Limite corrente:
 2000 scenari per campagna
 ```
 
-I pesi predefiniti UI sono densificati attorno a 10 kg e 15 kg per osservare possibili gradini tariffari.
+I 37 pesi predefiniti UI sono densificati attorno a 10 kg e ai multipli di 15 kg per osservare possibili gradini tariffari.
 
 Implementazione:
 
@@ -397,101 +397,33 @@ Implementazione:
 
 ## 10. Worker di campagna
 
-### 10.1 Esecuzione schedulata
+### 10.1 Scheduler n8n: adozione con cutover controllato
 
-Workflow:
+Il worker applicativo resta l'endpoint esistente:
 
-`.github/workflows/shipping-campaign-worker.yml`
+`POST /api/internal/shipping-campaign-worker`
 
-Frequenza:
+Il workflow n8n importabile è:
 
-```text
-*/5 * * * *
-```
+`ops/n8n/shipping-campaign-worker.json`
 
-Il workflow esegue:
+Contiene un `Schedule Trigger` ogni cinque minuti, un trigger manuale di test, una `HTTP Request` POST e una verifica del risultato che fallisce se `ok !== true` oppure `failed > 0`. La chiamata ha timeout 55 secondi e massimo due tentativi HTTP con intervallo di 15 secondi. In caso di fallimento, n8n registra un'esecuzione fallita: collegare un Error Workflow/alert ai canali già usati dal tenant.
 
-`scripts/process-shipping-campaign-worker.mjs`
+**Stato del cutover:** il template e l'endpoint con bearer dedicato sono predisposti nel repository, ma l'istanza n8n e le sue credenziali devono essere configurate e il workflow pubblicato prima di cambiare lo scheduler primario. Non considerare n8n attivo sulla sola base di questo commit.
 
-che chiama:
+L'endpoint accetta `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN` con confronto a tempo costante. Durante la transizione mantiene anche l'autenticazione legacy via `SUPABASE_SERVICE_ROLE_KEY` per il fallback GitHub. Non inserire la service-role key in n8n.
 
-```text
-POST /api/internal/shipping-campaign-worker
-```
+L'attuale `.github/workflows/shipping-campaign-worker.yml` continua a eseguire il cron finché la variabile GitHub `SHIPPING_CAMPAIGN_N8N_ACTIVE` non è `true`. Dopo avere verificato un'esecuzione manuale e due esecuzioni automatiche n8n riuscite, impostare quella variabile a `true` per saltare i job schedulati GitHub senza un deploy; `workflow_dispatch` resta disponibile per il recupero manuale. In seguito, rimuovere il trigger schedule GitHub con una modifica dedicata, una volta stabilizzato n8n.
 
-Auth:
+### 10.2 Batch e capacità
 
-```text
-Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
-```
+Il cron legacy chiama `scripts/process-shipping-campaign-worker.mjs`; n8n chiama direttamente l'endpoint HTTP applicativo. Nessuno dei due implementa il business logic delle campagne.
 
-La comparazione dell'autorizzazione riusa il meccanismo di `shippingSyncAuthorized`.
+Il worker `runCampaignBatch.ts` elabora otto scenari per tick schedulato, con due chiamate Packlink simultanee **per invocazione**; il pulsante admin `Traiter maintenant` usa un batch da venti scenari e cooldown da dieci secondi. `STALE_RUNNING_ITEM_MS` è pari a dieci minuti. Il claim compare-and-set `pending → running` evita l'elaborazione concorrente dello stesso item. Scheduler diversi simultanei possono comunque moltiplicare il parallelismo complessivo: effettuare il cutover tempestivamente.
 
-URL app preferita:
+### 10.3 Tenant admin
 
-```text
-SHIPPING_SYNC_APP_URL
-```
-
-Fallback configurati:
-
-```text
-AI_CORE_APP_URL
-NALA_ENRICHMENT_APP_URL
-EVENT_REPORTS_APP_URL
-```
-
-I fallback devono puntare allo stesso storefront deployment.
-
-### 10.2 Batch
-
-Costanti correnti in `runCampaignBatch.ts`:
-
-```text
-ITEMS_PER_TICK = 8
-WORKER_COUNT = 2
-DEFAULT_FRESHNESS_WINDOW_DAYS = 30
-STALE_RUNNING_ITEM_MS = 10 minuti
-```
-
-Quindi il worker non genera una raffica incontrollata di richieste Packlink.
-
-### 10.3 Claim e concorrenza
-
-Ogni item viene claimato con compare-and-set:
-
-```text
-pending → running
-```
-
-Questo evita doppia elaborazione quando cron e trigger admin si sovrappongono.
-
-Gli item `running` abbandonati vengono riportati a `pending` dopo 10 minuti.
-
-### 10.4 Trigger tenant admin
-
-Dalla UI il tenant può:
-
-- creare una campagna;
-- avviare subito il primo tick;
-- usare `Traiter maintenant`;
-- annullare una campagna.
-
-Endpoint manuale:
-
-```text
-POST /api/admin/shipping-simulation-campaigns/:id/process
-```
-
-Protezione:
-
-- tenant scope;
-- admin auth;
-- capability `shipping.manage`;
-- cooldown manuale di 10 secondi;
-- massimo un batch normale per chiamata.
-
-Il cron resta fallback e prosegue la campagna.
+L'admin mantiene `Lancer la campagne`, `Traiter maintenant` e `Annuler`. L'endpoint manuale `POST /api/admin/shipping-simulation-campaigns/:id/process` usa autenticazione admin e capability `shipping.manage`, senza esporre il token dello scheduler.
 
 ---
 
@@ -815,6 +747,7 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 11. Il suggerimento scatola non costituisce validazione fisica 3D del contenuto.
 12. La risoluzione città→CAP deve mantenere un fallback manuale.
 13. `Zone automatique` deve essere risolta server-side, non fidandosi soltanto del client.
+14. Il token n8n è dedicato, server-side e non viene pubblicato nel template o nel repository.
 
 ---
 
@@ -867,6 +800,7 @@ apps/storefront/src/lib/shipping/intelligence/
   requestHash.ts
   resolveZone.ts
   runCampaignBatch.ts
+  schedulerAuth.ts
   scenarioMatrix.ts
   similarity.ts
   tariffBacktest.ts
@@ -877,6 +811,7 @@ apps/storefront/src/lib/shipping/intelligence/
 ```text
 .github/workflows/shipping-campaign-worker.yml
 scripts/process-shipping-campaign-worker.mjs
+ops/n8n/shipping-campaign-worker.json
 apps/storefront/src/app/api/internal/shipping-campaign-worker/route.ts
 ```
 
@@ -898,37 +833,30 @@ apps/storefront/src/lib/auth/adminApiPermissions.ts
 
 ---
 
-## 21. Configurazione operativa worker
+## 21. Configurazione operativa e rollback n8n
 
-Prerequisiti GitHub Actions:
+Questa procedura richiede accesso all'istanza **n8n self-hosted Hetzner**, al progetto storefront **Vercel** e alle variabili del repository **GitHub**. Non è eseguibile automaticamente dal solo repository.
 
-```text
-secret:
-  SUPABASE_SERVICE_ROLE_KEY
+**Preparazione senza interruzioni**
 
-repository variable preferita:
-  SHIPPING_SYNC_APP_URL=https://<storefront-domain>
-```
+1. Generare un segreto casuale di almeno 32 byte con un gestore di password o generatore CSPRNG; non salvarlo nel repository, nella chat, nei log o nel JSON del workflow.
+2. Impostare su Vercel, nell'ambiente Production dello storefront ChloeFood: `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN` uguale al segreto. Applicare la configurazione a un deployment production aggiornato.
+3. Importare `ops/n8n/shipping-campaign-worker.json` su n8n Hetzner. Nel nodo `Process shipping campaign batch`, selezionare una **nuova credenziale HTTP Request → Header Auth** con Nome `Authorization` e Valore `Bearer <segreto-generato>`. La credenziale non deve contenere `SUPABASE_SERVICE_ROLE_KEY`.
+4. Verificare che l'URL dell'HTTP Request sia quello dello storefront corretto (il template pilota usa `https://shop.chloefood.com/api/internal/shipping-campaign-worker`). Ogni storefront/tenant richiede un workflow e una configurazione dedicati se il deployment è separato.
+5. Lasciare il workflow n8n non pubblicato e GitHub scheduler attivo durante il test iniziale.
 
-Fallback URL ammessi dal workflow:
+**Test e switch del primario**
 
-```text
-AI_CORE_APP_URL
-NALA_ENRICHMENT_APP_URL
-EVENT_REPORTS_APP_URL
-```
+6. Eseguire il nodo `Manual test` in n8n. Verificare HTTP 200, `ok: true` e il risultato del batch senza credenziali esposte. Un risultato `processed: 0` è valido se non esistono campagne in coda.
+7. Pubblicare/attivare il workflow n8n con schedule ogni cinque minuti. Verificare almeno due esecuzioni automatiche consecutive senza errori e, se ci sono campagne attive, l'avanzamento reale degli item.
+8. Nel repository GitHub, impostare la **repository variable** `SHIPPING_CAMPAIGN_N8N_ACTIVE=true`. Il job schedulato GitHub diventa skipped, mentre `workflow_dispatch` resta eseguibile manualmente.
+9. Configurare n8n per inviare un alert quando il workflow fallisce; controllare la cronologia Executions e gli errori applicativi Vercel. Un workflow riuscito senza item elaborati non prova che siano state completate campagne specifiche.
 
-Il dominio deve essere HTTPS e puntare allo stesso storefront tenant/deployment.
+**Rollback**
 
-Verifica operativa:
+Se n8n si ferma o non esegue i job, impostare `SHIPPING_CAMPAIGN_N8N_ACTIVE=false` o cancellare la variabile GitHub; il job GitHub torna operativo sui successivi trigger. È sempre possibile avviare `workflow_dispatch` manualmente. Disattivare il workflow n8n prima di lasciare GitHub come unico scheduler. Grazie al claim CAS, un overlap transitorio non duplica lo stesso item, ma può aumentare la concorrenza provider.
 
-1. creare una piccola campagna;
-2. verificare passaggio `queued → running`;
-3. verificare crescita contatori;
-4. verificare osservazioni in `shipping_quote_observations`;
-5. verificare `completed` o `completed_with_errors`;
-6. controllare Actions `Shipping campaign worker`;
-7. usare `Traiter maintenant` solo come acceleratore, non come requisito di funzionamento.
+**Sicurezza:** usare il token dedicato soltanto nella credenziale Header Auth n8n e nella env Vercel server-side. Non creare una env `NEXT_PUBLIC_*`, non passare il token come query parameter e non esportare le credenziali n8n insieme al workflow. La service-role key resta autorizzata dal vecchio endpoint soltanto per la compatibilità GitHub; valutare la sua rimozione dopo la stabilizzazione definitiva.
 
 ---
 
@@ -936,7 +864,7 @@ Verifica operativa:
 
 ### Campagna resta queued
 
-Controllare:
+Durante il cutover, controllare anzitutto che n8n sia pubblicato e che la repository variable `SHIPPING_CAMPAIGN_N8N_ACTIVE` sia coerente con il suo stato. Controllare inoltre:
 
 - tenant `shipping_provider = packlink`;
 - API key Packlink disponibile;

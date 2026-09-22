@@ -1,0 +1,125 @@
+{
+  "name": "Lepefy · Shipping campaign scheduler (ChloeFood)",
+  "nodes": [
+    {
+      "id": "51d36dbd-1855-4122-bc41-7d259b2ea2fb",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "42e974ec-bb6f-4127-8145-542dd551a3b9",
+      "name": "Manual test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        440
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "be46382d-e60e-44c7-bd7e-37a3f73ca0a6",
+      "name": "Process shipping campaign batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/shipping-campaign-worker",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 15000
+    },
+    {
+      "id": "c3bf2681-f5ee-441f-962c-87f33eff51ad",
+      "name": "Check batch outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        770,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const result = $input.first()?.json ?? {};\nconst processed = Number(result.processed ?? 0);\nconst failed = Number(result.failed ?? 0);\nif (result.ok !== true || !Number.isFinite(processed) || !Number.isFinite(failed) || failed > 0) {\n  // Throw without echoing upstream responses, HTTP headers, or credentials.\n  throw new Error('shipping_campaign_batch_failed');\n}\nreturn [{ json: { ok: true, processed, succeeded: Number(result.succeeded ?? 0), skipped: Number(result.skipped ?? 0), failed: 0 } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Process shipping campaign batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual test": {
+      "main": [
+        [
+          {
+            "node": "Process shipping campaign batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process shipping campaign batch": {
+      "main": [
+        [
+          {
+            "node": "Check batch outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
