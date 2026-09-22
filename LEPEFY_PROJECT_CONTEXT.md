@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 22 settembre 2026 — **v6.65 Current-State Snapshot**
+> **Aggiornato:** 22 settembre 2026 — **v6.66 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -38,7 +38,7 @@ LEPEFY_PROJECT_CONTEXT.md
 
 ### Tableau de bord client `/compte`
 
-L’account mostra profilo con modifica esplicita, anteprima compatta della carta, ultimo ordine e storico, parrainage/ambassador, informazioni e indirizzi leggibili. Su mobile l’ordine delle sezioni è carta → ordini → vantaggi → informazioni/indirizzi; su desktop carta/vantaggi e ordini/informazioni occupano due colonne. Il QR/barcode rimane nella pagina carta dedicata; il link Wallet nel riepilogo appare solo se un provider configurato è disponibile.
+L’account mostra profilo con modifica esplicita, anteprima compatta della carta, ultimo ordine e storico, parrainage/ambassador, informazioni e indirizzi leggibili. Su mobile l’ordine delle sezioni è carta → ordini → vantaggi → accesso Avis clients (se pubblico) → informazioni/indirizzi; su desktop carta/vantaggi/avis e ordini/informazioni occupano due colonne. Il QR/barcode rimane nella pagina carta dedicata; il link Wallet nel riepilogo appare solo se un provider configurato è disponibile.
 
 Le letture account sono parallele e tenant/customer-scoped. L’ultimo ordine reale è letto con `limit(1)`, riusa `getCustomerOrderPresentation` e il token tracking canonico senza alterare ordini o autorizzazioni. Errori saldo/indirizzi/ordini mostrano feedback e retry per sezione; un errore profilo canonico attiva l’error boundary e non simula privilegi/eligibilità. Il saldo non leggibile è `null` (—), distinto da zero; nessun ordine è distinto da errore di lettura.
 
@@ -259,7 +259,9 @@ La moderazione AI è predisposta solo semanticamente in `tenant_feature_settings
 
 Alla consegna di un ordine eleggibile viene creato idempotentemente un `review_invite`; il caso ordine già `delivered` che diventa `paid` successivamente è coperto anche dal PATCH admin ordine. Default: invio dopo 24 ore, reminder dopo 7 giorni, scadenza dopo 30 giorni. `.github/workflows/review-invites.yml` richiama ogni 30 minuti `scripts/process-review-invites.mjs`, che seleziona gli inviti dovuti e chiama `/api/internal/review-invites` sul dominio canonico tenant. La route usa claim retry-safe, token hashato e webhook n8n `/webhook/review-invite`. `notifyN8n()` è trattato come booleano autorevole: `false` non imposta `sent_at`/`reminder_sent_at`, cancella il token creato per quel tentativo e lascia il lavoro ritentabile.
 
-`reviews`, `review_invites`, `review_invite_tokens` e `review_moderation_events` sono service-role-only con RLS forzata e nessuna policy browser diretta. `tenant_review_stats` aggrega esclusivamente recensioni `published`; la media pubblica può essere nascosta fino a `min_public_count` (default 3), mentre `/avis` mostra soltanto righe pubblicate con badge `Commande vérifiée`. L'historique autenticato `/orders` mostra una CTA per gli ordini delivered+paid ancora senza recensione. Una submission anticipata completa l'invito eventualmente esistente per evitare e-mail successive inutili.
+`reviews`, `review_invites`, `review_invite_tokens` e `review_moderation_events` sono service-role-only con RLS forzata e nessuna policy browser diretta. `tenant_review_stats` aggrega esclusivamente recensioni `published`; la media pubblica può essere nascosta fino a `min_public_count` (default 3), mentre `/avis` mostra soltanto righe pubblicate con badge `Commande vérifiée`. La navigazione pubblica Reviews è esposta da `Compte → La communauté → Avis clients`, dalla pagina `/accueil` e, dato che la PWA si avvia sul catalogo `/`, da un teaser compatto sul catalogo iniziale non filtrato. Ogni accesso segue entitlement commerciale, abilitazione operativa e `public_display`; nessun teaser viene mostrato se la funzione è disabilitata. Il teaser usa esclusivamente la view tenant-scoped `tenant_review_stats` sulle recensioni `published`: media e conteggio sono visualizzati soltanto quando raggiungono `min_public_count`, senza inventare una media con 0–2 recensioni; in caso di errore statistico offre solo il link. Nessuna nuova migration o modifica alla moderazione.
+
+L'historique autenticato `/orders` mostra una CTA per gli ordini delivered+paid ancora senza recensione. Una submission anticipata completa l'invito eventualmente esistente per evitare e-mail successive inutili.
 
 Per recovery/rollout esiste un backfill manuale tenant-scoped, bounded a 1–30 giorni e idempotente: crea soltanto inviti per ordini `delivered + paid` che non hanno già né review né invito e non abilita mai feature/settings al posto del tenant. Poiché `orders` non persiste ancora un `delivered_at`, la finestra storica usa `orders.updated_at` come miglior proxy disponibile; il dispatcher ricontrolla inoltre l'assenza di una review immediatamente prima dell'invio, evitando mail tardive a chi ha già recensito.
 

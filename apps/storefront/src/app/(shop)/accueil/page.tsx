@@ -11,6 +11,8 @@ import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
 import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
 import { EventBanner } from '@/components/home/EventBanner';
+import { PublicReviewsTeaser } from '@/components/reviews/PublicReviewsTeaser';
+import { getPublicReviewsSummary } from '@/lib/reviews/publicReviewData';
 
 export const metadata: Metadata = {
   title: 'Découvrir',
@@ -49,6 +51,7 @@ export default async function HomePage() {
     { count: activeProductsCount },
     { data: discountCandidatesRaw },
     { data: heroSlidesRaw },
+    reviewsSummary,
   ] = await Promise.all([
     // 1. Categorie
     supabase
@@ -91,6 +94,7 @@ export default async function HomePage() {
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .order('position', { ascending: true }),
+    getPublicReviewsSummary(tenant.id),
   ]);
   const categories = categoriesRaw ?? [];
   const featuredProducts: HomeProduct[] = (featuredRaw as unknown as HomeProduct[] | null) ?? [];
@@ -190,6 +194,8 @@ export default async function HomePage() {
 
       {/* Contenuto centrato */}
       <div className="max-w-6xl mx-auto w-full">
+      {/* ── AVIS VÉRIFIÉS — pas de moyenne avant le seuil configuré ── */}
+      <PublicReviewsTeaser summary={reviewsSummary} />
       {/* ── PRODUITS VEDETTES — mobile (< md) : riga singola scrollabile,
            aucun autoscroll (section "en évidence" explorée à la main).
            Desktop (>= md) : grille statique multi-ligne, tous les produits

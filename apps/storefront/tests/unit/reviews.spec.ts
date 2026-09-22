@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { deterministicReviewFlags, normalizeReviewText, reviewerDisplayName } from '../../src/lib/reviews/reviewModeration';
 import { reviewDispatchAuthorized } from '../../src/lib/reviews/reviewDispatchAuth';
+import { summarizePublicReviewStats } from '../../src/lib/reviews/publicReviewSummary';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 import { permissionForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
@@ -27,4 +28,14 @@ test('review dispatcher bearer auth uses exact secret', () => {
   expect(reviewDispatchAuthorized('Bearer secret', 'secret')).toBe(true);
   expect(reviewDispatchAuthorized('Bearer wrong', 'secret')).toBe(false);
   expect(reviewDispatchAuthorized(null, 'secret')).toBe(false);
+});
+
+test('public reviews only show the average once the publication threshold is reached', () => {
+  expect(summarizePublicReviewStats(null, 3)).toEqual({ publishedCount: 0, averageRating: null });
+  expect(summarizePublicReviewStats({ published_count: 2, average_rating: '4.5' }, 3))
+    .toEqual({ publishedCount: 2, averageRating: null });
+  expect(summarizePublicReviewStats({ published_count: 3, average_rating: '4.5' }, 3))
+    .toEqual({ publishedCount: 3, averageRating: 4.5 });
+  expect(summarizePublicReviewStats({ published_count: 3, average_rating: 'not a rating' }, 3))
+    .toEqual({ publishedCount: 3, averageRating: null });
 });

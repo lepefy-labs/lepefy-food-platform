@@ -31,6 +31,7 @@ export interface AccountDashboardProps {
   latestOrder: AccountOrderSummary | null;
   errors: { points: boolean; addresses: boolean; orders: boolean };
   referral: AccountReferralSummary;
+  reviewsAvailable: boolean;
 }
 
 interface NavigationRowProps {
@@ -164,7 +165,7 @@ function AddressesSection({ addresses, error, retry }: { addresses: Address[]; e
 
 export function AccountDashboard({
   tenant, email, fullName, phone, confirmedPoints, addresses, isAmbassador, ambassadorProfileCompleted,
-  loyaltyCardNumberDisplay, loyaltyBrand, walletAvailable, accountAccentForeground, latestOrder, errors, referral,
+  loyaltyCardNumberDisplay, loyaltyBrand, walletAvailable, accountAccentForeground, latestOrder, errors, referral, reviewsAvailable,
 }: AccountDashboardProps) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -224,7 +225,8 @@ export function AccountDashboard({
             <LatestOrder order={latestOrder} error={errors.orders} currency={tenant.currency} retry={retry} />
           </div>
 
-          <section aria-labelledby="benefits-heading" className="lg:col-start-1 lg:row-start-2">
+          <div className="space-y-5 lg:col-start-1 lg:row-start-2">
+          <section aria-labelledby="benefits-heading">
             <h2 id="benefits-heading" className="mb-3 font-display text-lg font-bold text-gray-900">Mes avantages</h2>
             <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
               <NavigationRow href="/compte/parrainage" icon={IconGift}
@@ -240,6 +242,15 @@ export function AccountDashboard({
               <IconChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0" />
             </Link>}
           </section>
+          {reviewsAvailable && (
+            <section aria-labelledby="community-heading">
+              <h2 id="community-heading" className="mb-3 font-display text-lg font-bold text-gray-900">La communauté</h2>
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
+                <NavigationRow href="/avis" icon={IconStar} label="Avis clients" description="Lire les avis vérifiés de la boutique" />
+              </div>
+            </section>
+          )}
+          </div>
 
           <div className="space-y-5 lg:col-start-2 lg:row-start-2">
             <section aria-labelledby="profile-heading">

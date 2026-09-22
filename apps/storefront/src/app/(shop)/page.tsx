@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { CatalogClient } from '@/components/catalog/CatalogClient';
 import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
+import { getPublicReviewsSummary } from '@/lib/reviews/publicReviewData';
 import type { Category, ProductWithCategory } from '@lepefy/types';
 
 // Toujours dynamique : recherche/filtre/pagination pilotés par ?q=/?category=/
@@ -45,6 +46,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const sort = parseCatalogSort(searchParams.sort);
   const rankingDay = catalogRankingDay(searchParams.day);
   const quantityGroupId = searchParams.quantityGroup;
+  // The PWA opens on the catalogue; keep reviews discoverable on its landing only.
+  const reviewsSummaryPromise = !searchQuery && !searchParams.category && !quantityGroupId && page === 1
+    ? getPublicReviewsSummary(tenant.id)
+    : Promise.resolve(null);
   const quantityGroup = quantityGroupId
     ? await getActiveQuantityGroupFilter(supabase, tenant.id, quantityGroupId)
     : null;
@@ -71,7 +76,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   // Range cumulatif (0 → page*PAGE_SIZE-1) pour préserver les liens directs
   // ?page=N. Le catalogue et ses visuels décoratifs sont indépendants après la lecture
   // des catégories : les deux requêtes partent ensemble pour limiter la latence.
-  const [previewRows, { data: productsRaw, count }] = await Promise.all([
+  const [previewRows, { data: productsRaw, count }, reviewsSummary] = await Promise.all([
     previewRowsPromise,
     getCatalogPage(supabase, tenant.id, categories, {
       q: searchQuery,
@@ -79,6 +84,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       productIds: quantityGroupId ? quantityGroup?.productIds ?? [] : undefined,
       sort,
     }, 0, page * PRODUCTS_PAGE_SIZE, rankingDay),
+    reviewsSummaryPromise,
   ]);
 
   const previewImagesByCategory: Record<string, string[]> = {};
@@ -110,6 +116,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       hasNextPage={hasNextPage}
       sort={sort}
       rankingDay={rankingDay}
+      reviewsSummary={reviewsSummary}
     />
   );
 }

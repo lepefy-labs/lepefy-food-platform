@@ -11,6 +11,7 @@ import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { accountReferralState, type AccountOrderSummary } from '@/lib/account/dashboard';
 import type { Address } from '@lepefy/types';
 import { AccountDashboard } from './AccountDashboard';
+import { canShowPublicReviews } from '@/lib/reviews/publicReviewData';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -22,7 +23,7 @@ export default async function ComptePage() {
   await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte');
 
   const supabase = createServiceClient();
-  const [member, addresses, points, orders] = await Promise.all([
+  const [member, addresses, points, orders, reviewsAvailable] = await Promise.all([
     supabase.from('customers')
       .select('full_name, phone, loyalty_card_number, is_ambassador, ambassador_profile_completed_at, referral_access_granted, referral_suspended')
       .eq('tenant_id', tenant.id).eq('id', customer.id).single(),
@@ -36,6 +37,7 @@ export default async function ComptePage() {
     supabase.from('orders').select('id, status, created_at, total, email, fulfillment_type')
       .eq('tenant_id', tenant.id).eq('customer_id', customer.id)
       .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle(),
+    canShowPublicReviews(tenant.id),
   ]);
   // Core profile failure must not silently downgrade an ambassador or invent
   // referral eligibility. Other sections fail independently and can retry.
@@ -75,6 +77,7 @@ export default async function ComptePage() {
       walletAvailable={wallets.google || wallets.apple}
       accountAccentForeground={accountAccentForeground}
       latestOrder={latestOrder}
+      reviewsAvailable={reviewsAvailable}
       errors={{ points: !!points.error, addresses: !!addresses.error, orders: orderError }}
       referral={{
         state: accountReferralState(tenant.loyalty_enabled, row.referral_access_granted, row.referral_suspended),

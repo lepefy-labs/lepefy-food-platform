@@ -5,6 +5,8 @@ import { useState, useTransition, useEffect, useRef } from 'react';
 import { ProductGrid } from '@/components/catalog/ProductGrid';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
+import { PublicReviewsTeaser } from '@/components/reviews/PublicReviewsTeaser';
+import type { PublicReviewSummary } from '@/lib/reviews/publicReviewSummary';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
 import type { Category, ProductWithCategory, SemanticMatch } from '@lepefy/types';
 import type { CatalogSort } from '@/lib/catalog/pagination';
@@ -23,6 +25,7 @@ interface Props {
   rankingDay:      string;
   quantityGroupId?: string;
   quantityGroupName?: string;
+  reviewsSummary?: PublicReviewSummary | null;
 }
 
 export function CatalogClient({
@@ -39,6 +42,7 @@ export function CatalogClient({
   rankingDay,
   quantityGroupId,
   quantityGroupName,
+  reviewsSummary,
 }: Props) {
   const pathname      = usePathname();
   const router        = useRouter();
@@ -249,6 +253,9 @@ export function CatalogClient({
         )}
         </div>
       </div>
+
+      {/* Public reviews teaser only on the unfiltered PWA landing. */}
+      {reviewsSummary && <PublicReviewsTeaser summary={reviewsSummary} compact />}
 
       {/* Visual category navigation — hidden during textual search. */}
       {!hasActiveSearch && (
