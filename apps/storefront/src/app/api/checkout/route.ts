@@ -12,9 +12,7 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
-import { validatePurchaseQuantityRules, formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
-
-const MAX_QUANTITY_PER_ITEM = 999;
+import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 
 interface CartItemPayload {
   productId: string;
@@ -76,105 +74,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    for (const item of rawItems) {
-      if (!item.productId || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > MAX_QUANTITY_PER_ITEM) {
-        return NextResponse.json({ error: 'Article invalide.' }, { status: 400 });
-      }
+    // All payment entry points, including recovery, share this DB-backed gate.
+    const validated = await validateCheckoutItems(supabase, tenant.id, rawItems);
+    if (validated.ok === false) {
+      return NextResponse.json(validated.body, { status: validated.status });
     }
+    const { items, quantityByProduct } = validated;
 
-    const productIds = [...new Set(rawItems.map((item) => item.productId))];
-    const { data: dbProducts, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, price, storage_type, stock, min_order_quantity, order_quantity_step')
-      .eq('tenant_id', tenant.id)
-      .eq('active', true)
-      .in('id', productIds) as {
-        data: Array<{
-          id: string; name: string; price: number; storage_type: 'dry' | 'fresh' | 'frozen' | null; stock: number;
-          min_order_quantity: number; order_quantity_step: number;
-        }> | null;
-        error: unknown;
-      };
-
-    if (productsError || !dbProducts) {
-      console.error('[checkout] products lookup error:', productsError);
-      return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
-    }
-
-    const productById = new Map(dbProducts.map((product) => [product.id, product]));
-    if (productIds.some((id) => !productById.has(id))) {
-      return NextResponse.json({ error: 'Certains articles de votre panier ne sont plus disponibles.' }, { status: 400 });
-    }
-
-    const quantityByProduct = new Map<string, number>();
-    for (const item of rawItems) {
-      quantityByProduct.set(item.productId, (quantityByProduct.get(item.productId) ?? 0) + item.quantity);
-    }
-
-    // Quantité minimale/pas — validation autoritaire côté serveur : le panier
-    // peut rester temporairement incomplet pendant sa construction, mais le
-    // checkout ne peut jamais se conclure avec une règle violée (cf.
-    // docs/CART_SYNC.md et lib/purchaseQuantityRules.ts pour le détail).
-    const { data: groupRows, error: groupsError } = await supabase
-      .from('purchase_quantity_groups')
-      .select('id, name, min_quantity, quantity_step, purchase_quantity_group_products(product_id)')
-      .eq('tenant_id', tenant.id)
-      .eq('active', true) as {
-        data: Array<{
-          id: string; name: string; min_quantity: number; quantity_step: number;
-          purchase_quantity_group_products: Array<{ product_id: string }>;
-        }> | null;
-        error: unknown;
-      };
-
-    if (groupsError) {
-      console.error('[checkout] purchase quantity groups lookup error:', groupsError);
-      return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
-    }
-
-    const quantityViolations = validatePurchaseQuantityRules(
-      quantityByProduct,
-      dbProducts,
-      (groupRows ?? []).map((group) => ({
-        id: group.id,
-        name: group.name,
-        min_quantity: group.min_quantity,
-        quantity_step: group.quantity_step,
-        productIds: group.purchase_quantity_group_products.map((row) => row.product_id),
-      })),
-    );
-    if (quantityViolations.length > 0) {
-      return NextResponse.json({
-        error: formatQuantityViolationMessage(quantityViolations[0]!),
-        code: 'QUANTITY_RULE_VIOLATION',
-        violations: quantityViolations,
-      }, { status: 400 });
-    }
-
-    const insufficientStock: string[] = [];
-    for (const [productId, requestedQty] of quantityByProduct) {
-      const product = productById.get(productId)!;
-      if (product.stock < requestedQty) insufficientStock.push(product.name);
-    }
-    if (insufficientStock.length > 0) {
-      return NextResponse.json({ error: `Stock insuffisant pour : ${insufficientStock.join(', ')}.` }, { status: 400 });
-    }
-
-    const stockDecrementItems = Array.from(quantityByProduct.entries()).map(([productId, quantity]) => ({
+    const stockDecrementItems = [...quantityByProduct.entries()].map(([productId, quantity]) => ({
       product_id: productId,
       quantity,
     }));
-
-    const items: CartItemPayload[] = rawItems.map((item) => {
-      const product = productById.get(item.productId)!;
-      return {
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity,
-        storage_type: product.storage_type ?? 'dry',
-      };
-    });
 
     let shippingTotal = 0;
     if (fulfillmentType === 'delivery') {

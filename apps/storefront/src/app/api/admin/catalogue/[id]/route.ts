@@ -55,6 +55,12 @@ export async function PATCH(
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Tarification invalide.' }, { status: 400 });
   }
 
+  for (const field of ['min_order_quantity', 'order_quantity_step'] as const) {
+    if (field in body && (!Number.isInteger(Number(body[field])) || Number(body[field]) < 1)) {
+      return NextResponse.json({ error: 'Le minimum et l’incrément doivent être des entiers positifs.' }, { status: 400 });
+    }
+  }
+
   if ('name'               in body) updatePayload.name               = String(body.name).trim();
   if ('name_alt'           in body) updatePayload.name_alt           = body.name_alt ? String(body.name_alt).trim() : null;
   if ('description'        in body) updatePayload.description        = body.description ? String(body.description).trim() : null;
@@ -68,8 +74,8 @@ export async function PATCH(
   if ('price'              in body) updatePayload.price              = parseFloat(String(body.price)) || 0;
   if ('weight_grams'       in body) updatePayload.weight_grams       = body.weight_grams ? parseInt(String(body.weight_grams), 10) : null;
   if ('stock'              in body) updatePayload.stock              = parseInt(String(body.stock ?? 0), 10) || 0;
-  if ('min_order_quantity' in body) updatePayload.min_order_quantity = Math.max(1, parseInt(String(body.min_order_quantity ?? 1), 10) || 1);
-  if ('order_quantity_step' in body) updatePayload.order_quantity_step = Math.max(1, parseInt(String(body.order_quantity_step ?? 1), 10) || 1);
+  if ('min_order_quantity' in body) updatePayload.min_order_quantity = Number(body.min_order_quantity);
+  if ('order_quantity_step' in body) updatePayload.order_quantity_step = Number(body.order_quantity_step);
   if ('active'             in body) updatePayload.active             = Boolean(body.active);
   if ('featured'           in body) updatePayload.featured           = Boolean(body.featured);
   if ('storage_type'       in body) updatePayload.storage_type       = body.storage_type;

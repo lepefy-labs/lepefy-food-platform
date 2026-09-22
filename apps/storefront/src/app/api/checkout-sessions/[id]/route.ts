@@ -6,6 +6,7 @@ import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
+import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
@@ -14,7 +15,6 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const stripe = getStripeClient('shop');
-const MAX_QUANTITY_PER_ITEM = 999;
 
 type CheckoutStatus = 'open' | 'awaiting_verification' | 'completed' | 'cancelled' | 'expired';
 
@@ -141,7 +141,32 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     );
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    return NextResponse.json(toClientShape(auth.session));
+    // Editing an old session requires today's rules, not just the historic
+    // name/price/quantity snapshot. Return stock and active status even for
+    // products which have become unavailable so recovery can explain why.
+    const productIds = [...new Set(auth.session.items.map((item) => item.productId).filter(Boolean))];
+    const { data: productRules, error: rulesError } = await supabase
+      .from('products')
+      .select('id, min_order_quantity, order_quantity_step, stock, active')
+      .eq('tenant_id', tenant.id)
+      .in('id', productIds);
+    if (rulesError) {
+      return NextResponse.json({ error: 'Impossible de vérifier les règles de quantité.' }, { status: 503 });
+    }
+    const rulesById = new Map((productRules ?? []).map((product) => [product.id, product]));
+    return NextResponse.json({
+      ...toClientShape(auth.session),
+      items: auth.session.items.map((item) => {
+        const rules = rulesById.get(item.productId);
+        return {
+          ...item,
+          min_order_quantity: rules?.min_order_quantity ?? 1,
+          order_quantity_step: rules?.order_quantity_step ?? 1,
+          stock: rules?.stock ?? 0,
+          active: rules?.active ?? false,
+        };
+      }),
+    });
   } catch (err) {
     console.error('[checkout-sessions][GET] unhandled error:', err);
     return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
@@ -209,58 +234,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ id: session.id, status: 'cancelled' as const });
     }
 
-    let items = session.items;
-    if (body.items) {
-      if (!body.items.length) return NextResponse.json({ error: 'Le panier ne peut pas être vide.' }, { status: 400 });
-      for (const item of body.items) {
-        if (!item.productId || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > MAX_QUANTITY_PER_ITEM) {
-          return NextResponse.json({ error: 'Article invalide.' }, { status: 400 });
-        }
-      }
-
-      const productIds = [...new Set(body.items.map((item) => item.productId))];
-      const { data: dbProducts, error: productsError } = await supabase
-        .from('products')
-        .select('id, name, price, storage_type, stock')
-        .eq('tenant_id', tenant.id)
-        .eq('active', true)
-        .in('id', productIds) as {
-          data: Array<{ id: string; name: string; price: number; storage_type: 'dry' | 'fresh' | 'frozen' | null; stock: number }> | null;
-          error: unknown;
-        };
-
-      if (productsError || !dbProducts) {
-        console.error('[checkout-sessions][PATCH] products lookup error:', productsError);
-        return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
-      }
-
-      const productById = new Map(dbProducts.map((product) => [product.id, product]));
-      if (productIds.some((id) => !productById.has(id))) {
-        return NextResponse.json({ error: 'Certains articles de votre panier ne sont plus disponibles.' }, { status: 400 });
-      }
-
-      const quantityByProduct = new Map<string, number>();
-      for (const item of body.items) quantityByProduct.set(item.productId, (quantityByProduct.get(item.productId) ?? 0) + item.quantity);
-      const insufficientStock: string[] = [];
-      for (const [productId, requestedQty] of quantityByProduct) {
-        const product = productById.get(productId)!;
-        if (product.stock < requestedQty) insufficientStock.push(product.name);
-      }
-      if (insufficientStock.length > 0) {
-        return NextResponse.json({ error: `Stock insuffisant pour : ${insufficientStock.join(', ')}.` }, { status: 400 });
-      }
-
-      items = body.items.map((item) => {
-        const product = productById.get(item.productId)!;
-        return {
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: item.quantity,
-          storage_type: product.storage_type ?? 'dry',
-        };
-      });
+    // Recovery and session edits must revalidate even when items are unchanged:
+    // the tenant may have edited a SKU rule or activated a group meanwhile.
+    const validated = await validateCheckoutItems(supabase, tenant.id, body.items ?? session.items);
+    if (validated.ok === false) {
+      return NextResponse.json(validated.body, { status: validated.status });
     }
+    // Preserve the session's original price snapshot unless the customer
+    // explicitly edits items; quantity rules always come from today's DB.
+    const items: CartItemPayload[] = body.items ? validated.items : session.items;
 
     const fulfillmentType = body.fulfillmentType ?? session.fulfillment_type;
     const shippingAddress = body.shippingAddress !== undefined ? body.shippingAddress : session.shipping_address;

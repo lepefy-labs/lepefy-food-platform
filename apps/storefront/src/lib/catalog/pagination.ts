@@ -41,6 +41,8 @@ interface ProductsFilters {
   q?: string;
   category?: string;
   sort?: CatalogSort;
+  /** Explicit active group membership resolved on the server. */
+  productIds?: string[];
 }
 
 export function catalogRankingDay(value?: string): string {
@@ -69,6 +71,8 @@ export function buildProductsQuery(
     .eq('tenant_id', tenantId)
     .eq('active', true)
     .in('category_id', categories.map(category => category.id));
+
+  if (filters.productIds !== undefined) query = query.in('id', filters.productIds);
 
   const searchQuery = (filters.q?.trim() ?? '').slice(0, MAX_SEARCH_QUERY_LENGTH);
 
@@ -100,6 +104,11 @@ export async function getCatalogPage(
   limit: number,
   rankingDay: string,
 ): Promise<CatalogPageResult> {
+  if (filters.productIds !== undefined) {
+    if (filters.productIds.length === 0) return { data: [], count: 0, error: null };
+    // Group-filtered browsing must not call the unfiltered ranking RPC.
+    return buildProductsQuery(supabase, tenantId, categories, filters).range(offset, offset + limit - 1);
+  }
   const { createServiceClient } = await import('@/lib/supabase/server');
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const categoryId = !filters.q?.trim()

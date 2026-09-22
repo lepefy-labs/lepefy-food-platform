@@ -25,7 +25,7 @@ import { CheckoutOrderSummary } from './CheckoutOrderSummary';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
-import { formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
+import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
@@ -127,9 +127,21 @@ export default function CheckoutForm({
 }) {
   const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
-  const quantityGroups = useQuantityGroups();
+  const { groups: quantityGroups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
   const quantityViolations = computeCartQuantityViolations(items, quantityGroups);
-  const quantityBlockedMessage = quantityViolations[0] ? formatQuantityViolationMessage(quantityViolations[0]) : null;
+  const stockBlocked = items.find((item) =>
+    item.product.stock < item.quantity ||
+    getMaximumValidQuantity(item.product.stock, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1) === 0
+  );
+  const quantityBlockedMessage = groupsLoading
+    ? 'Vérification des règles du panier…'
+    : groupsError
+      ? groupsError
+      : quantityViolations[0]
+        ? formatQuantityViolationMessage(quantityViolations[0])
+        : stockBlocked
+          ? `Stock insuffisant pour : ${stockBlocked.product.name}. Ajustez votre panier.`
+          : null;
 
   const { customer: sessionCustomer, refresh: refreshSessionCustomer } = useSessionCustomer();
   const [showLoginForm, setShowLoginForm] = useState(false);
@@ -440,7 +452,7 @@ export default function CheckoutForm({
   }, [watch]);
 
   const isSubmitDisabled =
-    isSubmitting ||
+    isSubmitting || Boolean(quantityBlockedMessage) ||
     (fulfillmentType === 'delivery' && (shippingRecalculating || quoteToken === null));
 
   // ── Étape 1 → 2 : validation des coordonnées/adresse uniquement ────────────
@@ -515,6 +527,7 @@ export default function CheckoutForm({
   // sait pas distinguer les deux chemins, le contrat createIntent() reste
   // identique.
   async function createIntent() {
+    if (quantityBlockedMessage) return { error: quantityBlockedMessage };
     try {
       const sharedPayload = buildSharedPayload();
       // Snapshot des données qui déterminent le contenu de la session — si
@@ -818,6 +831,12 @@ export default function CheckoutForm({
             </div>
           )}
 
+          {(groupsError || groupsLoading) && (
+            <div role="status" className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {groupsLoading ? 'Vérification des règles du panier…' : groupsError}
+              {groupsError && <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">Réessayer</button>}
+            </div>
+          )}
           {submitError && (
             <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{submitError}</p>
           )}
@@ -937,7 +956,7 @@ export default function CheckoutForm({
             <button
               type="button"
               onClick={handleConfirmPayment}
-              disabled={isSubmitting || (consentState.showTermsCheckbox && !termsAccepted)}
+              disabled={isSubmitting || Boolean(quantityBlockedMessage) || (consentState.showTermsCheckbox && !termsAccepted)}
               className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-50 transition-opacity"
               style={{ backgroundColor: ctaColor }}
             >

@@ -33,6 +33,8 @@ export interface NalaProductAction {
     minOrderQuantity: number;
     orderQuantityStep: number;
   };
+  /** Groupe combinable actif, résolu côté serveur; facultatif pour anciens tours persistés. */
+  quantityGroup?: { id: string; name: string; minQuantity: number; quantityStep: number };
   /** Quantité que Nala ajoute réellement — respecte le minimum de vente (cf. purchaseQuantityRules.ts), jamais 1 littéral. */
   quantity: number;
   ctaLabel: string;
@@ -181,6 +183,7 @@ export function buildValidatedNalaProductActions(params: {
   locale: unknown;
   candidates: NalaProductActionCandidate[];
   products: NalaCanonicalProduct[];
+  groups?: Array<{ id: string; name: string; min_quantity: number; quantity_step: number; productIds: string[] }>;
 }): NalaProductAction[] {
   const productById = new Map(params.products.map((product) => [product.id, product]));
 
@@ -213,6 +216,7 @@ export function buildValidatedNalaProductActions(params: {
     if (product.stock < minOrderQuantity) return [];
 
     const quantity = minOrderQuantity;
+    const activeGroup = params.groups?.find((group) => group.productIds.includes(product.id));
     const copy = getNalaProductActionCopy(params.locale, quantity);
 
     return [{
@@ -235,6 +239,12 @@ export function buildValidatedNalaProductActions(params: {
         orderQuantityStep,
       },
       quantity,
+      quantityGroup: activeGroup ? {
+        id: activeGroup.id,
+        name: activeGroup.name,
+        minQuantity: activeGroup.min_quantity,
+        quantityStep: activeGroup.quantity_step,
+      } : undefined,
       ctaLabel: copy.ctaLabel,
       labels: copy.labels,
       interactionId: params.interactionId,

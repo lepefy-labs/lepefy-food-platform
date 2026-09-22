@@ -36,7 +36,7 @@ export default function QuantityGroupsClient({ products }: { products: ProductOp
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
+    const t = setTimeout(() => setToast(null), toast.type === 'error' ? 8000 : 3000);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -55,6 +55,10 @@ export default function QuantityGroupsClient({ products }: { products: ProductOp
   useEffect(() => { loadGroups(); }, []);
 
   async function createGroup() {
+    if (![Number(newMin), Number(newStep)].every((value) => Number.isInteger(value) && value >= 1)) {
+      setToast({ msg: 'Le minimum et l’incrément doivent être des entiers positifs.', type: 'error' });
+      return;
+    }
     if (!newName.trim()) { setToast({ msg: 'Nom requis.', type: 'error' }); return; }
     setCreating(true);
     try {
@@ -80,7 +84,14 @@ export default function QuantityGroupsClient({ products }: { products: ProductOp
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) { setToast({ msg: data.error ?? 'Erreur.', type: 'error' }); return false; }
+    if (!res.ok) {
+      const details = data.code === 'QUANTITY_GROUP_MEMBERSHIP_CONFLICT' && Array.isArray(data.conflicts)
+        ? data.conflicts.map((conflict: { productName: string; groupName: string }) =>
+          `${conflict.productName} → ${conflict.groupName}`).join(' · ')
+        : '';
+      setToast({ msg: [data.error ?? 'Erreur.', details].filter(Boolean).join(' '), type: 'error' });
+      return false;
+    }
     return true;
   }
 
@@ -223,7 +234,10 @@ function GroupCard({
           {dirty && (
             <button
               type="button"
-              onClick={() => onPatch({ name, min_quantity: minQuantity, quantity_step: quantityStep })}
+              onClick={() => {
+                if (![Number(minQuantity), Number(quantityStep)].every((value) => Number.isInteger(value) && value >= 1)) return;
+                onPatch({ name, min_quantity: Number(minQuantity), quantity_step: Number(quantityStep) });
+              }}
               className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white"
             >
               Enregistrer
@@ -237,6 +251,7 @@ function GroupCard({
 
       <p className="mt-3 text-xs text-gray-400">
         Quantités valides : {validQuantitiesPreview(Number(minQuantity) || 1, Number(quantityStep) || 1)}...
+        <span className="ml-2">Première quantité : {minQuantity || '1'} · puis +{quantityStep || '1'}</span>
       </p>
 
       <div className="mt-4">

@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { CatalogClient } from '@/components/catalog/CatalogClient';
 import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
+import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
 import type { Category, ProductWithCategory } from '@lepefy/types';
 
 // Toujours dynamique : recherche/filtre/pagination pilotés par ?q=/?category=/
@@ -19,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 interface ProductsPageProps {
-  searchParams: { category?: string; q?: string; page?: string; sort?: string; day?: string };
+  searchParams: { category?: string; q?: string; page?: string; sort?: string; day?: string; quantityGroup?: string };
 }
 
 type CategoryPreviewRow = {
@@ -43,6 +44,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const page = parsePageParam(searchParams.page);
   const sort = parseCatalogSort(searchParams.sort);
   const rankingDay = catalogRankingDay(searchParams.day);
+  const quantityGroupId = searchParams.quantityGroup;
+  const quantityGroup = quantityGroupId
+    ? await getActiveQuantityGroupFilter(supabase, tenant.id, quantityGroupId)
+    : null;
 
   // Une seule requête pour toutes les catégories sans visuel configuré :
   // le regroupement et la limite de 3 images restent côté serveur.
@@ -71,6 +76,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     getCatalogPage(supabase, tenant.id, categories, {
       q: searchQuery,
       category: searchParams.category,
+      productIds: quantityGroupId ? quantityGroup?.productIds ?? [] : undefined,
       sort,
     }, 0, page * PRODUCTS_PAGE_SIZE, rankingDay),
   ]);
@@ -96,7 +102,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       products={products}
       activeSlug={searchQuery ? undefined : searchParams.category}
       initialQuery={searchQuery}
-      semanticEnabled={tenant.ai_semantic_search ?? false}
+      semanticEnabled={Boolean(tenant.ai_semantic_search) && !quantityGroupId}
+      quantityGroupId={quantityGroup?.id}
+      quantityGroupName={quantityGroup?.name}
       totalCount={totalCount}
       currentPage={page}
       hasNextPage={hasNextPage}

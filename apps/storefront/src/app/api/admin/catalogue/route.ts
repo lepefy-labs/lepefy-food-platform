@@ -119,6 +119,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Tarification invalide.' }, { status: 400 });
   }
 
+  if (![Number(body.min_order_quantity ?? 1), Number(body.order_quantity_step ?? 1)]
+    .every((value) => Number.isInteger(value) && value >= 1)) {
+    return NextResponse.json({ error: 'Le minimum et l’incrément doivent être des entiers positifs.' }, { status: 400 });
+  }
+
   const slugProd = (body.name as string)
     .toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -146,8 +151,8 @@ export async function POST(req: NextRequest) {
       price: parseFloat(body.price) || 0,
       weight_grams: body.weight_grams ? parseInt(body.weight_grams, 10) : null,
       stock: parseInt(body.stock, 10) || 0,
-      min_order_quantity: Math.max(1, parseInt(body.min_order_quantity, 10) || 1),
-      order_quantity_step: Math.max(1, parseInt(body.order_quantity_step, 10) || 1),
+      min_order_quantity: Number(body.min_order_quantity ?? 1),
+      order_quantity_step: Number(body.order_quantity_step ?? 1),
       active: Boolean(body.active),
       featured: Boolean(body.featured),
       storage_type: body.storage_type ?? 'dry',

@@ -21,6 +21,8 @@ interface Props {
   hasNextPage:     boolean;
   sort:            CatalogSort;
   rankingDay:      string;
+  quantityGroupId?: string;
+  quantityGroupName?: string;
 }
 
 export function CatalogClient({
@@ -35,6 +37,8 @@ export function CatalogClient({
   hasNextPage,
   sort,
   rankingDay,
+  quantityGroupId,
+  quantityGroupName,
 }: Props) {
   const pathname      = usePathname();
   const router        = useRouter();
@@ -104,6 +108,7 @@ export function CatalogClient({
     else params.delete('q');
     if (overrides.category !== undefined) {
       if (overrides.category) params.set('category', overrides.category);
+      params.delete('quantityGroup');
       else params.delete('category');
     }
     if (overrides.sort !== undefined) {
@@ -128,6 +133,7 @@ export function CatalogClient({
       params.set('page', String(nextPage));
       params.set('day', rankingDay);
       if (sort !== 'recommended') params.set('sort', sort);
+      if (quantityGroupId) params.set('quantityGroup', quantityGroupId);
       const trimmedQuery = initialQuery.trim();
       if (trimmedQuery) params.set('q', trimmedQuery);
       else if (activeSlug) params.set('category', activeSlug);
@@ -180,7 +186,7 @@ export function CatalogClient({
   const activeCategory = categories.find(category => category.slug === activeSlug);
   const productHeading = hasActiveSearch
     ? `Résultats pour “${initialQuery}”`
-    : activeCategory?.name ?? 'Tous les produits';
+    : quantityGroupName ? `Compléter : ${quantityGroupName}` : activeCategory?.name ?? 'Tous les produits';
   const availableLabel = `${totalCount} produit${totalCount === 1 ? '' : 's'} disponible${totalCount === 1 ? '' : 's'}`;
 
   return (
@@ -247,6 +253,15 @@ export function CatalogClient({
       {/* Visual category navigation — hidden during textual search. */}
       {!hasActiveSearch && (
         <CatalogCategoryRow categories={categories} previewImagesByCategory={previewImagesByCategory} activeSlug={activeSlug} onSelect={handleCategorySelect} />
+      )}
+
+      {quantityGroupId && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm">
+          <p>Choisissez les produits à combiner dans « {quantityGroupName ?? 'ce groupe'} ».</p>
+          <button type="button" onClick={() => router.push('/')} className="min-h-11 shrink-0 font-bold underline">
+            Tous les produits
+          </button>
+        </div>
       )}
 
       {/* Résultats et tri */}

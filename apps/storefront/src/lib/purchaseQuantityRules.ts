@@ -56,6 +56,59 @@ export function computeQuantityRuleState(
   };
 }
 
+/**
+ * Quantità massima realmente acquistabile nello stock disponibile.
+ * Restituisce 0 quando stock < minimo. Lo stock non è di per sé uno step valido:
+ * min=4, step=4, stock=10 -> 8, non 10.
+ */
+export function getMaximumValidQuantity(stock: number, minimumQuantity: number, step: number): number {
+  if (!Number.isFinite(stock)) return 0;
+  const available = Math.max(0, Math.trunc(stock));
+  const minimum = Math.max(1, Math.trunc(minimumQuantity) || 1);
+  const increment = Math.max(1, Math.trunc(step) || 1);
+  if (available < minimum) return 0;
+  return minimum + Math.floor((available - minimum) / increment) * increment;
+}
+
+export function hasPurchasableQuantity(stock: number, minimumQuantity: number, step: number): boolean {
+  return getMaximumValidQuantity(stock, minimumQuantity, step) > 0;
+}
+
+/** Prossima quantità valida strettamente superiore a current, entro lo stock. */
+export function getNextValidQuantity(
+  current: number,
+  minimumQuantity: number,
+  step: number,
+  stock: number,
+): number | null {
+  const next = computeQuantityRuleState(Math.max(0, Math.trunc(current) || 0) + 1, minimumQuantity, step).nextValidQuantity;
+  return next <= getMaximumValidQuantity(stock, minimumQuantity, step) ? next : null;
+}
+
+/** Quantità valida strettamente inferiore a current; null se siamo al minimo. */
+export function getPreviousValidQuantity(current: number, minimumQuantity: number, step: number): number | null {
+  const minimum = Math.max(1, Math.trunc(minimumQuantity) || 1);
+  const increment = Math.max(1, Math.trunc(step) || 1);
+  if (!Number.isFinite(current) || current <= minimum) return null;
+  const previous = minimum + Math.floor((Math.trunc(current) - 1 - minimum) / increment) * increment;
+  return previous >= minimum ? previous : null;
+}
+
+/**
+ * Normalizza a una quantità valida <= richiesta e <= stock.
+ * 0 segnala che nessuna quantità valida è possibile: la UI deve marcare
+ * l'articolo indisponibile, non inserirlo nel carrello con un numero fuori step.
+ */
+export function normalizeQuantityForStock(requested: number, stock: number, minimumQuantity: number, step: number): number {
+  const max = getMaximumValidQuantity(stock, minimumQuantity, step);
+  if (!max || !Number.isFinite(requested)) return 0;
+  const capped = Math.min(Math.max(0, Math.trunc(requested)), max);
+  const minimum = Math.max(1, Math.trunc(minimumQuantity) || 1);
+  if (capped < minimum) return 0;
+  const increment = Math.max(1, Math.trunc(step) || 1);
+  return minimum + Math.floor((capped - minimum) / increment) * increment;
+}
+
 /** Prodotto minimale necessario per validare la regola di quantità del singolo SKU. */
 export interface QuantityRuleProduct {
   id: string;

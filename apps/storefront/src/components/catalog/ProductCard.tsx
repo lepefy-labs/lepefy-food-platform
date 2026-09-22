@@ -206,7 +206,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
               {merchandise && <button
                 onClick={handleAddToCart}
                 aria-label="Ajouter au panier"
-                disabled={outOfStock}
+                disabled={outOfStock || atLimit}
                 className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 disabled:opacity-40"
                 style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
               >
@@ -217,7 +217,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={outOfStock}
+                disabled={outOfStock || atLimit}
                 aria-disabled={atLimit || undefined}
                 aria-label={outOfStock ? 'Épuisé' : atLimit ? 'Stock maximum dans le panier' : hasMinRule ? `Ajouter ${minOrderQuantity} au panier` : 'Ajouter au panier'}
                 className="mt-2 flex min-h-11 w-full items-center justify-center rounded-lg px-1 py-2 text-[11px] font-semibold leading-tight whitespace-nowrap text-white transition-opacity hover:opacity-90 active:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 aria-disabled:opacity-60 sm:text-sm motion-reduce:transition-none"
@@ -249,7 +249,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
         <button
           onClick={handleAddToCart}
           aria-label={hasMinRule ? `Ajouter ${minOrderQuantity} au panier` : 'Ajouter au panier'}
-          disabled={outOfStock}
+          disabled={outOfStock || atLimit}
           className="absolute bottom-2 right-2 w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold transition-all active:scale-90 shadow-card disabled:opacity-40"
           style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
         >

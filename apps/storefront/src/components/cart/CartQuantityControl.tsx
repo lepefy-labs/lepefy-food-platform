@@ -10,10 +10,10 @@ interface CartQuantityControlProps {
 
 /**
  * Stepper +/- dédié aux lignes de panier — même style visuel que le contrôle
- * déjà utilisé sur /cart (CartClient.tsx, non touché par cette tâche), mais
- * composant distinct de QuantitySelector.tsx (PDP) : celui-ci accepte une
- * saisie libre au clavier avant l'ajout au panier, ce contrôle-ci n'a que
- * +/- et un plancher à `min` (jamais de suppression accidentelle en
+ * déjà utilisé sur /cart (CartPurchaseClient.tsx), mais
+ * composant distinct de QuantitySelector.tsx (PDP). Les deux n'exposent
+ * que des quantités valides; ce contrôle-ci délègue la règle +/- au store
+ * et garde un plancher à `min` (jamais de suppression accidentelle en
  * décrémentant — c'est le lien "Retirer" explicite qui supprime la ligne).
  * Boutons 44px (w-11 h-11) : cible tactile minimale (§7/§26).
  */

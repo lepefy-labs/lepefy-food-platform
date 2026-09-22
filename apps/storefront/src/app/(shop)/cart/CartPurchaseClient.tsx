@@ -13,7 +13,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
-import { formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
+import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
 import { useEffect, useState } from 'react';
 
@@ -32,10 +32,22 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   const removeItem = useCartStore((state) => state.removeItem);
   const addItem = useCartStore((state) => state.addItem);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
-  const quantityGroups = useQuantityGroups();
+  const { groups: quantityGroups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
   const quantityViolations = computeCartQuantityViolations(items, quantityGroups);
-  const canProceed = quantityViolations.length === 0;
-  const blockedMessage = quantityViolations[0] ? formatQuantityViolationMessage(quantityViolations[0]) : null;
+  const stockBlocked = items.find((item) =>
+    item.product.stock < item.quantity ||
+    getMaximumValidQuantity(item.product.stock, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1) === 0
+  );
+  const blockedMessage = groupsLoading
+    ? 'Vérification des règles du panier…'
+    : groupsError
+      ? groupsError
+      : quantityViolations[0]
+        ? formatQuantityViolationMessage(quantityViolations[0])
+        : stockBlocked
+          ? `Stock insuffisant pour : ${stockBlocked.product.name}. Ajustez sa quantité.`
+          : null;
+  const canProceed = !blockedMessage;
 
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
 
@@ -85,6 +97,12 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
             <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement 100 % sécurisé</p>
           </section>
 
+          {groupsError && (
+            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              {groupsError}
+              <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">Réessayer</button>
+            </div>
+          )}
           <QuantityGroupProgress groups={quantityGroups} items={items} />
 
           <section aria-label="Articles du panier">

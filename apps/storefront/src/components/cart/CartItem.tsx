@@ -5,6 +5,7 @@ import type { CartItem as CartItemType } from '@lepefy/types';
 import { formatPrice } from '@/lib/utils/format';
 import { deriveCartItemState } from '@/lib/cart/cartItemState';
 import { CartQuantityControl } from './CartQuantityControl';
+import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 
 interface CartItemProps {
   item: CartItemType;
@@ -44,7 +45,9 @@ export function CartItem({
     unavailableProductIds,
     pendingProductIds,
   });
-  const blocked = state === 'unavailable' || state === 'out_of_stock';
+  const maxPurchasable = getMaximumValidQuantity(product.stock, product.min_order_quantity ?? 1, product.order_quantity_step ?? 1);
+  const insufficientForPack = maxPurchasable === 0;
+  const blocked = state === 'unavailable' || state === 'out_of_stock' || insufficientForPack;
   const weightLabel = formatWeightLabel(product.weight_grams);
   const lineTotal = product.price * quantity;
   const isPage = variant === 'page';
@@ -99,6 +102,16 @@ export function CartItem({
                   Minimum {product.min_order_quantity}{(product.order_quantity_step ?? 1) > 1 ? ` · par ${product.order_quantity_step}` : ''}
                 </span>
               )}
+              {insufficientForPack && (
+                <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
+                  Stock inférieur au minimum
+                </span>
+              )}
+              {!insufficientForPack && quantity > maxPurchasable && (
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                  Ajustez à {maxPurchasable} unités
+                </span>
+              )}
               {(state === 'unavailable' || state === 'out_of_stock') && (
                 <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
                   {isPage ? 'Produit actuellement indisponible' : STATE_BADGE[state]}
@@ -118,7 +131,7 @@ export function CartItem({
             <CartQuantityControl
               quantity={quantity}
               min={product.min_order_quantity ?? 1}
-              max={Math.max(product.stock, 0)}
+              max={maxPurchasable}
               productName={product.name}
               disabled={blocked}
               onIncrement={() => onIncrement(product.id)}

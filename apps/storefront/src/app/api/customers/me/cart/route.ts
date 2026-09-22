@@ -53,7 +53,8 @@ function errorResponse(code: string, message: string, status: number) {
 /**
  * Rihydrata [{product_id, quantity}] in CartItem[] leggendo i prodotti dal DB.
  * I prodotti inattivi/eliminati sono esclusi (stesso principio di
- * /api/checkout) e la quantità è normalizzata sullo stock reale.
+ * /api/checkout). Quantità e stock vengono restituiti separatamente:
+ * nessun clamp silenzioso che possa produrre uno step invalido.
  */
 async function rehydrateItems(
   supabase: SupabaseServiceClient,
@@ -93,7 +94,11 @@ async function rehydrateItems(
         min_order_quantity:   p.min_order_quantity,
         order_quantity_step:  p.order_quantity_step,
       },
-      quantity: Math.min(row.quantity, p.stock),
+      // Do not clamp to raw stock: 12 -> 10 would invent an off-step quantity
+      // for min=4/step=4. Preserve the customer's stored intent, expose the
+      // current stock/rules and let the cart display an explicit adjustment.
+      // A change is persisted only by an intentional set_quantity mutation.
+      quantity: row.quantity,
     });
   }
 

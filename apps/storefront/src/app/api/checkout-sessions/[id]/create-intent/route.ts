@@ -4,6 +4,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
+import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { ShippingAddress } from '@lepefy/types';
 
@@ -73,6 +74,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     if (session.payment_method !== 'stripe') {
       return NextResponse.json({ error: 'Cette session n\'est pas configurée pour un paiement par carte.' }, { status: 400 });
+    }
+
+    // Check current product and active-group rules before reusing, updating or
+    // creating any PaymentIntent. A saved checkout snapshot is not authority.
+    const validated = await validateCheckoutItems(supabase, tenant.id, session.items);
+    if (validated.ok === false) {
+      return NextResponse.json(validated.body, { status: validated.status });
     }
 
     const subtotal = session.items.reduce((sum, item) => sum + item.price * item.quantity, 0);

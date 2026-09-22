@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { computeQuantityRuleState, validatePurchaseQuantityRules } from '../../src/lib/purchaseQuantityRules';
+import { computeQuantityRuleState, validatePurchaseQuantityRules, getMaximumValidQuantity, hasPurchasableQuantity, getNextValidQuantity, getPreviousValidQuantity, normalizeQuantityForStock } from '../../src/lib/purchaseQuantityRules';
 
 test('below minimum reports the minimum as next valid quantity', () => {
   const state = computeQuantityRuleState(10, 12, 6);
@@ -117,4 +117,26 @@ test('validatePurchaseQuantityRules applies product and group rules independentl
     nextValidQuantity: 2,
     missingQuantity: 1,
   }]);
+});
+
+test('stock between steps does not become a purchasable quantity', () => {
+  expect(getMaximumValidQuantity(10, 4, 4)).toBe(8);
+  expect(getMaximumValidQuantity(17, 12, 6)).toBe(12);
+  expect(getMaximumValidQuantity(18, 12, 6)).toBe(18);
+  expect(getNextValidQuantity(8, 4, 4, 10)).toBeNull();
+  expect(getNextValidQuantity(4, 4, 4, 10)).toBe(8);
+  expect(getPreviousValidQuantity(10, 4, 4)).toBe(8);
+  expect(getPreviousValidQuantity(4, 4, 4)).toBeNull();
+});
+
+test('stock below minimum is not purchasable even if positive', () => {
+  expect(getMaximumValidQuantity(3, 4, 1)).toBe(0);
+  expect(hasPurchasableQuantity(3, 4, 1)).toBe(false);
+  expect(getNextValidQuantity(0, 4, 1, 3)).toBeNull();
+});
+
+test('quantity normalization never clamps to an off-step stock count', () => {
+  expect(normalizeQuantityForStock(12, 10, 4, 4)).toBe(8);
+  expect(normalizeQuantityForStock(6, 10, 4, 4)).toBe(4);
+  expect(normalizeQuantityForStock(12, 3, 4, 4)).toBe(0);
 });

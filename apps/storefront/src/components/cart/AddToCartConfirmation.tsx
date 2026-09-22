@@ -14,6 +14,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { formatPrice } from '@/lib/utils/format';
+import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 
 const primary = { backgroundColor: 'var(--color-primary)' };
 const actionFocusClass = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors duration-150 motion-reduce:transition-none';
@@ -56,7 +57,7 @@ function RecommendationItem({ product, onAdded, onClose }: {
           </span>
         )}
       </div>
-      <button type="button" disabled={outOfStock} aria-disabled={atLimit || undefined}
+      <button type="button" disabled={outOfStock || atLimit} aria-disabled={atLimit || undefined}
         aria-label={atLimit ? `Stock maximum pour ${product.name}` : hasMinRule ? `Ajouter ${minOrderQuantity} ${product.name}` : `Ajouter ${product.name}`}
         className={`${recommendationActionClass} text-white hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-60`}
         style={added ? { backgroundColor: '#16a34a' } : primary}
@@ -73,7 +74,11 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
   const items = useCartStore(s => s.items);
   const cartItem = items.find(item => item.product.id === product.id);
   const quantity = cartItem?.quantity ?? 0;
-  const maxStock = Math.min(product.stock ?? 999, cartItem?.product.stock ?? 999);
+  const maxStock = getMaximumValidQuantity(
+    Math.min(product.stock ?? 999, cartItem?.product.stock ?? 999),
+    product.min_order_quantity,
+    product.order_quantity_step,
+  );
 
   function changeQuantity(delta: -1 | 1) {
     // Read synchronously for each click, including clicks batched before React renders.
@@ -121,7 +126,7 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
         if (!response.ok) return;
         const data = await response.json() as { products?: ProductCardProduct[] };
         if (!disposed && !controller.signal.aborted && Array.isArray(data.products)) {
-          setRecommendations(data.products.filter(p => p.id !== product.id && p.stock !== 0).slice(0, 4));
+          setRecommendations(data.products.filter(p => p.id !== product.id && getMaximumValidQuantity(p.stock ?? 999, p.min_order_quantity, p.order_quantity_step) > 0).slice(0, 4));
         }
       } catch {
         // Suggestions are optional. The confirmed local cart addition is unaffected.

@@ -4,7 +4,7 @@ import type { CartItem } from '@lepefy/types';
 import type { CartMutationInput, CartSyncStatus, PendingMutation } from '@/lib/cart/cartTypes';
 import { enqueueMutation } from '@/lib/cart/cartQueue';
 import { trackNalaAddToCart } from '@/lib/ai/nalaAttributionClient';
-import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
+import { computeQuantityRuleState, getMaximumValidQuantity, getNextValidQuantity, getPreviousValidQuantity } from '@/lib/purchaseQuantityRules';
 
 interface CartState {
   items: CartItem[];
@@ -87,38 +87,37 @@ export const useCartStore = create<CartState>()(
       unavailableProductIds: [],
 
       addItem(product, quantity = 1) {
-        let mutationQuantity = quantity;
+        let mutationQuantity = 0;
         set((state) => {
           const existing = state.items.find((i) => i.product.id === product.id);
           const minimum = product.min_order_quantity ?? 1;
           const step = product.order_quantity_step ?? 1;
+          const stock = Math.min(product.stock, existing?.product.stock ?? product.stock);
+          const maxValid = getMaximumValidQuantity(stock, minimum, step);
+          if (maxValid === 0) return state;
 
-          let items: CartItem[];
-          if (existing) {
-            // Un prodotto già in carrello rispetta lo step ad ogni aggiunta
-            // (min=4/step=4 : 4 → 8 → 12, non 4 → 5). Il "+1" della UI diventa
-            // quindi "+step" quando serve, mai una quantità intermedia invalida.
-            const rawTotal = Math.min(existing.quantity + quantity, product.stock);
-            const total = Math.min(computeQuantityRuleState(rawTotal, minimum, step).nextValidQuantity, product.stock);
-            mutationQuantity = total - existing.quantity;
-            items = state.items.map((i) => (i.product.id === product.id ? { ...i, quantity: total } : i));
-          } else {
-            // Premier ajout : va directement au minimum de vente (jamais 1
-            // unité isolée si le produit exige un minimum supérieur).
-            const total = Math.min(Math.max(quantity, minimum), product.stock);
-            mutationQuantity = total;
-            items = [...state.items, { product, quantity: total }];
-          }
+          const requested = Math.max(minimum, (existing?.quantity ?? 0) + quantity);
+          const next = computeQuantityRuleState(requested, minimum, step).nextValidQuantity;
+          const total = Math.min(next, maxValid);
+          mutationQuantity = total - (existing?.quantity ?? 0);
+          if (mutationQuantity === 0) return state;
 
-          // Operazione RELATIVA: due "+1" da due device diversi si sommano lato
-          // server invece di sovrascriversi (cf. lib/cart/cartTypes.ts).
+          const items: CartItem[] = existing
+            ? state.items.map((item) => item.product.id === product.id
+              ? { ...item, product: { ...item.product, ...product, stock }, quantity: total }
+              : item)
+            : [...state.items, { product, quantity: total }];
           return {
             items,
-            ...queueMutation(state, { type: 'add', productId: product.id, quantity: mutationQuantity }),
+            ...queueMutation(state, mutationQuantity > 0
+              ? { type: 'add', productId: product.id, quantity: mutationQuantity }
+              : { type: 'set_quantity', productId: product.id, quantity: total }),
           };
         });
-        flushScheduler();
-        void trackNalaAddToCart(product.id, mutationQuantity);
+        if (mutationQuantity !== 0) {
+          flushScheduler();
+          if (mutationQuantity > 0) void trackNalaAddToCart(product.id, mutationQuantity);
+        }
       },
 
       removeItem(productId) {
@@ -131,37 +130,46 @@ export const useCartStore = create<CartState>()(
 
       updateQuantity(productId, quantity) {
         if (quantity <= 0) { get().removeItem(productId); return; }
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.product.id === productId ? { ...i, quantity } : i,
-          ),
-          // Operazione ASSOLUTA: intento esplicito dell'utente, il server non
-          // deve mai sommarla a quanto già presente.
-          ...queueMutation(state, { type: 'set_quantity', productId, quantity }),
-        }));
-        flushScheduler();
+        let changed = false;
+        set((state) => {
+          const item = state.items.find((i) => i.product.id === productId);
+          if (!item) return state;
+          const minimum = item.product.min_order_quantity ?? 1;
+          const step = item.product.order_quantity_step ?? 1;
+          const maxValid = getMaximumValidQuantity(item.product.stock, minimum, step);
+          if (maxValid === 0) return state;
+          const target = Math.min(computeQuantityRuleState(quantity, minimum, step).nextValidQuantity, maxValid);
+          if (target === item.quantity) return state;
+          changed = true;
+          return {
+            items: state.items.map((entry) => entry.product.id === productId ? { ...entry, quantity: target } : entry),
+            ...queueMutation(state, { type: 'set_quantity', productId, quantity: target }),
+          };
+        });
+        if (changed) flushScheduler();
       },
 
       incrementItem(productId) {
         const item = get().items.find((i) => i.product.id === productId);
         if (!item) return;
-        const minimum = item.product.min_order_quantity ?? 1;
-        const step = item.product.order_quantity_step ?? 1;
-        const next = Math.min(
-          computeQuantityRuleState(item.quantity + 1, minimum, step).nextValidQuantity,
+        const next = getNextValidQuantity(
+          item.quantity,
+          item.product.min_order_quantity ?? 1,
+          item.product.order_quantity_step ?? 1,
           item.product.stock,
         );
-        get().updateQuantity(productId, next);
+        if (next !== null) get().updateQuantity(productId, next);
       },
 
       decrementItem(productId) {
         const item = get().items.find((i) => i.product.id === productId);
         if (!item) return;
-        const minimum = item.product.min_order_quantity ?? 1;
-        const step = item.product.order_quantity_step ?? 1;
-        const next = item.quantity - step;
-        if (next < minimum) { get().removeItem(productId); return; }
-        get().updateQuantity(productId, next);
+        const previous = getPreviousValidQuantity(
+          item.quantity,
+          item.product.min_order_quantity ?? 1,
+          item.product.order_quantity_step ?? 1,
+        );
+        if (previous !== null) get().updateQuantity(productId, previous);
       },
 
       clearCart() {

@@ -121,3 +121,34 @@ test('un cliente autenticato accoda mutation con la semantica corretta', async (
   expect(pending[1]).toMatchObject({ type: 'add', productId: PRODUCT_B.id, quantity: 1 });
   expect(pending.every((m) => typeof m.id === 'string' && m.id.length > 0)).toBe(true);
 });
+
+test('min 4 step 4 stock 10 never adds invalid quantity 10', async () => {
+  const { store } = await loadCart();
+  const product = { ...cartProduct(PRODUCT_A), stock: 10, min_order_quantity: 4, order_quantity_step: 4 };
+  store.useCartStore.getState().addItem(product);
+  expect(store.useCartStore.getState().items[0]?.quantity).toBe(4);
+  store.useCartStore.getState().incrementItem(product.id);
+  expect(store.useCartStore.getState().items[0]?.quantity).toBe(8);
+  store.useCartStore.getState().incrementItem(product.id);
+  expect(store.useCartStore.getState().items[0]?.quantity).toBe(8);
+  store.useCartStore.getState().addItem(product);
+  expect(store.useCartStore.getState().items[0]?.quantity).toBe(8);
+});
+
+test('stock below the minimum cannot add a new cart line', async () => {
+  const { store } = await loadCart();
+  const product = { ...cartProduct(PRODUCT_A), stock: 3, min_order_quantity: 4, order_quantity_step: 1 };
+  store.useCartStore.getState().addItem(product);
+  expect(store.useCartStore.getState().items).toEqual([]);
+});
+
+test('typed set_quantity snaps off-step values and decrement repairs legacy states', async () => {
+  const { store } = await loadCart();
+  const product = { ...cartProduct(PRODUCT_A), stock: 10, min_order_quantity: 4, order_quantity_step: 4 };
+  store.useCartStore.getState().addItem(product);
+  store.useCartStore.getState().updateQuantity(product.id, 5);
+  expect(store.useCartStore.getState().items[0]?.quantity).toBe(8);
+  store.useCartStore.setState({ items: [{ product, quantity: 10 }] });
+  store.useCartStore.getState().decrementItem(product.id);
+  expect(store.useCartStore.getState().items[0]?.quantity).toBe(8);
+});

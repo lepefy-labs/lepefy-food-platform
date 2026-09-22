@@ -31,6 +31,22 @@ export async function buildNalaProductActions(params: {
 
     if (error) throw new Error(error.message);
 
+    const { data: groupRows, error: groupsError } = await params.supabase
+      .from('purchase_quantity_groups')
+      .select('id, name, min_quantity, quantity_step, purchase_quantity_group_products(product_id)')
+      .eq('tenant_id', params.tenantId)
+      .eq('active', true);
+    if (groupsError) console.warn('[nala-product-actions] Group metadata temporarily unavailable:', groupsError);
+
+    const groups = (groupRows ?? []).map((group) => ({
+      id: group.id,
+      name: group.name,
+      min_quantity: group.min_quantity,
+      quantity_step: group.quantity_step,
+      productIds: (group.purchase_quantity_group_products as Array<{ product_id: string }>)
+        .map((member) => member.product_id),
+    }));
+
     return buildValidatedNalaProductActions({
       tenantId: params.tenantId,
       interactionId: params.interactionId,
@@ -38,6 +54,7 @@ export async function buildNalaProductActions(params: {
       locale: params.locale,
       candidates: params.candidates,
       products: (data ?? []) as NalaCanonicalProduct[],
+      groups,
     });
   } catch (error) {
     console.error('[nala-product-actions] Canonical product validation failed; omitting actions.', {

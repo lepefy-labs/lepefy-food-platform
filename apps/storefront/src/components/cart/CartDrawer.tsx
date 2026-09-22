@@ -52,7 +52,7 @@ export function CartDrawer() {
   const decrementItem = useCartStore((s) => s.decrementItem);
   const removeItem = useCartStore((s) => s.removeItem);
   const addItem = useCartStore((s) => s.addItem);
-  const quantityGroups = useQuantityGroups();
+  const { groups: quantityGroups, loading: groupsLoading, error: groupsError } = useQuantityGroups();
 
   const panelRef = useRef<HTMLDivElement>(null);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
@@ -132,6 +132,11 @@ export function CartDrawer() {
           <CartDrawerEmpty onNavigate={closeDrawer} />
         ) : (
           <div className="flex-1 overflow-y-auto px-5">
+            {(groupsLoading || groupsError) && (
+              <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-800" role="status">
+                {groupsLoading ? 'Vérification des règles du panier…' : groupsError}
+              </p>
+            )}
             <QuantityGroupProgress groups={quantityGroups} items={items} />
             <ul>
               {items.map((item) => (

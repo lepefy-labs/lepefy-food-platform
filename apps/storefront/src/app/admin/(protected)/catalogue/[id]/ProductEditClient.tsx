@@ -17,6 +17,7 @@ import Button from '../../../_components/ui/Button';
 import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
 import ProductRelationshipsEditor from './ProductRelationshipsEditor';
 import ProductMediaManager from './ProductMediaManager';
+import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 
 interface ProductEditProps {
   product: {
@@ -252,6 +253,11 @@ export default function ProductEditClient({
   }
 
   async function handleSave() {
+    if (![Number(formData.min_order_quantity), Number(formData.order_quantity_step)]
+      .every((value) => Number.isInteger(value) && value >= 1)) {
+      showToast('Le minimum et l’incrément doivent être des entiers positifs.', 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       const body = {
@@ -775,6 +781,22 @@ export default function ProductEditClient({
                   return Array.from({ length: 5 }, (_, i) => min + i * step).join(' · ');
                 })()}...
               </p>
+              {(() => {
+                const stock = Number(formData.stock);
+                const minimum = Number(formData.min_order_quantity);
+                const step = Number(formData.order_quantity_step);
+                if (!Number.isInteger(minimum) || minimum < 1 || !Number.isInteger(step) || step < 1) {
+                  return <p role="alert" className="mt-2 text-xs font-semibold text-red-700">Saisissez un minimum et un incrément valides.</p>;
+                }
+                const max = getMaximumValidQuantity(stock, minimum, step);
+                if (stock > 0 && max === 0) {
+                  return <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">Attention : le stock disponible ne permet pas d’atteindre le minimum de vente.</p>;
+                }
+                if (stock > max && max > 0) {
+                  return <p className="mt-2 text-xs font-medium text-amber-700">Stock : {stock} · Quantité maximale achetable : {max}.</p>;
+                }
+                return null;
+              })()}
             </section>
           </div>
         </div>

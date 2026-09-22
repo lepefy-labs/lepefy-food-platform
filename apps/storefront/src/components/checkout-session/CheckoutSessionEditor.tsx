@@ -6,6 +6,11 @@ import {
   IconExternalLink, IconChevronDown, IconTrash, IconTruck, IconBuildingStore, IconAlertTriangle, IconCreditCard,
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import { getMaximumValidQuantity, getNextValidQuantity, getPreviousValidQuantity, formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
+import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
+import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
+import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
+import type { CartItem } from '@lepefy/types';
 import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
 import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
@@ -37,6 +42,10 @@ interface SessionItem {
   price:        number;
   quantity:     number;
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
+  min_order_quantity?: number;
+  order_quantity_step?: number;
+  stock?: number;
+  active?: boolean;
 }
 
 interface SessionData {
@@ -81,6 +90,7 @@ export function CheckoutSessionEditor({
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
 
   const [editItems, setEditItems]           = useState<SessionItem[]>([]);
+  const { groups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
   const [editPaymentMethod, setEditPaymentMethod] = useState<'stripe' | 'external_link'>('stripe');
   const [editExternalMethodId, setEditExternalMethodId] = useState<string | null>(null);
   const [editFulfillmentType, setEditFulfillmentType]   = useState<'delivery' | 'pickup'>('delivery');
@@ -137,6 +147,24 @@ export function CheckoutSessionEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUrl]);
 
+  const cartItems: CartItem[] = editItems.map((item) => ({
+    product: {
+      id: item.productId, name: item.name, slug: '',
+      price: item.price, image_url: null, weight_grams: null,
+      storage_type: item.storage_type, stock: item.stock ?? 0,
+      min_order_quantity: item.min_order_quantity ?? 1,
+      order_quantity_step: item.order_quantity_step ?? 1,
+    },
+    quantity: item.quantity,
+  }));
+  const quantityViolations = computeCartQuantityViolations(cartItems, groups);
+  const stockBlocked = editItems.find((item) =>
+    item.active === false || item.stock === undefined || item.quantity > item.stock ||
+    getMaximumValidQuantity(item.stock, item.min_order_quantity ?? 1, item.order_quantity_step ?? 1) === 0
+  );
+  const quantityError = groupsLoading ? 'Vérification des règles du panier…' : groupsError
+    ?? (quantityViolations[0] ? formatQuantityViolationMessage(quantityViolations[0]) : null)
+    ?? (stockBlocked ? `Stock insuffisant ou produit indisponible : ${stockBlocked.name}.` : null);
   const editSubtotal = editItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const editTotal = editSubtotal + (editFulfillmentType === 'pickup' ? 0 : editShippingTotal);
 
@@ -169,11 +197,16 @@ export function CheckoutSessionEditor({
     }
   }, [editItems]);
 
-  function updateQty(productId: string, quantity: number) {
-    setEditItems((prev) => {
-      if (quantity <= 0) return prev.filter((i) => i.productId !== productId);
-      return prev.map((i) => (i.productId === productId ? { ...i, quantity } : i));
-    });
+  function updateQty(productId: string, direction: -1 | 1) {
+    setEditItems((prev) => prev.map((item) => {
+      if (item.productId !== productId) return item;
+      const minimum = item.min_order_quantity ?? 1;
+      const step = item.order_quantity_step ?? 1;
+      const next = direction > 0
+        ? getNextValidQuantity(item.quantity, minimum, step, item.stock ?? 0)
+        : getPreviousValidQuantity(item.quantity, minimum, step);
+      return next !== null ? { ...item, quantity: next } : item;
+    }));
   }
 
   function removeItem(productId: string) {
@@ -185,6 +218,10 @@ export function CheckoutSessionEditor({
 
     if (editItems.length === 0) {
       setSaveError('Le panier ne peut pas être vide.');
+      return;
+    }
+    if (quantityError) {
+      setSaveError(quantityError);
       return;
     }
     if (editPaymentMethod === 'external_link' && !editExternalMethodId) {
@@ -229,7 +266,14 @@ export function CheckoutSessionEditor({
         return;
       }
 
-      setData(json as SessionData);
+      setData({
+        ...(json as SessionData),
+        items: (json.items as SessionItem[]).map((item) => {
+          const meta = editItems.find((current) => current.productId === item.productId);
+          return { ...item, min_order_quantity: meta?.min_order_quantity,
+            order_quantity_step: meta?.order_quantity_step, stock: meta?.stock, active: meta?.active };
+        }),
+      });
       setExpanded(false);
 
       if (editPaymentMethod === 'external_link') return;
@@ -242,6 +286,7 @@ export function CheckoutSessionEditor({
   }
 
   async function createIntent() {
+    if (quantityError) return { error: quantityError };
     try {
       const res = await fetch(`/api/checkout-sessions/${sessionId}/create-intent`, {
         method:  'POST',
@@ -532,12 +577,13 @@ export function CheckoutSessionEditor({
                   <div key={item.productId} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-100">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium line-clamp-1">{item.name}</p>
-                      <p className="text-xs text-gray-400">{formatPrice(item.price, tenant.currency)}</p>
+                      <p className="text-xs text-gray-400">{formatPrice(item.price, tenant.currency)} · Minimum {item.min_order_quantity ?? 1}{(item.order_quantity_step ?? 1) > 1 ? ` · par ${item.order_quantity_step}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => updateQty(item.productId, item.quantity - 1)}
+                        onClick={() => updateQty(item.productId, -1)}
+                         disabled={getPreviousValidQuantity(item.quantity, item.min_order_quantity ?? 1, item.order_quantity_step ?? 1) === null}
                         className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600"
                       >
                         −
@@ -545,7 +591,8 @@ export function CheckoutSessionEditor({
                       <span className="w-5 text-center text-sm font-semibold">{item.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => updateQty(item.productId, item.quantity + 1)}
+                        onClick={() => updateQty(item.productId, 1)}
+                         disabled={getNextValidQuantity(item.quantity, item.min_order_quantity ?? 1, item.order_quantity_step ?? 1, item.stock ?? 0) === null}
                         className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-sm font-bold text-gray-600"
                       >
                         +
@@ -567,6 +614,16 @@ export function CheckoutSessionEditor({
                 <span className="font-semibold">{formatPrice(editSubtotal, tenant.currency)}</span>
               </div>
             </div>
+              <QuantityGroupProgress groups={groups} items={cartItems} />
+              {quantityError && (
+                <div role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {quantityError}
+                  {groupsError && (
+                    <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">Réessayer</button>
+                  )}
+                </div>
+              )}
+
 
             {saveError && (
               <p className="text-red-500 text-sm bg-red-50 rounded-xl px-4 py-3">{saveError}</p>

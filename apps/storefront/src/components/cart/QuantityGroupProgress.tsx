@@ -1,4 +1,5 @@
 import { IconCircleCheck, IconAlertCircle } from '@tabler/icons-react';
+import Link from 'next/link';
 import type { CartItem } from '@lepefy/types';
 import type { PublicQuantityGroup } from '@/app/api/quantity-groups/route';
 import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
@@ -55,6 +56,10 @@ function GroupProgressCard({ group, current }: { group: PublicQuantityGroup; cur
       <p className="mt-1 pl-[26px] text-amber-700">
         Ajoutez encore {state.missingQuantity} unité{state.missingQuantity > 1 ? 's' : ''} de {group.name.toLowerCase()} pour valider votre commande.
       </p>
+      <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`}
+        className="ml-[26px] mt-2 inline-flex min-h-11 items-center rounded-lg bg-amber-900 px-4 py-2 text-sm font-bold text-white hover:bg-amber-800">
+        Compléter ma sélection
+      </Link>
     </li>
   );
 }

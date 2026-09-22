@@ -12,6 +12,7 @@ import { ProductSpecs } from './ProductSpecs';
 import { ProductTabs } from './ProductTabs';
 import { TrustBadges } from './TrustBadges';
 import { formatPrice } from '@/lib/utils/format';
+import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import type { ProductWithCategory } from '@lepefy/types';
 
 export function ProductDetail({ product }: { product: ProductWithCategory }) {
@@ -27,10 +28,12 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const orderQuantityStep = product.order_quantity_step ?? 1;
   const [quantity, setQuantity] = useState(minOrderQuantity);
   const [added, setAdded] = useState(false);
-  const outOfStock = product.stock === 0;
+  const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
+  const outOfStock = maxPurchasable === 0;
   const totalPrice = product.price * quantity;
 
   function handleAddToCart() {
+    if (outOfStock || quantity > maxPurchasable) return;
     addItem({
       id:           product.id,
       name:         product.name,
@@ -100,11 +103,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
 
           {outOfStock ? (
             <>
-              <div className="hidden py-3 px-4 bg-gray-100 rounded-lg text-gray-500 text-sm font-medium text-center md:block">Produit épuisé</div>
+              <div className="hidden py-3 px-4 bg-gray-100 rounded-lg text-gray-500 text-sm font-medium text-center md:block">Indisponible dans le format minimum</div>
               <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
                 <div className="mx-auto max-w-7xl px-3 py-2.5">
                   <div className="flex min-h-12 items-center justify-center rounded-xl bg-gray-100 px-4 text-sm font-semibold text-gray-500">
-                    Produit épuisé
+                    Indisponible dans le format minimum
                   </div>
                 </div>
               </div>
@@ -114,7 +117,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
               <div className="hidden flex-col gap-3 md:flex">
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium text-gray-700">Quantité</span>
-                  <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={product.stock} onChange={setQuantity} />
+                  <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
                   {minOrderQuantity > 1 && (
                     <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
                       Minimum {minOrderQuantity}{orderQuantityStep > 1 ? ` · par ${orderQuantityStep}` : ''}
@@ -134,7 +137,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                 <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2.5">
                   <div className="shrink-0">
                     <span className="sr-only">Quantité</span>
-                    <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={product.stock} onChange={setQuantity} />
+                    <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
                   </div>
                   <button
                     onClick={handleAddToCart}

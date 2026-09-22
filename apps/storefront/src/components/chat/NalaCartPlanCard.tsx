@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import {
   IconCircle,
@@ -11,6 +12,8 @@ import {
   IconSparkles,
 } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import type { PublicQuantityGroup } from '@/app/api/quantity-groups/route';
+import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import {
@@ -27,12 +30,15 @@ export function NalaCartPlanCard({
   plan,
   expanded,
   onPrepare,
+  quantityGroups,
 }: {
   plan: NalaCartPlan;
   expanded: boolean;
   onPrepare: () => void;
+  quantityGroups: PublicQuantityGroup[];
 }) {
   const addItem = useCartStore((state) => state.addItem);
+  const cartItems = useCartStore((state) => state.items);
   const openCart = useCartUiStore((state) => state.openDrawer);
   const initialSelection = useMemo(() => new Set(
     plan.items.flatMap((item) => (
@@ -51,6 +57,16 @@ export function NalaCartPlanCard({
     (sum, item) => sum + (item.product?.price ?? 0) * item.quantity,
     0,
   );
+  const affectedGroups = quantityGroups
+    .filter((group) => selectedItems.some((item) => item.product && group.productIds.includes(item.product.id)))
+    .map((group) => {
+      const existing = cartItems.filter((item) => group.productIds.includes(item.product.id))
+        .reduce((sum, item) => sum + item.quantity, 0);
+      const planned = status === 'complete' ? 0 : selectedItems
+        .filter((item) => item.product && group.productIds.includes(item.product.id))
+        .reduce((sum, item) => sum + item.quantity, 0);
+      return { group, state: computeQuantityRuleState(existing + planned, group.min_quantity, group.quantity_step) };
+    });
   const failedItems = result
     ? plan.items.filter((item) => item.product && result.failedIds.includes(item.product.id))
     : [];
@@ -197,6 +213,23 @@ export function NalaCartPlanCard({
             {formatPrice(selectedSubtotal, plan.currency)}
           </strong>
         </div>
+
+        {affectedGroups.map(({ group, state }) => (
+          <div key={group.id} className="mb-2 rounded-lg bg-[#F7F5FF] p-2 text-xs text-[#4B3CC4]">
+            <strong>Groupe « {group.name} »</strong>
+            <p className="mt-1">
+              {state.isValid
+                ? `Sélection complète : ${state.currentQuantity} unités.`
+                : `${state.currentQuantity} / ${state.nextValidQuantity} · encore ${state.missingQuantity} unité(s). Vous pouvez mélanger les produits.`}
+            </p>
+            {!state.isValid && (
+              <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`}
+                className="mt-1 inline-flex min-h-11 items-center font-bold underline">
+                Compléter ma sélection
+              </Link>
+            )}
+          </div>
+        ))}
 
         {status !== 'complete' && (
           <button

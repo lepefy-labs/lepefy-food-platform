@@ -48,8 +48,11 @@ export async function POST(req: NextRequest) {
   const name = String(body.name ?? '').trim();
   if (!name) return NextResponse.json({ error: 'Nom requis.' }, { status: 400 });
 
-  const minQuantity = Math.max(1, parseInt(String(body.min_quantity ?? 1), 10) || 1);
-  const quantityStep = Math.max(1, parseInt(String(body.quantity_step ?? 1), 10) || 1);
+  if (![Number(body.min_quantity ?? 1), Number(body.quantity_step ?? 1)].every((value) => Number.isInteger(value) && value >= 1)) {
+    return NextResponse.json({ error: 'Minimum et incrément doivent être des entiers positifs.' }, { status: 400 });
+  }
+  const minQuantity = Number(body.min_quantity ?? 1);
+  const quantityStep = Number(body.quantity_step ?? 1);
 
   const supabase = createServiceClient();
   const { data, error } = await supabase

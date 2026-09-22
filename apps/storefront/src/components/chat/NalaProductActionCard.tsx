@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { IconLoader2, IconPhoto, IconShoppingCart } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import type { PublicQuantityGroup } from '@/app/api/quantity-groups/route';
+import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import {
@@ -15,8 +17,25 @@ import {
 
 type ActionStatus = 'idle' | 'adding' | 'added' | 'error';
 
-export function NalaProductActionCard({ action }: { action: NalaProductAction }) {
+export function NalaProductActionCard({
+  action,
+  quantityGroups,
+}: {
+  action: NalaProductAction;
+  quantityGroups: PublicQuantityGroup[];
+}) {
   const addItem = useCartStore((state) => state.addItem);
+  const cartItems = useCartStore((state) => state.items);
+  const liveGroup = quantityGroups.find((group) => group.productIds.includes(action.product.id));
+  const activeGroup = liveGroup ?? action.quantityGroup;
+  const groupMinimum = liveGroup?.min_quantity ?? action.quantityGroup?.minQuantity ?? 1;
+  const groupStep = liveGroup?.quantity_step ?? action.quantityGroup?.quantityStep ?? 1;
+  const groupTotal = liveGroup
+    ? cartItems.filter((item) => liveGroup.productIds.includes(item.product.id)).reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
+  const groupState = liveGroup && groupTotal > 0
+    ? computeQuantityRuleState(groupTotal, liveGroup.min_quantity, liveGroup.quantity_step)
+    : null;
   const openCart = useCartUiStore((state) => state.openDrawer);
   const [status, setStatus] = useState<ActionStatus>('idle');
   const inFlightRef = useRef(new Set<string>());
@@ -97,6 +116,25 @@ export function NalaProductActionCard({ action }: { action: NalaProductAction })
                 ? action.labels.retry
                 : action.ctaLabel}
         </button>
+
+        {activeGroup && (
+          <div className="rounded-lg border border-[#DDD8FF] bg-[#F7F5FF] p-2 text-xs text-[#4B3CC4]">
+            <p className="font-semibold">
+              Groupe « {activeGroup.name} » : minimum {groupMinimum}
+              {groupStep > 1 ? ` · par ${groupStep}` : ''}
+            </p>
+            <p className="mt-1">Vous pouvez mélanger les produits du groupe.</p>
+            {groupState && (
+              <p className="mt-1">
+                {groupState.isValid
+                  ? `Sélection complète : ${groupState.currentQuantity} unités.`
+                  : `${groupState.currentQuantity} / ${groupState.nextValidQuantity} · encore ${groupState.missingQuantity} unité(s).`}
+              </p>
+            )}
+            <Link href={`/?quantityGroup=${encodeURIComponent(activeGroup.id)}`}
+              className="mt-1 inline-flex min-h-11 items-center font-bold underline">Compléter ma sélection</Link>
+          </div>
+        )}
 
         {status === 'added' && (
           <button

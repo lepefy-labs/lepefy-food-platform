@@ -10,6 +10,7 @@ import {
   type NalaCartPlan,
 } from '@/lib/ai/nalaCartPlanContract';
 import { resolveLocale, useLocaleStore } from '@/lib/store/localeStore';
+import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 
 interface ChatWidgetProps {
   enabled: boolean;
@@ -64,6 +65,7 @@ function currentDeviceType(): 'mobile' | 'tablet' | 'desktop' {
 export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, whatsappNumber, raiseForProductPurchaseBar = false }: ChatWidgetProps) {
   const storeLocale = useLocaleStore((state) => state.locale);
   const storefrontLocale = resolveLocale(storeLocale, tenantLocales) || tenantLocale || 'fr';
+  const { groups: quantityGroups } = useQuantityGroups();
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState('');
@@ -292,11 +294,13 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
                   <NalaProductActionCard
                     key={`${action.interactionId}:${action.product.id}`}
                     action={action}
+                    quantityGroups={quantityGroups}
                   />
                 ))}
                 {turn.cartPlan && (
                   <NalaCartPlanCard
                     plan={turn.cartPlan}
+                    quantityGroups={quantityGroups}
                     expanded={turn.cartPlanExpanded === true}
                     onPrepare={() => {
                       setTurns((current) => current.map((candidate, index) => (
