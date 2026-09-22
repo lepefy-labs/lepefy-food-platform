@@ -108,8 +108,8 @@ export function CatalogClient({
     else params.delete('q');
     if (overrides.category !== undefined) {
       if (overrides.category) params.set('category', overrides.category);
-      params.delete('quantityGroup');
       else params.delete('category');
+      params.delete('quantityGroup');
     }
     if (overrides.sort !== undefined) {
       if (overrides.sort === 'recommended') params.delete('sort');
