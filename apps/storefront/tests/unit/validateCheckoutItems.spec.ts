@@ -25,7 +25,7 @@ function fakeClient(
         select() { return query; },
         eq() { return query; },
         in() { return Promise.resolve(result); },
-        then(onFulfilled: (result: typeof result) => unknown) { return Promise.resolve(result).then(onFulfilled); },
+        then(onFulfilled: (value: typeof result) => unknown) { return Promise.resolve(result).then(onFulfilled); },
       };
       return query;
     },
