@@ -1,83 +1,60 @@
 import type { createServiceClient } from '@/lib/supabase/server';
 import type { ShippingQuoteObservationRow } from '@lepefy/types';
+import { compareObservationToRequest, type ScenarioRequest } from './requestIdentity';
+import { groupQuoteExecutions } from './operationalObservation';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-export interface EquivalenceQuery {
-  tenantId: string;
-  provider: string;
-  originCountry: string;
-  originPostalCode: string;
-  destinationCountry: string;
-  destinationZoneCode: string | null;
-  destinationPostalCode: string;
-  numParcels: number;
-  totalWeightG: number;
-  volumeCm3: number;
-  freshnessWindowDays: number;
-}
-
-const WEIGHT_TOLERANCE_RATIO = 0.05;
-const WEIGHT_TOLERANCE_FLOOR_G = 250;
-const VOLUME_TOLERANCE_RATIO = 0.10;
+// Lignes candidates lues pour un même request_hash : ~20 services par
+// exécution, donc une dizaine d'exécutions récentes. Au-delà, on préfère un
+// nouvel appel plutôt qu'un réemploi approximatif.
+const MAX_CANDIDATE_ROWS = 200;
 
 /**
- * Une observation existante "couvre" un scénario quand tout ce qui suit
- * correspond : même provider/origine/destination (pays + zone si connue)/
- * nombre de colis, poids à ±5% (ou ±250g, le plus grand des deux), volume à
- * ±10%, et observée dans la fenêtre de fraîcheur demandée. Utilisé pour
- * éviter un appel Packlink redondant — voir §5 de la proposition.
+ * Sélection pure : parmi des lignes candidates (même tenant + même hash,
+ * dans la fenêtre de fraîcheur), retient l'observation opérationnelle de
+ * l'exécution valide la plus récente dont l'identité correspond STRICTEMENT
+ * à la demande (tenant, provider, origine, pays + CAP, poids total, colis).
+ * Aucune tolérance de poids/volume et aucune substitution par la zone :
+ * c'est un réemploi de devis identique, pas une estimation.
  */
-export async function findEquivalentObservation(
+export function pickReusableObservation<T extends ShippingQuoteObservationRow>(
+  rows: T[],
+  request: ScenarioRequest,
+  tenantId: string,
+  sinceIso: string,
+): T | null {
+  const identical = rows.filter((row) =>
+    row.request_hash === request.requestHash
+    && Date.parse(row.observed_at) >= Date.parse(sinceIso)
+    && compareObservationToRequest(row, request, tenantId) === null,
+  );
+  const execution = groupQuoteExecutions(identical).find((e) => e.chosen !== null);
+  return execution?.chosen ?? null;
+}
+
+/**
+ * Cherche un devis strictement identique encore frais pour éviter un appel
+ * Packlink redondant. Filtre en base sur tenant + request_hash AVANT toute
+ * limite (pas de LIMIT appliqué à un ensemble plus large filtré ensuite en
+ * mémoire), puis vérifie la sémantique ligne par ligne.
+ */
+export async function findReusableObservation(
   supabase: ServiceClient,
-  query: EquivalenceQuery,
+  params: { tenantId: string; request: ScenarioRequest; freshnessWindowDays: number; now?: number },
 ): Promise<ShippingQuoteObservationRow | null> {
-  const sinceIso = new Date(Date.now() - query.freshnessWindowDays * 24 * 60 * 60 * 1000).toISOString();
-  const weightTolerance = Math.max(query.totalWeightG * WEIGHT_TOLERANCE_RATIO, WEIGHT_TOLERANCE_FLOOR_G);
+  const sinceIso = new Date((params.now ?? Date.now()) - params.freshnessWindowDays * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from('shipping_quote_observations')
     .select('*')
-    .eq('tenant_id', query.tenantId)
-    .eq('provider', query.provider)
-    .eq('origin_country', query.originCountry)
-    .eq('origin_postal_code', query.originPostalCode)
-    .eq('destination_country', query.destinationCountry)
-    .eq('num_parcels', query.numParcels)
+    .eq('tenant_id', params.tenantId)
+    .eq('request_hash', params.request.requestHash)
     .eq('eligible', true)
     .gte('observed_at', sinceIso)
-    .gte('total_weight_g', Math.round(query.totalWeightG - weightTolerance))
-    .lte('total_weight_g', Math.round(query.totalWeightG + weightTolerance))
     .order('observed_at', { ascending: false })
-    .limit(20);
+    .limit(MAX_CANDIDATE_ROWS);
 
   if (error || !data?.length) return null;
-
-  const rows = data as ShippingQuoteObservationRow[];
-
-  // Filtre destination STRICT, sans repli sur `rows` non filtrées : contrairement
-  // à l'estimation de similarity.ts (où élargir la recherche est acceptable —
-  // le résultat reste étiqueté avec sa taille d'échantillon et sa confiance),
-  // ici un repli aurait fait considérer N'IMPORTE QUELLE observation italienne
-  // à un poids proche comme "équivalente" dès qu'un nouveau code postal
-  // (encore jamais observé) était testé — ce qui a fait passer une campagne de
-  // 1406 scénarios en 100% "doublon", 0% appel Packlink réel, sans construire
-  // la moindre nouvelle donnée pour les nouvelles villes couvertes.
-  const candidates = query.destinationZoneCode
-    ? rows.filter((r) => r.destination_zone_code === query.destinationZoneCode)
-    : rows.filter((r) => r.destination_postal_code === query.destinationPostalCode);
-
-  const match = candidates.find((r) => {
-    // Volume moyen par colis, pas somme totale — num_parcels est déjà
-    // exact-matché ci-dessus ; comparer le volume total gonflerait l'écart
-    // avec le volume par colis (query.volumeCm3) dès que num_parcels > 1.
-    const perParcelVolume = r.parcels.length > 0
-      ? r.parcels.reduce((sum, p) => sum + p.length_cm * p.width_cm * p.height_cm, 0) / r.parcels.length
-      : 0;
-    if (perParcelVolume === 0 || query.volumeCm3 === 0) return true;
-    const volumeDiff = Math.abs(perParcelVolume - query.volumeCm3) / query.volumeCm3;
-    return volumeDiff <= VOLUME_TOLERANCE_RATIO;
-  });
-
-  return match ?? null;
+  return pickReusableObservation(data as ShippingQuoteObservationRow[], params.request, params.tenantId, sinceIso);
 }

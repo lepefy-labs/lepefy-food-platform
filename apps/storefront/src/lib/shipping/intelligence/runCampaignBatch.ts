@@ -1,14 +1,14 @@
 import type { createServiceClient } from '@/lib/supabase/server';
 import type {
-  ShippingCampaignItemScenario,
   ShippingPackagingProfileRow,
   ShippingScenarioMatrix,
   ShippingSimulationCampaignItemRow,
   ShippingSimulationCampaignRow,
 } from '@lepefy/types';
 import type { Tenant } from '@lepefy/types';
-import { findEquivalentObservation } from './equivalence';
-import { quoteScenarioAndPersist, INTELLIGENCE_FROM_ADDRESS } from './quoteScenario';
+import { findReusableObservation } from './equivalence';
+import { quoteScenarioAndPersist } from './quoteScenario';
+import { buildScenarioRequest } from './requestIdentity';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -85,6 +85,7 @@ export async function runCampaignBatch(
   const { data: pendingItems } = await supabase
     .from('shipping_simulation_campaign_items')
     .select('*')
+    .eq('tenant_id', tenant.id)
     .in('campaign_id', campaignIds)
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
@@ -129,10 +130,14 @@ export async function runCampaignBatch(
       processed++;
       touchedCampaignIds.add(item.campaign_id);
       const profile = profilesById.get(item.scenario.packagingProfileId);
+      const markItem = (update: Record<string, unknown>) => supabase
+        .from('shipping_simulation_campaign_items')
+        .update({ ...update, attempted_at: claimTime })
+        .eq('id', item.id)
+        .eq('tenant_id', tenant.id);
+
       if (!profile) {
-        await supabase.from('shipping_simulation_campaign_items')
-          .update({ status: 'failed', error: 'packaging_profile_not_found', attempted_at: claimTime })
-          .eq('id', item.id);
+        await markItem({ status: 'failed', error: 'packaging_profile_not_found' });
         failed++;
         continue;
       }
@@ -141,28 +146,25 @@ export async function runCampaignBatch(
       const freshnessWindowDays = (campaign?.scenario_matrix as ShippingScenarioMatrix | undefined)?.freshnessWindowDays
         ?? DEFAULT_FRESHNESS_WINDOW_DAYS;
 
-      const totalWeightG = Math.round(item.scenario.weightKg * 1000);
-      const volumeCm3 = profile.box_length_cm * profile.box_width_cm * profile.box_height_cm;
-
       try {
-        const equivalent = await findEquivalentObservation(supabase, {
+        // Identité effective de la demande (CAP exact, colis exacts) — jamais
+        // la zone, jamais une tolérance de poids/volume. Un réemploi n'est
+        // accepté que pour un devis strictement identique encore frais.
+        const request = buildScenarioRequest({
+          weightKg: item.scenario.weightKg,
+          profile,
+          destination: item.scenario.destination,
+        });
+        const reusable = await findReusableObservation(supabase, {
           tenantId: tenant.id,
-          provider: 'packlink',
-          originCountry: INTELLIGENCE_FROM_ADDRESS.country,
-          originPostalCode: INTELLIGENCE_FROM_ADDRESS.zip_code,
-          destinationCountry: item.scenario.destination.country,
-          destinationPostalCode: item.scenario.destination.postalCode,
-          destinationZoneCode: item.scenario.destination.zoneCode ?? null,
-          numParcels: Math.ceil(totalWeightG / profile.max_weight_g),
-          totalWeightG,
-          volumeCm3,
+          request,
           freshnessWindowDays,
         });
 
-        if (equivalent) {
-          await supabase.from('shipping_simulation_campaign_items')
-            .update({ status: 'skipped_duplicate', observation_id: equivalent.id, attempted_at: claimTime })
-            .eq('id', item.id);
+        if (reusable) {
+          // skipped_duplicate = réemploi VALIDE d'un devis identique : couvre
+          // le scénario mais ne compte pas comme nouvel appel Packlink.
+          await markItem({ status: 'skipped_duplicate', observation_id: reusable.id, error: null });
           skipped++;
           continue;
         }
@@ -179,20 +181,16 @@ export async function runCampaignBatch(
         });
 
         if (result.ok) {
-          await supabase.from('shipping_simulation_campaign_items')
-            .update({ status: 'succeeded', observation_id: result.chosenObservationId, attempted_at: claimTime })
-            .eq('id', item.id);
+          await markItem({ status: 'succeeded', observation_id: result.chosenObservationId, error: null });
           succeeded++;
         } else {
-          await supabase.from('shipping_simulation_campaign_items')
-            .update({ status: 'failed', error: result.error ?? 'unknown_error', attempted_at: claimTime })
-            .eq('id', item.id);
+          // Y compris no_eligible_service : les offres ont pu être persistées
+          // pour l'analyse, mais le scénario n'a pas de devis exploitable.
+          await markItem({ status: 'failed', observation_id: null, error: result.error });
           failed++;
         }
       } catch (err) {
-        await supabase.from('shipping_simulation_campaign_items')
-          .update({ status: 'failed', error: err instanceof Error ? err.message : 'unexpected_error', attempted_at: claimTime })
-          .eq('id', item.id);
+        await markItem({ status: 'failed', error: err instanceof Error ? err.message : 'unexpected_error' });
         failed++;
       }
     }
@@ -209,10 +207,10 @@ export async function runCampaignBatch(
     // shipping_simulation_campaigns.completed_scenarios). Les agrégats COUNT
     // ne sont pas concernés par cette limite de lignes retournées.
     const [succeededResult, failedResult, skippedResult, pendingResult] = await Promise.all([
-      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).eq('status', 'succeeded'),
-      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).eq('status', 'failed'),
-      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).eq('status', 'skipped_duplicate'),
-      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId).in('status', ['pending', 'running']),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('campaign_id', campaignId).eq('status', 'succeeded'),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('campaign_id', campaignId).eq('status', 'failed'),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('campaign_id', campaignId).eq('status', 'skipped_duplicate'),
+      supabase.from('shipping_simulation_campaign_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('campaign_id', campaignId).in('status', ['pending', 'running']),
     ]);
     const succeededCount = succeededResult.count ?? 0;
     const failedCount = failedResult.count ?? 0;

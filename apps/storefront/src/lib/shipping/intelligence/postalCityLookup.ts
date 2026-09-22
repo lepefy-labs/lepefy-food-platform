@@ -1,26 +1,32 @@
 import type { createServiceClient } from '@/lib/supabase/server';
 import { normalizePlaceName } from './postalCodeImport';
+import { fetchAllPages } from './pagedQuery';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
+/**
+ * Ville candidate proposée à l'admin. Le contexte administratif est conservé
+ * tout au long du parcours recherche → choix → résolution CAP → campagne :
+ *  - source 'index'     : codes GeoNames exacts (adminCode1/adminCode2) ;
+ *  - source 'nominatim' : codes ISO 3166-2 (stateCodes), dont la convention
+ *                         peut différer de GeoNames (ex. région IT « 25 » ISO
+ *                         vs « 09 » GeoNames ; la province « MI » concorde).
+ */
 export interface ShippingCityCandidate {
   country: string;
   city: string;
   stateName: string;
   stateCodes: string[];
+  adminCode1: string | null;
+  adminCode2: string | null;
+  adminName1: string | null;
+  adminName2: string | null;
+  source: 'index' | 'nominatim';
   label: string;
 }
 
-export interface ShippingCityPostalCodes {
-  country: string;
-  city: string;
-  stateCode: string;
-  postalCodes: string[];
-}
-
-interface PostalIndexRow {
+export interface PostalAdminRow {
   place_name: string;
-  place_name_normalized: string;
   admin_name1: string | null;
   admin_code1: string | null;
   admin_name2: string | null;
@@ -28,12 +34,115 @@ interface PostalIndexRow {
   postal_code: string;
 }
 
+/** Une commune = un nom + un rattachement administratif (codes GeoNames). */
+export interface AdminGroup {
+  placeName: string;
+  adminCode1: string | null;
+  adminCode2: string | null;
+  adminName1: string | null;
+  adminName2: string | null;
+  postalCodes: string[];
+  label: string;
+}
+
+export type AdministrativeMatch = 'admin_codes' | 'state_codes' | 'unique_place';
+
+export type PostalResolution =
+  | { status: 'resolved'; group: AdminGroup; matchedBy: AdministrativeMatch }
+  | { status: 'ambiguous'; options: AdminGroup[] }
+  | { status: 'not_found' };
+
+export interface AdministrativeContext {
+  /** Codes GeoNames exacts (candidat issu de l'index). */
+  exact?: { adminCode1: string | null; adminCode2: string | null };
+  /** Codes ISO 3166-2 sans préfixe pays (candidat Nominatim). */
+  stateCodes?: string[];
+}
+
+function cleanCode(value: string | null | undefined): string | null {
+  const code = value?.trim().toUpperCase();
+  return code ? code : null;
+}
+
+function sortPostalCodes(codes: Iterable<string>): string[] {
+  // Chaînes uniquement : les zéros initiaux (ex. 01000, 00118) sont préservés.
+  return Array.from(new Set(codes)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+export function adminGroupLabel(group: Pick<AdminGroup, 'placeName' | 'adminName1' | 'adminName2' | 'adminCode2'>, country: string): string {
+  const admin2 = group.adminName2
+    ? `${group.adminName2}${group.adminCode2 && group.adminCode2 !== group.adminName2.toUpperCase() ? ` (${group.adminCode2})` : ''}`
+    : null;
+  return [group.placeName, admin2, group.adminName1, country].filter(Boolean).join(' · ');
+}
+
+/** Regroupe les lignes GeoNames par rattachement administratif — jamais par le seul nom. */
+export function groupByAdministration(rows: PostalAdminRow[], country: string): AdminGroup[] {
+  const groups = new Map<string, AdminGroup & { codes: Set<string> }>();
+  for (const row of rows) {
+    const adminCode1 = cleanCode(row.admin_code1);
+    const adminCode2 = cleanCode(row.admin_code2);
+    const key = `${adminCode1 ?? ''}|${adminCode2 ?? ''}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        placeName: row.place_name,
+        adminCode1,
+        adminCode2,
+        adminName1: row.admin_name1?.trim() || null,
+        adminName2: row.admin_name2?.trim() || null,
+        postalCodes: [],
+        label: '',
+        codes: new Set(),
+      };
+      groups.set(key, group);
+    }
+    const postal = String(row.postal_code ?? '').trim().toUpperCase();
+    if (postal.length >= 3 && postal.length <= 12) group.codes.add(postal);
+  }
+  return Array.from(groups.values())
+    .map(({ codes, ...g }) => ({ ...g, postalCodes: sortPostalCodes(codes), label: adminGroupLabel(g, country) }))
+    .filter((g) => g.postalCodes.length > 0)
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * Choisit la commune à partir du contexte administratif. Ne fusionne JAMAIS
+ * les CAP de communes distinctes : en cas d'ambiguïté non résoluble, renvoie
+ * les options pour une sélection explicite (ou la saisie manuelle du CAP).
+ */
+export function resolveAdministrativeGroup(groups: AdminGroup[], context: AdministrativeContext): PostalResolution {
+  if (groups.length === 0) return { status: 'not_found' };
+
+  if (context.exact) {
+    const code1 = cleanCode(context.exact.adminCode1);
+    const code2 = cleanCode(context.exact.adminCode2);
+    const match = groups.filter((g) => g.adminCode1 === code1 && g.adminCode2 === code2);
+    if (match.length === 1) return { status: 'resolved', group: match[0]!, matchedBy: 'admin_codes' };
+    return match.length > 1 ? { status: 'ambiguous', options: match } : { status: 'not_found' };
+  }
+
+  const stateCodes = new Set((context.stateCodes ?? []).map((c) => c.trim().toUpperCase()).filter(Boolean));
+  if (stateCodes.size > 0) {
+    // Niveau 2 (province/département) d'abord : plus discriminant, et évite
+    // les collisions de numérotation entre conventions (ex. FR : région INSEE
+    // « 11 » vs département « 11 »).
+    const byLevel2 = groups.filter((g) => g.adminCode2 && stateCodes.has(g.adminCode2));
+    const candidates = byLevel2.length > 0 ? byLevel2 : groups.filter((g) => g.adminCode1 && stateCodes.has(g.adminCode1));
+    if (candidates.length === 1) return { status: 'resolved', group: candidates[0]!, matchedBy: 'state_codes' };
+    if (candidates.length > 1) return { status: 'ambiguous', options: candidates };
+  }
+
+  // Conventions de codes incompatibles : n'accepter que s'il n'existe qu'une
+  // seule commune de ce nom dans le pays.
+  if (groups.length === 1) return { status: 'resolved', group: groups[0]!, matchedBy: 'unique_place' };
+  return { status: 'ambiguous', options: groups };
+}
+
 /**
  * Recherche dans l'index interne (shipping_postal_code_index, importé
  * statiquement depuis GeoNames — voir postalCodeImport.ts) avant tout appel
- * réseau. Retourne [] si l'index n'a simplement pas encore été peuplé pour
- * ce pays, pas juste si aucune ville ne correspond — le distinguo est fait
- * par l'appelant pour décider s'il vaut la peine de retomber sur Nominatim.
+ * réseau. Un candidat par commune (nom + codes administratifs).
  */
 export async function searchCitiesFromIndex(
   supabase: ServiceClient,
@@ -48,20 +157,27 @@ export async function searchCitiesFromIndex(
     .ilike('place_name_normalized', `${normalizedQuery}%`)
     .limit(200);
 
-  const rows = (data ?? []) as PostalIndexRow[];
+  const rows = (data ?? []) as Array<PostalAdminRow & { place_name_normalized: string }>;
   const seen = new Map<string, ShippingCityCandidate>();
 
   for (const row of rows) {
-    const stateCodes = [row.admin_code2, row.admin_code1].filter((c): c is string => Boolean(c?.trim()));
-    const stateName = row.admin_name2 || row.admin_name1 || '';
-    const key = `${row.place_name_normalized}|${stateCodes.join(',')}`;
+    const adminCode1 = cleanCode(row.admin_code1);
+    const adminCode2 = cleanCode(row.admin_code2);
+    const key = `${row.place_name_normalized}|${adminCode1 ?? ''}|${adminCode2 ?? ''}`;
     if (seen.has(key)) continue;
+    const adminName1 = row.admin_name1?.trim() || null;
+    const adminName2 = row.admin_name2?.trim() || null;
     seen.set(key, {
       country,
       city: row.place_name,
-      stateName,
-      stateCodes,
-      label: [row.place_name, stateName, country].filter(Boolean).join(' · '),
+      stateName: adminName2 || adminName1 || '',
+      stateCodes: [adminCode2, adminCode1].filter((c): c is string => Boolean(c)),
+      adminCode1,
+      adminCode2,
+      adminName1,
+      adminName2,
+      source: 'index',
+      label: adminGroupLabel({ placeName: row.place_name, adminName1, adminName2, adminCode2 }, country),
     });
   }
 
@@ -69,24 +185,28 @@ export async function searchCitiesFromIndex(
 }
 
 /**
- * Résout directement les codes postaux depuis l'index interne — aucun appel
- * réseau si l'index couvre ce pays/cette ville.
+ * Résout les CAP d'une commune depuis l'index interne : toutes les lignes du
+ * nom (paginées), regroupées par rattachement administratif, puis sélection
+ * par le contexte. Retourne not_found si l'index ne connaît pas ce nom.
  */
 export async function resolvePostalCodesFromIndex(
   supabase: ServiceClient,
   country: string,
   city: string,
-): Promise<string[]> {
+  context: AdministrativeContext,
+): Promise<PostalResolution> {
   const normalizedCity = normalizePlaceName(city);
-  const { data } = await supabase
+  const result = await fetchAllPages<PostalAdminRow>((from, to) => supabase
     .from('shipping_postal_code_index')
-    .select('postal_code')
+    .select('place_name, admin_name1, admin_code1, admin_name2, admin_code2, postal_code')
     .eq('country', country)
     .eq('place_name_normalized', normalizedCity)
-    .limit(1000);
-
-  const codes = ((data ?? []) as { postal_code: string }[]).map((r) => r.postal_code);
-  return Array.from(new Set(codes)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    .order('postal_code', { ascending: true })
+    .order('id', { ascending: true })
+    .range(from, to) as unknown as PromiseLike<{ data: PostalAdminRow[] | null; error: { message: string } | null }>,
+  { maxRows: 5000 });
+  if (result.error) throw new Error(`postal_index_lookup_failed: ${result.error}`);
+  return resolveAdministrativeGroup(groupByAdministration(result.rows, country), context);
 }
 
 interface NominatimAddress extends Record<string, string | undefined> {
@@ -195,6 +315,11 @@ export async function searchShippingCities(countryInput: string, queryInput: str
       city,
       stateName,
       stateCodes,
+      adminCode1: null,
+      adminCode2: null,
+      adminName1: (address.state || address.region || '').trim() || null,
+      adminName2: (address.county || '').trim() || null,
+      source: 'nominatim',
       label: [city, stateName, country].filter(Boolean).join(' · '),
     });
   }
@@ -207,46 +332,47 @@ interface GeoNamesPostalCode {
   placeName?: string;
   countryCode?: string;
   adminCode1?: string;
+  adminName1?: string;
   adminCode2?: string;
+  adminName2?: string;
 }
 
-function extractGeoNamesPostalCodes(payload: unknown, city: string): string[] {
+export function geoNamesEntriesToRows(payload: unknown, city: string): PostalAdminRow[] {
   if (!payload || typeof payload !== 'object') return [];
   const entries = Array.isArray((payload as { postalCodes?: unknown[] }).postalCodes)
     ? (payload as { postalCodes: unknown[] }).postalCodes
     : [];
 
-  const normalizedCity = city.trim().toLocaleLowerCase('fr-FR');
-  const codes = entries
+  const normalizedCity = normalizePlaceName(city);
+  return entries
     .filter((entry): entry is GeoNamesPostalCode => typeof entry === 'object' && entry !== null)
     // GeoNames renvoie parfois des lieux voisins portant un nom proche ;
     // on ne garde que les correspondances exactes du nom de ville demandé.
-    .filter((entry) => (entry.placeName ?? '').trim().toLocaleLowerCase('fr-FR') === normalizedCity)
-    .map((entry) => String(entry.postalCode ?? '').trim().toUpperCase())
-    .filter((code) => code.length >= 3 && code.length <= 12);
-
-  return Array.from(new Set(codes)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    .filter((entry) => normalizePlaceName(entry.placeName ?? '') === normalizedCity)
+    .map((entry) => ({
+      place_name: (entry.placeName ?? city).trim(),
+      admin_name1: entry.adminName1 ?? null,
+      admin_code1: entry.adminCode1 ?? null,
+      admin_name2: entry.adminName2 ?? null,
+      admin_code2: entry.adminCode2 ?? null,
+      postal_code: String(entry.postalCode ?? ''),
+    }));
 }
 
 /**
  * Repli GeoNames : Zippopotam.us ne supporte la recherche par nom de ville
- * ("place name search") que pour un sous-ensemble restreint de pays (US, DE
- * entre autres confirmés) — l'Italie et la France, marchés principaux de ce
- * repo, n'y répondent jamais que par 404, quel que soit le code province
- * essayé. GeoNames couvre ces pays mais nécessite un compte gratuit
- * (http://www.geonames.org/login) déclaré dans GEONAMES_USERNAME.
+ * que pour un sous-ensemble restreint de pays (IT/FR répondent toujours 404).
+ * GeoNames couvre ces pays mais nécessite un compte gratuit déclaré dans
+ * GEONAMES_USERNAME. Résultats regroupés par commune comme l'index interne.
  */
-async function resolveViaGeoNames(
-  country: string,
-  city: string,
-): Promise<string[]> {
+async function resolveViaGeoNames(country: string, city: string, context: AdministrativeContext): Promise<PostalResolution> {
   const username = process.env.GEONAMES_USERNAME;
-  if (!username) return [];
+  if (!username) return { status: 'not_found' };
 
   const url = new URL('http://api.geonames.org/postalCodeSearchJSON');
   url.searchParams.set('placename', city);
   url.searchParams.set('country', country);
-  url.searchParams.set('maxRows', '50');
+  url.searchParams.set('maxRows', '200');
   url.searchParams.set('username', username);
 
   try {
@@ -254,10 +380,10 @@ async function resolveViaGeoNames(
       signal: AbortSignal.timeout(5000),
       next: { revalidate: 604_800 },
     });
-    if (!response.ok) return [];
-    return extractGeoNamesPostalCodes(await response.json(), city);
+    if (!response.ok) return { status: 'not_found' };
+    return resolveAdministrativeGroup(groupByAdministration(geoNamesEntriesToRows(await response.json(), city), country), context);
   } catch {
-    return [];
+    return { status: 'not_found' };
   }
 }
 
@@ -275,22 +401,27 @@ function extractPostalCodes(payload: unknown): string[] {
     })
     .filter((code) => code.length >= 3 && code.length <= 12);
 
-  return Array.from(new Set(codes)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return sortPostalCodes(codes);
 }
 
+/**
+ * Repli réseau quand l'index interne ne connaît pas la commune. Zippopotam
+ * est interrogé par code d'État (donc déjà circonscrit) ; GeoNames est
+ * regroupé par commune et jamais fusionné entre homonymes.
+ */
 export async function resolveShippingCityPostalCodes(
   countryInput: string,
   cityInput: string,
-  stateCodesInput: string[],
-): Promise<ShippingCityPostalCodes | null> {
+  context: AdministrativeContext,
+): Promise<PostalResolution> {
   const country = normalizeCountry(countryInput);
   const city = cityInput.trim();
   const stateCodes = Array.from(new Set(
-    stateCodesInput.map((code) => code.trim().toUpperCase()).filter((code) => /^[A-Z0-9-]{1,12}$/.test(code)),
+    (context.stateCodes ?? []).map((code) => code.trim().toUpperCase()).filter((code) => /^[A-Z0-9-]{1,12}$/.test(code)),
   ));
 
-  if (!SUPPORTED_COUNTRIES.has(country) || city.length < 2 || city.length > 80 || stateCodes.length === 0) {
-    return null;
+  if (!SUPPORTED_COUNTRIES.has(country) || city.length < 2 || city.length > 80) {
+    return { status: 'not_found' };
   }
 
   for (const stateCode of stateCodes.slice(0, 5)) {
@@ -309,19 +440,15 @@ export async function resolveShippingCityPostalCodes(
       const postalCodes = extractPostalCodes(await response.json());
       if (postalCodes.length === 0) continue;
 
-      return { country, city, stateCode, postalCodes };
+      const group: AdminGroup = {
+        placeName: city, adminCode1: null, adminCode2: stateCode, adminName1: null, adminName2: null,
+        postalCodes, label: `${city} · ${stateCode} · ${country}`,
+      };
+      return { status: 'resolved', group, matchedBy: 'state_codes' };
     } catch {
       // Try another administrative code; manual postal entry remains the fallback.
     }
   }
 
-  // Zippopotam.us n'implémente la recherche par nom de ville que pour un
-  // sous-ensemble de pays (confirmé : ne répond jamais pour IT/FR, quel que
-  // soit le code province essayé) — GeoNames couvre ces marchés.
-  const geoNamesPostalCodes = await resolveViaGeoNames(country, city);
-  if (geoNamesPostalCodes.length > 0) {
-    return { country, city, stateCode: stateCodes[0] ?? '', postalCodes: geoNamesPostalCodes };
-  }
-
-  return null;
+  return resolveViaGeoNames(country, city, { ...context, stateCodes });
 }

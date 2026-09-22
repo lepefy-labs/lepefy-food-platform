@@ -5,7 +5,20 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { buildCampaignScenarios, validateScenarioMatrix } from '@/lib/shipping/intelligence/scenarioMatrix';
 import { resolveZoneCodeFromRows } from '@/lib/shipping/intelligence/resolveZone';
-import type { ShippingScenarioMatrix, ShippingZoneRow } from '@lepefy/types';
+import { normalizePostalCode } from '@/lib/shipping/intelligence/requestIdentity';
+import { buildWeightsByProfile } from '@/lib/shipping/intelligence/weightPresets';
+import type { ShippingPackagingProfileRow, ShippingSamplingMode, ShippingScenarioMatrix, ShippingZoneRow } from '@lepefy/types';
+
+function optionalText(value: unknown, max: number): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined;
+}
+
+function optionalAdminCode(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined;
+  const code = value.trim().toUpperCase();
+  return /^[A-Z0-9-]{1,20}$/.test(code) ? code : undefined;
+}
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -60,9 +73,14 @@ export async function POST(req: NextRequest) {
 
   for (const raw of rawDestinations) {
     const country = typeof raw.country === 'string' ? raw.country.trim().toUpperCase() : '';
-    const postalCode = typeof raw.postalCode === 'string' ? raw.postalCode.trim().toUpperCase() : '';
+    // Chaîne normalisée, jamais convertie en nombre : les zéros initiaux comptent.
+    const postalCode = typeof raw.postalCode === 'string' ? normalizePostalCode(raw.postalCode) : '';
     const requestedZoneCode = typeof raw.zoneCode === 'string' && raw.zoneCode.trim() ? raw.zoneCode.trim() : null;
-    const label = typeof raw.label === 'string' && raw.label.trim() ? raw.label.trim().slice(0, 120) : undefined;
+    const label = optionalText(raw.label, 120);
+    const city = optionalText(raw.city, 120);
+    const adminCode1 = optionalAdminCode(raw.adminCode1);
+    const adminCode2 = optionalAdminCode(raw.adminCode2);
+    const adminName = optionalText(raw.adminName, 120);
 
     if (!/^[A-Z]{2}$/.test(country) || postalCode.length < 3 || postalCode.length > 12) {
       return NextResponse.json({ error: 'Une destination est invalide.' }, { status: 400 });
@@ -77,14 +95,64 @@ export async function POST(req: NextRequest) {
 
     const zoneCode = requestedZoneCode ?? resolveZoneCodeFromRows(zones, country, postalCode);
     const key = `${country}|${postalCode}`;
-    if (!deduped.has(key)) deduped.set(key, { country, postalCode, zoneCode, label });
+    // Un même CAP peut desservir plusieurs communes : un seul scénario par CAP
+    // (le devis provider dépend du CAP), contexte de la première sélection conservé.
+    if (!deduped.has(key)) {
+      deduped.set(key, {
+        country, postalCode, zoneCode, label,
+        ...(city ? { city } : {}),
+        ...(adminCode1 !== undefined ? { adminCode1 } : {}),
+        ...(adminCode2 !== undefined ? { adminCode2 } : {}),
+        ...(adminName ? { adminName } : {}),
+      });
+    }
   }
 
+  const packagingProfileIds = Array.isArray(body.packagingProfileIds)
+    ? Array.from(new Set(body.packagingProfileIds.map(String)))
+    : [];
+  const samplingMode: ShippingSamplingMode = body.samplingMode === 'initial' || body.samplingMode === 'deep'
+    ? body.samplingMode
+    : 'manual';
+
+  let weightsByProfileId: Record<string, number[]> | undefined;
+  let weightsKg: number[] = Array.isArray(body.weightsKg) ? body.weightsKg.map(Number) : [];
+
+  if (samplingMode !== 'manual') {
+    if (samplingMode === 'deep' && body.confirmDeepAnalysis !== true) {
+      return NextResponse.json({ error: 'L’analyse approfondie doit être confirmée explicitement (volume d’appels Packlink élevé).' }, { status: 400 });
+    }
+    // Préréglage calculé côté serveur à partir des profils du tenant — le
+    // client n'envoie que le mode, jamais une matrice « préréglée » arbitraire.
+    const { data: profileData } = packagingProfileIds.length > 0
+      ? await supabase
+        .from('shipping_packaging_profiles')
+        .select('id, max_weight_g')
+        .eq('tenant_id', tenant.id)
+        .in('id', packagingProfileIds)
+      : { data: [] };
+    const profiles = (profileData ?? []) as Pick<ShippingPackagingProfileRow, 'id' | 'max_weight_g'>[];
+    if (profiles.length !== packagingProfileIds.length) {
+      return NextResponse.json({ error: 'Profil d’emballage invalide.' }, { status: 400 });
+    }
+    weightsByProfileId = buildWeightsByProfile(samplingMode, profiles);
+    weightsKg = Array.from(new Set(Object.values(weightsByProfileId).flat())).sort((a, b) => a - b);
+  }
+
+  const part = body.part && typeof body.part === 'object'
+    ? body.part as { index?: unknown; count?: unknown }
+    : null;
+
   const matrix: ShippingScenarioMatrix = {
-    weightsKg: Array.isArray(body.weightsKg) ? body.weightsKg.map(Number) : [],
-    packagingProfileIds: Array.isArray(body.packagingProfileIds) ? body.packagingProfileIds.map(String) : [],
+    weightsKg,
+    ...(weightsByProfileId ? { weightsByProfileId } : {}),
+    packagingProfileIds,
     destinations: Array.from(deduped.values()),
     freshnessWindowDays: Number.isFinite(Number(body.freshnessWindowDays)) ? Number(body.freshnessWindowDays) : 30,
+    samplingMode,
+    ...(part && Number.isInteger(part.index) && Number.isInteger(part.count)
+      ? { part: { index: part.index as number, count: part.count as number } }
+      : {}),
   };
 
   const validationError = validateScenarioMatrix(matrix);

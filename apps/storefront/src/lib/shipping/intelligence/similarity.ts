@@ -1,5 +1,6 @@
 import type { createServiceClient } from '@/lib/supabase/server';
 import type { ShippingPackagingProfileRow, ShippingQuoteObservationRow } from '@lepefy/types';
+import { latestValidPerScenario } from './operationalObservation';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -65,11 +66,12 @@ function confidenceFor(sampleSize: number, mostRecentObservedAt: string | null):
 }
 
 /**
- * Moteur de similarité déterministe (aucune IA/embedding) : filtre les
- * observations "choisies" (éligibles) par contraintes dures, puis calcule
- * une plage de coût + un niveau de confiance explicite, décomposée par
- * transporteur. Voir §6 de la proposition. Jamais présenté comme un prix
- * garanti.
+ * Moteur de similarité déterministe (aucune IA/embedding) : filtre les offres
+ * éligibles par contraintes dures, avec des TOLÉRANCES de poids/volume (±15 %
+ * / ±20 %) acceptables ici parce que le résultat est présenté comme une
+ * ESTIMATION (taille d'échantillon + confiance) — contrairement au réemploi en
+ * campagne, qui exige une demande strictement identique. L'échantillon compte
+ * des scénarios mesurés, pas les offres alternatives. Jamais un prix garanti.
  */
 export async function estimateForProfile(
   supabase: ServiceClient,
@@ -101,7 +103,7 @@ export async function estimateForProfile(
     .gte('total_weight_g', Math.round(params.totalWeightG - weightTolerance))
     .lte('total_weight_g', Math.round(params.totalWeightG + weightTolerance))
     .order('observed_at', { ascending: false })
-    .limit(200);
+    .limit(1000);
 
   const rows = (data ?? []) as ShippingQuoteObservationRow[];
 
@@ -123,52 +125,67 @@ export async function estimateForProfile(
     return Math.abs(perParcelVolume - targetVolume) / targetVolume <= VOLUME_DIFF_MAX_RATIO;
   }).filter((r) => r.total_provider_cost != null);
 
-  const costs = candidates.map((r) => r.total_provider_cost as number);
+  // Un échantillon = un scénario mesuré (request_hash), valorisé par
+  // l'observation opérationnelle de son devis le plus récent — jamais une
+  // offre alternative du même devis ni une ré-exécution du même scénario.
+  const scenarios = latestValidPerScenario(candidates);
+  const operational = scenarios.map((s) => s.chosen);
+  const costs = operational.map((r) => Number(r.total_provider_cost));
   const sampleSize = costs.length;
-  const mostRecentObservedAt = candidates[0]?.observed_at ?? null;
+  const mostRecentObservedAt = operational.reduce<string | null>(
+    (latest, r) => (latest === null || r.observed_at > latest ? r.observed_at : latest), null,
+  );
   const confidence = confidenceFor(sampleSize, mostRecentObservedAt);
 
-  // Décomposition par transporteur — voir doc-comment de ProfileEstimation.
-  const carrierGroups = new Map<string, ShippingQuoteObservationRow[]>();
-  for (const row of candidates) {
-    const key = row.carrier?.trim() || 'Transporteur inconnu';
-    const group = carrierGroups.get(key);
-    if (group) group.push(row);
-    else carrierGroups.set(key, [row]);
+  // Décomposition par transporteur (alternatives conservées pour l'analyse) :
+  // pour chaque scénario, l'offre la moins chère de chaque transporteur dans
+  // le devis retenu — un scénario compte au plus une fois par transporteur.
+  const carrierGroups = new Map<string, { costs: number[]; mostRecent: string }>();
+  for (const { execution } of scenarios) {
+    const bestByCarrier = new Map<string, ShippingQuoteObservationRow>();
+    for (const offer of execution.offers) {
+      const key = offer.carrier?.trim() || 'Transporteur inconnu';
+      const current = bestByCarrier.get(key);
+      if (!current || Number(offer.total_provider_cost) < Number(current.total_provider_cost)) bestByCarrier.set(key, offer);
+    }
+    for (const [carrier, offer] of bestByCarrier) {
+      const group = carrierGroups.get(carrier);
+      if (group) {
+        group.costs.push(Number(offer.total_provider_cost));
+        if (offer.observed_at > group.mostRecent) group.mostRecent = offer.observed_at;
+      } else {
+        carrierGroups.set(carrier, { costs: [Number(offer.total_provider_cost)], mostRecent: offer.observed_at });
+      }
+    }
   }
   const byCarrier: CarrierEstimation[] = Array.from(carrierGroups.entries())
-    .map(([carrier, carrierRows]) => {
-      const carrierCosts = carrierRows.map((r) => r.total_provider_cost as number);
-      const carrierMostRecent = carrierRows.reduce(
-        (latest, r) => (r.observed_at > latest ? r.observed_at : latest), carrierRows[0]!.observed_at,
-      );
-      return {
-        carrier,
-        sampleSize: carrierRows.length,
-        confidence: confidenceFor(carrierRows.length, carrierMostRecent),
-        minCost: Math.min(...carrierCosts),
-        medianCost: parseFloat(median(carrierCosts).toFixed(2)),
-        maxCost: Math.max(...carrierCosts),
-        mostRecentObservedAt: carrierMostRecent,
-        freshnessDays: daysSince(carrierMostRecent),
-      };
-    })
+    .map(([carrier, group]) => ({
+      carrier,
+      sampleSize: group.costs.length,
+      confidence: confidenceFor(group.costs.length, group.mostRecent),
+      minCost: Math.min(...group.costs),
+      medianCost: parseFloat(median(group.costs).toFixed(2)),
+      maxCost: Math.max(...group.costs),
+      mostRecentObservedAt: group.mostRecent,
+      freshnessDays: daysSince(group.mostRecent),
+    }))
     .sort((a, b) => a.medianCost - b.medianCost)
     .slice(0, MAX_CARRIERS_RETURNED);
 
-  // Prochain palier : observation la moins chère au-dessus du poids cible
-  // dont le coût médian diffère significativement de la plage courante.
+  // Prochain palier : scénario (observation opérationnelle) le plus léger
+  // au-dessus du poids cible dont le coût diffère significativement.
   let nextBoundary: ProfileEstimation['nextBoundary'] = null;
   if (sampleSize > 0) {
     const currentMedian = median(costs);
-    const heavier = pool
-      .filter((r) => r.total_weight_g > params.totalWeightG && r.total_provider_cost != null)
+    const heavier = latestValidPerScenario(pool.filter((r) => r.total_provider_cost != null))
+      .map((s) => s.chosen)
+      .filter((r) => r.total_weight_g > params.totalWeightG)
       .sort((a, b) => a.total_weight_g - b.total_weight_g);
-    const nextStep = heavier.find((r) => Math.abs((r.total_provider_cost as number) - currentMedian) >= 0.5);
+    const nextStep = heavier.find((r) => Math.abs(Number(r.total_provider_cost) - currentMedian) >= 0.5);
     if (nextStep) {
       nextBoundary = {
         deltaKg: parseFloat(((nextStep.total_weight_g - params.totalWeightG) / 1000).toFixed(2)),
-        nextCost: nextStep.total_provider_cost as number,
+        nextCost: Number(nextStep.total_provider_cost),
       };
     }
   }

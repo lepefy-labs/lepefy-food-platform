@@ -127,7 +127,7 @@ export function AssistantClient() {
                       <div className="text-right shrink-0 pl-2">
                         <span className="font-medium text-gray-900 dark:text-gray-100">{c.medianCost.toFixed(2)} €</span>
                         <span className="text-gray-400"> ({c.minCost.toFixed(2)}–{c.maxCost.toFixed(2)})</span>
-                        <span className="text-gray-400"> · {c.sampleSize} obs.</span>
+                        <span className="text-gray-400"> · {c.sampleSize} scén.</span>
                       </div>
                     </div>
                   ))}

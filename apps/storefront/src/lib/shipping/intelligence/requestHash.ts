@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 
 /**
- * Clé d'équivalence rapide pour une observation : deux scénarios strictement
- * identiques (mêmes valeurs arrondies) produisent le même hash. Le
- * rapprochement approximatif (tolérance de poids/volume) est fait séparément
- * en base — ce hash ne sert qu'au chemin rapide de correspondance exacte.
+ * Clé d'identité d'une demande provider : deux demandes strictement
+ * identiques (origine, pays + CAP de destination, colis poids × dimensions)
+ * produisent le même hash. Le tenant n'y figure pas — toute lecture filtre
+ * tenant_id séparément. Le hash sert de clé de recherche ; la correspondance
+ * est ensuite revérifiée champ par champ (requestIdentity.ts). Aucune
+ * tolérance de poids/volume : c'est la seule équivalence admise pour un
+ * réemploi en campagne.
  */
 export function computeRequestHash(input: {
   provider: string;

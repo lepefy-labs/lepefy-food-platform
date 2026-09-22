@@ -2,12 +2,18 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import type { ShippingQuoteObservationRow, ShippingSimulationCampaignItemRow } from '@lepefy/types';
+import { loadCampaignCoverage } from '@/lib/shipping/intelligence/campaignData';
+import type { ShippingSimulationCampaignRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
+/**
+ * Détail d'une campagne : couverture vérifiée par CAP × profil (items
+ * paginés, observations relues par lots et filtrées par tenant). Ne renvoie
+ * pas les milliers d'offres brutes.
+ */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -26,28 +32,16 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   if (error || !campaign) return NextResponse.json({ error: 'Campagne introuvable.' }, { status: 404 });
 
-  // Une campagne compte au plus MAX_CAMPAIGN_SCENARIOS (2000) items — la
-  // limite explicite doit couvrir ce plafond, sinon PostgREST tronque
-  // silencieusement à 1000 lignes.
-  const { data: items } = await supabase
-    .from('shipping_simulation_campaign_items')
-    .select('*')
-    .eq('campaign_id', params.id)
-    .limit(2500);
-
-  const observationIds = (items as ShippingSimulationCampaignItemRow[] | null ?? [])
-    .map((i) => i.observation_id)
-    .filter((id): id is string => Boolean(id));
-
-  let observations: ShippingQuoteObservationRow[] = [];
-  if (observationIds.length > 0) {
-    const { data } = await supabase
-      .from('shipping_quote_observations')
-      .select('*')
-      .in('id', observationIds)
-      .limit(2500);
-    observations = (data as ShippingQuoteObservationRow[] | null) ?? [];
+  try {
+    const coverage = await loadCampaignCoverage(supabase, tenant.id, campaign as ShippingSimulationCampaignRow);
+    return NextResponse.json({
+      campaign,
+      summary: coverage.summary,
+      postalCodes: coverage.postalCodes,
+      rows: coverage.rows,
+      itemsTruncated: coverage.itemsTruncated,
+    });
+  } catch {
+    return NextResponse.json({ error: 'Impossible de calculer la couverture de la campagne.' }, { status: 500 });
   }
-
-  return NextResponse.json({ campaign, items: items ?? [], observations });
 }

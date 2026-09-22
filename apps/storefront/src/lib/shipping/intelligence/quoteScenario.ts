@@ -3,31 +3,45 @@ import {
   isEligibleService,
   getExclusionReason,
   describePacklinkService,
-  splitIntoParcels,
 } from '@/lib/shipping/calculateShipping';
-import { computeRequestHash } from './requestHash';
+import { buildScenarioRequest, INTELLIGENCE_FROM_ADDRESS } from './requestIdentity';
+import { chooseOperationalOffer, operationalCost } from './operationalObservation';
 import type { createServiceClient } from '@/lib/supabase/server';
 import type { ShippingObservationSource, ShippingPackagingProfileRow } from '@lepefy/types';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-// Même adresse d'expédition que /api/shipping/quote et le simulateur admin —
-// dupliquée ici volontairement, cf. convention établie (ne pas toucher au
-// fichier de flux réel pour exporter une valeur interne).
-export const INTELLIGENCE_FROM_ADDRESS = { country: 'IT', zip_code: '42122' };
+export { INTELLIGENCE_FROM_ADDRESS };
 
-export interface ScenarioQuoteResult {
-  ok: boolean;
-  chosenObservationId: string | null;
-  error?: string;
-}
+/**
+ * Issue d'une exécution de scénario. Seul `ok: true` constitue un devis
+ * exploitable (une observation opérationnelle choisie existe) :
+ *  - provider_error            : appel Packlink en échec, rien de persisté ;
+ *  - no_service                : Packlink n'a renvoyé aucun service, rien de persisté ;
+ *  - no_eligible_service       : services reçus et persistés (avec motif
+ *                                d'exclusion) mais aucun n'est éligible ;
+ *  - persistence_error         : devis reçu mais écriture impossible ;
+ *  - chosen_observation_missing: offres écrites mais l'observation choisie
+ *                                n'a pas été retrouvée dans le retour d'insert.
+ */
+export type ScenarioQuoteFailureReason =
+  | 'provider_error'
+  | 'no_service'
+  | 'no_eligible_service'
+  | 'persistence_error'
+  | 'chosen_observation_missing';
+
+export type ScenarioQuoteResult =
+  | { ok: true; chosenObservationId: string; offersCount: number; eligibleCount: number }
+  | { ok: false; reason: ScenarioQuoteFailureReason; error: string; offersPersisted: boolean };
 
 /**
  * Interroge Packlink pour un scénario (poids, profil d'emballage,
  * destination) et persiste UNE ligne shipping_quote_observations par service
- * retourné (éligible ou non, avec le motif d'exclusion) — même niveau de
- * détail que le simulateur admin, mais conservé au lieu d'être jeté. Retourne
- * l'id de l'observation "choisie" (moins chère et éligible), s'il y en a une.
+ * retourné (éligible ou non, avec le motif d'exclusion) — les alternatives
+ * restent disponibles pour l'analyse par transporteur/service. Désigne
+ * ensuite UNE observation opérationnelle : le service éligible au coût total
+ * (base + taxes) le plus bas. Ce coût est un devis, jamais une facture.
  */
 export async function quoteScenarioAndPersist(params: {
   supabase: ServiceClient;
@@ -41,82 +55,64 @@ export async function quoteScenarioAndPersist(params: {
 }): Promise<ScenarioQuoteResult> {
   const { supabase, tenantId, packlinkApiKey, source, campaignId, weightKg, profile, destination } = params;
 
-  const totalWeightG = Math.round(weightKg * 1000);
-  const parcelWeightsG = splitIntoParcels(totalWeightG, profile.max_weight_g / 1000);
-  const numParcels = parcelWeightsG.length;
-  const to = { country: destination.country, zip_code: destination.postalCode };
-
-  const parcelsForObservation = parcelWeightsG.map((g) => ({
-    weight_g: g,
-    length_cm: profile.box_length_cm,
-    width_cm: profile.box_width_cm,
-    height_cm: profile.box_height_cm,
-  }));
-
-  const requestHash = computeRequestHash({
-    provider: 'packlink',
-    originCountry: INTELLIGENCE_FROM_ADDRESS.country,
-    originPostalCode: INTELLIGENCE_FROM_ADDRESS.zip_code,
-    destinationCountry: destination.country,
-    destinationPostalCode: destination.postalCode,
-    numParcels,
-    parcels: parcelWeightsG.map((g) => ({
-      weightG: g, lengthCm: profile.box_length_cm, widthCm: profile.box_width_cm, heightCm: profile.box_height_cm,
-    })),
-  });
+  const request = buildScenarioRequest({ weightKg, profile, destination });
 
   let services;
   try {
     services = await fetchAllPacklinkServices(
-      packlinkApiKey, INTELLIGENCE_FROM_ADDRESS, to,
-      parcelWeightsG.map((g) => ({
-        weight: parseFloat((g / 1000).toFixed(3)),
-        width: profile.box_width_cm,
-        height: profile.box_height_cm,
-        length: profile.box_length_cm,
+      packlinkApiKey,
+      INTELLIGENCE_FROM_ADDRESS,
+      { country: request.destinationCountry, zip_code: request.destinationPostalCode },
+      request.parcels.map((p) => ({
+        weight: parseFloat((p.weight_g / 1000).toFixed(3)),
+        width: p.width_cm,
+        height: p.height_cm,
+        length: p.length_cm,
       })),
     );
   } catch (err) {
-    return { ok: false, chosenObservationId: null, error: err instanceof Error ? err.message : 'packlink_error' };
+    return { ok: false, reason: 'provider_error', error: err instanceof Error ? err.message : 'provider_error', offersPersisted: false };
   }
 
   if (services === null) {
-    return { ok: false, chosenObservationId: null, error: 'packlink_error' };
+    return { ok: false, reason: 'provider_error', error: 'provider_error', offersPersisted: false };
   }
   if (services.length === 0) {
-    return { ok: false, chosenObservationId: null, error: 'no_service' };
+    return { ok: false, reason: 'no_service', error: 'no_service', offersPersisted: false };
   }
 
-  const eligible = services.filter(isEligibleService);
-  const cheapest = eligible.length > 0
-    ? eligible.reduce((min, s) => (s.price.base_price < min.price.base_price ? s : min))
-    : null;
+  const chosen = chooseOperationalOffer(services.map((s) => ({
+    id: s.id,
+    eligible: isEligibleService(s),
+    basePrice: Number(s.price.base_price),
+    taxPrice: Number(s.price.tax_price ?? 0),
+  })));
 
   const rows = services.map((s) => {
     const { carrierName, serviceName } = describePacklinkService(s);
     return {
       tenant_id: tenantId,
-      provider: 'packlink',
+      provider: request.provider,
       source,
       campaign_id: campaignId,
-      origin_country: INTELLIGENCE_FROM_ADDRESS.country,
-      origin_postal_code: INTELLIGENCE_FROM_ADDRESS.zip_code,
-      destination_country: destination.country,
-      destination_postal_code: destination.postalCode,
+      origin_country: request.originCountry,
+      origin_postal_code: request.originPostalCode,
+      destination_country: request.destinationCountry,
+      destination_postal_code: request.destinationPostalCode,
       destination_zone_code: destination.zoneCode ?? null,
-      num_parcels: numParcels,
-      parcels: parcelsForObservation,
-      total_weight_g: totalWeightG,
+      num_parcels: request.numParcels,
+      parcels: request.parcels,
+      total_weight_g: request.totalWeightG,
       packaging_profile_id: profile.id,
       service_id: String(s.id),
       carrier: carrierName || null,
       service_name: serviceName || null,
       base_price: s.price.base_price,
       tax_price: s.price.tax_price ?? 0,
-      total_provider_cost: parseFloat((s.price.base_price + (s.price.tax_price ?? 0)).toFixed(2)),
+      total_provider_cost: operationalCost({ base_price: s.price.base_price, tax_price: s.price.tax_price ?? 0 }),
       eligible: isEligibleService(s),
       exclusion_reason: getExclusionReason(s),
-      request_hash: requestHash,
+      request_hash: request.requestHash,
     };
   });
 
@@ -126,12 +122,19 @@ export async function quoteScenarioAndPersist(params: {
     .select('id, service_id');
 
   if (insertError) {
-    return { ok: false, chosenObservationId: null, error: insertError.message };
+    return { ok: false, reason: 'persistence_error', error: `persistence_error: ${insertError.message}`, offersPersisted: false };
   }
 
-  const chosenObservation = cheapest
-    ? (inserted as { id: string; service_id: string }[] | null)?.find((r) => r.service_id === String(cheapest.id))
-    : null;
+  const eligibleCount = rows.filter((r) => r.eligible).length;
+  if (!chosen) {
+    return { ok: false, reason: 'no_eligible_service', error: 'no_eligible_service', offersPersisted: true };
+  }
 
-  return { ok: true, chosenObservationId: chosenObservation?.id ?? null };
+  const chosenObservation = (inserted as { id: string; service_id: string }[] | null)
+    ?.find((r) => r.service_id === String(chosen.id));
+  if (!chosenObservation) {
+    return { ok: false, reason: 'chosen_observation_missing', error: 'chosen_observation_missing', offersPersisted: true };
+  }
+
+  return { ok: true, chosenObservationId: chosenObservation.id, offersCount: rows.length, eligibleCount };
 }

@@ -23,12 +23,16 @@ export default async function AdminShippingHistoryPage() {
       <AdminPageHeader
         title="Livraison"
         description="Coûts fournisseur observés, agrégés par destination et profil d'emballage — jamais un prix client."
-        meta={`${summary.totalObservations} observation${summary.totalObservations !== 1 ? 's' : ''} au total`}
+        meta={`${summary.scenariosMeasured} scénario${summary.scenariosMeasured !== 1 ? 's' : ''} mesuré${summary.scenariosMeasured !== 1 ? 's' : ''} · ${summary.totalObservations} offre${summary.totalObservations !== 1 ? 's' : ''} provider enregistrée${summary.totalObservations !== 1 ? 's' : ''}`}
       />
 
       <LivraisonTabs active="historique" />
 
       <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <p className="text-xs text-gray-400 mb-3">
+          Un échantillon = un scénario mesuré (CAP × poids × colis), valorisé par le service éligible au coût base + taxes le plus bas de son devis le plus récent. Ce sont des devis Packlink, pas des factures.
+          {summary.truncated && <> Volume maximal lu atteint : agrégats partiels.</>}
+        </p>
         {summary.groups.length === 0 ? (
           <p className="text-sm text-gray-400">
             Aucune observation encore — utilisez le laboratoire (test rapide ou campagne) pour commencer à construire l&apos;historique.
@@ -39,7 +43,7 @@ export default async function AdminShippingHistoryPage() {
               <thead>
                 <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
                   <th className="py-2 pr-3">Destination</th><th className="py-2 pr-3">Profil</th><th className="py-2 pr-3">Coût médian</th>
-                  <th className="py-2 pr-3">Plage</th><th className="py-2 pr-3">Échantillon</th><th className="py-2 pr-3">Confiance</th><th className="py-2 pr-3">Dernière observation</th>
+                  <th className="py-2 pr-3">Plage</th><th className="py-2 pr-3" title="Scénarios distincts mesurés (dernier devis valide de chacun) — les offres alternatives d'un même devis ne comptent pas">Scénarios</th><th className="py-2 pr-3">CAP</th><th className="py-2 pr-3">Confiance</th><th className="py-2 pr-3">Dernière observation</th>
                 </tr>
               </thead>
               <tbody>
@@ -50,6 +54,7 @@ export default async function AdminShippingHistoryPage() {
                     <td className="py-2.5 pr-3 font-medium">{g.medianCost.toFixed(2)} €</td>
                     <td className="py-2.5 pr-3 text-gray-500">{g.minCost.toFixed(2)}–{g.maxCost.toFixed(2)} €</td>
                     <td className="py-2.5 pr-3 text-gray-400">{g.sampleSize}</td>
+                    <td className="py-2.5 pr-3 text-gray-400">{g.postalCodes}</td>
                     <td className="py-2.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${CONFIDENCE_CLS[g.confidence]}`}>{CONFIDENCE_LABEL[g.confidence]}</span></td>
                     <td className="py-2.5 pr-3 text-gray-400">{new Date(g.mostRecentObservedAt).toLocaleDateString('fr-FR')}</td>
                   </tr>

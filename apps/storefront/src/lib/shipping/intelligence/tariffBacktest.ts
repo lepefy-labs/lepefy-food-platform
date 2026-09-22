@@ -1,10 +1,98 @@
-import type { ShippingMultiParcelStrategy, ShippingTariffBand } from '@lepefy/types';
+import type { ShippingMultiParcelStrategy, ShippingQuoteObservationRow, ShippingTariffBand } from '@lepefy/types';
+import { latestValidPerScenario } from './operationalObservation';
 
 export interface BacktestRow {
   providerCost: number;
   weightKg: number;
   zoneCode: string | null;
   numParcels: number;
+}
+
+export type ScenarioBacktestObservation = Pick<ShippingQuoteObservationRow,
+  | 'id' | 'request_hash' | 'observed_at' | 'eligible' | 'total_provider_cost' | 'total_weight_g'
+  | 'destination_zone_code' | 'destination_country' | 'destination_postal_code' | 'num_parcels'>;
+
+export interface ScenarioSampleStats {
+  /** Lignes d'offres provider lues (alternatives comprises). */
+  offersRead: number;
+  /** Exécutions de devis distinctes (un appel provider = une exécution). */
+  executions: number;
+  /** Scénarios distincts mesurés = taille réelle de l'échantillon. */
+  scenarios: number;
+  /** Offres alternatives écartées (non comptées comme échantillons). */
+  alternativeOffersExcluded: number;
+  /** Exécutions plus anciennes d'un même scénario écartées. */
+  olderExecutionsExcluded: number;
+  postalCodes: number;
+  zones: number;
+  countries: number;
+  /** Part du CAP le plus représenté (0–1) : concentration géographique. */
+  topPostalCodeShare: number;
+}
+
+/**
+ * Transforme des lignes d'offres (une par service Packlink) en échantillon
+ * statistique : UNE observation opérationnelle (service éligible au coût total
+ * le plus bas) par exécution, puis UNE exécution — la plus récente valide —
+ * par scénario (request_hash). Les offres alternatives d'un même devis ne sont
+ * jamais des tirages indépendants.
+ */
+export function buildScenarioBacktestSample(rows: ScenarioBacktestObservation[]): { rows: BacktestRow[]; stats: ScenarioSampleStats } {
+  const perScenario = latestValidPerScenario(rows);
+  const executions = new Set(rows.map((r) => `${r.request_hash}@${new Date(r.observed_at).toISOString()}`)).size;
+  const postal = new Map<string, number>();
+  const zones = new Set<string>();
+  const countries = new Set<string>();
+  let executionsUsedTotal = 0;
+
+  const backtestRows: BacktestRow[] = perScenario.map(({ chosen, executionsForScenario }) => {
+    executionsUsedTotal += executionsForScenario;
+    const postalKey = `${chosen.destination_country}|${chosen.destination_postal_code}`;
+    postal.set(postalKey, (postal.get(postalKey) ?? 0) + 1);
+    if (chosen.destination_zone_code) zones.add(chosen.destination_zone_code);
+    countries.add(chosen.destination_country);
+    return {
+      providerCost: Number(chosen.total_provider_cost),
+      weightKg: chosen.total_weight_g / 1000,
+      zoneCode: chosen.destination_zone_code,
+      numParcels: chosen.num_parcels,
+    };
+  });
+
+  const scenarios = backtestRows.length;
+  const topPostal = Math.max(0, ...Array.from(postal.values()));
+  return {
+    rows: backtestRows,
+    stats: {
+      offersRead: rows.length,
+      executions,
+      scenarios,
+      alternativeOffersExcluded: rows.length - executions,
+      olderExecutionsExcluded: Math.max(0, executionsUsedTotal - scenarios),
+      postalCodes: postal.size,
+      zones: zones.size,
+      countries: countries.size,
+      topPostalCodeShare: scenarios > 0 ? parseFloat((topPostal / scenarios).toFixed(3)) : 0,
+    },
+  };
+}
+
+export type SampleReliability = 'insufficient' | 'limited' | 'indicative';
+
+export const MIN_SCENARIOS_FOR_INDICATIVE = 30;
+export const MIN_POSTAL_CODES_FOR_INDICATIVE = 10;
+
+/**
+ * Fiabilité volontairement prudente d'un échantillon SYNTHÉTIQUE : jamais
+ * « élevée » (grille uniforme, pas la fréquence réelle des commandes).
+ *  - insufficient : < 30 scénarios distincts ;
+ *  - limited      : couverture géographique étroite (< 10 CAP, ou un CAP > 50 %) ;
+ *  - indicative   : sinon.
+ */
+export function assessScenarioReliability(stats: Pick<ScenarioSampleStats, 'scenarios' | 'postalCodes' | 'topPostalCodeShare'>): SampleReliability {
+  if (stats.scenarios < MIN_SCENARIOS_FOR_INDICATIVE) return 'insufficient';
+  if (stats.postalCodes < MIN_POSTAL_CODES_FOR_INDICATIVE || stats.topPostalCodeShare > 0.5) return 'limited';
+  return 'indicative';
 }
 
 export interface BacktestMetrics {

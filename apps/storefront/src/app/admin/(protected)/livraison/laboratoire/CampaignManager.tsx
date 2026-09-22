@@ -3,22 +3,48 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
-import type { ShippingPackagingProfileRow, ShippingSimulationCampaignRow, ShippingZoneRow } from '@lepefy/types';
+import type {
+  ShippingPackagingProfileRow,
+  ShippingScenarioDestination,
+  ShippingScenarioMatrix,
+  ShippingSimulationCampaignRow,
+  ShippingZoneRow,
+} from '@lepefy/types';
 import {
   CampaignDestinationPicker,
   emptyCampaignDestination,
   type CampaignDestinationRow,
 } from './CampaignDestinationPicker';
+import { MAX_CAMPAIGN_SCENARIOS, splitDestinationsForLimit } from '@/lib/shipping/intelligence/scenarioMatrix';
+import { parseManualWeights, weightsForProfile } from '@/lib/shipping/intelligence/weightPresets';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
 const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
-// Densité accrue autour de chaque multiple de 15 kg (max_weight_g par défaut
-// du profil "Standard") : c'est là que le nombre de colis change (1→2→3→4),
-// donc là que le coût fait ses plus gros sauts, pas seulement en fonction du
-// poids brut.
-const DEFAULT_WEIGHTS = '1, 2, 3, 5, 7.5, 9, 9.5, 10, 10.5, 11, 12.5, 14, 14.5, 15, 15.5, 16, 18, 20, 22.5, 25, 27.5, 29, 29.5, 30, 30.5, 31, 33, 35, 38, 40, 44, 44.5, 45, 45.5, 46, 48, 50';
-const MAX_CAMPAIGN_SCENARIOS = 2000;
+
+type UiSamplingMode = 'initial' | 'deep' | 'manual';
+
+const SAMPLING_MODES: Array<{ value: UiSamplingMode; title: string; description: string }> = [
+  {
+    value: 'initial',
+    title: 'Couverture initiale',
+    description: '≈ 6 poids par profil : 1 kg, 3 kg, mi-capacité, juste avant / juste après le passage à 2 colis, 2 colis pleins.',
+  },
+  {
+    value: 'deep',
+    title: 'Analyse approfondie',
+    description: 'Points denses autour des paliers transporteur (1, 2, 3, 5, 10, 20 kg) et des seuils 1×, 2×, 3× la capacité du profil. Coût API élevé.',
+  },
+  {
+    value: 'manual',
+    title: 'Poids manuels',
+    description: 'Vos propres poids, appliqués à chaque profil sélectionné.',
+  },
+];
+
+const MODE_LABEL: Record<string, string> = {
+  initial: 'Couverture initiale', deep: 'Analyse approfondie', manual: 'Poids manuels', resample: 'Remesure',
+};
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Brouillon', queued: 'En file', running: 'En cours',
@@ -30,6 +56,10 @@ const STATUS_CLS: Record<string, string> = {
 };
 type CampaignNotice = { tone: 'success' | 'warning'; text: string };
 
+function formatKg(value: number): string {
+  return value.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+}
+
 export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagingProfileRow[]; zones: ShippingZoneRow[] }) {
   const [campaigns, setCampaigns] = useState<ShippingSimulationCampaignRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -39,7 +69,10 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<CampaignNotice | null>(null);
   const [name, setName] = useState('');
-  const [weightsInput, setWeightsInput] = useState(DEFAULT_WEIGHTS);
+  const [samplingMode, setSamplingMode] = useState<UiSamplingMode>('initial');
+  const [weightsInput, setWeightsInput] = useState('');
+  const [confirmDeep, setConfirmDeep] = useState(false);
+  const [launchedParts, setLaunchedParts] = useState<number[]>([]);
   const [selectedProfiles, setSelectedProfiles] = useState<string[]>(profiles.filter((p) => p.active).map((p) => p.id));
   const [destinations, setDestinations] = useState<CampaignDestinationRow[]>([emptyCampaignDestination()]);
 
@@ -56,38 +89,70 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
 
   useEffect(() => { void loadCampaigns(); }, []);
 
-  const weightsKg = useMemo(
-    () => weightsInput.split(',').map((w) => Number(w.trim())).filter((w) => Number.isFinite(w) && w > 0),
-    [weightsInput],
-  );
+  const manualWeights = useMemo(() => parseManualWeights(weightsInput), [weightsInput]);
+
+  // Aperçu client — le serveur recalcule les préréglages depuis les profils
+  // du tenant, c'est lui qui fait foi.
+  const weightsByProfile = useMemo(() => profiles
+    .filter((p) => selectedProfiles.includes(p.id))
+    .map((p) => ({
+      profile: p,
+      weights: samplingMode === 'manual' ? manualWeights : weightsForProfile(samplingMode, p.max_weight_g),
+    })), [manualWeights, profiles, samplingMode, selectedProfiles]);
 
   const expandedDestinations = useMemo(() => {
-    const unique = new Map<string, { country: string; postalCode: string; zoneCode: string | null; label: string }>();
+    const unique = new Map<string, ShippingScenarioDestination>();
     for (const destination of destinations) {
       const postalCodes = destination.mode === 'city'
         ? destination.postalCodes
         : [destination.manualPostalCode.trim()].filter(Boolean);
 
       for (const postalCode of postalCodes) {
+        // Chaîne conservée telle quelle (zéros initiaux significatifs).
         const normalizedPostalCode = postalCode.trim().toUpperCase();
         if (!normalizedPostalCode) continue;
         const key = `${destination.country}|${normalizedPostalCode}`;
         if (unique.has(key)) continue;
+        const isCity = destination.mode === 'city' && Boolean(destination.city);
         unique.set(key, {
           country: destination.country,
           postalCode: normalizedPostalCode,
           zoneCode: destination.zoneCode,
-          label: destination.mode === 'city' && destination.city
-            ? `${destination.city} · ${normalizedPostalCode}`
-            : `${destination.country} · ${normalizedPostalCode}`,
+          label: isCity ? `${destination.city} · ${normalizedPostalCode}` : `${destination.country} · ${normalizedPostalCode}`,
+          ...(isCity ? {
+            city: destination.city,
+            adminCode1: destination.adminCode1,
+            adminCode2: destination.adminCode2,
+            adminName: destination.stateName || undefined,
+          } : {}),
         });
       }
     }
     return Array.from(unique.values());
   }, [destinations]);
 
-  const scenariosPerPostalCode = weightsKg.length * selectedProfiles.length;
+  const scenariosPerPostalCode = weightsByProfile.reduce((sum, entry) => sum + entry.weights.length, 0);
   const scenarioCount = scenariosPerPostalCode * expandedDestinations.length;
+  const overLimit = scenarioCount > MAX_CAMPAIGN_SCENARIOS;
+  const parts = useMemo(
+    () => (overLimit ? splitDestinationsForLimit(expandedDestinations, scenariosPerPostalCode) : []),
+    [expandedDestinations, overLimit, scenariosPerPostalCode],
+  );
+  const initialPreviewCount = useMemo(() => profiles
+    .filter((p) => selectedProfiles.includes(p.id))
+    .reduce((sum, p) => sum + weightsForProfile('initial', p.max_weight_g).length, 0) * expandedDestinations.length,
+  [expandedDestinations.length, profiles, selectedProfiles]);
+
+  useEffect(() => { setLaunchedParts([]); }, [expandedDestinations, samplingMode, selectedProfiles, weightsInput]);
+
+  function changeMode(mode: UiSamplingMode) {
+    if (mode === 'manual' && !weightsInput.trim()) {
+      const union = Array.from(new Set(weightsByProfile.flatMap((e) => e.weights))).sort((a, b) => a - b);
+      setWeightsInput(union.join(', '));
+    }
+    if (mode !== 'deep') setConfirmDeep(false);
+    setSamplingMode(mode);
+  }
 
   async function processCampaign(id: string, automatic = false) {
     setProcessingId(id);
@@ -107,7 +172,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
       }
       const result = data.result;
       setNotice((result?.processed ?? 0) > 0
-        ? { tone: 'success', text: `Lot immédiat : ${result?.processed ?? 0} scénario(s), ${result?.succeeded ?? 0} réussi(s), ${result?.skipped ?? 0} doublon(s), ${result?.failed ?? 0} échec(s). Le worker poursuivra si nécessaire.` }
+        ? { tone: 'success', text: `Lot immédiat : ${result?.processed ?? 0} scénario(s) — ${result?.succeeded ?? 0} nouveau(x) devis Packlink, ${result?.skipped ?? 0} réemploi(s) de devis identique, ${result?.failed ?? 0} échec(s). Le worker poursuivra si nécessaire.` }
         : { tone: 'warning', text: 'Aucun scénario pris dans ce lot ; le worker automatique reste actif.' });
     } catch {
       setNotice({
@@ -122,32 +187,48 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
     }
   }
 
-  async function handleCreate() {
+  function validateForm(): string | null {
+    if (selectedProfiles.length === 0) return 'Sélectionnez au moins un profil d\'emballage.';
+    if (samplingMode === 'manual' && manualWeights.length === 0) return 'Indiquez au moins un poids valide.';
+    if (weightsByProfile.some((e) => e.weights.length === 0)) return 'Un profil sélectionné ne produit aucun poids valide.';
+    if (expandedDestinations.length === 0) return 'Sélectionnez au moins une ville ou indiquez un code postal.';
+    if (samplingMode === 'deep' && !confirmDeep) return 'Confirmez le volume d’appels Packlink de l’analyse approfondie.';
+    return null;
+  }
+
+  async function createCampaign(subset: ShippingScenarioDestination[], part?: { index: number; count: number }) {
     setError(null);
     setNotice(null);
-    if (weightsKg.length === 0) return setError('Indiquez au moins un poids valide.');
-    if (selectedProfiles.length === 0) return setError('Sélectionnez au moins un profil d\'emballage.');
-    if (expandedDestinations.length === 0) return setError('Sélectionnez au moins une ville ou indiquez un code postal.');
-    if (scenarioCount > MAX_CAMPAIGN_SCENARIOS) {
-      return setError(`${scenarioCount} scénarios dépassent la limite de ${MAX_CAMPAIGN_SCENARIOS}. Réduisez les poids, profils ou destinations.`);
+    const formError = validateForm();
+    if (formError) return setError(formError);
+    if (subset.length * scenariosPerPostalCode > MAX_CAMPAIGN_SCENARIOS) {
+      return setError(`${subset.length * scenariosPerPostalCode} scénarios dépassent la limite de ${MAX_CAMPAIGN_SCENARIOS}.`);
     }
 
     setSubmitting(true);
     try {
+      const baseName = name.trim() || `Campagne ${new Date().toLocaleDateString('fr-FR')}`;
       const res = await fetch('/api/admin/shipping-simulation-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim() || undefined,
-          weightsKg,
+          name: part ? `${baseName} (partie ${part.index}/${part.count})` : baseName,
+          samplingMode,
+          confirmDeepAnalysis: samplingMode === 'deep' ? confirmDeep : undefined,
+          weightsKg: samplingMode === 'manual' ? manualWeights : undefined,
           packagingProfileIds: selectedProfiles,
-          destinations: expandedDestinations,
+          destinations: subset,
+          part,
         }),
       });
       const data = await res.json() as ShippingSimulationCampaignRow & { error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Erreur');
-      setCreating(false);
-      setName('');
+      if (part) {
+        setLaunchedParts((prev) => [...prev, part.index]);
+      } else {
+        setCreating(false);
+        setName('');
+      }
       await loadCampaigns();
       void processCampaign(data.id, true);
     } catch (err) {
@@ -162,6 +243,10 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
     await loadCampaigns();
   }
 
+  const overflowExplanation = weightsByProfile
+    .map((e) => `${e.profile.name} : ${e.weights.length} poids`)
+    .join(' + ');
+
   return (
     <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
       <div className="flex items-center justify-between mb-1">
@@ -169,7 +254,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
         <button onClick={() => void loadCampaigns()} className="min-h-8 px-2 py-1.5 text-xs rounded-lg border border-gray-200 flex items-center gap-1 text-gray-500"><IconRefresh size={14} stroke={1.5} />Actualiser</button>
       </div>
       <p className="text-xs text-gray-400 mb-4">
-        Une ville est déployée sur tous ses codes postaux connus. Chaque CAP reçoit toutes les combinaisons poids × profils ; le worker traite les appels Packlink par petits lots.
+        Chaque CAP est une destination distincte. Un scénario n&apos;est couvert que par un devis de SON CAP et de sa configuration de colis exacte — nouvel appel Packlink, ou réemploi d&apos;un devis strictement identique encore frais.
       </p>
 
       {notice && <div className={`mb-4 px-3 py-2 rounded-lg text-xs border ${notice.tone === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>{notice.text}</div>}
@@ -182,44 +267,48 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
         <div className="overflow-x-auto mb-6">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
-              <th className="py-2 pr-3">Nom</th><th className="py-2 pr-3">Statut</th><th className="py-2 pr-3">Progression</th><th className="py-2 pr-3">Créée</th><th className="py-2 pr-3 text-right">Actions</th>
+              <th className="py-2 pr-3">Nom</th><th className="py-2 pr-3">Statut</th><th className="py-2 pr-3">Traités</th><th className="py-2 pr-3">Créée</th><th className="py-2 pr-3 text-right">Actions</th>
             </tr></thead>
             <tbody>
-              {campaigns.map((c) => (
-                <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/60">
-                  <td className="py-2.5 pr-3"><Link href={`/admin/livraison/laboratoire/${c.id}`} className="text-[var(--color-primary-dark)] hover:underline">{c.name}</Link></td>
-                  <td className="py-2.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${STATUS_CLS[c.status] ?? 'bg-gray-100 text-gray-500'}`}>{STATUS_LABEL[c.status] ?? c.status}</span></td>
-                  <td className="py-2.5 pr-3 text-gray-600 dark:text-gray-300">{c.completed_scenarios}/{c.total_scenarios}{c.failed_scenarios > 0 && <span className="text-red-500"> · {c.failed_scenarios} échec(s)</span>}</td>
-                  <td className="py-2.5 pr-3 text-gray-400">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
-                  <td className="py-2.5 pr-3 text-right">
-                    {(c.status === 'queued' || c.status === 'running') && (
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <button onClick={() => void processCampaign(c.id)} disabled={processingId !== null} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50">
-                          {processingId === c.id ? 'Traitement…' : 'Traiter maintenant'}
-                        </button>
-                        <button onClick={() => void handleCancel(c.id)} disabled={processingId === c.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 disabled:opacity-50">Annuler</button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {campaigns.map((c) => {
+                const mode = (c.scenario_matrix as ShippingScenarioMatrix | null)?.samplingMode;
+                return (
+                  <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/60">
+                    <td className="py-2.5 pr-3">
+                      <Link href={`/admin/livraison/laboratoire/${c.id}`} className="text-[var(--color-primary-dark)] hover:underline">{c.name}</Link>
+                      {mode && <span className="block text-2xs text-gray-400">{MODE_LABEL[mode] ?? mode}</span>}
+                    </td>
+                    <td className="py-2.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${STATUS_CLS[c.status] ?? 'bg-gray-100 text-gray-500'}`}>{STATUS_LABEL[c.status] ?? c.status}</span></td>
+                    <td className="py-2.5 pr-3 text-gray-600 dark:text-gray-300" title="Scénarios traités (nouveaux devis + réemplois) / total. La couverture vérifiée par CAP est dans le détail.">
+                      {c.completed_scenarios}/{c.total_scenarios}{c.failed_scenarios > 0 && <span className="text-red-500"> · {c.failed_scenarios} échec(s)</span>}
+                    </td>
+                    <td className="py-2.5 pr-3 text-gray-400">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+                    <td className="py-2.5 pr-3 text-right">
+                      {(c.status === 'queued' || c.status === 'running') && (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button onClick={() => void processCampaign(c.id)} disabled={processingId !== null} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50">
+                            {processingId === c.id ? 'Traitement…' : 'Traiter maintenant'}
+                          </button>
+                          <button onClick={() => void handleCancel(c.id)} disabled={processingId === c.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 disabled:opacity-50">Annuler</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
       {creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4 space-y-3">
+        <div className="border border-dashed border-gray-200 rounded-lg p-4 space-y-4">
           {error && <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
           <div>
             <label className={LABEL_CLS}>Nom (optionnel)</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} placeholder="Ex. Couverture Italie — villes principales" />
           </div>
-          <div>
-            <label className={LABEL_CLS}>Poids représentatifs (kg, séparés par des virgules)</label>
-            <input type="text" value={weightsInput} onChange={(e) => setWeightsInput(e.target.value)} className={INPUT_CLS} />
-            <p className="text-xs text-gray-400 mt-1">Ces poids sont testés pour chaque CAP ; gardez une densité accrue autour des seuils 10 kg et 15 kg.</p>
-          </div>
+
           <div>
             <label className={LABEL_CLS}>Profils d&apos;emballage</label>
             {profiles.length === 0 ? (
@@ -229,12 +318,47 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                 {profiles.map((p) => (
                   <label key={p.id} className="flex items-center gap-1.5 text-sm text-gray-600">
                     <input type="checkbox" checked={selectedProfiles.includes(p.id)} onChange={() => setSelectedProfiles((prev) => prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id])} />
-                    {p.name}
+                    {p.name} <span className="text-2xs text-gray-400">({formatKg(p.max_weight_g / 1000)} kg max)</span>
                   </label>
                 ))}
               </div>
             )}
           </div>
+
+          <div>
+            <label className={LABEL_CLS}>Échantillonnage des poids</label>
+            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Mode d'échantillonnage">
+              {SAMPLING_MODES.map((mode) => (
+                <button
+                  key={mode.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={samplingMode === mode.value}
+                  onClick={() => changeMode(mode.value)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${samplingMode === mode.value ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <span className="block text-sm font-semibold text-gray-900">{mode.title}</span>
+                  <span className="mt-0.5 block text-2xs text-gray-500">{mode.description}</span>
+                </button>
+              ))}
+            </div>
+
+            {samplingMode === 'manual' ? (
+              <div className="mt-2">
+                <input type="text" value={weightsInput} onChange={(e) => setWeightsInput(e.target.value)} className={INPUT_CLS} placeholder="Ex. 1, 3, 7.5, 14.5, 15.5, 30" aria-label="Poids manuels (kg)" />
+                <p className="text-xs text-gray-400 mt-1">Poids en kg séparés par des virgules (point décimal), testés pour chaque profil et chaque CAP.</p>
+              </div>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {weightsByProfile.map((entry) => (
+                  <li key={entry.profile.id} className="text-xs text-gray-600">
+                    <span className="font-medium">{entry.profile.name}</span> — {entry.weights.length} poids : {entry.weights.map(formatKg).join(' · ')} kg
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div>
             <label className={LABEL_CLS}>Destinations</label>
             <div className="space-y-2">
@@ -253,16 +377,67 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
             </button>
           </div>
 
-          <div className={`rounded-lg px-3 py-2 text-xs ${scenarioCount > MAX_CAMPAIGN_SCENARIOS ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>
-            <strong>{expandedDestinations.length} CAP</strong> × <strong>{scenariosPerPostalCode} scénario(s) par CAP</strong> = <strong>{scenarioCount} scénario(s)</strong>
-            {scenarioCount > MAX_CAMPAIGN_SCENARIOS && <> · limite {MAX_CAMPAIGN_SCENARIOS}</>}
+          <div className={`rounded-lg px-3 py-2 text-xs ${overLimit ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>
+            <strong>{expandedDestinations.length} CAP</strong> × <strong>{scenariosPerPostalCode} scénario(s) par CAP</strong>
+            {weightsByProfile.length > 0 && <> ({overflowExplanation})</>} = <strong>{scenarioCount} scénario(s)</strong>
+            <span className="block mt-0.5 text-2xs opacity-80">Au plus {scenarioCount} appel(s) Packlink : un devis identique encore frais est réemployé sans nouvel appel.</span>
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
-            <button onClick={() => void handleCreate()} disabled={submitting || scenarioCount === 0 || scenarioCount > MAX_CAMPAIGN_SCENARIOS} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">
+          {overLimit && (
+            <div className="rounded-lg border border-red-200 p-3 space-y-2">
+              <p className="text-xs text-red-700">
+                Limite d&apos;une campagne : {MAX_CAMPAIGN_SCENARIOS} scénarios. Le dépassement vient de {expandedDestinations.length} CAP × {scenariosPerPostalCode} scénarios par CAP. Aucun CAP ni profil n&apos;est retiré automatiquement.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {samplingMode !== 'initial' && (
+                  <button type="button" onClick={() => changeMode('initial')} className="min-h-10 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-700">
+                    Passer en Couverture initiale ({initialPreviewCount} scénarios)
+                  </button>
+                )}
+              </div>
+              {parts.length > 0 ? (
+                <div>
+                  <p className="text-xs text-gray-600 mb-1.5">Découpage déterministe par CAP (triés), en {parts.length} campagnes à lancer une par une :</p>
+                  <ul className="space-y-1.5">
+                    {parts.map((part, i) => {
+                      const partIndex = i + 1;
+                      const launched = launchedParts.includes(partIndex);
+                      return (
+                        <li key={partIndex} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-xs">
+                          <span>
+                            Partie {partIndex}/{parts.length} — {part.length} CAP ({part[0]?.postalCode} → {part[part.length - 1]?.postalCode}) · {part.length * scenariosPerPostalCode} scénarios
+                          </span>
+                          <button
+                            type="button"
+                            disabled={submitting || launched}
+                            onClick={() => void createCampaign(part, { index: partIndex, count: parts.length })}
+                            className="min-h-9 px-3 py-1 rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50"
+                          >
+                            {launched ? 'Lancée' : `Lancer la partie ${partIndex}`}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-600">Un seul CAP dépasse déjà la limite : réduisez les poids ou les profils.</p>
+              )}
+            </div>
+          )}
+
+          {samplingMode === 'deep' && (
+            <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <input type="checkbox" checked={confirmDeep} onChange={(e) => setConfirmDeep(e.target.checked)} className="mt-0.5" />
+              <span>Je confirme lancer une analyse approfondie : jusqu&apos;à {Math.min(scenarioCount, MAX_CAMPAIGN_SCENARIOS)} appel(s) Packlink par campagne.</span>
+            </label>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button onClick={() => void createCampaign(expandedDestinations)} disabled={submitting || scenarioCount === 0 || overLimit || (samplingMode === 'deep' && !confirmDeep)} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">
               {submitting ? 'Lancement…' : 'Lancer la campagne'}
             </button>
-            <button onClick={() => setCreating(false)} disabled={submitting} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Annuler</button>
+            <button onClick={() => setCreating(false)} disabled={submitting} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Fermer</button>
           </div>
         </div>
       ) : (

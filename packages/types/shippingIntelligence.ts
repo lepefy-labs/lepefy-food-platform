@@ -65,11 +65,41 @@ export interface ShippingQuoteObservationRow {
 export type ShippingCampaignStatus =
   | 'draft' | 'queued' | 'running' | 'completed' | 'completed_with_errors' | 'cancelled';
 
+/**
+ * initial  : « Couverture initiale » — ~6 poids par profil, calés sur sa capacité ;
+ * deep     : « Analyse approfondie » — densifiée autour des paliers tarifaires et
+ *            des seuils de passage à plusieurs colis ;
+ * manual   : poids saisis librement (appliqués à chaque profil) ;
+ * resample : campagne de remesure — items = sous-ensemble explicite, pas le produit cartésien.
+ */
+export type ShippingSamplingMode = 'initial' | 'deep' | 'manual' | 'resample';
+
+export interface ShippingScenarioDestination {
+  country: string;
+  /** Toujours une chaîne : les zéros initiaux sont significatifs. */
+  postalCode: string;
+  zoneCode?: string | null;
+  label?: string;
+  /** Contexte géographique conservé depuis la sélection de ville (optionnel pour les CAP manuels). */
+  city?: string;
+  adminCode1?: string | null;
+  adminCode2?: string | null;
+  adminName?: string;
+}
+
 export interface ShippingScenarioMatrix {
+  /** Union des poids (compatibilité + affichage). */
   weightsKg: number[];
+  /** Poids par profil (modes initial/deep) — prioritaire sur weightsKg quand présent. */
+  weightsByProfileId?: Record<string, number[]>;
   packagingProfileIds: string[];
-  destinations: Array<{ country: string; postalCode: string; zoneCode?: string | null; label?: string }>;
+  destinations: ShippingScenarioDestination[];
   freshnessWindowDays?: number;
+  samplingMode?: ShippingSamplingMode;
+  /** Campagne d'origine pour une remesure. */
+  sourceCampaignId?: string;
+  /** Partie k/N d'une couverture découpée de façon déterministe. */
+  part?: { index: number; count: number };
 }
 
 export interface ShippingSimulationCampaignRow {

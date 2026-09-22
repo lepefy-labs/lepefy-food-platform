@@ -2,9 +2,9 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@5ba18710bcdde340775641e235bb9bb55806aa83`
+> **Base codice verificata:** `main@1a86ce1f8f1986afe940772c3d029bad0a58cdec`
 > **Ultima verifica:** 22 settembre 2026
-> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql`
+> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
 > Questo documento descrive lo **stato corrente** del modulo. Il codice rimane la source of truth.
 > Quando il modulo viene modificato, questo file deve essere aggiornato nello stesso delivery unit/commit secondo `AGENTS.md`.
@@ -223,6 +223,14 @@ failed
 skipped_duplicate
 ```
 
+Semantica corrente:
+
+- `succeeded` = nuova chiamata Packlink con osservazione operativa (`observation_id`);
+- `skipped_duplicate` = riuso valido di un preventivo strettamente identico e fresco (nessuna nuova chiamata, `observation_id` = osservazione riusata);
+- `failed` = nessuna quotazione utilizzabile, con codice in `error` (§12.1).
+
+Gli item creati prima della V1E possono contenere `skipped_duplicate` per zona/tolleranza: la copertura li riclassifica (§13.2).
+
 La persistenza per item rende le campagne riprendibili.
 
 ### 4.6 `shipping_tariff_drafts`
@@ -294,51 +302,69 @@ profilo suggerito ≠ garanzia che tutti i prodotti entrino fisicamente nella sc
 
 ---
 
-## 7. Destinazioni: città → tutti i CAP
+## 7. Destinazioni: città → CAP della commune (disambiguata)
 
-Nel Laboratoire l'admin può scegliere una città.
+Nel Laboratoire l'admin può scegliere una città. Il contesto geografico (paese + codici amministrativi) è conservato lungo tutto il percorso:
+
+```text
+ricerca → scelta commune → risoluzione CAP → creazione campagna
+```
 
 Flusso corrente:
 
 ```text
 Paese + testo città
         ↓
-Nominatim / OpenStreetMap
+indice interno GeoNames (migration 120)          → candidati con admin_code1/admin_code2 esatti (source 'index')
+   └ se vuoto: Nominatim / OpenStreetMap          → candidati con codici ISO 3166-2 (source 'nominatim')
         ↓
-città disambiguata + codici amministrativi
+risoluzione CAP della commune scelta
+   index     : righe con stesso nome normalizzato, raggruppate per (admin_code1, admin_code2)
+   nominatim : stessi gruppi, selezionati per codice ISO (livello 2 → poi livello 1)
+   repli rete: Zippopotam.us (già circoscritto per codice di stato) → GeoNames API (stesso raggruppamento)
         ↓
-indice postale GeoNames interno (migration 120), se importato
+resolved   → CAP di UNA sola commune + codici amministrativi
+ambiguous  → elenco delle communes omonime da scegliere esplicitamente (o CAP manuale)
+not_found  → CAP manuale
         ↓
-insieme dei CAP conosciuti della città
-        ↓
-un destination scenario per ogni CAP
+un destination scenario per ogni CAP (city, adminCode1, adminCode2, adminName salvati nella matrice)
 ```
 
 Implementazione:
 
-- `postalCityLookup.ts`;
-- `/api/admin/shipping-simulation-campaigns/city-postal-codes`;
-- `CampaignDestinationPicker.tsx`.
+- `postalCityLookup.ts` (`groupByAdministration`, `resolveAdministrativeGroup`, ricerca e repli rete);
+- `GET /api/admin/shipping-simulation-campaigns/city-postal-codes` (`mode=search|resolve`, `exact=1` + `adminCode1/adminCode2` per un candidato dell'indice o un'opzione di disambiguazione, altrimenti `stateCodes`);
+- `CampaignDestinationPicker.tsx` (scelta disambiguata quando la risposta è `ambiguous`).
 
-Fallback:
+### 7.1 Convenzioni di codici differenti
 
-- CAP manuale sempre disponibile.
+Nominatim e GeoNames non usano sempre gli stessi codici:
 
-### Perché tutti i CAP
+| Paese | Nominatim (ISO 3166-2) | GeoNames `admin_code1` | GeoNames `admin_code2` |
+|---|---|---|---|
+| IT | regione `IT-25`, provincia `IT-MI` | regione `09` | provincia `MI` |
+| FR | regione `FR-ARA`, dipartimento `FR-69` | regione INSEE `84` | dipartimento `69` |
+| DE / CH | Land/Cantone `DE-BY` / `CH-ZH` | `BY` / `ZH` | distretto |
 
-L'obiettivo non è rappresentare una città con un solo CAP arbitrario.
+Regole:
 
-Ogni CAP genera uno scenario distinto per individuare:
+1. si confronta prima il **livello 2** (provincia/dipartimento), poi il livello 1 — evita collisioni di numerazione (es. FR: regione INSEE `11` ≠ dipartimento `11`);
+2. se nessun codice concorda, la commune è accettata **solo** se è l'unica di quel nome nel paese (`matchedBy = unique_place`);
+3. altrimenti la risposta è `ambiguous`: **i CAP di communes distinte non vengono mai uniti**.
 
-- differenze di costo intra-città;
-- eventuali discontinuità provider;
-- copertura statistica più robusta.
+### 7.2 Codici postali
 
-### Limite operativo
+- sempre stringhe: gli zeri iniziali (`00118`, `01000`) sono preservati dal DB fino alla richiesta Packlink;
+- normalizzazione unica `normalizePostalCode()` (trim + maiuscole), mai conversione numerica;
+- un CAP condiviso da più communes produce **un solo** scenario (il preventivo dipende dal CAP), con il contesto della prima selezione.
 
-La ricerca città usa Nominatim e, quando importato, l'indice GeoNames interno per il mapping CAP. In caso di mancata risoluzione, l'utente deve poter continuare con inserimento CAP manuale.
+### 7.3 Completezza
 
-Non considerare il servizio geografico autorevole per pricing o checkout.
+L'interfaccia mostra «N code(s) postal(aux) connu(s) pour cette commune — exhaustivité non garantie». L'API restituisce `completeness: 'unverified'`: il dataset non permette di dimostrare che una commune possieda esattamente quei CAP ufficiali. L'import GeoNames non viene rieseguito né sovrascritto da questo flusso.
+
+### 7.4 Limite operativo
+
+In caso di mancata risoluzione l'utente continua con il CAP manuale. Non considerare il servizio geografico autorevole per pricing o checkout. Le città GeoNames suddivise per arrondissement (es. `Lyon 01`…`Lyon 09`, `Paris 01`…) sono communes distinte nell'indice e non vengono raggruppate automaticamente.
 
 ---
 
@@ -361,43 +387,53 @@ L'admin può forzare una zona esplicita; il server verifica che la zona apparten
 
 ---
 
-## 9. Matrice di campagna
+## 9. Matrice di campagna e campionamento progressivo
 
 La matrice è deterministica:
 
 ```text
-weightsKg
-× packagingProfileIds
-× destinations (CAP espansi)
-= total_scenarios
+Σ(profili) pesi(profilo) × destinations (CAP espansi) = total_scenarios
 ```
 
-Esempio:
+Per profilo, i pesi sono `scenario_matrix.weightsByProfileId[profileId]` quando presenti, altrimenti `weightsKg` (campagne storiche e modalità manuale).
+
+### 9.1 Modalità (`scenario_matrix.samplingMode`)
+
+| Modalità | UI | Pesi per profilo di capacità M kg |
+|---|---|---|
+| `initial` (default) | Couverture initiale | `1, 3, M/2, M−0,5, M+0,5, 2M` → M=15: `1 · 3 · 7,5 · 14,5 · 15,5 · 30` |
+| `deep` | Analyse approfondie | per ogni soglia `1, 2, 3, 5, 10, 20` (fasce corriere) e `M, 2M, 3M` (passaggio a 2/3 colli): `t−δ, t, t+δ` (δ = 0,25 sotto 5 kg, altrimenti 0,5), fino a 3M+1 kg → 27 pesi per M=15 |
+| `manual` | Poids manuels | pesi inseriti, applicati a ogni profilo |
+| `resample` | Remesure | sottoinsieme esplicito di item (non prodotto cartesiano), vedi §13.4 |
+
+Motivazione della Couverture initiale: colli leggeri (prime fasce corriere), metà capacità, l'ultimo peso che sta in un collo, il primo che ne richiede due (il salto di costo più frequente), due colli pieni.
+
+I pesi dei preset sono **ricalcolati dal server** a partire da `max_weight_g` dei profili del tenant (`weightPresets.ts`); il client invia solo la modalità. L'anteprima client usa la stessa funzione pura.
+
+L'Analyse approfondie richiede `confirmDeepAnalysis: true` (casella di conferma con il numero massimo di chiamate Packlink): non parte mai implicitamente. La matrice completa storica (37 pesi) non viene più applicata per default.
+
+### 9.2 Limite
 
 ```text
-17 pesi
-× 1 profilo
-× 25 CAP
-= 425 scenari
+2000 scenari per campagna (MAX_CAMPAIGN_SCENARIOS)
 ```
 
-Limite corrente:
+Quando la selezione supera il limite, la UI:
 
-```text
-2000 scenari per campagna
-```
+- mostra `CAP × scenari per CAP (profilo: n pesi + …) = totale`;
+- propone «Passer en Couverture initiale (N scénarios)» se la modalità è più pesante;
+- propone una **suddivisione deterministica** (`splitDestinationsForLimit`): CAP ordinati per paese e codice, parti contigue di dimensione bilanciata ≤ 2000, lanciate **una per una** («Lancer la partie k»), con nome `… (partie k/N)` e `scenario_matrix.part`;
+- non rimuove mai silenziosamente CAP o profili. Se un solo CAP supera già il limite, chiede di ridurre pesi/profili.
 
-I 37 pesi predefiniti UI sono densificati attorno a 10 kg e ai multipli di 15 kg per osservare possibili gradini tariffari.
+Il server rivalida con lo stesso messaggio (`validateScenarioMatrix`).
 
-Implementazione:
-
-`apps/storefront/src/lib/shipping/intelligence/scenarioMatrix.ts`.
+Implementazione: `scenarioMatrix.ts`, `weightPresets.ts`, `CampaignManager.tsx`, `POST /api/admin/shipping-simulation-campaigns`.
 
 ---
 
 ## 10. Worker di campagna
 
-### 10.1 Scheduler n8n: adozione con cutover controllato
+### 10.1 Scheduler n8n (primario) e fallback GitHub
 
 Il worker applicativo resta l'endpoint esistente:
 
@@ -409,11 +445,11 @@ Il workflow n8n importabile è:
 
 Contiene un `Schedule Trigger` ogni cinque minuti, un trigger manuale di test, una `HTTP Request` POST e una verifica del risultato che fallisce se `ok !== true` oppure `failed > 0`. La chiamata ha timeout 55 secondi e massimo due tentativi HTTP con intervallo di 15 secondi. In caso di fallimento, n8n registra un'esecuzione fallita: collegare un Error Workflow/alert ai canali già usati dal tenant.
 
-**Stato del cutover:** il template e l'endpoint con bearer dedicato sono predisposti nel repository, ma l'istanza n8n e le sue credenziali devono essere configurate e il workflow pubblicato prima di cambiare lo scheduler primario. Non considerare n8n attivo sulla sola base di questo commit.
+**Stato:** n8n su Hetzner è lo scheduler primario (ogni cinque minuti, credenziale dedicata `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN`). La repository variable `SHIPPING_CAMPAIGN_N8N_ACTIVE=true` è configurata (verificata il 22 settembre 2026: i job schedulati GitHub risultano `skipped`); GitHub Actions resta disponibile come fallback manuale (`workflow_dispatch`).
 
 L'endpoint accetta `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN` con confronto a tempo costante. Durante la transizione mantiene anche l'autenticazione legacy via `SUPABASE_SERVICE_ROLE_KEY` per il fallback GitHub. Non inserire la service-role key in n8n.
 
-L'attuale `.github/workflows/shipping-campaign-worker.yml` continua a eseguire il cron finché la variabile GitHub `SHIPPING_CAMPAIGN_N8N_ACTIVE` non è `true`. Dopo avere verificato un'esecuzione manuale e due esecuzioni automatiche n8n riuscite, impostare quella variabile a `true` per saltare i job schedulati GitHub senza un deploy; `workflow_dispatch` resta disponibile per il recupero manuale. In seguito, rimuovere il trigger schedule GitHub con una modifica dedicata, una volta stabilizzato n8n.
+`.github/workflows/shipping-campaign-worker.yml` mantiene il trigger schedule ma salta i job schedulati finché `SHIPPING_CAMPAIGN_N8N_ACTIVE = true`; `workflow_dispatch` resta eseguibile. La rimozione definitiva del trigger schedule GitHub è una modifica dedicata, da fare una volta stabilizzato n8n.
 
 ### 10.2 Batch e capacità
 
@@ -427,54 +463,161 @@ L'admin mantiene `Lancer la campagne`, `Traiter maintenant` e `Annuler`. L'endpo
 
 ---
 
-## 11. Deduplicazione ed equivalenza
+## 11. Identità delle richieste, equivalenza e riuso
 
-Prima di chiamare Packlink, il worker cerca un'osservazione recente equivalente.
+### 11.1 Identità effettiva
 
-Implementazione:
+Una richiesta provider è identificata da ciò che viene realmente inviato a Packlink (`requestIdentity.ts`, `buildScenarioRequest`):
 
-`apps/storefront/src/lib/shipping/intelligence/equivalence.ts`.
+- tenant (filtro di ogni lettura) e provider;
+- origine (`INTELLIGENCE_FROM_ADDRESS`);
+- paese e **CAP** di destinazione (normalizzato, zeri preservati);
+- numero di colli;
+- peso di ogni collo (`splitIntoParcels`) e dimensioni del profilo;
+- finestra di freschezza (`scenario_matrix.freshnessWindowDays`, default 30 giorni).
 
-Criteri principali:
+`request_hash` (`requestHash.ts`) = SHA-256 troncato a 32 caratteri di provider, origine, destinazione, numero colli e colli ordinati. Non include il tenant: tenant_id è sempre filtrato separatamente.
 
-- stesso tenant;
-- stesso provider;
-- stessa origine;
-- stesso paese destinazione;
-- stessa zona quando disponibile, altrimenti CAP;
-- stesso numero colli;
-- peso entro ±5%, con tolleranza minima ±250 g;
-- volume entro ±10%;
-- osservazione dentro la freshness window.
+La **zona commerciale non fa parte dell'identità**: due CAP della stessa zona sono due richieste diverse.
 
-Se trovata:
+### 11.2 Riuso nel worker
+
+Prima di chiamare Packlink, `findReusableObservation()` (`equivalence.ts`):
+
+1. legge le osservazioni `tenant_id = tenant AND request_hash = hash AND eligible AND observed_at ≥ now − freshness` (filtro in DB prima del limite, max 200 righe);
+2. rivaluta ogni riga con `compareObservationToRequest()` (tenant, provider, origine, paese, CAP, peso totale, numero colli, colli esatti): un hash coincidente con dati divergenti è scartato;
+3. raggruppa le righe per esecuzione e restituisce l'osservazione operativa dell'esecuzione valida più recente (§12).
+
+Se trovata: `item.status = skipped_duplicate`, `observation_id` = osservazione operativa riusata. **Non** è una nuova chiamata Packlink, ma è una quotazione valida per quel CAP.
+
+Nessuna tolleranza di peso/volume e nessuna sostituzione con la zona nel riuso di campagna. Le tolleranze restano nell'Assistant expédition (§16.1), dove il risultato è esplicitamente una stima.
+
+### 11.3 Dati storici
+
+Prima della V1E il worker considerava equivalente un'osservazione della stessa zona (anziché dello stesso CAP) con peso ±5 % (min ±250 g) e volume ±10 %. Questi item `skipped_duplicate` storici **non vengono né cancellati né corretti**: la copertura li classifica (§13.2) ed esclude quelli incompatibili. La remesure (§13.4) permette di rimisurarli in modo esplicito.
+
+---
+
+## 12. Quotazione e costo operativo
+
+`quoteScenarioAndPersist()` (`quoteScenario.ts`):
+
+1. costruisce la richiesta con `buildScenarioRequest()` (stessa identità del riuso);
+2. invia a Packlink peso e dimensioni per collo;
+3. riceve tutti i servizi e applica le regole di eligibility del shipping core (`isEligibleService`/`getExclusionReason`);
+4. salva **una riga per servizio ricevuto**, eleggibile o no, con motivo di esclusione — le alternative restano disponibili per l'analisi per corriere/servizio;
+5. designa **una sola osservazione operativa** (`chooseOperationalOffer`, `operationalObservation.ts`):
 
 ```text
-item.status = skipped_duplicate
+costo operativo = base_price + tax_price   (= total_provider_cost)
+osservazione scelta = servizio ELEGGIBILE con costo operativo minimo
+spareggio: base_price, poi id servizio
 ```
 
-e viene riusata l'osservazione esistente.
+Un servizio non eleggibile non viene mai scelto, anche se più economico. Il costo operativo è un **preventivo**, non il costo finale di una spedizione acquistata.
 
-Per scenari strettamente identici viene inoltre generato un `request_hash` SHA-256 troncato a 32 caratteri.
+### 12.1 Esiti espliciti
+
+| Esito | Offerte persistite | Item | Conta come |
+|---|---|---|---|
+| `ok` (osservazione scelta) | sì | `succeeded` + `observation_id` | nuova quotazione valida |
+| riuso valido (§11.2) | no | `skipped_duplicate` + `observation_id` | quotazione valida, non nuova chiamata |
+| `provider_error` (HTTP/rete/parsing) | no | `failed`, `error = provider_error` | errore |
+| `no_service` (0 servizi) | no | `failed`, `error = no_service` | errore |
+| `no_eligible_service` | sì (con motivi) | `failed`, `error = no_eligible_service`, `observation_id = null` | errore — mai un falso successo |
+| `persistence_error` | no | `failed`, `error = persistence_error: …` | errore |
+| `chosen_observation_missing` | sì | `failed` | errore |
+| profilo eliminato | no | `failed`, `error = packaging_profile_not_found` | errore |
+
+### 12.2 Esecuzioni e campioni
+
+Tutte le offerte di una chiamata Packlink sono inserite con una sola istruzione e condividono quindi `observed_at`. Un'**esecuzione** = `(request_hash, observed_at)`; la sua osservazione operativa è ricalcolata dalle righe eleggibili (`groupQuoteExecutions`). Questo vale anche per le righe storiche (anche quelle scelte, prima della V1E, sul solo prezzo base) e per il Test rapide, senza nuove colonne.
+
+Il Test rapide (simulatore admin) conserva la propria logica di scelta allineata al checkout reale per la risposta mostrata; le sue offerte persistite sono rivalutate con la regola operativa quando entrano in Historique/Assistant/rétrotest.
 
 ---
 
-## 12. Quotazione e persistenza
+## 13. Copertura verificabile per CAP
 
-`quoteScenarioAndPersist()`:
+Route: `/admin/livraison/laboratoire/:id` — API equivalente: `GET /api/admin/shipping-simulation-campaigns/:id`.
 
-1. divide il peso totale in colli secondo `profile.max_weight_g`;
-2. invia a Packlink peso e dimensioni per collo;
-3. riceve tutti i servizi;
-4. applica le stesse regole di eligibility usate dal shipping core;
-5. salva una riga `shipping_quote_observations` per ogni servizio ricevuto;
-6. identifica come osservazione scelta il servizio eleggibile più economico.
+### 13.1 Caricamento
 
-Questo è intenzionale: il dataset conserva anche alternative e servizi esclusi, non solo il vincitore.
+`campaignData.ts`:
+
+- `fetchCampaignItems()` legge **tutti** gli item con `.range()` a pagine di 1000 su ordine stabile (`created_at`, `id`) e filtro `tenant_id` + `campaign_id` — mai un `SELECT` implicitamente troncato a 1000 righe;
+- `fetchObservationsByIds()` rilegge le osservazioni collegate a lotti di 150 id, **sempre** con `tenant_id` (un'osservazione di un altro tenant risulta assente);
+- una query profili tenant-scoped; nessuna query per CAP (niente N+1).
+
+### 13.2 Classificazione degli item (`classifyCampaignItem`)
+
+| Classe | Significato | Copre il CAP |
+|---|---|---|
+| `quoted` | `succeeded`, osservazione eleggibile di questa campagna/profilo, stesso paese, CAP e peso | sì |
+| `reused_valid` | `skipped_duplicate`, osservazione strettamente identica alla richiesta dello scenario (§11.1) e fresca al momento del riuso | sì |
+| `pending` / `running` | da elaborare / in elaborazione | no |
+| `failed` | errore esplicito (§12.1) | no |
+| `reused_other_postal_code` | riuso storico di un preventivo di un **altro CAP** | no |
+| `reused_incompatible` | riuso storico divergente (peso, colli, dimensioni, origine, non eleggibile) o scaduto | no |
+| `observation_missing` | nessuna osservazione collegata o ritrovata nel tenant | no |
+| `unverifiable` | coerenza non dimostrabile (profilo eliminato per un riuso, divergenza su un `succeeded`, altro tenant) | no |
+
+Le ultime quattro classi sono «Données historiques incompatibles»: restano in produzione, ma non contribuiscono alla copertura.
+
+### 13.3 Aggregazione (`computeCampaignCoverage`)
+
+Per riga CAP × profilo: scenari previsti, nuove quotazioni, riusi validi, in attesa, in corso, falliti, incompatibili, pesi previsti/coperti/mancanti, range dei costi operativi coperti, data dell'ultima quotazione valida, stato:
+
+```text
+complete      tutti gli scenari hanno una quotazione valida (quoted | reused_valid)
+incompatible  non completo e almeno un item storico incompatibile
+partial       almeno una quotazione valida
+todo          nessuna quotazione valida
+```
+
+Un CAP è **completamente coperto** solo se tutte le sue righe profilo sono `complete`.
+
+Vue d'ensemble: CAP previsti, CAP completi, nuove quotazioni (chiamate Packlink effettive), riusi validi, errori, scenari da elaborare, dettaglio degli incompatibili. Il numero di offerte restituite da Packlink non compare mai come numero di scenari misurati.
+
+Tabella «Couverture par CAP»: filtri «À mesurer» (default quando esistono righe incomplete), «Incompatibles», «Complets», «Tous», ricerca CAP/città/zona/profilo; tabella su desktop, card su mobile. Stati: `Couverture complète`, `Couverture partielle`, `À compléter`, `Données historiques incompatibles`.
+
+La colonna «Traités» della lista campagne resta `completed_scenarios/total_scenarios` (nuove quotazioni + riusi registrati dal worker): la copertura verificata è solo nel dettaglio.
+
+### 13.4 Remesure
+
+`POST /api/admin/shipping-simulation-campaigns/:id/resample` (`shipping.manage`), su conferma esplicita (`{ confirm: true }`) dal pulsante «Remesurer N scénario(s)»:
+
+- disponibile solo a campagna terminata/annullata; rifiutata (409) se una remesure della stessa campagna è già `queued/running`;
+- seleziona gli item `failed` + incompatibili (§13.2), deduplicati per CAP × profilo × peso, esclude i profili eliminati (conteggiati);
+- crea una campagna `Remesure — <nome>` con `samplingMode = resample`, `sourceCampaignId`, al massimo 2000 item in ordine deterministico (il resto è segnalato come `deferred`);
+- non modifica né cancella i dati storici; il worker riusa un preventivo identico ancora fresco prima di chiamare Packlink.
+
+Nessuna remesure viene avviata automaticamente.
 
 ---
 
-## 13. Test rapido
+## 14. Significato dei campioni statistici
+
+Regole comuni a Historique, Assistant e rétrotest:
+
+1. **una riga di offerta ≠ un campione**: le offerte alternative di una stessa esecuzione non sono estrazioni indipendenti;
+2. per ogni esecuzione si considera l'osservazione operativa (§12);
+3. per ogni scenario (`request_hash`) si considera **l'ultima esecuzione valida** (`latestValidPerScenario`): le esecuzioni più vecchie dello stesso scenario non aumentano il campione;
+4. un item `skipped_duplicate` non crea osservazioni e quindi non è mai una misura indipendente;
+5. le analisi per corriere (Assistant `byCarrier`) usano le alternative, ma contano al massimo un campione per scenario e per corriere (offerta più economica del corriere nell'esecuzione retenuta);
+6. letture paginate (`pagedQuery.ts`): Historique fino a 20 000 offerte eleggibili, rétrotest fino a 30 000 offerte sintetiche + 10 000 ordini; l'eventuale troncamento è segnalato.
+
+Popolazioni distinte e mai mescolate:
+
+| Popolazione | Fonte | Natura |
+|---|---|---|
+| scenari sintetici | `shipping_quote_observations.source = synthetic_simulation` (campagne + Test rapide) | preventivi Packlink su una griglia uniforme |
+| quotazioni reali | `orders.shipping_details.packlinkCost` | preventivo registrato al momento dell'ordine, non fattura |
+| spedizioni con costo finale verificato | `source = real_shipment` | non alimentato: solo conteggiato |
+
+---
+
+## 15. Test rapido
 
 Il blocco `Test rapide` nel Laboratoire riusa il simulatore Packlink esistente.
 
@@ -492,7 +635,7 @@ Uso:
 
 ---
 
-## 14. Assistant expédition
+## 16. Assistant expédition
 
 Route:
 
@@ -518,7 +661,7 @@ Per ogni profilo attivo il sistema stima il costo usando solo osservazioni stori
 
 **Non viene eseguita una nuova chiamata Packlink.**
 
-### 14.1 Similarità
+### 16.1 Similarità
 
 Implementazione:
 
@@ -532,9 +675,13 @@ Vincoli principali:
 - peso entro ±15%;
 - volume entro ±20%;
 - preferenza per stessa zona quando disponibile;
-- massimo 200 osservazioni candidate.
+- massimo 1000 offerte candidate lette.
 
-### 14.2 Confidence
+Queste tolleranze sono ammesse **solo** qui, perché il risultato è presentato come stima con dimensione del campione e confidence; il riuso di campagna (§11.2) non ne applica alcuna.
+
+Il campione è costituito da **scenari misurati** (§14): per ogni `request_hash` l'osservazione operativa dell'ultima esecuzione valida. La scomposizione `byCarrier` conserva le alternative ma conta al massimo un campione per scenario e corriere. Nell'interfaccia la dimensione è indicata come «scén.».
+
+### 16.2 Confidence
 
 Livelli:
 
@@ -547,6 +694,7 @@ high
 
 Regole correnti:
 
+- (sample = scenario misurato, non offerta)
 - 0–1 sample → `insufficient_data`;
 - ≥3 sample → almeno `medium`;
 - ≥8 sample e osservazione più recente <60 giorni → `high`;
@@ -562,9 +710,9 @@ Output:
 - eventuale prossimo gradino osservato;
 - profilo raccomandato sulla mediana più bassa tra quelli con dati sufficienti.
 
-### 14.3 Prossimo gradino
+### 16.3 Prossimo gradino
 
-Se esistono osservazioni più pesanti con differenza costo ≥ €0,50 rispetto alla mediana corrente, il sistema può restituire:
+Se esistono scenari più pesanti (osservazione operativa) con differenza costo ≥ €0,50 rispetto alla mediana corrente, il sistema può restituire:
 
 ```text
 deltaKg
@@ -577,7 +725,7 @@ Non equivale a una garanzia tariffaria provider.
 
 ---
 
-## 15. Historique des coûts
+## 17. Historique des coûts
 
 Route:
 
@@ -585,21 +733,18 @@ Route:
 
 L'interfaccia non mostra migliaia di righe raw.
 
-`observationsSummary.ts`:
+`observationsSummary.ts` (`summarizeObservations` puro + `buildObservationsSummary`):
 
-- considera fino a 2000 osservazioni eleggibili recenti;
-- aggrega per destinazione/zona e profilo;
-- calcola mediana, min, max, sample size, ultima osservazione;
-- assegna confidence aggregata:
-  - ≥8 high;
-  - ≥3 medium;
-  - altrimenti low.
+- legge fino a 20 000 offerte eleggibili (paginato);
+- riduce a **scenari misurati** (§14);
+- aggrega per zona (o paese) × profilo: scenari, CAP distinti, mediana, min, max, ultima osservazione;
+- confidence aggregata sul numero di scenari: ≥8 high, ≥3 medium, altrimenti low.
 
-Il contatore totale viene calcolato separatamente sul dataset completo tenant.
+Il meta della pagina mostra `N scénarios mesurés · M offres provider enregistrées`; il totale delle offerte è un `COUNT` separato sul dataset tenant.
 
 ---
 
-## 16. Analyse tarifaire
+## 18. Analyse tarifaire
 
 Route:
 
@@ -607,7 +752,7 @@ Route:
 
 Serve a valutare un forfait prima di qualsiasi integrazione checkout.
 
-### 16.1 Bande
+### 18.1 Bande
 
 Una bozza contiene bande:
 
@@ -626,7 +771,7 @@ Esempio di partenza UI:
 
 Sono valori di bozza, non configurazione cliente attiva.
 
-### 16.2 Surcharge zone
+### 18.2 Surcharge zone
 
 Formato logico:
 
@@ -640,7 +785,7 @@ Esempio UI:
 IT_SICILY=2
 ```
 
-### 16.3 Strategia multi-collo
+### 18.3 Strategia multi-collo
 
 Il modello supporta:
 
@@ -652,7 +797,7 @@ flat_multi_parcel_rate
 
 L'UI corrente non espone ancora tutte le varianti in modo completo.
 
-### 16.4 Retrotest
+### 18.4 Retrotest
 
 Endpoint:
 
@@ -660,38 +805,39 @@ Endpoint:
 POST /api/admin/shipping-tariff-drafts/:id/simulate
 ```
 
-Restituisce due popolazioni separate:
+Restituisce popolazioni separate, mai mediate insieme:
 
 ```text
-scenarioWeighted
-orderWeighted
+scenarioWeighted   + scenarioSample
+orderWeighted      + orderSample
+verifiedShipmentCosts (conteggio real_shipment)
 ```
 
-Non vengono mai mediate insieme.
+`scenarioWeighted` usa **un'osservazione operativa per scenario misurato** (ultima quotazione valida, §14) tra le osservazioni `synthetic_simulation`. `buildScenarioBacktestSample()` restituisce anche:
 
-Metriche:
+- `scenarios` (dimensione reale del campione), `executions`, `offersRead`;
+- `alternativeOffersExcluded`, `olderExecutionsExcluded`;
+- `postalCodes`, `zones`, `countries`, `topPostalCodeShare`;
+- `reliability` prudente (`assessScenarioReliability`): `insufficient` (< 30 scenari), `limited` (< 10 CAP o un CAP > 50 % del campione), altrimenti `indicative` — mai «élevée», perché la griglia è uniforme e non ponderata sulla domanda.
 
-- sample size;
-- costo provider medio;
-- mediana;
-- P90;
-- P95;
-- margine medio;
-- % margine negativo;
-- perdita massima osservata;
-- margine aggregato.
+Metriche (per popolazione): sample size, preventivo medio, mediana, P90, P95, margine medio, % a perdita, perdita massima, margine cumulato.
 
-`orderWeighted` è considerato affidabile solo con almeno 30 campioni.
+Correttezza dell'interfaccia (`TariffLabClient.tsx`):
 
-Lo storico ordini è utilizzabile solo quando `orders.shipping_details` contiene dati compatibili come `packlinkCost` e `totalWeightG`.
+- scenari sintetici → «% de scénarios à perte», «Pire perte (1 scénario)»; ordini → «% de commandes à perte»;
+- i costi sono etichettati «Devis Packlink», mai come fattura pagata;
+- viene mostrato il blocco campione (scenari, CAP, zone, paesi, offerte alternative escluse, concentrazione);
+- `orderWeighted` è considerato affidabile solo con almeno 30 ordini; lo storico ordini è utilizzabile solo quando `orders.shipping_details` contiene `packlinkCost` e `totalWeightG`.
+
+Le tariffe restano bozze: nessuna attivazione nel checkout.
 
 ---
 
-## 17. Sicurezza e tenant isolation
+## 19. Sicurezza e tenant isolation
 
 Regole obbligatorie:
 
-- tutte le query intelligence devono essere `tenant_id` scoped;
+- tutte le query intelligence devono essere `tenant_id` scoped, comprese le letture paginate (`.range()`) e per lotti di id (`.in('id', …)` sempre accompagnato da `tenant_id`);
 - i costi provider interni non devono diventare pubblici;
 - API admin passano dal sistema admin/capability esistente;
 - letture operative usano `shipping.view`;
@@ -704,7 +850,7 @@ Tabelle con costi/simulazioni non hanno policy pubbliche e sono pensate per acce
 
 ---
 
-## 18. Dipendenze esterne
+## 20. Dipendenze esterne
 
 ### Packlink
 
@@ -716,42 +862,51 @@ Usato per:
 
 Packlink rimane la fonte autorevole per il prezzo operativo corrente.
 
+### Indice GeoNames interno (`shipping_postal_code_index`)
+
+Fonte primaria per ricerca commune e risoluzione CAP (import statico CC BY 4.0, §7). Questo modulo lo legge soltanto: nessun reimport o sovrascrittura massiva.
+
 ### Nominatim / OpenStreetMap
 
-Usato per disambiguare la città scelta dall'admin.
+Repli per la ricerca città quando l'indice non contiene il paese/nome; fornisce codici ISO 3166-2 riconciliati con GeoNames secondo §7.1.
 
 Non viene usato come fonte del prezzo.
 
-### Zippopotam.us / GeoNames
+### Zippopotam.us / GeoNames API
 
-Usato per espandere una città nell'insieme dei CAP conosciuti.
+Repli rete per espandere una commune nei CAP conosciuti quando l'indice non la conosce; i risultati GeoNames sono raggruppati per commune come l'indice.
 
-Fallback manuale obbligatorio quando il lookup non è disponibile o incompleto.
+Fallback manuale obbligatorio quando il lookup non è disponibile, ambiguo o incompleto.
 
 ---
 
-## 19. Invarianti da preservare
+## 21. Invarianti da preservare
 
 Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decisione architetturale approvata:
 
 1. Shipping Intelligence non modifica il checkout implicitamente.
 2. `shipping_tariff_drafts` non è letto dal checkout.
-3. Una stima storica non viene presentata come prezzo provider garantito.
+3. Una stima storica non viene presentata come prezzo provider garantito; un preventivo non viene presentato come fattura.
 4. Una spedizione reale deve continuare a usare un dato provider corrente quando richiesto.
 5. Nessun secret/provider raw payload viene persistito nel dataset intelligence.
-6. Tenant isolation su ogni lettura/scrittura.
+6. Tenant isolation su ogni lettura/scrittura, incluse le letture paginate e per lotti di id.
 7. Le campagne restano bounded e resumable.
-8. Nessuna raffica API incontrollata dal browser.
+8. Nessuna raffica API incontrollata dal browser; analisi approfondite, parti di una suddivisione e remesure partono solo su azione esplicita.
 9. Cron e trigger admin possono convivere senza doppia elaborazione.
 10. Il catalogo imballaggi intelligence non sostituisce automaticamente `packaging_surcharges`.
 11. Il suggerimento scatola non costituisce validazione fisica 3D del contenuto.
-12. La risoluzione città→CAP deve mantenere un fallback manuale.
+12. La risoluzione città→CAP mantiene un fallback manuale e non unisce mai i CAP di communes omonime distinte.
 13. `Zone automatique` deve essere risolta server-side, non fidandosi soltanto del client.
 14. Il token n8n è dedicato, server-side e non viene pubblicato nel template o nel repository.
+15. Un CAP è coperto soltanto da una quotazione valida della sua esatta destinazione e configurazione di colli (nuova o riusata da una richiesta strettamente identica e fresca); la zona non sostituisce mai il CAP.
+16. Ogni scenario contribuisce una sola volta alle statistiche operative, indipendentemente dal numero di servizi restituiti da Packlink.
+17. L'osservazione operativa è il servizio eleggibile con costo base + tasse minimo; nessun servizio eleggibile ⇒ nessuna quotazione utilizzabile.
+18. I dati storici di produzione non vengono corretti o cancellati per migliorare la copertura: la copertura li classifica.
+19. Nessuna lettura che deve essere esaustiva si affida a un `SELECT` limitato implicitamente da PostgREST (1000 righe).
 
 ---
 
-## 20. File map
+## 22. File map
 
 ### UI Admin
 
@@ -763,9 +918,12 @@ apps/storefront/src/app/admin/(protected)/livraison/
   emballages/
   laboratoire/
     page.tsx
-    CampaignManager.tsx
-    CampaignDestinationPicker.tsx
-    [id]/page.tsx
+    CampaignManager.tsx              modalità di campionamento, limite, suddivisione
+    CampaignDestinationPicker.tsx    ricerca/disambiguazione commune
+    PostalCodeIndexAdmin.tsx
+    [id]/page.tsx                    Vue d'ensemble + couverture
+    [id]/CampaignCoverageTable.tsx   Couverture par CAP (filtri, mobile)
+    [id]/ResampleCampaignButton.tsx  remesure esplicita
   assistant/
   historique/
   analyse-tarifaire/
@@ -780,10 +938,13 @@ apps/storefront/src/app/api/admin/
   shipping-packaging-profiles/
   shipping-zones/
   shipping-simulation-campaigns/
-    route.ts
-    city-postal-codes/route.ts
+    route.ts                    GET lista / POST creazione (samplingMode, contesto città)
+    city-postal-codes/route.ts  search / resolve (resolved | ambiguous)
+    [id]/route.ts               GET copertura
     [id]/process/route.ts
     [id]/cancel/route.ts
+    [id]/resample/route.ts      POST remesure
+  shipping-postal-code-import/
   shipping-observations/summary/
   shipping-advisor/
   shipping-tariff-drafts/
@@ -793,17 +954,33 @@ apps/storefront/src/app/api/admin/
 
 ```text
 apps/storefront/src/lib/shipping/intelligence/
-  equivalence.ts
-  observationsSummary.ts
-  postalCityLookup.ts
-  quoteScenario.ts
+  requestIdentity.ts        identità richiesta, normalizePostalCode, confronto osservazione/richiesta
   requestHash.ts
-  resolveZone.ts
-  runCampaignBatch.ts
-  schedulerAuth.ts
-  scenarioMatrix.ts
+  equivalence.ts            riuso stretto (pickReusableObservation / findReusableObservation)
+  operationalObservation.ts costo operativo, esecuzioni, ultimo valido per scenario
+  quoteScenario.ts          chiamata Packlink + persistenza + esiti espliciti
+  runCampaignBatch.ts       worker
+  campaignCoverage.ts       classificazione item + copertura CAP (puro)
+  campaignData.ts           caricamento paginato/tenant-scoped della copertura
+  pagedQuery.ts             paginazione .range() + chunk id
+  scenarioMatrix.ts         matrice, limite, suddivisione deterministica
+  weightPresets.ts          Couverture initiale / Analyse approfondie
+  postalCityLookup.ts       disambiguazione geografica
+  postalCodeImport.ts       import GeoNames (invariato)
+  observationsSummary.ts
   similarity.ts
-  tariffBacktest.ts
+  tariffBacktest.ts         campione per scenario + affidabilità
+  resolveZone.ts
+  schedulerAuth.ts
+  unzip.ts
+```
+
+### Test
+
+```text
+apps/storefront/tests/unit/shippingIntelligenceDataQuality.spec.ts
+apps/storefront/tests/unit/helpers/fakeShippingSupabase.ts   (client in memoria con tetto 1000 righe + log tenant scope)
+apps/storefront/tests/unit/shippingSchedulerAuth.spec.ts
 ```
 
 ### Worker
@@ -819,8 +996,11 @@ apps/storefront/src/app/api/internal/shipping-campaign-worker/route.ts
 
 ```text
 supabase/migrations/119_shipping_intelligence_foundation.sql
-packages/types/shippingIntelligence.ts
+supabase/migrations/120_shipping_postal_code_index.sql
+packages/types/shippingIntelligence.ts   (ShippingScenarioMatrix: samplingMode, weightsByProfileId, part, sourceCampaignId; destinazione con city/adminCode1/adminCode2/adminName)
 ```
+
+La V1E non introduce migration: i nuovi campi vivono nel JSON `scenario_matrix` e la semantica di esecuzione usa colonne esistenti (`request_hash`, `observed_at`).
 
 ### Shipping core correlato
 
@@ -833,7 +1013,7 @@ apps/storefront/src/lib/auth/adminApiPermissions.ts
 
 ---
 
-## 21. Configurazione operativa e rollback n8n
+## 23. Configurazione operativa e rollback n8n
 
 Questa procedura richiede accesso all'istanza **n8n self-hosted Hetzner**, al progetto storefront **Vercel** e alle variabili del repository **GitHub**. Non è eseguibile automaticamente dal solo repository.
 
@@ -860,46 +1040,55 @@ Se n8n si ferma o non esegue i job, impostare `SHIPPING_CAMPAIGN_N8N_ACTIVE=fals
 
 ---
 
-## 22. Troubleshooting
+## 24. Troubleshooting
 
 ### Campagna resta queued
 
-Durante il cutover, controllare anzitutto che n8n sia pubblicato e che la repository variable `SHIPPING_CAMPAIGN_N8N_ACTIVE` sia coerente con il suo stato. Controllare inoltre:
+Controllare anzitutto che il workflow n8n sia pubblicato e riuscito (Executions) — è lo scheduler primario; la repository variable `SHIPPING_CAMPAIGN_N8N_ACTIVE=true` rende skipped i job schedulati GitHub. Controllare inoltre:
 
 - tenant `shipping_provider = packlink`;
 - API key Packlink disponibile;
-- worker GitHub Actions attivo;
 - URL worker configurata;
-- bearer service-role valido;
+- bearer dedicato valido;
 - endpoint interno raggiungibile.
+
+In emergenza: `workflow_dispatch` GitHub oppure `Traiter maintenant`.
 
 ### `Traiter maintenant` restituisce 429
 
-Comportamento atteso entro il cooldown manuale di 10 secondi.
+Comportamento atteso entro il cooldown manuale di 10 secondi. Lo scheduler continua comunque a funzionare.
 
-Il cron continua comunque a funzionare.
+### Molti `skipped_duplicate` / «Réemplois valides»
 
-### Molti `skipped_duplicate`
+Esistono preventivi **strettamente identici** (stesso CAP, stessi colli) ancora freschi: nessuna chiamata Packlink è necessaria. Se l'obiettivo è una misura più recente, ridurre `freshnessWindowDays` invece di duplicare chiamate.
 
-Significa che esistono osservazioni equivalenti ancora fresche.
+### Una campagna storica mostra «Données historiques incompatibles»
 
-Controllare la freshness window prima di aumentare inutilmente il volume di chiamate.
+Sono riusi pre-V1E per zona/tolleranza di peso, osservazioni sparite o non verificabili. Non vengono corretti in DB. Per ottenere la copertura, usare «Remesurer N scénario(s)» a campagna terminata.
+
+### Un CAP resta «Couverture partielle» a campagna terminata
+
+Guardare i pesi «Manquants» e gli errori della riga: `no_eligible_service` (Packlink risponde solo con servizi dropoff/B2B per quel CAP/peso), `provider_error`, `no_service`. Rilanciare con la remesure; un `no_eligible_service` ricorrente è un'informazione logistica, non un bug.
+
+### Il numero di scenari dell'Historique è molto inferiore al numero di offerte
+
+Atteso: un preventivo Packlink restituisce più servizi, ma conta come un solo scenario misurato (§14).
+
+### Rétrotest «Données insuffisantes» o «Couverture limitée»
+
+Meno di 30 scenari distinti, meno di 10 CAP o un CAP che pesa oltre metà del campione. Ampliare la copertura geografica (Couverture initiale su più CAP) prima di trarre conclusioni nazionali.
 
 ### Assistant mostra dati insufficienti
 
-Generare una campagna con:
+Generare una campagna con stesso paese, CAP rappresentativi, pesi vicini, stesso profilo e numero colli coerente.
 
-- stesso paese;
-- zone/CAP rappresentativi;
-- pesi vicini;
-- stesso profilo;
-- numero colli coerente.
+### Una città non restituisce CAP o propone più communes
 
-### Una città non restituisce CAP
+`ambiguous`: scegliere la commune corretta (provincia/dipartimento). `not_found`: usare il CAP manuale. Non inventare CAP nel codice o nel client.
 
-Usare il fallback manuale.
+### La selezione supera 2000 scenari
 
-Non inventare CAP nel codice o nel client.
+Passare alla Couverture initiale o lanciare le parti della suddivisione una per una.
 
 ### Costo storico diverso dal live Packlink
 
@@ -907,24 +1096,31 @@ Non inventare CAP nel codice o nel client.
 
 ---
 
-## 23. Limiti correnti e sviluppi futuri
+## 25. Limiti correnti e sviluppi futuri
 
 Non ancora implementato:
 
 - attivazione del pricing rule-based nel checkout;
 - costi finali `real_shipment` acquisiti come consuntivo separato;
 - true 3D bin-packing per prodotto;
-- adaptive sampling automatico dei soli punti di discontinuità;
+- campionamento adattivo automatico dei soli punti di discontinuità (l'Analyse approfondie resta un preset esplicito);
 - provider logistici multipli nel laboratorio;
-- modello città/CAP proprietario persistito in Lepefy;
+- raggruppamento automatico delle città GeoNames suddivise per arrondissement;
+- verifica di completezza ufficiale dei CAP di una commune;
 - UI completa per tutte le strategie multi-collo;
-- valutazione statistica avanzata per regione/corriere/SLA.
+- valutazione statistica avanzata per regione/corriere/SLA e distinzione di campioni temporali dello stesso scenario (oggi: ultima quotazione valida).
+
+Limiti noti della V1E:
+
+- il range di costo mostrato per un item storico `succeeded` usa l'osservazione collegata all'epoca (scelta sul prezzo base prima della V1E); Historique, Assistant e rétrotest ricalcolano invece l'osservazione operativa dall'esecuzione;
+- gli item storici incompatibili restano nel DB finché non viene lanciata una remesure esplicita;
+- la classificazione di un riuso storico confronta i colli con il profilo **corrente**: se il profilo è stato modificato dopo il riuso, l'item risulta `reused_incompatible`.
 
 Qualsiasi passaggio del forfait dal laboratorio al checkout è un cambio money-impacting e richiede il normale approval gate critico previsto da `AGENTS.md`.
 
 ---
 
-## 24. Contratto di manutenzione di questo documento
+## 26. Contratto di manutenzione di questo documento
 
 Questo file è documentazione **viva**.
 

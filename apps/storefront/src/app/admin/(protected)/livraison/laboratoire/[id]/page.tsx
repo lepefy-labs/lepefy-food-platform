@@ -1,14 +1,12 @@
 import { notFound } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { loadCampaignCoverage } from '@/lib/shipping/intelligence/campaignData';
 import AdminPageHeader from '../../../../_components/ui/AdminPageHeader';
 import { LivraisonTabs } from '../../LivraisonTabs';
-import type {
-  ShippingPackagingProfileRow,
-  ShippingQuoteObservationRow,
-  ShippingSimulationCampaignItemRow,
-  ShippingSimulationCampaignRow,
-} from '@lepefy/types';
+import { CampaignCoverageTable } from './CampaignCoverageTable';
+import { ResampleCampaignButton } from './ResampleCampaignButton';
+import type { ShippingScenarioMatrix, ShippingSimulationCampaignRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -17,11 +15,19 @@ const STATUS_LABEL: Record<string, string> = {
   draft: 'Brouillon', queued: 'En file', running: 'En cours',
   completed: 'Terminée', completed_with_errors: 'Terminée avec erreurs', cancelled: 'Annulée',
 };
+const MODE_LABEL: Record<string, string> = {
+  initial: 'Couverture initiale', deep: 'Analyse approfondie', manual: 'Poids manuels', resample: 'Remesure',
+};
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+function Stat({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: 'green' | 'red' | 'amber' }) {
+  const toneCls = tone === 'green' ? 'text-green-600' : tone === 'red' ? 'text-red-600' : tone === 'amber' ? 'text-amber-600' : 'text-gray-900 dark:text-gray-100';
+  return (
+    <div className="min-w-0">
+      <p className="text-2xs uppercase text-gray-400">{label}</p>
+      <p className={`text-lg font-semibold ${toneCls}`}>{value}</p>
+      {hint && <p className="text-2xs text-gray-400">{hint}</p>}
+    </div>
+  );
 }
 
 export default async function CampaignDetailPage({ params }: { params: { id: string } }) {
@@ -38,91 +44,71 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
 
   if (!campaign) notFound();
   const typedCampaign = campaign as ShippingSimulationCampaignRow;
+  const matrix = typedCampaign.scenario_matrix as ShippingScenarioMatrix;
 
-  // Une campagne compte au plus MAX_CAMPAIGN_SCENARIOS (2000) items — la
-  // limite explicite doit couvrir ce plafond, sinon PostgREST tronque
-  // silencieusement à 1000 lignes (bug vécu sur le comptage de progression,
-  // voir runCampaignBatch.ts).
-  const { data: items } = await supabase
-    .from('shipping_simulation_campaign_items')
-    .select('*')
-    .eq('campaign_id', params.id)
-    .limit(2500);
-  const typedItems = (items as ShippingSimulationCampaignItemRow[] | null) ?? [];
-
-  const observationIds = typedItems.map((i) => i.observation_id).filter((id): id is string => Boolean(id));
-  let observations: ShippingQuoteObservationRow[] = [];
-  if (observationIds.length > 0) {
-    const { data } = await supabase.from('shipping_quote_observations').select('*').in('id', observationIds).limit(2500);
-    observations = (data as ShippingQuoteObservationRow[] | null) ?? [];
-  }
-  const observationById = new Map(observations.map((o) => [o.id, o]));
-
-  const { data: profileRows } = await supabase.from('shipping_packaging_profiles').select('*').eq('tenant_id', tenant.id);
-  const profilesById = new Map((profileRows as ShippingPackagingProfileRow[] | null ?? []).map((p) => [p.id, p.name]));
-
-  const groups = new Map<string, { destination: string; profile: string; costs: number[] }>();
-  for (const item of typedItems) {
-    const observation = item.observation_id ? observationById.get(item.observation_id) : null;
-    if (!observation?.total_provider_cost) continue;
-    const destination = `${observation.destination_country} ${observation.destination_postal_code}`;
-    const profileName = profilesById.get(item.scenario.packagingProfileId) ?? 'Profil supprimé';
-    const key = `${destination}::${profileName}`;
-    const existing = groups.get(key);
-    if (existing) existing.costs.push(observation.total_provider_cost);
-    else groups.set(key, { destination, profile: profileName, costs: [observation.total_provider_cost] });
-  }
-
-  const resultRows = Array.from(groups.values()).map((g) => ({
-    destination: g.destination,
-    profile: g.profile,
-    sampleSize: g.costs.length,
-    medianCost: parseFloat(median(g.costs).toFixed(2)),
-  }));
+  // Items paginés (≤ 2000, jamais tronqués à 1000) + observations relues par
+  // lots, filtrées par tenant — voir campaignData.ts.
+  const coverage = await loadCampaignCoverage(supabase, tenant.id, typedCampaign);
+  const { summary } = coverage;
+  const byClass = summary.byClass;
+  const campaignActive = typedCampaign.status === 'queued' || typedCampaign.status === 'running';
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
         title="Livraison"
-        description={`Campagne « ${typedCampaign.name} » — ${STATUS_LABEL[typedCampaign.status] ?? typedCampaign.status}`}
+        description={`Campagne « ${typedCampaign.name} » — ${STATUS_LABEL[typedCampaign.status] ?? typedCampaign.status}${matrix.samplingMode ? ` · ${MODE_LABEL[matrix.samplingMode] ?? matrix.samplingMode}` : ''}`}
       />
 
       <LivraisonTabs active="laboratoire" />
 
       <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div><p className="text-2xs uppercase text-gray-400">Total</p><p className="text-lg font-semibold">{typedCampaign.total_scenarios}</p></div>
-          <div><p className="text-2xs uppercase text-gray-400">Réussies</p><p className="text-lg font-semibold text-green-600">{typedCampaign.completed_scenarios - typedCampaign.skipped_scenarios}</p></div>
-          <div><p className="text-2xs uppercase text-gray-400">Doublons ignorés</p><p className="text-lg font-semibold">{typedCampaign.skipped_scenarios}</p></div>
-          <div><p className="text-2xs uppercase text-gray-400">Échecs</p><p className="text-lg font-semibold text-red-600">{typedCampaign.failed_scenarios}</p></div>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Vue d&apos;ensemble</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <Stat label="CAP prévus" value={summary.plannedPostalCodes} hint={`${summary.plannedScenarios} scénarios`} />
+          <Stat label="CAP complets" value={`${summary.completePostalCodes}/${summary.plannedPostalCodes}`} tone="green" hint="tous les scénarios couverts" />
+          <Stat label="Nouveaux devis" value={summary.newQuotes} hint="appels Packlink effectifs" />
+          <Stat label="Réemplois valides" value={summary.validReuses} hint="devis identique et frais" />
+          <Stat label="Échecs" value={summary.failed} tone={summary.failed > 0 ? 'red' : undefined} />
+          <Stat label="À traiter" value={summary.remaining} hint={summary.running > 0 ? `${summary.running} en cours` : undefined} />
         </div>
+
+        {summary.incompatible > 0 && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="font-semibold">{summary.incompatible} scénario(s) avec données historiques incompatibles — non comptés comme couverts.</p>
+            <p className="mt-0.5">
+              {byClass.reused_other_postal_code > 0 && <>{byClass.reused_other_postal_code} réemploi(s) d&apos;un devis d&apos;un autre CAP · </>}
+              {byClass.reused_incompatible > 0 && <>{byClass.reused_incompatible} réemploi(s) divergent(s) (poids, colis, dimensions ou fraîcheur) · </>}
+              {byClass.observation_missing > 0 && <>{byClass.observation_missing} sans observation retrouvée · </>}
+              {byClass.unverifiable > 0 && <>{byClass.unverifiable} non vérifiable(s)</>}
+            </p>
+            <p className="mt-0.5 text-amber-800/80">Les données d&apos;origine ne sont ni supprimées ni modifiées ; seule la couverture affichée les exclut.</p>
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <ResampleCampaignButton
+            campaignId={typedCampaign.id}
+            candidates={summary.resampleCandidates}
+            failed={summary.failed}
+            incompatible={summary.incompatible}
+            disabled={campaignActive}
+          />
+          {campaignActive && summary.resampleCandidates > 0 && (
+            <p className="text-2xs text-gray-400">Remesure disponible une fois la campagne terminée ou annulée.</p>
+          )}
+        </div>
+        {coverage.itemsTruncated && (
+          <p className="mt-3 text-xs text-red-600">Nombre d&apos;items inattendu : la couverture affichée est partielle.</p>
+        )}
       </section>
 
       <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Coût médian par CAP × profil</h2>
-        {resultRows.length === 0 ? (
-          <p className="text-sm text-gray-400">Pas encore de résultats — la campagne est peut-être encore en file d&apos;attente (traitement toutes les 5 minutes).</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
-                  <th className="py-2 pr-3">Destination</th><th className="py-2 pr-3">Profil</th><th className="py-2 pr-3">Coût médian</th><th className="py-2 pr-3">Échantillon</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resultRows.map((r, i) => (
-                  <tr key={i} className="border-b border-gray-50 dark:border-gray-800/60">
-                    <td className="py-2.5 pr-3">{r.destination}</td>
-                    <td className="py-2.5 pr-3">{r.profile}</td>
-                    <td className="py-2.5 pr-3 font-medium">{r.medianCost.toFixed(2)} €</td>
-                    <td className="py-2.5 pr-3 text-gray-400">{r.sampleSize}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Couverture par CAP</h2>
+        <p className="text-xs text-gray-400 mb-3">
+          Un CAP est couvert uniquement par un devis valide de ce CAP et de cette configuration de colis. Les coûts sont des devis Packlink (base + taxes du service éligible le moins cher), pas des factures.
+        </p>
+        <CampaignCoverageTable rows={coverage.rows} postalCodes={coverage.postalCodes} />
       </section>
     </div>
   );
