@@ -17,10 +17,16 @@ pnpm lint         # ESLint
 pnpm typecheck    # TypeScript type-check (tsc --noEmit)
 ```
 
-There is no test suite yet. Type-checking is the primary correctness check:
+Type-checking is the primary correctness check:
 ```bash
 cd apps/storefront && pnpm typecheck
 ```
+
+Unit tests (Playwright test runner used for pure/isolated logic, not browser E2E) live in `apps/storefront/tests/unit/`:
+```bash
+cd apps/storefront && pnpm test:unit
+```
+A separate browser E2E suite exists in `apps/storefront/tests/e2e/` (`pnpm test:e2e`); it targets `https://chloefood.com` by default and needs `E2E_TEST_SECRET` to flag orders as `is_test` — do not run it without that secret configured, or it exercises live Stripe/order creation.
 
 Database migrations (requires Supabase CLI):
 ```bash
@@ -54,6 +60,18 @@ Cart (Zustand, localStorage)
     → POST /api/checkout        (creates order + Stripe PaymentIntent or in-store order)
   → /order-confirmation
 ```
+
+### Purchase Quantity Rules (minimum + step, per product and per combinable group)
+
+`products.min_order_quantity` / `products.order_quantity_step` (migration `121_purchase_quantity_rules.sql`, default `1`/`1` — no behavior change until a tenant configures otherwise) express a generic rule: quantity `q` is valid iff `q >= minimum AND (q - minimum) % step == 0`. The same migration adds `purchase_quantity_groups` / `purchase_quantity_group_products` for an aggregate minimum across a combinable group of products (e.g. a "Boissons" group with minimum 12, any mix of member products counting toward the total) — group membership is explicit, never derived from `categories`.
+
+- **Single engine, no duplication**: `src/lib/purchaseQuantityRules.ts` (`computeQuantityRuleState`, `validatePurchaseQuantityRules`, `formatQuantityViolationMessage`) is imported by both the server (checkout) and the client (cart/checkout UI) — never reimplemented per call site.
+- **Authoritative enforcement**: `/api/checkout` and `/api/checkout/external-link` validate product-rule and group-rule independently before creating any order/PaymentIntent. The cart can stay temporarily invalid while being built; checkout never can.
+- **Client-side pre-gates** (UX only, not a substitute for server validation): `CartPurchaseClient.tsx` disables its "Continuer" buttons, and `CheckoutForm.tsx` blocks both the address→payment step transition and the moment right before rendering `StripePaymentStep` — needed because Stripe's deferred-intent flow renders the payment form before any PaymentIntent/validation exists, so reaching that page does not by itself mean the cart is valid.
+- **Cart UX**: `cartStore.ts`'s `addItem`/`incrementItem`/`decrementItem` snap to the minimum/step (decrementing below the minimum removes the line rather than leaving an invalid quantity); `QuantityGroupProgress.tsx` (fed by public `GET /api/quantity-groups`) shows live progress for touched groups.
+- **One product card, one data shape**: every `products` query feeding a card uses the shared projection `src/lib/catalog/productCardSelect.ts` (`PRODUCT_CARD_SELECT`); `ProductCardProduct.min_order_quantity/order_quantity_step` are required (not optional) fields on purpose, so a data source that forgets to populate them fails to compile. `match_products` (the semantic-search RPC, migration `122_match_products_quantity_rules.sql`) returns these columns directly — extending it requires `drop function` before `create` since Postgres rejects a `create or replace` that changes the return columns.
+- **Nala** (`src/lib/ai/nalaProductActionContract.ts`, `nalaCartPlanContract.ts`/`nalaCartPlanResolver.ts`) proposes/adds the real minimum quantity, never a literal `1`, and drops a candidate whose stock can't cover its minimum instead of proposing an unpurchasable quantity.
+- **Admin**: product editor "Règles de vente" section (min/step) and `/admin/catalogue/quantity-groups` (+ `api/admin/catalogue/quantity-groups/**`) for group CRUD and membership.
 
 ### Shipping Calculation (`src/lib/shipping/calculateShipping.ts`)
 

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 21 settembre 2026 — **v6.64 Current-State Snapshot**
+> **Aggiornato:** 22 settembre 2026 — **v6.65 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -405,6 +405,20 @@ awaiting_verification -> completed | cancelled | open
 
 Recovery canonica: `/checkout/reprendre/[id]`; legacy `/orders/en-attente/[id]` redirige lì. Le conferme manuali di pagamento esterno Shop sono protette dalla capability critica `shop_payments.confirm`.
 
+### Purchase quantity rules (minimo/step per prodotto e per gruppo combinabile)
+
+`products.min_order_quantity` / `products.order_quantity_step` (migration `121_purchase_quantity_rules.sql`, default `1/1` — nessun impatto sui prodotti esistenti finché il tenant non configura valori diversi) esprimono una regola generica minimo+step: una quantità `q` è valida se `q >= minimum AND (q - minimum) % step == 0`. La stessa migration introduce `purchase_quantity_groups` / `purchase_quantity_group_products` per un minimo aggregato su un gruppo di prodotti combinabili (es. "Boissons": minimo 12, mix libero tra i membri, somma delle quantità nel carrello) — membership esplicita, mai derivata dalla categoria merchandising, per non alterare una regola commerciale spostando un prodotto di categoria. Un prodotto può appartenere ad al più un gruppo attivo; il vincolo non è esprimibile in SQL (attraversa un join) ed è verificato application-side dalle API admin gruppi.
+
+Motore unico e puro `apps/storefront/src/lib/purchaseQuantityRules.ts` (`computeQuantityRuleState`, `validatePurchaseQuantityRules`, `formatQuantityViolationMessage`): stessa logica e stesso testo d'errore riusati sia server-side sia client-side, mai duplicati. Enforcement autorevole in `/api/checkout` e `/api/checkout/external-link` (regola prodotto e regola gruppo verificate indipendentemente, entrambe devono essere soddisfatte); il carrello può restare temporaneamente incompleto durante la costruzione, ma il checkout non si conclude mai con una regola violata. Poiché il form di pagamento Stripe usa deferred-intent (renderizzato prima che un PaymentIntent esista), raggiungere la pagina Stripe non implica un carrello valido: solo il click "Payer" richiama `/api/checkout`. Per questo esistono anche due gate client-side che riusano lo stesso motore senza chiamate di rete aggiuntive — bottoni "Continuer — Livraison" del carrello (`CartPurchaseClient.tsx`) e doppio controllo in `CheckoutForm.tsx` (passaggio indirizzo→pagamento, e di nuovo subito prima di mostrare il form Stripe, per coprire un carrello cambiato nel frattempo via sync multi-dispositivo) — il server resta comunque l'unica autorità reale.
+
+`cartStore.ts` applica la regola come UX (mai come unica garanzia): primo `addItem` salta al minimo, `incrementItem`/`decrementItem` si muovono a passi di `order_quantity_step` e decrementare al minimo rimuove la riga invece di produrre una quantità intermedia invalida. Il carrello mostra un banner di progresso per i gruppi toccati (`QuantityGroupProgress.tsx`, alimentato da `GET /api/quantity-groups`, pubblico e tenant-scoped) e un badge ambra "Minimum N" con prezzo sempre esplicitato "/ unité" su ogni superficie che espone un prodotto: `ProductCard` (varianti grid e shelf), `ProductDetail`, righe carrello (`CartItem.tsx`, con `CartQuantityControl` che disabilita "−" esattamente al minimo invece di rimuovere per errore) e il pannello `AddToCartConfirmation.tsx` (prodotto appena aggiunto e raccomandazioni).
+
+Tutte le query `products` che alimentano una card passano dalla proiezione colonne condivisa `apps/storefront/src/lib/catalog/productCardSelect.ts` (`PRODUCT_CARD_SELECT`), e `ProductCardProduct.min_order_quantity/order_quantity_step` sono campi obbligatori (non opzionali) apposta: una fonte dati che dimentica di popolarli non compila. `SemanticProductCard` è stato rimosso: i risultati di ricerca semantica renderizzano tramite lo stesso `ProductCard` via l'adapter `semanticMatchToProductCardProduct`. La funzione SQL `match_products` (migration `122_match_products_quantity_rules.sql`, richiede `drop function` esplicito prima del `create` perché Postgres rifiuta un `create or replace` che cambia le colonne di output) restituisce direttamente `min_order_quantity`/`order_quantity_step`, eliminando la query di compensazione che il Cart Builder Nala faceva prima solo per sé.
+
+Nala rispetta la stessa regola sia nelle product action (`lib/ai/nalaProductActionContract.ts`: propone/aggiunge la quantità minima reale, mai `1` letterale, e la dice esplicitamente nel testo) sia nel Cart Builder ricette (`lib/ai/nalaCartPlanContract.ts` + `nalaCartPlanResolver.ts`: quantità proposta = minimo del prodotto scelto, subtotale calcolato prezzo×quantità); un candidato il cui stock non copre il proprio minimo viene scartato a monte (mai proposto) in favore di un sostituto, per non far arrivare l'utente a un checkout che verrebbe comunque rifiutato.
+
+Admin: sezione "Règles de vente" nell'editor prodotto (`min_order_quantity`/`order_quantity_step`, con anteprima delle quantità valide) e pagina dedicata `/admin/catalogue/quantity-groups` (+ API `api/admin/catalogue/quantity-groups/**`) per creare/modificare gruppi e gestirne i prodotti membri; entrambe riusano le permission `catalog.view`/`catalog.manage` esistenti (risolte automaticamente dal prefisso `/api/admin/catalogue/*`).
+
 ---
 
 ## 9. Pagamenti condivisi
@@ -648,6 +662,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 110_event_gallery_editorial.sql
 111_managed_shipping_tracking.sql
 119_shipping_intelligence_foundation.sql
+121_purchase_quantity_rules.sql
+122_match_products_quantity_rules.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -700,6 +716,10 @@ Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/09
 
 Knowledge Suggestions V1 non richiede migration: deriva candidati temporanei dagli stessi segnali 095/097 e li rende persistenti esclusivamente dopo approvazione tenant dentro la tabella `tenant_knowledge_base` già esistente. Nessuna tabella di candidate queue, backfill o modifica retention viene introdotta.
 
+`121` è additiva: `products.min_order_quantity`/`order_quantity_step` (default `1`/`1`, nessun cambio di comportamento sui prodotti esistenti) e le nuove tabelle `purchase_quantity_groups`/`purchase_quantity_group_products` per il minimo aggregato su gruppo combinabile (vedi sezione 8). RLS pubblica in lettura sui soli gruppi/membership attivi, scrittura service-role-only. Applicazione manuale richiesta prima del codice che la usa.
+
+`122` è additiva e operativa: ridefinisce la funzione `match_products` (introdotta da `028_semantic_search.sql`) per restituire anche `min_order_quantity`/`order_quantity_step`, così ricerca semantica, prodotti correlati semantici e Cart Builder Nala ereditano la regola senza query di compensazione dedicata. Richiede `drop function` esplicito prima del `create` — Postgres rifiuta un `create or replace` che cambia le colonne di output (`42P13`). Applicazione manuale richiesta.
+
 ---
 
 ## 15. UI conventions
@@ -724,6 +744,9 @@ apps/storefront/src/components/checkout-session/*
 apps/storefront/src/stores/cartStore.ts
 apps/storefront/src/lib/cart/*
 apps/storefront/src/lib/checkout/*
+apps/storefront/src/lib/purchaseQuantityRules.ts
+apps/storefront/src/lib/catalog/*
+apps/storefront/src/components/catalog/ProductCard.tsx
 apps/storefront/src/lib/shipping/*
 apps/storefront/src/lib/tenant/getTenant.ts
 apps/storefront/src/app/api/pwa-icon/route.ts
@@ -777,8 +800,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.63
+# Fine snapshot v6.65
 
-**Base audit:** `main + Shipping Intelligence V1A–V1D + city-wide postal campaign expansion + tenant-admin immediate campaign tick`; `main + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI`
-**Data:** 19 settembre 2026
+**Base audit:** `main` @ `4cf0c50` — `Shipping Intelligence V1A–V1D + city-wide postal campaign expansion + tenant-admin immediate campaign tick + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI + Purchase quantity rules (minimo/step prodotto e gruppo combinabile, migration 121/122) + gate checkout client-side + consolidamento ProductCard`
+**Data:** 22 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
