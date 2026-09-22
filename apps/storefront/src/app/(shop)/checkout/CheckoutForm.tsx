@@ -23,6 +23,9 @@ import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
 import { CheckoutOrderSummary } from './CheckoutOrderSummary';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
+import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
+import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
+import { formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
@@ -124,6 +127,9 @@ export default function CheckoutForm({
 }) {
   const { items, totalPrice, shippingPayload } = useCartStore();
   const router = useRouter();
+  const quantityGroups = useQuantityGroups();
+  const quantityViolations = computeCartQuantityViolations(items, quantityGroups);
+  const quantityBlockedMessage = quantityViolations[0] ? formatQuantityViolationMessage(quantityViolations[0]) : null;
 
   const { customer: sessionCustomer, refresh: refreshSessionCustomer } = useSessionCustomer();
   const [showLoginForm, setShowLoginForm] = useState(false);
@@ -442,6 +448,10 @@ export default function CheckoutForm({
   // ni /api/checkout ni /api/checkout/external-link ne peuvent être appelés
   // avant l'étape 'select-payment'.
   const onValidateForm = (data: FormValues) => {
+    if (quantityBlockedMessage) {
+      setSubmitError(quantityBlockedMessage);
+      return;
+    }
     if (fulfillmentType === 'delivery' && (!data.street || !data.houseNumber || !data.city || !data.postal_code)) {
       setSubmitError('Veuillez compléter votre adresse de livraison.');
       return;
@@ -570,6 +580,14 @@ export default function CheckoutForm({
   }
 
   const handleConfirmPayment = async () => {
+    // Recontrôle défensif : le panier a pu changer (autre appareil, sync en
+    // arrière-plan) depuis l'étape 1, avant que le client ne voie jamais le
+    // formulaire de carte. Le serveur (/api/checkout) reste la seule
+    // autorité réelle ; ceci évite seulement d'y arriver pour rien.
+    if (quantityBlockedMessage) {
+      setSubmitError(quantityBlockedMessage);
+      return;
+    }
     if (consentState.showTermsCheckbox && !termsAccepted) {
       setSubmitError('Merci d\'accepter les Conditions Générales de Vente pour continuer.');
       return;

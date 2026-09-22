@@ -144,3 +144,14 @@ export function validatePurchaseQuantityRules(
 
   return violations;
 }
+
+/**
+ * Message d'erreur canonique pour une violation — utilisé aussi bien par la
+ * validation serveur (checkout) que par les points de blocage côté client
+ * (panier, formulaire de checkout) : même texte partout, jamais une version
+ * "client" qui diverge de celle qui bloque réellement au serveur.
+ */
+export function formatQuantityViolationMessage(violation: QuantityRuleViolation): string {
+  const label = violation.groupName ?? violation.productName ?? 'Un article';
+  return `${label} : quantité minimale ${violation.requiredMinimum}${violation.step > 1 ? ` par ${violation.step}` : ''}. Ajoutez encore ${violation.missingQuantity} unité(s).`;
+}

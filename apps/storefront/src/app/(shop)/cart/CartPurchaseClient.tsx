@@ -12,6 +12,8 @@ import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
+import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
+import { formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
 import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
 import { useEffect, useState } from 'react';
 
@@ -31,6 +33,9 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   const addItem = useCartStore((state) => state.addItem);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
   const quantityGroups = useQuantityGroups();
+  const quantityViolations = computeCartQuantityViolations(items, quantityGroups);
+  const canProceed = quantityViolations.length === 0;
+  const blockedMessage = quantityViolations[0] ? formatQuantityViolationMessage(quantityViolations[0]) : null;
 
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
 
@@ -60,6 +65,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
   }
 
   function startCheckout() {
+    if (!canProceed) return;
     sessionStorage.removeItem('lepefy-checkout-shipping');
     router.push('/checkout');
   }
@@ -100,13 +106,23 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
             {undo && <div className="pt-3"><CartUndoToast productName={undo.item.product.name} onUndo={restore} /></div>}
           </section>
 
-          <div className="hidden items-center gap-3 md:flex lg:max-w-xl">
-            <Link href="/" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
-              <IconArrowLeft size={16} /> Continuer mes achats
-            </Link>
-            <button type="button" onClick={startCheckout} className="flex min-h-12 flex-[1.2] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
-              Continuer — Livraison <IconArrowRight size={16} />
-            </button>
+          <div className="hidden flex-col gap-2 md:flex lg:max-w-xl">
+            {blockedMessage && <p className="text-xs font-semibold text-amber-700">{blockedMessage}</p>}
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
+                <IconArrowLeft size={16} /> Continuer mes achats
+              </Link>
+              <button
+                type="button"
+                onClick={startCheckout}
+                disabled={!canProceed}
+                aria-disabled={!canProceed}
+                className="flex min-h-12 flex-[1.2] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                Continuer — Livraison <IconArrowRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -117,7 +133,15 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
             <p className="pb-1 text-xs font-medium text-gray-500">{formatProductCount(itemCount)}</p>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-gray-500">Les frais de livraison seront calculés à l’étape suivante selon votre adresse.</p>
-          <button type="button" onClick={startCheckout} className="mt-5 min-h-12 w-full rounded-2xl px-4 py-3 font-bold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
+          {blockedMessage && <p className="mt-3 text-xs font-semibold text-amber-700">{blockedMessage}</p>}
+          <button
+            type="button"
+            onClick={startCheckout}
+            disabled={!canProceed}
+            aria-disabled={!canProceed}
+            className="mt-3 min-h-12 w-full rounded-2xl px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
             Continuer — Livraison
           </button>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement sécurisé</p>
@@ -125,18 +149,23 @@ export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
       </div>
 
       <div className="fixed inset-x-0 bottom-16 z-40 border-t border-black/10 bg-white/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-xl grid-cols-[0.9fr_1.25fr] gap-2.5">
-          <Link href="/" className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm font-bold text-gray-800">
-            <IconArrowLeft size={15} /> Achats
-          </Link>
-          <button
-            type="button"
-            onClick={startCheckout}
-            className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl px-3 py-3 text-sm font-bold text-white transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-          >
-            Livraison <IconArrowRight size={15} />
-          </button>
+        <div className="mx-auto max-w-xl">
+          {blockedMessage && <p className="mb-1.5 text-center text-xs font-semibold text-amber-700">{blockedMessage}</p>}
+          <div className="grid grid-cols-[0.9fr_1.25fr] gap-2.5">
+            <Link href="/" className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm font-bold text-gray-800">
+              <IconArrowLeft size={15} /> Achats
+            </Link>
+            <button
+              type="button"
+              onClick={startCheckout}
+              disabled={!canProceed}
+              aria-disabled={!canProceed}
+              className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl px-3 py-3 text-sm font-bold text-white transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+            >
+              Livraison <IconArrowRight size={15} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

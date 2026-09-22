@@ -12,14 +12,9 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSession';
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
-import { validatePurchaseQuantityRules, type QuantityRuleViolation } from '@/lib/purchaseQuantityRules';
+import { validatePurchaseQuantityRules, formatQuantityViolationMessage } from '@/lib/purchaseQuantityRules';
 
 const MAX_QUANTITY_PER_ITEM = 999;
-
-function formatQuantityViolationMessage(violation: QuantityRuleViolation): string {
-  const label = violation.groupName ?? violation.productName ?? 'Un article';
-  return `${label} : quantité minimale ${violation.requiredMinimum}${violation.step > 1 ? ` par ${violation.step}` : ''}. Ajoutez encore ${violation.missingQuantity} unité(s).`;
-}
 
 interface CartItemPayload {
   productId: string;
