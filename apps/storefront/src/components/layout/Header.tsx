@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart } from '@tabler/icons-react';
+import { IconArrowLeft, IconLock, IconMenu2, IconShoppingCart, IconStar } from '@tabler/icons-react';
 import type { TenantSocialLink } from '@lepefy/types';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
@@ -18,9 +18,10 @@ import {
 interface HeaderProps {
   socialLinks?: TenantSocialLink[];
   storyEnabled?: boolean;
+  reviewsAvailable?: boolean;
 }
 
-export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) {
+export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailable = false }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -155,11 +156,18 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
             <IconMenu2 size={24} />
           </button>
 
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0" aria-label={tenant.name}>
-            <TenantLogo variant="header" priority />
+          <Link href="/" className="absolute left-[46%] -translate-x-1/2 md:static md:translate-x-0" aria-label={tenant.name}>
+            <TenantLogo variant="header" priority className="!max-w-[40vw] md:!max-w-none" />
           </Link>
 
           <div className="ml-auto flex items-center gap-4">
+            {reviewsAvailable && (
+              <Link href="/avis" aria-label="Voir les avis clients" aria-current={pathname === '/avis' ? 'page' : undefined}
+                className="absolute right-16 flex h-11 w-11 flex-col items-center justify-center rounded-lg text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] md:hidden">
+                <IconStar size={23} stroke={2} aria-hidden="true" />
+                <span className="text-[10px] font-semibold leading-3 text-gray-700">Avis</span>
+              </Link>
+            )}
             <Link
               href="/cart"
               onClick={handleCartClick}
@@ -178,6 +186,7 @@ export function Header({ socialLinks = [], storyEnabled = false }: HeaderProps) 
             <nav className="hidden items-center gap-6 md:flex" aria-label="Navigation principale">
               <Link href="/" aria-current={isActive('/') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Catalogue</Link>
               <Link href="/accueil" aria-current={isActive('/accueil') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/accueil') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Découvrir</Link>
+              {reviewsAvailable && <Link href="/avis" aria-current={pathname === '/avis' ? 'page' : undefined} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"><IconStar size={19} stroke={2} className="text-amber-500" aria-hidden="true" />Avis</Link>}
               <Link href="/cart" onClick={handleCartClick} aria-haspopup="dialog" className="relative text-sm font-medium text-gray-700 hover:text-gray-900">
                 Panier
                 {totalItems > 0 && <span className="absolute -right-4 -top-2 flex h-5 w-5 items-center justify-center rounded-full text-xs text-white" style={{ backgroundColor: 'var(--color-primary)' }}>{totalItems}</span>}

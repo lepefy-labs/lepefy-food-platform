@@ -14,12 +14,14 @@ import { CartDrawer } from '@/components/cart/CartDrawer';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
+import { canShowPublicReviews } from '@/lib/reviews/publicReviewData';
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const [socialLinks, nalaEnabled] = await Promise.all([
+  const [socialLinks, nalaEnabled, reviewsAvailable] = await Promise.all([
     getTenantSocialLinks(tenant.id),
     canUseNala(tenant.id),
+    canShowPublicReviews(tenant.id),
   ]);
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
 
@@ -27,7 +29,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
     <div className="min-h-screen flex flex-col">
       <CartSyncProvider>
       <PWABanner />
-      <Suspense fallback={<div className="h-24" />}><Header socialLinks={socialLinks} storyEnabled={storyEnabled} /></Suspense>
+      <Suspense fallback={<div className="h-24" />}><Header socialLinks={socialLinks} storyEnabled={storyEnabled} reviewsAvailable={reviewsAvailable} /></Suspense>
 
       <CheckoutNotificationBarGate />
       <ActiveCheckoutRecovery tenant={tenant} />
