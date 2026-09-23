@@ -37,7 +37,11 @@ export interface ScenarioSampleStats {
  * par scénario (request_hash). Les offres alternatives d'un même devis ne sont
  * jamais des tirages indépendants.
  */
-export function buildScenarioBacktestSample(rows: ScenarioBacktestObservation[]): { rows: BacktestRow[]; stats: ScenarioSampleStats } {
+export function buildScenarioBacktestSample(
+  rows: ScenarioBacktestObservation[],
+  /** Zone recalculée depuis le CAP (zones tenant) ; à défaut, la zone stockée. */
+  resolveZone?: (country: string, postalCode: string) => string | null,
+): { rows: BacktestRow[]; stats: ScenarioSampleStats } {
   const perScenario = latestValidPerScenario(rows);
   const executions = new Set(rows.map((r) => `${r.request_hash}@${new Date(r.observed_at).toISOString()}`)).size;
   const postal = new Map<string, number>();
@@ -49,12 +53,15 @@ export function buildScenarioBacktestSample(rows: ScenarioBacktestObservation[])
     executionsUsedTotal += executionsForScenario;
     const postalKey = `${chosen.destination_country}|${chosen.destination_postal_code}`;
     postal.set(postalKey, (postal.get(postalKey) ?? 0) + 1);
-    if (chosen.destination_zone_code) zones.add(chosen.destination_zone_code);
+    const zoneCode = resolveZone
+      ? resolveZone(chosen.destination_country, chosen.destination_postal_code)
+      : chosen.destination_zone_code;
+    if (zoneCode) zones.add(zoneCode);
     countries.add(chosen.destination_country);
     return {
       providerCost: Number(chosen.total_provider_cost),
       weightKg: chosen.total_weight_g / 1000,
-      zoneCode: chosen.destination_zone_code,
+      zoneCode,
       numParcels: chosen.num_parcels,
     };
   });
@@ -81,17 +88,21 @@ export type SampleReliability = 'insufficient' | 'limited' | 'indicative';
 
 export const MIN_SCENARIOS_FOR_INDICATIVE = 30;
 export const MIN_POSTAL_CODES_FOR_INDICATIVE = 10;
+/** Couverture par zone : quelques CAP témoins par zone suffisent (prix identiques dans une zone). */
+export const MIN_ZONES_FOR_INDICATIVE = 3;
 
 /**
  * Fiabilité volontairement prudente d'un échantillon SYNTHÉTIQUE : jamais
  * « élevée » (grille uniforme, pas la fréquence réelle des commandes).
  *  - insufficient : < 30 scénarios distincts ;
- *  - limited      : couverture géographique étroite (< 10 CAP, ou un CAP > 50 %) ;
+ *  - limited      : couverture géographique étroite (< 3 zones ET < 10 CAP,
+ *                   ou un CAP > 50 % de l'échantillon) ;
  *  - indicative   : sinon.
  */
-export function assessScenarioReliability(stats: Pick<ScenarioSampleStats, 'scenarios' | 'postalCodes' | 'topPostalCodeShare'>): SampleReliability {
+export function assessScenarioReliability(stats: Pick<ScenarioSampleStats, 'scenarios' | 'postalCodes' | 'topPostalCodeShare'> & { zones?: number }): SampleReliability {
   if (stats.scenarios < MIN_SCENARIOS_FOR_INDICATIVE) return 'insufficient';
-  if (stats.postalCodes < MIN_POSTAL_CODES_FOR_INDICATIVE || stats.topPostalCodeShare > 0.5) return 'limited';
+  if (stats.topPostalCodeShare > 0.5) return 'limited';
+  if (stats.postalCodes < MIN_POSTAL_CODES_FOR_INDICATIVE && (stats.zones ?? 0) < MIN_ZONES_FOR_INDICATIVE) return 'limited';
   return 'indicative';
 }
 

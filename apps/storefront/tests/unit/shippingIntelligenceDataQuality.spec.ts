@@ -14,6 +14,9 @@ import { groupByAdministration, resolveAdministrativeGroup, type PostalAdminRow 
 import { deepAnalysisWeights, initialCoverageWeights } from '../../src/lib/shipping/intelligence/weightPresets';
 import { buildCampaignScenarios, countScenarios, splitDestinationsForLimit, validateScenarioMatrix } from '../../src/lib/shipping/intelligence/scenarioMatrix';
 import { FakeDb, fakeId } from './helpers/fakeShippingSupabase';
+import { isGenericItalianPostalCode, planZoneSentinels, selectSpread } from '../../src/lib/shipping/intelligence/zoneSentinels';
+import { selectZonePool } from '../../src/lib/shipping/intelligence/similarity';
+import { resolveZoneCodeFromRows } from '../../src/lib/shipping/intelligence/resolveZone';
 import { errorReasonFromItemError } from '../../src/lib/shipping/intelligence/campaignErrorReasons';
 
 const TENANT = 'tenant-a';
@@ -570,4 +573,70 @@ test('the worker stops claiming items once the tick time budget is spent', async
   expect(result.failed).toBe(0);
   expect(stored.filter((i) => i.status === 'pending')).toHaveLength(10 - result.processed);
   expect(stored.some((i) => i.status === 'running')).toBe(false);
+});
+
+// ─── Couverture par zone (CAP témoins) ─────────────────────────────────────
+
+function zoneRow(code: string, prefixes: string[], position = 0) {
+  return {
+    id: code, tenant_id: TENANT, code, country: 'IT', postal_prefixes: prefixes, active: true, position,
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+  };
+}
+
+test('generic pre-reform CAPs are detected only when the city has split codes', () => {
+  const counts = new Map([['401', 3], ['211', 1]]);
+  expect(isGenericItalianPostalCode('40100', counts)).toBe(true);
+  expect(isGenericItalianPostalCode('21100', counts)).toBe(false); // Varese : 21100 reste valide
+  expect(isGenericItalianPostalCode('40121', counts)).toBe(false);
+});
+
+test('zone sentinels are deterministic, spread, and skip generic or rejected CAPs', () => {
+  const zones = [
+    zoneRow('IT_EMILIA_ROMAGNA', ['40', '41'], 1),
+    zoneRow('IT_CAMPANIA', ['80'], 2),
+    zoneRow('IT_MINOR_ISLANDS', ['80073'], 3),
+  ];
+  const codes = ['40100', '40121', '40122', '40123', '40124', '41121', '80121', '80122', '80073', '90121'];
+  const cityOf = (code: string) => (code.startsWith('401') ? 'Bologna' : code.startsWith('801') ? 'Napoli' : `Ville ${code}`);
+  // GeoNames : un même CAP peut porter une frazione ; le libellé retenu est la ville.
+  const candidates = [...codes.map((postalCode) => ({ postalCode, city: cityOf(postalCode), adminCode2: null })), { postalCode: '40121', city: 'Frazione', adminCode2: null }];
+  const plan = planZoneSentinels({ country: 'IT', zones, candidates, perZone: 2, rejectedPostalCodes: new Set(['40122']) });
+
+  const byZone: Record<string, (typeof plan)[number]> = Object.fromEntries(plan.map((p) => [p.zoneCode ?? '', p]));
+  expect(plan.map((p) => p.zoneCode)).toEqual(['IT_EMILIA_ROMAGNA', 'IT_CAMPANIA', 'IT_MINOR_ISLANDS']);
+  expect(byZone.IT_EMILIA_ROMAGNA).toMatchObject({ candidates: 4, excludedGeneric: 1, excludedRejected: 1 });
+  expect(byZone.IT_EMILIA_ROMAGNA!.sentinels.map((s) => s.postalCode)).toEqual(['40123', '41121']); // CAP médian de Bologna (ville principale) + une autre localité
+  expect(byZone.IT_EMILIA_ROMAGNA!.sentinels[0]!.city).toBe('Bologna');
+  // Préfixe le plus spécifique : 80073 (Capri) relève des îles mineures, pas de la Campanie.
+  expect(byZone.IT_MINOR_ISLANDS!.sentinels.map((s) => s.postalCode)).toEqual(['80073']);
+  expect(byZone.IT_CAMPANIA!.sentinels.map((s) => s.postalCode)).toEqual(['80121', '80122']);
+  // 90121 : hors zones actives, exclu par défaut.
+  expect(plan.some((p) => p.zoneCode === null)).toBe(false);
+  // Même entrée → même sortie.
+  expect(planZoneSentinels({ country: 'IT', zones, candidates, perZone: 2, rejectedPostalCodes: new Set(['40122']) })).toEqual(plan);
+  expect(selectSpread([1, 2, 3, 4, 5, 6, 7, 8], 2)).toEqual([3, 7]);
+});
+
+test('the advisor estimates strictly by zone, resolving legacy observations from their CAP', () => {
+  const zones = [zoneRow('IT_LOMBARDY', ['20']), zoneRow('IT_SICILY', ['90'])];
+  const rows = [
+    { destination_postal_code: '20121', destination_zone_code: null }, // ancienne observation sans zone
+    { destination_postal_code: '20122', destination_zone_code: 'IT_LOMBARDY' },
+  ];
+  expect(selectZonePool(rows, 'IT', 'IT_LOMBARDY', zones)).toHaveLength(2);
+  // Aucune donnée sicilienne : jamais les prix du continent.
+  expect(selectZonePool(rows, 'IT', 'IT_SICILY', zones)).toHaveLength(0);
+});
+
+test('the backtest applies zone surcharges from the CAP even when the stored zone is missing', () => {
+  const request = buildScenarioRequest({ weightKg: 10, profile: PROFILE, destination: { country: 'IT', postalCode: '90121' } });
+  const offers = [observationFor(request, { destination_zone_code: null, total_provider_cost: 10 })];
+  const zones = [zoneRow('IT_SICILY', ['90'])];
+  const sample = buildScenarioBacktestSample(offers, (country, postal) => resolveZoneCodeFromRows(zones, country, postal));
+  expect(sample.rows[0]?.zoneCode).toBe('IT_SICILY');
+  const metrics = backtestTariff([{ minKg: 0, maxKg: 15, price: 9 }], { IT_SICILY: 2 }, null, sample.rows);
+  expect(metrics.avgMargin).toBe(1);
+  expect(assessScenarioReliability({ scenarios: 60, postalCodes: 6, topPostalCodeShare: 0.2, zones: 3 })).toBe('indicative');
+  expect(assessScenarioReliability({ scenarios: 60, postalCodes: 6, topPostalCodeShare: 0.2, zones: 2 })).toBe('limited');
 });

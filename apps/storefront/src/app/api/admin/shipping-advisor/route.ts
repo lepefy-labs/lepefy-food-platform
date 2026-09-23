@@ -11,10 +11,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { estimateForProfile } from '@/lib/shipping/intelligence/similarity';
-import { resolveZoneCode } from '@/lib/shipping/intelligence/resolveZone';
+import { resolveZoneCodeFromRows } from '@/lib/shipping/intelligence/resolveZone';
 import { INTELLIGENCE_FROM_ADDRESS } from '@/lib/shipping/intelligence/quoteScenario';
 import { splitIntoParcels } from '@/lib/shipping/calculateShipping';
-import type { ShippingPackagingProfileRow } from '@lepefy/types';
+import type { ShippingPackagingProfileRow, ShippingZoneRow } from '@lepefy/types';
 
 export const runtime = 'nodejs';
 
@@ -50,7 +50,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Aucun profil d\'emballage actif — configurez-en un dans « Emballages ».' }, { status: 400 });
   }
 
-  const zoneCode = await resolveZoneCode(supabase, tenant.id, country, postalCode);
+  // Zones chargées une fois : la zone cible ET celle de chaque observation
+  // sont résolues depuis le CAP (estimation strictement par zone).
+  const { data: zoneRows } = await supabase
+    .from('shipping_zones')
+    .select('*')
+    .eq('tenant_id', tenant.id)
+    .eq('country', country)
+    .eq('active', true);
+  const zones = (zoneRows ?? []) as ShippingZoneRow[];
+  const zoneCode = resolveZoneCodeFromRows(zones, country, postalCode);
   const totalWeightG = Math.round(weightKg * 1000);
 
   // Découpage en colis réel (même formule que le flux de calcul de
@@ -79,6 +88,7 @@ export async function POST(req: NextRequest) {
         numParcels,
         totalWeightG,
         profile,
+        zones,
       });
     }),
   );

@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@2ed533607298ba6d97c2e0ebbec68855ce1843de`
+> **Base codice verificata:** `main@213bbc1968f9172728d55398da336f258d3ee413`
 > **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
@@ -429,6 +429,19 @@ Il server rivalida con lo stesso messaggio (`validateScenarioMatrix`).
 
 Implementazione: `scenarioMatrix.ts`, `weightPresets.ts`, `CampaignManager.tsx`, `POST /api/admin/shipping-simulation-campaigns`.
 
+### 9.3 Couverture par zone (CAP témoins)
+
+**Constatazione sui dati (23/09/2026, 2.887 scenari, 77 CAP):** a parità di peso e imballaggio il preventivo Packlink è identico al centesimo su tutti i CAP della stessa zona (80/80 gruppi) e anche tra Lombardia ed Emilia. Il prezzo dipende da fasce di peso, dimensioni del collo e poche zone speciali (isole, Calabria, laguna, isole minori, extra-doganali). Coprire tutti i CAP non aggiunge informazione.
+
+Nel form «Nouvelle campagne», la scheda **«Par zone (CAP témoins)»** (`ZoneSentinelPicker.tsx`) sostituisce la scelta per città/CAP:
+
+- `GET /api/admin/shipping-simulation-campaigns/zone-sentinels?country=IT&perZone=1..3[&includeUnzoned=1]` (sola lettura, nessuna chiamata Packlink) legge tutto l'indice GeoNames del paese (paginato), le zone attive del tenant e i CAP già rifiutati da Packlink;
+- `planZoneSentinels` (`zoneSentinels.ts`, puro e deterministico): assegna ogni CAP alla zona col prefisso più specifico; esclude i **CAP generici pre-riforma** (IT: finisce in «00» e la stessa radice a 3 cifre ha altri CAP, es. 40100 ↔ 40121; 21100 Varese resta valido) e i CAP rifiutati; per ogni CAP usa come nome la località con più CAP (la città, non la frazione);
+- CAP campione: **1° = CAP mediano della città principale della zona**, i successivi distribuiti tra le altre località (periferia, dove possono comparire supplementi «località disagiate»);
+- l'admin vede per zona: CAP campione, CAP noti, esclusi (generici/rifiutati), e sceglie le zone da includere; le destinazioni risultanti portano il proprio `zoneCode`; la matrice registra `destinationMode = zone_sentinels` e `sentinelsPerZone`.
+
+Ordine di grandezza: 23 zone × 2 CAP × 36 scenari (Couverture initiale, 6 profili) ≈ 1.650 scenari; in Analyse approfondie si usa la suddivisione in parti (§9.2). Una zona senza CAP nell'indice (es. IT_EXTRA_CUSTOMS: Livigno 23041, Campione 22061) va misurata con il CAP manuale.
+
 ---
 
 ## 10. Worker di campagna
@@ -685,7 +698,7 @@ Vincoli principali:
 - stesso profilo;
 - peso entro ±15%;
 - volume entro ±20%;
-- preferenza per stessa zona quando disponibile;
+- **stessa zona, in modo stretto**: le zone attive del tenant sono passate alla stima e la zona di ogni osservazione è ricalcolata dal suo CAP (`selectZonePool`), anche per le osservazioni storiche senza `destination_zone_code`; una zona senza dati dà «dati insufficienti», mai i prezzi di un'altra zona (es. il continente per la Sicilia);
 - massimo 1000 offerte candidate lette.
 
 Queste tolleranze sono ammesse **solo** qui, perché il risultato è presentato come stima con dimensione del campione e confidence; il riuso di campagna (§11.2) non ne applica alcuna.
@@ -829,7 +842,8 @@ verifiedShipmentCosts (conteggio real_shipment)
 - `scenarios` (dimensione reale del campione), `executions`, `offersRead`;
 - `alternativeOffersExcluded`, `olderExecutionsExcluded`;
 - `postalCodes`, `zones`, `countries`, `topPostalCodeShare`;
-- `reliability` prudente (`assessScenarioReliability`): `insufficient` (< 30 scenari), `limited` (< 10 CAP o un CAP > 50 % del campione), altrimenti `indicative` — mai «élevée», perché la griglia è uniforme e non ponderata sulla domanda.
+- zona di ogni scenario ricalcolata dal CAP con le zone attive del tenant (le maggiorazioni di zona si applicano anche alle osservazioni storiche senza zona salvata);
+- `reliability` prudente (`assessScenarioReliability`): `insufficient` (< 30 scenari), `limited` (un CAP > 50 % del campione, oppure < 3 zone **e** < 10 CAP), altrimenti `indicative` — mai «élevée», perché la griglia è uniforme e non ponderata sulla domanda.
 
 Metriche (per popolazione): sample size, preventivo medio, mediana, P90, P95, margine medio, % a perdita, perdita massima, margine cumulato.
 
@@ -915,6 +929,7 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 18. I dati storici di produzione non vengono corretti o cancellati per migliorare la copertura: la copertura li classifica.
 19. Nessuna lettura che deve essere esaustiva si affida a un `SELECT` limitato implicitamente da PostgREST (1000 righe).
 20. Lo scheduler fallisce solo per incidenti di esecuzione; un rifiuto deterministico di Packlink è un dato, visibile nel diagnostic, e non viene richiamato né rimisurato automaticamente.
+21. Una stima per zona non usa mai i prezzi di un'altra zona; la zona di un'osservazione si ricava dal suo CAP.
 
 ---
 
@@ -932,6 +947,7 @@ apps/storefront/src/app/admin/(protected)/livraison/
     page.tsx
     CampaignManager.tsx              modalità di campionamento, limite, suddivisione
     CampaignDestinationPicker.tsx    ricerca/disambiguazione commune
+    ZoneSentinelPicker.tsx           Couverture par zone (CAP campione)
     PostalCodeIndexAdmin.tsx
     [id]/page.tsx                    Vue d'ensemble + couverture
     [id]/CampaignCoverageTable.tsx   Couverture par CAP (filtri, mobile)
@@ -951,7 +967,8 @@ apps/storefront/src/app/api/admin/
   shipping-packaging-profiles/
   shipping-zones/
   shipping-simulation-campaigns/
-    route.ts                    GET lista / POST creazione (samplingMode, contesto città)
+    route.ts                    GET lista / POST creazione (samplingMode, contesto città, destinationMode)
+    zone-sentinels/route.ts     GET anteprima CAP campione per zona (sola lettura)
     city-postal-codes/route.ts  search / resolve (resolved | ambiguous)
     [id]/route.ts               GET copertura
     [id]/process/route.ts
@@ -976,6 +993,7 @@ apps/storefront/src/lib/shipping/intelligence/
   campaignCoverage.ts       classificazione item + copertura CAP + diagnostic (puro)
   campaignErrorReasons.ts   catalogo motivi (etichetta, spiegazione, remesure sì/no)
   campaignOutcomes.ts       incidente vs dato, CAP già rifiutato
+  zoneSentinels.ts          CAP campione per zona (generici esclusi, capoluogo + periferia)
   packlinkQuote.ts          chiamata Packlink del laboratorio con stato HTTP
   campaignData.ts           caricamento paginato/tenant-scoped della copertura
   pagedQuery.ts             paginazione .range() + chunk id
@@ -1103,6 +1121,8 @@ Atteso: un preventivo Packlink restituisce più servizi, ma conta come un solo s
 Meno di 30 scenari distinti, meno di 10 CAP o un CAP che pesa oltre metà del campione. Ampliare la copertura geografica (Couverture initiale su più CAP) prima di trarre conclusioni nazionali.
 
 ### Assistant mostra dati insufficienti
+
+La stima è per zona in modo stretto: se la zona del CAP richiesto non ha misure (es. Sicilia), lanciare una «Couverture par zone» che la includa.
 
 Generare una campagna con stesso paese, CAP rappresentativi, pesi vicini, stesso profilo e numero colli coerente.
 

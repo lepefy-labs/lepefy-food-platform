@@ -100,6 +100,9 @@ export interface ShippingScenarioMatrix {
   sourceCampaignId?: string;
   /** Partie k/N d'une couverture découpée de façon déterministe. */
   part?: { index: number; count: number };
+  /** 'zone_sentinels' : CAP témoins choisis automatiquement par zone tarifaire. */
+  destinationMode?: 'postal' | 'zone_sentinels';
+  sentinelsPerZone?: number;
 }
 
 export interface ShippingSimulationCampaignRow {

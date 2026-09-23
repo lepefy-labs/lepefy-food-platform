@@ -150,6 +150,12 @@ export async function POST(req: NextRequest) {
     destinations: Array.from(deduped.values()),
     freshnessWindowDays: Number.isFinite(Number(body.freshnessWindowDays)) ? Number(body.freshnessWindowDays) : 30,
     samplingMode,
+    ...(body.destinationMode === 'zone_sentinels'
+      ? {
+        destinationMode: 'zone_sentinels' as const,
+        sentinelsPerZone: Math.min(Math.max(Math.round(Number(body.sentinelsPerZone) || 1), 1), 3),
+      }
+      : {}),
     ...(part && Number.isInteger(part.index) && Number.isInteger(part.count)
       ? { part: { index: part.index as number, count: part.count as number } }
       : {}),

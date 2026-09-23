@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { IconPlus, IconRefresh } from '@tabler/icons-react';
 import type {
@@ -15,6 +15,7 @@ import {
   emptyCampaignDestination,
   type CampaignDestinationRow,
 } from './CampaignDestinationPicker';
+import { ZoneSentinelPicker } from './ZoneSentinelPicker';
 import { MAX_CAMPAIGN_SCENARIOS, splitDestinationsForLimit } from '@/lib/shipping/intelligence/scenarioMatrix';
 import { parseManualWeights, weightsForProfile } from '@/lib/shipping/intelligence/weightPresets';
 
@@ -75,6 +76,13 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
   const [launchedParts, setLaunchedParts] = useState<number[]>([]);
   const [selectedProfiles, setSelectedProfiles] = useState<string[]>(profiles.filter((p) => p.active).map((p) => p.id));
   const [destinations, setDestinations] = useState<CampaignDestinationRow[]>([emptyCampaignDestination()]);
+  const [destinationMode, setDestinationMode] = useState<'postal' | 'zone_sentinels'>('postal');
+  const [zoneDestinations, setZoneDestinations] = useState<ShippingScenarioDestination[]>([]);
+  const [sentinelsPerZone, setSentinelsPerZone] = useState(2);
+  const handleZoneDestinations = useCallback((next: ShippingScenarioDestination[], perZone: number) => {
+    setZoneDestinations(next);
+    setSentinelsPerZone(perZone);
+  }, []);
 
   async function loadCampaigns() {
     setLoadingList(true);
@@ -100,7 +108,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
       weights: samplingMode === 'manual' ? manualWeights : weightsForProfile(samplingMode, p.max_weight_g),
     })), [manualWeights, profiles, samplingMode, selectedProfiles]);
 
-  const expandedDestinations = useMemo(() => {
+  const cityDestinations = useMemo(() => {
     const unique = new Map<string, ShippingScenarioDestination>();
     for (const destination of destinations) {
       const postalCodes = destination.mode === 'city'
@@ -130,6 +138,8 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
     }
     return Array.from(unique.values());
   }, [destinations]);
+
+  const expandedDestinations = destinationMode === 'zone_sentinels' ? zoneDestinations : cityDestinations;
 
   const scenariosPerPostalCode = weightsByProfile.reduce((sum, entry) => sum + entry.weights.length, 0);
   const scenarioCount = scenariosPerPostalCode * expandedDestinations.length;
@@ -219,6 +229,8 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
           packagingProfileIds: selectedProfiles,
           destinations: subset,
           part,
+          destinationMode,
+          sentinelsPerZone: destinationMode === 'zone_sentinels' ? sentinelsPerZone : undefined,
         }),
       });
       const data = await res.json() as ShippingSimulationCampaignRow & { error?: string };
@@ -271,12 +283,13 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
             </tr></thead>
             <tbody>
               {campaigns.map((c) => {
-                const mode = (c.scenario_matrix as ShippingScenarioMatrix | null)?.samplingMode;
+                const matrix = c.scenario_matrix as ShippingScenarioMatrix | null;
+                const mode = matrix?.samplingMode;
                 return (
                   <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/60">
                     <td className="py-2.5 pr-3">
                       <Link href={`/admin/livraison/laboratoire/${c.id}`} className="text-[var(--color-primary-dark)] hover:underline">{c.name}</Link>
-                      {mode && <span className="block text-2xs text-gray-400">{MODE_LABEL[mode] ?? mode}</span>}
+                      {mode && <span className="block text-2xs text-gray-400">{MODE_LABEL[mode] ?? mode}{matrix?.destinationMode === 'zone_sentinels' ? ' · CAP témoins par zone' : ''}</span>}
                     </td>
                     <td className="py-2.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${STATUS_CLS[c.status] ?? 'bg-gray-100 text-gray-500'}`}>{STATUS_LABEL[c.status] ?? c.status}</span></td>
                     <td className="py-2.5 pr-3 text-gray-600 dark:text-gray-300" title="Scénarios traités (nouveaux devis + réemplois) / total. La couverture vérifiée par CAP est dans le détail.">
@@ -361,6 +374,23 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
 
           <div>
             <label className={LABEL_CLS}>Destinations</label>
+            <div className="mb-2 inline-flex rounded-lg border border-gray-200 p-0.5" role="tablist" aria-label="Type de destinations">
+              {([['postal', 'Par ville ou CAP'], ['zone_sentinels', 'Par zone (CAP témoins)']] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={destinationMode === value}
+                  onClick={() => setDestinationMode(value)}
+                  className={`min-h-9 px-3 py-1 text-xs rounded-md ${destinationMode === value ? 'bg-[var(--color-primary)] text-white' : 'text-gray-600'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {destinationMode === 'zone_sentinels' ? (
+              <ZoneSentinelPicker zones={zones} onChange={handleZoneDestinations} />
+            ) : (<>
             <div className="space-y-2">
               {destinations.map((destination, index) => (
                 <CampaignDestinationPicker
@@ -375,6 +405,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
             <button type="button" onClick={() => setDestinations((prev) => [...prev, emptyCampaignDestination()])} className="mt-2 text-xs text-[var(--color-primary-dark)] flex items-center gap-1">
               <IconPlus size={13} stroke={1.5} />Ajouter une ville
             </button>
+            </>)}
           </div>
 
           <div className={`rounded-lg px-3 py-2 text-xs ${overLimit ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>

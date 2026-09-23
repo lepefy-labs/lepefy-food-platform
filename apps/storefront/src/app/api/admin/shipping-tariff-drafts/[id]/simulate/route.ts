@@ -26,7 +26,8 @@ import {
   type ScenarioBacktestObservation,
 } from '@/lib/shipping/intelligence/tariffBacktest';
 import { fetchAllPages } from '@/lib/shipping/intelligence/pagedQuery';
-import type { ShippingTariffDraftRow } from '@lepefy/types';
+import { resolveZoneCodeFromRows } from '@/lib/shipping/intelligence/resolveZone';
+import type { ShippingTariffDraftRow, ShippingZoneRow } from '@lepefy/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -56,7 +57,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (draftError || !draft) return NextResponse.json({ error: 'Brouillon introuvable.' }, { status: 404 });
   const tariffDraft = draft as ShippingTariffDraftRow;
 
-  const [offers, orders, verifiedShipments] = await Promise.all([
+  const [offers, orders, verifiedShipments, { data: zoneRows }] = await Promise.all([
     fetchAllPages<ScenarioBacktestObservation>((from, to) => supabase
       .from('shipping_quote_observations')
       .select('id, request_hash, observed_at, eligible, total_provider_cost, total_weight_g, destination_zone_code, destination_country, destination_postal_code, num_parcels')
@@ -83,13 +84,20 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenant.id)
       .eq('source', 'real_shipment'),
+    supabase.from('shipping_zones').select('*').eq('tenant_id', tenant.id).eq('active', true),
   ]);
 
   if (offers.error || orders.error) {
     return NextResponse.json({ error: 'Impossible de charger les données du rétrotest.' }, { status: 500 });
   }
 
-  const scenarioSample = buildScenarioBacktestSample(offers.rows);
+  // Zone recalculée depuis le CAP : les observations anciennes n'ont pas
+  // toujours destination_zone_code, et les surcharges de zone en dépendent.
+  const zones = (zoneRows ?? []) as ShippingZoneRow[];
+  const scenarioSample = buildScenarioBacktestSample(
+    offers.rows,
+    (country, postalCode) => resolveZoneCodeFromRows(zones, country, postalCode),
+  );
 
   const orderRows: BacktestRow[] = orders.rows
     .map((o) => o.shipping_details)

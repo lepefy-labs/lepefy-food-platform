@@ -1,5 +1,7 @@
 import type { createServiceClient } from '@/lib/supabase/server';
-import type { ShippingPackagingProfileRow, ShippingQuoteObservationRow } from '@lepefy/types';
+import type { ShippingPackagingProfileRow, ShippingQuoteObservationRow, ShippingZoneRow } from '@lepefy/types';
+import { fetchAllPages } from './pagedQuery';
+import { resolveZoneCodeFromRows } from './resolveZone';
 import { latestValidPerScenario } from './operationalObservation';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
@@ -73,6 +75,27 @@ function confidenceFor(sampleSize: number, mostRecentObservedAt: string | null):
  * campagne, qui exige une demande strictement identique. L'échantillon compte
  * des scénarios mesurés, pas les offres alternatives. Jamais un prix garanti.
  */
+/**
+ * Réservoir d'observations pour la zone cible. Avec les zones du tenant, la
+ * zone de chaque observation est recalculée depuis son CAP (les observations
+ * anciennes n'ont pas toujours destination_zone_code) et le filtre est STRICT :
+ * une zone sans données donne « données insuffisantes », jamais les prix
+ * d'une autre zone (ex. le continent pour la Sicile). Sans zones fournies,
+ * comportement historique : préférence pour la zone stockée, repli sur tout.
+ */
+export function selectZonePool<T extends Pick<ShippingQuoteObservationRow, 'destination_postal_code' | 'destination_zone_code'>>(
+  rows: T[],
+  country: string,
+  targetZoneCode: string | null,
+  zones?: ShippingZoneRow[],
+): T[] {
+  if (zones) {
+    return rows.filter((r) => resolveZoneCodeFromRows(zones, country, r.destination_postal_code) === targetZoneCode);
+  }
+  const zoneFiltered = targetZoneCode ? rows.filter((r) => r.destination_zone_code === targetZoneCode) : rows;
+  return zoneFiltered.length > 0 ? zoneFiltered : rows;
+}
+
 export async function estimateForProfile(
   supabase: ServiceClient,
   params: {
@@ -85,12 +108,14 @@ export async function estimateForProfile(
     numParcels: number;
     totalWeightG: number;
     profile: ShippingPackagingProfileRow;
+    /** Zones actives du tenant : la zone de chaque observation est recalculée depuis son CAP. */
+    zones?: ShippingZoneRow[];
   },
 ): Promise<ProfileEstimation> {
   const targetVolume = volumeOf(params.profile);
   const weightTolerance = params.totalWeightG * WEIGHT_DIFF_MAX_RATIO;
 
-  const { data } = await supabase
+  const { rows } = await fetchAllPages<ShippingQuoteObservationRow>((from, to) => supabase
     .from('shipping_quote_observations')
     .select('*')
     .eq('tenant_id', params.tenantId)
@@ -103,14 +128,11 @@ export async function estimateForProfile(
     .gte('total_weight_g', Math.round(params.totalWeightG - weightTolerance))
     .lte('total_weight_g', Math.round(params.totalWeightG + weightTolerance))
     .order('observed_at', { ascending: false })
-    .limit(1000);
+    .order('id', { ascending: true })
+    .range(from, to) as unknown as PromiseLike<{ data: ShippingQuoteObservationRow[] | null; error: { message: string } | null }>,
+  { maxRows: 5000 });
 
-  const rows = (data ?? []) as ShippingQuoteObservationRow[];
-
-  const zoneFiltered = params.destinationZoneCode
-    ? rows.filter((r) => r.destination_zone_code === params.destinationZoneCode)
-    : rows;
-  const pool = zoneFiltered.length > 0 ? zoneFiltered : rows;
+  const pool = selectZonePool(rows, params.destinationCountry, params.destinationZoneCode, params.zones);
 
   const candidates = pool.filter((r) => {
     // Comparaison par colis (volume moyen), pas par somme totale : deux
