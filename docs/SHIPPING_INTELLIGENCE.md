@@ -2,9 +2,9 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@c74001f967562fdf3472bb069a2337ec1f7d4732`
+> **Base codice verificata:** `main@200abcca46bc73e22313317a7c3828e2ceac5a11`
 > **Ultima verifica:** 24 settembre 2026
-> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode)
+> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
 >
@@ -57,7 +57,7 @@ Le regole cliente correnti restano separate:
 
 I record di `shipping_tariff_drafts` sono solo bozze di analisi.
 
-**Invariante:** il checkout non legge `shipping_tariff_drafts`. Dalla V1F il checkout legge `shipping_tariff_versions` (snapshot immutabili) **solo** quando `tenants.shipping_pricing_mode = shadow`, per un calcolo di confronto che non viene mai addebitato (§18.5, `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §10).
+**Invariante:** il checkout non legge `shipping_tariff_drafts`. Legge `shipping_tariff_versions` (snapshot immutabili): in modalità `shadow` la versione `shadow` per un confronto mai addebitato (V1F); in modalità `tariff` **solo** la versione `active` del paese, attivata esplicitamente in admin, con preventivo e pagamento verificati server-side (V1G, §18.5, `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12).
 
 ### 2.3 Shipping Intelligence
 
@@ -85,7 +85,7 @@ Comprende:
 | Assistant expédition | `/admin/livraison/assistant` | stima deterministica dallo storico |
 | Historique des coûts | `/admin/livraison/historique` | aggregati delle osservazioni |
 | Analyse tarifaire | `/admin/livraison/analyse-tarifaire` | bozze e retrotest forfait |
-| Forfait shadow | `/admin/livraison/forfait-shadow` | versioni immutabili, collecte shadow, qualità pesi, rapporto ordini reali (§18.5) |
+| Forfait | `/admin/livraison/forfait-shadow` | versioni immutabili, collecte shadow, attivazione commerciale e rollback, fallback, qualità pesi, rapporto ordini reali (§18.5) |
 | Diagnostic Packlink | `/admin/livraison/diagnostic-packlink` | diagnostica provider esistente |
 
 Source:
@@ -255,9 +255,11 @@ Contiene:
 
 Non è sorgente del prezzo checkout.
 
-### 4.7 `shipping_tariff_versions` (migration 124, V1F)
+### 4.7 `shipping_tariff_versions` (migration 124 V1F, 125 V1G)
 
 Snapshot **immutabili** di una bozza (fasce in grammi `min_g_exclusive < peso ≤ max_g_inclusive`, prezzi in centesimi, maggiorazioni di zona per collo/ordine, zone non consegnabili, colli max, blocchi oltre N kg, limite logistico verificato, IVA inclusa o no). Stati `validated | shadow | retired | active` (`active` riservato, mai scritto in V1F); una sola `shadow` e una sola `active` per tenant+paese (indici parziali); trigger di immutabilità dei parametri economici; nessun `DELETE`; selezione atomica via RPC `select_shipping_tariff_shadow_version`. Accanto: `tenants.shipping_pricing_mode` (`provider_cost` default | `shadow` | `tariff` riservato), indipendente da `shipping_provider`.
+
+V1G (migration 125): `activated_at/activated_by/retired_by`; RPC atomiche `activate_shipping_tariff_version`, `retire_shipping_tariff_country`, `rollback_shipping_tariff_to_provider_cost`; su `tenants` `shipping_tariff_fallback` (`unavailable` default | `provider_cost`) e `shipping_public_grid_enabled` (default false); su `shipping_packaging_profiles` `tare_g` (solo peso lordo per la verifica Packlink).
 
 ---
 
@@ -873,9 +875,11 @@ Correttezza dell'interfaccia (`TariffLabClient.tsx`):
 
 Le tariffe restano bozze: nessuna attivazione nel checkout. Per confrontarle con gli ordini reali senza addebitarle, una bozza si copia in una versione immutabile (§18.5).
 
-### 18.5 Forfait shadow (V1F)
+### 18.5 Forfait shadow (V1F) e tariffazione commerciale (V1G)
 
 Route `/admin/livraison/forfait-shadow` (lettura `shipping.view`, scritture `shipping.manage`). Una bozza (solo strategia «prezzo sul peso totale») diventa una versione immutabile con collo max, blocchi, zone non consegnabili e limite logistico; la versione `shadow` selezionata è calcolata a ogni checkout con consegna quando `shipping_pricing_mode = shadow`, con il motore puro `lib/shipping/tariff/priceFromTariff.ts`, e registrata in `orders.shipping_details.shadow_tariff` senza cambiare importo, token, PaymentIntent o dati Packlink. Peso = `products.weight_grams` server-side (nessun fallback 400 g: prodotto senza peso → simulazione incompleta). Il rapporto lavora solo sugli ordini reali (mai sugli scenari sintetici), conta solo le simulazioni `complete` e separa «forfait − addebitato» (due prezzi cliente) da «écart avant emballage» (forfait − preventivo Packlink TTC verificato contro il totale firmato). Il rétrotest delle bozze (`applyTariffDraft`) resta un motore distinto. Dettaglio e runbook: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §10–11.
+
+**V1G.** Dalla stessa route («Forfait») una versione si attiva per i clienti con conferma e checklist (maggiorazioni `per_order` da confermare esplicitamente, zona extra-doganale, pesi mancanti, cartoni, limite logistico, costo imballaggi). In modalità `tariff` `/api/shipping/quote` calcola il prezzo sul server (versione `active`, peso da `products.weight_grams`, zona tenant, regole paese), verifica la disponibilità logistica con il piano colli della preparazione e firma un token V2 (tenant, importo, paese/CAP, peso, impronta del carrello, versione); ogni percorso di pagamento ricalcola e confronta (`checkoutShipping.ts`). Le osservazioni dei preventivi live sono salvate come `real_quote` e riusate. Il rapporto separa gli ordini al forfait (forfait pagato vs preventivo Packlink) dalle simulazioni shadow. Dettaglio e runbook: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–13.
 
 ---
 
@@ -954,7 +958,9 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 22. Una versione tariffaria non cambia mai i propri parametri economici: una correzione crea una nuova versione.
 23. Lo shadow mode non modifica mai importo, token HMAC, PaymentIntent o dati Packlink; un suo errore non blocca il checkout; uno `shadow_tariff` inviato dal browser è sempre scartato.
 24. Il peso di fascia è calcolato dal server da `products.weight_grams`, mai dal browser e mai con un peso di fallback.
-25. Nessuna azione admin V1F attiva la tariffazione commerciale (`tariff`/`active`).
+25. La tariffazione commerciale (`tariff`/`active`) si attiva solo con l'azione esplicita «Activer cette tarification pour les clients» (conferma + checklist); nessuna attivazione automatica.
+26. In modalità `tariff` un ordine non arriva mai al pagamento con un importo di spedizione diverso da quello ricalcolato dal server e confermato dal cliente (token V2 + ricalcolo in ogni percorso; differenza → nuovo preventivo).
+27. La disponibilità logistica non è mai dedotta dalla sola formula: preventivo identico recente, chiamata provider limitata nel tempo, o evidenza recente dello stesso CAP (mai oltre il limite logistico verificato). I territori extra-doganali restano non consegnabili anche con `flat_rate_override`.
 
 ---
 
@@ -1005,7 +1011,9 @@ apps/storefront/src/app/api/admin/
   shipping-tariff-drafts/
   shipping-tariff-versions/        GET lista / POST da bozza (+ select) · [id]/select POST
   shipping-pricing-mode/           GET / PATCH (solo provider_cost | shadow)
-  shipping-shadow-report/          GET rapporto ordini reali
+  shipping-shadow-report/          GET rapporto ordini reali (+ ordini al forfait)
+  shipping-tariff-versions/[id]/activate/  POST attivazione commerciale (conferma + checklist)
+  shipping-tariff-versions/retire/         POST ritiro della tariffa di un paese
 ```
 
 ### Intelligence core
@@ -1038,7 +1046,11 @@ apps/storefront/src/lib/shipping/tariff/          (V1F)
   tariffVersion.ts          validazione versioni, bozza → versione
   shadowTariff.ts           calcolo shadow server-side al checkout
   shadowReport.ts           aggregati ordini reali
-  adminData.ts              dati onglet Forfait shadow
+  adminData.ts              dati onglet Forfait
+  tariffQuote.ts            (V1G) preventivo autorevole, disponibilità logistica, snapshot ordine
+  checkoutShipping.ts       (V1G) verifica in ogni percorso di pagamento, 409 SHIPPING_REQUOTE_REQUIRED
+  activationChecklist.ts    (V1G) checklist di attivazione
+  publicGrid.ts             (V1G) griglia pubblica /livraison (nascosta di default)
   resolveZone.ts
   schedulerAuth.ts
   unzip.ts
@@ -1053,6 +1065,7 @@ apps/storefront/tests/unit/shippingSchedulerAuth.spec.ts
 apps/storefront/tests/unit/shippingTariffEngine.spec.ts
 apps/storefront/tests/unit/shadowTariff.spec.ts
 apps/storefront/tests/unit/shadowReport.spec.ts
+apps/storefront/tests/unit/tariffCheckout.spec.ts
 ```
 
 ### Worker
@@ -1070,6 +1083,7 @@ apps/storefront/src/app/api/internal/shipping-campaign-worker/route.ts
 supabase/migrations/119_shipping_intelligence_foundation.sql
 supabase/migrations/120_shipping_postal_code_index.sql
 supabase/migrations/124_shipping_tariff_versions.sql
+supabase/migrations/125_shipping_tariff_activation.sql
 packages/types/shippingIntelligence.ts   (ShippingScenarioMatrix: samplingMode, weightsByProfileId, part, sourceCampaignId; destinazione con city/adminCode1/adminCode2/adminName)
 ```
 
@@ -1191,7 +1205,8 @@ Vedere `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §11.6. Stop immediato: «Désactiv
 
 Non ancora implementato:
 
-- tariffazione commerciale nel checkout (la V1F calcola il forfait solo in shadow, senza addebitarlo);
+- costo reale degli imballaggi e margine completo per ordine al forfait;
+- creazione automatica delle spedizioni/etichette Packlink (restano create a mano in Packlink PRO);
 - rétrotest delle bozze sul motore condiviso `priceFromTariff` (oggi `applyTariffDraft` distinto);
 - costi finali `real_shipment` acquisiti come consuntivo separato;
 - true 3D bin-packing per prodotto;

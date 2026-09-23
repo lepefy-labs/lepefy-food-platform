@@ -21,7 +21,7 @@ export default async function AdminForfaitShadowPage() {
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
         title="Livraison"
-        description="Le forfait est calculé à côté du prix actuel, pour comparaison. Vos clients paient toujours les frais de livraison actuels."
+        description="Versions tarifaires figées : simulation shadow, puis activation explicite pour les clients. Rien n'est facturé sans confirmation."
       />
 
       <LivraisonTabs active="forfait-shadow" />

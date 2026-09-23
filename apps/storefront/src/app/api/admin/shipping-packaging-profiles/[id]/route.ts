@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import { parseSuggestRange } from '@/lib/shipping/cartonSuggestion';
+import { parseSuggestRange, parseTare } from '@/lib/shipping/cartonSuggestion';
 
 export const runtime = 'nodejs';
 
@@ -38,7 +38,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   const suggestRange = parseSuggestRange(body);
   if (!suggestRange.ok) return NextResponse.json({ error: suggestRange.error }, { status: 400 });
-  Object.assign(updatePayload, suggestRange.patch);
+  const tare = parseTare(body);
+  if (!tare.ok) return NextResponse.json({ error: tare.error }, { status: 400 });
+  Object.assign(updatePayload, suggestRange.patch, tare.patch);
   if ('active' in body) updatePayload.active = Boolean(body.active);
   if ('position' in body) updatePayload.position = parseInt(String(body.position), 10) || 0;
 

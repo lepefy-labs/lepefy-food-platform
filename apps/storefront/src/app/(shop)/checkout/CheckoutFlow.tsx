@@ -316,6 +316,19 @@ export default function CheckoutFlow({
     setShippingError(null);
   }
 
+  // Le serveur a recalculé des frais différents du devis (tarif remplacé,
+  // panier ou adresse modifiés) : nouveau devis + nouvelle confirmation du
+  // client, jamais de paiement avec un montant non confirmé.
+  function handleShippingRequote(result: { code?: string; error?: string }): boolean {
+    if (result.code !== 'SHIPPING_REQUOTE_REQUIRED') return false;
+    stripeSessionIdRef.current = null;
+    invalidateQuote();
+    setStep('shipping');
+    setSubmitError(result.error ?? 'Les frais de livraison doivent être recalculés. Vérifiez le nouveau montant avant de payer.');
+    if (!isPickup) void quoteShipping(country, postalCode);
+    return true;
+  }
+
   function focusAddressSection(message?: string) {
     if (message) setSubmitError(message);
     setAddressLocked(false);
@@ -406,6 +419,7 @@ export default function CheckoutFlow({
         }
         if (retryResponse.status !== 404) {
           const retryResult = await retryResponse.json().catch(() => ({}));
+          handleShippingRequote(retryResult);
           return { error: retryResult.error ?? 'Une erreur est survenue.' };
         }
         stripeSessionIdRef.current = null;
@@ -417,7 +431,10 @@ export default function CheckoutFlow({
         body: JSON.stringify({ ...sharedPayload, shippingTotal: effectiveShippingTotal, paymentMethod: 'stripe' as const }),
       });
       const result = await response.json();
-      if (!response.ok) return { error: result.error ?? 'Une erreur est survenue.' };
+      if (!response.ok) {
+        handleShippingRequote(result);
+        return { error: result.error ?? 'Une erreur est survenue.' };
+      }
       stripeSessionIdRef.current = result.sessionId ?? null;
       stripeSessionSnapshotRef.current = snapshot;
       return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
@@ -441,7 +458,10 @@ export default function CheckoutFlow({
           body: JSON.stringify({ ...sharedPayload, externalPaymentMethodId: selectedExternalMethodId }),
         });
         const result = await response.json();
-        if (!response.ok) { setSubmitError(result.error ?? 'Une erreur est survenue.'); return; }
+        if (!response.ok) {
+          if (!handleShippingRequote(result)) setSubmitError(result.error ?? 'Une erreur est survenue.');
+          return;
+        }
         sessionStorage.setItem('lepefy-pending-payment', JSON.stringify({
           sessionId: result.sessionId, link: result.link, amount: result.amount, currency: result.currency,
           isPaypal: result.isPaypal, label: result.label, accessToken: result.accessToken,

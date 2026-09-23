@@ -197,6 +197,18 @@ export function CheckoutSessionEditor({
     }
   }, [editItems]);
 
+  // Tarif remplacé, panier ou adresse modifiés depuis le devis : le serveur
+  // refuse le montant enregistré. Nouveau devis + nouvelle confirmation.
+  function handleShippingRequote(json: { code?: string; error?: string }): boolean {
+    if (json.code !== 'SHIPPING_REQUOTE_REQUIRED') return false;
+    setPayAsStripe(false);
+    setExpanded(true);
+    setEditQuoteToken(null);
+    setSaveError(json.error ?? 'Les frais de livraison doivent être recalculés. Vérifiez le nouveau montant avant de payer.');
+    if (editFulfillmentType === 'delivery') void requoteShipping(editCountry, editPostalCode);
+    return true;
+  }
+
   function updateQty(productId: string, direction: -1 | 1) {
     setEditItems((prev) => prev.map((item) => {
       if (item.productId !== productId) return item;
@@ -262,7 +274,7 @@ export function CheckoutSessionEditor({
 
       const json = await res.json();
       if (!res.ok) {
-        setSaveError(json.error ?? 'Une erreur est survenue.');
+        if (!handleShippingRequote(json)) setSaveError(json.error ?? 'Une erreur est survenue.');
         return;
       }
 
@@ -294,7 +306,10 @@ export function CheckoutSessionEditor({
         body:    JSON.stringify({ accessToken }),
       });
       const json = await res.json();
-      if (!res.ok) return { error: json.error ?? 'Une erreur est survenue.' };
+      if (!res.ok) {
+        handleShippingRequote(json);
+        return { error: json.error ?? 'Une erreur est survenue.' };
+      }
       setStripeClientSecret(json.clientSecret ?? null);
       return { clientSecret: json.clientSecret, reference_id: sessionId };
     } catch {

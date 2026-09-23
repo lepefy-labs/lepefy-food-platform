@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconArrowRight, IconBuildingStore, IconCheck, IconMapPin, IconTruck } from '@tabler/icons-react';
@@ -59,6 +61,7 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
   const [shippingTotal, setShippingTotal] = useState<number | null>(null);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(null);
   const [freeShipping, setFreeShipping] = useState<FreeShippingInfo>(null);
+  const [tariffGridUrl, setTariffGridUrl] = useState<string | null>(null);
   const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
@@ -90,7 +93,9 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
         setShippingDetails(data.shippingDetails ?? null);
         setFreeShipping(data.freeShipping ?? null);
         setQuoteToken(data.quoteToken ?? null);
+        setTariffGridUrl(typeof data.tariffGridUrl === 'string' ? data.tariffGridUrl : null);
       } else {
+        setTariffGridUrl(null);
         setShippingError(data.message ?? 'Livraison non disponible pour cette adresse.');
         setShippingTotal(null);
         setShippingDetails(null);
@@ -352,6 +357,9 @@ export default function CartClient({ tenant }: { tenant: Tenant }) {
             <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><span className="h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden="true" /> Livraison calculée. Votre total est maintenant définitif.</p>
           )}
           {!shippingLoading && freeShipping && <p className="mt-1.5 text-sm font-medium text-green-700">Livraison offerte{freeShipping.reason === 'threshold' ? ' pour cette commande' : ' pour ce pays'}.</p>}
+          {!shippingLoading && tariffGridUrl && shippingTotal !== null && !shippingError && (
+            <p className="mt-1.5 text-xs text-gray-500">Forfait calculé sur le poids des produits. <Link href={tariffGridUrl} className="underline">Voir les tarifs de livraison</Link></p>
+          )}
         </div>
       )}
     </div>

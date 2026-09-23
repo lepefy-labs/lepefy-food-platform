@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { saveCheckoutProfile } from '@/lib/customers/saveCheckoutProfile';
 import { resolveOrCreateCustomer } from '@/lib/customers/resolveOrCreateCustomer';
@@ -13,7 +12,7 @@ import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSessio
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
-import { resolveCheckoutShippingDetails } from '@/lib/shipping/tariff/shadowTariff';
+import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 interface CartItemPayload {
@@ -93,37 +92,24 @@ export async function POST(req: NextRequest) {
     }
     const { items, quantityByProduct } = validated;
 
-    let shippingTotal = 0;
-    if (fulfillmentType === 'delivery') {
-      const quoteSecret = process.env.TRACKING_SECRET;
-      if (!quoteSecret) return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
-      if (!quoteToken || !shippingAddress) {
-        return NextResponse.json({ error: 'Frais de livraison non calculés. Veuillez repasser par le panier.' }, { status: 400 });
-      }
-      const verification = verifyQuote(quoteToken, quoteSecret);
-      if (!verification.valid) {
-        return NextResponse.json({ error: 'Le devis de livraison a expiré. Veuillez repasser par le panier.' }, { status: 400 });
-      }
-      const quote = verification.payload;
-      if (quote.c !== shippingAddress.country || quote.z !== shippingAddress.postal_code) {
-        return NextResponse.json({ error: 'L\'adresse de livraison a changé. Veuillez recalculer les frais depuis le panier.' }, { status: 400 });
-      }
-      shippingTotal = quote.t;
-    }
-
     const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
-    // Shadow forfait (V1F) : calcul serveur à part, jamais sur le montant facturé.
-    const serverShippingDetails = await resolveCheckoutShippingDetails({
+    // Frais de livraison vérifiés côté serveur : token legacy (provider_cost /
+    // shadow) ou token V2 recalculé (forfait commercial). Jamais le montant du navigateur.
+    const shipping = await verifyCheckoutShipping({
       supabase,
-      tenantId: tenant.id,
-      pricingMode: tenant.shipping_pricing_mode,
+      tenant,
       fulfillmentType,
-      destination: shippingAddress ? { country: shippingAddress.country, postalCode: shippingAddress.postal_code } : null,
+      address: shippingAddress,
+      quoteToken,
       quantityByProduct,
       subtotal,
-      chargedShippingTotal: shippingTotal,
       clientShippingDetails: shippingDetails,
     });
+    if (shipping.ok === false) {
+      return NextResponse.json(shipping.body, { status: shipping.status });
+    }
+    const shippingTotal = shipping.shippingTotal;
+    const serverShippingDetails = shipping.shippingDetails;
     let customerId = sessionCustomer?.id ?? null;
     if (!customerId) {
       try {

@@ -10,6 +10,8 @@ export interface ShippingPackagingProfileRow {
    *  Absent tant que la migration n'est pas appliquée ; null = jamais suggéré. */
   suggest_min_weight_g?: number | null;
   suggest_max_weight_g?: number | null;
+  /** Migration 125 — tara del cartone (g), solo per la verifica logistica. */
+  tare_g?: number | null;
   is_default: boolean;
   active: boolean;
   position: number;
@@ -230,4 +232,8 @@ export interface ShippingTariffVersionRow {
   selected_at: string | null;
   retired_at: string | null;
   updated_at: string;
+  /** Migration 125 — assenti finché non applicata. */
+  activated_at?: string | null;
+  activated_by?: string | null;
+  retired_by?: string | null;
 }

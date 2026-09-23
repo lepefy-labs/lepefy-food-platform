@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
-import { verifyQuote } from '@/lib/shipping/quoteToken';
 import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { resolveCheckoutShippingDetails } from '@/lib/shipping/tariff/shadowTariff';
+import { revalidateSessionShipping, verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
@@ -248,43 +248,53 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const fulfillmentType = body.fulfillmentType ?? session.fulfillment_type;
     const shippingAddress = body.shippingAddress !== undefined ? body.shippingAddress : session.shipping_address;
     const shippingDetails = body.shippingDetails !== undefined ? body.shippingDetails : session.shipping_details;
+    const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
     let shippingTotal = session.shipping_total;
+    let serverShippingDetails: Record<string, unknown> | null;
 
     if (body.shippingTotal !== undefined) {
-      if (fulfillmentType === 'pickup') {
-        shippingTotal = 0;
-      } else {
-        const quoteSecret = process.env.TRACKING_SECRET;
-        if (!quoteSecret) return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
-        if (!body.quoteToken || !shippingAddress) {
-          return NextResponse.json({ error: 'Frais de livraison non calculés. Veuillez repasser par le panier.' }, { status: 400 });
-        }
-        const verification = verifyQuote(body.quoteToken, quoteSecret);
-        if (!verification.valid) {
-          return NextResponse.json({ error: 'Le devis de livraison a expiré. Veuillez repasser par le panier.' }, { status: 400 });
-        }
-        const quote = verification.payload;
-        if (quote.c !== shippingAddress.country || quote.z !== shippingAddress.postal_code) {
-          return NextResponse.json({ error: 'L\'adresse de livraison a changé. Veuillez recalculer les frais depuis le panier.' }, { status: 400 });
-        }
-        shippingTotal = quote.t;
-      }
+      // Nouveau devis : même vérification serveur que /api/checkout.
+      const verified = await verifyCheckoutShipping({
+        supabase,
+        tenant,
+        fulfillmentType,
+        address: shippingAddress,
+        quoteToken: body.quoteToken,
+        quantityByProduct: validated.quantityByProduct,
+        subtotal,
+        clientShippingDetails: shippingDetails,
+      });
+      if (verified.ok === false) return NextResponse.json(verified.body, { status: verified.status });
+      shippingTotal = verified.shippingTotal;
+      serverShippingDetails = verified.shippingDetails;
+    } else {
+      // Pas de nouveau devis : au forfait, le montant enregistré n'est conservé
+      // que si panier, adresse et tarif actif donnent toujours le même prix.
+      const kept = await revalidateSessionShipping({
+        supabase,
+        tenant,
+        fulfillmentType,
+        address: shippingAddress,
+        shippingDetails,
+        shippingTotal,
+        quantityByProduct: validated.quantityByProduct,
+        subtotal,
+      });
+      if (kept.ok === false) return NextResponse.json(kept.body, { status: kept.status });
+      // Shadow forfait (V1F) : recalculé côté serveur à chaque modification de
+      // session ; un shadow_tariff venu du navigateur n'est jamais conservé.
+      serverShippingDetails = kept.tariffManaged ? shippingDetails : await resolveCheckoutShippingDetails({
+        supabase,
+        tenantId: tenant.id,
+        pricingMode: tenant.shipping_pricing_mode,
+        fulfillmentType,
+        destination: shippingAddress ? { country: shippingAddress.country, postalCode: shippingAddress.postal_code } : null,
+        quantityByProduct: validated.quantityByProduct,
+        subtotal,
+        chargedShippingTotal: shippingTotal,
+        clientShippingDetails: shippingDetails,
+      });
     }
-
-    const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
-    // Shadow forfait (V1F) : recalculé côté serveur à chaque modification de
-    // session ; un shadow_tariff venu du navigateur n'est jamais conservé.
-    const serverShippingDetails = await resolveCheckoutShippingDetails({
-      supabase,
-      tenantId: tenant.id,
-      pricingMode: tenant.shipping_pricing_mode,
-      fulfillmentType,
-      destination: shippingAddress ? { country: shippingAddress.country, postalCode: shippingAddress.postal_code } : null,
-      quantityByProduct: validated.quantityByProduct,
-      subtotal,
-      chargedShippingTotal: shippingTotal,
-      clientShippingDetails: shippingDetails,
-    });
     let ambassadorDiscount = session.ambassador_discount_amount ?? 0;
     if (body.items) {
       ambassadorDiscount = await resolveCheckoutAmbassadorDiscount({

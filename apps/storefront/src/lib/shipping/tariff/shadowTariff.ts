@@ -13,8 +13,9 @@
  *   totale, PaymentIntent o token: in caso di errore restituisce i dettagli
  *   originali con uno shadow in stato `error`;
  * - un `shadow_tariff` inviato dal browser viene sempre scartato;
- * - con pricing mode diverso da `shadow` (default `provider_cost`, `tariff`
- *   non supportato in V1F) i dettagli restano quelli di oggi;
+ * - con pricing mode diverso da `shadow` i dettagli restano quelli di oggi
+ *   (`provider_cost`), oppure sono lo snapshot commerciale V1G (`tariff`,
+ *   vedi checkoutShipping.ts): nessuna simulazione in parallelo;
  * - nessun fallback di peso: un prodotto senza peso rende il calcolo incompleto;
  * - il ritiro in negozio non riceve alcun calcolo (escluso esplicitamente).
  */
@@ -102,11 +103,8 @@ export interface ShadowTariffRecord {
   warnings: string[];
 }
 
+/** La simulazione shadow gira solo in modalità `shadow` (mai in `tariff`, dove il forfait è il prezzo reale). */
 export function resolveShadowEnabled(mode: ShippingPricingMode | string | null | undefined): boolean {
-  if (mode === 'tariff') {
-    // Fail-safe V1F: nessuna tariffazione commerciale e nessuna raccolta.
-    console.warn('[shadow-tariff] shipping_pricing_mode=tariff non supporté en V1F — traité comme provider_cost');
-  }
   return mode === 'shadow';
 }
 

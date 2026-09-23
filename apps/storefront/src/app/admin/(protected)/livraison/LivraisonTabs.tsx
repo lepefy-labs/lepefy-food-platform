@@ -10,7 +10,7 @@ const TABS: Array<{ key: LivraisonTab; href: string; label: string }> = [
   { key: 'assistant', href: '/admin/livraison/assistant', label: 'Assistant expédition' },
   { key: 'historique', href: '/admin/livraison/historique', label: 'Historique des coûts' },
   { key: 'tarif-analyse', href: '/admin/livraison/analyse-tarifaire', label: 'Analyse tarifaire' },
-  { key: 'forfait-shadow', href: '/admin/livraison/forfait-shadow', label: 'Forfait shadow' },
+  { key: 'forfait-shadow', href: '/admin/livraison/forfait-shadow', label: 'Forfait' },
   { key: 'packlink-diagnostic', href: '/admin/livraison/diagnostic-packlink', label: 'Diagnostic Packlink' },
 ];
 

@@ -87,7 +87,7 @@ test.describe('shadow désactivé : checkout identique', () => {
     expect(db.log).toHaveLength(0);
   });
 
-  test('migration absente (mode undefined) et mode tariff non supporté : aucun calcul', async () => {
+  test('migration absente (mode undefined) et mode tariff : aucune simulation shadow', async () => {
     for (const pricingMode of [undefined, 'tariff']) {
       const db = makeDb();
       const details = await resolveCheckoutShippingDetails(input(db, { pricingMode }));

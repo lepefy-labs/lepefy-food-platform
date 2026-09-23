@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import { parseSuggestRange } from '@/lib/shipping/cartonSuggestion';
+import { parseSuggestRange, parseTare } from '@/lib/shipping/cartonSuggestion';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -51,6 +51,8 @@ export async function POST(req: NextRequest) {
   }
   const suggestRange = parseSuggestRange(body);
   if (!suggestRange.ok) return NextResponse.json({ error: suggestRange.error }, { status: 400 });
+  const tare = parseTare(body);
+  if (!tare.ok) return NextResponse.json({ error: tare.error }, { status: 400 });
 
   const supabase = createServiceClient();
 
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
       active: body.active === undefined ? true : Boolean(body.active),
       position: nextPosition,
       ...suggestRange.patch,
+      ...tare.patch,
     })
     .select('*')
     .single();

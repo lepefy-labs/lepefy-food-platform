@@ -24,6 +24,7 @@ export async function requestPacklinkServices(
   from: { country: string; zip_code: string },
   to: { country: string; zip_code: string },
   parcels: Array<{ weight: number; width: number; height: number; length: number }>,
+  options?: { timeoutMs?: number },
 ): Promise<PacklinkServicesResponse> {
   const params = new URLSearchParams();
   params.set('from[country]', from.country);
@@ -41,7 +42,7 @@ export async function requestPacklinkServices(
   try {
     res = await fetch(`${PACKLINK_API_BASE}/services?${params}`, {
       headers: { Authorization: apiKey },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(options?.timeoutMs ?? 20_000),
     });
   } catch {
     return { kind: 'error', status: null };

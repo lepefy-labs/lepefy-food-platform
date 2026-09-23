@@ -6,6 +6,7 @@ import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessio
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
+import { revalidateSessionShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import type { ShippingAddress } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,9 @@ interface CheckoutSessionRow {
   tenant_id: string;
   customer_id: string | null;
   email: string;
+  fulfillment_type: 'delivery' | 'pickup';
   shipping_address: ShippingAddress | null;
+  shipping_details: Record<string, unknown> | null;
   shipping_total: number;
   ambassador_discount_amount: number | null;
   items: CartItemPayload[];
@@ -84,6 +87,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const subtotal = session.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    // Au forfait commercial, l'intention de paiement n'est créée/mise à jour que
+    // si le tarif enregistré correspond encore au tarif actif (sinon nouveau devis).
+    const shippingCheck = await revalidateSessionShipping({
+      supabase,
+      tenant,
+      fulfillmentType: session.fulfillment_type,
+      address: session.shipping_address,
+      shippingDetails: session.shipping_details,
+      shippingTotal: session.shipping_total ?? 0,
+      quantityByProduct: validated.quantityByProduct,
+      subtotal: parseFloat(subtotal.toFixed(2)),
+    });
+    if (shippingCheck.ok === false) {
+      return NextResponse.json(shippingCheck.body, { status: shippingCheck.status });
+    }
     const total = parseFloat((subtotal + (session.shipping_total ?? 0) - (session.ambassador_discount_amount ?? 0)).toFixed(2));
     const amount = Math.round(total * 100);
 

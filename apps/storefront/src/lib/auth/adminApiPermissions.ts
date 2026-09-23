@@ -51,6 +51,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (/^\/api\/admin\/shipping-tariff-drafts\/[^/]+\/simulate$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.view' : null;
   if (path.startsWith('/api/admin/shipping-tariff-drafts')) return read ? 'shipping.view' : 'shipping.manage';
   if (/^\/api\/admin\/shipping-tariff-versions\/[^/]+\/select$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
+  if (/^\/api\/admin\/shipping-tariff-versions\/[^/]+\/activate$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
+  if (path === '/api/admin/shipping-tariff-versions/retire') return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
   if (path === '/api/admin/shipping-tariff-versions') return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-pricing-mode') return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-shadow-report') return read ? 'shipping.view' : null;

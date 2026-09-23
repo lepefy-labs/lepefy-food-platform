@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 24 settembre 2026 — **v6.70 Current-State Snapshot**
+> **Aggiornato:** 24 settembre 2026 — **v6.71 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -405,6 +405,8 @@ open + external handoff -> awaiting_verification
 awaiting_verification -> completed | cancelled | open
 ```
 
+Spese di spedizione: ogni percorso di pagamento passa da `lib/shipping/tariff/checkoutShipping.ts` (token legacy in `provider_cost`/`shadow`, token V2 ricalcolato in `tariff`; 409 `SHIPPING_REQUOTE_REQUIRED` → nuovo preventivo e nuova conferma del cliente), vedi sezione 13.
+
 Recovery canonica: `/checkout/reprendre/[id]`; legacy `/orders/en-attente/[id]` redirige lì. Le conferme manuali di pagamento esterno Shop sono protette dalla capability critica `shop_payments.confirm`.
 
 ### Purchase quantity rules (minimo/step SKU e gruppi combinabili)
@@ -622,6 +624,8 @@ La pagina cliente `/orders/[id]` mostra timeline Lepefy sincronizzata più recen
 
 **Forfait shadow (V1F, migration `124`)** : `tenants.shipping_pricing_mode` (`provider_cost` par défaut | `shadow` | `tariff` réservé, traité comme `provider_cost`) est indépendant de `shipping_provider` (dont `flat_rate` reste le forfait unique historique). `shipping_tariff_versions` stocke des snapshots **immuables** copiés d'un brouillon (tranches en grammes `min < poids ≤ max`, prix en centimes, suppléments de zone par colis/commande, zones non livrables, colis max, blocs au-delà de N kg, limite logistique vérifiée, TVA incluse ou non) ; statuts `validated | shadow | retired | active` (`active` jamais écrit), une seule `shadow` par tenant+pays, trigger d'immuabilité, aucun DELETE, sélection atomique par RPC. Le moteur pur `lib/shipping/tariff/priceFromTariff.ts` (entiers grammes/centimes, colis remplis via `splitParcelWeightsFilled`, règles pays via `applyCountryRule`) est appelé côté serveur par `resolveCheckoutShippingDetails` (`shadowTariff.ts`) depuis `/api/checkout`, `/api/checkout/external-link` et le PATCH de session : en mode `shadow` et livraison seulement, il ajoute `shipping_details.shadow_tariff` (version, poids net depuis `products.weight_grams`, zone, tranche, colis, supplément, prix shadow, montant facturé, devis Packlink vérifié contre le total signé, écart) sans jamais modifier `shippingTotal`, le total, le token HMAC, le PaymentIntent ni les champs Packlink ; toute clé `shadow_tariff` venue du navigateur est retirée ; timeout 2,5 s et erreurs non bloquantes ; aucun repli de poids (produit sans poids → simulation incomplète) ; retrait en magasin exclu. Admin → Livraison → **Forfait shadow** (`/admin/livraison/forfait-shadow`, `shipping.view`/`shipping.manage`) : création de version depuis un brouillon, sélection/rollback, activation de la seule collecte, qualité des poids produits, rapport sur commandes réelles (période, version, fiabilité prudente). La tarification commerciale n'est pas implémentée. Détail et runbook : `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §10–11.
 
+**Forfait commerciale (V1G, migration `125`)** : `shipping_pricing_mode = tariff` s'obtient uniquement par l'action admin « Activer cette tarification pour les clients » (RPC atomique `activate_shipping_tariff_version` : une seule version `active` par tenant+pays, activée par/le tracés ; retrait par pays `retire_shipping_tariff_country`, retour global `rollback_shipping_tariff_to_provider_cost`). En mode `tariff`, `/api/shipping/quote` calcule côté serveur le prix de la version active (poids net depuis `products.weight_grams`, zone tenant — CAP sans zone refusé, territoires extra-douaniers toujours refusés même avec `flat_rate_override` —, `priceFromTariff`, règles pays dans l'ordre du live, jamais `packaging_surcharges`), vérifie la disponibilité logistique avec le même plan de colis que la préparation (`cartonsForWeight` + `tare_g`) : devis identique récent (7 j), sinon appel Packlink limité à 6 s (services persistés en `real_quote`), sinon preuve récente du même CAP (30 j, jamais au-delà du poids logistique vérifié), et signe un **token V2** (`v2.` + HMAC : tenant, montant en centimes, pays, CAP normalisé, poids, empreinte du panier validé, mode, version, devis provider, expiration). `lib/shipping/tariff/checkoutShipping.ts` recalcule et compare dans `/api/checkout` (Stripe + magasin), `/api/checkout/external-link`, le PATCH de session ; `revalidateSessionShipping` protège `create-intent` et le PATCH sans nouveau devis ; toute divergence → 409 `SHIPPING_REQUOTE_REQUIRED`, le client refait le devis et le client reconfirme. Token legacy refusé en `tariff`, token V2 refusé hors `tariff`. `tenants.shipping_tariff_fallback` (`unavailable` défaut | `provider_cost`) règle explicitement les pays sans tarif et les produits sans poids. L'ordre conserve `shipping_details.pricingMode = tariff` + `tariff{versionId, version, zone, poids, tranche, blocs, colis, supplément, TVA, règles, finalCents, providerQuoteTtcCents}` sans `packlinkCost`. Admin « Forfait » : états Brouillon / Shadow / Active / Retirée, confirmation avec checklist (`activationChecklist.ts`), retrait, rollback, repli, tare dans Emballages, rapport « Commandes facturées au forfait ». Page publique `/livraison` (FR/IT, générée depuis la version active) présente mais **masquée** : `tenants.shipping_public_grid_enabled` défaut false. Aucun tenant n'est activé par le déploiement. Runbook : `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–13.
+
 `docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth destinatari interni. Gli alert pagamento esterno Shop/Events condividono `notify_external_payment_pending` ma webhook/payload distinti. Gli eventi aggiungono `notify_event_booking_closed_reports` per i tre report automatici di chiusura.
 
 ---
@@ -672,6 +676,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 122_match_products_quantity_rules.sql
 123_packaging_profile_carton_suggestion.sql
 124_shipping_tariff_versions.sql
+125_shipping_tariff_activation.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -723,6 +728,8 @@ Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/09
 `123` è additiva e reversibile: due colonne nullable `suggest_min_weight_g`/`suggest_max_weight_g` su `shipping_packaging_profiles` per suggerire il cartone per collo nel dettaglio ordine admin (card «Carton à utiliser», motore puro `lib/shipping/cartonSuggestion.ts`, split pieno 15 kg + resto). Nessun impatto su checkout, prezzo o `packaging_surcharges`; finché non è applicata manualmente in Supabase la card resta nascosta e l'editor Emballages non invia i nuovi campi. Dossier del futuro forfait checkout: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` (prezzi tenant IVA inclusa).
 
 `124` è additiva e reversibile: `tenants.shipping_pricing_mode` (default `provider_cost`, nessun cambio per i tenant esistenti) e la tabella service-role-only `shipping_tariff_versions` (snapshot immutabili via trigger, nessun DELETE, una sola versione `shadow`/`active` per tenant+paese, RPC `select_shipping_tariff_shadow_version`). Nessun backfill. Finché non è applicata manualmente in Supabase, il checkout resta invariato (il mode assente vale `provider_cost`) e l'onglet Forfait shadow mostra «migration non appliquée». Rollback documentato in fondo al file SQL.
+
+`125` è additiva: `shipping_tariff_versions.activated_at/activated_by/retired_by`, `tenants.shipping_tariff_fallback` (default `unavailable`), `tenants.shipping_public_grid_enabled` (default false), `shipping_packaging_profiles.tare_g`, e le RPC service-role di attivazione/ritiro/rollback. Nessun backfill e nessun tenant attivato: il forfait è addebitato solo dopo l'attivazione esplicita in admin. Da applicare manualmente dopo la 124; senza di essa l'attivazione è indisponibile e il checkout resta invariato. Rollback documentato nel file SQL.
 
 `119` è additiva : 5 nuove tabelle (Shipping Intelligence, vedi sezione 13), zero colonne modificate su `tenants`/`orders`/`packaging_surcharges`/`shipping_country_rules`, zero impatto checkout. Seed non distruttivo: un `shipping_packaging_profiles` di default per tenant derivato da `packaging_surcharges` esistente. L'applicazione in Supabase resta manuale.
 
@@ -793,9 +800,11 @@ supabase/migrations/*
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;
 - le API admin legacy mantengono il nome helper `requireAdmin()` per compatibilità, ma l'enforcement è già capability-driven tramite `adminApiPermissions.ts`;
-- `shipping_details` resta un eco del quote inviato dal browser: solo `shippingTotal` è firmato (`t`); `packlinkCost`/`vatAmount`/`totalWeightG` non lo sono. Lo shadow V1F ricalcola il peso sul server e accetta il devis provider solo se ricostruisce il totale firmato;
-- il rétrotest delle bozze (`applyTariffDraft`) non usa ancora il motore condiviso `priceFromTariff` della V1F;
-- Shipping Intelligence : il mapping città→CAP dipende dall'indice GeoNames importato (`shipping_postal_code_index`) con repli Nominatim/Zippopotam.us/GeoNames e fallback manuale; l'esaustività dei CAP non è verificabile e le città GeoNames suddivise per arrondissement (es. `Lyon 01`…`Lyon 09`) non sono raggruppate automaticamente; il mapping CAP→zona commerciale resta tenant-owned (`shipping_zones.postal_prefixes`) e non costituisce un mapping regionale ufficiale della piattaforma; `shipping_quote_observations.source = 'real_shipment'` non è mai popolato perché il costo finale reale di una spedizione non è catturato separatamente dal preventivo; gli item storici con riuso incompatibile restano in produzione (esclusi solo dalla copertura) finché non viene lanciata una remesure esplicita; il range di costo mostrato per un item storico `succeeded` usa l'osservazione collegata all'epoca (scelta sul solo prezzo base prima della V1E), mentre Historique/Assistant/rétrotest ricalcolano l'osservazione operativa; la tariffazione commerciale forfait non è implementata — l'importo addebitato resta interamente sul flusso `shipping_country_rules`/provider esistente; la V1F calcola il forfait solo in shadow mode;
+- in `provider_cost`/`shadow` `shipping_details` resta un eco del quote inviato dal browser (solo `shippingTotal` è firmato); in `tariff` lo snapshot è interamente ricostruito dal server;
+- il rétrotest delle bozze (`applyTariffDraft`) non usa ancora il motore condiviso `priceFromTariff`;
+- in `provider_cost` un `flat_rate_override` IT salterebbe Packlink anche per Livigno/Campione (il blocco extra-doganale è garantito solo in `tariff`);
+- costo reale degli imballaggi non registrato: nessun margine completo sugli ordini al forfait;
+- Shipping Intelligence : il mapping città→CAP dipende dall'indice GeoNames importato (`shipping_postal_code_index`) con repli Nominatim/Zippopotam.us/GeoNames e fallback manuale; l'esaustività dei CAP non è verificabile e le città GeoNames suddivise per arrondissement (es. `Lyon 01`…`Lyon 09`) non sono raggruppate automaticamente; il mapping CAP→zona commerciale resta tenant-owned (`shipping_zones.postal_prefixes`) e non costituisce un mapping regionale ufficiale della piattaforma; `shipping_quote_observations.source = 'real_shipment'` non è mai popolato perché il costo finale reale di una spedizione non è catturato separatamente dal preventivo; gli item storici con riuso incompatibile restano in produzione (esclusi solo dalla copertura) finché non viene lanciata una remesure esplicita; il range di costo mostrato per un item storico `succeeded` usa l'osservazione collegata all'epoca (scelta sul solo prezzo base prima della V1E), mentre Historique/Assistant/rétrotest ricalcolano l'osservazione operativa; la tariffazione commerciale forfait è implementata (V1G) ma nessun tenant è attivato finché un admin non lo fa esplicitamente;
 - AI credits predisposti semanticamente ma non monetizzati/applicati.
 
 ---
@@ -814,7 +823,7 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.70
+# Fine snapshot v6.71
 
 **Base audit:** `main` @ `876a4ac` — `Shipping Intelligence V1A–V1E (qualità dati: equivalenza stretta per CAP, costo operativo per scenario, copertura CAP verificabile, campionamento progressivo, disambiguazione geografica, retrotest per scenario) + n8n scheduler cutover template + city-wide postal campaign expansion + tenant-admin immediate campaign tick + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI + Purchase quantity rules (minimo/step prodotto e gruppo combinabile, migration 121/122) + gate checkout client-side + consolidamento ProductCard`
 **Data:** 22 settembre 2026

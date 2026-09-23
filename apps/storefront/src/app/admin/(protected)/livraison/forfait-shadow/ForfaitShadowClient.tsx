@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { IconAlertTriangle, IconLock, IconRefresh } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCircleCheck, IconLock, IconRefresh } from '@tabler/icons-react';
 import type { ShippingTariffVersionRow } from '@lepefy/types';
 import type { ForfaitShadowAdminData } from '@/lib/shipping/tariff/adminData';
 import type { ShadowReport } from '@/lib/shipping/tariff/shadowReport';
 import type { ShadowTariffReason } from '@/lib/shipping/tariff/shadowTariff';
 import { priceFromTariff, type TariffSnapshot } from '@/lib/shipping/tariff/priceFromTariff';
 import { buildVersionFromDraft, parseTariffVersion, TARIFF_ERROR_LABELS } from '@/lib/shipping/tariff/tariffVersion';
+import { buildActivationChecklist, describeCountryRule, perOrderSurchargeZones } from '@/lib/shipping/tariff/activationChecklist';
+import { resolveCountryRule } from '@/lib/shipping/resolveCountryRule';
 
 const CARD = 'bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5';
 const INPUT_CLS =
@@ -167,6 +169,13 @@ export function ForfaitShadowClient({
 }) {
   const [versions, setVersions] = useState<ShippingTariffVersionRow[]>(data.versions);
   const [mode, setMode] = useState(data.pricingMode);
+  const [fallback, setFallback] = useState(data.fallback);
+  const [publicGrid, setPublicGrid] = useState(data.publicGridEnabled);
+  const [activation, setActivation] = useState<ShippingTariffVersionRow | null>(null);
+  const [ackPerOrder, setAckPerOrder] = useState(false);
+  const [ackConfirm, setAckConfirm] = useState(false);
+  const [retireCountry, setRetireCountry] = useState<string | null>(null);
+  const [confirmRollback, setConfirmRollback] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -267,15 +276,93 @@ export function ForfaitShadowClient({
     }
   }
 
-  async function handleMode(next: 'provider_cost' | 'shadow') {
+  async function handleMode(next: 'provider_cost' | 'shadow', confirm = false) {
     setBusy('mode');
     setMessage(null);
     try {
-      const res = await call('/api/admin/shipping-pricing-mode', { method: 'PATCH', body: JSON.stringify({ mode: next }) });
+      const wasTariff = mode === 'tariff';
+      const res = await call('/api/admin/shipping-pricing-mode', { method: 'PATCH', body: JSON.stringify({ mode: next, confirm }) });
       setMode(res.mode as typeof mode);
-      setMessage({ kind: 'ok', text: next === 'shadow' ? 'Collecte shadow activée. Les frais facturés aux clients ne changent pas.' : 'Collecte shadow désactivée.' });
+      if (wasTariff) await refreshVersions();
+      setConfirmRollback(false);
+      setMessage({
+        kind: 'ok',
+        text: wasTariff
+          ? 'Tarification retirée : les nouveaux devis reviennent au calcul actuel. Les commandes passées gardent leur tarif.'
+          : next === 'shadow' ? 'Collecte shadow activée. Les frais facturés aux clients ne changent pas.' : 'Collecte shadow désactivée.',
+      });
     } catch (err) {
       setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Mise à jour impossible.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleFallback(next: 'unavailable' | 'provider_cost') {
+    setBusy('fallback');
+    setMessage(null);
+    try {
+      await call('/api/admin/shipping-pricing-mode', { method: 'PATCH', body: JSON.stringify({ fallback: next }) });
+      setFallback(next);
+      setMessage({ kind: 'ok', text: 'Règle de repli enregistrée.' });
+    } catch (err) {
+      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Mise à jour impossible.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handlePublicGrid(next: boolean) {
+    setBusy('public-grid');
+    setMessage(null);
+    try {
+      await call('/api/admin/shipping-pricing-mode', { method: 'PATCH', body: JSON.stringify({ publicGrid: next }) });
+      setPublicGrid(next);
+      setMessage({ kind: 'ok', text: next ? 'Page publique « Frais de livraison » affichée (si une tarification est active).' : 'Page publique masquée.' });
+    } catch (err) {
+      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Mise à jour impossible.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function openActivation(version: ShippingTariffVersionRow) {
+    setActivation(version);
+    setAckPerOrder(false);
+    setAckConfirm(false);
+    setMessage(null);
+  }
+
+  async function handleActivate() {
+    if (!activation) return;
+    setBusy('activate');
+    try {
+      await call(`/api/admin/shipping-tariff-versions/${activation.id}/activate`, {
+        method: 'POST',
+        body: JSON.stringify({ confirm: ackConfirm, acknowledgePerOrderSurcharges: ackPerOrder }),
+      });
+      await refreshVersions();
+      setMode('tariff');
+      setMessage({ kind: 'ok', text: `Tarification ${activation.country} v${activation.version} active : les nouveaux devis et paiements utilisent ce tarif.` });
+      setActivation(null);
+    } catch (err) {
+      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Activation impossible.' });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRetire(countryCode: string) {
+    setBusy(`retire-${countryCode}`);
+    setMessage(null);
+    try {
+      const res = await call('/api/admin/shipping-tariff-versions/retire', { method: 'POST', body: JSON.stringify({ country: countryCode, confirm: true }) });
+      await refreshVersions();
+      setMode(res.pricingMode as typeof mode);
+      setRetireCountry(null);
+      setMessage({ kind: 'ok', text: `Tarification ${countryCode} retirée. Les commandes passées gardent leur tarif.` });
+    } catch (err) {
+      setMessage({ kind: 'error', text: err instanceof Error ? err.message : 'Retrait impossible.' });
     } finally {
       setBusy(null);
     }
@@ -295,8 +382,32 @@ export function ForfaitShadowClient({
   }
 
   const collecting = mode === 'shadow';
+  const tariffMode = mode === 'tariff';
+  const activeVersions = versions.filter((v) => v.status === 'active');
+  const retiredVersions = versions.filter((v) => v.status === 'retired');
   const r = report?.report ?? null;
   const maxBucket = r ? Math.max(1, ...r.gap.buckets.map((b) => b.count)) : 1;
+  const who = (id: string | null | undefined) => (id ? data.adminEmails[id] ?? 'un administrateur' : 'un administrateur');
+  const checklist = activation ? buildActivationChecklist({
+    version: activation,
+    migrationReady: data.activationReady,
+    missingWeightProducts: data.missingWeightProducts.length,
+    zoneCodes: data.zoneCodes,
+    profiles: data.profiles,
+    countryRule: resolveCountryRule(activation.country, data.countryRules),
+    fallback,
+  }) : [];
+  const blocking = checklist.some((i) => i.status === 'blocking');
+  const needsPerOrderAck = activation ? perOrderSurchargeZones(activation).length > 0 : false;
+
+  function activateButton(v: ShippingTariffVersionRow) {
+    return (
+      <button onClick={() => openActivation(v)} disabled={busy !== null || !data.activationReady} className={BTN}
+        title={!data.activationReady ? 'Migration 125 requise' : undefined}>
+        Activer cette tarification pour les clients
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -306,13 +417,19 @@ export function ForfaitShadowClient({
           <p>La migration <code>124_shipping_tariff_versions.sql</code> n&apos;est pas encore appliquée. Les versions et la collecte shadow sont indisponibles ; le checkout fonctionne comme avant.</p>
         </div>
       )}
+      {data.migrationReady && !data.activationReady && (
+        <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <IconAlertTriangle size={18} stroke={1.5} className="shrink-0 mt-0.5" />
+          <p>La migration <code>125_shipping_tariff_activation.sql</code> n&apos;est pas encore appliquée : l&apos;activation commerciale est indisponible. La collecte shadow fonctionne.</p>
+        </div>
+      )}
 
       {message && (
         <div role="status" className={`rounded-lg px-3 py-2 text-xs ${message.kind === 'ok' ? 'bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}>{message.text}</div>
       )}
 
-      {/* États : brouillon / version shadow / tarification active */}
-      <section className="grid gap-2 md:grid-cols-3">
+      {/* États : brouillon / version shadow / tarification active / retirée */}
+      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4">
           <p className="text-sm font-semibold">Brouillon</p>
           <p className="text-xs text-gray-500 mt-1">Modifiable, rétrotesté dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>. Jamais lu par le checkout.</p>
@@ -320,41 +437,107 @@ export function ForfaitShadowClient({
         </div>
         <div className="rounded-xl border border-[var(--color-primary)] bg-[var(--admin-primary-soft)] p-4">
           <p className="text-sm font-semibold text-[var(--admin-primary-fg)]">Version shadow</p>
-          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">Figée. Calculée sur chaque commande livrée quand la collecte est active, jamais facturée.</p>
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">Figée. Calculée à côté du prix réel quand la collecte est active, jamais facturée.</p>
           <p className="text-2xs text-gray-500 mt-2">{shadowVersions.length ? shadowVersions.map((v) => `${v.country} v${v.version}`).join(' · ') : 'Aucune version sélectionnée'}</p>
         </div>
-        <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 opacity-70">
-          <p className="text-sm font-semibold flex items-center gap-1.5"><IconLock size={14} stroke={1.5} />Tarification active</p>
-          <p className="text-xs text-gray-500 mt-1">Non disponible dans cette version. Facturer le forfait demandera une décision et une évolution dédiées du checkout.</p>
+        <div className={`rounded-xl p-4 ${activeVersions.length ? 'border-2 border-green-600 bg-green-50 dark:bg-green-950/30' : 'border border-gray-200 dark:border-gray-800'}`}>
+          <p className="text-sm font-semibold flex items-center gap-1.5">{activeVersions.length ? <IconCircleCheck size={15} stroke={1.8} className="text-green-700" /> : <IconLock size={14} stroke={1.5} />}Tarification active</p>
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{activeVersions.length ? 'Facturée aux clients sur les nouveaux devis et paiements.' : 'Aucun tarif facturé : les frais de livraison suivent le calcul actuel.'}</p>
+          <p className="text-2xs text-gray-500 mt-2">{activeVersions.length ? activeVersions.map((v) => `${v.country} v${v.version}`).join(' · ') : '—'}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <p className="text-sm font-semibold">Version retirée</p>
+          <p className="text-xs text-gray-500 mt-1">Historique immuable, conservé pour expliquer les commandes passées. Peut être réactivée.</p>
+          <p className="text-2xs text-gray-400 mt-2">{retiredVersions.length} version(s)</p>
         </div>
       </section>
 
-      {/* Collecte */}
+      {/* Mode de tarification */}
       <section className={CARD}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">Collecte shadow : {collecting ? 'activée' : 'désactivée'}</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              {collecting
-                ? 'Le forfait de la version shadow est calculé et enregistré sur chaque commande livrée. Le client paie toujours les frais actuels.'
-                : 'Aucun calcul de forfait au checkout. Les frais de livraison sont calculés comme aujourd’hui.'}
-            </p>
-            {mode === 'tariff' && <p className="text-xs text-red-600 mt-1">Mode « tariff » détecté : non pris en charge, traité comme le calcul actuel sans collecte.</p>}
+        {tariffMode ? (
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold">Tarification client : forfait actif</h2>
+              <p className="text-xs text-gray-500 mt-1">Le prix de livraison est calculé par le serveur à partir de la version active du pays, puis vérifié à nouveau à chaque paiement. La collecte shadow est suspendue.</p>
+            </div>
+            {confirmRollback ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                <p className="mb-2">Tous les tarifs actifs seront retirés. Les nouveaux devis reviendront au calcul actuel (devis Packlink + emballage). Les commandes passées ne changent pas ; les paiements en cours au forfait devront être recalculés.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => void handleMode('provider_cost', true)} disabled={busy !== null} className={`${BTN} bg-red-700`}>{busy === 'mode' ? 'Retrait…' : 'Confirmer le retour au calcul actuel'}</button>
+                  <button onClick={() => setConfirmRollback(false)} className={BTN_GHOST}>Annuler</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmRollback(true)} disabled={busy !== null} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>Revenir au calcul actuel (tous pays)</button>
+            )}
           </div>
-          {collecting ? (
-            <button onClick={() => void handleMode('provider_cost')} disabled={busy !== null || !data.migrationReady} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>
-              {busy === 'mode' ? 'Mise à jour…' : 'Désactiver la collecte'}
-            </button>
-          ) : (
-            <button onClick={() => void handleMode('shadow')} disabled={busy !== null || !data.migrationReady || shadowVersions.length === 0} className={BTN}
-              title={shadowVersions.length === 0 ? 'Sélectionnez d’abord une version shadow' : undefined}>
-              {busy === 'mode' ? 'Mise à jour…' : 'Activer la collecte shadow'}
-            </button>
-          )}
-        </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Collecte shadow : {collecting ? 'activée' : 'désactivée'}</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                {collecting
+                  ? 'Le forfait de la version shadow est calculé et enregistré sur chaque commande livrée. Le client paie toujours les frais actuels.'
+                  : 'Aucun calcul de forfait au checkout. Les frais de livraison sont calculés comme aujourd’hui.'}
+              </p>
+            </div>
+            {collecting ? (
+              <button onClick={() => void handleMode('provider_cost')} disabled={busy !== null || !data.migrationReady} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>
+                {busy === 'mode' ? 'Mise à jour…' : 'Désactiver la collecte'}
+              </button>
+            ) : (
+              <button onClick={() => void handleMode('shadow')} disabled={busy !== null || !data.migrationReady || shadowVersions.length === 0} className={BTN}
+                title={shadowVersions.length === 0 ? 'Sélectionnez d’abord une version shadow' : undefined}>
+                {busy === 'mode' ? 'Mise à jour…' : 'Activer la collecte shadow'}
+              </button>
+            )}
+          </div>
+        )}
+        {data.activationReady && (
+          <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+            <label htmlFor="fs-fallback" className={LABEL_CLS}>Si le forfait ne s&apos;applique pas (pays sans tarif actif, produit sans poids)</label>
+            <select id="fs-fallback" value={fallback} disabled={busy !== null} onChange={(e) => void handleFallback(e.target.value as 'unavailable' | 'provider_cost')} className={`${INPUT_CLS} sm:max-w-md`}>
+              <option value="unavailable">Livraison indisponible, retrait proposé (recommandé)</option>
+              <option value="provider_cost">Facturer le devis provider actuel (Packlink + emballage)</option>
+            </select>
+            <label className="mt-4 flex items-start gap-2 text-sm">
+              <input id="fs-public-grid" type="checkbox" className="mt-1" checked={publicGrid} disabled={busy !== null} onChange={(e) => void handlePublicGrid(e.target.checked)} />
+              <span>
+                Afficher la page publique « Frais de livraison » (<code>/livraison</code>)
+                <span className="block text-xs text-gray-500">Grille générée depuis la tarification active, avec un lien dans le panier. Masquée par défaut ; sans tarification active, la page reste introuvable.</span>
+              </span>
+            </label>
+          </div>
+        )}
       </section>
 
-      {/* Versions */}
+      {/* Tarifs actifs */}
+      {activeVersions.map((v) => (
+        <section key={v.id} className={`${CARD} border-2 border-green-600`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+            <h2 className="text-sm font-semibold">Tarification active {v.country} · v{v.version} — {v.name}</h2>
+            <p className="text-2xs text-gray-500">active depuis le {v.activated_at ? new Date(v.activated_at).toLocaleString('fr-FR') : '—'} · par {who(v.activated_by)}</p>
+          </div>
+          <VersionDetails version={v} vatRate={vatRateFor(v.country, data.vatRates)} />
+          <p className="text-xs text-gray-500 mt-3">{describeCountryRule(resolveCountryRule(v.country, data.countryRules))}</p>
+          <div className="mt-4">
+            {retireCountry === v.country ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                <p className="mb-2">Retirer le tarif {v.country} : les nouveaux devis vers ce pays suivront le calcul actuel, ou la règle de repli si d&apos;autres pays restent au forfait.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => void handleRetire(v.country)} disabled={busy !== null} className={`${BTN} bg-red-700`}>{busy === `retire-${v.country}` ? 'Retrait…' : 'Confirmer le retrait'}</button>
+                  <button onClick={() => setRetireCountry(null)} className={BTN_GHOST}>Annuler</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setRetireCountry(v.country)} disabled={busy !== null} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>Retirer ce tarif</button>
+            )}
+          </div>
+        </section>
+      ))}
+
+      {/* Versions shadow */}
       {shadowVersions.map((v) => (
         <section key={v.id} className={CARD}>
           <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
@@ -362,26 +545,78 @@ export function ForfaitShadowClient({
             <p className="text-2xs text-gray-400">créée le {new Date(v.created_at).toLocaleDateString('fr-FR')}{v.selected_at ? ` · sélectionnée le ${new Date(v.selected_at).toLocaleDateString('fr-FR')}` : ''}</p>
           </div>
           <VersionDetails version={v} vatRate={vatRateFor(v.country, data.vatRates)} />
+          <div className="mt-4">{activateButton(v)}</div>
         </section>
       ))}
 
-      {versions.some((v) => v.status !== 'shadow') && (
+      {versions.some((v) => v.status === 'validated' || v.status === 'retired') && (
         <section className={CARD}>
           <h2 className="text-sm font-semibold mb-3">Autres versions</h2>
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {versions.filter((v) => v.status !== 'shadow').map((v) => (
+            {versions.filter((v) => v.status === 'validated' || v.status === 'retired').map((v) => (
               <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span>{v.country} v{v.version} — {v.name} <span className="text-2xs text-gray-400">({v.status === 'retired' ? 'retirée' : v.status === 'validated' ? 'non sélectionnée' : v.status})</span></span>
-                {v.status !== 'active' && (
-                  <button onClick={() => void handleSelect(v)} disabled={busy !== null} className={BTN_GHOST}>
+                <span>
+                  {v.country} v{v.version} — {v.name}{' '}
+                  <span className="text-2xs text-gray-400">
+                    ({v.status === 'retired'
+                      ? `retirée${v.retired_at ? ` le ${new Date(v.retired_at).toLocaleDateString('fr-FR')}` : ''}${v.activated_at ? `, active depuis le ${new Date(v.activated_at).toLocaleDateString('fr-FR')}` : ''}`
+                      : 'non sélectionnée'})
+                  </span>
+                </span>
+                <span className="flex flex-wrap gap-2">
+                  <button onClick={() => void handleSelect(v)} disabled={busy !== null || tariffMode} className={BTN_GHOST}>
                     {busy === `select-${v.id}` ? 'Sélection…' : 'Sélectionner comme version shadow'}
                   </button>
-                )}
+                  {activateButton(v)}
+                </span>
               </li>
             ))}
           </ul>
-          <p className="text-2xs text-gray-400 mt-2">Resélectionner une version précédente est le retour arrière : les commandes déjà enregistrées gardent la version utilisée.</p>
+          <p className="text-2xs text-gray-400 mt-2">Réactiver une version précédente est le retour arrière : les commandes déjà passées gardent la version avec laquelle elles ont été payées.</p>
         </section>
+      )}
+
+      {/* Confirmation d'activation */}
+      {activation && (
+        <div role="dialog" aria-modal="true" aria-labelledby="fs-activation-title" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-900 p-5 shadow-xl">
+            <h2 id="fs-activation-title" className="text-base font-semibold">Activer la tarification {activation.country} v{activation.version} pour les clients</h2>
+            <p className="text-xs text-gray-500 mt-1 mb-4">
+              Dès la confirmation, les nouveaux devis et paiements vers {activation.country} utilisent ce tarif (prix calculé et vérifié par le serveur).
+              {activeVersions.find((v) => v.country === activation.country) ? ` La version active actuelle (v${activeVersions.find((v) => v.country === activation.country)!.version}) sera retirée.` : ''}
+              {' '}Les commandes passées ne changent pas ; les paiements en cours sur un autre tarif devront être recalculés et reconfirmés par le client.
+            </p>
+            <VersionDetails version={activation} vatRate={vatRateFor(activation.country, data.vatRates)} />
+            <ul className="mt-4 space-y-1.5">
+              {checklist.map((item) => (
+                <li key={item.key} className="flex gap-2 text-xs">
+                  <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${item.status === 'ok' ? 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300' : item.status === 'warning' ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}>
+                    {item.status === 'ok' ? 'OK' : item.status === 'warning' ? 'À vérifier' : 'Bloquant'}
+                  </span>
+                  <span><b>{item.label}</b> — {item.detail}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 space-y-2">
+              {needsPerOrderAck && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input id="fs-ack-per-order" type="checkbox" className="mt-1" checked={ackPerOrder} onChange={(e) => setAckPerOrder(e.target.checked)} />
+                  Je confirme que les suppléments de zone s&apos;appliquent une seule fois par commande, et non par colis.
+                </label>
+              )}
+              <label className="flex items-start gap-2 text-sm">
+                <input id="fs-ack-confirm" type="checkbox" className="mt-1" checked={ackConfirm} onChange={(e) => setAckConfirm(e.target.checked)} />
+                Je confirme que les clients paieront ce tarif sur leurs nouvelles commandes livrées en {activation.country}.
+              </label>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button onClick={() => void handleActivate()} disabled={busy !== null || blocking || !ackConfirm || (needsPerOrderAck && !ackPerOrder)} className={BTN}>
+                {busy === 'activate' ? 'Activation…' : 'Activer pour les clients'}
+              </button>
+              <button onClick={() => setActivation(null)} disabled={busy === 'activate'} className={BTN_GHOST}>Annuler</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Création */}
@@ -485,7 +720,13 @@ export function ForfaitShadowClient({
             {data.missingWeightProducts.length} / {data.activeProducts} produit(s) actif(s) sans poids
           </span>
         </div>
-        <p className="text-xs text-gray-500 mb-3">Une commande contenant un produit sans poids reste payable normalement, mais sa simulation est « incomplète » et exclue des statistiques (aucun poids par défaut n&apos;est utilisé).</p>
+        <p className="text-xs text-gray-500 mb-3">
+          {tariffMode
+            ? fallback === 'provider_cost'
+              ? 'Tarification active : un panier contenant ces produits est facturé au devis provider (repli configuré), jamais au forfait avec un poids supposé.'
+              : 'Tarification active : un panier contenant ces produits ne peut pas être livré (retrait proposé) tant que le poids manque. Aucun poids par défaut n’est utilisé.'
+            : 'Une commande contenant un produit sans poids reste payable normalement, mais sa simulation est « incomplète » et exclue des statistiques (aucun poids par défaut n’est utilisé).'}
+        </p>
         {data.missingWeightProducts.length > 0 && (
           <ul className="divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
             {data.missingWeightProducts.map((p) => (
@@ -550,6 +791,18 @@ export function ForfaitShadowClient({
                 </div>
               ))}
             </div>
+            {(r.commercial.orders > 0 || r.commercial.fallbackOrders > 0) && (
+              <div className="rounded-lg border border-green-600/40 bg-green-50/60 dark:bg-green-950/20 p-3">
+                <p className="text-xs font-semibold mb-2">Commandes facturées au forfait</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm tabular-nums">
+                  <div><p className="text-2xs uppercase text-gray-400">Commandes</p><p className="font-bold">{r.commercial.orders}</p><p className="text-2xs text-gray-400">{r.commercial.byVersion.map((v) => `${v.country} v${v.version} : ${v.count}`).join(' · ') || '—'}</p></div>
+                  <div><p className="text-2xs uppercase text-gray-400">Forfait payé (moy.)</p><p className="font-bold">{eurCents(r.commercial.avgChargedCents)}</p></div>
+                  <div><p className="text-2xs uppercase text-gray-400">Devis Packlink TTC (moy.)</p><p className="font-bold">{eurCents(r.commercial.avgProviderQuoteCents)}</p><p className="text-2xs text-gray-400">{r.commercial.providerQuoteVerified} devis connu(s)</p></div>
+                  <div><p className="text-2xs uppercase text-gray-400">Écart avant emballage</p><p className={`font-bold ${gapCls(r.commercial.avgGapBeforePackagingCents)}`}>{eurCents(r.commercial.avgGapBeforePackagingCents, true)}</p><p className="text-2xs text-gray-400">{r.commercial.negativeGap} commande(s) négative(s)</p></div>
+                </div>
+                <p className="mt-2 text-2xs text-gray-500">Devis au moment du paiement, pas la facture Packlink ; le coût réel des cartons n&apos;est pas inclus. {r.commercial.fallbackOrders > 0 ? `${r.commercial.fallbackOrders} commande(s) facturée(s) au devis provider (repli).` : ''}</p>
+              </div>
+            )}
             <p className="text-2xs text-gray-400">« Forfait − facturé » compare deux prix client : ce n&apos;est pas une marge. « Écart avant emballage » = forfait − devis Packlink TTC, seulement quand le devis reconstruit exactement le montant signé. Devis, pas des factures.</p>
 
             <div className="grid gap-4 md:grid-cols-3">

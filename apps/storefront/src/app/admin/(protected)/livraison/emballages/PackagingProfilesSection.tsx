@@ -19,6 +19,7 @@ interface FormState {
   active: boolean;
   suggest_min_kg: string;
   suggest_max_kg: string;
+  tare_g: string;
 }
 
 const gToKg = (g: number | null | undefined) => (g == null ? '' : String(g / 1000));
@@ -35,14 +36,17 @@ function toFormState(profile?: ShippingPackagingProfileRow): FormState {
     active: profile?.active ?? true,
     suggest_min_kg: gToKg(profile?.suggest_min_weight_g),
     suggest_max_kg: gToKg(profile?.suggest_max_weight_g),
+    tare_g: profile?.tare_g == null ? '' : String(profile.tare_g),
   };
 }
 
 // Les champs de suggestion ne sont envoyés que si la migration 123 est appliquée
 // (colonnes présentes) ou si l'utilisateur les a remplis.
-function formToBody(form: FormState, suggestColumns: boolean) {
+function formToBody(form: FormState, suggestColumns: boolean, tareColumn: boolean) {
   const sendSuggest = suggestColumns || form.suggest_min_kg.trim() !== '' || form.suggest_max_kg.trim() !== '';
+  const sendTare = tareColumn || form.tare_g.trim() !== '';
   return {
+    ...(sendTare ? { tare_g: form.tare_g.trim() === '' ? null : Number(form.tare_g) } : {}),
     ...(sendSuggest ? { suggest_min_weight_g: kgToG(form.suggest_min_kg), suggest_max_weight_g: kgToG(form.suggest_max_kg) } : {}),
     name: form.name.trim(),
     box_length_cm: Number(form.box_length_cm),
@@ -63,6 +67,7 @@ function validate(form: FormState): string | null {
   if ((min != null && (!Number.isFinite(min) || min < 0)) || (max != null && (!Number.isFinite(max) || max <= 0))) return 'Tranche de suggestion invalide.';
   if (min != null && max == null) return 'Indiquez le poids maximum de la tranche de suggestion.';
   if (min != null && max != null && min >= max) return 'Le poids minimum de suggestion doit être inférieur au maximum.';
+  if (form.tare_g.trim() !== '' && (!Number.isFinite(Number(form.tare_g)) || Number(form.tare_g) < 0)) return 'Tare du carton invalide.';
   return null;
 }
 
@@ -113,6 +118,11 @@ function ProfileForm({
         </div>
         <p className="mt-1 text-[11px] text-gray-400">Vide = jamais suggéré (laboratoire uniquement). Si plusieurs cartons couvrent un poids, le premier est suggéré, les autres proposés si volumineux.</p>
       </div>
+      <div>
+        <label className={LABEL_CLS}>Tare du carton (g)</label>
+        <input type="number" min={0} value={form.tare_g} onChange={(e) => set('tare_g', e.target.value)} placeholder="Ex. 450" className={INPUT_CLS} />
+        <p className="mt-1 text-[11px] text-gray-400">Ajoutée au poids du colis pour vérifier la disponibilité Packlink au forfait. Jamais utilisée pour le prix client.</p>
+      </div>
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input type="checkbox" checked={form.is_default} onChange={(e) => set('is_default', e.target.checked)} className="w-5 h-5" />
@@ -134,6 +144,7 @@ function ProfileForm({
 export function PackagingProfilesSection({ initialProfiles }: { initialProfiles: ShippingPackagingProfileRow[] }) {
   const [profiles, setProfiles] = useState<ShippingPackagingProfileRow[]>([...initialProfiles].sort((a, b) => a.position - b.position));
   const suggestColumns = initialProfiles.some((p) => 'suggest_max_weight_g' in p);
+  const tareColumn = initialProfiles.some((p) => 'tare_g' in p);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -148,7 +159,7 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
   async function handleCreate(form: FormState) {
     setSavingId('new');
     try {
-      const res = await fetch('/api/admin/shipping-packaging-profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formToBody(form, suggestColumns)) });
+      const res = await fetch('/api/admin/shipping-packaging-profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formToBody(form, suggestColumns, tareColumn)) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       setProfiles((prev) => {
@@ -178,7 +189,7 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
 
   async function handleUpdate(id: string, form: FormState) {
     setSavingId(id);
-    const body = formToBody(form, suggestColumns);
+    const body = formToBody(form, suggestColumns, tareColumn);
     const ok = await patchProfile(id, body);
     if (ok) {
       setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...body } : (body.is_default ? { ...p, is_default: false } : p))));

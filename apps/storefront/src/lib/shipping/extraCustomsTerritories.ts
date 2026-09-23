@@ -24,3 +24,9 @@ export function extraCustomsUnavailableMessage(territory: string, clickCollectEn
     : 'Contactez-nous pour trouver une solution.';
   return `Livraison indisponible vers ${territory} (zone extra-douanière). ${alternative}`;
 }
+
+/** Territori extra-doganali noti di un paese (per la pagina pubblica «Livraison»). */
+export function extraCustomsTerritoriesFor(country: string): Array<{ postalCode: string; name: string }> {
+  const codes = EXTRA_CUSTOMS_POSTAL_CODES[country.trim().toUpperCase()] ?? {};
+  return Object.entries(codes).map(([postalCode, name]) => ({ postalCode, name }));
+}

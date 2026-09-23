@@ -1,10 +1,10 @@
 # Forfait di spedizione nel checkout — dossier di implementazione
 
-> **Stato:** **V1F implementata: foundation + shadow mode** (base `main@c74001f`, 24/09/2026). Il motore
-> tariffario, le versioni immutabili e la raccolta shadow esistono nel codice (§10), ma **nessun cliente
-> paga il forfait**: il checkout addebita sempre il preventivo attuale. La tariffazione commerciale
-> (`tariff`) non è implementata. Migration `124` da applicare manualmente; collecte shadow **disattivata**
-> di default per ogni tenant.
+> **Stato:** **V1G implementata: tariffazione commerciale** (base `main@200abcc`, 24/09/2026), sopra la V1F
+> (foundation + shadow, §10–11). Il codice permette di addebitare una versione tariffaria attiva con
+> preventivo e pagamento verificati server-side (§12–13), ma **nessun tenant è attivato**: il forfait è
+> addebitato solo dopo l'attivazione esplicita in admin. Migration `124` e `125` da applicare
+> manualmente. Pagina pubblica `/livraison` presente ma **nascosta** (default).
 > **Tenant pilota:** ChloeFood (IT, partenza Reggio Emilia 42122).
 > **Dati raccolti:** 22–23 settembre 2026 (Shipping Intelligence, campagne + preventivi diretti Packlink).
 > **Documenti collegati:** `docs/SHIPPING_INTELLIGENCE.md` (laboratorio, rétrotest, bozze), `CLAUDE.md` § Shipping Calculation.
@@ -286,7 +286,9 @@ Con il forfait il prezzo non dipende da Packlink, ma la **consegnabilità** sì.
 ### 5.6 Quote token e checkout
 
 > **V1F (shadow):** il token **non** è stato modificato. Il forfait è ricalcolato sul server al checkout
-> e non transita dal quote. L'estensione del token resta necessaria per la futura tariffazione commerciale.
+> e non transita dal quote.
+>
+> **V1G:** token V2 implementato e ricalcolo in ogni percorso di pagamento (§12.4–12.5).
 
 - Estendere il payload firmato: `{ t, c, z, e, w (peso g), v (tariff_id:version), m (pricing_mode) }`.
 - In `/api/checkout` **ricalcolare** il prezzo con `priceFromTariff` sul carrello server-side e
@@ -424,8 +426,8 @@ Ordine unico, documentato e testato:
 
 **Cosa esiste nel codice.** Motore tariffario puro, versioni immutabili, modalità di pricing per tenant,
 calcolo shadow server-side al checkout, onglet admin «Forfait shadow» e rapporto sugli ordini reali.
-**Cosa NON esiste.** Nessun prezzo forfait è addebitato, mostrato al cliente o firmato nel quote token;
-nessuna azione admin imposta `tariff` o lo stato `active`; nessuna pagina pubblica della griglia.
+**Perimetro V1F (storico).** La V1F non addebitava alcun forfait. La tariffazione commerciale, lo stato
+`active` e la pagina pubblica sono arrivati con la V1G (§12).
 
 ### 10.1 Schema (migration `124_shipping_tariff_versions.sql`, additiva e reversibile)
 
@@ -551,12 +553,184 @@ Nessun cambiamento di prezzo per il cliente.
 | `error / timeout` | Latenza DB > 2,5 s: il checkout è proseguito; verificare i log Vercel `[shadow-tariff]` |
 | `provider.verification = unverified` | Regola paese applicata o dettagli del quote incoerenti: margine non calcolato (voluto) |
 | `logistics_unverified_weight` | Ordine oltre il limite logistico verificato: prezzo teorico, fattibilità Packlink da confermare |
-| Log `shipping_pricing_mode=tariff non supporté` | Valore `tariff` impostato a mano: rimettere `shadow` o `provider_cost` |
 
-### 11.7 Percorso verso la tariffazione commerciale (fuori scope)
+### 11.7 Passaggio alla tariffazione commerciale
 
-Richiede una decisione e un intervento dedicati: estensione del token firmato (peso, versione, modalità),
-ricalcolo e confronto in `/api/checkout`, gestione del cambio versione tra quote e pagamento, stato
-`active` e relativa azione admin, disponibilità logistica (§5.5), pagina pubblica «Livraison»,
-migrazione di `applyTariffDraft` sul motore condiviso, costo reale dei cartoni per il margine completo.
+Implementato in V1G: vedi §12 (comportamento) e §13 (runbook di pubblicazione e rollback).
 Nessuna attivazione automatica basata sulla dimensione del campione.
+
+---
+
+## 12. Implementazione V1G — tariffazione commerciale
+
+**Stato distinto in tre fatti:** (1) codice commerciale implementato e distribuito; (2) schema di
+produzione (`124` e `125`) da applicare e verificare manualmente; (3) **nessun tenant è attivato**:
+il forfait viene addebitato solo dopo l'azione esplicita «Activer cette tarification pour les clients».
+
+### 12.1 Modello
+
+- `tenants.shipping_provider` resta il provider logistico (Packlink: disponibilità, spedizioni, tracking);
+  `flat_rate` resta il forfait unico storico, invariato.
+- `tenants.shipping_pricing_mode`: `provider_cost` (default) | `shadow` (V1F) | `tariff` (V1G). `tariff`
+  si ottiene **solo** con l'attivazione di una versione (RPC atomica), mai con un PATCH diretto.
+- `tenants.shipping_tariff_fallback` (migration 125): cosa succede in modalità `tariff` quando la
+  tariffa non si applica (paese senza versione attiva, prodotto senza peso): `unavailable` (default,
+  consegna non disponibile e ritiro proposto) oppure `provider_cost` (preventivo Packlink attuale).
+  Mai implicito.
+- `tenants.shipping_public_grid_enabled` (migration 125, default `false`): pagina pubblica `/livraison`.
+  **Attualmente nascosta** su richiesta del tenant: il codice esiste, la pagina risponde 404 finché non
+  viene attivata dall'admin (e comunque solo con una tariffa attiva).
+
+### 12.2 Schema (migration `125_shipping_tariff_activation.sql`, additiva)
+
+- `shipping_tariff_versions.activated_at / activated_by / retired_by` (tracciabilità; parametri
+  economici sempre immutabili via trigger 124).
+- `tenants.shipping_tariff_fallback`, `tenants.shipping_public_grid_enabled`.
+- `shipping_packaging_profiles.tare_g` (tara del cartone, solo per la verifica logistica).
+- RPC service-role: `activate_shipping_tariff_version(tenant, version, actor)` (ritira l'`active` dello
+  stesso paese, attiva, porta il tenant a `tariff`); `retire_shipping_tariff_country(tenant, country,
+  actor)` (se non resta alcuna attiva → `provider_cost`); `rollback_shipping_tariff_to_provider_cost`.
+- Nessun backfill, nessun tenant attivato dalla migration. Rollback in fondo al file.
+
+### 12.3 Preventivo autorevole (`/api/shipping/quote`, `lib/shipping/tariff/tariffQuote.ts`)
+
+In modalità `tariff`, nell'ordine:
+
+1. territori extra-doganali noti (Livigno 23041, Campione 22061) → sempre non consegnabili, anche con
+   `flat_rate_override`;
+2. versione `active` del paese (una `shadow` non è mai addebitata); assente → fallback configurato;
+3. prodotti del tenant e **peso netto** da `products.weight_grams` × quantità (il peso e il prezzo del
+   browser sono ignorati); prodotto senza peso → fallback configurato, mai 400 g;
+4. zona tenant (`resolveZoneCodeFromRows`); CAP senza zona → non disponibile (una zona ignota non
+   riceve il prezzo «standard»: potrebbe essere un'isola); zona `non_deliverable` → non disponibile;
+5. `priceFromTariff` + regole paese nella stessa precedenza del live (tariffa → `flat_rate_override`
+   → sconto → gratuità sul subtotale server). `packaging_surcharges` non è mai sommato. IVA una volta;
+6. **disponibilità logistica** (`checkTariffAvailability`), separata dal prezzo:
+   - piano colli uguale a quello della preparazione (colli pieni al limite della versione + resto,
+     cartone per collo con `cartonsForWeight`, altrimenti profilo di default o scatola
+     `packaging_surcharges`), peso lordo = netto + `tare_g`;
+   - preventivo **identico** (stesso CAP, stessi colli) ancora fresco (7 giorni) → disponibile senza chiamata;
+   - altrimenti chiamata Packlink con timeout 6 s; servizi persistiti come osservazioni `real_quote`;
+     rifiuto / nessun servizio / nessun servizio eleggibile → non disponibile;
+   - errore o timeout Packlink → disponibile **solo** con un'osservazione eleggibile dello stesso CAP
+     negli ultimi 30 giorni, e mai oltre `logistics_verified_max_weight_g`; altrimenti messaggio chiaro
+     e ritiro proposto;
+   - provider senza API di preventivo (es. `flat_rate`) → `not_checked`.
+7. risposta `{ shippingTotal, shippingDetails, pricingMode: 'tariff', quoteToken (V2) }`.
+
+`provider_cost` e `shadow`: flusso storico invariato (token legacy).
+
+### 12.4 Token V2 (`lib/shipping/quoteToken.ts`)
+
+`v2.<payload>.<HMAC-SHA256>` con dominio di firma distinto dal legacy (un token non vale mai per
+l'altro formato). Payload con chiavi fisse e interi: tenant, importo in centesimi, paese, CAP
+normalizzato, peso netto in grammi, impronta canonica del carrello (`cartFingerprint`: sha256 di
+`id:qty` ordinati), modalità (`tariff` | `provider_cost` per il fallback), id e numero di versione,
+preventivo provider firmato, origine della disponibilità, corriere/servizio, scadenza (1 h).
+Confronto della firma a tempo costante. Nessun segreto nel client.
+
+### 12.5 Verifica in ogni percorso di pagamento (`lib/shipping/tariff/checkoutShipping.ts`)
+
+| Percorso | Verifica |
+|---|---|
+| `/api/checkout` (Stripe e pagamento in negozio) | `verifyCheckoutShipping` |
+| `/api/checkout/external-link` | `verifyCheckoutShipping` |
+| `PATCH /api/checkout-sessions/:id` con nuovo preventivo | `verifyCheckoutShipping` |
+| `PATCH` senza nuovo preventivo, `create-intent` (recupero Stripe) | `revalidateSessionShipping` |
+| Webhook Stripe, conferma pagamento esterno (`createOrderFromCheckoutSession`) | copiano lo snapshot verificato della sessione, idempotenti (`23505`) |
+| Ritiro | nessun forfait, importo 0 |
+
+In `tariff`: token V2 obbligatorio (un legacy → nuovo preventivo); tenant, paese/CAP e impronta del
+carrello devono coincidere; il server ricalcola peso, zona, versione attiva e prezzo e li confronta
+con il token (versione, peso, centesimi). Qualsiasi differenza (tariffa sostituita o ritirata, carrello
+o indirizzo cambiati, token scaduto o alterato) → **409 `SHIPPING_REQUOTE_REQUIRED`**: il checkout e
+l'editor di sessione rifanno il preventivo e il cliente riconferma il nuovo importo. Mai un aumento
+silenzioso; il PaymentIntent è creato/aggiornato solo dopo la verifica. Un ritorno a `provider_cost`
+rende non validi i token e gli snapshot al forfait ancora aperti (nuovo preventivo).
+
+### 12.6 Snapshot sull'ordine
+
+`shipping_details` di un ordine al forfait: `pricingMode: 'tariff'`, `totalWeightG`, `numParcels`,
+`carrierName`, `serviceName` (letti da picking/carton e dettaglio ordine) e `tariff: { versionId,
+version, name, country, currency, pricesIncludeVat, postalCode, zoneCode, weightG, blocks, band,
+parcelsG, zoneSurcharge, vat, theoreticalCents, commercial, finalCents, availability.source,
+providerQuoteTtcCents, warnings, verifiedAt }`. `packlinkCost` **non** è scritto (il cliente non ha
+pagato il preventivo provider; il rétrotest delle bozze esclude quindi questi ordini). Fallback:
+`pricingMode: 'provider_cost_fallback'` + dettagli Packlink + `tariffFallback.reason`. I dati shadow
+V1F restano negli ordini storici.
+
+### 12.7 Admin (`/admin/livraison/forfait-shadow`, onglet «Forfait»)
+
+- Stati: Brouillon / Version shadow / Tarification active (paese, dal, autore) / Version retirée.
+- «Activer cette tarification pour les clients» su una versione shadow, validata o ritirata →
+  schermata di conferma: paese, fasce, blocchi, maggiorazioni, zone escluse, regola paese, conseguenze,
+  checklist (`activationChecklist.ts`): migration 125 (bloccante), coerenza versione (bloccante),
+  maggiorazioni `per_order` (conferma esplicita obbligatoria, anche lato API), zona extra-doganale
+  esclusa, pesi mancanti, cartoni, limite logistico, costo reale degli imballaggi, ordini di test.
+- Ritiro per paese; «Revenir au calcul actuel (tous pays)» con conferma; riattivare una versione
+  precedente = rollback controllato. Scelta del fallback. Casella della pagina pubblica (default spenta).
+- Rapporto: blocco «Commandes facturées au forfait» (forfait pagato, preventivo Packlink del
+  momento del pagamento, scarto prima dell'imballaggio — non un margine reale).
+- Emballages: campo «Tare du carton (g)».
+- API: `POST /api/admin/shipping-tariff-versions/:id/activate` (`{ confirm, acknowledgePerOrderSurcharges }`),
+  `POST /api/admin/shipping-tariff-versions/retire`, `PATCH /api/admin/shipping-pricing-mode`
+  (`mode`, `fallback`, `publicGrid`), tutte `shipping.manage`.
+
+### 12.8 Limiti rimasti
+
+- Il costo reale degli imballaggi non è in Lepefy: nessun margine completo.
+- La tara pesa solo sulla verifica Packlink; il cartone suggerito non è una validazione 3D.
+- Le spedizioni restano create a mano in Packlink PRO (nessuna creazione di etichette da Lepefy).
+- `applyTariffDraft` (rétrotest delle bozze) non usa ancora `priceFromTariff`.
+- Origine `42122` ancora codificata (`FROM_ADDRESS`, `INTELLIGENCE_FROM_ADDRESS`).
+- In `provider_cost` (flusso storico) un `flat_rate_override` IT continuerebbe a saltare Packlink per
+  Livigno/Campione: il blocco extra-doganale è garantito solo in modalità `tariff`.
+
+---
+
+## 13. Runbook di pubblicazione commerciale
+
+### 13.1 Checklist prima del primo utilizzo
+
+1. Migration `124` e `125` applicate in Supabase; verifica:
+   `select shipping_pricing_mode, shipping_tariff_fallback, shipping_public_grid_enabled, count(*) from tenants group by 1,2,3;`
+2. Versione IT valida (onglet Forfait): maggiorazioni **par colis** su `IT_SICILY`, `IT_SARDINIA`,
+   `IT_CALABRIA`; `IT_EXTRA_CUSTOMS` non consegnabile; collo 15 kg; blocco 30 kg = 19,80 €; limite 50 kg.
+3. Prodotti attivi con peso (sezione «Qualité des poids produits»).
+4. Cartoni S/M con tranche di suggerimento e tara (Emballages).
+5. Costo reale degli imballaggi verificato con il fornitore (≤ 1,79 € TTC per collo, §1).
+6. Fallback scelto (consigliato: `unavailable`).
+7. Approvazione critica secondo `AGENTS.md`.
+
+### 13.2 Attivazione
+
+Onglet Forfait → versione → «Activer cette tarification pour les clients» → verificare la checklist →
+spuntare la conferma → «Activer pour les clients». Subito dopo: un ordine di test verso il continente
+e uno verso una zona maggiorata (es. Palermo 90121); controllare in `orders.shipping_details.tariff`
+`finalCents`, `zoneSurcharge`, `versionId`, e che `shipping_cost` sia uguale a `finalCents / 100`.
+
+### 13.3 Monitoraggio
+
+Rapporto dell'onglet (blocco commandes au forfait): forfait pagato vs preventivo Packlink TTC e casi
+negativi; confrontare con le fatture Packlink reali. Nessuna modifica automatica dei prezzi: una nuova
+griglia = nuova bozza → nuova versione → nuova attivazione.
+
+### 13.4 Rollback
+
+- **Un paese:** «Retirer ce tarif» (o riattivare la versione precedente).
+- **Tutto:** «Revenir au calcul actuel (tous pays)»; oppure SQL
+  `select rollback_shipping_tariff_to_provider_cost('<tenant>', null);`.
+- Effetto sui nuovi preventivi immediato; gli ordini pagati conservano il loro snapshot; i checkout
+  aperti al forfait devono rifare il preventivo (409 gestito dal client).
+
+### 13.5 Troubleshooting
+
+| Sintomo | Causa / azione |
+|---|---|
+| «Activer» disabilitato | Migration 125 assente |
+| Attivazione rifiutata «par commande» | La versione ha maggiorazioni per ordine: correggere la versione o confermarle esplicitamente |
+| «Ce code postal n'est pas encore desservi» | CAP senza zona tenant: completare `shipping_zones` |
+| «Les frais de livraison de certains articles…» | Prodotto senza peso con fallback `unavailable` |
+| «Impossible de confirmer la livraison…» | Packlink in errore senza evidenza recente del CAP, oppure oltre il limite logistico |
+| 409 `SHIPPING_REQUOTE_REQUIRED` frequenti | Tariffa cambiata, carrello o indirizzo modificati dopo il preventivo: comportamento voluto |
+| `/livraison` in 404 | Pagina non attivata (default) o nessuna tariffa attiva |

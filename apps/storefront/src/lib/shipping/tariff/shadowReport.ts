@@ -61,6 +61,18 @@ export interface ShadowReport {
   excludedOrders: ShadowReportOrderLine[];
   reliability: ShadowReportReliability;
   latestVersion: { version: number; computedAt: string } | null;
+  /** Commandes réellement facturées au forfait (V1G) — jamais mélangées aux simulations shadow. */
+  commercial: {
+    orders: number;
+    fallbackOrders: number;
+    avgChargedCents: number | null;
+    providerQuoteVerified: number;
+    avgProviderQuoteCents: number | null;
+    /** Forfait payé − devis Packlink TTC, avant emballage (pas une marge réelle). */
+    avgGapBeforePackagingCents: number | null;
+    negativeGap: number;
+    byVersion: Array<{ versionId: string; version: number; country: string; count: number }>;
+  };
 }
 
 const GAP_BUCKETS: Array<{ label: string; test: (c: number) => boolean }> = [
@@ -143,12 +155,33 @@ export function summarizeShadowOrders(orders: ShadowReportOrder[], filter: { ver
   let recorded = 0;
   let logisticsWarnings = 0;
   let latest: { version: number; computedAt: string } | null = null;
+  const charged: number[] = [];
+  const tariffQuotes: number[] = [];
+  const tariffGaps: number[] = [];
+  const tariffVersions = new Map<string, { versionId: string; version: number; country: string; count: number }>();
+  let fallbackOrders = 0;
 
   for (const order of orders) {
     if (order.is_test) continue;
     if (order.fulfillment_type !== 'delivery') { pickupOrders += 1; continue; }
     deliveryOrders += 1;
-    const record = order.shipping_details?.shadow_tariff;
+    const details = order.shipping_details;
+    if (details?.pricingMode === 'provider_cost_fallback') { fallbackOrders += 1; continue; }
+    if (details?.pricingMode === 'tariff') {
+      const t = details.tariff as { versionId?: string; version?: number; country?: string; finalCents?: number; providerQuoteTtcCents?: number | null } | undefined;
+      if (!t || typeof t.finalCents !== 'number' || typeof t.versionId !== 'string') continue;
+      if (filter.versionId && t.versionId !== filter.versionId) continue;
+      charged.push(t.finalCents);
+      if (typeof t.providerQuoteTtcCents === 'number') {
+        tariffQuotes.push(t.providerQuoteTtcCents);
+        tariffGaps.push(t.finalCents - t.providerQuoteTtcCents);
+      }
+      const v = tariffVersions.get(t.versionId) ?? { versionId: t.versionId, version: t.version ?? 0, country: t.country ?? '', count: 0 };
+      v.count += 1;
+      tariffVersions.set(t.versionId, v);
+      continue;
+    }
+    const record = details?.shadow_tariff;
     if (!isShadowRecord(record)) { withoutShadow += 1; continue; }
     if (filter.versionId && record.tariff?.versionId !== filter.versionId) continue;
 
@@ -208,6 +241,16 @@ export function summarizeShadowOrders(orders: ShadowReportOrder[], filter: { ver
     excludedOrders: excluded.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50),
     reliability: complete < MIN_ORDERS_FOR_LIMITED ? 'insufficient' : complete < MIN_ORDERS_FOR_INDICATIVE ? 'limited' : 'indicative',
     latestVersion: latest,
+    commercial: {
+      orders: charged.length,
+      fallbackOrders,
+      avgChargedCents: avg(charged),
+      providerQuoteVerified: tariffQuotes.length,
+      avgProviderQuoteCents: avg(tariffQuotes),
+      avgGapBeforePackagingCents: avg(tariffGaps),
+      negativeGap: tariffGaps.filter((g) => g < 0).length,
+      byVersion: [...tariffVersions.values()].sort((a, b) => b.version - a.version),
+    },
   };
 }
 

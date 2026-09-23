@@ -108,3 +108,19 @@ export function groupSuggestedCartons(suggestion: CartonSuggestion): Array<{ car
   }
   return Array.from(groups.values());
 }
+
+/**
+ * Lecture API de la tare du carton (g, migration 125). Absente du corps → rien
+ * n'est écrit (compatibilité tant que la migration n'est pas appliquée).
+ * Utilisée seulement pour le poids brut envoyé au provider, jamais pour le prix.
+ */
+export function parseTare(body: Record<string, unknown>):
+  | { ok: true; patch: { tare_g?: number | null } }
+  | { ok: false; error: string } {
+  if (!('tare_g' in body)) return { ok: true, patch: {} };
+  const raw = body.tare_g;
+  if (raw === null || raw === '' || raw === undefined) return { ok: true, patch: { tare_g: null } };
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > 10_000) return { ok: false, error: 'Tare du carton invalide (0 à 10 000 g).' };
+  return { ok: true, patch: { tare_g: Math.round(n) } };
+}
