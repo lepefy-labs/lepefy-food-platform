@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@8fb8563a897b701d37bf3c609d7647a5919c1c13`
+> **Base codice verificata:** `main@876a4ac37fe328e781bcc72e4363c62c96b6dbc3`
 > **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
@@ -813,15 +813,16 @@ IT_SICILY=2
 
 ### 18.3 Strategia multi-collo
 
-Il modello supporta:
+`multi_parcel_strategy` (JSON, validato server-side da `validateMultiParcelStrategy` in POST/PATCH; `null` = banda sul peso totale). Selezionabile nel form «Colis supplémentaires»:
 
-```text
-weight_bands_whole_order
-first_parcel_plus_discounted
-flat_multi_parcel_rate
-```
+| Tipo | Calcolo |
+|---|---|
+| `weight_bands_whole_order` / `null` | banda applicata al peso totale dell'ordine |
+| `first_parcel_plus_percentage` | colli riempiti fino a `parcelMaxKg` (`splitParcelsFilled`: 20 kg / 15 → 15 + 5); 1° collo al prezzo della sua banda, ogni collo in più al prezzo della **sua** banda − `percentageDiscount` % |
+| `first_parcel_plus_discounted` | come sopra, ma ogni collo in più aggiunge `discountedParcelRate` (senza `parcelMaxKg`: comportamento storico, banda sul totale + importo × colli extra) |
+| `flat_multi_parcel_rate` | prezzo unico da 2 colli |
 
-L'UI corrente non espone ancora tutte le varianti in modo completo.
+La maggiorazione di zona si applica una volta per ordine. Esempio (proposta tenant 0–10 kg 10,50 €, 10–15 kg 12,50 €, −50 % sui colli in più, 15 kg/collo): 20 kg → 17,75 €, 30 kg → 18,75 €, 45 kg → 25,00 €. Il form mostra un'**anteprima dei prezzi cliente** (stesso motore `applyTariffDraft`) e cliccando una bozza esistente la ricopia nel form per testare una variante.
 
 ### 18.4 Retrotest
 
@@ -839,7 +840,7 @@ orderWeighted      + orderSample
 verifiedShipmentCosts (conteggio real_shipment)
 ```
 
-**Base TTC e paese.** I brouillons sono prezzi cliente TTC: il costo confrontato è il devis Packlink **TTC** — `providerCostTtc`: TVA del paese di destinazione da `shipping_vat_rates` aggiunta quando Packlink non restituisce la taxe — e per gli ordini `packlinkCost + vatAmount` (`orderBacktestRows`). Scenari e ordini sono filtrati sul paese del rétrotest (body `{ country }`, default `IT`; la UI invia IT). I frais d'emballage par colis (`packaging_surcharges`) non sono inclusi nel confronto. Metriche: `maxLoss` = perdita più forte (≤ 0, 0 se nessuna), `minMargin` = margine più basso (mostrato in UI come «Marge minimale»). «Enregistrer et rétrotester» lancia ora davvero il rétrotest dopo il salvataggio.
+**Base TTC e paese.** I brouillons sono prezzi cliente TTC: il costo confrontato è il devis Packlink **TTC** — `providerCostTtc`: TVA del paese di destinazione da `shipping_vat_rates` aggiunta quando Packlink non restituisce la taxe — e per gli ordini `packlinkCost + vatAmount` (`orderBacktestRows`). Scenari e ordini sono filtrati sul paese del rétrotest (body `{ country }`, default `IT`; la UI invia IT). **Costo reale** = devis Packlink TTC + frais d'emballage attuali (`packaging_surcharges`, per collo o per ordine: `packagingCostFor`), cioè ciò che il cliente paga oggi e ciò che il forfait (TTC, emballage compreso) sostituisce: è la base delle metriche principali (`withPackagingCost`); `scenarioWeightedPacklinkOnly` resta disponibile. Per gli ordini il costo reale è `packlinkCost + vatAmount + packagingSurchargeTotal` (= quanto pagato dal cliente). Il blocco in evidenza **«Coûts réels Packlink vs forfait»** mostra KPI (costo reale medio, forfait medio, scarto medio, % in perdita, scarto peggiore) e la tabella `buildCostComparison` per peso misurato × gruppo di zone con la stessa maggiorazione: Packlink TTC (mediana/max), + emballage, = coût réel (caso più caro), forfait, écart colorato. Metriche: `maxLoss` = perdita più forte (≤ 0, 0 se nessuna), `minMargin` = margine più basso (mostrato in UI come «Marge minimale»). «Enregistrer et rétrotester» lancia ora davvero il rétrotest dopo il salvataggio.
 
 `scenarioWeighted` usa **un'osservazione operativa per scenario misurato** (ultima quotazione valida, §14) tra le osservazioni `synthetic_simulation`. `buildScenarioBacktestSample()` restituisce anche:
 

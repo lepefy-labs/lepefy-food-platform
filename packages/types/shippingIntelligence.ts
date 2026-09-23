@@ -149,12 +149,25 @@ export interface ShippingTariffBand {
   price: number;
 }
 
-export type ShippingMultiParcelStrategyType = 'weight_bands_whole_order' | 'first_parcel_plus_discounted' | 'flat_multi_parcel_rate';
+/**
+ * weight_bands_whole_order     : bande appliquée au poids total de la commande ;
+ * first_parcel_plus_discounted : 1er colis au prix de sa bande + montant fixe par colis supplémentaire ;
+ * first_parcel_plus_percentage : 1er colis au prix de sa bande + chaque colis supplémentaire au prix
+ *                                de SA bande moins percentageDiscount % ;
+ * flat_multi_parcel_rate       : prix unique dès 2 colis.
+ * Avec parcelMaxKg, les colis sont remplis jusqu'à parcelMaxKg (le 1er est le plus lourd).
+ */
+export type ShippingMultiParcelStrategyType =
+  | 'weight_bands_whole_order' | 'first_parcel_plus_discounted' | 'first_parcel_plus_percentage' | 'flat_multi_parcel_rate';
 
 export interface ShippingMultiParcelStrategy {
   type: ShippingMultiParcelStrategyType;
   discountedParcelRate?: number;
+  /** 0–100 : remise en % sur chaque colis supplémentaire. */
+  percentageDiscount?: number;
   flatMultiParcelRate?: number;
+  /** Poids max par colis pour le découpage (ex. 15). */
+  parcelMaxKg?: number;
 }
 
 export interface ShippingTariffDraftRow {

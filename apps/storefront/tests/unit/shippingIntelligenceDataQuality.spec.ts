@@ -8,7 +8,7 @@ import { runCampaignBatch } from '../../src/lib/shipping/intelligence/runCampaig
 import { classifyCampaignItem, computeCampaignCoverage, needsResample } from '../../src/lib/shipping/intelligence/campaignCoverage';
 import { fetchCampaignItems, loadCampaignCoverage } from '../../src/lib/shipping/intelligence/campaignData';
 import { fetchAllPages } from '../../src/lib/shipping/intelligence/pagedQuery';
-import { buildScenarioBacktestSample, assessScenarioReliability, backtestTariff, orderBacktestRows, providerCostTtc } from '../../src/lib/shipping/intelligence/tariffBacktest';
+import { applyTariffDraft, buildCostComparison, buildScenarioBacktestSample, assessScenarioReliability, backtestTariff, orderBacktestRows, packagingCostFor, providerCostTtc, splitParcelsFilled, validateMultiParcelStrategy, withPackagingCost } from '../../src/lib/shipping/intelligence/tariffBacktest';
 import { summarizeObservations } from '../../src/lib/shipping/intelligence/observationsSummary';
 import { groupByAdministration, resolveAdministrativeGroup, type PostalAdminRow } from '../../src/lib/shipping/intelligence/postalCityLookup';
 import { deepAnalysisWeights, initialCoverageWeights } from '../../src/lib/shipping/intelligence/weightPresets';
@@ -658,8 +658,60 @@ test('the backtest compares customer TTC prices with Packlink quotes plus VAT, f
   expect(backtestTariff([{ minKg: 0, maxKg: 15, price: 10.9 }], {}, null, sample.rows)).toMatchObject({ maxLoss: 0, minMargin: 1.27 });
 
   const orders = orderBacktestRows([
-    { shipping_details: { packlinkCost: 5.42, vatAmount: 1.19, totalWeightG: 2100, numParcels: 1 }, shipping_address: { country: 'IT' } },
+    { shipping_details: { packlinkCost: 5.42, vatAmount: 1.19, packagingSurchargeTotal: 3, totalWeightG: 2100, numParcels: 1 }, shipping_address: { country: 'IT' } },
     { shipping_details: { packlinkCost: 10.44, vatAmount: 2.3, totalWeightG: 900, numParcels: 1 }, shipping_address: { country: 'BE' } },
   ], 'IT');
-  expect(orders).toEqual([{ providerCost: 6.61, weightKg: 2.1, zoneCode: null, numParcels: 1 }]);
+  expect(orders).toEqual([{ providerCost: 6.61, packagingCost: 3, weightKg: 2.1, zoneCode: null, numParcels: 1 }]);
+  // Coût réel de la commande = ce que le client a payé (9,61 €).
+  expect(withPackagingCost(orders)[0]!.providerCost).toBe(9.61);
+});
+
+// ─── Colis supplémentaires & coût réel (Packlink TTC + emballage) ──────────
+
+const TENANT_BANDS = [{ minKg: 0, maxKg: 10, price: 10.5 }, { minKg: 10, maxKg: 15, price: 12.5 }];
+
+test('per-parcel pricing: first parcel at its band, extra parcels at their band minus the discount', () => {
+  const pct = { type: 'first_parcel_plus_percentage' as const, percentageDiscount: 50, parcelMaxKg: 15 };
+  const price = (weightKg: number) => applyTariffDraft(TENANT_BANDS, {}, pct, { weightKg, zoneCode: null, numParcels: 1 });
+  expect(splitParcelsFilled(20, 15)).toEqual([15, 5]);
+  expect(price(8)).toBe(10.5);
+  expect(price(12)).toBe(12.5);
+  expect(price(20)).toBe(17.75); // 12,50 + 50 % × 10,50
+  expect(price(30)).toBe(18.75); // 12,50 + 50 % × 12,50
+  expect(price(45)).toBe(25);    // 12,50 + 2 × 6,25
+  // Surcharge de zone : une fois par commande.
+  expect(applyTariffDraft(TENANT_BANDS, { IT_SICILY: 1 }, pct, { weightKg: 20, zoneCode: 'IT_SICILY', numParcels: 2 })).toBe(18.75);
+
+  const fixed = { type: 'first_parcel_plus_discounted' as const, discountedParcelRate: 6.25, parcelMaxKg: 15 };
+  expect(applyTariffDraft(TENANT_BANDS, {}, fixed, { weightKg: 20, zoneCode: null, numParcels: 2 })).toBe(18.75);
+  // Sans stratégie, une bande manquante au-delà de 15 kg reste « hors bandes ».
+  expect(applyTariffDraft(TENANT_BANDS, {}, null, { weightKg: 20, zoneCode: null, numParcels: 2 })).toBeNull();
+});
+
+test('multi-parcel strategies are validated server-side', () => {
+  expect(validateMultiParcelStrategy(null)).toBeNull();
+  expect(validateMultiParcelStrategy({ type: 'first_parcel_plus_percentage', percentageDiscount: '50', parcelMaxKg: 15 }))
+    .toEqual({ type: 'first_parcel_plus_percentage', percentageDiscount: 50, parcelMaxKg: 15 });
+  expect(validateMultiParcelStrategy({ type: 'first_parcel_plus_percentage', percentageDiscount: 150, parcelMaxKg: 15 })).toBe('invalid');
+  expect(validateMultiParcelStrategy({ type: 'first_parcel_plus_percentage', percentageDiscount: 50 })).toBe('invalid');
+  expect(validateMultiParcelStrategy({ type: 'unknown' })).toBe('invalid');
+});
+
+test('the real cost includes current packaging and the comparison flags uncovered cases', () => {
+  const packaging = { surcharge_amount: 3, surcharge_mode: 'per_parcel' };
+  expect(packagingCostFor(2, packaging)).toBe(6);
+  expect(packagingCostFor(2, { surcharge_amount: 3, surcharge_mode: 'per_order' })).toBe(3);
+
+  const rows = [
+    { providerCost: 7.2, weightKg: 1, zoneCode: 'IT_LOMBARDY', numParcels: 1, packagingCost: 3 },
+    { providerCost: 11.21, weightKg: 7.5, zoneCode: 'IT_SICILY', numParcels: 1, packagingCost: 3 },
+    { providerCost: 8.3, weightKg: 7.5, zoneCode: 'IT_LOMBARDY', numParcels: 1, packagingCost: 3 },
+  ];
+  expect(withPackagingCost(rows)[0]!.providerCost).toBe(10.2);
+
+  const comparison = buildCostComparison(rows, TENANT_BANDS, {}, null);
+  expect(comparison.map((r) => r.weightKg)).toEqual([1, 7.5]);
+  const cell = comparison[1]!.cells[0]!;
+  expect(cell).toMatchObject({ zoneSurcharge: 0, scenarios: 2, realCostMax: 14.21, forfait: 10.5, worstGap: -3.71 });
+  expect(backtestTariff(TENANT_BANDS, {}, null, withPackagingCost(rows))).toMatchObject({ negativeMarginPct: 66.7 });
 });

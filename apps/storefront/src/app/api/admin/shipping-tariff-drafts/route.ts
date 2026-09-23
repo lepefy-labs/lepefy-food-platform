@@ -3,7 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
-import type { ShippingMultiParcelStrategy, ShippingTariffBand } from '@lepefy/types';
+import type { ShippingTariffBand } from '@lepefy/types';
+import { validateMultiParcelStrategy } from '@/lib/shipping/intelligence/tariffBacktest';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -55,7 +56,8 @@ export async function POST(req: NextRequest) {
   const zoneSurcharges = (typeof body.zone_surcharges === 'object' && body.zone_surcharges !== null)
     ? body.zone_surcharges as Record<string, number>
     : {};
-  const multiParcelStrategy = (body.multi_parcel_strategy ?? null) as ShippingMultiParcelStrategy | null;
+  const multiParcelStrategy = validateMultiParcelStrategy(body.multi_parcel_strategy);
+  if (multiParcelStrategy === 'invalid') return NextResponse.json({ error: 'Stratégie multi-colis invalide.' }, { status: 400 });
 
   const supabase = createServiceClient();
   const { data, error } = await supabase

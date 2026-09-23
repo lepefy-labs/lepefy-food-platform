@@ -16,7 +16,9 @@
  *
  * Base TTC : les brouillons sont des prix client TTC ; les devis Packlink sont
  * HT (tax_price = 0) et reçoivent la TVA du pays (shipping_vat_rates), comme
- * au checkout. Les frais d'emballage par colis ne sont pas inclus.
+ * au checkout. Coût réel = devis Packlink TTC + frais d'emballage actuels
+ * (packaging_surcharges) : c'est ce que le forfait remplace (prix TTC,
+ * emballage compris). Les métriques « Packlink seul » restent fournies.
  * Pays : body { country } (défaut IT) — scénarios et commandes filtrés.
  */
 import { NextResponse } from 'next/server';
@@ -26,8 +28,11 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import {
   assessScenarioReliability,
   backtestTariff,
+  buildCostComparison,
   buildScenarioBacktestSample,
   orderBacktestRows,
+  packagingCostFor,
+  withPackagingCost,
   type BacktestRow,
   type ScenarioBacktestObservation,
 } from '@/lib/shipping/intelligence/tariffBacktest';
@@ -67,7 +72,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (draftError || !draft) return NextResponse.json({ error: 'Brouillon introuvable.' }, { status: 404 });
   const tariffDraft = draft as ShippingTariffDraftRow;
 
-  const [offers, orders, verifiedShipments, { data: zoneRows }, { data: vatRows }] = await Promise.all([
+  const [offers, orders, verifiedShipments, { data: zoneRows }, { data: vatRows }, { data: packagingRow }] = await Promise.all([
     fetchAllPages<ScenarioBacktestObservation>((from, to) => supabase
       .from('shipping_quote_observations')
       .select('id, request_hash, observed_at, eligible, total_provider_cost, tax_price, total_weight_g, destination_zone_code, destination_country, destination_postal_code, num_parcels')
@@ -97,6 +102,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       .eq('source', 'real_shipment'),
     supabase.from('shipping_zones').select('*').eq('tenant_id', tenant.id).eq('active', true),
     supabase.from('shipping_vat_rates').select('countries, vat_rate').eq('tenant_id', tenant.id).eq('active', true),
+    supabase.from('packaging_surcharges').select('surcharge_amount, surcharge_mode').eq('tenant_id', tenant.id).eq('active', true).maybeSingle(),
   ]);
 
   if (offers.error || orders.error) {
@@ -112,19 +118,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     (destinationCountry) => resolveVatRate(destinationCountry, (vatRows ?? []) as VatRate[]),
   );
 
+  const packaging = (packagingRow ?? null) as { surcharge_amount: number; surcharge_mode: string } | null;
+  const scenarioRows: BacktestRow[] = scenarioSample.rows.map((row) => ({ ...row, packagingCost: packagingCostFor(row.numParcels, packaging) }));
   const orderRows: BacktestRow[] = orderBacktestRows(orders.rows, country);
 
-  const scenarioWeighted = backtestTariff(
-    tariffDraft.bands, tariffDraft.zone_surcharges, tariffDraft.multi_parcel_strategy, scenarioSample.rows,
-  );
-  const orderWeighted = backtestTariff(
-    tariffDraft.bands, tariffDraft.zone_surcharges, tariffDraft.multi_parcel_strategy, orderRows,
-  );
+  const { bands, zone_surcharges: zoneSurcharges, multi_parcel_strategy: strategy } = tariffDraft;
+  // Métrique principale : forfait (TTC, emballage compris) contre coût réel
+  // (devis Packlink TTC + emballage). « Packlink seul » en complément.
+  const scenarioWeighted = backtestTariff(bands, zoneSurcharges, strategy, withPackagingCost(scenarioRows));
+  const scenarioWeightedPacklinkOnly = backtestTariff(bands, zoneSurcharges, strategy, scenarioRows);
+  const orderWeighted = backtestTariff(bands, zoneSurcharges, strategy, withPackagingCost(orderRows));
+  const comparison = buildCostComparison(scenarioRows, bands, zoneSurcharges, strategy);
 
   return NextResponse.json({
     country,
     costBasis: 'ttc',
     scenarioWeighted,
+    scenarioWeightedPacklinkOnly,
+    comparison,
+    packaging: packaging ? { amount: Number(packaging.surcharge_amount), mode: packaging.surcharge_mode } : null,
     scenarioSample: {
       ...scenarioSample.stats,
       reliability: assessScenarioReliability(scenarioSample.stats),

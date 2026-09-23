@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import type { ShippingMultiParcelStrategy, ShippingTariffBand } from '@lepefy/types';
+import type { ShippingTariffBand } from '@lepefy/types';
+import { validateMultiParcelStrategy } from '@/lib/shipping/intelligence/tariffBacktest';
 
 export const runtime = 'nodejs';
 
@@ -42,7 +43,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       ? body.zone_surcharges : {};
   }
   if ('multi_parcel_strategy' in body) {
-    updatePayload.multi_parcel_strategy = body.multi_parcel_strategy as ShippingMultiParcelStrategy | null;
+    const strategy = validateMultiParcelStrategy(body.multi_parcel_strategy);
+    if (strategy === 'invalid') return NextResponse.json({ error: 'Stratégie multi-colis invalide.' }, { status: 400 });
+    updatePayload.multi_parcel_strategy = strategy;
   }
   if ('notes' in body) updatePayload.notes = typeof body.notes === 'string' ? body.notes.trim() || null : null;
   if ('status' in body && (body.status === 'draft' || body.status === 'archived')) updatePayload.status = body.status;

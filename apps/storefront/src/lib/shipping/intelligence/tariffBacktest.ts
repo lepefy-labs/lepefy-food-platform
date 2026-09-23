@@ -2,10 +2,13 @@ import type { ShippingMultiParcelStrategy, ShippingQuoteObservationRow, Shipping
 import { latestValidPerScenario } from './operationalObservation';
 
 export interface BacktestRow {
+  /** Devis Packlink TTC. */
   providerCost: number;
   weightKg: number;
   zoneCode: string | null;
   numParcels: number;
+  /** Frais d'emballage facturés aujourd'hui (packaging_surcharges), TTC. */
+  packagingCost?: number;
 }
 
 export type ScenarioBacktestObservation = Pick<ShippingQuoteObservationRow,
@@ -39,6 +42,7 @@ export function orderBacktestRows(
     .filter((d): d is Record<string, unknown> => d !== null && typeof d.packlinkCost === 'number' && typeof d.totalWeightG === 'number')
     .map((d) => ({
       providerCost: parseFloat(((d.packlinkCost as number) + (typeof d.vatAmount === 'number' ? d.vatAmount : 0)).toFixed(2)),
+      packagingCost: typeof d.packagingSurchargeTotal === 'number' ? d.packagingSurchargeTotal : 0,
       weightKg: (d.totalWeightG as number) / 1000,
       zoneCode: null,
       numParcels: typeof d.numParcels === 'number' ? d.numParcels : 1,
@@ -164,9 +168,31 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, idx)]!;
 }
 
+/** Découpage « rempli » : colis de parcelMaxKg, le reste dans le dernier (20 kg / 15 → 15 + 5). */
+export function splitParcelsFilled(weightKg: number, parcelMaxKg: number): number[] {
+  const parcels: number[] = [];
+  let remainingG = Math.round(weightKg * 1000);
+  const maxG = Math.round(parcelMaxKg * 1000);
+  if (maxG <= 0) return [weightKg];
+  while (remainingG > 0) {
+    const g = Math.min(maxG, remainingG);
+    parcels.push(g / 1000);
+    remainingG -= g;
+  }
+  return parcels.length > 0 ? parcels : [weightKg];
+}
+
+function bandPrice(sortedBands: ShippingTariffBand[], weightKg: number): number | null {
+  const band = sortedBands.find((b) => weightKg >= b.minKg && (b.maxKg === null || weightKg <= b.maxKg));
+  return band ? band.price : null;
+}
+
 /**
  * Tarif client pour un poids/zone/nombre de colis donné, selon un brouillon
  * de tarif. Bandes triées par minKg ; maxKg = null → pas de plafond.
+ * Stratégies « 1er colis + … » avec parcelMaxKg : calcul colis par colis
+ * (colis remplis jusqu'à parcelMaxKg, le 1er au prix de sa bande). La
+ * surcharge de zone s'applique une fois par commande.
  * Ne modifie jamais rien en checkout — appelé uniquement par le laboratoire.
  */
 export function applyTariffDraft(
@@ -176,24 +202,154 @@ export function applyTariffDraft(
   input: { weightKg: number; zoneCode: string | null; numParcels: number },
 ): number | null {
   const sorted = [...bands].sort((a, b) => a.minKg - b.minKg);
-  const band = sorted.find((b) => input.weightKg >= b.minKg && (b.maxKg === null || input.weightKg <= b.maxKg));
-  if (!band) return null;
+  const surcharge = input.zoneCode ? zoneSurcharges[input.zoneCode] ?? 0 : 0;
+  const strategy = multiParcelStrategy;
 
-  let price = band.price;
-  if (input.zoneCode && zoneSurcharges[input.zoneCode]) {
-    price += zoneSurcharges[input.zoneCode]!;
+  if (strategy && (strategy.type === 'first_parcel_plus_percentage' || strategy.type === 'first_parcel_plus_discounted') && strategy.parcelMaxKg) {
+    const parcels = splitParcelsFilled(input.weightKg, strategy.parcelMaxKg);
+    const first = bandPrice(sorted, parcels[0]!);
+    if (first === null) return null;
+    let price = first;
+    for (const parcel of parcels.slice(1)) {
+      if (strategy.type === 'first_parcel_plus_discounted') {
+        price += strategy.discountedParcelRate ?? 0;
+      } else {
+        const parcelPrice = bandPrice(sorted, parcel);
+        if (parcelPrice === null) return null;
+        price += parcelPrice * (1 - Math.min(Math.max(strategy.percentageDiscount ?? 0, 0), 100) / 100);
+      }
+    }
+    return parseFloat((price + surcharge).toFixed(2));
   }
 
-  if (input.numParcels > 1 && multiParcelStrategy) {
-    if (multiParcelStrategy.type === 'first_parcel_plus_discounted') {
-      price += (input.numParcels - 1) * (multiParcelStrategy.discountedParcelRate ?? 0);
-    } else if (multiParcelStrategy.type === 'flat_multi_parcel_rate' && multiParcelStrategy.flatMultiParcelRate != null) {
-      price = multiParcelStrategy.flatMultiParcelRate;
+  const whole = bandPrice(sorted, input.weightKg);
+  if (whole === null) return null;
+  let price = whole + surcharge;
+
+  if (input.numParcels > 1 && strategy) {
+    if (strategy.type === 'first_parcel_plus_discounted') {
+      price += (input.numParcels - 1) * (strategy.discountedParcelRate ?? 0);
+    } else if (strategy.type === 'flat_multi_parcel_rate' && strategy.flatMultiParcelRate != null) {
+      price = strategy.flatMultiParcelRate;
     }
     // 'weight_bands_whole_order' : le tarif de bande s'applique déjà au poids total, rien à ajouter.
   }
 
   return parseFloat(price.toFixed(2));
+}
+
+/** Validation serveur d'une stratégie multi-colis (null = bande sur le poids total). */
+export function validateMultiParcelStrategy(raw: unknown): ShippingMultiParcelStrategy | null | 'invalid' {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object') return 'invalid';
+  const r = raw as Record<string, unknown>;
+  const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+  const parcelMaxKg = num(r.parcelMaxKg);
+  if (parcelMaxKg !== undefined && (!Number.isFinite(parcelMaxKg) || parcelMaxKg <= 0 || parcelMaxKg > 100)) return 'invalid';
+  switch (r.type) {
+    case 'weight_bands_whole_order':
+      return { type: 'weight_bands_whole_order' };
+    case 'first_parcel_plus_percentage': {
+      const pct = num(r.percentageDiscount);
+      if (pct === undefined || !Number.isFinite(pct) || pct < 0 || pct > 100 || parcelMaxKg === undefined) return 'invalid';
+      return { type: 'first_parcel_plus_percentage', percentageDiscount: pct, parcelMaxKg };
+    }
+    case 'first_parcel_plus_discounted': {
+      const rate = num(r.discountedParcelRate);
+      if (rate === undefined || !Number.isFinite(rate) || rate < 0) return 'invalid';
+      return { type: 'first_parcel_plus_discounted', discountedParcelRate: rate, ...(parcelMaxKg !== undefined ? { parcelMaxKg } : {}) };
+    }
+    case 'flat_multi_parcel_rate': {
+      const flat = num(r.flatMultiParcelRate);
+      if (flat === undefined || !Number.isFinite(flat) || flat < 0) return 'invalid';
+      return { type: 'flat_multi_parcel_rate', flatMultiParcelRate: flat };
+    }
+    default:
+      return 'invalid';
+  }
+}
+
+/** Coût réel complet = devis Packlink TTC + frais d'emballage (ce que le forfait remplace). */
+export function withPackagingCost(rows: BacktestRow[]): BacktestRow[] {
+  return rows.map((r) => ({ ...r, providerCost: parseFloat((r.providerCost + (r.packagingCost ?? 0)).toFixed(2)) }));
+}
+
+/** Frais d'emballage d'une commande selon packaging_surcharges (par colis ou par commande). */
+export function packagingCostFor(numParcels: number, surcharge: { surcharge_amount: number; surcharge_mode: string } | null): number {
+  if (!surcharge) return 0;
+  const amount = Number(surcharge.surcharge_amount) || 0;
+  return parseFloat((surcharge.surcharge_mode === 'per_parcel' ? amount * numParcels : amount).toFixed(2));
+}
+
+export interface CostComparisonCell {
+  /** Montant de surcharge de zone du brouillon (0 = zones standard). */
+  zoneSurcharge: number;
+  zones: string[];
+  scenarios: number;
+  packlinkMedian: number;
+  packlinkMax: number;
+  packaging: number;
+  realCostMax: number;
+  forfait: number | null;
+  /** Forfait − coût réel le plus élevé du groupe (négatif = perte). */
+  worstGap: number | null;
+}
+
+export interface CostComparisonRow {
+  weightKg: number;
+  numParcels: number;
+  cells: CostComparisonCell[];
+}
+
+function medianOf(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+/**
+ * Tableau « coûts réels vs forfait » : pour chaque poids mesuré et chaque
+ * groupe de zones de même surcharge, devis Packlink TTC (médiane, max),
+ * emballage, coût réel max, prix forfait et écart le plus défavorable.
+ */
+export function buildCostComparison(
+  rows: BacktestRow[],
+  bands: ShippingTariffBand[],
+  zoneSurcharges: Record<string, number>,
+  multiParcelStrategy: ShippingMultiParcelStrategy | null,
+): CostComparisonRow[] {
+  const byWeight = new Map<number, BacktestRow[]>();
+  for (const row of rows) byWeight.set(row.weightKg, [...(byWeight.get(row.weightKg) ?? []), row]);
+  return Array.from(byWeight.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([weightKg, list]) => {
+      const groups = new Map<number, BacktestRow[]>();
+      for (const row of list) {
+        const surcharge = row.zoneCode ? zoneSurcharges[row.zoneCode] ?? 0 : 0;
+        groups.set(surcharge, [...(groups.get(surcharge) ?? []), row]);
+      }
+      const cells: CostComparisonCell[] = Array.from(groups.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([zoneSurcharge, groupRows]) => {
+          const packlink = groupRows.map((r) => r.providerCost);
+          const realCosts = groupRows.map((r) => r.providerCost + (r.packagingCost ?? 0));
+          const realCostMax = Math.max(...realCosts);
+          const worst = groupRows[realCosts.indexOf(realCostMax)]!;
+          const forfait = applyTariffDraft(bands, zoneSurcharges, multiParcelStrategy, worst);
+          return {
+            zoneSurcharge,
+            zones: Array.from(new Set(groupRows.map((r) => r.zoneCode ?? '—'))).sort(),
+            scenarios: groupRows.length,
+            packlinkMedian: parseFloat(medianOf(packlink).toFixed(2)),
+            packlinkMax: parseFloat(Math.max(...packlink).toFixed(2)),
+            packaging: parseFloat((worst.packagingCost ?? 0).toFixed(2)),
+            realCostMax: parseFloat(realCostMax.toFixed(2)),
+            forfait,
+            worstGap: forfait === null ? null : parseFloat((forfait - realCostMax).toFixed(2)),
+          };
+        });
+      return { weightKg, numParcels: Math.max(...list.map((r) => r.numParcels)), cells };
+    });
 }
 
 export function backtestTariff(
