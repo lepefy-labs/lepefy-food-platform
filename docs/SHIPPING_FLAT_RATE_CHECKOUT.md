@@ -1,6 +1,10 @@
 # Forfait di spedizione nel checkout — dossier di implementazione
 
-> **Stato:** decisione commerciale in corso — **nulla di questo documento è attivo nel checkout**.
+> **Stato:** **V1F implementata: foundation + shadow mode** (base `main@c74001f`, 24/09/2026). Il motore
+> tariffario, le versioni immutabili e la raccolta shadow esistono nel codice (§10), ma **nessun cliente
+> paga il forfait**: il checkout addebita sempre il preventivo attuale. La tariffazione commerciale
+> (`tariff`) non è implementata. Migration `124` da applicare manualmente; collecte shadow **disattivata**
+> di default per ogni tenant.
 > **Tenant pilota:** ChloeFood (IT, partenza Reggio Emilia 42122).
 > **Dati raccolti:** 22–23 settembre 2026 (Shipping Intelligence, campagne + preventivi diretti Packlink).
 > **Documenti collegati:** `docs/SHIPPING_INTELLIGENCE.md` (laboratorio, rétrotest, bozze), `CLAUDE.md` § Shipping Calculation.
@@ -27,8 +31,9 @@
 | Condizione di validità | Costo reale imballaggio (cartone + nastro + riempitivo) **≤ 1,79 € IVA inclusa per collo, cioè ≤ 1,47 € + IVA** (i listini fornitori sono di solito HT); tra 1,80 e 2,30 € IVA inclusa (1,48–1,88 € HT) portare 0–5 kg a **8,90 €**; oltre, rivedere la griglia |
 
 Bozza di riferimento in admin: **«Grille ChloeFood 23/09 — 8,40/10,80/12,60/16,40/19,80, îles +2 €/colis»**
-(`shipping_tariff_drafts.id = cdae3da2-1c5b-47a4-b47d-b260cd12cea5`). La regola a blocchi oltre 30 kg
-non è modellabile nelle bozze attuali (vedi §5.3).
+(`shipping_tariff_drafts.id = cdae3da2-1c5b-47a4-b47d-b260cd12cea5`). La regola a blocchi oltre 30 kg,
+il limite di 15 kg per collo e le zone non consegnabili non esistono nelle bozze: si aggiungono quando
+la bozza viene copiata in una **versione tariffaria** (§10.2).
 
 ---
 
@@ -150,7 +155,9 @@ Cart → POST /api/shipping/quote → { shippingTotal, shippingDetails, quoteTok
 | Token | `lib/shipping/quoteToken.ts` | firma `{t, c, z, e}` — non include peso né versione tariffa |
 | Zone | `shipping_zones` + `lib/shipping/intelligence/resolveZone.ts` | prefisso più lungo; oggi usato solo dal laboratorio |
 | Territori extra-doganali | `lib/shipping/extraCustomsTerritories.ts` | messaggio dedicato su `no_service` |
-| Bozze | `shipping_tariff_drafts` + `lib/shipping/intelligence/tariffBacktest.ts` (`applyTariffDraft`) | **invariante attuale: il checkout non legge le bozze** |
+| Bozze | `shipping_tariff_drafts` + `lib/shipping/intelligence/tariffBacktest.ts` (`applyTariffDraft`) | **invariante: il checkout non legge mai le bozze** |
+| Versioni (V1F) | `shipping_tariff_versions` + `lib/shipping/tariff/*` | lette dal checkout **solo** in shadow mode, mai addebitate (§10) |
+| Modalità pricing (V1F) | `tenants.shipping_pricing_mode` | `provider_cost` (default) \| `shadow` \| `tariff` (riservato) |
 
 ---
 
@@ -167,6 +174,9 @@ Così un tenant può avere forfait + Packlink per le spedizioni, e un altro prov
 toccare il pricing. Default `provider_cost` → **zero cambiamenti** per i tenant non migrati.
 
 ### 5.2 Tariffe pubblicate, versionate e immutabili
+
+> **V1F:** implementato con uno schema più compatto (una tabella con fasce e maggiorazioni in JSON, stati
+> `validated | shadow | retired | active`), vedi §10.1. Lo schema sotto resta il design di riferimento.
 
 Non far leggere al checkout `shipping_tariff_drafts`. Aggiungere una **pubblicazione** che copia una
 bozza in una versione immutabile:
@@ -200,6 +210,9 @@ Regole:
 - l'ordine conserva `tariff_id` + `version` → ogni prezzo storico resta spiegabile.
 
 ### 5.3 Un solo motore di prezzo, condiviso
+
+> **V1F:** motore implementato in `lib/shipping/tariff/priceFromTariff.ts` (grammi e centesimi interi).
+> Il rétrotest del laboratorio (`applyTariffDraft`) **non** è ancora stato migrato su questo motore.
 
 Stesso principio di `lib/purchaseQuantityRules.ts`: **una funzione pura** importata da checkout,
 simulatore admin e rétrotest.
@@ -271,6 +284,9 @@ Con il forfait il prezzo non dipende da Packlink, ma la **consegnabilità** sì.
    noto; loggare l'incidente.
 
 ### 5.6 Quote token e checkout
+
+> **V1F (shadow):** il token **non** è stato modificato. Il forfait è ricalcolato sul server al checkout
+> e non transita dal quote. L'estensione del token resta necessaria per la futura tariffazione commerciale.
 
 - Estendere il payload firmato: `{ t, c, z, e, w (peso g), v (tariff_id:version), m (pricing_mode) }`.
 - In `/api/checkout` **ricalcolare** il prezzo con `priceFromTariff` sul carrello server-side e
@@ -401,3 +417,146 @@ Ordine unico, documentato e testato:
 - I 3 € per collo usati nei rétrotest sono il supplemento pagato oggi dal cliente, **non** un costo misurato.
 - Nessuna misura tra 50 e 60 kg; oltre 70 kg solo TNT (continente).
 - Solo Italia misurata.
+
+---
+
+## 10. Implementazione V1F — foundation e shadow mode
+
+**Cosa esiste nel codice.** Motore tariffario puro, versioni immutabili, modalità di pricing per tenant,
+calcolo shadow server-side al checkout, onglet admin «Forfait shadow» e rapporto sugli ordini reali.
+**Cosa NON esiste.** Nessun prezzo forfait è addebitato, mostrato al cliente o firmato nel quote token;
+nessuna azione admin imposta `tariff` o lo stato `active`; nessuna pagina pubblica della griglia.
+
+### 10.1 Schema (migration `124_shipping_tariff_versions.sql`, additiva e reversibile)
+
+- `tenants.shipping_pricing_mode` `provider_cost | shadow | tariff`, default `provider_cost` (nessun
+  cambio per i tenant esistenti). Indipendente da `tenants.shipping_provider` (`flat_rate` resta il
+  forfait unico esistente). In V1F `tariff` è trattato come `provider_cost` (log di avvertimento).
+- `shipping_tariff_versions`: `tenant_id`, `country`, `currency`, `version` (unica per tenant+paese),
+  `status` `validated | shadow | retired | active`, `name`, `bands`
+  (`[{min_g_exclusive, max_g_inclusive|null, price_cents}]`), `zone_surcharges`
+  (`[{zone_code, amount_cents, mode: per_parcel|per_order}]`), `non_deliverable_zones`,
+  `max_parcel_weight_g`, `block_weight_g`/`block_price_cents` (entrambi o nessuno),
+  `logistics_verified_max_weight_g`, `prices_include_vat`, `source_draft_id`, `notes`, `created_by`,
+  `created_at`, `selected_at`, `retired_at`.
+- **Immutabilità:** il trigger `shipping_tariff_versions_immutable` rifiuta ogni modifica dei parametri
+  economici e dell'identità (cambiano solo stato, date e note); nessun `DELETE` concesso al service role.
+- **Vincoli:** indice unico parziale «una sola `shadow` per tenant+paese» e «una sola `active`».
+- **Selezione atomica:** la RPC `select_shipping_tariff_shadow_version(tenant, version)` ritira la shadow
+  corrente e seleziona la nuova nella stessa transazione; rifiuta una versione `active`.
+- RLS attiva senza policy pubbliche (service role).
+
+### 10.2 Motore (`apps/storefront/src/lib/shipping/tariff/`)
+
+| File | Ruolo |
+|---|---|
+| `priceFromTariff.ts` | `priceFromTariff(snapshot, {weightG, country, zoneCode, vatRate})` puro: fascia `min < peso ≤ max`, blocchi `floor(peso / blocco)` + fascia del resto, colli a riempimento progressivo (`splitParcelWeightsFilled` di `cartonSuggestion.ts`), maggiorazione per collo/ordine, IVA inclusa o aggiunta una volta, avvertimento `logistics_unverified_weight` oltre il limite logistico verificato. `applyCommercialRulesCents` riusa `applyCountryRule` (stessa precedenza del live). |
+| `tariffVersion.ts` | validazione (fasce da 0, contigue, illimitata solo in fondo, blocco coperto, maggiorazioni uniche), `parseTariffVersion`, `buildVersionFromDraft` (bozza → grammi/centesimi; solo «prezzo sul peso totale», le strategie «1er colis + …» sono rifiutate). |
+| `shadowTariff.ts` | `resolveCheckoutShippingDetails`: toglie sempre un `shadow_tariff` inviato dal browser; se `shipping_pricing_mode = shadow` e consegna, esegue `computeShadowTariff` con timeout di 2,5 s e `try/catch`, poi aggiunge `shipping_details.shadow_tariff`. |
+| `shadowReport.ts` | aggregati sugli ordini reali (paginati, tenant-scoped). |
+| `adminData.ts` | dati dell'onglet admin. |
+
+Esempi ChloeFood verificati nei test: 5 000 g → 8,40 €; 5 001 g → 10,80 €; 15,001 kg → 16,40 €;
+20 kg → 15 + 5 (Sicilia 16,40 + 2 × 2 € = 20,40 €); 30 kg → 19,80 €; 30,001 kg → 28,20 €; 45 kg → 32,40 €;
+60 kg → 39,60 €; 90 kg → 59,40 €.
+
+### 10.3 Checkout (importi invariati)
+
+```text
+Importo cliente : /api/shipping/quote → token {t,c,z,e} (invariato) → /api/checkout | external-link | PATCH session → Stripe / in negozio / link esterno
+Shadow          : prodotti validati + products.weight_grams → resolveZoneCode → priceFromTariff(versione shadow)
+                  → regole paese (subtotale server) → shipping_details.shadow_tariff
+```
+
+- Punti di aggancio: `/api/checkout` (Stripe e in negozio), `/api/checkout/external-link`,
+  `PATCH /api/checkout-sessions/:id` (ricalcolo a ogni modifica; lo shadow del browser è scartato).
+  Webhook Stripe e `createOrderFromCheckoutSession` copiano `shipping_details` senza modifiche.
+- `shippingTotal`, totale, PaymentIntent, token e i campi Packlink di `shipping_details` usati per
+  l'etichetta **non cambiano**. Con `provider_cost` i dettagli restano identici a prima.
+- Ritiro in negozio: nessun calcolo (escluso esplicitamente).
+- **Peso:** netto, da `products.weight_grams` × quantità validate server-side; il peso inviato dal
+  browser (`totalWeightG`) è ignorato. Nessun fallback di 400 g: un prodotto senza peso → `incomplete`
+  + `missingWeightProductIds`. Tara: `tareG = null` (non configurata, mai sommata).
+- **Preventivo provider:** `packlinkCost + vatAmount` è registrato come verificato solo se, con
+  l'imballaggio, ricostruisce al centesimo il totale firmato (`matches_signed_total`); altrimenti
+  `unverified` e nessun margine.
+- **Margini:** `shadowMinusChargedCents` confronta due prezzi cliente (non è un margine);
+  `expectedMarginBeforePackagingCents` = forfait − preventivo Packlink TTC verificato;
+  `expectedMarginCents` resta `null` finché il costo reale dell'imballaggio non è noto.
+- Stati: `complete` | `incomplete` (`missing_product_weight`, `zone_unresolved`) | `unavailable`
+  (`no_shadow_tariff`, `band_not_covered`, `zone_not_deliverable`, `vat_rate_missing`, `invalid_weight`,
+  `country_mismatch`) | `error` (`invalid_tariff_config`, `timeout`, `unexpected_exception`).
+  Solo `complete` entra nelle statistiche.
+
+### 10.4 Admin → Livraison → Forfait shadow (`/admin/livraison/forfait-shadow`)
+
+Lettura con `shipping.view`; creazione/selezione di versione e collecte con `shipping.manage`.
+Stati espliciti Brouillon / Version shadow / Tarification active (bloccata). Creazione di una versione
+da una bozza (paese, TTC/HT, collo max, blocco, zone non consegnabili, limite logistico) con anteprima e
+simulazione d'esempio calcolata dallo stesso motore; riselezione di una versione precedente (rollback);
+attivazione/disattivazione della sola collecte; qualità dei pesi prodotto (link all'editor);
+rapporto sugli ordini reali filtrabile per periodo e versione (affidabilità: < 30 insufficiente, < 100 limitata).
+
+API: `GET/POST /api/admin/shipping-tariff-versions`, `POST …/:id/select`,
+`GET/PATCH /api/admin/shipping-pricing-mode` (solo `provider_cost`/`shadow`),
+`GET /api/admin/shipping-shadow-report`.
+
+---
+
+## 11. Runbook operativo
+
+### 11.1 Prerequisiti
+
+1. Applicare manualmente `supabase/migrations/124_shipping_tariff_versions.sql` (Vercel non applica
+   migration). Verifica: `select shipping_pricing_mode, count(*) from tenants group by 1;` → solo
+   `provider_cost`.
+2. Finché la migration non è applicata l'onglet mostra «migration non appliquée» e il checkout resta invariato.
+3. Completare i pesi mancanti (sezione «Qualité des poids produits»).
+
+### 11.2 Configurazione della tariffa ChloeFood
+
+Onglet **Forfait shadow** → «Créer une version shadow depuis un brouillon»: bozza «Grille ChloeFood
+23/09», paese `IT`, prezzi TTC, collo max 15 kg, blocco 30 kg = 19,80 €, zona non consegnabile
+`IT_EXTRA_CUSTOMS`, logistica verificata fino a 50 kg, «Sélectionner comme version shadow».
+Controllare la simulazione d'esempio (valori §10.2).
+
+### 11.3 Attivazione shadow
+
+Dopo autorizzazione esplicita: «Activer la collecte shadow» (richiede una versione shadow selezionata).
+Nessun cambiamento di prezzo per il cliente.
+
+### 11.4 Verifica dei dati raccolti
+
+- Rapporto nell'onglet (periodo, versione).
+- SQL: `select id, shipping_cost, shipping_details->'shadow_tariff'->>'status', shipping_details->'shadow_tariff'->>'shadowTtcCents' from orders where tenant_id = … order by created_at desc limit 20;`
+- `shipping_cost` deve restare identico all'importo del quote (`chargedCents / 100`).
+
+### 11.5 Rollback immediato
+
+- **Stop raccolta:** «Désactiver la collecte» (oppure `update tenants set shipping_pricing_mode = 'provider_cost' where id = …`).
+  Effetto dal checkout successivo; nessun altro cambiamento.
+- **Versione errata:** selezionare una versione precedente o crearne una nuova (le vecchie restano immutabili).
+- **Codice:** revert del commit V1F; gli `shadow_tariff` già scritti restano JSON inerte negli ordini.
+- **Schema:** blocco di rollback in fondo alla migration 124.
+
+### 11.6 Troubleshooting
+
+| Sintomo | Causa / azione |
+|---|---|
+| Onglet «migration non appliquée» | Migration 124 assente nel Supabase del deployment |
+| «Activer» disabilitato | Nessuna versione `shadow` selezionata |
+| Molti `incomplete / missing_product_weight` | Pesi prodotto mancanti: correggerli nell'editor catalogo |
+| `zone_unresolved` | CAP senza zona tenant: completare `shipping_zones` (onglet Tarification) |
+| `unavailable / no_shadow_tariff` | Ordine verso un paese senza versione shadow |
+| `error / timeout` | Latenza DB > 2,5 s: il checkout è proseguito; verificare i log Vercel `[shadow-tariff]` |
+| `provider.verification = unverified` | Regola paese applicata o dettagli del quote incoerenti: margine non calcolato (voluto) |
+| `logistics_unverified_weight` | Ordine oltre il limite logistico verificato: prezzo teorico, fattibilità Packlink da confermare |
+| Log `shipping_pricing_mode=tariff non supporté` | Valore `tariff` impostato a mano: rimettere `shadow` o `provider_cost` |
+
+### 11.7 Percorso verso la tariffazione commerciale (fuori scope)
+
+Richiede una decisione e un intervento dedicati: estensione del token firmato (peso, versione, modalità),
+ricalcolo e confronto in `/api/checkout`, gestione del cambio versione tra quote e pagamento, stato
+`active` e relativa azione admin, disponibilità logistica (§5.5), pagina pubblica «Livraison»,
+migrazione di `applyTariffDraft` sul motore condiviso, costo reale dei cartoni per il margine completo.
+Nessuna attivazione automatica basata sulla dimensione del campione.

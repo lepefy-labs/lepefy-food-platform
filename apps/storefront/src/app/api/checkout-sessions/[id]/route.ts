@@ -7,6 +7,7 @@ import { isValidCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessio
 import { resolveCheckoutAmbassadorDiscount } from '@/lib/ambassador/resolveCheckoutAmbassadorDiscount';
 import { checkoutExpiryFromNow } from '@/lib/checkout/activeCheckoutSession';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
+import { resolveCheckoutShippingDetails } from '@/lib/shipping/tariff/shadowTariff';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
@@ -271,6 +272,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
+    // Shadow forfait (V1F) : recalculé côté serveur à chaque modification de
+    // session ; un shadow_tariff venu du navigateur n'est jamais conservé.
+    const serverShippingDetails = await resolveCheckoutShippingDetails({
+      supabase,
+      tenantId: tenant.id,
+      pricingMode: tenant.shipping_pricing_mode,
+      fulfillmentType,
+      destination: shippingAddress ? { country: shippingAddress.country, postalCode: shippingAddress.postal_code } : null,
+      quantityByProduct: validated.quantityByProduct,
+      subtotal,
+      chargedShippingTotal: shippingTotal,
+      clientShippingDetails: shippingDetails,
+    });
     let ambassadorDiscount = session.ambassador_discount_amount ?? 0;
     if (body.items) {
       ambassadorDiscount = await resolveCheckoutAmbassadorDiscount({
@@ -397,7 +411,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         items,
         fulfillment_type: fulfillmentType,
         shipping_address: shippingAddress,
-        shipping_details: shippingDetails,
+        shipping_details: serverShippingDetails,
         shipping_total: shippingTotal,
         ambassador_discount_amount: ambassadorDiscount,
         payment_method: paymentMethod,

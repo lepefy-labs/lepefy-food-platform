@@ -13,6 +13,7 @@ import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSessio
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
+import { resolveCheckoutShippingDetails } from '@/lib/shipping/tariff/shadowTariff';
 import type { TenantPaymentMethod } from '@lepefy/types';
 
 interface CartItemPayload {
@@ -111,6 +112,18 @@ export async function POST(req: NextRequest) {
     }
 
     const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
+    // Shadow forfait (V1F) : calcul serveur à part, jamais sur le montant facturé.
+    const serverShippingDetails = await resolveCheckoutShippingDetails({
+      supabase,
+      tenantId: tenant.id,
+      pricingMode: tenant.shipping_pricing_mode,
+      fulfillmentType,
+      destination: shippingAddress ? { country: shippingAddress.country, postalCode: shippingAddress.postal_code } : null,
+      quantityByProduct,
+      subtotal,
+      chargedShippingTotal: shippingTotal,
+      clientShippingDetails: shippingDetails,
+    });
     let customerId = sessionCustomer?.id ?? null;
     if (!customerId) {
       try {
@@ -151,7 +164,7 @@ export async function POST(req: NextRequest) {
         phone: phone ?? null,
         fulfillment_type: fulfillmentType,
         shipping_address: shippingAddress ?? null,
-        shipping_details: shippingDetails ?? null,
+        shipping_details: serverShippingDetails,
         shipping_total: shippingTotal,
         ambassador_discount_amount: ambassadorDiscount,
         items,

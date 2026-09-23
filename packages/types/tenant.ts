@@ -3,6 +3,13 @@ import type { AmbassadorCommissionMode, AmbassadorDiscountType } from './ambassa
 
 export type ShippingProvider = 'packlink' | 'flat_rate' | 'pickup_only';
 
+/**
+ * Modalità di pricing della spedizione (migration 124), indipendente dal
+ * provider logistico. `tariff` è riservato: in V1F è trattato come
+ * `provider_cost`. Assente se la migration non è applicata.
+ */
+export type ShippingPricingMode = 'provider_cost' | 'shadow' | 'tariff';
+
 export interface Tenant {
   id: string;
   slug: string;
@@ -47,6 +54,7 @@ export interface Tenant {
   shipping_provider: ShippingProvider;
   packlink_api_key: string | null;
   flat_rate_amount: number | null;
+  shipping_pricing_mode?: ShippingPricingMode;
   show_powered_by: boolean;
   // Sezione "Notre origine" (home)
   story_heading: string | null;

@@ -189,3 +189,45 @@ export interface ShippingTariffDraftRow {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Versioni tariffarie immutabili (migration 124) ─────────────────────────
+
+/** Fascia di peso: `min_g_exclusive < peso ≤ max_g_inclusive` (null = senza limite). */
+export interface ShippingTariffVersionBand {
+  min_g_exclusive: number;
+  max_g_inclusive: number | null;
+  price_cents: number;
+}
+
+export interface ShippingTariffVersionZoneSurcharge {
+  zone_code: string;
+  amount_cents: number;
+  mode: 'per_parcel' | 'per_order';
+}
+
+export type ShippingTariffVersionStatus = 'validated' | 'shadow' | 'retired' | 'active';
+
+export interface ShippingTariffVersionRow {
+  id: string;
+  tenant_id: string;
+  country: string;
+  currency: string;
+  version: number;
+  status: ShippingTariffVersionStatus;
+  name: string;
+  bands: ShippingTariffVersionBand[];
+  zone_surcharges: ShippingTariffVersionZoneSurcharge[];
+  non_deliverable_zones: string[];
+  max_parcel_weight_g: number;
+  block_weight_g: number | null;
+  block_price_cents: number | null;
+  logistics_verified_max_weight_g: number | null;
+  prices_include_vat: boolean;
+  source_draft_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  selected_at: string | null;
+  retired_at: string | null;
+  updated_at: string;
+}

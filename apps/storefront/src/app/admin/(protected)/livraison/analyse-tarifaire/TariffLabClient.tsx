@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import type {
@@ -317,7 +318,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
       {drafts.length > 0 && (
         <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <h2 className="text-sm font-semibold mb-1">Brouillons existants</h2>
-          <p className="text-xs text-gray-400 mb-3">Cliquer un brouillon relance son rétrotest et le recopie dans le formulaire pour tester une variante.</p>
+          <p className="text-xs text-gray-400 mb-3">Cliquer un brouillon relance son rétrotest et le recopie dans le formulaire pour tester une variante. Pour figer un brouillon et le comparer aux commandes réelles sans le facturer : <Link href="/admin/livraison/forfait-shadow" className="underline text-[var(--color-primary-dark)]">créer une version shadow</Link>.</p>
           <div className="flex flex-wrap gap-2">
             {drafts.map((d) => (
               <button key={d.id} onClick={() => loadDraft(d)} className={`text-xs px-3 py-1.5 rounded-lg border ${selectedId === d.id ? 'border-[var(--color-primary)] text-[var(--color-primary-dark)]' : 'border-gray-200 text-gray-500'}`}>
