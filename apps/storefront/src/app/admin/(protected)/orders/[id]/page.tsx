@@ -22,6 +22,7 @@ import StatusBadge from '../../../_components/ui/StatusBadge'
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent'
 import type { Order, OrderItem } from '@lepefy/types'
 import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
+import { suggestCartons, type CartonProfile } from '@/lib/shipping/cartonSuggestion'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -128,6 +129,34 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const carriers = (carriersRaw ?? []) as { name: string }[]
   const shippingDetails = (order.shipping_details ?? null) as ShippingDetails | null
   const isPickup = order.fulfillment_type === 'pickup'
+
+  // Carton suggéré (aide à la préparation, jamais utilisé pour le prix).
+  // Poids : celui calculé au checkout, sinon recalculé depuis les produits.
+  let cartonSuggestion: ReturnType<typeof suggestCartons> = null
+  let missingWeightLines = 0
+  if (!isPickup && !['delivered', 'cancelled'].includes(order.status)) {
+    const [{ data: profilesRaw }, { data: surchargeRaw }] = await Promise.all([
+      supabase.from('shipping_packaging_profiles').select('*').eq('tenant_id', tenant.id).eq('active', true),
+      supabase.from('packaging_surcharges').select('max_pack_kg').eq('tenant_id', tenant.id).eq('active', true).maybeSingle(),
+    ])
+    const profiles = (profilesRaw ?? []) as CartonProfile[]
+    let totalWeightG = shippingDetails?.totalWeightG ?? null
+    if (totalWeightG == null) {
+      const productIds = Array.from(new Set(items.map(item => item.product_id).filter((id): id is string => Boolean(id))))
+      const { data: productsRaw } = productIds.length > 0
+        ? await supabase.from('products').select('id, weight_grams').eq('tenant_id', tenant.id).in('id', productIds)
+        : { data: [] }
+      const weightById = new Map(((productsRaw ?? []) as { id: string; weight_grams: number | null }[]).map(p => [p.id, p.weight_grams]))
+      totalWeightG = 0
+      for (const item of items) {
+        const weight = item.product_id ? weightById.get(item.product_id) : null
+        if (weight == null) { missingWeightLines += 1; continue }
+        totalWeightG += weight * item.quantity
+      }
+    }
+    const maxPackKg = Number((surchargeRaw as { max_pack_kg?: number } | null)?.max_pack_kg) || 15
+    cartonSuggestion = suggestCartons(totalWeightG, profiles, maxPackKg * 1000)
+  }
   const steps = isPickup ? PICKUP_STEPS : DELIVERY_STEPS
   const currentStep = steps.findIndex(step => step.key === order.status)
   const address = order.shipping_address as {
@@ -361,6 +390,8 @@ export default async function AdminOrderPage({ params }: PageProps) {
               managedProvider={managedProvider}
               coldChain={{ fresh: freshQty, frozen: frozenQty }}
               pickingProgress={pickingProgress}
+              cartonSuggestion={cartonSuggestion}
+              missingWeightLines={missingWeightLines}
             />
           </aside>
         </div>

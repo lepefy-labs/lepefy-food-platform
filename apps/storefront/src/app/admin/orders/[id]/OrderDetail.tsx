@@ -8,6 +8,8 @@ import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 import PackingPanel from './PackingPanel';
 import ManagedShipmentPanel from './ManagedShipmentPanel';
+import CartonSuggestionCard from './CartonSuggestionCard';
+import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { Order, OrderStatus } from '@lepefy/types';
 
 interface ShippingDetails {
@@ -41,6 +43,8 @@ interface Props {
   managedProvider?: { key: string; displayName: string } | null;
   coldChain?: { fresh: number; frozen: number };
   pickingProgress: PickingProgress;
+  cartonSuggestion?: CartonSuggestion | null;
+  missingWeightLines?: number;
 }
 
 const CARRIER_MAP: Record<string, string> = {
@@ -88,6 +92,8 @@ export default function OrderDetail({
   managedProvider,
   coldChain = { fresh: 0, frozen: 0 },
   pickingProgress,
+  cartonSuggestion = null,
+  missingWeightLines = 0,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -181,6 +187,10 @@ export default function OrderDetail({
 
   return (
     <>
+      {!isPickup && cartonSuggestion && ['new', 'preparing'].includes(order.status) && (
+        <CartonSuggestionCard suggestion={cartonSuggestion} missingWeightLines={missingWeightLines} />
+      )}
+
       {!isPickup && order.status === 'preparing' && (
         <PackingPanel
           orderId={order.id}

@@ -668,6 +668,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 119_shipping_intelligence_foundation.sql
 121_purchase_quantity_rules.sql
 122_match_products_quantity_rules.sql
+123_packaging_profile_carton_suggestion.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -715,6 +716,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `113` introduce Reviews V1 verificato: entitlement/settings tenant, capability RBAC dedicate, recensioni service one-per-order paid+delivered, inviti token-hashati, moderazione umana obbligatoria con contenuto immutabile e audit append-only, blacklist deterministica, statistiche pubbliche sulle sole recensioni published e dispatcher retry-safe. L’AI moderation resta disabilitata in V1. La migration è additiva e richiede applicazione manuale in Supabase prima dell’attivazione del modulo.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
+
+`123` è additiva e reversibile: due colonne nullable `suggest_min_weight_g`/`suggest_max_weight_g` su `shipping_packaging_profiles` per suggerire il cartone per collo nel dettaglio ordine admin (card «Carton à utiliser», motore puro `lib/shipping/cartonSuggestion.ts`, split pieno 15 kg + resto). Nessun impatto su checkout, prezzo o `packaging_surcharges`; finché non è applicata manualmente in Supabase la card resta nascosta e l'editor Emballages non invia i nuovi campi. Dossier del futuro forfait checkout: `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` (prezzi tenant IVA inclusa).
 
 `119` è additiva : 5 nuove tabelle (Shipping Intelligence, vedi sezione 13), zero colonne modificate su `tenants`/`orders`/`packaging_surcharges`/`shipping_country_rules`, zero impatto checkout. Seed non distruttivo: un `shipping_packaging_profiles` di default per tenant derivato da `packaging_surcharges` esistente. L'applicazione in Supabase resta manuale.
 

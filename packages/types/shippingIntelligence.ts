@@ -6,6 +6,10 @@ export interface ShippingPackagingProfileRow {
   box_width_cm: number;
   box_height_cm: number;
   max_weight_g: number;
+  /** Migration 123 — tranche de poids par colis (g) où ce carton est suggéré en préparation.
+   *  Absent tant que la migration n'est pas appliquée ; null = jamais suggéré. */
+  suggest_min_weight_g?: number | null;
+  suggest_max_weight_g?: number | null;
   is_default: boolean;
   active: boolean;
   position: number;

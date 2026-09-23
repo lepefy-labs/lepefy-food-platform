@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { parseSuggestRange } from '@/lib/shipping/cartonSuggestion';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
   if (!name || !boxLengthCm || !boxWidthCm || !boxHeightCm || !maxWeightG) {
     return NextResponse.json({ error: 'Nom et dimensions/poids requis (valeurs positives).' }, { status: 400 });
   }
+  const suggestRange = parseSuggestRange(body);
+  if (!suggestRange.ok) return NextResponse.json({ error: suggestRange.error }, { status: 400 });
 
   const supabase = createServiceClient();
 
@@ -80,6 +83,7 @@ export async function POST(req: NextRequest) {
       is_default: isDefault,
       active: body.active === undefined ? true : Boolean(body.active),
       position: nextPosition,
+      ...suggestRange.patch,
     })
     .select('*')
     .single();

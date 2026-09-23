@@ -17,7 +17,12 @@ interface FormState {
   max_weight_g: string;
   is_default: boolean;
   active: boolean;
+  suggest_min_kg: string;
+  suggest_max_kg: string;
 }
+
+const gToKg = (g: number | null | undefined) => (g == null ? '' : String(g / 1000));
+const kgToG = (kg: string) => (kg.trim() === '' ? null : Math.round(Number(kg.replace(',', '.')) * 1000));
 
 function toFormState(profile?: ShippingPackagingProfileRow): FormState {
   return {
@@ -28,11 +33,17 @@ function toFormState(profile?: ShippingPackagingProfileRow): FormState {
     max_weight_g: profile ? String(profile.max_weight_g) : '',
     is_default: profile?.is_default ?? false,
     active: profile?.active ?? true,
+    suggest_min_kg: gToKg(profile?.suggest_min_weight_g),
+    suggest_max_kg: gToKg(profile?.suggest_max_weight_g),
   };
 }
 
-function formToBody(form: FormState) {
+// Les champs de suggestion ne sont envoyés que si la migration 123 est appliquée
+// (colonnes présentes) ou si l'utilisateur les a remplis.
+function formToBody(form: FormState, suggestColumns: boolean) {
+  const sendSuggest = suggestColumns || form.suggest_min_kg.trim() !== '' || form.suggest_max_kg.trim() !== '';
   return {
+    ...(sendSuggest ? { suggest_min_weight_g: kgToG(form.suggest_min_kg), suggest_max_weight_g: kgToG(form.suggest_max_kg) } : {}),
     name: form.name.trim(),
     box_length_cm: Number(form.box_length_cm),
     box_width_cm: Number(form.box_width_cm),
@@ -47,6 +58,11 @@ function validate(form: FormState): string | null {
   if (!form.name.trim()) return 'Indiquez un nom (ex. « Moyen »).';
   const dims = [form.box_length_cm, form.box_width_cm, form.box_height_cm, form.max_weight_g];
   if (dims.some((v) => !v || Number(v) <= 0)) return 'Toutes les dimensions et le poids max doivent être positifs.';
+  const min = kgToG(form.suggest_min_kg);
+  const max = kgToG(form.suggest_max_kg);
+  if ((min != null && (!Number.isFinite(min) || min < 0)) || (max != null && (!Number.isFinite(max) || max <= 0))) return 'Tranche de suggestion invalide.';
+  if (min != null && max == null) return 'Indiquez le poids maximum de la tranche de suggestion.';
+  if (min != null && max != null && min >= max) return 'Le poids minimum de suggestion doit être inférieur au maximum.';
   return null;
 }
 
@@ -89,6 +105,14 @@ function ProfileForm({
         <label className={LABEL_CLS}>Poids maximum (g)</label>
         <input type="number" min={1} value={form.max_weight_g} onChange={(e) => set('max_weight_g', e.target.value)} placeholder="Ex. 10000 pour 10 kg" className={INPUT_CLS} />
       </div>
+      <div>
+        <label className={LABEL_CLS}>Carton suggéré en préparation, par colis (kg)</label>
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" min={0} step="0.5" value={form.suggest_min_kg} onChange={(e) => set('suggest_min_kg', e.target.value)} placeholder="Au-delà de (ex. 0)" className={INPUT_CLS} />
+          <input type="number" min={0} step="0.5" value={form.suggest_max_kg} onChange={(e) => set('suggest_max_kg', e.target.value)} placeholder="Jusqu'à (ex. 5)" className={INPUT_CLS} />
+        </div>
+        <p className="mt-1 text-[11px] text-gray-400">Vide = jamais suggéré (laboratoire uniquement). Si plusieurs cartons couvrent un poids, le premier est suggéré, les autres proposés si volumineux.</p>
+      </div>
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input type="checkbox" checked={form.is_default} onChange={(e) => set('is_default', e.target.checked)} className="w-5 h-5" />
@@ -109,6 +133,7 @@ function ProfileForm({
 
 export function PackagingProfilesSection({ initialProfiles }: { initialProfiles: ShippingPackagingProfileRow[] }) {
   const [profiles, setProfiles] = useState<ShippingPackagingProfileRow[]>([...initialProfiles].sort((a, b) => a.position - b.position));
+  const suggestColumns = initialProfiles.some((p) => 'suggest_max_weight_g' in p);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -123,7 +148,7 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
   async function handleCreate(form: FormState) {
     setSavingId('new');
     try {
-      const res = await fetch('/api/admin/shipping-packaging-profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formToBody(form)) });
+      const res = await fetch('/api/admin/shipping-packaging-profiles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formToBody(form, suggestColumns)) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       setProfiles((prev) => {
@@ -153,7 +178,7 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
 
   async function handleUpdate(id: string, form: FormState) {
     setSavingId(id);
-    const body = formToBody(form);
+    const body = formToBody(form, suggestColumns);
     const ok = await patchProfile(id, body);
     if (ok) {
       setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...body } : (body.is_default ? { ...p, is_default: false } : p))));
@@ -200,6 +225,11 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
                 </div>
                 <p className="text-xs text-gray-500 mb-0.5">{profile.box_length_cm} × {profile.box_width_cm} × {profile.box_height_cm} cm</p>
                 <p className="text-xs text-gray-400">≤ {(profile.max_weight_g / 1000).toLocaleString('fr-FR')} kg{!profile.active && ' · inactif'}</p>
+                {profile.suggest_max_weight_g != null && (
+                  <p className="mt-0.5 text-xs font-medium text-[var(--color-primary-dark)]">
+                    Suggéré en préparation : {((profile.suggest_min_weight_g ?? 0) / 1000).toLocaleString('fr-FR')}–{(profile.suggest_max_weight_g / 1000).toLocaleString('fr-FR')} kg
+                  </p>
+                )}
                 <div className="flex items-center gap-2 mt-3">
                   <button onClick={() => setEditingId(editingId === profile.id ? null : profile.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === profile.id ? 'Fermer' : 'Modifier'}</button>
                   <button onClick={() => setPendingDeleteId(profile.id)} disabled={savingId === profile.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>

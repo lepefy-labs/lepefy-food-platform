@@ -6,6 +6,8 @@
 > **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
+> Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
+>
 > Questo documento descrive lo **stato corrente** del modulo. Il codice rimane la source of truth.
 > Quando il modulo viene modificato, questo file deve essere aggiornato nello stesso delivery unit/commit secondo `AGENTS.md`.
 
@@ -108,9 +110,14 @@ Campi principali:
 - `max_weight_g`;
 - `is_default`;
 - `active`;
-- `position`.
+- `position`;
+- `suggest_min_weight_g` / `suggest_max_weight_g` (migration `123_packaging_profile_carton_suggestion.sql`, nullable).
 
 Al momento **non sostituisce** `packaging_surcharges` nel checkout.
+
+**Carton suggerito in preparazione.** Un profilo attivo con `suggest_max_weight_g` valorizzato è un cartone "di magazzino": il dettaglio ordine admin (stati `new`/`preparing`, solo consegna) mostra la card «Carton à utiliser». Il peso dell'ordine è `shipping_details.totalWeightG` del checkout, altrimenti ricalcolato da `order_items` × `products.weight_grams` (le righe senza peso sono segnalate). Il peso è diviso in colli pieni di `packaging_surcharges.max_pack_kg` (default 15 kg) più il resto (20 kg → 15 + 5, non 10 + 10 come lo split del checkout). Per ogni collo: carton = primo profilo per `position` con `min < peso ≤ max`; gli altri profili che coprono lo stesso peso sono proposti «si volumineux». Motore puro `lib/shipping/cartonSuggestion.ts` (test `tests/unit/cartonSuggestion.spec.ts`); editor in Admin → Livraison → Emballages. Solo aiuto alla preparazione: nessun effetto sul prezzo o sul checkout. Senza migration applicata le colonne mancano e la card resta nascosta.
+
+Configurazione ChloeFood prevista: Carton S commerce 35×25×22 (0–5 kg), Standard 40×30×30 (5–15 kg), Carton L commerce 45×35×40 (12,5–15 kg, alternativa per colli voluminosi).
 
 La migration crea un profilo iniziale `Standard` derivato dalla configurazione `packaging_surcharges` attiva.
 
