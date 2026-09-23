@@ -264,28 +264,30 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
                   <th className="py-2 pr-3">Zones</th>
                   <th className="py-2 pr-3 text-right" title="Devis Packlink TTC, médiane (max) des scénarios">Packlink TTC</th>
                   <th className="py-2 pr-3 text-right">+ Emballage</th>
-                  <th className="py-2 pr-3 text-right" title="Cas le plus cher du groupe">= Coût réel</th>
+                  <th className="py-2 pr-3 text-right" title="Médiane (cas le plus cher) du groupe">= Coût réel</th>
                   <th className="py-2 pr-3 text-right">Forfait</th>
-                  <th className="py-2 pr-3 text-right" title="Forfait − coût réel le plus cher du groupe">Écart</th>
+                  <th className="py-2 pr-3 text-right" title="Forfait − coût réel médian : le cas le plus courant">Écart typique</th>
+                  <th className="py-2 pr-3 text-right" title="Forfait − coût réel le plus cher du groupe (grande boîte, zone chère…)">Pire écart</th>
                 </tr>
               </thead>
               <tbody>
                 {res.comparison.flatMap((row) => row.cells.map((cell, i) => (
-                  <tr key={`${row.weightKg}-${cell.zoneSurcharge}`} className={`border-b border-gray-50 dark:border-gray-800/60 ${cell.worstGap != null && cell.worstGap < 0 ? 'bg-red-50/60 dark:bg-red-950/20' : ''}`}>
+                  <tr key={`${row.weightKg}-${cell.zoneSurcharge}`} className={`border-b border-gray-50 dark:border-gray-800/60 ${cell.typicalGap != null && cell.typicalGap < 0 ? 'bg-red-50/60 dark:bg-red-950/20' : ''}`}>
                     <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{i === 0 ? <>{kg(row.weightKg)} <span className="text-2xs text-gray-400">· {row.numParcels} colis</span></> : ''}</td>
                     <td className="py-1.5 pr-3 text-xs text-gray-500" title={cell.zones.join(', ')}>
                       {cell.zoneSurcharge > 0 ? `Supplément ${eur(cell.zoneSurcharge)}` : 'Zones standard'} <span className="text-2xs text-gray-400">({cell.zones.length})</span>
                     </td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{eur(cell.packlinkMedian)}{cell.packlinkMax !== cell.packlinkMedian && <span className="text-2xs text-gray-400"> ({eur(cell.packlinkMax)})</span>}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums text-gray-500">{eur(cell.packaging)}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{eur(cell.realCostMax)}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{eur(cell.realCostMedian ?? cell.realCostMax)}{cell.realCostMedian != null && cell.realCostMedian !== cell.realCostMax && <span className="text-2xs font-normal text-gray-400"> ({eur(cell.realCostMax)})</span>}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{cell.forfait == null ? <span className="text-gray-400" title="Aucune bande ne couvre ce poids">hors bandes</span> : eur(cell.forfait)}</td>
-                    <td className={`py-1.5 pr-3 text-right tabular-nums ${gapCls(cell.worstGap)}`}>{eur(cell.worstGap)}</td>
+                    <td className={`py-1.5 pr-3 text-right tabular-nums ${gapCls(cell.typicalGap ?? null)}`}>{eur(cell.typicalGap)}</td>
+                    <td className={`py-1.5 pr-3 text-right tabular-nums text-xs ${gapCls(cell.worstGap)}`}>{eur(cell.worstGap)}</td>
                   </tr>
                 )))}
               </tbody>
             </table>
-            <p className="mt-2 text-2xs text-gray-400">Vert : écart ≥ 1 € · orange : 0–1 € · rouge : le forfait ne couvre pas le coût réel. Devis Packlink, pas des factures payées.</p>
+            <p className="mt-2 text-2xs text-gray-400">Écart typique : cas médian (boîte et zone les plus courantes du groupe) · pire écart : cas le plus cher du groupe. Vert : ≥ 1 € · orange : 0–1 € · rouge : le forfait ne couvre pas le coût réel. Devis Packlink, pas des factures payées.</p>
           </div>
         )}
       </section>
@@ -396,7 +398,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-2xs uppercase text-gray-400">
-                  <th className="py-1 pr-3">Poids</th><th className="py-1 pr-3">Colis</th><th className="py-1 pr-3 text-right">Zones standard</th>
+                  <th className="py-1 pr-3">Poids</th><th className="py-1 pr-3">Colis (kg)</th><th className="py-1 pr-3 text-right">Zones standard</th>
                   {preview[0]?.surchargeZone && <th className="py-1 pr-3 text-right">{preview[0].surchargeZone}</th>}
                 </tr>
               </thead>

@@ -712,6 +712,6 @@ test('the real cost includes current packaging and the comparison flags uncovere
   const comparison = buildCostComparison(rows, TENANT_BANDS, {}, null);
   expect(comparison.map((r) => r.weightKg)).toEqual([1, 7.5]);
   const cell = comparison[1]!.cells[0]!;
-  expect(cell).toMatchObject({ zoneSurcharge: 0, scenarios: 2, realCostMax: 14.21, forfait: 10.5, worstGap: -3.71 });
+  expect(cell).toMatchObject({ zoneSurcharge: 0, scenarios: 2, realCostMedian: 12.76, realCostMax: 14.21, forfait: 10.5, typicalGap: -2.26, worstGap: -3.71 });
   expect(backtestTariff(TENANT_BANDS, {}, null, withPackagingCost(rows))).toMatchObject({ negativeMarginPct: 66.7 });
 });

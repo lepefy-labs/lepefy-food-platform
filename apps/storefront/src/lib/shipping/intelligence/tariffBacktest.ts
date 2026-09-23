@@ -289,8 +289,12 @@ export interface CostComparisonCell {
   packlinkMedian: number;
   packlinkMax: number;
   packaging: number;
+  /** Coût réel médian (cas typique) et le plus élevé (cas le plus défavorable). */
+  realCostMedian: number;
   realCostMax: number;
   forfait: number | null;
+  /** Forfait − coût réel médian (cas typique). */
+  typicalGap: number | null;
   /** Forfait − coût réel le plus élevé du groupe (négatif = perte). */
   worstGap: number | null;
 }
@@ -334,6 +338,7 @@ export function buildCostComparison(
           const packlink = groupRows.map((r) => r.providerCost);
           const realCosts = groupRows.map((r) => r.providerCost + (r.packagingCost ?? 0));
           const realCostMax = Math.max(...realCosts);
+          const realCostMedian = medianOf(realCosts);
           const worst = groupRows[realCosts.indexOf(realCostMax)]!;
           const forfait = applyTariffDraft(bands, zoneSurcharges, multiParcelStrategy, worst);
           return {
@@ -343,8 +348,10 @@ export function buildCostComparison(
             packlinkMedian: parseFloat(medianOf(packlink).toFixed(2)),
             packlinkMax: parseFloat(Math.max(...packlink).toFixed(2)),
             packaging: parseFloat((worst.packagingCost ?? 0).toFixed(2)),
+            realCostMedian: parseFloat(realCostMedian.toFixed(2)),
             realCostMax: parseFloat(realCostMax.toFixed(2)),
             forfait,
+            typicalGap: forfait === null ? null : parseFloat((forfait - realCostMedian).toFixed(2)),
             worstGap: forfait === null ? null : parseFloat((forfait - realCostMax).toFixed(2)),
           };
         });
