@@ -503,4 +503,3 @@ export function readTariffSnapshot(details: Record<string, unknown> | null | und
     || !Number.isInteger(t.weightG) || typeof t.postalCode !== 'string' || typeof t.country !== 'string') return null;
   return { versionId: t.versionId, version: t.version as number, finalCents: t.finalCents as number, weightG: t.weightG as number, postalCode: t.postalCode, country: t.country };
 }
-
