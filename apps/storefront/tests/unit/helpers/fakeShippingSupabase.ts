@@ -37,6 +37,15 @@ function cmpValues(a: unknown, b: unknown): number {
   return compare(a, b);
 }
 
+/** Colonnes simples ou chemins JSON PostgREST (`a->b->>c`). */
+function readColumn(row: Row, col: string): unknown {
+  if (!col.includes('->')) return row[col];
+  const [head, ...rest] = col.split(/->>?/);
+  let value: unknown = row[head!];
+  for (const key of rest) value = value && typeof value === 'object' ? (value as Row)[key] : undefined;
+  return col.includes('->>') && value !== undefined && value !== null ? String(value) : value;
+}
+
 class FakeQuery implements PromiseLike<{ data: unknown; error: null; count: number | null }> {
   private filters: Filter[] = [];
   private orders: Array<{ col: string; ascending: boolean }> = [];
@@ -75,7 +84,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count: numb
 
   private matches(row: Row): boolean {
     return this.filters.every((f) => {
-      const v = row[f.col];
+      const v = readColumn(row, f.col);
       switch (f.op) {
         case 'eq': return v === f.value;
         case 'in': return (f.value as unknown[]).includes(v);

@@ -5,7 +5,7 @@ import { findReusableObservation, pickReusableObservation } from '../../src/lib/
 import { chooseOperationalOffer, groupQuoteExecutions } from '../../src/lib/shipping/intelligence/operationalObservation';
 import { quoteScenarioAndPersist } from '../../src/lib/shipping/intelligence/quoteScenario';
 import { runCampaignBatch } from '../../src/lib/shipping/intelligence/runCampaignBatch';
-import { classifyCampaignItem, computeCampaignCoverage } from '../../src/lib/shipping/intelligence/campaignCoverage';
+import { classifyCampaignItem, computeCampaignCoverage, needsResample } from '../../src/lib/shipping/intelligence/campaignCoverage';
 import { fetchCampaignItems, loadCampaignCoverage } from '../../src/lib/shipping/intelligence/campaignData';
 import { fetchAllPages } from '../../src/lib/shipping/intelligence/pagedQuery';
 import { buildScenarioBacktestSample, assessScenarioReliability, backtestTariff } from '../../src/lib/shipping/intelligence/tariffBacktest';
@@ -14,6 +14,7 @@ import { groupByAdministration, resolveAdministrativeGroup, type PostalAdminRow 
 import { deepAnalysisWeights, initialCoverageWeights } from '../../src/lib/shipping/intelligence/weightPresets';
 import { buildCampaignScenarios, countScenarios, splitDestinationsForLimit, validateScenarioMatrix } from '../../src/lib/shipping/intelligence/scenarioMatrix';
 import { FakeDb, fakeId } from './helpers/fakeShippingSupabase';
+import { errorReasonFromItemError } from '../../src/lib/shipping/intelligence/campaignErrorReasons';
 
 const TENANT = 'tenant-a';
 const OTHER_TENANT = 'tenant-b';
@@ -135,7 +136,10 @@ function packlinkService(id: number, base: number, tax: number, eligible = true)
   };
 }
 
-async function withPacklinkResponse<T>(services: unknown[] | null, run: (calls: string[]) => Promise<T>): Promise<T> {
+async function withPacklinkResponse<T>(
+  services: unknown[] | null | ((url: URL) => Response),
+  run: (calls: string[]) => Promise<T>,
+): Promise<T> {
   const originalFetch = globalThis.fetch;
   const originalInfo = console.info;
   const originalError = console.error;
@@ -144,6 +148,7 @@ async function withPacklinkResponse<T>(services: unknown[] | null, run: (calls: 
   console.error = () => undefined;
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     calls.push(String(input));
+    if (typeof services === 'function') return services(new URL(String(input)));
     if (services === null) return new Response('boom', { status: 500 });
     return new Response(JSON.stringify(services), { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;
@@ -447,4 +452,94 @@ test('the cost history summary counts measured scenarios, not provider offers', 
   const { scenariosMeasured, groups } = summarizeObservations(offers, new Map([[PROFILE.id, PROFILE.name]]));
   expect(scenariosMeasured).toBe(1);
   expect(groups[0]).toMatchObject({ sampleSize: 1, medianCost: 9, postalCodes: 1, confidence: 'low' });
+});
+
+// ─── Refus de destination Packlink vs incident ─────────────────────────────
+
+function packlinkByZip(rejected: string[]) {
+  return (url: URL) => {
+    const zip = url.searchParams.get('to[zip]') ?? '';
+    if (rejected.includes(zip)) return new Response('{"messages":[{"message":"Bad Request"}]}', { status: 400 });
+    return new Response(JSON.stringify([packlinkService(7, 8, 1)]), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+}
+
+test('a Packlink 400 is a rejected destination, not an infrastructure incident', async () => {
+  const rejected = await withPacklinkResponse(packlinkByZip(['41100']), () => quoteScenarioAndPersist({
+    supabase: new FakeDb().client(), tenantId: TENANT, packlinkApiKey: 'k', source: 'synthetic_simulation',
+    campaignId: 'c1', weightKg: 10, profile: PROFILE, destination: { country: 'IT', postalCode: '41100' },
+  }));
+  expect(rejected).toMatchObject({ ok: false, reason: 'provider_rejected', offersPersisted: false });
+
+  const outage = await withPacklinkResponse(() => new Response('down', { status: 503 }), () => quoteScenarioAndPersist({
+    supabase: new FakeDb().client(), tenantId: TENANT, packlinkApiKey: 'k', source: 'synthetic_simulation',
+    campaignId: 'c1', weightKg: 10, profile: PROFILE, destination: { country: 'IT', postalCode: '41121' },
+  }));
+  expect(outage).toMatchObject({ ok: false, reason: 'provider_error' });
+});
+
+test('the worker reports rejected CAPs separately and stops calling them after two weights', async () => {
+  const items = [1, 3, 7.5, 14.5].map((w) => campaignItem('camp', '41100', w)).concat([campaignItem('camp', '41121', 1)]);
+  const db = new FakeDb({
+    shipping_simulation_campaigns: [{
+      id: 'camp', tenant_id: TENANT, name: 'C', status: 'queued', created_at: '2026-09-01T00:00:00.000Z',
+      scenario_matrix: { weightsKg: [], packagingProfileIds: [PROFILE.id], destinations: [], freshnessWindowDays: 30 },
+    }],
+    shipping_simulation_campaign_items: items,
+    shipping_packaging_profiles: [PROFILE],
+  });
+
+  // Premier lot : deux poids refusés pour 41100 → la destination est prouvée refusée.
+  const first = await withPacklinkResponse(packlinkByZip(['41100']), async (calls) => ({
+    result: await runCampaignBatch(db.client(), TENANT_ROW, { itemsPerTick: 2 }),
+    calls: calls.length,
+  }));
+  expect(first.result).toMatchObject({ processed: 2, failed: 0, rejected: 2 });
+  expect(first.calls).toBe(2);
+
+  // Lot suivant : les poids restants de 41100 sont clos sans appel ; 41121 est mesuré.
+  const second = await withPacklinkResponse(packlinkByZip(['41100']), async (calls) => ({
+    result: await runCampaignBatch(db.client(), TENANT_ROW, { itemsPerTick: 10 }),
+    calls: calls.map((c) => new URL(c).searchParams.get('to[zip]')),
+  }));
+  expect(second.result).toMatchObject({ processed: 3, succeeded: 1, failed: 0, rejected: 2 });
+  expect(second.calls).toEqual(['41121']);
+
+  const stored = db.tables.shipping_simulation_campaign_items as unknown as ShippingSimulationCampaignItemRow[];
+  expect(stored.filter((i) => i.error === 'provider_rejected_known_destination')).toHaveLength(2);
+  expect(db.unscopedQueries('shipping_simulation_campaign_items', TENANT).filter((q) => q.action !== 'insert')).toHaveLength(0);
+});
+
+test('the error diagnostic explains each reason and excludes deterministic refusals from resampling', () => {
+  expect(errorReasonFromItemError('packlink_error')).toBe('legacy_packlink_error');
+  expect(errorReasonFromItemError('persistence_error: timeout')).toBe('persistence_error');
+  expect(errorReasonFromItemError('boom')).toBe('unexpected_error');
+
+  const failedItem = (postalCode: string, weightKg: number, error: string) => ({
+    ...campaignItem('camp', postalCode, weightKg), status: 'failed' as const, error, attempted_at: new Date().toISOString(),
+  });
+  const items = [
+    failedItem('41100', 1, 'provider_rejected'),
+    failedItem('41100', 3, 'provider_rejected_known_destination'),
+    failedItem('41121', 1, 'provider_error'),
+    failedItem('41122', 1, 'no_eligible_service'),
+    failedItem('43100', 1, 'packlink_error'),
+  ];
+  const coverage = computeCampaignCoverage({
+    tenantId: TENANT, items, observationsById: new Map(), profilesById: new Map([[PROFILE.id, PROFILE]]),
+    destinations: [], freshnessWindowDays: 30,
+  });
+
+  const byCode = Object.fromEntries(coverage.summary.errorBreakdown.map((e) => [e.code, e]));
+  expect(byCode.provider_rejected).toMatchObject({ scenarios: 1, postalCodes: ['41100'], resample: false });
+  expect(byCode.provider_error).toMatchObject({ scenarios: 1, resample: true });
+  expect(byCode.no_eligible_service).toMatchObject({ resample: false });
+  expect(byCode.legacy_packlink_error).toMatchObject({ postalCodes: ['43100'], resample: true });
+  expect(coverage.summary.resampleCandidates).toBe(2);
+  expect(coverage.summary.rejected).toBe(2);
+  expect(coverage.summary.rejectedPostalCodes).toBe(1);
+  expect(coverage.postalCodes.find((p) => p.postalCode === '41100')?.status).toBe('rejected');
+
+  const resampled = items.filter((i) => needsResample(coverage.classifications.get(i.id)!)).map((i) => i.scenario.destination.postalCode);
+  expect(resampled.sort()).toEqual(['41121', '43100']);
 });

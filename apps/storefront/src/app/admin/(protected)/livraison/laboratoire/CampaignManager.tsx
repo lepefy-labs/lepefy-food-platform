@@ -161,7 +161,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
       const res = await fetch(`/api/admin/shipping-simulation-campaigns/${id}/process`, { method: 'POST' });
       const data = await res.json() as {
         error?: string;
-        result?: { processed: number; succeeded: number; failed: number; skipped: number };
+        result?: { processed: number; succeeded: number; failed: number; skipped: number; rejected?: number };
       };
       if (!res.ok) {
         if (res.status === 429) {
@@ -172,7 +172,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
       }
       const result = data.result;
       setNotice((result?.processed ?? 0) > 0
-        ? { tone: 'success', text: `Lot immédiat : ${result?.processed ?? 0} scénario(s) — ${result?.succeeded ?? 0} nouveau(x) devis Packlink, ${result?.skipped ?? 0} réemploi(s) de devis identique, ${result?.failed ?? 0} échec(s). Le worker poursuivra si nécessaire.` }
+        ? { tone: 'success', text: `Lot immédiat : ${result?.processed ?? 0} scénario(s) — ${result?.succeeded ?? 0} nouveau(x) devis Packlink, ${result?.skipped ?? 0} réemploi(s) de devis identique, ${result?.rejected ?? 0} sans devis exploitable (CAP refusé, aucun service éligible…), ${result?.failed ?? 0} incident(s). Le worker poursuivra si nécessaire.` }
         : { tone: 'warning', text: 'Aucun scénario pris dans ce lot ; le worker automatique reste actif.' });
     } catch {
       setNotice({

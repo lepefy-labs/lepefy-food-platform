@@ -83,7 +83,7 @@ export type ShippingResult =
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PACKLINK_API_BASE = 'https://api.packlink.com/v1'; // sandbox: https://apisandbox.packlink.com/v1
+export const PACKLINK_API_BASE = 'https://api.packlink.com/v1'; // sandbox: https://apisandbox.packlink.com/v1
 const WEIGHT_FALLBACK_G = 400;
 
 // ─── Packlink API ─────────────────────────────────────────────────────────────

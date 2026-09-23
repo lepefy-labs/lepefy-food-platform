@@ -6,6 +6,7 @@ import AdminPageHeader from '../../../../_components/ui/AdminPageHeader';
 import { LivraisonTabs } from '../../LivraisonTabs';
 import { CampaignCoverageTable } from './CampaignCoverageTable';
 import { ResampleCampaignButton } from './ResampleCampaignButton';
+import { CampaignErrorDiagnostic } from './CampaignErrorDiagnostic';
 import type { ShippingScenarioMatrix, ShippingSimulationCampaignRow } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,6 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   // lots, filtrées par tenant — voir campaignData.ts.
   const coverage = await loadCampaignCoverage(supabase, tenant.id, typedCampaign);
   const { summary } = coverage;
-  const byClass = summary.byClass;
   const campaignActive = typedCampaign.status === 'queued' || typedCampaign.status === 'running';
 
   return (
@@ -69,29 +69,23 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           <Stat label="CAP complets" value={`${summary.completePostalCodes}/${summary.plannedPostalCodes}`} tone="green" hint="tous les scénarios couverts" />
           <Stat label="Nouveaux devis" value={summary.newQuotes} hint="appels Packlink effectifs" />
           <Stat label="Réemplois valides" value={summary.validReuses} hint="devis identique et frais" />
-          <Stat label="Échecs" value={summary.failed} tone={summary.failed > 0 ? 'red' : undefined} />
+          <Stat label="Sans devis" value={summary.failed + summary.rejected} tone={summary.failed + summary.rejected > 0 ? 'red' : undefined} hint={summary.rejected > 0 ? `dont ${summary.rejected} refusé(s) par Packlink` : 'échecs'} />
           <Stat label="À traiter" value={summary.remaining} hint={summary.running > 0 ? `${summary.running} en cours` : undefined} />
         </div>
 
-        {summary.incompatible > 0 && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            <p className="font-semibold">{summary.incompatible} scénario(s) avec données historiques incompatibles — non comptés comme couverts.</p>
-            <p className="mt-0.5">
-              {byClass.reused_other_postal_code > 0 && <>{byClass.reused_other_postal_code} réemploi(s) d&apos;un devis d&apos;un autre CAP · </>}
-              {byClass.reused_incompatible > 0 && <>{byClass.reused_incompatible} réemploi(s) divergent(s) (poids, colis, dimensions ou fraîcheur) · </>}
-              {byClass.observation_missing > 0 && <>{byClass.observation_missing} sans observation retrouvée · </>}
-              {byClass.unverifiable > 0 && <>{byClass.unverifiable} non vérifiable(s)</>}
-            </p>
-            <p className="mt-0.5 text-amber-800/80">Les données d&apos;origine ne sont ni supprimées ni modifiées ; seule la couverture affichée les exclut.</p>
-          </div>
-        )}
+        <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pt-4">
+          <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-1">Diagnostic des erreurs</h3>
+          <p className="text-2xs text-gray-400 mb-2">
+            Scénarios sans devis valide, par motif — à examiner avant toute remesure. Les données d&apos;origine ne sont ni supprimées ni modifiées.
+          </p>
+          <CampaignErrorDiagnostic breakdown={summary.errorBreakdown} />
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <ResampleCampaignButton
             campaignId={typedCampaign.id}
             candidates={summary.resampleCandidates}
-            failed={summary.failed}
-            incompatible={summary.incompatible}
+            breakdown={summary.errorBreakdown}
             disabled={campaignActive}
           />
           {campaignActive && summary.resampleCandidates > 0 && (

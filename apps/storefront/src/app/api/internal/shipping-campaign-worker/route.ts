@@ -5,6 +5,11 @@
  * temporaire GitHub Actions (service-role bearer). Comparaison à temps
  * constant, aucun secret dans l'URL ni les logs. Exécute un lot borné
  * d'éléments pending, sans acheter de transport ni modifier le checkout.
+ *
+ * `failed` ne compte que les incidents d'exécution (Packlink indisponible,
+ * credential, persistance) : c'est lui que vérifient n8n et le fallback
+ * GitHub. Les scénarios clos pour une raison de donnée (CAP refusé par
+ * Packlink, aucun service éligible…) sont comptés dans `rejected`.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';

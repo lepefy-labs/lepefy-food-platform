@@ -9,6 +9,7 @@ import type { Tenant } from '@lepefy/types';
 import { findReusableObservation } from './equivalence';
 import { quoteScenarioAndPersist } from './quoteScenario';
 import { buildScenarioRequest } from './requestIdentity';
+import { isDataOutcomeError, isKnownRejectedDestination } from './campaignOutcomes';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -28,16 +29,32 @@ const STALE_RUNNING_ITEM_MS = 10 * 60 * 1000;
  * absorber un tick plus long, contrairement au cron silencieux). Chaque
  * campagne reste reprenable quel que soit le déclencheur.
  */
+/**
+ * failed   : incidents d'exécution (provider indisponible, credential,
+ *            persistance, exception) — font échouer le tick du scheduler ;
+ * rejected : scénarios clos sans devis exploitable pour une raison de DONNÉE
+ *            (CAP refusé par Packlink, aucun service / aucun service éligible,
+ *            profil supprimé) — restent `failed` dans la campagne mais ne
+ *            signalent pas une panne.
+ */
+export interface CampaignBatchResult {
+  processed: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  rejected: number;
+}
+
 export async function runCampaignBatch(
   supabase: ServiceClient,
   tenant: Tenant,
   options?: { campaignId?: string; itemsPerTick?: number },
-): Promise<{ processed: number; succeeded: number; failed: number; skipped: number }> {
+): Promise<CampaignBatchResult> {
   if (tenant.shipping_provider !== 'packlink') {
-    return { processed: 0, succeeded: 0, failed: 0, skipped: 0 };
+    return { processed: 0, succeeded: 0, failed: 0, skipped: 0, rejected: 0 };
   }
   const resolvedApiKey = tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY;
-  if (!resolvedApiKey) return { processed: 0, succeeded: 0, failed: 0, skipped: 0 };
+  if (!resolvedApiKey) return { processed: 0, succeeded: 0, failed: 0, skipped: 0, rejected: 0 };
   const packlinkApiKey: string = resolvedApiKey;
 
   let activeCampaignQuery = supabase
@@ -54,7 +71,7 @@ export async function runCampaignBatch(
     .order('created_at', { ascending: true });
 
   const campaigns = (activeCampaigns ?? []) as ShippingSimulationCampaignRow[];
-  if (campaigns.length === 0) return { processed: 0, succeeded: 0, failed: 0, skipped: 0 };
+  if (campaigns.length === 0) return { processed: 0, succeeded: 0, failed: 0, skipped: 0, rejected: 0 };
 
   const campaignIds = campaigns.map((c) => c.id);
 
@@ -105,6 +122,8 @@ export async function runCampaignBatch(
   let succeeded = 0;
   let failed = 0;
   let skipped = 0;
+  let rejected = 0;
+  const rejectedDestinationChecks = new Map<string, Promise<boolean>>();
   const touchedCampaignIds = new Set<string>();
 
   let index = 0;
@@ -138,7 +157,7 @@ export async function runCampaignBatch(
 
       if (!profile) {
         await markItem({ status: 'failed', error: 'packaging_profile_not_found' });
-        failed++;
+        rejected++;
         continue;
       }
 
@@ -169,6 +188,25 @@ export async function runCampaignBatch(
           continue;
         }
 
+        // CAP déjà refusé par Packlink (≥ 2 poids distincts, HTTP 400/404/422)
+        // dans la fenêtre de fraîcheur : clôturé sans nouvel appel.
+        const destinationKey = `${request.destinationCountry}|${request.destinationPostalCode}`;
+        let knownRejected = rejectedDestinationChecks.get(destinationKey);
+        if (!knownRejected) {
+          knownRejected = isKnownRejectedDestination(supabase, {
+            tenantId: tenant.id,
+            country: request.destinationCountry,
+            postalCode: request.destinationPostalCode,
+            sinceIso: new Date(Date.now() - freshnessWindowDays * 24 * 60 * 60 * 1000).toISOString(),
+          });
+          rejectedDestinationChecks.set(destinationKey, knownRejected);
+        }
+        if (await knownRejected) {
+          await markItem({ status: 'failed', observation_id: null, error: 'provider_rejected_known_destination' });
+          rejected++;
+          continue;
+        }
+
         const result = await quoteScenarioAndPersist({
           supabase,
           tenantId: tenant.id,
@@ -187,7 +225,8 @@ export async function runCampaignBatch(
           // Y compris no_eligible_service : les offres ont pu être persistées
           // pour l'analyse, mais le scénario n'a pas de devis exploitable.
           await markItem({ status: 'failed', observation_id: null, error: result.error });
-          failed++;
+          if (isDataOutcomeError(result.reason)) rejected++;
+          else failed++;
         }
       } catch (err) {
         await markItem({ status: 'failed', error: err instanceof Error ? err.message : 'unexpected_error' });
@@ -242,5 +281,5 @@ export async function runCampaignBatch(
       .eq('tenant_id', tenant.id);
   }
 
-  return { processed, succeeded, failed, skipped };
+  return { processed, succeeded, failed, skipped, rejected };
 }

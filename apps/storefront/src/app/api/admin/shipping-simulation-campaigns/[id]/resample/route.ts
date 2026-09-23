@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   let profileMissing = 0;
   for (const item of coverage.items) {
     const classification = coverage.classifications.get(item.id);
-    if (!classification || !needsResample(classification.cls)) continue;
+    if (!classification || !needsResample(classification)) continue;
     const scenario = item.scenario;
     if (!existingProfiles.has(scenario.packagingProfileId)) { profileMissing++; continue; }
     const postalCode = normalizePostalCode(scenario.destination.postalCode);

@@ -5,12 +5,16 @@ import type {
   ShippingScenarioDestination,
   ShippingSimulationCampaignItemRow,
 } from '@lepefy/types';
+import { REJECTED_DESTINATION_ERRORS } from './campaignOutcomes';
+import { errorReasonFromItemError, shouldResampleReason, type ErrorReasonCode } from './campaignErrorReasons';
 import { buildScenarioRequest, compareObservationToRequest, normalizePostalCode, type IdentityMismatch } from './requestIdentity';
 
 /**
  * Classement vérifiable d'un item de campagne. Seuls `quoted` et
  * `reused_valid` couvrent un scénario :
  *  - quoted                   : nouvel appel Packlink, observation choisie cohérente ;
+ *  - provider_rejected        : Packlink refuse la destination (HTTP 400/404/422,
+ *                               ex. CAP générique inexistant) — pas de remesure ;
  *  - reused_valid             : réemploi d'un devis STRICTEMENT identique et frais ;
  *  - reused_other_postal_code : réemploi historique d'un devis d'un AUTRE CAP ;
  *  - reused_incompatible      : réemploi historique divergent (poids, colis,
@@ -26,6 +30,7 @@ export type ItemCoverageClass =
   | 'pending'
   | 'running'
   | 'failed'
+  | 'provider_rejected'
   | 'reused_other_postal_code'
   | 'reused_incompatible'
   | 'observation_missing'
@@ -38,13 +43,15 @@ export const INCOMPATIBLE_HISTORY_CLASSES: ReadonlySet<ItemCoverageClass> = new 
 
 export interface ItemClassification {
   cls: ItemCoverageClass;
+  /** Motif lisible pour les classes non couvrantes (échec, refus, historique). */
+  reason?: ErrorReasonCode;
   mismatch?: IdentityMismatch | 'stale' | 'not_eligible' | 'profile_missing' | 'campaign';
 }
 
 type ProfileShape = Pick<ShippingPackagingProfileRow, 'id' | 'box_length_cm' | 'box_width_cm' | 'box_height_cm' | 'max_weight_g'>;
 
 export function classifyCampaignItem(
-  item: Pick<ShippingSimulationCampaignItemRow, 'status' | 'observation_id' | 'scenario' | 'attempted_at' | 'campaign_id'>,
+  item: Pick<ShippingSimulationCampaignItemRow, 'status' | 'observation_id' | 'scenario' | 'attempted_at' | 'campaign_id'> & { error?: string | null },
   observation: ShippingQuoteObservationRow | undefined,
   profile: ProfileShape | undefined,
   tenantId: string,
@@ -52,7 +59,10 @@ export function classifyCampaignItem(
 ): ItemClassification {
   if (item.status === 'pending') return { cls: 'pending' };
   if (item.status === 'running') return { cls: 'running' };
-  if (item.status === 'failed') return { cls: 'failed' };
+  if (item.status === 'failed') {
+    const reason = errorReasonFromItemError(item.error);
+    return { cls: item.error && REJECTED_DESTINATION_ERRORS.has(item.error) ? 'provider_rejected' : 'failed', reason };
+  }
 
   const reused = item.status === 'skipped_duplicate';
   if (!item.observation_id || !observation) return { cls: 'observation_missing' };
@@ -98,7 +108,7 @@ export function classifyCampaignItem(
   return { cls: 'reused_valid' };
 }
 
-export type CoverageStatus = 'complete' | 'partial' | 'todo' | 'incompatible';
+export type CoverageStatus = 'complete' | 'partial' | 'todo' | 'incompatible' | 'rejected';
 
 export interface CoverageRow {
   key: string;
@@ -114,7 +124,11 @@ export interface CoverageRow {
   pending: number;
   running: number;
   failed: number;
+  /** Scénarios dont Packlink refuse la destination. */
+  rejected: number;
   incompatible: number;
+  /** Nombre de scénarios non couverts par motif. */
+  reasons: Partial<Record<ErrorReasonCode, number>>;
   plannedWeightsKg: number[];
   coveredWeightsKg: number[];
   missingWeightsKg: number[];
@@ -143,12 +157,26 @@ export interface CoverageSummary {
   newQuotes: number;
   validReuses: number;
   failed: number;
+  /** Scénarios / CAP refusés par Packlink (non remesurés). */
+  rejected: number;
+  rejectedPostalCodes: number;
   remaining: number;
   pending: number;
   running: number;
   incompatible: number;
   byClass: Record<ItemCoverageClass, number>;
   resampleCandidates: number;
+  errorBreakdown: ErrorBreakdownEntry[];
+}
+
+export interface ErrorBreakdownEntry {
+  code: ErrorReasonCode;
+  scenarios: number;
+  postalCodes: string[];
+  weightsKg: number[];
+  resample: boolean;
+  /** Message brut d'exemple (erreurs inattendues uniquement). */
+  sampleMessage: string | null;
 }
 
 export interface CampaignCoverage {
@@ -157,8 +185,9 @@ export interface CampaignCoverage {
   postalCodes: PostalCoverage[];
 }
 
-function statusFor(valid: number, planned: number, incompatible: number): CoverageStatus {
+function statusFor(valid: number, planned: number, incompatible: number, rejected = 0): CoverageStatus {
   if (planned > 0 && valid === planned) return 'complete';
+  if (rejected > 0 && valid === 0) return 'rejected';
   if (incompatible > 0) return 'incompatible';
   if (valid > 0) return 'partial';
   return 'todo';
@@ -174,8 +203,21 @@ function cityFromDestination(destination: ShippingScenarioDestination | undefine
   return null;
 }
 
-export function needsResample(cls: ItemCoverageClass): boolean {
-  return cls === 'failed' || INCOMPATIBLE_HISTORY_CLASSES.has(cls);
+/** Classe → motif lisible (null pour les classes couvrantes ou en cours). */
+export function reasonForClassification(classification: ItemClassification): ErrorReasonCode | null {
+  if (classification.reason) return classification.reason;
+  if (INCOMPATIBLE_HISTORY_CLASSES.has(classification.cls)) return classification.cls as ErrorReasonCode;
+  return null;
+}
+
+/**
+ * Une remesure n'est proposée que si elle peut aboutir : incidents,
+ * historique incompatible, erreurs anciennes ambiguës. Un refus déterministe
+ * (CAP refusé, aucun service éligible, profil supprimé) est exclu.
+ */
+export function needsResample(classification: ItemClassification): boolean {
+  const reason = reasonForClassification(classification);
+  return reason !== null && shouldResampleReason(reason);
 }
 
 /**
@@ -185,7 +227,7 @@ export function needsResample(cls: ItemCoverageClass): boolean {
  */
 export function computeCampaignCoverage(params: {
   tenantId: string;
-  items: Array<Pick<ShippingSimulationCampaignItemRow, 'id' | 'status' | 'observation_id' | 'scenario' | 'attempted_at' | 'campaign_id'>>;
+  items: Array<Pick<ShippingSimulationCampaignItemRow, 'id' | 'status' | 'observation_id' | 'scenario' | 'attempted_at' | 'campaign_id'> & { error?: string | null }>;
   observationsById: Map<string, ShippingQuoteObservationRow>;
   profilesById: Map<string, ProfileShape & { name: string }>;
   destinations: ShippingScenarioDestination[];
@@ -193,11 +235,13 @@ export function computeCampaignCoverage(params: {
 }): CampaignCoverage & { classifications: Map<string, ItemClassification> } {
   const destinationByKey = new Map(params.destinations.map((d) => [`${d.country}|${normalizePostalCode(d.postalCode)}`, d]));
   const byClass = {
-    quoted: 0, reused_valid: 0, pending: 0, running: 0, failed: 0,
+    quoted: 0, reused_valid: 0, pending: 0, running: 0, failed: 0, provider_rejected: 0,
     reused_other_postal_code: 0, reused_incompatible: 0, observation_missing: 0, unverifiable: 0,
   } as Record<ItemCoverageClass, number>;
   const classifications = new Map<string, ItemClassification>();
   const rows = new Map<string, CoverageRow & { covered: Set<number>; plannedSet: Set<number> }>();
+  const breakdown = new Map<ErrorReasonCode, { scenarios: number; postal: Set<string>; weights: Set<number>; sampleMessage: string | null }>();
+  let resampleCandidates = 0;
 
   for (const item of params.items) {
     const scenario = item.scenario as ShippingCampaignItemScenario;
@@ -219,7 +263,7 @@ export function computeCampaignCoverage(params: {
         zoneCode: scenario.destination.zoneCode ?? destination?.zoneCode ?? null,
         profileId: scenario.packagingProfileId,
         profileName: profile?.name ?? 'Profil supprimé',
-        planned: 0, quoted: 0, reusedValid: 0, pending: 0, running: 0, failed: 0, incompatible: 0,
+        planned: 0, quoted: 0, reusedValid: 0, pending: 0, running: 0, failed: 0, rejected: 0, incompatible: 0, reasons: {},
         plannedWeightsKg: [], coveredWeightsKg: [], missingWeightsKg: [],
         lastValidQuoteAt: null, minCost: null, maxCost: null, status: 'todo',
         covered: new Set(), plannedSet: new Set(),
@@ -235,7 +279,19 @@ export function computeCampaignCoverage(params: {
       case 'pending': row.pending++; break;
       case 'running': row.running++; break;
       case 'failed': row.failed++; break;
+      case 'provider_rejected': row.rejected++; break;
       default: row.incompatible++;
+    }
+    const reason = reasonForClassification(classification);
+    if (reason) {
+      row.reasons[reason] = (row.reasons[reason] ?? 0) + 1;
+      const entry = breakdown.get(reason) ?? { scenarios: 0, postal: new Set<string>(), weights: new Set<number>(), sampleMessage: null };
+      entry.scenarios++;
+      entry.postal.add(postalCode);
+      entry.weights.add(scenario.weightKg);
+      if (reason === 'unexpected_error' && !entry.sampleMessage && item.error) entry.sampleMessage = item.error.slice(0, 160);
+      breakdown.set(reason, entry);
+      if (shouldResampleReason(reason)) resampleCandidates++;
     }
     if (VALID_COVERAGE_CLASSES.has(classification.cls) && observation) {
       row.covered.add(scenario.weightKg);
@@ -254,7 +310,7 @@ export function computeCampaignCoverage(params: {
       plannedWeightsKg,
       coveredWeightsKg,
       missingWeightsKg: plannedWeightsKg.filter((w) => !covered.has(w)),
-      status: statusFor(row.quoted + row.reusedValid, row.planned, row.incompatible),
+      status: statusFor(row.quoted + row.reusedValid, row.planned, row.incompatible, row.rejected),
     };
   }).sort((a, b) =>
     a.country.localeCompare(b.country)
@@ -262,23 +318,24 @@ export function computeCampaignCoverage(params: {
     || a.profileName.localeCompare(b.profileName),
   );
 
-  const postal = new Map<string, PostalCoverage & { incompatible: number }>();
+  const postal = new Map<string, PostalCoverage & { incompatible: number; rejected: number }>();
   for (const row of finalRows) {
     const key = `${row.country}|${row.postalCode}`;
     const existing = postal.get(key) ?? {
       country: row.country, postalCode: row.postalCode, city: row.city, zoneCode: row.zoneCode,
-      planned: 0, valid: 0, coveredProfiles: 0, profiles: 0, status: 'todo' as CoverageStatus, incompatible: 0,
+      planned: 0, valid: 0, coveredProfiles: 0, profiles: 0, status: 'todo' as CoverageStatus, incompatible: 0, rejected: 0,
     };
     existing.planned += row.planned;
     existing.valid += row.quoted + row.reusedValid;
     existing.incompatible += row.incompatible;
+    existing.rejected += row.rejected;
     existing.profiles++;
     if (row.status === 'complete') existing.coveredProfiles++;
     postal.set(key, existing);
   }
-  const postalCodes: PostalCoverage[] = Array.from(postal.values()).map(({ incompatible, ...p }) => ({
+  const postalCodes: PostalCoverage[] = Array.from(postal.values()).map(({ incompatible, rejected, ...p }) => ({
     ...p,
-    status: statusFor(p.valid, p.planned, incompatible),
+    status: statusFor(p.valid, p.planned, incompatible, rejected),
   }));
 
   const incompatible = byClass.reused_other_postal_code + byClass.reused_incompatible + byClass.observation_missing + byClass.unverifiable;
@@ -293,12 +350,24 @@ export function computeCampaignCoverage(params: {
       newQuotes: byClass.quoted,
       validReuses: byClass.reused_valid,
       failed: byClass.failed,
+      rejected: byClass.provider_rejected,
+      rejectedPostalCodes: postalCodes.filter((p) => p.status === 'rejected').length,
       pending: byClass.pending,
       running: byClass.running,
       remaining: byClass.pending + byClass.running,
       incompatible,
       byClass,
-      resampleCandidates: incompatible + byClass.failed,
+      resampleCandidates,
+      errorBreakdown: Array.from(breakdown.entries())
+        .map(([code, e]) => ({
+          code,
+          scenarios: e.scenarios,
+          postalCodes: Array.from(e.postal).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+          weightsKg: Array.from(e.weights).sort((a, b) => a - b),
+          resample: shouldResampleReason(code),
+          sampleMessage: e.sampleMessage,
+        }))
+        .sort((a, b) => b.scenarios - a.scenarios),
     },
   };
 }

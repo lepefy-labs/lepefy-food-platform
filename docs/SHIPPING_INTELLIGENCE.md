@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@1a86ce1f8f1986afe940772c3d029bad0a58cdec`
-> **Ultima verifica:** 22 settembre 2026
+> **Base codice verificata:** `main@4b627cc4c0605d3c4d3dac0943a9d3a53b8e8fa2`
+> **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
 > Questo documento descrive lo **stato corrente** del modulo. Il codice rimane la source of truth.
@@ -447,6 +447,8 @@ Contiene un `Schedule Trigger` ogni cinque minuti, un trigger manuale di test, u
 
 **Stato:** n8n su Hetzner è lo scheduler primario (ogni cinque minuti, credenziale dedicata `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN`). La repository variable `SHIPPING_CAMPAIGN_N8N_ACTIVE=true` è configurata (verificata il 22 settembre 2026: i job schedulati GitHub risultano `skipped`); GitHub Actions resta disponibile come fallback manuale (`workflow_dispatch`).
 
+**Contratto della risposta:** `{ ok, processed, succeeded, skipped, failed, rejected }`. `failed` conta **solo gli incidenti di esecuzione** (Packlink indisponibile/429/credential, persistenza, eccezioni) ed è l'unico contatore che fa fallire il nodo n8n `Check batch outcome` (`shipping_campaign_batch_failed`) e il fallback GitHub. Gli scenari chiusi per una ragione di dato (CAP rifiutato da Packlink, nessun servizio / nessun servizio eleggibile, profilo eliminato) sono in `rejected`: restano `failed` nella campagna ma non segnalano un guasto. Il template n8n non richiede modifiche.
+
 L'endpoint accetta `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN` con confronto a tempo costante. Durante la transizione mantiene anche l'autenticazione legacy via `SUPABASE_SERVICE_ROLE_KEY` per il fallback GitHub. Non inserire la service-role key in n8n.
 
 `.github/workflows/shipping-campaign-worker.yml` mantiene il trigger schedule ma salta i job schedulati finché `SHIPPING_CAMPAIGN_N8N_ACTIVE = true`; `workflow_dispatch` resta eseguibile. La rimozione definitiva del trigger schedule GitHub è una modifica dedicata, da fare una volta stabilizzato n8n.
@@ -522,12 +524,16 @@ Un servizio non eleggibile non viene mai scelto, anche se più economico. Il cos
 |---|---|---|---|
 | `ok` (osservazione scelta) | sì | `succeeded` + `observation_id` | nuova quotazione valida |
 | riuso valido (§11.2) | no | `skipped_duplicate` + `observation_id` | quotazione valida, non nuova chiamata |
-| `provider_error` (HTTP/rete/parsing) | no | `failed`, `error = provider_error` | errore |
-| `no_service` (0 servizi) | no | `failed`, `error = no_service` | errore |
-| `no_eligible_service` | sì (con motivi) | `failed`, `error = no_eligible_service`, `observation_id = null` | errore — mai un falso successo |
-| `persistence_error` | no | `failed`, `error = persistence_error: …` | errore |
-| `chosen_observation_missing` | sì | `failed` | errore |
-| profilo eliminato | no | `failed`, `error = packaging_profile_not_found` | errore |
+| `provider_error` (rete, timeout, 5xx, 429, 401/403, JSON invalido) | no | `failed`, `error = provider_error` | incidente (fa fallire il tick) |
+| `provider_rejected` (HTTP 400/404/422) | no | `failed`, `error = provider_rejected` | dato: destinazione rifiutata |
+| CAP già rifiutato (≥ 2 pesi distinti rifiutati nel tenant entro la finestra di freschezza) | no, **nessuna chiamata** | `failed`, `error = provider_rejected_known_destination` | dato |
+| `no_service` (0 servizi) | no | `failed`, `error = no_service` | dato |
+| `no_eligible_service` | sì (con motivi) | `failed`, `error = no_eligible_service`, `observation_id = null` | dato — mai un falso successo |
+| `persistence_error` | no | `failed`, `error = persistence_error: …` | incidente |
+| `chosen_observation_missing` | sì | `failed` | incidente |
+| profilo eliminato | no | `failed`, `error = packaging_profile_not_found` | dato |
+
+La chiamata del laboratorio passa da `packlinkQuote.ts` (`requestPacklinkServices`), che conserva lo stato HTTP; il flusso reale/checkout continua a usare `fetchAllPacklinkServices` invariato (da `calculateShipping.ts` è stata solo esportata la costante `PACKLINK_API_BASE`). Casi osservati il 23/09/2026: i CAP generici pre-riforma presenti in GeoNames (`29100`, `40100`, `41100`, `42100`, `43100`, …) ricevono 400 da Packlink, mentre i CAP in vigore (es. `41121`) restituiscono i servizi.
 
 ### 12.2 Esecuzioni e campioni
 
@@ -556,7 +562,8 @@ Route: `/admin/livraison/laboratoire/:id` — API equivalente: `GET /api/admin/s
 | `quoted` | `succeeded`, osservazione eleggibile di questa campagna/profilo, stesso paese, CAP e peso | sì |
 | `reused_valid` | `skipped_duplicate`, osservazione strettamente identica alla richiesta dello scenario (§11.1) e fresca al momento del riuso | sì |
 | `pending` / `running` | da elaborare / in elaborazione | no |
-| `failed` | errore esplicito (§12.1) | no |
+| `failed` | errore esplicito (§12.1), motivo in `reason` | no |
+| `provider_rejected` | destinazione rifiutata da Packlink (`provider_rejected*`) | no |
 | `reused_other_postal_code` | riuso storico di un preventivo di un **altro CAP** | no |
 | `reused_incompatible` | riuso storico divergente (peso, colli, dimensioni, origine, non eleggibile) o scaduto | no |
 | `observation_missing` | nessuna osservazione collegata o ritrovata nel tenant | no |
@@ -571,6 +578,7 @@ Per riga CAP × profilo: scenari previsti, nuove quotazioni, riusi validi, in at
 ```text
 complete      tutti gli scenari hanno una quotazione valida (quoted | reused_valid)
 incompatible  non completo e almeno un item storico incompatibile
+rejected      nessuna quotazione valida e scenari rifiutati da Packlink
 partial       almeno una quotazione valida
 todo          nessuna quotazione valida
 ```
@@ -578,6 +586,8 @@ todo          nessuna quotazione valida
 Un CAP è **completamente coperto** solo se tutte le sue righe profilo sono `complete`.
 
 Vue d'ensemble: CAP previsti, CAP completi, nuove quotazioni (chiamate Packlink effettive), riusi validi, errori, scenari da elaborare, dettaglio degli incompatibili. Il numero di offerte restituite da Packlink non compare mai come numero di scenari misurati.
+
+**Diagnostic des erreurs** (prima della remesure): `summary.errorBreakdown` raggruppa per motivo (`campaignErrorReasons.ts`) gli scenari senza quotazione valida — fallimenti e dati storici incompatibili — con etichetta, spiegazione, natura (Incident / Donnée / Historique), numero di scenari, CAP e pesi coinvolti, messaggio d'esempio per le eccezioni e l'indicazione «Inclus / Exclu de la remesure». Ogni riga CAP × profilo mostra anche i propri motivi (`reasons`). Le erreurs `packlink_error` anteriori alla distinzione incidente/rifiuto sono mostrate come «Erreur Packlink (antérieure au diagnostic détaillé)».
 
 Tabella «Couverture par CAP»: filtri «À mesurer» (default quando esistono righe incomplete), «Incompatibles», «Complets», «Tous», ricerca CAP/città/zona/profilo; tabella su desktop, card su mobile. Stati: `Couverture complète`, `Couverture partielle`, `À compléter`, `Données historiques incompatibles`.
 
@@ -588,7 +598,8 @@ La colonna «Traités» della lista campagne resta `completed_scenarios/total_sc
 `POST /api/admin/shipping-simulation-campaigns/:id/resample` (`shipping.manage`), su conferma esplicita (`{ confirm: true }`) dal pulsante «Remesurer N scénario(s)»:
 
 - disponibile solo a campagna terminata/annullata; rifiutata (409) se una remesure della stessa campagna è già `queued/running`;
-- seleziona gli item `failed` + incompatibili (§13.2), deduplicati per CAP × profilo × peso, esclude i profili eliminati (conteggiati);
+- seleziona gli item il cui motivo è rimisurabile (`needsResample`): incidenti, errori storici ambigui, dati storici incompatibili, `no_service`; **esclude** i rifiuti deterministici (`provider_rejected*`, `no_eligible_service`, profilo eliminato); deduplica per CAP × profilo × peso;
+- la conferma elenca motivi inclusi ed esclusi con i rispettivi conteggi;
 - crea una campagna `Remesure — <nome>` con `samplingMode = resample`, `sourceCampaignId`, al massimo 2000 item in ordine deterministico (il resto è segnalato come `deferred`);
 - non modifica né cancella i dati storici; il worker riusa un preventivo identico ancora fresco prima di chiamare Packlink.
 
@@ -903,6 +914,7 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 17. L'osservazione operativa è il servizio eleggibile con costo base + tasse minimo; nessun servizio eleggibile ⇒ nessuna quotazione utilizzabile.
 18. I dati storici di produzione non vengono corretti o cancellati per migliorare la copertura: la copertura li classifica.
 19. Nessuna lettura che deve essere esaustiva si affida a un `SELECT` limitato implicitamente da PostgREST (1000 righe).
+20. Lo scheduler fallisce solo per incidenti di esecuzione; un rifiuto deterministico di Packlink è un dato, visibile nel diagnostic, e non viene richiamato né rimisurato automaticamente.
 
 ---
 
@@ -923,7 +935,8 @@ apps/storefront/src/app/admin/(protected)/livraison/
     PostalCodeIndexAdmin.tsx
     [id]/page.tsx                    Vue d'ensemble + couverture
     [id]/CampaignCoverageTable.tsx   Couverture par CAP (filtri, mobile)
-    [id]/ResampleCampaignButton.tsx  remesure esplicita
+    [id]/CampaignErrorDiagnostic.tsx Diagnostic des erreurs
+    [id]/ResampleCampaignButton.tsx  remesure esplicita (motivi inclusi/esclusi)
   assistant/
   historique/
   analyse-tarifaire/
@@ -960,7 +973,10 @@ apps/storefront/src/lib/shipping/intelligence/
   operationalObservation.ts costo operativo, esecuzioni, ultimo valido per scenario
   quoteScenario.ts          chiamata Packlink + persistenza + esiti espliciti
   runCampaignBatch.ts       worker
-  campaignCoverage.ts       classificazione item + copertura CAP (puro)
+  campaignCoverage.ts       classificazione item + copertura CAP + diagnostic (puro)
+  campaignErrorReasons.ts   catalogo motivi (etichetta, spiegazione, remesure sì/no)
+  campaignOutcomes.ts       incidente vs dato, CAP già rifiutato
+  packlinkQuote.ts          chiamata Packlink del laboratorio con stato HTTP
   campaignData.ts           caricamento paginato/tenant-scoped della copertura
   pagedQuery.ts             paginazione .range() + chunk id
   scenarioMatrix.ts         matrice, limite, suddivisione deterministica
@@ -1053,6 +1069,14 @@ Controllare anzitutto che il workflow n8n sia pubblicato e riuscito (Executions)
 - endpoint interno raggiungibile.
 
 In emergenza: `workflow_dispatch` GitHub oppure `Traiter maintenant`.
+
+### n8n: `shipping_campaign_batch_failed`
+
+Il nodo `Check batch outcome` fallisce se `ok !== true` o se `failed > 0`. Dopo la distinzione incidente/dato, `failed` > 0 indica un incidente reale (Packlink 5xx/429/credential, persistenza, eccezione): controllare i log Vercel del worker e il «Diagnostic des erreurs» della campagna in corso. CAP rifiutati e scenari senza servizio eleggibile finiscono in `rejected` e non fanno fallire il workflow.
+
+### CAP rifiutato da Packlink
+
+Packlink risponde 400 per quel codice postale (spesso un CAP generico pre-riforma listato da GeoNames). Dopo due pesi rifiutati, gli altri scenari del CAP sono chiusi senza chiamate. Sostituirlo con i CAP in vigore in una nuova campagna; la remesure non lo include.
 
 ### `Traiter maintenant` restituisce 429
 

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { IconRefreshDot } from '@tabler/icons-react';
 import { MAX_CAMPAIGN_SCENARIOS } from '@/lib/shipping/intelligence/scenarioMatrix';
+import { ERROR_REASONS } from '@/lib/shipping/intelligence/campaignErrorReasons';
+import type { ErrorBreakdownEntry } from '@/lib/shipping/intelligence/campaignCoverage';
 
 /**
  * Remesure explicite des scénarios sans devis valide. Jamais automatique :
@@ -13,16 +15,16 @@ import { MAX_CAMPAIGN_SCENARIOS } from '@/lib/shipping/intelligence/scenarioMatr
 export function ResampleCampaignButton({
   campaignId,
   candidates,
-  failed,
-  incompatible,
+  breakdown,
   disabled,
 }: {
   campaignId: string;
   candidates: number;
-  failed: number;
-  incompatible: number;
+  breakdown: ErrorBreakdownEntry[];
   disabled: boolean;
 }) {
+  const included = breakdown.filter((e) => e.resample);
+  const excluded = breakdown.filter((e) => !e.resample);
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +80,17 @@ export function ResampleCampaignButton({
       ) : (
         <div className="rounded-lg border border-gray-200 p-3 text-xs space-y-2">
           <p className="text-gray-700">
-            Créer une campagne de remesure pour {Math.min(candidates, MAX_CAMPAIGN_SCENARIOS)} scénario(s) ({failed} échec(s), {incompatible} donnée(s) historique(s) incompatible(s)).
-            Jusqu&apos;à {Math.min(candidates, MAX_CAMPAIGN_SCENARIOS)} appel(s) Packlink ; un devis identique encore frais sera réemployé sans appel.
+            Créer une campagne de remesure pour {Math.min(candidates, MAX_CAMPAIGN_SCENARIOS)} scénario(s).
+            Jusqu&apos;à {Math.min(candidates, MAX_CAMPAIGN_SCENARIOS)} appel(s) Packlink ; un devis identique encore frais sera réemployé sans appel, et un CAP refusé par Packlink est arrêté après deux poids.
           </p>
+          <ul className="space-y-0.5">
+            {included.map((e) => (
+              <li key={e.code} className="text-gray-700">✓ {ERROR_REASONS[e.code].label} — {e.scenarios} scénario(s), {e.postalCodes.length} CAP</li>
+            ))}
+            {excluded.map((e) => (
+              <li key={e.code} className="text-gray-400">✕ {ERROR_REASONS[e.code].label} — {e.scenarios} scénario(s) exclus (refus déterministe)</li>
+            ))}
+          </ul>
           {candidates > MAX_CAMPAIGN_SCENARIOS && (
             <p className="text-amber-700">Au-delà de {MAX_CAMPAIGN_SCENARIOS}, les scénarios restants (ordre déterministe) resteront à remesurer ensuite.</p>
           )}

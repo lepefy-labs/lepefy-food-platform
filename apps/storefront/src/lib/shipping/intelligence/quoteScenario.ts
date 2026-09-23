@@ -1,10 +1,10 @@
 import {
-  fetchAllPacklinkServices,
   isEligibleService,
   getExclusionReason,
   describePacklinkService,
 } from '@/lib/shipping/calculateShipping';
 import { buildScenarioRequest, INTELLIGENCE_FROM_ADDRESS } from './requestIdentity';
+import { requestPacklinkServices } from './packlinkQuote';
 import { chooseOperationalOffer, operationalCost } from './operationalObservation';
 import type { createServiceClient } from '@/lib/supabase/server';
 import type { ShippingObservationSource, ShippingPackagingProfileRow } from '@lepefy/types';
@@ -16,7 +16,10 @@ export { INTELLIGENCE_FROM_ADDRESS };
 /**
  * Issue d'une exécution de scénario. Seul `ok: true` constitue un devis
  * exploitable (une observation opérationnelle choisie existe) :
- *  - provider_error            : appel Packlink en échec, rien de persisté ;
+ *  - provider_error            : incident Packlink/réseau/credential (5xx, 429,
+ *                                401/403, timeout), rien de persisté ;
+ *  - provider_rejected         : Packlink refuse la demande (400/404/422, ex.
+ *                                CAP générique inexistant), rien de persisté ;
  *  - no_service                : Packlink n'a renvoyé aucun service, rien de persisté ;
  *  - no_eligible_service       : services reçus et persistés (avec motif
  *                                d'exclusion) mais aucun n'est éligible ;
@@ -26,6 +29,7 @@ export { INTELLIGENCE_FROM_ADDRESS };
  */
 export type ScenarioQuoteFailureReason =
   | 'provider_error'
+  | 'provider_rejected'
   | 'no_service'
   | 'no_eligible_service'
   | 'persistence_error'
@@ -57,26 +61,25 @@ export async function quoteScenarioAndPersist(params: {
 
   const request = buildScenarioRequest({ weightKg, profile, destination });
 
-  let services;
-  try {
-    services = await fetchAllPacklinkServices(
-      packlinkApiKey,
-      INTELLIGENCE_FROM_ADDRESS,
-      { country: request.destinationCountry, zip_code: request.destinationPostalCode },
-      request.parcels.map((p) => ({
-        weight: parseFloat((p.weight_g / 1000).toFixed(3)),
-        width: p.width_cm,
-        height: p.height_cm,
-        length: p.length_cm,
-      })),
-    );
-  } catch (err) {
-    return { ok: false, reason: 'provider_error', error: err instanceof Error ? err.message : 'provider_error', offersPersisted: false };
-  }
+  const response = await requestPacklinkServices(
+    packlinkApiKey,
+    INTELLIGENCE_FROM_ADDRESS,
+    { country: request.destinationCountry, zip_code: request.destinationPostalCode },
+    request.parcels.map((p) => ({
+      weight: parseFloat((p.weight_g / 1000).toFixed(3)),
+      width: p.width_cm,
+      height: p.height_cm,
+      length: p.length_cm,
+    })),
+  );
 
-  if (services === null) {
+  if (response.kind === 'rejected') {
+    return { ok: false, reason: 'provider_rejected', error: 'provider_rejected', offersPersisted: false };
+  }
+  if (response.kind === 'error') {
     return { ok: false, reason: 'provider_error', error: 'provider_error', offersPersisted: false };
   }
+  const services = response.services;
   if (services.length === 0) {
     return { ok: false, reason: 'no_service', error: 'no_service', offersPersisted: false };
   }

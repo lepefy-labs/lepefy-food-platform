@@ -3,18 +3,21 @@
 import { useMemo, useState } from 'react';
 import { IconSearch } from '@tabler/icons-react';
 import type { CoverageRow, CoverageStatus, PostalCoverage } from '@/lib/shipping/intelligence/campaignCoverage';
+import { ERROR_REASONS, type ErrorReasonCode } from '@/lib/shipping/intelligence/campaignErrorReasons';
 
 const STATUS_LABEL: Record<CoverageStatus, string> = {
   complete: 'Couverture complète',
   partial: 'Couverture partielle',
   todo: 'À compléter',
   incompatible: 'Données historiques incompatibles',
+  rejected: 'CAP refusé par Packlink',
 };
 const STATUS_CLS: Record<CoverageStatus, string> = {
   complete: 'bg-green-50 text-green-700',
   partial: 'bg-blue-50 text-blue-700',
   todo: 'bg-gray-100 text-gray-600',
   incompatible: 'bg-amber-50 text-amber-800',
+  rejected: 'bg-red-50 text-red-700',
 };
 
 type Filter = 'all' | 'needs_work' | 'incompatible' | 'complete';
@@ -49,16 +52,19 @@ function Progress({ row }: { row: CoverageRow }) {
       <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden" aria-hidden>
         <div className="h-full bg-green-500" style={{ width: `${pct}%` }} />
       </div>
-      {(row.pending + row.running + row.failed + row.incompatible) > 0 && (
+      {(row.pending + row.running) > 0 && (
         <p className="mt-0.5 text-2xs text-gray-500">
           {[
             row.pending > 0 ? `${row.pending} en attente` : null,
             row.running > 0 ? `${row.running} en cours` : null,
-            row.failed > 0 ? `${row.failed} échec(s)` : null,
-            row.incompatible > 0 ? `${row.incompatible} incompatible(s)` : null,
           ].filter(Boolean).join(' · ')}
         </p>
       )}
+      {Object.entries(row.reasons).map(([code, count]) => (
+        <p key={code} className="mt-0.5 text-2xs text-red-700" title={ERROR_REASONS[code as ErrorReasonCode].explanation}>
+          {count} × {ERROR_REASONS[code as ErrorReasonCode].label}
+        </p>
+      ))}
       {row.missingWeightsKg.length > 0 && row.missingWeightsKg.length < row.plannedWeightsKg.length && (
         <p className="mt-0.5 text-2xs text-gray-400" title={`Poids couverts : ${row.coveredWeightsKg.map(formatKg).join(' · ')} kg`}>
           Manquants : {row.missingWeightsKg.map(formatKg).join(' · ')} kg
@@ -74,7 +80,7 @@ export function CampaignCoverageTable({ rows, postalCodes }: { rows: CoverageRow
 
   const counts = useMemo(() => ({
     all: rows.length,
-    needs_work: rows.filter((r) => r.status !== 'complete').length,
+    needs_work: rows.filter((r) => r.status !== 'complete' && r.status !== 'rejected').length,
     incompatible: rows.filter((r) => r.status === 'incompatible').length,
     complete: rows.filter((r) => r.status === 'complete').length,
   }), [rows]);
@@ -82,7 +88,7 @@ export function CampaignCoverageTable({ rows, postalCodes }: { rows: CoverageRow
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
-      if (filter === 'needs_work' && r.status === 'complete') return false;
+      if (filter === 'needs_work' && (r.status === 'complete' || r.status === 'rejected')) return false;
       if (filter === 'incompatible' && r.status !== 'incompatible') return false;
       if (filter === 'complete' && r.status !== 'complete') return false;
       if (!q) return true;
