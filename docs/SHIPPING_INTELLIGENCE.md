@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@4b627cc4c0605d3c4d3dac0943a9d3a53b8e8fa2`
+> **Base codice verificata:** `main@2ed533607298ba6d97c2e0ebbec68855ce1843de`
 > **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
@@ -457,7 +457,7 @@ L'endpoint accetta `SHIPPING_CAMPAIGN_SCHEDULER_TOKEN` con confronto a tempo cos
 
 Il cron legacy chiama `scripts/process-shipping-campaign-worker.mjs`; n8n chiama direttamente l'endpoint HTTP applicativo. Nessuno dei due implementa il business logic delle campagne.
 
-Il worker `runCampaignBatch.ts` elabora otto scenari per tick schedulato, con due chiamate Packlink simultanee **per invocazione**; il pulsante admin `Traiter maintenant` usa un batch da venti scenari e cooldown da dieci secondi. `STALE_RUNNING_ITEM_MS` è pari a dieci minuti. Il claim compare-and-set `pending → running` evita l'elaborazione concorrente dello stesso item. Scheduler diversi simultanei possono comunque moltiplicare il parallelismo complessivo: effettuare il cutover tempestivamente.
+Il worker `runCampaignBatch.ts` elabora fino a **40 scenari per tick** (scheduler e `Traiter maintenant`), con **3 chiamate Packlink simultanee per invocazione** e un **budget di 30 secondi** (`TICK_TIME_BUDGET_MS`) oltre il quale non reclama più item: quelli non reclamati restano `pending` per il tick successivo. Con il timeout di 20 s di una chiamata Packlink (`packlinkQuote.ts`) un tick resta sotto ~50 s, entro il timeout HTTP n8n (55 s) e `maxDuration` Vercel (60 s). I riusi (nessuna chiamata) sono rapidi, quindi un tick ne elabora in genere molti di più delle nuove quotazioni. `Traiter maintenant` mantiene il cooldown da dieci secondi. `STALE_RUNNING_ITEM_MS` è pari a dieci minuti. Il claim compare-and-set `pending → running` evita l'elaborazione concorrente dello stesso item; scheduler e trigger manuale simultanei possono comunque sommare il parallelismo verso Packlink.
 
 ### 10.3 Tenant admin
 

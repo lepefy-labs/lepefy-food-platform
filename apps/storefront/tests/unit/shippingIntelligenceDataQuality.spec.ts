@@ -543,3 +543,31 @@ test('the error diagnostic explains each reason and excludes deterministic refus
   const resampled = items.filter((i) => needsResample(coverage.classifications.get(i.id)!)).map((i) => i.scenario.destination.postalCode);
   expect(resampled.sort()).toEqual(['41121', '43100']);
 });
+
+// ─── Lot du worker borné en temps ──────────────────────────────────────────
+
+test('the worker stops claiming items once the tick time budget is spent', async () => {
+  const items = Array.from({ length: 10 }, (_, i) => campaignItem('camp', String(41121 + (i % 5)), 1 + i));
+  const db = new FakeDb({
+    shipping_simulation_campaigns: [{
+      id: 'camp', tenant_id: TENANT, name: 'C', status: 'running', created_at: '2026-09-01T00:00:00.000Z',
+      scenario_matrix: { weightsKg: [], packagingProfileIds: [PROFILE.id], destinations: [], freshnessWindowDays: 30 },
+    }],
+    shipping_simulation_campaign_items: items,
+    shipping_packaging_profiles: [PROFILE],
+  });
+
+  // Horloge simulée : chaque lecture avance de 4 s → le budget de 30 s est
+  // atteint après quelques items, les autres restent pending.
+  let clock = 0;
+  const now = () => { clock += 4_000; return clock; };
+  const result = await withPacklinkResponse([packlinkService(5, 8, 1)], () =>
+    runCampaignBatch(db.client(), TENANT_ROW, { itemsPerTick: 40, timeBudgetMs: 30_000, now }));
+
+  const stored = db.tables.shipping_simulation_campaign_items as unknown as ShippingSimulationCampaignItemRow[];
+  expect(result.processed).toBeGreaterThan(0);
+  expect(result.processed).toBeLessThan(10);
+  expect(result.failed).toBe(0);
+  expect(stored.filter((i) => i.status === 'pending')).toHaveLength(10 - result.processed);
+  expect(stored.some((i) => i.status === 'running')).toBe(false);
+});

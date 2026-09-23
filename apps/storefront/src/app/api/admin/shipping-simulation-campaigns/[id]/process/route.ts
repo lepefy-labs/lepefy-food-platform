@@ -10,10 +10,10 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const MANUAL_TICK_COOLDOWN_MS = 10_000;
-// Un admin qui clique "Traiter maintenant" attend le résultat et peut
-// absorber un tick plus long que le cron silencieux (8 par défaut) — reste
-// sous le budget maxDuration=60s même si Packlink répond lentement.
-const MANUAL_ITEMS_PER_TICK = 20;
+// Même lot que le scheduler (40 max) : le budget temps de runCampaignBatch
+// (TICK_TIME_BUDGET_MS) garde l'appel sous maxDuration=60s même si
+// Packlink répond lentement.
+const MANUAL_ITEMS_PER_TICK = 40;
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';

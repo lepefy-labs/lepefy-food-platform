@@ -13,20 +13,23 @@ import { isDataOutcomeError, isKnownRejectedDestination } from './campaignOutcom
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-const DEFAULT_ITEMS_PER_TICK = 8;
-const WORKER_COUNT = 2;
+// Lot par tick : jusqu'40 scénarios, 3 appels Packlink simultanés, et un
+// budget de 30 s au-delà duquel aucun nouvel item n'est réclamé (les items
+// non réclamés restent pending pour le tick suivant). Un appel Packlink a un
+// timeout de 20 s : un tick reste sous ~50 s, en deçà du timeout HTTP n8n
+// (55 s) et de maxDuration Vercel (60 s).
+const DEFAULT_ITEMS_PER_TICK = 40;
+const WORKER_COUNT = 3;
+export const TICK_TIME_BUDGET_MS = 30_000;
 const DEFAULT_FRESHNESS_WINDOW_DAYS = 30;
 const STALE_RUNNING_ITEM_MS = 10 * 60 * 1000;
 
 /**
- * Traite un lot borné d'éléments de campagne "pending" pour le tenant, en
- * réutilisant le motif éprouvé de shippingSyncBatch.ts (2 workers bornés
- * puisant dans une file partagée). Appelé par un tick cron
- * (/api/internal/shipping-campaign-worker, toujours avec le lot par défaut
- * — 8, conservateur car non supervisé) ou par le déclenchement manuel admin
- * "Traiter maintenant" (/api/admin/shipping-simulation-campaigns/:id/process,
- * qui peut passer un lot plus large : un admin qui clique et attend peut
- * absorber un tick plus long, contrairement au cron silencieux). Chaque
+ * Traite un lot borné d'éléments de campagne "pending" pour le tenant
+ * (workers bornés puisant dans une file partagée, cf. shippingSyncBatch.ts).
+ * Appelé par le scheduler (/api/internal/shipping-campaign-worker) ou par
+ * « Traiter maintenant » (/api/admin/shipping-simulation-campaigns/:id/process).
+ * Le lot est borné en nombre ET en temps (TICK_TIME_BUDGET_MS). Chaque
  * campagne reste reprenable quel que soit le déclencheur.
  */
 /**
@@ -48,8 +51,11 @@ export interface CampaignBatchResult {
 export async function runCampaignBatch(
   supabase: ServiceClient,
   tenant: Tenant,
-  options?: { campaignId?: string; itemsPerTick?: number },
+  options?: { campaignId?: string; itemsPerTick?: number; timeBudgetMs?: number; now?: () => number },
 ): Promise<CampaignBatchResult> {
+  const now = options?.now ?? Date.now;
+  const startedAt = now();
+  const timeBudgetMs = options?.timeBudgetMs ?? TICK_TIME_BUDGET_MS;
   if (tenant.shipping_provider !== 'packlink') {
     return { processed: 0, succeeded: 0, failed: 0, skipped: 0, rejected: 0 };
   }
@@ -129,6 +135,8 @@ export async function runCampaignBatch(
   let index = 0;
   async function worker() {
     while (index < items.length) {
+      // Budget épuisé : ne plus réclamer d'item, ils restent pending.
+      if (now() - startedAt >= timeBudgetMs) break;
       const item = items[index++];
       if (!item) break;
 
