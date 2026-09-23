@@ -1,11 +1,18 @@
 'use client';
 
 import type { Order, OrderItem } from '@lepefy/types';
+import { groupSuggestedCartons, type CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 
 interface Props {
   order: Order;
   items: OrderItem[];
   currency: string;
+  cartonSuggestion?: CartonSuggestion | null;
+  missingWeightLines?: number;
+}
+
+function kg(weightG: number) {
+  return `${(weightG / 1000).toLocaleString('it-IT', { maximumFractionDigits: 2 })} kg`;
 }
 
 // Storage badge config — text only, no colour (prints cleanly on B&W)
@@ -15,7 +22,7 @@ const STORAGE_BADGE: Record<string, string> = {
   dry:    '[ SECCO ]',
 };
 
-export default function PickingList({ order, items, currency }: Props) {
+export default function PickingList({ order, items, currency, cartonSuggestion = null, missingWeightLines = 0 }: Props) {
   const date = new Date(order.created_at).toLocaleDateString('it-IT', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
@@ -64,6 +71,31 @@ export default function PickingList({ order, items, currency }: Props) {
         </div>
 
         <hr className="pl-divider" />
+
+        {/* Carton suggerito — aiuto alla preparazione, nessun effetto sul prezzo */}
+        {!isPickup && cartonSuggestion && (
+          <div className="pl-cartons">
+            <div className="pl-cartons-title">IMBALLO SUGGERITO</div>
+            {groupSuggestedCartons(cartonSuggestion).map((group) => (
+              <div key={group.carton?.id ?? 'none'} className="pl-carton-line">
+                <span className="pl-checkbox">□</span>{' '}
+                {group.carton
+                  ? <><strong>{group.count} × {group.carton.name}</strong> — {group.carton.box_length_cm} × {group.carton.box_width_cm} × {group.carton.box_height_cm} cm — {group.weightsG.map(kg).join(' + ')}</>
+                  : <>{group.count} collo/i ({group.weightsG.map(kg).join(' + ')}): nessun cartone configurato per questo peso</>}
+              </div>
+            ))}
+            {(() => {
+              const alternatives = Array.from(new Map(cartonSuggestion.parcels.flatMap((p) => p.alternatives).map((c) => [c.id, c])).values());
+              return alternatives.length > 0 && (
+                <div className="pl-carton-note">Se voluminoso: {alternatives.map((c) => `${c.name} (${c.box_length_cm} × ${c.box_width_cm} × ${c.box_height_cm} cm)`).join(', ')}</div>
+              );
+            })()}
+            <div className="pl-carton-note">
+              Peso totale {kg(cartonSuggestion.totalWeightG)}
+              {missingWeightLines > 0 && ` · ${missingWeightLines} righe senza peso: verificare`}
+            </div>
+          </div>
+        )}
 
         {/* Items table */}
         <table className="pl-table">

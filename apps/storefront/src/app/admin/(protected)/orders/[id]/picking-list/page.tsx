@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import PickingList from '../../../../orders/[id]/PickingList';
 import AutoPrint from '../../AutoPrint';
+import { loadCartonSuggestion } from '@/lib/shipping/loadCartonSuggestion';
 import type { Order, OrderItem } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -44,10 +45,15 @@ export default async function PickingListPage({ params }: PageProps) {
     return la.localeCompare(lb);
   });
 
+  const checkoutWeightG = (order.shipping_details as { totalWeightG?: number } | null)?.totalWeightG;
+  const { suggestion: cartonSuggestion, missingWeightLines } = order.fulfillment_type !== 'pickup' && order.status !== 'cancelled'
+    ? await loadCartonSuggestion(supabase, tenant.id, items, checkoutWeightG)
+    : { suggestion: null, missingWeightLines: 0 };
+
   return (
     <>
       <AutoPrint />
-      <PickingList order={order} items={items} currency={tenant.currency} />
+      <PickingList order={order} items={items} currency={tenant.currency} cartonSuggestion={cartonSuggestion} missingWeightLines={missingWeightLines} />
     </>
   );
 }
