@@ -30,7 +30,7 @@ export default async function AdminShippingHistoryPage() {
 
       <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
         <p className="text-xs text-gray-400 mb-3">
-          Un échantillon = un scénario mesuré (CAP × poids × colis), valorisé par le service éligible au coût base + taxes le plus bas de son devis le plus récent. Ce sont des devis Packlink, pas des factures.
+          Un échantillon = un scénario mesuré (CAP × poids × colis), valorisé par le service éligible au coût base + taxes le plus bas de son devis le plus récent. Ce sont des devis Packlink hors TVA (Packlink ne renvoie pas de taxe ; le checkout ajoute la TVA du pays), pas des factures.
           {summary.truncated && <> Volume maximal lu atteint : agrégats partiels.</>}
         </p>
         {summary.groups.length === 0 ? (
@@ -42,8 +42,8 @@ export default async function AdminShippingHistoryPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
-                  <th className="py-2 pr-3">Destination</th><th className="py-2 pr-3">Profil</th><th className="py-2 pr-3">Coût médian</th>
-                  <th className="py-2 pr-3">Plage</th><th className="py-2 pr-3" title="Scénarios distincts mesurés (dernier devis valide de chacun) — les offres alternatives d'un même devis ne comptent pas">Scénarios</th><th className="py-2 pr-3">CAP</th><th className="py-2 pr-3">Confiance</th><th className="py-2 pr-3">Dernière observation</th>
+                  <th className="py-2 pr-3">Destination</th><th className="py-2 pr-3">Profil</th><th className="py-2 pr-3" title="Devis Packlink hors TVA (Packlink ne renvoie pas de taxe ; le checkout ajoute la TVA du pays)">Coût médian HT</th>
+                  <th className="py-2 pr-3">Plage HT</th><th className="py-2 pr-3" title="Scénarios distincts mesurés (dernier devis valide de chacun) — les offres alternatives d'un même devis ne comptent pas">Scénarios</th><th className="py-2 pr-3">CAP</th><th className="py-2 pr-3">Confiance</th><th className="py-2 pr-3">Dernière observation</th>
                 </tr>
               </thead>
               <tbody>

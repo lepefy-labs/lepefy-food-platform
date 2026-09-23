@@ -10,7 +10,40 @@ export interface BacktestRow {
 
 export type ScenarioBacktestObservation = Pick<ShippingQuoteObservationRow,
   | 'id' | 'request_hash' | 'observed_at' | 'eligible' | 'total_provider_cost' | 'total_weight_g'
-  | 'destination_zone_code' | 'destination_country' | 'destination_postal_code' | 'num_parcels'>;
+  | 'destination_zone_code' | 'destination_country' | 'destination_postal_code' | 'num_parcels'>
+  & Partial<Pick<ShippingQuoteObservationRow, 'tax_price'>>;
+
+/**
+ * Base de comparaison : les brouillons sont des prix CLIENT TTC. Packlink
+ * renvoie tax_price = 0 (devis HT) et le checkout ajoute la TVA du pays
+ * (shipping_vat_rates) : le coût comparé doit donc être le devis TTC, sinon la
+ * marge est surestimée d'environ le taux de TVA.
+ */
+export function providerCostTtc(costExclOrInclTax: number, taxPrice: number | null | undefined, vatRate: number): number {
+  if (taxPrice != null && Number(taxPrice) > 0) return parseFloat(Number(costExclOrInclTax).toFixed(2));
+  return parseFloat((Number(costExclOrInclTax) * (1 + vatRate)).toFixed(2));
+}
+
+/**
+ * Commandes réelles : packlinkCost est HT, vatAmount la TVA appliquée au
+ * checkout. Filtrées sur le pays du brouillon (un forfait Italie ne se
+ * compare pas à une commande belge).
+ */
+export function orderBacktestRows(
+  orders: Array<{ shipping_details: Record<string, unknown> | null; shipping_address?: Record<string, unknown> | null }>,
+  country: string,
+): BacktestRow[] {
+  return orders
+    .filter((o) => String(o.shipping_address?.country ?? '').toUpperCase() === country.toUpperCase())
+    .map((o) => o.shipping_details)
+    .filter((d): d is Record<string, unknown> => d !== null && typeof d.packlinkCost === 'number' && typeof d.totalWeightG === 'number')
+    .map((d) => ({
+      providerCost: parseFloat(((d.packlinkCost as number) + (typeof d.vatAmount === 'number' ? d.vatAmount : 0)).toFixed(2)),
+      weightKg: (d.totalWeightG as number) / 1000,
+      zoneCode: null,
+      numParcels: typeof d.numParcels === 'number' ? d.numParcels : 1,
+    }));
+}
 
 export interface ScenarioSampleStats {
   /** Lignes d'offres provider lues (alternatives comprises). */
@@ -41,6 +74,8 @@ export function buildScenarioBacktestSample(
   rows: ScenarioBacktestObservation[],
   /** Zone recalculée depuis le CAP (zones tenant) ; à défaut, la zone stockée. */
   resolveZone?: (country: string, postalCode: string) => string | null,
+  /** Taux de TVA du pays de destination, ajouté quand Packlink ne renvoie pas de taxe. */
+  vatRateFor?: (country: string) => number,
 ): { rows: BacktestRow[]; stats: ScenarioSampleStats } {
   const perScenario = latestValidPerScenario(rows);
   const executions = new Set(rows.map((r) => `${r.request_hash}@${new Date(r.observed_at).toISOString()}`)).size;
@@ -59,7 +94,9 @@ export function buildScenarioBacktestSample(
     if (zoneCode) zones.add(zoneCode);
     countries.add(chosen.destination_country);
     return {
-      providerCost: Number(chosen.total_provider_cost),
+      providerCost: vatRateFor
+        ? providerCostTtc(Number(chosen.total_provider_cost), chosen.tax_price, vatRateFor(chosen.destination_country))
+        : Number(chosen.total_provider_cost),
       weightKg: chosen.total_weight_g / 1000,
       zoneCode,
       numParcels: chosen.num_parcels,
@@ -114,7 +151,10 @@ export interface BacktestMetrics {
   p95ProviderCost: number | null;
   avgMargin: number | null;
   negativeMarginPct: number | null;
+  /** Perte la plus forte (≤ 0) ; 0 si aucun cas à perte. */
   maxLoss: number | null;
+  /** Marge la plus faible observée (peut être positive). */
+  minMargin: number | null;
   aggregateMargin: number | null;
 }
 
@@ -174,7 +214,7 @@ export function backtestTariff(
   if (sampleSize === 0) {
     return {
       sampleSize: 0, avgProviderCost: null, medianProviderCost: null, p90ProviderCost: null,
-      p95ProviderCost: null, avgMargin: null, negativeMarginPct: null, maxLoss: null, aggregateMargin: null,
+      p95ProviderCost: null, avgMargin: null, negativeMarginPct: null, maxLoss: null, minMargin: null, aggregateMargin: null,
     };
   }
 
@@ -190,7 +230,8 @@ export function backtestTariff(
     p95ProviderCost: parseFloat(percentile(costsSorted, 95).toFixed(2)),
     avgMargin: parseFloat((margins.reduce((s, m) => s + m, 0) / sampleSize).toFixed(2)),
     negativeMarginPct: parseFloat(((negativeCount / sampleSize) * 100).toFixed(1)),
-    maxLoss: parseFloat(Math.min(...margins).toFixed(2)),
+    maxLoss: parseFloat(Math.min(0, ...margins).toFixed(2)),
+    minMargin: parseFloat(Math.min(...margins).toFixed(2)),
     aggregateMargin: parseFloat(margins.reduce((s, m) => s + m, 0).toFixed(2)),
   };
 }

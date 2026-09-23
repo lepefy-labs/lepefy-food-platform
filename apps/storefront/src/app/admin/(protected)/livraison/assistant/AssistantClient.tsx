@@ -125,7 +125,7 @@ export function AssistantClient() {
                         <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${CONFIDENCE_CLS[c.confidence] ?? ''}`}>{CONFIDENCE_LABEL[c.confidence] ?? c.confidence}</span>
                       </div>
                       <div className="text-right shrink-0 pl-2">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{c.medianCost.toFixed(2)} €</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{c.medianCost.toFixed(2)} € HT</span>
                         <span className="text-gray-400"> ({c.minCost.toFixed(2)}–{c.maxCost.toFixed(2)})</span>
                         <span className="text-gray-400"> · {c.sampleSize} scén.</span>
                       </div>

@@ -8,7 +8,7 @@ import { runCampaignBatch } from '../../src/lib/shipping/intelligence/runCampaig
 import { classifyCampaignItem, computeCampaignCoverage, needsResample } from '../../src/lib/shipping/intelligence/campaignCoverage';
 import { fetchCampaignItems, loadCampaignCoverage } from '../../src/lib/shipping/intelligence/campaignData';
 import { fetchAllPages } from '../../src/lib/shipping/intelligence/pagedQuery';
-import { buildScenarioBacktestSample, assessScenarioReliability, backtestTariff } from '../../src/lib/shipping/intelligence/tariffBacktest';
+import { buildScenarioBacktestSample, assessScenarioReliability, backtestTariff, orderBacktestRows, providerCostTtc } from '../../src/lib/shipping/intelligence/tariffBacktest';
 import { summarizeObservations } from '../../src/lib/shipping/intelligence/observationsSummary';
 import { groupByAdministration, resolveAdministrativeGroup, type PostalAdminRow } from '../../src/lib/shipping/intelligence/postalCityLookup';
 import { deepAnalysisWeights, initialCoverageWeights } from '../../src/lib/shipping/intelligence/weightPresets';
@@ -639,4 +639,27 @@ test('the backtest applies zone surcharges from the CAP even when the stored zon
   expect(metrics.avgMargin).toBe(1);
   expect(assessScenarioReliability({ scenarios: 60, postalCodes: 6, topPostalCodeShare: 0.2, zones: 3 })).toBe('indicative');
   expect(assessScenarioReliability({ scenarios: 60, postalCodes: 6, topPostalCodeShare: 0.2, zones: 2 })).toBe('limited');
+});
+
+// ─── Rétrotest : base TTC et pays ──────────────────────────────────────────
+
+test('the backtest compares customer TTC prices with Packlink quotes plus VAT, for the draft country only', () => {
+  // Packlink renvoie des devis HT (tax_price = 0) : la TVA du pays est ajoutée.
+  expect(providerCostTtc(7.89, 0, 0.22)).toBe(9.63);
+  // Si Packlink renvoyait la taxe, le total est déjà TTC.
+  expect(providerCostTtc(9.63, 1.74, 0.22)).toBe(9.63);
+
+  const request = buildScenarioRequest({ weightKg: 10, profile: PROFILE, destination: { country: 'IT', postalCode: '40131' } });
+  const sample = buildScenarioBacktestSample([observationFor(request, { total_provider_cost: 7.89, tax_price: 0 })], undefined, () => 0.22);
+  expect(sample.rows[0]?.providerCost).toBe(9.63);
+  const metrics = backtestTariff([{ minKg: 0, maxKg: 15, price: 8.9 }], {}, null, sample.rows);
+  expect(metrics.avgMargin).toBe(-0.73); // marge HT apparente +1,01 → réellement à perte en TTC
+  expect(metrics.maxLoss).toBe(-0.73);
+  expect(backtestTariff([{ minKg: 0, maxKg: 15, price: 10.9 }], {}, null, sample.rows)).toMatchObject({ maxLoss: 0, minMargin: 1.27 });
+
+  const orders = orderBacktestRows([
+    { shipping_details: { packlinkCost: 5.42, vatAmount: 1.19, totalWeightG: 2100, numParcels: 1 }, shipping_address: { country: 'IT' } },
+    { shipping_details: { packlinkCost: 10.44, vatAmount: 2.3, totalWeightG: 900, numParcels: 1 }, shipping_address: { country: 'BE' } },
+  ], 'IT');
+  expect(orders).toEqual([{ providerCost: 6.61, weightKg: 2.1, zoneCode: null, numParcels: 1 }]);
 });

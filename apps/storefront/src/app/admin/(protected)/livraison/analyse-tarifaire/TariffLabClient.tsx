@@ -11,7 +11,7 @@ const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
 interface BacktestMetrics {
   sampleSize: number; avgProviderCost: number | null; medianProviderCost: number | null;
   p90ProviderCost: number | null; p95ProviderCost: number | null; avgMargin: number | null;
-  negativeMarginPct: number | null; maxLoss: number | null; aggregateMargin: number | null;
+  negativeMarginPct: number | null; maxLoss: number | null; minMargin?: number | null; aggregateMargin: number | null;
 }
 
 interface ScenarioSample {
@@ -75,6 +75,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       setDrafts((prev) => [data as ShippingTariffDraftRow, ...prev]);
       setSelectedId((data as ShippingTariffDraftRow).id);
+      void handleSimulate((data as ShippingTariffDraftRow).id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde.');
     } finally {
@@ -86,7 +87,11 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     setSimulating(true);
     setResults(null);
     try {
-      const res = await fetch(`/api/admin/shipping-tariff-drafts/${draftId}/simulate`, { method: 'POST' });
+      const res = await fetch(`/api/admin/shipping-tariff-drafts/${draftId}/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country: 'IT' }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? 'Erreur');
       setResults(data);
@@ -102,7 +107,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     // une commande, et un devis Packlink n'est pas une facture payée.
     const unit = population === 'scenario' ? 'scénario' : 'commande';
     const unitPlural = population === 'scenario' ? 'scénarios' : 'commandes';
-    const costLabel = population === 'scenario' ? 'Devis Packlink moyen' : 'Devis Packlink moyen (à la commande)';
+    const costLabel = population === 'scenario' ? 'Devis Packlink moyen TTC' : 'Devis Packlink TTC moyen (à la commande)';
     return (
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label} <span className="normal-case font-normal text-gray-400">(n = {metrics.sampleSize} {metrics.sampleSize > 1 ? unitPlural : unit})</span></h3>
@@ -119,7 +124,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
             <div><p className="text-2xs text-gray-400" title={`95 % des ${unitPlural} ont un devis inférieur à ce montant`}>P95 (cas très cher, 1 sur 20)</p><p className="font-medium">{metrics.p95ProviderCost?.toFixed(2)} €</p></div>
             <div><p className="text-2xs text-gray-400" title="Prix client (bandes ci-dessus) moins devis Packlink, en moyenne">Marge moyenne</p><p className={`font-medium ${((metrics.avgMargin ?? 0) < 0) ? 'text-red-600' : 'text-green-600'}`}>{metrics.avgMargin?.toFixed(2)} €</p></div>
             <div><p className="text-2xs text-gray-400" title={population === 'scenario' ? 'Part des scénarios de la grille synthétique où ce forfait serait inférieur au devis — pas une part de vos commandes réelles' : 'Part des commandes où ce forfait aurait été inférieur au devis Packlink enregistré'}>% de {unitPlural} à perte</p><p className="font-medium">{metrics.negativeMarginPct}%</p></div>
-            <div><p className="text-2xs text-gray-400" title={`La pire perte sur un(e) seul(e) ${unit} de cet échantillon`}>Pire perte (1 {unit})</p><p className="font-medium text-red-600">{metrics.maxLoss?.toFixed(2)} €</p></div>
+            <div><p className="text-2xs text-gray-400" title={`La plus faible marge sur un(e) seul(e) ${unit} de cet échantillon ; négative = perte`}>Marge minimale (1 {unit})</p><p className={`font-medium ${((metrics.minMargin ?? metrics.maxLoss ?? 0) < 0) ? 'text-red-600' : 'text-green-600'}`}>{(metrics.minMargin ?? metrics.maxLoss)?.toFixed(2)} €</p></div>
             <div><p className="text-2xs text-gray-400" title={population === 'scenario' ? 'Somme des marges sur les scénarios mesurés — dépend de la grille testée, pas un résultat financier' : 'Somme des marges si ce forfait avait été appliqué à ces commandes'}>Marge cumulée sur l&apos;échantillon</p><p className="font-medium">{metrics.aggregateMargin?.toFixed(2)} €</p></div>
           </div>
         )}
@@ -234,6 +239,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
           )}
           <p className="text-xs text-gray-400">
             Les deux populations ne sont jamais moyennées ensemble : les scénarios synthétiques disent « que se passerait-il sur la gamme de poids/destinations mesurée », les commandes réelles disent « qu&apos;est-ce que cela aurait changé sur ce que vous avez réellement vendu ».
+            {' '}Base de comparaison : prix client TTC contre devis Packlink TTC (TVA du pays ajoutée, Packlink renvoyant des devis HT), Italie uniquement ; les frais d&apos;emballage par colis ne sont pas inclus.
             {' '}Coûts finaux d&apos;expédition vérifiés disponibles : {results.verifiedShipmentCosts ?? 0} — aucun résultat ci-dessus ne représente une facture Packlink payée.
           </p>
         </section>

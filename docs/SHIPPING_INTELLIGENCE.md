@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@507542255895a228bb8e52796ab59f5a6edc3e24`
+> **Base codice verificata:** `main@8fb8563a897b701d37bf3c609d7647a5919c1c13`
 > **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
@@ -531,6 +531,8 @@ spareggio: base_price, poi id servizio
 
 Un servizio non eleggibile non viene mai scelto, anche se più economico. Il costo operativo è un **preventivo**, non il costo finale di una spedizione acquistata.
 
+**IVA:** Packlink restituisce `tax_price = 0` (verificato: 0 osservazioni su 43.141 con taxe > 0): `total_provider_cost` è quindi di fatto **HT**. Il checkout aggiunge la TVA del paese (`shipping_vat_rates`). Historique e Assistant mostrano i costi con l'indicazione «HT»; il rétrotest li converte in TTC (§18.4).
+
 ### 12.1 Esiti espliciti
 
 | Esito | Offerte persistite | Item | Conta come |
@@ -836,6 +838,8 @@ scenarioWeighted   + scenarioSample
 orderWeighted      + orderSample
 verifiedShipmentCosts (conteggio real_shipment)
 ```
+
+**Base TTC e paese.** I brouillons sono prezzi cliente TTC: il costo confrontato è il devis Packlink **TTC** — `providerCostTtc`: TVA del paese di destinazione da `shipping_vat_rates` aggiunta quando Packlink non restituisce la taxe — e per gli ordini `packlinkCost + vatAmount` (`orderBacktestRows`). Scenari e ordini sono filtrati sul paese del rétrotest (body `{ country }`, default `IT`; la UI invia IT). I frais d'emballage par colis (`packaging_surcharges`) non sono inclusi nel confronto. Metriche: `maxLoss` = perdita più forte (≤ 0, 0 se nessuna), `minMargin` = margine più basso (mostrato in UI come «Marge minimale»). «Enregistrer et rétrotester» lancia ora davvero il rétrotest dopo il salvataggio.
 
 `scenarioWeighted` usa **un'osservazione operativa per scenario misurato** (ultima quotazione valida, §14) tra le osservazioni `synthetic_simulation`. `buildScenarioBacktestSample()` restituisce anche:
 
