@@ -682,6 +682,12 @@ test('per-parcel pricing: first parcel at its band, extra parcels at their band 
   // Surcharge de zone : une fois par commande.
   expect(applyTariffDraft(TENANT_BANDS, { IT_SICILY: 1 }, pct, { weightKg: 20, zoneCode: 'IT_SICILY', numParcels: 2 })).toBe(18.75);
 
+  // Surcharge par colis : 2 € × 2 colis.
+  expect(applyTariffDraft(TENANT_BANDS, { IT_SICILY: 2 }, { ...pct, zoneSurchargeMode: 'per_parcel' }, { weightKg: 20, zoneCode: 'IT_SICILY', numParcels: 2 })).toBe(21.75);
+  expect(applyTariffDraft(TENANT_BANDS, { IT_SICILY: 2 }, { type: 'weight_bands_whole_order', zoneSurchargeMode: 'per_parcel' }, { weightKg: 12, zoneCode: 'IT_SICILY', numParcels: 1 })).toBe(14.5);
+  expect(validateMultiParcelStrategy({ type: 'weight_bands_whole_order', zoneSurchargeMode: 'per_parcel' })).toEqual({ type: 'weight_bands_whole_order', zoneSurchargeMode: 'per_parcel' });
+  expect(validateMultiParcelStrategy({ type: 'weight_bands_whole_order', zoneSurchargeMode: 'weekly' })).toBe('invalid');
+
   const fixed = { type: 'first_parcel_plus_discounted' as const, discountedParcelRate: 6.25, parcelMaxKg: 15 };
   expect(applyTariffDraft(TENANT_BANDS, {}, fixed, { weightKg: 20, zoneCode: null, numParcels: 2 })).toBe(18.75);
   // Sans stratégie, une bande manquante au-delà de 15 kg reste « hors bandes ».

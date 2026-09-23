@@ -192,7 +192,8 @@ function bandPrice(sortedBands: ShippingTariffBand[], weightKg: number): number 
  * de tarif. Bandes triées par minKg ; maxKg = null → pas de plafond.
  * Stratégies « 1er colis + … » avec parcelMaxKg : calcul colis par colis
  * (colis remplis jusqu'à parcelMaxKg, le 1er au prix de sa bande). La
- * surcharge de zone s'applique une fois par commande.
+ * surcharge de zone s'applique une fois par commande, ou à chaque colis si
+ * zoneSurchargeMode = 'per_parcel'.
  * Ne modifie jamais rien en checkout — appelé uniquement par le laboratoire.
  */
 export function applyTariffDraft(
@@ -202,8 +203,9 @@ export function applyTariffDraft(
   input: { weightKg: number; zoneCode: string | null; numParcels: number },
 ): number | null {
   const sorted = [...bands].sort((a, b) => a.minKg - b.minKg);
-  const surcharge = input.zoneCode ? zoneSurcharges[input.zoneCode] ?? 0 : 0;
+  const zoneAmount = input.zoneCode ? zoneSurcharges[input.zoneCode] ?? 0 : 0;
   const strategy = multiParcelStrategy;
+  const perParcelSurcharge = strategy?.zoneSurchargeMode === 'per_parcel';
 
   if (strategy && (strategy.type === 'first_parcel_plus_percentage' || strategy.type === 'first_parcel_plus_discounted') && strategy.parcelMaxKg) {
     const parcels = splitParcelsFilled(input.weightKg, strategy.parcelMaxKg);
@@ -219,12 +221,12 @@ export function applyTariffDraft(
         price += parcelPrice * (1 - Math.min(Math.max(strategy.percentageDiscount ?? 0, 0), 100) / 100);
       }
     }
-    return parseFloat((price + surcharge).toFixed(2));
+    return parseFloat((price + zoneAmount * (perParcelSurcharge ? parcels.length : 1)).toFixed(2));
   }
 
   const whole = bandPrice(sorted, input.weightKg);
   if (whole === null) return null;
-  let price = whole + surcharge;
+  let price = whole + zoneAmount * (perParcelSurcharge ? Math.max(1, input.numParcels) : 1);
 
   if (input.numParcels > 1 && strategy) {
     if (strategy.type === 'first_parcel_plus_discounted') {
@@ -246,23 +248,25 @@ export function validateMultiParcelStrategy(raw: unknown): ShippingMultiParcelSt
   const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v));
   const parcelMaxKg = num(r.parcelMaxKg);
   if (parcelMaxKg !== undefined && (!Number.isFinite(parcelMaxKg) || parcelMaxKg <= 0 || parcelMaxKg > 100)) return 'invalid';
+  if (r.zoneSurchargeMode !== undefined && r.zoneSurchargeMode !== 'per_order' && r.zoneSurchargeMode !== 'per_parcel') return 'invalid';
+  const mode = r.zoneSurchargeMode === 'per_parcel' ? { zoneSurchargeMode: 'per_parcel' as const } : {};
   switch (r.type) {
     case 'weight_bands_whole_order':
-      return { type: 'weight_bands_whole_order' };
+      return { type: 'weight_bands_whole_order', ...mode };
     case 'first_parcel_plus_percentage': {
       const pct = num(r.percentageDiscount);
       if (pct === undefined || !Number.isFinite(pct) || pct < 0 || pct > 100 || parcelMaxKg === undefined) return 'invalid';
-      return { type: 'first_parcel_plus_percentage', percentageDiscount: pct, parcelMaxKg };
+      return { type: 'first_parcel_plus_percentage', percentageDiscount: pct, parcelMaxKg, ...mode };
     }
     case 'first_parcel_plus_discounted': {
       const rate = num(r.discountedParcelRate);
       if (rate === undefined || !Number.isFinite(rate) || rate < 0) return 'invalid';
-      return { type: 'first_parcel_plus_discounted', discountedParcelRate: rate, ...(parcelMaxKg !== undefined ? { parcelMaxKg } : {}) };
+      return { type: 'first_parcel_plus_discounted', discountedParcelRate: rate, ...(parcelMaxKg !== undefined ? { parcelMaxKg } : {}), ...mode };
     }
     case 'flat_multi_parcel_rate': {
       const flat = num(r.flatMultiParcelRate);
       if (flat === undefined || !Number.isFinite(flat) || flat < 0) return 'invalid';
-      return { type: 'flat_multi_parcel_rate', flatMultiParcelRate: flat };
+      return { type: 'flat_multi_parcel_rate', flatMultiParcelRate: flat, ...mode };
     }
     default:
       return 'invalid';

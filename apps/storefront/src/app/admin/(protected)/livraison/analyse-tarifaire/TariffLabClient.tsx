@@ -83,6 +83,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
   const [fixedParcelRate, setFixedParcelRate] = useState(6.25);
   const [flatRate, setFlatRate] = useState(18);
   const [parcelMaxKg, setParcelMaxKg] = useState(15);
+  const [zoneSurchargeMode, setZoneSurchargeMode] = useState<'per_order' | 'per_parcel'>('per_order');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simulating, setSimulating] = useState(false);
@@ -98,11 +99,12 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
   }
 
   function buildStrategy(): ShippingMultiParcelStrategy | null {
+    const mode = zoneSurchargeMode === 'per_parcel' ? { zoneSurchargeMode } : {};
     switch (strategyType) {
-      case 'first_parcel_plus_percentage': return { type: strategyType, percentageDiscount, parcelMaxKg };
-      case 'first_parcel_plus_discounted': return { type: strategyType, discountedParcelRate: fixedParcelRate, parcelMaxKg };
-      case 'flat_multi_parcel_rate': return { type: strategyType, flatMultiParcelRate: flatRate };
-      default: return null;
+      case 'first_parcel_plus_percentage': return { type: strategyType, percentageDiscount, parcelMaxKg, ...mode };
+      case 'first_parcel_plus_discounted': return { type: strategyType, discountedParcelRate: fixedParcelRate, parcelMaxKg, ...mode };
+      case 'flat_multi_parcel_rate': return { type: strategyType, flatMultiParcelRate: flatRate, ...mode };
+      default: return zoneSurchargeMode === 'per_parcel' ? { type: 'weight_bands_whole_order', ...mode } : null;
     }
   }
 
@@ -124,7 +126,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     });
     // buildStrategy/parseZoneSurcharges lisent l'état ci-dessous.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bands, zoneSurchargesText, strategyType, percentageDiscount, fixedParcelRate, flatRate, parcelMaxKg]);
+  }, [bands, zoneSurchargesText, strategyType, percentageDiscount, fixedParcelRate, flatRate, parcelMaxKg, zoneSurchargeMode]);
 
   function loadDraft(draft: ShippingTariffDraftRow) {
     setSelectedId(draft.id);
@@ -137,6 +139,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     if (strategy?.discountedParcelRate != null) setFixedParcelRate(strategy.discountedParcelRate);
     if (strategy?.flatMultiParcelRate != null) setFlatRate(strategy.flatMultiParcelRate);
     if (strategy?.parcelMaxKg != null) setParcelMaxKg(strategy.parcelMaxKg);
+    setZoneSurchargeMode(strategy?.zoneSurchargeMode ?? 'per_order');
     void handleSimulate(draft.id);
   }
 
@@ -388,8 +391,14 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
         <div className="mb-4">
           <label className={LABEL_CLS}>Surcharges de zone (code=montant, séparés par des virgules)</label>
-          <p className="text-xs text-gray-400 mb-2">Montant additionnel par commande pour une zone (îles, régions éloignées). Codes de zone : onglet « Tarification ».</p>
-          <input type="text" value={zoneSurchargesText} onChange={(e) => setZoneSurchargesText(e.target.value)} className={INPUT_CLS} placeholder="IT_SICILY=2" />
+          <p className="text-xs text-gray-400 mb-2">Montant additionnel pour une zone (îles, régions éloignées). Codes de zone : onglet « Tarification ».</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input type="text" value={zoneSurchargesText} onChange={(e) => setZoneSurchargesText(e.target.value)} className={INPUT_CLS} placeholder="IT_SICILY=2" />
+            <select value={zoneSurchargeMode} onChange={(e) => setZoneSurchargeMode(e.target.value as 'per_order' | 'per_parcel')} className={`${INPUT_CLS} sm:w-56`} aria-label="Application de la surcharge de zone">
+              <option value="per_order">Par commande</option>
+              <option value="per_parcel">Par colis</option>
+            </select>
+          </div>
         </div>
 
         <div className="mb-4 rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3">

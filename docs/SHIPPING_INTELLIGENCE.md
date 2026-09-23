@@ -822,7 +822,7 @@ IT_SICILY=2
 | `first_parcel_plus_discounted` | come sopra, ma ogni collo in più aggiunge `discountedParcelRate` (senza `parcelMaxKg`: comportamento storico, banda sul totale + importo × colli extra) |
 | `flat_multi_parcel_rate` | prezzo unico da 2 colli |
 
-La maggiorazione di zona si applica una volta per ordine. Esempio (proposta tenant 0–10 kg 10,50 €, 10–15 kg 12,50 €, −50 % sui colli in più, 15 kg/collo): 20 kg → 17,75 €, 30 kg → 18,75 €, 45 kg → 25,00 €. Il form mostra un'**anteprima dei prezzi cliente** (stesso motore `applyTariffDraft`) e cliccando una bozza esistente la ricopia nel form per testare una variante.
+La maggiorazione di zona si applica una volta per ordine (default) oppure **a ogni collo** (`zoneSurchargeMode = per_parcel`, selettore «Par commande / Par colis» accanto alle surcharges; salvato in `multi_parcel_strategy`, anche con la banda sul peso totale). Esempio (proposta tenant 0–10 kg 10,50 €, 10–15 kg 12,50 €, −50 % sui colli in più, 15 kg/collo): 20 kg → 17,75 €, 30 kg → 18,75 €, 45 kg → 25,00 €. Il form mostra un'**anteprima dei prezzi cliente** (stesso motore `applyTariffDraft`) e cliccando una bozza esistente la ricopia nel form per testare una variante.
 
 ### 18.4 Retrotest
 

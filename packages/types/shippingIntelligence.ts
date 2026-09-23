@@ -168,6 +168,8 @@ export interface ShippingMultiParcelStrategy {
   flatMultiParcelRate?: number;
   /** Poids max par colis pour le découpage (ex. 15). */
   parcelMaxKg?: number;
+  /** Surcharge de zone appliquée une fois par commande (défaut) ou à chaque colis. */
+  zoneSurchargeMode?: 'per_order' | 'per_parcel';
 }
 
 export interface ShippingTariffDraftRow {
