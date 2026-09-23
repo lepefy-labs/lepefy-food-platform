@@ -21,6 +21,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { calculateShipping } from '@/lib/shipping/calculateShipping';
+import { extraCustomsTerritory, extraCustomsUnavailableMessage } from '@/lib/shipping/extraCustomsTerritories';
 import { signQuote } from '@/lib/shipping/quoteToken';
 import { resolveCountryRule, applyCountryRule, type ShippingCountryRule } from '@/lib/shipping/resolveCountryRule';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
@@ -268,7 +269,13 @@ export async function POST(request: Request) {
         console.info('[shipping/quote] calculateShipping result:', JSON.stringify(result));
 
         if (!result.available) {
-          return NextResponse.json({ available: false, message: result.message });
+          // Zones extra-douanières (Livigno, Campione d'Italia) : Packlink ne
+          // propose aucun service. Même indisponibilité, message explicite.
+          const territory = result.reason === 'no_service' ? extraCustomsTerritory(to.country, to.zip_code) : null;
+          const message = territory
+            ? extraCustomsUnavailableMessage(territory, Boolean(tenant.click_collect_enabled))
+            : result.message;
+          return NextResponse.json({ available: false, message });
         }
 
         const applied = applyCountryRule(result.shippingTotal, cartSubtotal, rule);

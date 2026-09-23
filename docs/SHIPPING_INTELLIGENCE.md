@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@213bbc1968f9172728d55398da336f258d3ee413`
+> **Base codice verificata:** `main@507542255895a228bb8e52796ab59f5a6edc3e24`
 > **Ultima verifica:** 23 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration)
 >
@@ -1129,6 +1129,10 @@ Generare una campagna con stesso paese, CAP rappresentativi, pesi vicini, stesso
 ### Una città non restituisce CAP o propone più communes
 
 `ambiguous`: scegliere la commune corretta (provincia/dipartimento). `not_found`: usare il CAP manuale. Non inventare CAP nel codice o nel client.
+
+### Livigno / Campione d'Italia (IT_EXTRA_CUSTOMS)
+
+Packlink non restituisce alcun servizio verso 23041 (Livigno) e 22061 (Campione d'Italia) da origine 42122 (campagna e preventivo live verificati il 23/09/2026). Nel checkout la consegna resta non disponibile (nessun `quoteToken`, `/api/checkout` rifiuta l'ordine con consegna); `/api/shipping/quote` mostra un messaggio esplicito «Livraison indisponible vers … (zone extra-douanière)», con il ritiro in negozio proposto solo se `click_collect_enabled` (`lib/shipping/extraCustomsTerritories.ts`). Un eventuale `flat_rate_override` sul paese IT salterebbe la chiamata Packlink e renderebbe questi CAP «disponibili»: da escludere prima di attivarlo.
 
 ### La selezione supera 2000 scenari
 
