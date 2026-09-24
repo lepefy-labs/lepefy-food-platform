@@ -496,7 +496,7 @@ export function ForfaitShadowClient({
         )}
         {data.activationReady && (
           <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
-            <label htmlFor="fs-fallback" className={LABEL_CLS}>Si le forfait ne s&apos;applique pas (pays sans tarif actif, produit sans poids)</label>
+            <label htmlFor="fs-fallback" className={LABEL_CLS}>Si le forfait ne s&apos;applique pas (pays sans tarif actif, code postal hors zones, produit sans poids)</label>
             <select id="fs-fallback" value={fallback} disabled={busy !== null} onChange={(e) => void handleFallback(e.target.value as 'unavailable' | 'provider_cost')} className={`${INPUT_CLS} sm:max-w-md`}>
               <option value="unavailable">Livraison indisponible, retrait proposé (recommandé)</option>
               <option value="provider_cost">Facturer le devis provider actuel (Packlink + emballage)</option>

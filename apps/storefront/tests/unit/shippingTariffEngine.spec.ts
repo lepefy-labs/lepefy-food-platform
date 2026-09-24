@@ -219,3 +219,30 @@ test.describe('bozza → versione', () => {
     expect(buildVersionFromDraft(draft, { ...opts, blockPrice: null })).toMatchObject({ ok: false, errors: ['block_incomplete'] });
   });
 });
+
+test.describe('griglia a 3 fasce con blocchi da 15 kg (FR/BE/DE)', () => {
+  const FR: TariffSnapshot = {
+    ...CHLOEFOOD_TARIFF,
+    id: 'v-fr-1', country: 'FR', zoneSurcharges: [], nonDeliverableZones: [],
+    bands: [
+      { min_g_exclusive: 0, max_g_inclusive: 5000, price_cents: 1400 },
+      { min_g_exclusive: 5000, max_g_inclusive: 10000, price_cents: 1800 },
+      { min_g_exclusive: 10000, max_g_inclusive: 15000, price_cents: 2000 },
+    ],
+    blockWeightG: 15000, blockPriceCents: 2000, logisticsVerifiedMaxWeightG: 15000,
+  };
+  const fr = (g: number) => {
+    const r = priceFromTariff(FR, { weightG: g, country: 'FR', zoneCode: 'FR_MAINLAND' });
+    if (!r.available) throw new Error(r.reason);
+    return r;
+  };
+
+  test('fino a 15 kg la fascia, oltre blocchi da 15 kg + fascia del resto', () => {
+    expect(fr(15000).totalTtcCents).toBe(2000);
+    expect(fr(15001)).toMatchObject({ blocks: 1, remainderWeightG: 1, totalTtcCents: 2000 + 1400 });
+    expect(fr(20000).totalTtcCents).toBe(3400);
+    expect(fr(30000)).toMatchObject({ blocks: 2, band: null, totalTtcCents: 4000 });
+    expect(fr(40000).totalTtcCents).toBe(4000 + 1800);
+    expect(fr(20000).warnings).toEqual(['logistics_unverified_weight']);
+  });
+});

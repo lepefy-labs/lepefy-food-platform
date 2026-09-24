@@ -574,7 +574,7 @@ il forfait viene addebitato solo dopo l'azione esplicita «Activer cette tarific
 - `tenants.shipping_pricing_mode`: `provider_cost` (default) | `shadow` (V1F) | `tariff` (V1G). `tariff`
   si ottiene **solo** con l'attivazione di una versione (RPC atomica), mai con un PATCH diretto.
 - `tenants.shipping_tariff_fallback` (migration 125): cosa succede in modalità `tariff` quando la
-  tariffa non si applica (paese senza versione attiva, prodotto senza peso): `unavailable` (default,
+  tariffa non si applica (paese senza versione attiva, CAP fuori dalle zone, prodotto senza peso): `unavailable` (default,
   consegna non disponibile e ritiro proposto) oppure `provider_cost` (preventivo Packlink attuale).
   Mai implicito.
 - `tenants.shipping_public_grid_enabled` (migration 125, default `false`): pagina pubblica `/livraison`.
@@ -601,8 +601,11 @@ In modalità `tariff`, nell'ordine:
 2. versione `active` del paese (una `shadow` non è mai addebitata); assente → fallback configurato;
 3. prodotti del tenant e **peso netto** da `products.weight_grams` × quantità (il peso e il prezzo del
    browser sono ignorati); prodotto senza peso → fallback configurato, mai 400 g;
-4. zona tenant (`resolveZoneCodeFromRows`); CAP senza zona → non disponibile (una zona ignota non
-   riceve il prezzo «standard»: potrebbe essere un'isola); zona `non_deliverable` → non disponibile;
+4. zona tenant (`resolveZoneCodeFromRows`); CAP fuori da ogni zona → **non coperto dal forfait** e
+   segue il fallback del tenant (`zone_not_covered`: preventivo provider, oppure non disponibile). Una
+   zona ignota non riceve mai il prezzo «standard» (potrebbe essere un'isola). È così che si escludono
+   dal forfait aree come Corsica, oltremare e Monaco: la zona del paese copre solo i prefissi serviti.
+   Zona `non_deliverable` → non disponibile;
 5. `priceFromTariff` + regole paese nella stessa precedenza del live (tariffa → `flat_rate_override`
    → sconto → gratuità sul subtotale server). `packaging_surcharges` non è mai sommato. IVA una volta;
 6. **disponibilità logistica** (`checkTariffAvailability`), separata dal prezzo:
@@ -729,7 +732,7 @@ griglia = nuova bozza → nuova versione → nuova attivazione.
 |---|---|
 | «Activer» disabilitato | Migration 125 assente |
 | Attivazione rifiutata «par commande» | La versione ha maggiorazioni per ordine: correggere la versione o confermarle esplicitamente |
-| «Ce code postal n'est pas encore desservi» | CAP senza zona tenant: completare `shipping_zones` |
+| «La livraison en ligne n'est pas disponible vers ce code postal» | CAP fuori dalle zone del tenant con fallback `unavailable`: completare `shipping_zones` o scegliere il fallback provider |
 | «Les frais de livraison de certains articles…» | Prodotto senza peso con fallback `unavailable` |
 | «Impossible de confirmer la livraison…» | Packlink in errore senza evidenza recente del CAP, oppure oltre il limite logistico |
 | 409 `SHIPPING_REQUOTE_REQUIRED` frequenti | Tariffa cambiata, carrello o indirizzo modificati dopo il preventivo: comportamento voluto |

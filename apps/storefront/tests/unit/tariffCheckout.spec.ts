@@ -156,7 +156,7 @@ test.describe('computeTariffQuote — grille ChloeFood depuis la version active'
   test('zone non livrable par la version, zone non résolue, poids manquant, pays sans tarif', async () => {
     const db = makeDb({ shipping_zones: [...ZONES, { id: 'z9', tenant_id: T1, code: 'IT_EXTRA_CUSTOMS', country: 'IT', postal_prefixes: ['23030'], active: true, position: 9 }] });
     expect(await quote(db, kgOfRiz(1000), '23030')).toMatchObject({ kind: 'unavailable', reason: 'zone_not_deliverable' });
-    expect(await quote(db, kgOfRiz(1000), '42122')).toMatchObject({ kind: 'unavailable', reason: 'zone_unresolved' });
+    expect(await quote(db, kgOfRiz(1000), '42122')).toEqual({ kind: 'fallback', reason: 'zone_not_covered', missingProductIds: [] });
     expect(await quote(db, new Map([['riz', 1], ['epices', 2]]))).toEqual({ kind: 'fallback', reason: 'missing_product_weight', missingProductIds: ['epices'] });
     const fr = await computeTariffQuote({ supabase: db.client(), tenantId: T1, destination: { country: 'FR', postalCode: '75001' }, quantityByProduct: kgOfRiz(1000), subtotalCents: 0, clickCollectEnabled: false });
     expect(fr).toMatchObject({ kind: 'fallback', reason: 'no_active_tariff' });
@@ -267,6 +267,16 @@ test.describe('verifyCheckoutShipping', () => {
     rows.find((r) => r.id === 'ver-it-3')!.status = 'retired';
     rows.push(version({ id: 'ver-it-4', version: 4, bands: [{ min_g_exclusive: 0, max_g_inclusive: 30000, price_cents: 990 }] }) as never);
     expect(await checkout(db, token, qty)).toMatchObject({ ok: false, status: 409, body: { code: SHIPPING_REQUOTE_REQUIRED } });
+  });
+
+  test('code postal hors zones (ex. Corse) : repli provider si configuré, sinon indisponible', async () => {
+    const db = makeDb();
+    const qty = kgOfRiz(1000);
+    const token = signQuoteV2({ ten: T1, t: 5028, c: 'IT', z: '42122', w: 0, h: cartFingerprint(qty), m: 'provider_cost', tid: null, tv: null, pq: null, av: 'provider_cost_fallback', cr: null, sv: null }, SECRET);
+    const address = { country: 'IT', postal_code: '42122' };
+    expect(await checkout(db, token, qty, { address })).toMatchObject({ status: 409 });
+    const ok = await checkout(db, token, qty, { address, tenant: tenant({ shipping_tariff_fallback: 'provider_cost' }) });
+    expect(ok).toMatchObject({ ok: true, shippingTotal: 50.28, shippingDetails: { pricingMode: 'provider_cost_fallback', tariffFallback: { reason: 'zone_not_covered' } } });
   });
 
   test('repli provider_cost : seulement s’il est configuré et que le forfait ne s’applique toujours pas', async () => {

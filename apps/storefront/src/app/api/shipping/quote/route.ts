@@ -36,7 +36,7 @@ import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import type { Tenant } from '@lepefy/types';
 import { effectivePricingMode, tariffFallback } from '@/lib/shipping/tariff/checkoutShipping';
 import {
-  MISSING_WEIGHT_MESSAGE, NO_TARIFF_MESSAGE,
+  MISSING_WEIGHT_MESSAGE, NO_TARIFF_MESSAGE, ZONE_NOT_COVERED_MESSAGE,
   buildTariffShippingDetails, checkTariffAvailability, computeTariffQuote, quantitiesFromItems, tariffUnavailableMessage,
 } from '@/lib/shipping/tariff/tariffQuote';
 
@@ -295,7 +295,9 @@ async function quoteTariff(
     if (tariffFallback(tenant) !== 'provider_cost') {
       return NextResponse.json({
         available: false,
-        message: outcome.reason === 'missing_product_weight' ? MISSING_WEIGHT_MESSAGE(clickCollect) : NO_TARIFF_MESSAGE(clickCollect),
+        message: outcome.reason === 'missing_product_weight' ? MISSING_WEIGHT_MESSAGE(clickCollect)
+          : outcome.reason === 'zone_not_covered' ? ZONE_NOT_COVERED_MESSAGE(clickCollect)
+          : NO_TARIFF_MESSAGE(clickCollect),
       });
     }
     const provider = await quoteProviderCost(supabase, tenant, items, to);

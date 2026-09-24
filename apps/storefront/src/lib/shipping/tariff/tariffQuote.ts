@@ -9,7 +9,8 @@
  *
  * Separazione formale:
  *   prezzo applicabile (versione attiva + motore puro + regole paese)
- *   ≠ zona servita (zone non consegnabili, territori extra-doganali)
+ *   ≠ zona servita (zone non consegnabili, territori extra-doganali; un CAP fuori
+ *     da ogni zona tenant non è coperto dal forfait → fallback esplicito del tenant)
  *   ≠ disponibilità logistica (osservazione identica recente, chiamata
  *     provider limitata nel tempo, evidenza recente dello stesso CAP)
  *   ≠ limiti di peso (oltre il limite logistico verificato serve una risposta
@@ -56,7 +57,6 @@ export type TariffUnavailableCode =
   | 'extra_customs'
   | 'invalid_tariff_config'
   | 'product_unavailable'
-  | 'zone_unresolved'
   | 'zone_not_deliverable'
   | 'band_not_covered'
   | 'vat_rate_missing'
@@ -67,7 +67,7 @@ export type TariffUnavailableCode =
   | 'provider_rejected'
   | 'provider_unavailable';
 
-export type TariffFallbackReason = 'no_active_tariff' | 'missing_product_weight';
+export type TariffFallbackReason = 'no_active_tariff' | 'missing_product_weight' | 'zone_not_covered';
 
 export interface TariffPriced {
   kind: 'priced';
@@ -96,7 +96,6 @@ export function tariffUnavailableMessage(code: TariffUnavailableCode, clickColle
   const alt = alternative(clickCollectEnabled);
   switch (code) {
     case 'zone_not_deliverable': return `Livraison indisponible vers cette destination. ${alt}`;
-    case 'zone_unresolved': return `Ce code postal n'est pas encore desservi en ligne. ${alt}`;
     case 'band_not_covered': return `Cette commande dépasse le poids livrable en ligne. ${alt}`;
     case 'product_unavailable': return 'Certains articles de votre panier ne sont plus disponibles. Veuillez actualiser votre panier.';
     case 'no_service':
@@ -111,6 +110,8 @@ export const MISSING_WEIGHT_MESSAGE = (clickCollectEnabled: boolean) =>
   `Les frais de livraison de certains articles ne peuvent pas encore être calculés. ${alternative(clickCollectEnabled)}`;
 export const NO_TARIFF_MESSAGE = (clickCollectEnabled: boolean) =>
   `La livraison en ligne n'est pas disponible vers ce pays. ${alternative(clickCollectEnabled)}`;
+export const ZONE_NOT_COVERED_MESSAGE = (clickCollectEnabled: boolean) =>
+  `La livraison en ligne n'est pas disponible vers ce code postal. ${alternative(clickCollectEnabled)}`;
 
 /**
  * Normalizza le righe carrello ricevute (quote o sessione) in quantità per
@@ -187,10 +188,12 @@ export async function computeTariffQuote(input: TariffQuoteInput): Promise<Tarif
   }
   if (missing.length > 0) return { kind: 'fallback', reason: 'missing_product_weight', missingProductIds: missing.sort() };
 
-  // 4. Zona tenant (stessa risoluzione del laboratorio). Una zona sconosciuta
-  //    non riceve il prezzo «standard» per difetto: potrebbe essere un'isola.
+  // 4. Zona tenant (stessa risoluzione del laboratorio). Un CAP fuori da ogni
+  //    zona NON riceve il prezzo «standard» per difetto (potrebbe essere
+  //    un'isola): non è coperto dal forfait e segue il fallback esplicito del
+  //    tenant (es. Corsica, oltremare, Monaco esclusi dalla zona continentale).
   const zoneCode = resolveZoneCodeFromRows((zonesResult.data ?? []) as ShippingZoneRow[], country, postalCode);
-  if (!zoneCode) return unavailable('zone_unresolved');
+  if (!zoneCode) return { kind: 'fallback', reason: 'zone_not_covered', missingProductIds: [] };
 
   // 5. Prezzo teorico + regole commerciali paese.
   const vatRate = resolveVatRate(country, (vatResult.data ?? []) as VatRate[]);
