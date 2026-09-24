@@ -1,10 +1,10 @@
 # Forfait di spedizione nel checkout — dossier di implementazione
 
 > **Stato:** **V1G implementata: tariffazione commerciale** (base `main@200abcc`, 24/09/2026), sopra la V1F
-> (foundation + shadow, §10–11). Il codice permette di addebitare una versione tariffaria attiva con
-> preventivo e pagamento verificati server-side (§12–13), ma **nessun tenant è attivato**: il forfait è
-> addebitato solo dopo l'attivazione esplicita in admin. Migration `124` e `125` da applicare
-> manualmente. Pagina pubblica `/livraison` presente ma **nascosta** (default).
+> (foundation + shadow, §10–11). Il codice addebita una versione tariffaria attiva con preventivo e
+> pagamento verificati server-side (§12–13), solo dopo l'attivazione esplicita in admin. Migration `124`
+> e `125` applicate. **ChloeFood: forfait attivo per IT, FR, BE, DE** (§13.6). Pagina pubblica
+> `/livraison` presente ma **nascosta**.
 > **Tenant pilota:** ChloeFood (IT, partenza Reggio Emilia 42122).
 > **Dati raccolti:** 22–23 settembre 2026 (Shipping Intelligence, campagne + preventivi diretti Packlink).
 > **Documenti collegati:** `docs/SHIPPING_INTELLIGENCE.md` (laboratorio, rétrotest, bozze), `CLAUDE.md` § Shipping Calculation.
@@ -725,6 +725,26 @@ griglia = nuova bozza → nuova versione → nuova attivazione.
   `select rollback_shipping_tariff_to_provider_cost('<tenant>', null);`.
 - Effetto sui nuovi preventivi immediato; gli ordini pagati conservano il loro snapshot; i checkout
   aperti al forfait devono rifare il preventivo (409 gestito dal client).
+
+### 13.6 Configurazione attiva ChloeFood (24/09/2026)
+
+Fallback del tenant: `provider_cost` (preventivo Packlink + imballaggio). Tutti i prezzi IVA inclusa,
+colli da 15 kg.
+
+| Paese | Zona forfait | Fasce | Oltre | Maggiorazioni | Fuori forfait (preventivo Packlink) |
+|---|---|---|---|---|---|
+| IT v1 | 23 zone regionali | 0–5 kg 8,40 · 5–10 10,80 · 10–15 12,60 · 15–20 16,40 · 20–30 19,80 € | blocchi 30 kg a 19,80 € | Sicilia, Sardegna, Calabria +2 €/collo | — (Livigno/Campione non consegnabili) |
+| FR v1 | `FR_MAINLAND` (CAP 01–19, 21–95) | 0–5 kg 14 · 5–10 18 · 10–15 20 € | blocchi 15 kg a 20 € | — | Corsica (20), oltremare (97), Monaco (98) |
+| BE v1 | `BE_ALL` | 0–5 kg 14 · 5–10 18 · 10–15 20 € | blocchi 15 kg a 20 € | — | — |
+| DE v1 | `DE_ALL` | 0–5 kg 13 · 5–10 15 · 10–15 18 € | blocchi 15 kg a 18 € | — | — |
+
+Limite logistico verificato: 50 kg (IT), 15 kg (FR/BE/DE: oltre serve una risposta Packlink positiva).
+Svizzera e paesi senza versione: preventivo Packlink (fallback). Prodotti senza peso: preventivo Packlink.
+
+**Evidenza al momento dell'attivazione (preventivi Packlink IVA inclusa, cartone escluso):** FR e BE
+sono sotto il costo Packlink su gran parte delle fasce (es. FR 5 kg 14 € vs 15,63 €; BE 5 kg 14 € vs
+16,64 €); DE circa in pareggio. Prezzi confermati dal tenant così come sono. Oltremare e Monaco (CAP
+francese) non sono serviti da Packlink.
 
 ### 13.5 Troubleshooting
 
