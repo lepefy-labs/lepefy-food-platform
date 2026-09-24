@@ -12,6 +12,8 @@ import { TenantLogo } from '@/components/branding/TenantLogo';
 import { AddToHomeScreen } from './AddToHomeScreen';
 import { CardLocation } from './CardLocation';
 import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
+import { visibleCardPaymentMethods } from '@/lib/payments/applePay';
+import { useApplePaySupport } from '@/lib/payments/useApplePaySupport';
 
 const ICONS = { IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBrandYoutube, IconBrandLinkedin, IconBrandX };
 type Lang = 'fr' | 'it';
@@ -44,6 +46,7 @@ interface Props {
   };
   socialLinks: TenantSocialLink[];
   paymentMethods: TenantPaymentMethod[];
+  applePayEnabled: boolean;
   reviewsEnabled: boolean;
 }
 
@@ -55,7 +58,12 @@ function readableForeground(hex: string): '#111827' | '#ffffff' {
   return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b) > 0.42 ? '#111827' : '#ffffff';
 }
 
-export function DigitalCard({ tenant, socialLinks, paymentMethods, reviewsEnabled }: Props) {
+export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethods, applePayEnabled, reviewsEnabled }: Props) {
+  // Filtre unique pour le bouton « Voir les moyens de paiement » et pour la
+  // liste : si seule la ligne apple_pay existe et que l'appareil ne supporte
+  // pas Apple Pay, la section entière reste masquée (jamais de page vide).
+  const applePaySupported = useApplePaySupport();
+  const paymentMethods = visibleCardPaymentMethods(allCardMethods, applePayEnabled, applePaySupported);
   const [lang, setLang] = useState<Lang>(() => typeof window !== 'undefined' ? ((localStorage.getItem('lepefy-card-lang') as Lang) ?? 'fr') : 'fr');
   const [inPayment, setInPayment] = useState(false);
   const t = COPY[lang]; const initials = tenant.name.slice(0, 2).toUpperCase(); const secondaryForeground = readableForeground(tenant.secondary_color);

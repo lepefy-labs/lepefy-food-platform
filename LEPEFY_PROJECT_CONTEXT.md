@@ -433,6 +433,15 @@ Componente centrale: `apps/storefront/src/components/payments/StripePaymentStep.
 
 `payment_funnel_logs` è cross-module.
 
+Il Payment Element di `StripePaymentStep` imposta `wallets.applePay = 'never'` per **tutti** i moduli (shop, card, event, rental): la registrazione di un dominio presso Stripe vale per dominio, non per modulo, quindi senza questo flag Apple Pay comparirebbe ovunque appena il dominio è registrato. Google Pay resta `auto`, invariato. Apple Pay è offerto solo dal flusso dedicato di `/card` (sezione 13).
+
+### Azioni manuali pendenti (pagamenti)
+
+- Stripe Link: da disattivare manualmente dal Dashboard Stripe (Settings → Payment Methods → Link) su ogni account usato, come ricordato in `api/card/quick-pay/route.ts` e `api/rental/checkout/route.ts`.
+- Apple Pay /card, per ogni account Stripe usato dal modulo carta (`STRIPE_SECRET_KEY_CARD`, fallback `STRIPE_SECRET_KEY`): Dashboard → Impostazioni → Metodi di pagamento → Apple Pay abilitato.
+- Apple Pay /card, dall'admin del tenant (`/admin/parametres/paiements`): attivare "Apple Pay" e premere "Enregistrer le domaine" (live; Stripe registra automaticamente anche in sandbox).
+- Apple Pay /card, collaudo su dispositivo reale **non ancora eseguito**: iPhone Safari con carta nel Wallet (tile visibile → importo → pulsante nero → Face ID → "Merci !"), PWA installata di `/card` (`display: standalone`, supporto iOS non uniforme: registrare l'esito reale, nessun workaround), iPhone senza carte (pannello "Payer par carte bancaire"), Android/PC Chrome e browser in-app (nessun tile; shop/eventi/noleggio senza Apple Pay), pagamento reale di 1 € con webhook `card_quick_payment` che marca `tenant_card_payments` come `paid`.
+
 ---
 
 ## 10. Événementiel
@@ -608,6 +617,8 @@ Le tabelle feedback/inviti non hanno accesso browser diretto e forzano RLS. Le m
 
 `/card` è hub tenant; location usa `tenant.google_maps_url`, senza Google Maps API/iframe.
 
+**Apple Pay in `/card` (migration `126`)**: `tenant_payment_methods.method = 'apple_pay'` è un on/off senza `value`/`extra` (come `card`), scopato da `enabled_modules` (default `['card']` alla creazione admin) e indipendente dalla riga `card`. Il tile "Apple Pay" compare solo se `isApplePayEnabledForCard` (riga attiva con `'card'`) E il dispositivo supporta Apple Pay: `useApplePaySupport` legge `window.ApplePaySession.canMakePayments()` solo dopo il mount (helper puri in `lib/payments/applePay.ts`, test `tests/unit/applePay.spec.ts`). Il filtro `visibleCardPaymentMethods` è applicato in `DigitalCard` sia alla lista sia al bouton "Voir les moyens de paiement" (mai una lista vuota). Flusso dedicato: `CardQuickPay mode="apple_pay"` (stesso step 1 importo/nome/email, pulsante nero) → `StripeExpressWalletStep` (Express Checkout Element, solo Apple Pay, pulsante nero `plain` 48 px; stessa sequenza `elements.submit → createIntent → confirmPayment` e stessi `event_type` di funnel con `detail.wallet = 'apple_pay'`). Senza carte nel Wallet o su `onLoadError` mostra il fallback "Payer par carte bancaire" verso la riga `card` se visibile. Server invariato: riusa `api/card/quick-pay`, il PaymentIntent (`automatic_payment_methods`) e il webhook `card_quick_payment`. Registrazione dominio self-serve: `GET/POST /api/admin/payment-methods/apple-pay/domain` (`tenant_settings.view/manage`), account Stripe del modulo `card`, dominio = hostname di `tenant.storefront_url` con fallback `NEXT_PUBLIC_APP_URL` (422 se assente, mai un default), POST idempotente (list → create o riattivazione → validate); card di stato in `PaymentMethodsSection` quando `apple_pay` è attivo. Le route admin `payment-methods` chiamano `revalidatePath('/card')` dopo ogni scrittura (`/card` ha `revalidate = 300`). Azioni manuali: sezione 9.
+
 Il tracking operativo post-ordine è provider-neutral: `src/lib/shipping/providers/types.ts` definisce `ShippingProviderAdapter` e il modello canonico snapshot/eventi; il registry server-side espone capability e metadata UI serializzabili. Packlink è il primo adapter, con credenziale tenant `packlink_api_key` e fallback server `PACKLINK_API_KEY`, API shipment + track bounded, tracking primario `carrier_shipment_tracking_number` e fallback `trackings[]`. Il diagnostic read-only Admin → Livraison resta indipendente e invariato. Nessuna conversione MyBRT, scraping o callback provider non verificata viene introdotta.
 
 Per provider con capability provider-reference, l’admin termina picking, controlli freddo e packing, quindi verifica e associa la reference tramite POST `/api/admin/orders/[id]/shipment/attach`. `/shipment/sync` consente aggiornamento manuale; `/shipment/manual` è il fallback esplicito per ordine. Tutte le route sono tenant-scoped, protette da `orders.manage` e fail-closed. La modalità manuale disassocia la reference, mantiene gli snapshot compatibili `tracking_code/carrier` e impedisce aggiornamenti automatici; provider senza adapter conservano il flusso manuale. `shipping.view` separa consultazione da `shipping.manage` per le regole di configurazione.
@@ -677,6 +688,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 123_packaging_profile_carton_suggestion.sql
 124_shipping_tariff_versions.sql
 125_shipping_tariff_activation.sql
+126_tenant_payment_apple_pay.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -730,6 +742,8 @@ Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/09
 `124` è additiva e reversibile: `tenants.shipping_pricing_mode` (default `provider_cost`, nessun cambio per i tenant esistenti) e la tabella service-role-only `shipping_tariff_versions` (snapshot immutabili via trigger, nessun DELETE, una sola versione `shadow`/`active` per tenant+paese, RPC `select_shipping_tariff_shadow_version`). Nessun backfill. Finché non è applicata manualmente in Supabase, il checkout resta invariato (il mode assente vale `provider_cost`) e l'onglet Forfait shadow mostra «migration non appliquée». Rollback documentato in fondo al file SQL.
 
 `125` è additiva: `shipping_tariff_versions.activated_at/activated_by/retired_by`, `tenants.shipping_tariff_fallback` (default `unavailable`), `tenants.shipping_public_grid_enabled` (default false), `shipping_packaging_profiles.tare_g`, e le RPC service-role di attivazione/ritiro/rollback. Nessun backfill e nessun tenant attivato: il forfait è addebitato solo dopo l'attivazione esplicita in admin. Da applicare manualmente dopo la 124; senza di essa l'attivazione è indisponibile e il checkout resta invariato. Rollback documentato nel file SQL.
+
+`126` è additiva: ricrea soltanto `tenant_payment_methods_method_check` aggiungendo `'apple_pay'` (idempotente, nessun dato toccato, nessuna nuova tabella quindi nessun nuovo GRANT). Da applicare manualmente prima di attivare Apple Pay in admin: senza di essa l'insert di una riga `apple_pay` fallisce sulla CHECK, il resto è invariato.
 
 `119` è additiva : 5 nuove tabelle (Shipping Intelligence, vedi sezione 13), zero colonne modificate su `tenants`/`orders`/`packaging_surcharges`/`shipping_country_rules`, zero impatto checkout. Seed non distruttivo: un `shipping_packaging_profiles` di default per tenant derivato da `packaging_surcharges` esistente. L'applicazione in Supabase resta manuale.
 

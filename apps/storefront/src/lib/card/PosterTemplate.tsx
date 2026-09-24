@@ -6,6 +6,7 @@ import {
   IconQrcode,
   IconWallet,
   IconCreditCard,
+  IconBrandApple,
   IconBrandInstagram,
   IconBrandFacebook,
   IconBrandTiktok,
@@ -16,7 +17,7 @@ import {
 } from '@tabler/icons-react';
 import { methodColor } from './methodColor';
 
-const ICONS = { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconCreditCard };
+const ICONS = { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, IconCreditCard, IconBrandApple };
 
 const ICONS_SOCIAL = {
   IconBrandInstagram, IconBrandFacebook, IconBrandTiktok,

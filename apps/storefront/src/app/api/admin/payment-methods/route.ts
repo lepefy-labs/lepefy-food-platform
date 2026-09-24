@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import type { PaymentMethodType, PaymentModule } from '@lepefy/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
-const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card', 'apple_pay'];
 const VALID_MODULES: PaymentModule[] = ['shop', 'card', 'event', 'rental'];
 
 // Même vérification que le constraint DB
@@ -19,9 +22,9 @@ function isValidEnabledModules(value: unknown): value is PaymentModule[] {
 
 // 'card' est un simple on/off (montant saisi par le client à chaque paiement,
 // cf. api/card/quick-pay) — jamais de value/extra à renseigner, même
-// traitement que 'cash'.
+// traitement que 'cash'. 'apple_pay' idem (tuile Apple Pay de /card).
 function hasNoValueFields(method: PaymentMethodType): boolean {
-  return method === 'cash' || method === 'card';
+  return method === 'cash' || method === 'card' || method === 'apple_pay';
 }
 
 function cleanExtra(raw: unknown): Record<string, string> | null {
@@ -65,7 +68,11 @@ export async function POST(req: NextRequest) {
         extra:      hasNoValueFields(method) ? null : cleanExtra(body.extra),
         sort_order: parseInt(body.sort_order, 10) || 0,
         active:     Boolean(body.active),
-        ...('enabled_modules' in body ? { enabled_modules: body.enabled_modules } : {}),
+        // apple_pay sans portée explicite : /card uniquement (seul module qui
+        // le propose), pas le DEFAULT DB des 4 modules.
+        ...('enabled_modules' in body
+          ? { enabled_modules: body.enabled_modules }
+          : method === 'apple_pay' ? { enabled_modules: ['card'] } : {}),
       })
       .select('*')
       .single();
@@ -81,6 +88,9 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
+    // /card a revalidate = 300 : sans ceci, la modification resterait
+    // invisible jusqu'à 5 minutes.
+    revalidatePath('/card');
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     // DEBUG TEMPORAIRE — voir note de retrait en fin de réponse.

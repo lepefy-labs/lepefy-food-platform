@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import type { PaymentMethodType, PaymentModule } from '@lepefy/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
-const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+const VALID_METHODS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card', 'apple_pay'];
 const VALID_MODULES: PaymentModule[] = ['shop', 'card', 'event', 'rental'];
 
 // Même vérification que le constraint DB
@@ -19,9 +22,9 @@ function isValidEnabledModules(value: unknown): value is PaymentModule[] {
 
 // 'card' est un simple on/off (montant saisi par le client à chaque paiement,
 // cf. api/card/quick-pay) — jamais de value/extra à renseigner, même
-// traitement que 'cash'.
+// traitement que 'cash'. 'apple_pay' idem (tuile Apple Pay de /card).
 function hasNoValueFields(method: PaymentMethodType): boolean {
-  return method === 'cash' || method === 'card';
+  return method === 'cash' || method === 'card' || method === 'apple_pay';
 }
 
 function cleanExtra(raw: unknown): Record<string, string> | null {
@@ -88,6 +91,9 @@ export async function PATCH(
       }, { status: 500 });
     }
 
+    // /card a revalidate = 300 : sans ceci, la modification resterait
+    // invisible jusqu'à 5 minutes.
+    revalidatePath('/card');
     return NextResponse.json({ success: true });
   } catch (err) {
     // DEBUG TEMPORAIRE — voir note de retrait en fin de réponse.
@@ -119,5 +125,6 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  revalidatePath('/card');
   return NextResponse.json({ success: true });
 }

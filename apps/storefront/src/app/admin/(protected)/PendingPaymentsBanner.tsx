@@ -12,6 +12,7 @@ import {
   IconQrcode,
   IconWallet,
   IconCreditCard,
+  IconBrandApple,
   IconChevronDown,
   IconChevronUp,
   IconSettings,
@@ -28,6 +29,7 @@ const PAYMENT_ICONS = {
   IconQrcode,
   IconWallet,
   IconCreditCard,
+  IconBrandApple,
 };
 
 const AGED_PAYMENT_MS = 24 * 60 * 60 * 1000;

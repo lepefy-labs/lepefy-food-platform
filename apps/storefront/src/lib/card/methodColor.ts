@@ -8,7 +8,10 @@ export function methodColor(method: TenantPaymentMethod['method'], tenantPrimary
     case 'paypal':   return '#003087';
     case 'cash':     return '#2E7D32';
     case 'satispay': return '#FF3B30';
-    default:         return tenantPrimary; // bank_transfer, other
+    // Noir imposé par les règles de marque Apple Pay (bouton noir), pas une
+    // couleur tenant.
+    case 'apple_pay': return '#000000';
+    default:        return tenantPrimary; // bank_transfer, other
   }
 }
 

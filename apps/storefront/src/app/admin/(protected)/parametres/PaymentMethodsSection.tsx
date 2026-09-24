@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { IconCreditCard, IconPlus, IconTrash } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
+import { ApplePayDomainStatus } from './ApplePayDomainStatus';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType, type PaymentModule } from '@lepefy/types';
 
 const INPUT_CLS =
   'w-full min-h-10 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 const LABEL_CLS = 'mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400';
 
-const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card'];
+const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card', 'apple_pay'];
 
 const MODULE_OPTIONS: { value: PaymentModule; label: string }[] = [
   { value: 'shop', label: 'Boutique' },
@@ -19,7 +20,19 @@ const MODULE_OPTIONS: { value: PaymentModule; label: string }[] = [
 ];
 
 function hasNoValueFields(method: PaymentMethodType): boolean {
-  return method === 'cash' || method === 'card';
+  return method === 'cash' || method === 'card' || method === 'apple_pay';
+}
+
+// Précision affichée sous le sélecteur pour les méthodes sans champ à saisir.
+const METHOD_HINTS: Partial<Record<PaymentMethodType, string>> = {
+  apple_pay: 'Bouton Apple Pay dans /card, affiché seulement sur les appareils compatibles.',
+};
+
+// Apple Pay n'existe que dans /card : à la sélection, portée par défaut /card.
+function withMethod(form: FormState, method: PaymentMethodType): FormState {
+  return method === 'apple_pay' && form.method !== 'apple_pay'
+    ? { ...form, method, enabled_modules: ['card'] }
+    : { ...form, method };
 }
 
 interface FormState {
@@ -233,6 +246,8 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
       </header>
 
       <div className="p-4 sm:p-5">
+        {methods.some((m) => m.method === 'apple_pay' && m.active) && <ApplePayDomainStatus />}
+
         {toast && (
           <div className={`mb-4 rounded-xl border px-3 py-2.5 text-xs font-medium ${toast.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
             {toast.msg}
@@ -281,6 +296,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                       >
                         {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{PAYMENT_METHOD_REGISTRY[m].label}</option>)}
                       </select>
+                      {METHOD_HINTS[form.method] && <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{METHOD_HINTS[form.method]}</p>}
                     </div>
                     <div>
                       <label className={LABEL_CLS}>Étiquette (optionnel)</label>
@@ -379,9 +395,10 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className={LABEL_CLS}>Méthode</label>
-                <select value={newForm.method} onChange={(e) => setNewForm({ ...newForm, method: e.target.value as PaymentMethodType })} className={INPUT_CLS}>
+                <select value={newForm.method} onChange={(e) => setNewForm(withMethod(newForm, e.target.value as PaymentMethodType))} className={INPUT_CLS}>
                   {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{PAYMENT_METHOD_REGISTRY[m].label}</option>)}
                 </select>
+                {METHOD_HINTS[newForm.method] && <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{METHOD_HINTS[newForm.method]}</p>}
               </div>
               <div>
                 <label className={LABEL_CLS}>Étiquette (optionnel)</label>

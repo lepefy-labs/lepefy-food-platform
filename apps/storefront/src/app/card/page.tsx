@@ -5,6 +5,7 @@ import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
 import { DigitalCard } from '@/components/card/DigitalCard';
+import { isApplePayEnabledForCard } from '@/lib/payments/applePay';
 
 const manrope = Manrope({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-card-heading', display: 'swap' });
 const dmSans  = DM_Sans({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-card-body', display: 'swap' });
@@ -24,6 +25,9 @@ export default async function CardPage() {
     canUseReviews(tenant.id),
   ]);
   const paymentMethods = allPaymentMethods.filter((m) => m.enabled_modules.includes('card'));
+  // Activation tenant uniquement ; le support appareil est détecté côté
+  // client (DigitalCard) avant d'afficher la tuile.
+  const applePayEnabled = isApplePayEnabledForCard(allPaymentMethods);
 
   return (
     <div className={`${manrope.variable} ${dmSans.variable}`}>
@@ -46,6 +50,7 @@ export default async function CardPage() {
         }}
         socialLinks={socialLinks}
         paymentMethods={paymentMethods}
+        applePayEnabled={applePayEnabled}
         reviewsEnabled={reviewsEnabled}
       />
     </div>

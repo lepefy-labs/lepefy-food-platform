@@ -152,7 +152,11 @@ function InnerPaymentStep({
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-900" role="note">
           {paymentWarning ?? DEFAULT_PAYMENT_WARNING}
         </div>
-        <PaymentElement options={{ layout: 'accordion' }} />
+        {/* Apple Pay jamais dans le Payment Element (tous modules) : il n'est
+            proposé que via la tuile dédiée de /card (StripeExpressWalletStep).
+            L'enregistrement du domaine Stripe vaut pour tout le domaine, pas
+            par module. Google Pay inchangé. */}
+        <PaymentElement options={{ layout: 'accordion', wallets: { applePay: 'never' } }} />
       </div>
 
       <div className="hidden lg:block">{payButton}</div>
