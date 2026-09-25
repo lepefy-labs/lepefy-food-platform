@@ -86,8 +86,8 @@ The shipping logic is the most complex part of the codebase:
 ### Storefront Caching
 
 - `getTenant()` (60 s), shop categories / category previews / catalogue ranking IDs (`src/lib/catalog/catalogCache.ts`, 60–300 s) and the shop-layout display data (`getShopShellData`, 300 s) live in the Next.js Data Cache, tagged via `src/lib/cache/storefrontCache.ts`. Product rows (price, stock) are always read fresh — the cache only decides the order.
-- `(shop)/layout.tsx` must never read cookies/session: that would make every shop page dynamic again and disable ISR on `/products/[slug]` and `/accueil`. Per-customer UI (e.g. `ActiveCheckoutRecovery` → `GET /api/checkout-sessions/active`) is resolved client-side.
-- Any admin route that writes tenant, catalogue, social links or review/feature settings wraps its handlers with `withStorefrontInvalidation([...scopes], handler)` so changes appear immediately; the TTLs only bound staleness for writers that forget.
+- `(shop)/layout.tsx` must never read cookies/session: that would make every shop page dynamic again and disable ISR on `/products/[slug]`, `/accueil` and `/avis`. Per-customer UI (e.g. `ActiveCheckoutRecovery` → `GET /api/checkout-sessions/active`) is resolved client-side.
+- Any admin route that writes tenant, catalogue, social links, review moderation or review/feature settings wraps its handlers with `withStorefrontInvalidation([...scopes], handler)` so changes appear immediately; the TTLs only bound staleness for writers that forget.
 - `public/sw.js` is network-only (no `fetch` handler): it must not proxy or cache HTML, RSC payloads or Next.js chunks.
 
 ### State Management

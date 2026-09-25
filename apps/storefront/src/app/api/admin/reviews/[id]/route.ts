@@ -5,6 +5,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { REVIEW_REASON_CODES } from '@/lib/reviews/reviewModeration';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 const schema = z.object({
   action: z.enum(['publish','reject','hide','restore']),
@@ -12,7 +13,7 @@ const schema = z.object({
   reasonText: z.string().trim().max(500).nullable().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+async function handlePATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
@@ -55,3 +56,5 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   return NextResponse.json({ ok: true, review });
 }
+
+export const PATCH = withStorefrontInvalidation(['reviews'], handlePATCH);

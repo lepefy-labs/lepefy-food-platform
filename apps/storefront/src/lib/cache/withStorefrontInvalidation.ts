@@ -1,11 +1,12 @@
 import { getTenant } from '@/lib/tenant/getTenant';
 import {
   revalidateCatalogCache,
+  revalidateReviewsCache,
   revalidateShopShellCache,
   revalidateTenantCache,
 } from '@/lib/cache/storefrontCache';
 
-export type StorefrontCacheScope = 'tenant' | 'catalog' | 'shop-shell';
+export type StorefrontCacheScope = 'tenant' | 'catalog' | 'shop-shell' | 'reviews';
 
 /**
  * Enveloppe un handler admin qui modifie des données affichées par le
@@ -22,6 +23,7 @@ export function withStorefrontInvalidation<H extends (...args: any[]) => Promise
     const response = await handler(...args);
     if (response.ok) {
       if (scopes.includes('tenant')) revalidateTenantCache();
+      if (scopes.includes('reviews')) revalidateReviewsCache();
       if (scopes.includes('catalog') || scopes.includes('shop-shell')) {
         const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood').catch(() => null);
         if (tenant && scopes.includes('catalog')) revalidateCatalogCache(tenant.id);

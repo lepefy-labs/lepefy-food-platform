@@ -6,8 +6,11 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
 import { getReviewSettings } from '@/lib/reviews/reviewSettings';
 
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+// ISR : la page est identique pour tous les visiteurs (aucune session lue).
+// Sans cache, ~6 allers-retours Supabase en série à chaque visite (>1 s).
+// Modération et réglages d'affichage l'invalident immédiatement via
+// withStorefrontInvalidation(['reviews']) ; 5 min au plus sinon.
+export const revalidate = 300;
 
 function Stars({ rating }: { rating: number }) {
   return <span className="inline-flex" aria-label={`${rating} sur 5`}>{[1,2,3,4,5].map((value) => <IconStar key={value} size={16} fill={value <= Math.round(rating) ? 'currentColor' : 'none'} className={value <= Math.round(rating) ? 'text-amber-500' : 'text-gray-300'} />)}</span>;

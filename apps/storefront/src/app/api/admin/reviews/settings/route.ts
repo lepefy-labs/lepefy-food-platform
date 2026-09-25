@@ -43,4 +43,4 @@ async function handlePATCH(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-export const PATCH = withStorefrontInvalidation(['shop-shell'], handlePATCH);
+export const PATCH = withStorefrontInvalidation(['shop-shell', 'reviews'], handlePATCH);

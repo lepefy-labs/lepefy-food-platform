@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface CategoryBlocksRowProps {
-  /** Les blocs réels SUIVIS de leur copie décorative dupliquée (voir
-   *  CategoryBlock `hiddenFromA11y`) — la duplication rend la boucle
-   *  imperceptible : au moment où le scroll atteint le début de la copie
-   *  (offsetLeft du (itemCount+1)-ième enfant), on retranche silencieusement
-   *  la largeur d'un jeu complet. Les deux jeux sont concaténés par
-   *  l'appelant (page.tsx). */
+  /** Les blocs réels, une seule fois. La copie décorative qui rend la boucle
+   *  imperceptible est ajoutée ici, côté client, après l'hydratation : elle
+   *  ne sert qu'à l'animation et n'a pas à peser dans l'HTML/RSC de la page.
+   *  Au moment où le scroll atteint le début de la copie (offsetLeft de son
+   *  premier bloc), on retranche silencieusement la largeur d'un jeu complet. */
   children: React.ReactNode;
   /** Nombre de blocs réels — pilote la durée d'un tour complet. */
   itemCount: number;
@@ -55,6 +54,9 @@ export function CategoryBlocksRow({ children, itemCount }: CategoryBlocksRowProp
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
   const reducedMotionRef = useRef(false);
+  const [showLoopCopy, setShowLoopCopy] = useState(false);
+
+  useEffect(() => { setShowLoopCopy(true); }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -84,15 +86,16 @@ export function CategoryBlocksRow({ children, itemCount }: CategoryBlocksRowProp
 
       if (track && !pausedRef.current && !reducedMotionRef.current) {
         // Largeur exacte d'un jeu complet = position de départ de la copie
-        // dupliquée (le enfant d'index `itemCount`, premier élément dupliqué).
+        // dupliquée (premier bloc de l'enveloppe `data-loop-copy`).
         // scrollWidth / 2 est FAUX ici : avec 2N enfants dans une même ligne
         // flex à gap uniforme, il y a 2N-1 gaps au total, pas 2N — la moitié
         // de scrollWidth dépasse donc la largeur réelle d'un jeu d'un demi-gap,
         // ce qui décale le point de bouclage (glitch visible au raccord).
         // `offsetLeft` du premier duplicata inclut tous les gaps réels et
         // reste correct quel que soit le gap CSS, sans le recalculer à la main.
-        const firstDuplicate = track.children[itemCount] as HTMLElement | undefined;
-        const wrapWidth = firstDuplicate ? firstDuplicate.offsetLeft : track.scrollWidth / 2;
+        // Premier bloc de la copie (enveloppe display:contents, sans boîte).
+        const firstDuplicate = track.querySelector<HTMLElement>(':scope > [data-loop-copy] > *');
+        const wrapWidth = firstDuplicate ? firstDuplicate.offsetLeft : 0;
         if (wrapWidth > 0) {
           const pxPerMs = wrapWidth / durationMs;
           track.scrollLeft += pxPerMs * delta;
@@ -126,6 +129,19 @@ export function CategoryBlocksRow({ children, itemCount }: CategoryBlocksRowProp
       "
     >
       {children}
+      {showLoopCopy && (
+        // Copie purement visuelle : masquée aux lecteurs d'écran, non
+        // focalisable (inert, posé via ref : React 18 ne sérialise pas cet
+        // attribut) et non cliquable.
+        <div
+          data-loop-copy
+          ref={el => el?.setAttribute('inert', '')}
+          className="contents pointer-events-none"
+          aria-hidden="true"
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }

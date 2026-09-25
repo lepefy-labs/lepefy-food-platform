@@ -41,6 +41,13 @@ export function revalidateCatalogCache(tenantId: string) {
   });
 }
 
+/** Page publique /avis (ISR) : modération ou réglages d'affichage. */
+export function revalidateReviewsCache() {
+  safely(() => {
+    revalidatePath('/avis');
+  });
+}
+
 /** Réseaux sociaux, Nala et avis affichés par le layout boutique. */
 export function revalidateShopShellCache(tenantId: string) {
   safely(() => {

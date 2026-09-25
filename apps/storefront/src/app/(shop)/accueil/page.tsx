@@ -250,19 +250,6 @@ export default async function HomePage() {
                 secondaryColor={tenant.secondary_color}
               />
             ))}
-            {renderableCategories.map(({ cat, index, products }) => (
-              <CategoryBlock
-                key={`${cat.id}-dup`}
-                index={index}
-                name={cat.name}
-                slug={cat.slug}
-                count={categoryCounts[cat.id] ?? products.length}
-                products={products}
-                primaryColor={tenant.primary_color}
-                secondaryColor={tenant.secondary_color}
-                hiddenFromA11y
-              />
-            ))}
           </CategoryBlocksRow>
 
           <CategoryBlocksGrid>
