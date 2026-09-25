@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition, useEffect, useRef } from 'react';
-import { ProductGrid } from '@/components/catalog/ProductGrid';
+import { ProductGrid, ProductCardSkeleton } from '@/components/catalog/ProductGrid';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { CatalogCategoryRow } from '@/components/catalog/CatalogCategoryRow';
 import { semanticMatchToProductCardProduct } from '@/lib/catalog/productCardAdapters';
@@ -47,13 +47,19 @@ export function CatalogClient({
   const [isPending, startTransition] = useTransition();
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Accumulation des pages chargées via "Charger plus" — remise à zéro
+  // Accumulation des pages chargées par le scroll infini — remise à zéro
   // chaque fois qu'un nouveau rendu serveur arrive (recherche/catégorie
   // changée, ou chargement direct d'une URL ?page=N).
   const [items, setItems]             = useState<ProductWithCategory[]>(products);
   const [page, setPage]               = useState(currentPage);
   const [hasMore, setHasMore]         = useState(hasNextPage);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const sentinelRef    = useRef<HTMLDivElement | null>(null);
+  // Garde synchrone : l'observer peut notifier deux fois avant que
+  // setIsLoadingMore n'ait re-rendu le composant.
+  const loadingMoreRef = useRef(false);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
 
   const [semanticResults, setSemanticResults]     = useState<SemanticMatch[]>([]);
   const [isSemanticLoading, setIsSemanticLoading] = useState(false);
@@ -63,9 +69,13 @@ export function CatalogClient({
   }, [initialQuery]);
 
   useEffect(() => {
+    // Une page suivante encore en vol appartient à l'ancien filtre : elle ne
+    // doit jamais être ajoutée à la nouvelle liste.
+    loadMoreAbortRef.current?.abort();
     setItems(products);
     setPage(currentPage);
     setHasMore(hasNextPage);
+    setLoadMoreFailed(false);
   }, [products, currentPage, hasNextPage]);
 
   // Cascade : la recherche sémantique ne se déclenche que si la recherche
@@ -125,8 +135,12 @@ export function CatalogClient({
   }
 
   async function handleLoadMore() {
-    if (isLoadingMore || !hasMore) return;
+    if (loadingMoreRef.current || !hasMore) return;
+    loadingMoreRef.current = true;
+    const controller = new AbortController();
+    loadMoreAbortRef.current = controller;
     setIsLoadingMore(true);
+    setLoadMoreFailed(false);
     try {
       const nextPage = page + 1;
       const params = new URLSearchParams();
@@ -138,11 +152,17 @@ export function CatalogClient({
       if (trimmedQuery) params.set('q', trimmedQuery);
       else if (activeSlug) params.set('category', activeSlug);
 
-      const res = await fetch(`/api/products?${params.toString()}`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/products?${params.toString()}`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: { products?: ProductWithCategory[]; hasNextPage?: boolean } = await res.json();
+      if (controller.signal.aborted) return;
 
-      setItems(prev => [...prev, ...(data.products ?? [])]);
+      // Dédoublonnage défensif : le classement "recommandé" peut bouger entre
+      // deux pages (stock épuisé entre-temps) et renvoyer un produit déjà affiché.
+      setItems(prev => {
+        const seen = new Set(prev.map(p => p.id));
+        return [...prev, ...(data.products ?? []).filter(p => !seen.has(p.id))];
+      });
       setPage(nextPage);
       setHasMore(Boolean(data.hasNextPage));
 
@@ -158,11 +178,40 @@ export function CatalogClient({
       urlParams.set('day', rankingDay);
       window.history.replaceState(null, '', `${window.location.pathname}?${urlParams.toString()}`);
     } catch {
-      // Dégradation silencieuse — le bouton reste cliquable pour réessayer.
+      // Le sentinel reste visible sans nouvelle intersection : sans bouton
+      // "Réessayer", un échec réseau bloquerait le scroll infini.
+      if (!controller.signal.aborted) setLoadMoreFailed(true);
     } finally {
-      setIsLoadingMore(false);
+      if (loadMoreAbortRef.current === controller) {
+        loadingMoreRef.current = false;
+        loadMoreAbortRef.current = null;
+        setIsLoadingMore(false);
+      }
     }
   }
+
+  // Toujours la dernière version de handleLoadMore (page/filtres courants)
+  // sans ré-abonner l'observer à chaque rendu.
+  const loadMoreRef = useRef(handleLoadMore);
+  loadMoreRef.current = handleLoadMore;
+
+  // Scroll infini : la page suivante part ~2 écrans avant la fin de la grille,
+  // pour qu'elle soit en général déjà affichée quand l'utilisateur y arrive.
+  const autoLoadEnabled = hasMore && !isPending && !loadMoreFailed;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!autoLoadEnabled || !sentinel || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      entries => { if (entries.some(entry => entry.isIntersecting)) void loadMoreRef.current(); },
+      { rootMargin: '0px 0px 1200px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // `items.length` ré-arme l'observer après chaque page : si le sentinel est
+    // toujours dans la zone (écran haut, page courte), on enchaîne la suivante.
+  }, [autoLoadEnabled, items.length]);
+
+  useEffect(() => () => loadMoreAbortRef.current?.abort(), []);
 
   function handleQueryChange(value: string) {
     setQuery(value);
@@ -299,20 +348,36 @@ export function CatalogClient({
       {/* Griglia */}
       <ProductGrid products={items} loading={isPending} />
 
-      {/* Bouton "Charger plus" — pagination server-side, pas de scroll auto.
+      {/* Scroll infini — pagination server-side déclenchée par le sentinel.
           Masqué pendant une transition de filtre (isPending) : la grille va
-          être remplacée par le skeleton, "Charger plus" n'a plus de sens. */}
+          être remplacée par le skeleton. */}
       {!isPending && hasMore && (
-        <div className="flex justify-center mt-6">
-          <button
-            type="button"
-            onClick={handleLoadMore}
-            disabled={isLoadingMore}
-            className="px-6 py-2.5 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
-          >
-            {isLoadingMore ? 'Chargement…' : 'Charger plus'}
-          </button>
-        </div>
+        <>
+          {isLoadingMore && (
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:mt-4 md:gap-4 lg:grid-cols-4" aria-hidden="true">
+              {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+            </div>
+          )}
+          <p className="sr-only" role="status" aria-live="polite">
+            {isLoadingMore ? 'Chargement de produits supplémentaires…' : ''}
+          </p>
+          {loadMoreFailed && (
+            <div className="mt-6 flex flex-col items-center gap-2 text-center">
+              <p className="text-sm text-gray-500">Impossible de charger la suite du catalogue.</p>
+              <button
+                type="button"
+                onClick={() => void handleLoadMore()}
+                className="min-h-11 rounded-full border border-gray-200 px-6 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
+          <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+        </>
+      )}
+      {!isPending && !hasMore && page > 1 && (
+        <p className="mt-8 text-center text-sm text-gray-400">Vous avez vu tous les produits.</p>
       )}
 
       {/* Résultats similaires — recherche sémantique, cascade uniquement si peu de résultats textuels */}

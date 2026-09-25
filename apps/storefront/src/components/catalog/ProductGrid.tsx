@@ -4,7 +4,7 @@ import { ProductCard } from './ProductCard';
 /** Placeholder animé — même gabarit (image + 2 lignes) et mêmes tokens
  *  radius que la ProductCard réelle, pour que le passage skeleton → contenu
  *  ne "saute" pas visuellement. */
-function ProductCardSkeleton() {
+export function ProductCardSkeleton() {
   return (
     <div className="rounded-lg overflow-hidden border border-gray-200 animate-pulse">
       <div className="aspect-[4/3] bg-gray-100 sm:aspect-square" />
