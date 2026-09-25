@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 // Bascule les deux flags d'activation indépendants du module (052) —
 // events_enabled et services_enabled sur `tenants`, jamais de valeur par
 // défaut hardcodée pour un tenant en particulier.
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
@@ -43,3 +44,5 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json(data);
 }
+
+export const PATCH = withStorefrontInvalidation(['tenant'], handlePATCH);

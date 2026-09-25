@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 
 // Un produit ne peut appartenir qu'à un seul groupe *actif* à la fois — la
 // contrainte n'est pas exprimable en SQL partiel (elle traverse une jointure,
 // cf. migration 121), donc elle est vérifiée ici avant l'insertion.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+async function handlePOST(req: NextRequest, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const denied = await requireAdmin(tenant.id);
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ success: true }, { status: 201 });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+async function handleDELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const denied = await requireAdmin(tenant.id);
@@ -86,3 +87,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
+
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);
+export const DELETE = withStorefrontInvalidation(['catalog'], handleDELETE);

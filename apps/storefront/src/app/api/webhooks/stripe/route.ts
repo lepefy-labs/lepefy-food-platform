@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { revalidateTenantCache } from '@/lib/cache/storefrontCache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
@@ -107,6 +108,8 @@ export async function POST(req: NextRequest) {
       console.error('[webhook/billing] errore aggiornamento tenant:', error);
       return NextResponse.json({ error: 'DB update failed' }, { status: 500 });
     }
+
+    revalidateTenantCache();
 
     console.info(`[webhook/billing] abbonamento rinnovato per tenant: ${tenantSlug} fino al ${paidUntil.toISOString()}`);
 

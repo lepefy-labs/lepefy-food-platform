@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { revalidateCatalogCache } from '@/lib/cache/storefrontCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ async function saveCategory(req: NextRequest, update: boolean) {
   revalidatePath('/gadgets');
   revalidatePath('/products/[slug]', 'page');
   revalidatePath('/admin/catalogue', 'layout');
+  revalidateCatalogCache(tenant.id);
   return NextResponse.json({ category: data }, { status: update ? 200 : 201 });
 }
 

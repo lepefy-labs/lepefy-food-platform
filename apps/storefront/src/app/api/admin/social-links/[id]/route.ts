@@ -3,12 +3,13 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import type { SocialPlatform } from '@lepefy/types';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 
 const VALID_PLATFORMS: SocialPlatform[] = ['instagram', 'facebook', 'tiktok', 'youtube', 'linkedin', 'x'];
 
-export async function PATCH(
+async function handlePATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -44,7 +45,7 @@ export async function PATCH(
   return NextResponse.json({ success: true });
 }
 
-export async function DELETE(
+async function handleDELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -68,3 +69,6 @@ export async function DELETE(
 
   return NextResponse.json({ success: true });
 }
+
+export const PATCH = withStorefrontInvalidation(['shop-shell'], handlePATCH);
+export const DELETE = withStorefrontInvalidation(['shop-shell'], handleDELETE);

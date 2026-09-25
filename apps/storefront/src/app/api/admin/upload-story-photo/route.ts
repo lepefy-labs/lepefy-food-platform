@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -10,7 +11,7 @@ export const maxDuration = 30;
 // Upload de la photo illustrant la section "Notre origine" (home). Même
 // pattern que upload-product-image/upload-label-asset : resize sharp, upload
 // bucket `assets`, cache-busting `?v=` (path déterministe via upsert).
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
@@ -53,3 +54,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ imageUrl });
 }
+
+export const POST = withStorefrontInvalidation(['tenant'], handlePOST);

@@ -17,6 +17,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { loadPricingMode, loadTariffFallback } from '@/lib/shipping/tariff/adminData';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -31,7 +32,7 @@ export async function GET() {
   return NextResponse.json({ mode, fallback, migrationReady: mode !== null, activationReady: fallback !== null });
 }
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
@@ -102,3 +103,5 @@ export async function PATCH(req: NextRequest) {
   console.info('[shipping-pricing-mode] tenant:', tenant.id, '→', mode);
   return NextResponse.json({ mode });
 }
+
+export const PATCH = withStorefrontInvalidation(['tenant'], handlePATCH);

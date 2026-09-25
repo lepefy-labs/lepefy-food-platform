@@ -1,54 +1,50 @@
-import { createServiceClient } from '@/lib/supabase/server';
-import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
-import type { Tenant } from '@lepefy/types';
-import { ActiveCheckoutRecoveryBar } from './ActiveCheckoutRecoveryBar';
+'use client';
 
-interface SessionRow {
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useSessionCustomer } from '@/hooks/useSessionCustomer';
+import { useTenant } from '@/providers/TenantProvider';
+import { ActiveCheckoutRecoveryBar, isCheckoutRecoveryPath } from './ActiveCheckoutRecoveryBar';
+
+interface ActiveSession {
   id: string;
-  items: { price: number; quantity: number }[];
-  shipping_total: number;
-  ambassador_discount_amount: number | null;
+  itemCount: number;
+  total: number;
 }
 
-export async function ActiveCheckoutRecovery({ tenant }: { tenant: Tenant }) {
-  const customer = await getSessionCustomer(tenant.id);
-  if (!customer) return null;
+// Résolu côté client (et non plus dans le layout serveur) pour que le layout
+// boutique ne lise jamais les cookies : les invités ne font aucun appel, et
+// un client connecté ne paie la requête que sur les pages où le bandeau
+// s'affiche.
+export function ActiveCheckoutRecovery() {
+  const tenant = useTenant();
+  const pathname = usePathname();
+  const { customer } = useSessionCustomer();
+  const [session, setSession] = useState<ActiveSession | null>(null);
+  const onRecoveryPath = isCheckoutRecoveryPath(pathname);
 
-  const supabase = createServiceClient();
-  const nowIso = new Date().toISOString();
+  useEffect(() => {
+    if (!customer || !onRecoveryPath) {
+      if (!customer) setSession(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch('/api/checkout-sessions/active', { cache: 'no-store', signal: controller.signal })
+      .then(res => (res.ok ? res.json() : { session: null }))
+      .then((data: { session?: ActiveSession | null }) => setSession(data.session ?? null))
+      .catch(() => {
+        // Bandeau purement informatif : un échec réseau le masque simplement.
+      });
+    return () => controller.abort();
+  }, [customer, onRecoveryPath, pathname]);
 
-  // Lazy expiration keeps stale purchase intents out of every customer-facing
-  // surface even without a cron extension installed in Supabase.
-  await supabase
-    .from('checkout_sessions')
-    .update({ status: 'expired', updated_at: nowIso })
-    .eq('tenant_id', tenant.id)
-    .eq('customer_id', customer.id)
-    .eq('status', 'open')
-    .lte('expires_at', nowIso);
-
-  const { data } = await supabase
-    .from('checkout_sessions')
-    .select('id, items, shipping_total, ambassador_discount_amount')
-    .eq('tenant_id', tenant.id)
-    .eq('customer_id', customer.id)
-    .eq('status', 'open')
-    .gt('expires_at', nowIso)
-    .order('last_activity_at', { ascending: false })
-    .limit(1)
-    .maybeSingle() as { data: SessionRow | null };
-
-  if (!data) return null;
-
-  const itemCount = data.items.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const total = subtotal + (data.shipping_total ?? 0) - (data.ambassador_discount_amount ?? 0);
+  if (!session) return null;
 
   return (
     <ActiveCheckoutRecoveryBar
-      sessionId={data.id}
-      itemCount={itemCount}
-      total={total}
+      sessionId={session.id}
+      itemCount={session.itemCount}
+      total={session.total}
       currency={tenant.currency ?? 'eur'}
     />
   );

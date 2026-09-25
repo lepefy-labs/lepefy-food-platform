@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 const ENDPOINT = 'generate-product-image';
 
@@ -162,7 +163,7 @@ async function uploadToStorage(
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
@@ -288,3 +289,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);

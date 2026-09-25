@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createClient } from '@/lib/supabase/server';
 import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
+import { getShopCategories } from '@/lib/catalog/catalogCache';
 
 // Toujours dynamique : dépend de ?page=/?q=/?category=, jamais cacheable
 // comme une réponse unique. Explicite depuis que getTenant() n'utilise plus
@@ -11,7 +12,7 @@ import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter'
 export const dynamic = 'force-dynamic';
 
 /**
- * Page suivante du catalogue pour le bouton "Charger plus" (CatalogClient).
+ * Page suivante du catalogue pour le scroll infini (CatalogClient).
  * Contrairement au SSR de /products (range cumulatif), cette route ne
  * renvoie que la tranche de la page demandée : le client accumule déjà les
  * pages précédentes en mémoire, inutile de les re-transférer.
@@ -21,12 +22,7 @@ export async function GET(req: NextRequest) {
   const tenant = await getTenant(slug);
   const supabase = createClient();
 
-  const { data: categoriesRaw } = await supabase
-    .from('categories')
-    .select('id, slug')
-    .eq('tenant_id', tenant.id)
-    .eq('catalog_scope', 'shop');
-  const categories = categoriesRaw ?? [];
+  const categories = await getShopCategories(tenant.id).catch(() => []);
 
   const page = parsePageParam(req.nextUrl.searchParams.get('page') ?? undefined);
   const q = req.nextUrl.searchParams.get('q') ?? undefined;

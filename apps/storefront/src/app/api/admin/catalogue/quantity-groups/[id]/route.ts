@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+async function handlePATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const denied = await requireAdmin(tenant.id);
@@ -89,7 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ success: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+async function handleDELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const denied = await requireAdmin(tenant.id);
@@ -105,3 +106,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
+
+export const PATCH = withStorefrontInvalidation(['catalog'], handlePATCH);
+export const DELETE = withStorefrontInvalidation(['catalog'], handleDELETE);

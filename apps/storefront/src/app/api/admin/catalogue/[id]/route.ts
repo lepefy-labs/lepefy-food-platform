@@ -6,6 +6,7 @@ import { syncProductEmbedding } from '@/lib/ai/embeddings';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
 
 import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 
@@ -25,7 +26,7 @@ function cleanDescriptions(raw: unknown): Record<string, string> {
   return Object.fromEntries(entries);
 }
 
-export async function PATCH(
+async function handlePATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -125,3 +126,5 @@ export async function PATCH(
 
   return NextResponse.json({ success: true });
 }
+
+export const PATCH = withStorefrontInvalidation(['catalog'], handlePATCH);

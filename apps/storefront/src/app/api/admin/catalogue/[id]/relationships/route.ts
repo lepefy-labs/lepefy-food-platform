@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 import {
   isProductRelationshipType,
   validateProductRelationshipProducts,
@@ -68,7 +69,7 @@ export async function GET(
   });
 }
 
-export async function POST(
+async function handlePOST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
@@ -137,3 +138,5 @@ export async function POST(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ id: data.id }, { status: 201 });
 }
+
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);

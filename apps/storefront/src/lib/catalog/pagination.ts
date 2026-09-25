@@ -1,4 +1,3 @@
-import { prioritizedCatalogIds } from './productMerchandising';
 import { PRODUCT_CARD_SELECT } from './productCardSelect';
 import type { createClient } from '@/lib/supabase/server';
 
@@ -109,48 +108,37 @@ export async function getCatalogPage(
     // Group-filtered browsing must not call the unfiltered ranking RPC.
     return buildProductsQuery(supabase, tenantId, categories, filters).range(offset, offset + limit - 1);
   }
-  const { createServiceClient } = await import('@/lib/supabase/server');
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const categoryId = !filters.q?.trim()
-      ? categories.find(category => category.slug === filters.category)?.id ?? null
-      : null;
-    const recommended = !filters.sort || filters.sort === 'recommended';
-    const pins = recommended
-      ? await buildProductsQuery(supabase, tenantId, categories, filters).lt('position', 0).gt('stock', 0).range(0, 2399)
-      : { data: null, error: null };
-    if (pins.error) return { data: null, count: null, error: pins.error };
-    const pinnedIds = (pins.data ?? []).map(product => product.id);
-    const hasPins = pinnedIds.length > 0;
-    const service = createServiceClient();
-    const { data: ranking, error } = await service.rpc('catalog_ranked_product_ids', {
-      p_tenant_id: tenantId,
-      p_category_id: categoryId,
-      p_query: (filters.q?.trim() ?? '').slice(0, MAX_SEARCH_QUERY_LENGTH),
-      p_sort: filters.sort ?? 'recommended',
-      p_day: rankingDay,
-      p_offset: hasPins ? 0 : offset,
-      p_limit: hasPins ? Math.min(2400, offset + limit + pinnedIds.length) : limit,
-    });
-    if (!error && ranking) {
-      const rows = ranking as { product_id: string; total_count: number }[];
-      const rankedIds = rows.map(row => row.product_id);
-      const ids = hasPins ? prioritizedCatalogIds(rankedIds, pinnedIds, offset, limit) : rankedIds;
-      if (!ids.length) {
-        // Even a deep-link past the last page retains the real result count.
-        const { count, error: countError } = await buildProductsQuery(supabase, tenantId, categories, filters).range(0, 0);
-        if (countError) return { data: null, count: null, error: countError };
-        return { data: [], count: count ?? 0, error: null };
-      }
+    // Import dynamique : garde next/cache et le client service hors du graphe
+    // des tests unitaires qui n'utilisent que buildProductsQuery.
+    const { getRankedCatalogIds } = await import('./catalogCache');
+    let ranking: { ids: string[]; count: number } | null = null;
+    try {
+      // L'ordre (IDs) est mis en cache ; les lignes produit ci-dessous restent
+      // lues à chaque requête, prix et stock toujours frais.
+      ranking = await getRankedCatalogIds(tenantId, {
+        categories: categories.map(({ id, slug }) => ({ id, slug })),
+        q: (filters.q?.trim() ?? '').slice(0, MAX_SEARCH_QUERY_LENGTH),
+        category: filters.category,
+        sort: filters.sort ?? 'recommended',
+        offset,
+        limit,
+        rankingDay,
+      });
+    } catch (error) {
+      // An absent RPC during deployment is expected; other errors deserve a log.
+      const code = (error as { code?: string }).code;
+      if (code !== 'PGRST202' && code !== '42883') console.error('[catalog] Ranking unavailable:', error);
+    }
+    if (ranking) {
+      const { ids, count } = ranking;
+      if (!ids.length) return { data: [], count, error: null };
       const result = await supabase.from('products').select(PRODUCT_SELECT)
         .eq('tenant_id', tenantId).eq('active', true).in('id', ids);
       if (result.error) return { data: null, count: null, error: result.error };
       const byId = new Map((result.data ?? []).map(product => [product.id, product]));
       return { data: ids.map(id => byId.get(id)).filter((product): product is NonNullable<typeof product> => Boolean(product)),
-        count: Number(rows[0]?.total_count ?? 0), error: null };
-    }
-    // An absent RPC during deployment is expected; other errors deserve a log.
-    if (error && error.code !== 'PGRST202' && error.code !== '42883') {
-      console.error('[catalog] Ranking unavailable:', error);
+        count, error: null };
     }
   }
   return buildProductsQuery(supabase, tenantId, categories, filters).range(offset, offset + limit - 1);

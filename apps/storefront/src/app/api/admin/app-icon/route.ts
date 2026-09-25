@@ -4,13 +4,14 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { APP_ICON_MAX_BYTES, validateAppIconMetadata } from '@/lib/tenant/appIcon';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 const ASSETS_BUCKET = 'assets';
 const storagePath = (tenantId: string) => `branding/${tenantId}/app-icon.png`;
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const denied = await requireAdmin(tenant.id);
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ appIconUrl });
 }
 
-export async function DELETE() {
+async function handleDELETE() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const denied = await requireAdmin(tenant.id);
@@ -83,3 +84,6 @@ export async function DELETE() {
 
   return NextResponse.json({ success: true });
 }
+
+export const POST = withStorefrontInvalidation(['tenant'], handlePOST);
+export const DELETE = withStorefrontInvalidation(['tenant'], handleDELETE);

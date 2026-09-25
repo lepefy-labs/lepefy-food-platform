@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getTenantFeatureSetting } from '@/lib/entitlements/tenantFeatureSettings';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 const schema = z.object({
   enabled: z.boolean(),
@@ -12,7 +13,7 @@ const schema = z.object({
   blacklistTerms: z.array(z.string().trim().min(1).max(80)).max(100),
 });
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
@@ -41,3 +42,5 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: 'Impossible d’enregistrer la configuration.' }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = withStorefrontInvalidation(['shop-shell'], handlePATCH);

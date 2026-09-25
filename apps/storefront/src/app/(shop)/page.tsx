@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { CatalogClient } from '@/components/catalog/CatalogClient';
 import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
-import type { Category, ProductWithCategory } from '@lepefy/types';
+import { getCategoryPreviewRows, getShopCategories } from '@/lib/catalog/catalogCache';
+import type { ProductWithCategory } from '@lepefy/types';
 
 // Toujours dynamique : recherche/filtre/pagination pilotés par ?q=/?category=/
 // ?page=, jamais une même réponse pour tous. Explicite depuis que getTenant()
@@ -23,23 +24,12 @@ interface ProductsPageProps {
   searchParams: { category?: string; q?: string; page?: string; sort?: string; day?: string; quantityGroup?: string };
 }
 
-type CategoryPreviewRow = {
-  category_id: string | null;
-  image_url: string | null;
-};
-
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const supabase = createClient();
 
-  const { data: categoriesRaw } = await supabase
-    .from('categories')
-    .select('*')
-    .eq('tenant_id', tenant.id)
-    .eq('catalog_scope', 'shop')
-    .order('position');
-  const categories: Category[] = categoriesRaw ?? [];
+  const categories = await getShopCategories(tenant.id).catch(() => []);
   const searchQuery = searchParams.q?.trim() ?? '';
   const page = parsePageParam(searchParams.page);
   const sort = parseCatalogSort(searchParams.sort);
@@ -52,21 +42,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   // Une seule requête pour toutes les catégories sans visuel configuré :
   // le regroupement et la limite de 3 images restent côté serveur.
   const previewCategoryIds = categories.filter(category => !category.image_url).map(category => category.id);
-  const previewRowsPromise = (async (): Promise<CategoryPreviewRow[]> => {
-    if (searchQuery || previewCategoryIds.length === 0) return [];
-    const previewQueryLimit = Math.min(Math.max(previewCategoryIds.length * 25, 75), 1000);
-    const { data } = await supabase
-      .from('products')
-      .select('category_id, image_url')
-      .eq('tenant_id', tenant.id)
-      .eq('active', true)
-      .in('category_id', previewCategoryIds)
-      .not('image_url', 'is', null)
-      .order('position', { ascending: true })
-      .order('id', { ascending: true })
-      .limit(previewQueryLimit);
-    return (data as CategoryPreviewRow[] | null) ?? [];
-  })();
+  const previewRowsPromise = searchQuery
+    ? Promise.resolve([])
+    : getCategoryPreviewRows(tenant.id, previewCategoryIds).catch(() => []);
 
   // Range cumulatif (0 → page*PAGE_SIZE-1) pour préserver les liens directs
   // ?page=N. Le catalogue et ses visuels décoratifs sont indépendants après la lecture

@@ -6,6 +6,7 @@ import { syncProductEmbedding } from '@/lib/ai/embeddings';
 import { assignBarcodeToProduct } from '@/lib/barcode';
 
 import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 
@@ -100,7 +101,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
@@ -196,3 +197,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ id: data.id }, { status: 201 });
 }
+
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);

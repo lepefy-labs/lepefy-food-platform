@@ -10,6 +10,7 @@ import {
   normalizeProductImages,
 } from '@/lib/catalog/productImages';
 import type { ProductImage } from '@lepefy/types';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -37,7 +38,7 @@ function managedStoragePath(imageUrl: string, tenantId: string, productId: strin
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const startedAt = Date.now();
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
@@ -185,7 +186,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+async function handleDELETE(req: NextRequest) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const denied = await requireAdmin(tenant.id);
@@ -240,3 +241,6 @@ export async function DELETE(req: NextRequest) {
     imageUrl: nextImages[0]?.url ?? null,
   });
 }
+
+export const POST = withStorefrontInvalidation(['catalog'], handlePOST);
+export const DELETE = withStorefrontInvalidation(['catalog'], handleDELETE);

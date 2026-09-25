@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import type { SocialPlatform } from '@lepefy/types';
+import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 // Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
 // Data Cache non disattivata da force-dynamic da solo, confermato in
@@ -36,7 +37,7 @@ export async function GET() {
   return NextResponse.json(data ?? []);
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);
 
@@ -71,3 +72,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(data, { status: 201 });
 }
+
+export const POST = withStorefrontInvalidation(['shop-shell'], handlePOST);

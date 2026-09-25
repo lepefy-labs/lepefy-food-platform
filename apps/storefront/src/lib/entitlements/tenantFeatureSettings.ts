@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import { revalidateShopShellCache } from '@/lib/cache/storefrontCache';
 
 export interface TenantFeatureSetting {
   enabled: boolean;
@@ -63,4 +64,5 @@ export async function setTenantFeatureEnabled(
   if (error) {
     throw new Error(`Unable to update tenant feature setting: ${error.message}`);
   }
+  revalidateShopShellCache(tenantId);
 }
