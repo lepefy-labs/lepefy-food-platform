@@ -37,7 +37,7 @@ export type HomeProduct = {
   order_quantity_step: number;
 };
 
-const HERO_LIMIT = 5;
+const HERO_LIMIT = 6;
 const EDITORIAL_IMAGES = [
   '/images/hero/chloe-spices.webp',
   '/images/hero/chloe-fresh-produce.webp',
@@ -238,13 +238,7 @@ export default async function HomePage() {
     ? EDITORIAL_IMAGES[index % EDITORIAL_IMAGES.length] ?? EDITORIAL_IMAGES[0]
     : null;
 
-  const editorialSlides: HeroSlideData[] = editorialRows && editorialRows.length > 0
-    ? (editorialRows as HeroSlideData[]).map((slide, index) => ({
-        ...slide,
-        kind: 'editorial',
-        image_url: slide.image_url || editorialImage(index),
-      }))
-    : [
+  const fallbackEditorialSlides: HeroSlideData[] = [
         {
           id: 'fallback-spices',
           badge_text: tenant.tagline ?? 'Épicerie africaine',
@@ -285,6 +279,22 @@ export default async function HomePage() {
           kind: 'editorial',
         },
       ];
+  const configuredEditorialSlides: HeroSlideData[] = editorialRows && editorialRows.length > 0
+    ? (editorialRows as HeroSlideData[]).map((slide, index) => ({
+        ...slide,
+        kind: 'editorial',
+        image_url: slide.image_url || editorialImage(index),
+      }))
+    : [];
+  const editorialSlides: HeroSlideData[] = configuredEditorialSlides.length > 0
+    ? [
+        ...configuredEditorialSlides,
+        ...(slug === 'chloefood'
+          ? fallbackEditorialSlides.slice(1).filter((fallback) =>
+              !configuredEditorialSlides.some((slide) => slide.image_url === fallback.image_url))
+          : []),
+      ]
+    : fallbackEditorialSlides;
 
   const dynamicSlides: HeroSlideData[] = [];
 
@@ -362,10 +372,16 @@ export default async function HomePage() {
     });
   }
 
-  const heroSlides = [
-    ...dynamicSlides.slice(0, HERO_LIMIT - 1),
-    ...editorialSlides.slice(0, HERO_LIMIT - Math.min(dynamicSlides.length, HERO_LIMIT - 1)),
-  ];
+  const serviceSlides = dynamicSlides.filter((slide) => slide.kind === 'service');
+  const heroSlides: HeroSlideData[] = [
+    dynamicSlides.find((slide) => slide.kind === 'event'),
+    dynamicSlides.find((slide) => slide.kind === 'offers'),
+    editorialSlides[0],
+    serviceSlides[0],
+    dynamicSlides.find((slide) => slide.kind === 'new-arrivals'),
+    serviceSlides[1],
+    ...editorialSlides.slice(1),
+  ].filter((slide): slide is HeroSlideData => Boolean(slide)).slice(0, HERO_LIMIT);
 
   return (
     <div className="min-h-screen bg-[#f7f9f8]">
