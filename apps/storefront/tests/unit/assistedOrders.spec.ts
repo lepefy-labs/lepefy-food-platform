@@ -462,4 +462,3 @@ test('logistics workflow: an order without email still ships, loyalty runs, no e
   await runOrderTransitionSideEffects({ tenantId: TENANT, orderId: ORDER_ID, previousStatus: 'preparing', nextStatus: 'shipped', email: 'awa@example.com', fullName: 'Awa', fulfillmentType: 'delivery', trackingCode: 'BRT1' }, deps);
   expect(messages).toEqual(['/webhook/order-shipped']);
 });
-
