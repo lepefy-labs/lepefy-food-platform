@@ -184,7 +184,7 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
                 <div>
                   {slide.badge_text && <ShopTag className="mb-3">{slide.badge_text}</ShopTag>}
                   <h2 className="max-w-[22ch] font-display text-3xl font-bold leading-[1.05] text-white md:text-5xl">{slide.title}</h2>
-                  {slide.subtitle && <p className="mt-3 max-w-[42ch] line-clamp-3 text-sm leading-relaxed text-white/88 md:text-base">{slide.subtitle}</p>}
+                  {slide.subtitle && <p className="mt-3 max-w-[42ch] line-clamp-3 text-sm leading-relaxed text-white md:text-base">{slide.subtitle}</p>}
                   {slide.meta && <p className="mt-3 text-xs font-bold uppercase tracking-[.12em] text-[var(--color-secondary)]">{slide.meta}</p>}
                   <div className="mt-6 flex flex-wrap gap-2.5">
                     {slide.cta_primary_label && slide.cta_primary_url && (
