@@ -90,6 +90,12 @@ The shipping logic is the most complex part of the codebase:
 - Any admin route that writes tenant, catalogue, social links, review moderation or review/feature settings wraps its handlers with `withStorefrontInvalidation([...scopes], handler)` so changes appear immediately; the TTLs only bound staleness for writers that forget.
 - `public/sw.js` is network-only (no `fetch` handler): it must not proxy or cache HTML, RSC payloads or Next.js chunks.
 
+### Assisted orders (WhatsApp / phone / Instagram / in-store) — `docs/ASSISTED_ORDERS.md`
+
+- A staff-entered purchase is a `checkout_sessions` row with `origin = 'assisted'` (`draft → open (/pay/[token]) → awaiting_verification → completed`); **no `orders` row exists before payment is confirmed**. Customer-facing recovery code must keep filtering `origin = 'storefront'`.
+- Every conversion (assisted Stripe webhook `metadata.type = assisted_preorder`, manual confirmation, "Déjà payé") goes through `src/lib/orders/convertCheckoutSessionToOrder.ts` → RPC `convert_checkout_session_to_order` (migration 128): row lock + order/items/stock in one transaction, unique `orders.checkout_session_id`; side effects run only when `created = true`.
+- `orders.email` can be null for assisted orders: never assume an email; tracking tokens are `HMAC(orderId + (email ?? ''))`.
+
 ### State Management
 
 Cart state lives in Zustand (`src/stores/cartStore.ts`), persisted to `localStorage` under key `lepefy-cart`. No other global client state.

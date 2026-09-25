@@ -20,7 +20,12 @@ import PickingChecklist from '../../../orders/[id]/PickingChecklist'
 import PickingList from '../../../orders/[id]/PickingList'
 import StatusBadge from '../../../_components/ui/StatusBadge'
 import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent'
-import type { Order, OrderItem } from '@lepefy/types'
+import ShareLinkActions from '../../../_components/ui/ShareLinkActions'
+import type { Order, OrderItem, PaymentConfirmationSource } from '@lepefy/types'
+import { SALES_CHANNEL_LABELS } from '@lepefy/types'
+import { buildOrderTrackingLink } from '@/lib/orders/convertCheckoutSessionToOrder'
+import { buildTrackingShareMessage, preorderReference } from '@/lib/orders/assisted/assistedOrderPolicy'
+import { shopBaseUrl } from '@/lib/orders/assisted/assistedOrderServer'
 import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
 import { loadCartonSuggestion } from '@/lib/shipping/loadCartonSuggestion'
 
@@ -67,10 +72,17 @@ const PICKUP_STEPS = [
 function paymentLabel(method: string | null) {
   if (method === 'stripe') return 'Carte bancaire'
   if (method === 'external_link') return 'Paiement externe'
+  if (method === 'manual') return 'Encaissement enregistré'
   if (method === 'satispay') return 'Satispay'
   if (method === 'in_store') return 'En magasin'
   if (method === 'cash') return 'Espèces'
   return method ?? '—'
+}
+
+const CONFIRMATION_SOURCE_LABELS: Record<PaymentConfirmationSource, string> = {
+  stripe_webhook: 'Confirmé automatiquement par Stripe',
+  admin_verified: 'Paiement déclaré, vérifié manuellement par l’équipe',
+  admin_recorded: 'Encaissement enregistré manuellement par l’équipe',
 }
 
 function elapsedLabel(createdAt: string) {
@@ -127,6 +139,22 @@ export default async function AdminOrderPage({ params }: PageProps) {
     .order('position', { ascending: true })
 
   const carriers = (carriersRaw ?? []) as { name: string }[]
+
+  // Commande assistée / encaissement manuel : origine, audit de l'encaissement
+  // et lien de suivi à partager quand le client n'a pas d'e-mail.
+  const isAssisted = order.order_origin === 'assisted'
+  const showPaymentAudit = isAssisted || Boolean(order.payment_confirmation_source && order.payment_confirmation_source !== 'stripe_webhook')
+  const [assistedSessionResult, confirmerResult] = await Promise.all([
+    isAssisted && order.checkout_session_id
+      ? supabase.from('checkout_sessions').select('id, phone').eq('id', order.checkout_session_id).eq('tenant_id', tenant.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    order.payment_confirmed_by
+      ? supabase.from('admin_users').select('email').eq('id', order.payment_confirmed_by).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const assistedSession = assistedSessionResult.data as { id: string; phone: string | null } | null
+  const confirmedByEmail = (confirmerResult.data as { email: string } | null)?.email ?? null
+  const trackingLink = isAssisted ? buildOrderTrackingLink(order.id, order.email, shopBaseUrl(tenant)) : null
   const shippingDetails = (order.shipping_details ?? null) as ShippingDetails | null
   const isPickup = order.fulfillment_type === 'pickup'
 
@@ -311,7 +339,9 @@ export default async function AdminOrderPage({ params }: PageProps) {
                 <div className="grid gap-3 p-4 sm:grid-cols-2">
                   <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{order.full_name ?? '—'}</p>
-                    <a href={`mailto:${order.email}`} className="mt-1 block break-all text-sm text-[var(--admin-primary-fg)] hover:underline">{order.email}</a>
+                    {order.email
+                      ? <a href={`mailto:${order.email}`} className="mt-1 block break-all text-sm text-[var(--admin-primary-fg)] hover:underline">{order.email}</a>
+                      : <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Pas d’e-mail{assistedSession?.phone ? ` · ${assistedSession.phone}` : ''}</p>}
                   </div>
                   <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
                     <div className="flex items-start gap-2">
@@ -340,6 +370,57 @@ export default async function AdminOrderPage({ params }: PageProps) {
                 </div>
               </section>
             </AdminBlockAccent>
+
+            {showPaymentAudit && (
+              <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5" aria-labelledby="order-origin-title">
+                <h2 id="order-origin-title" className="text-sm font-semibold text-gray-900 dark:text-gray-100">Origine & encaissement</h2>
+                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-gray-500 dark:text-gray-400">Origine</dt>
+                    <dd className="font-medium text-gray-900 dark:text-gray-100">
+                      {isAssisted ? `Saisie par l’équipe${order.sales_channel ? ` · ${SALES_CHANNEL_LABELS[order.sales_channel]}` : ''}` : 'Boutique en ligne'}
+                    </dd>
+                    {assistedSession && (
+                      <Link href={`/admin/orders/precommandes/${assistedSession.id}`} className="mt-1 inline-flex min-h-8 items-center text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">
+                        Précommande {preorderReference(assistedSession.id)} →
+                      </Link>
+                    )}
+                  </div>
+                  <div>
+                    <dt className="text-xs text-gray-500 dark:text-gray-400">Paiement</dt>
+                    <dd className="font-medium text-gray-900 dark:text-gray-100">{order.external_payment_label ?? paymentLabel(order.payment_method)}</dd>
+                    {order.payment_confirmation_source && <dd className="text-xs text-gray-500 dark:text-gray-400">{CONFIRMATION_SOURCE_LABELS[order.payment_confirmation_source]}</dd>}
+                  </div>
+                  {order.payment_received_at && (
+                    <div><dt className="text-xs text-gray-500 dark:text-gray-400">Reçu le</dt><dd className="text-gray-900 dark:text-gray-100">{formatDate(order.payment_received_at, 'fr')}</dd></div>
+                  )}
+                  {order.payment_reference && (
+                    <div><dt className="text-xs text-gray-500 dark:text-gray-400">Référence</dt><dd className="break-all font-mono text-gray-900 dark:text-gray-100">{order.payment_reference}</dd></div>
+                  )}
+                  {confirmedByEmail && (
+                    <div><dt className="text-xs text-gray-500 dark:text-gray-400">Confirmé par</dt><dd className="break-all text-gray-900 dark:text-gray-100">{confirmedByEmail}</dd></div>
+                  )}
+                  {order.payment_note && (
+                    <div className="sm:col-span-2"><dt className="text-xs text-gray-500 dark:text-gray-400">Note d’encaissement</dt><dd className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">{order.payment_note}</dd></div>
+                  )}
+                </dl>
+                {trackingLink && (
+                  <div className="mt-4 border-t border-[var(--admin-border)] pt-4 dark:border-gray-800">
+                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                      {order.email
+                        ? 'Lien de suivi client (également envoyé par e-mail aux étapes clés).'
+                        : 'Le client n’a pas d’e-mail : aucune notification e-mail n’est envoyée. Partagez-lui ce lien de suivi.'}
+                    </p>
+                    <ShareLinkActions
+                      url={trackingLink}
+                      phone={assistedSession?.phone ?? null}
+                      message={buildTrackingShareMessage({ customerName: order.full_name, orderNumber: `#${order.id.slice(0, 8).toUpperCase()}`, url: trackingLink, tenantName: tenant.name })}
+                      copyLabel="Copier le lien de suivi"
+                    />
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
               <div className="mb-4 flex items-center gap-3">

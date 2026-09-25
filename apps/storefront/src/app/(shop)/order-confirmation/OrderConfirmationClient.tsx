@@ -31,7 +31,7 @@ interface OrderItem {
 
 interface Order {
   id:               string;
-  email:            string;
+  email:            string | null;
   fulfillment_type: 'delivery' | 'pickup';
   payment_method:   string | null;
   payment_status:   string;
@@ -277,9 +277,11 @@ export default function OrderConfirmationClient({
         </div>
       )}
 
-      <p className="text-xs text-gray-400 text-center mb-6">
-        Un email de confirmation a été envoyé à {order.email}.
-      </p>
+      {order.email && (
+        <p className="text-xs text-gray-400 text-center mb-6">
+          Un email de confirmation a été envoyé à {order.email}.
+        </p>
+      )}
 
       <div className="text-center">
         <Link href="/" className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>

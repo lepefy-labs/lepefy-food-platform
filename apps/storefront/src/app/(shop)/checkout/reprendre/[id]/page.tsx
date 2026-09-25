@@ -40,6 +40,7 @@ export default async function CheckoutRecoveryPage({
     .select('id, customer_id, email, status, payment_method, expires_at, resume_count')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
+    .eq('origin', 'storefront')
     .maybeSingle();
 
   const session = rawSession as RecoverySession | null;

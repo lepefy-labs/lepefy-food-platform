@@ -41,6 +41,7 @@ export async function GET() {
     .from('checkout_sessions')
     .select('id, items, shipping_total, ambassador_discount_amount')
     .eq('tenant_id', tenant.id)
+    .eq('origin', 'storefront')
     .eq('customer_id', customer.id)
     .eq('status', 'open')
     .gt('expires_at', nowIso)

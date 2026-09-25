@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { IconAlertTriangle, IconArrowLeft, IconClock, IconPackage, IconUser, IconWallet } from '@tabler/icons-react';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -76,7 +76,7 @@ export default async function PendingPaymentManagementPage({ params }: { params:
 
   const { data: rawSession } = await supabase
     .from('checkout_sessions')
-    .select('id, email, full_name, phone, fulfillment_type, shipping_address, items, shipping_total, ambassador_discount_amount, status, expires_at, payment_method, external_payment_type, external_payment_label, external_payment_link, order_id, created_at')
+    .select('id, email, full_name, phone, fulfillment_type, shipping_address, items, shipping_total, ambassador_discount_amount, status, expires_at, payment_method, external_payment_type, external_payment_label, external_payment_link, order_id, created_at, origin')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
     .eq('payment_method', 'external_link')
@@ -85,6 +85,8 @@ export default async function PendingPaymentManagementPage({ params }: { params:
     .maybeSingle();
 
   if (!rawSession) notFound();
+  // Précommande assistée : gérée (confirmation tracée, remise en attente, lien) dans sa fiche dédiée.
+  if ((rawSession as { origin?: string }).origin === 'assisted') redirect(`/admin/orders/precommandes/${params.id}`);
 
   const session = rawSession as {
     id: string;

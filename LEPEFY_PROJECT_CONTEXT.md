@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 25 settembre 2026 — **v6.72 Current-State Snapshot**
+> **Aggiornato:** 25 settembre 2026 — **v6.73 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -235,7 +235,7 @@ Il CRM tenant è disponibile su `/admin/clients`, con Customer 360 su `/admin/cl
 
 `resolveOrCreateCustomer()` è il resolver centrale tenant-scoped per signup, guest checkout, admin ed Events. L'ordine è Auth ID, e-mail normalizzata, telefono sufficientemente affidabile e creazione. Non usa fuzzy matching sul nome. Un guest viene collegato all'account dopo OTP solo se l'identità è univoca nello stesso tenant; collisioni storiche non vengono fuse. Il backfill valorizza `normalized_email` / `normalized_phone` soltanto per valori univoci e lascia le collisioni a revisione manuale; il trigger impedisce nuove collisioni.
 
-Checkout Shop Stripe/external-link/in-store continua a usare prezzi, stock, pagamento e state machine preesistenti, ma risolve anche i guest nel CRM e propaga sempre il `customer_id` quando l'identità è sicura. `event_reservations.customer_id` collega allo stesso customer le prenotazioni realmente riconducibili. `customer_events` è append-only e usa `event_key` tenant-scoped per gli eventi retryable; ordini, loyalty manuale, prenotazioni e consensi restano anche nelle rispettive fonti autorevoli e la timeline Customer 360 le unifica senza creare ordini fittizi.
+Checkout Shop Stripe/external-link/in-store continua a usare prezzi, stock, pagamento e state machine preesistenti, ma risolve anche i guest nel CRM e propaga sempre il `customer_id` quando l'identità è sicura. Gli ordini assistiti (sezione 8) riusano lo stesso resolver con `source = 'admin'` (ricerca per nome/telefono/e-mail, nessun duplicato, nessuna e-mail inventata, nessun consenso marketing dedotto); `orders.email` è nullable **solo** per `order_origin = 'assisted'` e `order_completed` porta `source = 'assisted_order'` con canale e fonte di conferma. Nessuna attribuzione Nala per le vendite assistite. `event_reservations.customer_id` collega allo stesso customer le prenotazioni realmente riconducibili. `customer_events` è append-only e usa `event_key` tenant-scoped per gli eventi retryable; ordini, loyalty manuale, prenotazioni e consensi restano anche nelle rispettive fonti autorevoli e la timeline Customer 360 le unifica senza creare ordini fittizi.
 
 Il read model `customer_crm_overview` deriva in una query aggregata ordini, valore, panier moyen, spesa online/in-store, saldo loyalty, ultima attività, partecipazioni Events, prodotto/categoria preferiti e consenso marketing corrente. RFM mantiene valori raw e score tecnici separati dal segmento umano; la UI mostra le etichette francesi VIP, Fidèle, Potentiel fidèle, Nouveau, À risque, Inactif e Perdu. Le soglie V1 sono centralizzate nel read model.
 
@@ -399,17 +399,31 @@ cart -> checkout_session -> pagamento confermato -> order
 
 L'attribuzione Nala è un sidecar best-effort e non cambia questo state machine. `nala_checkout_attributions` lega per prodotto il checkout all'ultima interaction qualificante e sopravvive a resume/reuse; `nala_conversion_events` registra solo `add_to_cart`, `checkout_started` e `purchase_completed`. La purchase viene scritta dopo le `order_items` da una RPC idempotente e usa il subtotale lordo reale delle sole righe assistite, prima di sconti order-level e shipping. Errori o schema analytics non disponibile non bloccano carrello, checkout, pagamento o ordine.
 
-Checkout session lifecycle:
+Checkout session lifecycle (`checkout_sessions.origin` = `storefront` | `assisted`, migration 128):
 
 ```text
+(assisted) draft -> open | cancelled
 open -> completed | cancelled | expired
 open + external handoff -> awaiting_verification
 awaiting_verification -> completed | cancelled | open
+(assisted) expired -> open (nuovo link)
 ```
 
 Spese di spedizione: ogni percorso di pagamento passa da `lib/shipping/tariff/checkoutShipping.ts` (token legacy in `provider_cost`/`shadow`, token V2 ricalcolato in `tariff`; 409 `SHIPPING_REQUOTE_REQUIRED` → nuovo preventivo e nuova conferma del cliente), vedi sezione 13.
 
-Recovery canonica: `/checkout/reprendre/[id]`; legacy `/orders/en-attente/[id]` redirige lì. Le conferme manuali di pagamento esterno Shop sono protette dalla capability critica `shop_payments.confirm`.
+Recovery canonica: `/checkout/reprendre/[id]`; legacy `/orders/en-attente/[id]` redirige lì. Tutte le superfici di recovery cliente (`activeCheckoutSession`, `/api/checkout-sessions/*`, `/orders`, reminder admin) filtrano `origin = 'storefront'`; l'indice «una sola sessione open per cliente» vale solo per lo storefront. Le conferme manuali di pagamento esterno Shop sono protette dalla capability critica `shop_payments.confirm`.
+
+Conversione centrale: `lib/orders/convertCheckoutSessionToOrder.ts` → RPC transazionale `convert_checkout_session_to_order` (lock `FOR UPDATE` della sessione, ordine + righe + decremento stock + chiusura sessione in una transazione, indice unico `orders.checkout_session_id`, `created=false` sui replay). Solo la chiamata vincente esegue consenso/CRM/Nala/notifiche/rimborso. La usano la conferma admin dei pagamenti esterni (storefront e assistiti), il webhook Stripe dei preordini assistiti e gli incassi registrati; `createOrderFromCheckoutSession.ts` è stato rimosso. Il webhook Stripe **storefront** conserva la propria creazione inline (debito tecnico, sezione 17).
+
+### Ordini assistiti / preordini (migration 128)
+
+*Review del codice: 25/09/2026, base `main@7fd6054ae8ac49e6d383653a296a1a65261ff3e9`.* Documentazione completa, policy e runbook: `docs/ASSISTED_ORDERS.md`.
+
+`Admin → Commandes` espone **Nouvelle commande** (`/admin/orders/new`) e **Précommandes** (`/admin/orders/precommandes`, scheda `/[id]`, modifica `/[id]/modifier`). Un acquisto WhatsApp/telefono/Instagram/negozio è una checkout_session `origin='assisted'` con `sales_channel`: `draft` (Brouillon), `open` (En attente de paiement, link `/pay/<token>`), `awaiting_verification` (Paiement à vérifier), `completed`, `expired`, `cancelled`. «Déjà payé» crea la sessione e la converte subito (`admin_recorded`). Contenuto sempre validato server-side con `validateCheckoutItems` + `verifyCheckoutShipping` (preventivo firmato `/api/shipping/quote`) + sconto ambassador; nessun prezzo/tenant/stato dal browser; `request_key` rende idempotente la saisie.
+
+Link pubblico: token opaco = HMAC(`TRACKING_SECRET`, sessione + nonce), ricercato per SHA-256 tenant-scoped, revocato cambiando nonce; valido 72 h con prezzi garantiti; ogni emissione riapplica prezzi catalogo, disponibilità e spedizione; una modifica revoca il link, annulla il PaymentIntent (rifiutata se il pagamento è in corso) e riporta in `draft`. `/pay/[token]` (fuori dal layout shop, noindex) mostra solo dati di pagamento e propone Stripe (`StripePaymentStep`, `metadata.type = assisted_preorder`) e i `tenant_payment_methods` attivi del modulo shop (bonifico con riferimento `P-XXXXXXXX`); la scelta di un metodo esterno porta a `awaiting_verification`, mai a una conferma. Il successo è mostrato solo quando il server riporta `completed`.
+
+Audit: `orders.order_origin`, `sales_channel`, `checkout_session_id`, `created_by_admin_id`, `payment_confirmation_source` (`stripe_webhook | admin_verified | admin_recorded`), `payment_received_at`, `payment_reference`, `payment_confirmed_by`, `payment_note`; `payment_method = manual` per gli incassi registrati; journal `assisted_order_events` service-role only. Capability: `shop_payments.confirm` per «Déjà payé» e conferme d'incasso, `orders.manage` per creare/modificare/link/annullare, `orders.view` per leggere. Nessuna riserva di stock: verifica finale prima di ogni pagamento/incasso, conflitto dopo pagamento → `stock_conflict` + rimborso Stripe o intervento manuale.
 
 ### Purchase quantity rules (minimo/step SKU e gruppi combinabili)
 
@@ -639,6 +653,8 @@ La pagina cliente `/orders/[id]` mostra timeline Lepefy sincronizzata più recen
 
 **Forfait commerciale (V1G, migration `125`)** : `shipping_pricing_mode = tariff` s'obtient uniquement par l'action admin « Activer cette tarification pour les clients » (RPC atomique `activate_shipping_tariff_version` : une seule version `active` par tenant+pays, activée par/le tracés ; retrait par pays `retire_shipping_tariff_country`, retour global `rollback_shipping_tariff_to_provider_cost`). En mode `tariff`, `/api/shipping/quote` calcule côté serveur le prix de la version active (poids net depuis `products.weight_grams`, zone tenant — CAP hors zones non couvert par le forfait (repli du tenant, ex. Corse/outre-mer/Monaco), territoires extra-douaniers toujours refusés même avec `flat_rate_override` —, `priceFromTariff`, règles pays dans l'ordre du live, jamais `packaging_surcharges`), vérifie la disponibilité logistique avec le même plan de colis que la préparation (`cartonsForWeight` + `tare_g`) : devis identique récent (7 j), sinon appel Packlink limité à 6 s (services persistés en `real_quote`), sinon preuve récente du même CAP (30 j, jamais au-delà du poids logistique vérifié), et signe un **token V2** (`v2.` + HMAC : tenant, montant en centimes, pays, CAP normalisé, poids, empreinte du panier validé, mode, version, devis provider, expiration). `lib/shipping/tariff/checkoutShipping.ts` recalcule et compare dans `/api/checkout` (Stripe + magasin), `/api/checkout/external-link`, le PATCH de session ; `revalidateSessionShipping` protège `create-intent` et le PATCH sans nouveau devis ; toute divergence → 409 `SHIPPING_REQUOTE_REQUIRED`, le client refait le devis et le client reconfirme. Token legacy refusé en `tariff`, token V2 refusé hors `tariff`. `tenants.shipping_tariff_fallback` (`unavailable` défaut | `provider_cost`) règle explicitement les pays sans tarif, les CAP hors zones et les produits sans poids. L'ordre conserve `shipping_details.pricingMode = tariff` + `tariff{versionId, version, zone, poids, tranche, blocs, colis, supplément, TVA, règles, finalCents, providerQuoteTtcCents}` sans `packlinkCost`. Admin « Forfait » : états Brouillon / Shadow / Active / Retirée, confirmation avec checklist (`activationChecklist.ts`), retrait, rollback, repli, tare dans Emballages, rapport « Commandes facturées au forfait ». Page publique `/livraison` (FR/IT, générée depuis la version active) présente mais **masquée** : `tenants.shipping_public_grid_enabled` défaut false. Aucun tenant n'est activé par le déploiement. Runbook : `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §12–13.
 
+Ordini senza e-mail (assistiti, cliente solo telefono): `order-confirmed` e tutte le notifiche di stato cliente sono saltate senza dichiararle inviate (loyalty e recensioni invariate); il token di tracking è HMAC(`orderId` + e-mail vuota) e il link si condivide dall'admin (copia / `wa.me`). Per gli incassi registrati il tenant sceglie se inviare `order-confirmed`.
+
 `docs/NOTIFICATION_JOURNEY_V1.md` resta riferimento notifiche; `tenant_notification_recipients` è source of truth destinatari interni. Gli alert pagamento esterno Shop/Events condividono `notify_external_payment_pending` ma webhook/payload distinti. Gli eventi aggiungono `notify_event_booking_closed_reports` per i tre report automatici di chiusura.
 
 ---
@@ -692,7 +708,10 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 125_shipping_tariff_activation.sql
 126_tenant_payment_apple_pay.sql
 127_hero_slide_images.sql
+128_assisted_orders.sql
 ```
+
+`128` è additiva ma **operativamente significativa** (checkout, pagamenti, ordini): origine/canale/link/audit su `checkout_sessions`, stato `draft`, e-mail nullable per le sole sessioni/ordini assistiti (vincoli CHECK), colonne di audit incasso e `order_origin` su `orders`, `payment_method = 'manual'`, indice unico `orders.checkout_session_id`, indice «una sessione open per cliente» limitato allo storefront, trigger funnel e vista `checkout_funnel_30d` limitati allo storefront, journal `assisted_order_events` service-role only e RPC `convert_checkout_session_to_order` (EXECUTE solo service_role). Deve essere applicata **prima** del codice (recovery storefront e conferme esterne ne dipendono), poi verificata con `supabase/verification/128_assisted_orders_verification.sql` (transazione annullata). Runbook e rollback: `docs/ASSISTED_ORDERS.md` §10.
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
 
@@ -782,6 +801,9 @@ apps/storefront/src/components/checkout-session/*
 apps/storefront/src/stores/cartStore.ts
 apps/storefront/src/lib/cart/*
 apps/storefront/src/lib/checkout/*
+apps/storefront/src/lib/orders/*
+apps/storefront/src/app/pay/*
+apps/storefront/src/app/api/pay/*
 apps/storefront/src/lib/purchaseQuantityRules.ts
 apps/storefront/src/lib/catalog/*
 apps/storefront/src/components/catalog/ProductCard.tsx
@@ -810,6 +832,8 @@ supabase/migrations/*
 - collisione storica prefisso migration `071`: non rinominare retroattivamente;
 - telefono checkout non uniformemente server-enforced;
 - legacy `CheckoutForm.tsx`: verificare caller prima della rimozione;
+- il webhook Stripe storefront (`payment_intent.succeeded` senza `metadata.type`) crea ancora l'ordine inline invece di usare la RPC `convert_checkout_session_to_order`: due implementazioni di scrittura ordine restano (idempotenza garantita dall'indice unico sul PaymentIntent);
+- ordini assistiti: nessuna riserva di stock durante la validità del link (per design) e indirizzi inseriti dall'operatore non salvati nella rubrica cliente;
 - abandoned-checkout outbound automatico non abilitato senza policy consenso/timing;
 - tenant resolution resta deployment/env-based (`NEXT_PUBLIC_TENANT_SLUG`);
 - URL Events resta temporaneamente env-based;
@@ -842,7 +866,7 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.72
+# Fine snapshot v6.73
 
 **Base audit:** `main` @ `e0d5bf3` — Shipping Intelligence V1A–V1E, loyalty Wallet, verified service reviews, purchase quantity rules, ProductCard consolidato, e hero Découvrir con contenuti live.
 **Data:** 25 settembre 2026

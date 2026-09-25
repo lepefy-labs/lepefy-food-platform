@@ -82,7 +82,7 @@ export function validateOrderTransition({
   return { ok: true };
 }
 
-function buildTrackingLink(orderId: string, email: string, storefrontUrl: string): string | null {
+function buildTrackingLink(orderId: string, email: string | null, storefrontUrl: string): string | null {
   if (!process.env.TRACKING_SECRET || !storefrontUrl) return null;
   const trackingToken = generateTrackingToken(orderId, email);
   return `${storefrontUrl}/orders/${orderId}?token=${trackingToken}`;
@@ -103,7 +103,10 @@ export async function runOrderTransitionSideEffects({
   orderId: string;
   previousStatus: OrderStatus;
   nextStatus: OrderStatus;
-  email: string;
+  // Null pour une commande assistée sans e-mail : aucun e-mail client n'est
+  // émis (loyalty et avis restent traités) ; le lien de suivi se partage
+  // manuellement depuis l'admin.
+  email: string | null;
   fullName: string | null;
   fulfillmentType: FulfillmentType;
   trackingCode?: string | null;
@@ -125,6 +128,10 @@ export async function runOrderTransitionSideEffects({
   }
 
   if (!process.env.N8N_WEBHOOK_URL) return;
+  if (!email) {
+    console.info('[admin order workflow] order without email — customer notification skipped — order_id:', orderId);
+    return;
+  }
   const tenant = await dependencies.getTenantNotificationContext(tenantId);
   if (!tenant) {
     console.warn('[admin order workflow] tenant notification context unavailable — skipping webhook — tenant_id:', tenantId);

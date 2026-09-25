@@ -45,6 +45,14 @@ Internal tenant notifications use `tenant_notification_recipients`; recipient ad
 | `order-cancelled` | Order reaches `cancelled` | Order is cancelled and customer knows what happens next | `Voir ma commande` or support | Email |
 | `order-stock-conflict` | Post-payment stock decrement conflict | Operational incident requiring staff handling | Admin/internal in v1 | Internal |
 
+### Assisted orders and orders without email
+
+Assisted orders (`docs/ASSISTED_ORDERS.md`) reuse the same events, emitted once by the winning conversion
+(`convert_checkout_session_to_order`). `order-confirmed` is never sent before payment confirmation; for payments
+recorded by staff it is sent only if the operator ticks the option. When the customer has no email (phone-only
+WhatsApp customer), `order-confirmed` and every status email above are skipped and never reported as sent;
+the tracking link is shared manually from the admin (copy / WhatsApp). No WhatsApp message is sent automatically.
+
 ## Events intentionally not sent
 
 ### `preparing`

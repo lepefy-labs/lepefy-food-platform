@@ -15,6 +15,100 @@ import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSi
 import type { ShippingAddress, EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
+import { convertCheckoutSessionToOrder } from '@/lib/orders/convertCheckoutSessionToOrder';
+import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
+import { computePreorderTotals, toCents } from '@/lib/orders/assisted/assistedOrderPolicy';
+
+// ─── Précommandes assistées (/pay/[token]) ──────────────────────────────────
+
+async function refundDuplicateAssistedPayment(
+  stripe: Stripe,
+  intent: Stripe.PaymentIntent,
+  tenantId: string,
+  sessionId: string,
+  orderId: string | null,
+) {
+  const supabase = createServiceClient();
+  let refunded = false;
+  try {
+    await stripe.refunds.create({ payment_intent: intent.id }, { idempotencyKey: `assisted-duplicate-refund:${intent.id}` });
+    refunded = true;
+  } catch (refundErr) {
+    console.error('[webhook] duplicate assisted payment refund FAILED — intent:', intent.id, '— manual refund required:', refundErr);
+  }
+  await recordAssistedOrderEvent(supabase, {
+    tenantId, checkoutSessionId: sessionId, orderId, eventType: 'duplicate_payment', actorType: 'system',
+    detail: { payment_intent_id: intent.id, amount_cents: intent.amount_received, refunded },
+  });
+}
+
+async function handleAssistedPreorderPaymentSucceeded(intent: Stripe.PaymentIntent, stripe: Stripe): Promise<NextResponse> {
+  const sessionId = intent.metadata?.session_id;
+  const tenantId = intent.metadata?.tenant_id;
+  if (!sessionId || !tenantId) {
+    console.error('[webhook] assisted_preorder intent without session/tenant metadata — intent:', intent.id);
+    return NextResponse.json({ received: true });
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('checkout_sessions')
+    .select('id, tenant_id, origin, status, order_id, items, shipping_total, ambassador_discount_amount')
+    .eq('id', sessionId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (error) {
+    console.error('[webhook] assisted session lookup failed — intent:', intent.id, error);
+    return NextResponse.json({ error: 'lookup_failed' }, { status: 500 });
+  }
+  const session = data as {
+    id: string; origin: string; status: string; order_id: string | null;
+    items: Array<{ price: number; quantity: number }>; shipping_total: number | null; ambassador_discount_amount: number | null;
+  } | null;
+  if (!session || session.origin !== 'assisted') {
+    console.error('[webhook] assisted session not found for tenant — intent:', intent.id, '— session:', sessionId);
+    return NextResponse.json({ received: true });
+  }
+
+  const expectedCents = toCents(computePreorderTotals(session.items ?? [], session.shipping_total, session.ambassador_discount_amount).total);
+  if (intent.amount_received !== expectedCents) {
+    // Ne devrait jamais arriver (toute modification annule l'intent ouvert) :
+    // le paiement est capturé, on crée la commande et on trace l'écart.
+    console.error('[webhook] assisted payment amount mismatch — intent:', intent.id, '— received:', intent.amount_received,
+      '— expected:', expectedCents);
+    await recordAssistedOrderEvent(supabase, {
+      tenantId, checkoutSessionId: sessionId, eventType: 'amount_mismatch', actorType: 'system',
+      detail: { payment_intent_id: intent.id, received_cents: intent.amount_received, expected_cents: expectedCents },
+    });
+  }
+
+  const result = await convertCheckoutSessionToOrder(supabase, {
+    tenantId,
+    sessionId,
+    payment: { source: 'stripe_webhook', paymentIntentId: intent.id },
+  });
+
+  if (!result.ok) {
+    if (result.reason === 'rpc_unavailable' || result.reason === 'conversion_failed') {
+      // Transitoire : Stripe réessaiera, la conversion est idempotente.
+      return NextResponse.json({ error: 'conversion_failed' }, { status: 500 });
+    }
+    console.error('[webhook] assisted preorder not convertible — intent:', intent.id, '— reason:', result.reason,
+      '— status:', result.sessionStatus);
+    await refundDuplicateAssistedPayment(stripe, intent, tenantId, sessionId, session.order_id);
+    return NextResponse.json({ received: true });
+  }
+
+  if (!result.created && result.order.stripe_payment_intent_id !== intent.id) {
+    // La précommande a déjà été réglée autrement (ex. encaissement confirmé
+    // par l'équipe) : ce second paiement est remboursé, jamais une 2e commande.
+    console.error('[webhook] duplicate payment for converted assisted preorder — intent:', intent.id,
+      '— order:', result.order.id);
+    await refundDuplicateAssistedPayment(stripe, intent, tenantId, sessionId, result.order.id);
+  }
+
+  return NextResponse.json({ received: true });
+}
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
@@ -139,6 +233,12 @@ export async function POST(req: NextRequest) {
     // ci-dessus, routé avant la logique commande existante.
     if (intent.metadata?.type === 'rental_reservation') {
       return handleRentalReservationPaymentSucceeded(intent);
+    }
+
+    // Précommande assistée payée via /pay/[token] — conversion par le service
+    // central idempotent (verrou + clé unique session → commande).
+    if (intent.metadata?.type === 'assisted_preorder') {
+      return handleAssistedPreorderPaymentSucceeded(intent, stripe);
     }
 
     const sessionId = intent.metadata?.session_id;

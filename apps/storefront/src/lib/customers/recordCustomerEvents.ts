@@ -42,13 +42,15 @@ export async function recordOrderCustomerEvents(input: {
   total: number;
   source: string;
   items: Array<{ productId?: string | null; name: string; quantity: number; subtotal?: number }>;
+  /** Ex. origine assistée et canal commercial — jamais de consentement déduit. */
+  orderMetadata?: Record<string, unknown>;
 }) {
   if (!input.customerId) return;
   await recordCustomerEvents([
     {
       tenantId: input.tenantId, customerId: input.customerId, eventType: 'order_completed',
       source: input.source, entityType: 'order', entityId: input.orderId,
-      eventKey: `order_completed:${input.orderId}`, metadata: { total: input.total },
+      eventKey: `order_completed:${input.orderId}`, metadata: { ...(input.orderMetadata ?? {}), total: input.total },
     },
     ...input.items.map((item, index) => ({
       tenantId: input.tenantId, customerId: input.customerId!, eventType: 'product_purchased' as const,

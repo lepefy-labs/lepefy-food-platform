@@ -8,8 +8,10 @@ import {
   IconBuildingStore,
   IconChevronLeft,
   IconChevronRight,
+  IconClipboardList,
   IconCurrencyEuro,
   IconPackage,
+  IconPlus,
   IconSearch,
   IconTruck,
   IconX,
@@ -160,7 +162,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
   // l'historique du tenant) + le scan JS derrière.
   const operationalFlagColumn = OPERATIONAL_FLAG_COLUMN[filterView]
 
-  const [{ data: stats }, { data: carriersRaw }, { data: pendingPaymentsRaw }, operationalIdsResult] = await Promise.all([
+  const [{ data: stats }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: activePreordersCount }, operationalIdsResult] = await Promise.all([
     supabase
       .from('admin_order_dashboard_stats')
       .select('*')
@@ -177,7 +179,15 @@ export default async function AdminPage({ searchParams }: PageProps) {
       .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
       .eq('tenant_id', tenant.id)
       .eq('payment_method', 'external_link')
+      .in('status', ['open', 'expired', 'awaiting_verification'])
+      .is('order_id', null)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('checkout_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('origin', 'assisted')
+      .in('status', ['draft', 'open', 'awaiting_verification']),
     // Seulement quand une carte "file opérationnelle" est active — la vue
     // n'est interrogée pour ses ids que si on en a réellement besoin pour
     // filtrer la liste paginée ci-dessous.
@@ -305,7 +315,22 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-8">
-      <AdminPageHeader title="Commandes" description="Traitez d'abord les commandes qui demandent votre attention." meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`} />
+      <AdminPageHeader
+        title="Commandes"
+        description="Traitez d'abord les commandes qui demandent votre attention."
+        meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`}
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/admin/orders/precommandes" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+              <IconClipboardList size={17} /> Précommandes
+              {(activePreordersCount ?? 0) > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800">{activePreordersCount}</span>}
+            </Link>
+            <Link href="/admin/orders/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white hover:opacity-90">
+              <IconPlus size={17} /> Nouvelle commande
+            </Link>
+          </div>
+        )}
+      />
 
       <section className="mb-4 rounded-2xl border border-[var(--admin-border)] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-4">
         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

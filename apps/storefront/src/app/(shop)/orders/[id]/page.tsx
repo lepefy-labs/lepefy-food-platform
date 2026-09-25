@@ -57,7 +57,7 @@ interface OrderRow {
   status: string;
   created_at: string;
   updated_at: string;
-  email: string;
+  email: string | null;
   full_name: string | null;
   total: number;
   shipping_cost: number;
@@ -93,11 +93,11 @@ function trackingBaseUrl(carrier: string | null) {
   return CARRIER_URLS[carrier.toLowerCase().trim()] ?? null;
 }
 
-function isValidToken(orderId: string, email: string, token: string): boolean {
+function isValidToken(orderId: string, email: string | null, token: string): boolean {
   if (!process.env.TRACKING_SECRET || !token) return false;
   const expected = crypto
     .createHmac('sha256', process.env.TRACKING_SECRET)
-    .update(orderId + email)
+    .update(orderId + (email ?? ''))
     .digest('hex');
   try {
     return crypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'));

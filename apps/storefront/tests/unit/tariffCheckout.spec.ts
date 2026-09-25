@@ -448,6 +448,10 @@ test.describe('parcours de paiement', () => {
     const webhook = src('app/api/webhooks/stripe/route.ts');
     expect(webhook).toContain('shipping_details:          checkoutSession.shipping_details ?? null');
     expect(webhook).toContain("'23505'");
-    expect(src('lib/orders/createOrderFromCheckoutSession.ts')).toContain('shipping_details: session.shipping_details ?? null');
+    // Conversion partagée (confirmation manuelle / précommandes assistées) : la
+    // RPC transactionnelle copie le snapshot de la session sur la commande.
+    const conversion = readFileSync(join(__dirname, '../../../../supabase/migrations/128_assisted_orders.sql'), 'utf8');
+    expect(conversion).toContain('s.fulfillment_type, s.shipping_address, s.shipping_details');
+    expect(conversion).toContain('orders_checkout_session_id_uniq');
   });
 });

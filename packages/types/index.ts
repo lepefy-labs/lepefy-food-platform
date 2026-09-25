@@ -15,3 +15,4 @@ export * from './shippingCountryRule';
 export * from './shippingIntelligence';
 export * from './events';
 export * from './notificationRecipients';
+export * from './assistedOrders';

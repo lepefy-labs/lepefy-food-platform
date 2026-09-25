@@ -22,6 +22,13 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   const read = isRead(method);
 
   if (/^\/api\/admin\/checkout-sessions\/[^/]+\/confirm-payment$/.test(path)) return 'shop_payments.confirm';
+  // Commandes assistées : enregistrer un encaissement (« Déjà payé ») ou
+  // confirmer un paiement déclaré crée une commande payée → capability critique.
+  if (path === '/api/admin/assisted-orders/paid') return method.toUpperCase() === 'POST' ? 'shop_payments.confirm' : null;
+  if (/^\/api\/admin\/assisted-orders\/[^/]+\/confirm-payment$/.test(path)) return method.toUpperCase() === 'POST' ? 'shop_payments.confirm' : null;
+  // Recherche client / catalogue réservée à la saisie (données de contact).
+  if (path.startsWith('/api/admin/assisted-orders/customers') || path === '/api/admin/assisted-orders/products') return 'orders.manage';
+  if (path.startsWith('/api/admin/assisted-orders')) return read ? 'orders.view' : 'orders.manage';
   if (path.startsWith('/api/admin/checkout-sessions')) return read ? 'orders.view' : 'orders.manage';
   if (/^\/api\/admin\/orders\/[^/]+\/shipment\/(attach|sync|manual)$/.test(path)) return method.toUpperCase() === 'POST' ? 'orders.manage' : null;
   if (path.startsWith('/api/admin/orders')) return read ? 'orders.view' : 'orders.manage';

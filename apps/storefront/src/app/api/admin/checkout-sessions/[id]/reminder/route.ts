@@ -44,6 +44,7 @@ export async function POST(
     .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, status, expires_at, payment_method, external_payment_type, external_payment_label, order_id, created_at')
     .eq('id', params.id)
     .eq('tenant_id', tenant.id)
+    .eq('origin', 'storefront')
     .eq('payment_method', 'external_link')
     .in('status', ['open', 'awaiting_verification'])
     .is('order_id', null)

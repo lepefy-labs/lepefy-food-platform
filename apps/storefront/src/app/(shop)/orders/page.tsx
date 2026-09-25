@@ -53,7 +53,7 @@ export default async function OrdersListPage() {
       .eq('tenant_id', tenant.id).eq('customer_id', customerId).eq('status', 'open').lte('expires_at', nowIso);
     return supabase.from('checkout_sessions')
       .select('id, full_name, fulfillment_type, shipping_total, ambassador_discount_amount, payment_method, external_payment_label, items, created_at')
-      .eq('tenant_id', tenant.id).eq('customer_id', customerId).eq('status', 'open').gt('expires_at', nowIso)
+      .eq('tenant_id', tenant.id).eq('origin', 'storefront').eq('customer_id', customerId).eq('status', 'open').gt('expires_at', nowIso)
       .order('last_activity_at', { ascending: false }).limit(1) as unknown as Promise<{ data: PendingSessionRow[] | null }>;
   }
 

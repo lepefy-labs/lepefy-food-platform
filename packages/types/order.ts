@@ -1,3 +1,5 @@
+import type { SalesChannel } from './assistedOrders';
+
 export type OrderStatus =
   | 'new'
   | 'preparing'
@@ -8,7 +10,11 @@ export type OrderStatus =
   | 'stock_conflict';
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
-export type PaymentMethod = 'stripe' | 'satispay' | 'cash' | 'in_store' | 'external_link';
+export type PaymentMethod = 'stripe' | 'satispay' | 'cash' | 'in_store' | 'external_link' | 'manual';
+/** Qui a confirmé le paiement (migration 128) — null pour les commandes historiques. */
+export type PaymentConfirmationSource = 'stripe_webhook' | 'admin_verified' | 'admin_recorded';
+/** storefront = achat autonome du client ; assisted = saisi par l'équipe. */
+export type OrderOrigin = 'storefront' | 'assisted';
 export type FulfillmentType = 'delivery' | 'pickup';
 
 export type NormalizedShipmentStatus = 'pending' | 'ready_for_collection' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned' | 'cancelled' | 'unknown';
@@ -23,7 +29,8 @@ export interface Order {
   id: string;
   tenant_id: string;
   customer_id: string | null;
-  email: string;
+  /** Null uniquement pour une commande assistée d'un client joignable par téléphone seulement. */
+  email: string | null;
   full_name: string | null;
   fulfillment_type: FulfillmentType;
   shipping_address: ShippingAddress | null;
@@ -66,6 +73,16 @@ export interface Order {
   /** Required for delivery orders containing fresh/frozen products. */
   cold_chain_packing_checked_at: string | null;
   notes: string | null;
+  /** Migration 128 — absents tant que la migration n'est pas appliquée. */
+  order_origin?: OrderOrigin;
+  sales_channel?: SalesChannel | null;
+  checkout_session_id?: string | null;
+  created_by_admin_id?: string | null;
+  payment_confirmation_source?: PaymentConfirmationSource | null;
+  payment_received_at?: string | null;
+  payment_reference?: string | null;
+  payment_confirmed_by?: string | null;
+  payment_note?: string | null;
   created_at: string;
   updated_at: string;
 }

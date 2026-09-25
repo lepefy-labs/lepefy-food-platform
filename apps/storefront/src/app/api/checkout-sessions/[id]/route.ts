@@ -88,6 +88,9 @@ async function loadAndAuthorizeSession(
     .select('*')
     .eq('id', sessionId)
     .eq('tenant_id', tenantId)
+    // Les précommandes assistées se paient uniquement via /pay/[token] et ne
+    // sont jamais modifiables par le client depuis la reprise du checkout.
+    .eq('origin', 'storefront')
     .in('status', ['open', 'awaiting_verification'])
     .maybeSingle();
 

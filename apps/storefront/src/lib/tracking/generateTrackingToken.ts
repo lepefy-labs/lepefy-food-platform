@@ -5,14 +5,18 @@ import crypto from 'crypto';
 // /orders, validation /orders/[id]). Le pendant client (CopyTrackingButton)
 // ne peut pas importer ce module — il tourne dans le navigateur et rejoue le
 // même algorithme via Web Crypto — mais doit rester bit-à-bit identique.
-export function generateTrackingToken(orderId: string, email: string): string {
+//
+// Une commande assistée peut ne pas avoir d'e-mail (client joignable par
+// téléphone seulement) : l'entrée devient alors orderId seul. Pour toute
+// commande avec e-mail, la signature est strictement inchangée.
+export function generateTrackingToken(orderId: string, email: string | null | undefined): string {
   return crypto
     .createHmac('sha256', process.env.TRACKING_SECRET!)
-    .update(orderId + email)
+    .update(orderId + (email ?? ''))
     .digest('hex');
 }
 
-export function isValidTrackingToken(orderId: string, email: string, token: string): boolean {
+export function isValidTrackingToken(orderId: string, email: string | null | undefined, token: string): boolean {
   if (!process.env.TRACKING_SECRET || !token) return false;
   const expected = generateTrackingToken(orderId, email);
   try {

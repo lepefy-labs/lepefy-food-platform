@@ -53,6 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from('checkout_sessions')
       .select('*')
       .eq('id', params.id)
+      .eq('origin', 'storefront')
       .eq('tenant_id', tenant.id)
       .eq('status', 'open')
       .gt('expires_at', nowIso)

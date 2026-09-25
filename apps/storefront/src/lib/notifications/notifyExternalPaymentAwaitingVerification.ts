@@ -11,7 +11,7 @@ interface ExternalPaymentItem {
 
 interface ExternalPaymentSession {
   id: string;
-  email: string;
+  email: string | null;
   full_name: string | null;
   phone: string | null;
   items: ExternalPaymentItem[];

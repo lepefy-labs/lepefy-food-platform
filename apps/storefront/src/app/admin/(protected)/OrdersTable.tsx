@@ -77,6 +77,7 @@ const PAYMENT_CONFIG: Record<string, { label: string; icon: string; className: s
   satispay: { label: 'Satispay', icon: '🟠', className: 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300' },
   in_store: { label: 'En magasin', icon: '🏪', className: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' },
   cash: { label: 'Espèces', icon: '💶', className: 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300' },
+  manual: { label: 'Encaissé', icon: '✍', className: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300' },
 };
 
 function FlagBadge({ country }: { country: string }) {

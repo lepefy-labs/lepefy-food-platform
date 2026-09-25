@@ -36,7 +36,7 @@ const AGED_PAYMENT_MS = 24 * 60 * 60 * 1000;
 
 export interface PendingPaymentSession {
   id: string;
-  email: string;
+  email: string | null;
   full_name: string | null;
   items: { name: string; price: number; quantity: number }[];
   shipping_total: number;
@@ -184,7 +184,7 @@ export default function PendingPaymentsBanner({
                       </span>
                       <span className="text-[11px] text-gray-400">·</span>
                       <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                        {session.full_name ?? session.email}
+                        {session.full_name ?? session.email ?? 'Client'}
                       </span>
                       {aged && (
                         <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-700 dark:bg-red-950/50 dark:text-red-300">
