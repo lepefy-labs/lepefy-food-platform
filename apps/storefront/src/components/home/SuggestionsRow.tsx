@@ -8,6 +8,7 @@ export interface SuggestionProduct extends HomeProduct {
 }
 
 interface SuggestionsRowProps {
+  id?: string;
   label: string;
   products: SuggestionProduct[];
   currency: string;
@@ -21,11 +22,11 @@ interface SuggestionsRowProps {
  * pourcentage arbitraire. Se masque entièrement si vide, même pattern que
  * "Notre origine".
  */
-export function SuggestionsRow({ label, products, currency }: SuggestionsRowProps) {
+export function SuggestionsRow({ id, label, products, currency }: SuggestionsRowProps) {
   if (products.length === 0) return null;
 
   return (
-    <section>
+    <section id={id} className="scroll-mt-24">
       <div className="flex items-center justify-between px-4 mb-2 mt-5">
         <h2 className="font-display text-sm font-bold text-gray-900">{label}</h2>
       </div>

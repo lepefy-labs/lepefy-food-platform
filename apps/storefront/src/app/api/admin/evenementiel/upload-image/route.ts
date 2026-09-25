@@ -8,11 +8,11 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-// Upload générique pour toutes les images du module Événementiel (bannière
-// événement, tarifs sur place, galerie, article de location, couverture de
-// service) — même pattern que upload-product-image/upload-story-photo : resize
-// sharp, upload bucket `assets`, chemin déterministe par kind + uuid.
-const VALID_KINDS = ['event-banner', 'event-price-list', 'gallery', 'rental-item', 'service-cover'] as const;
+// Upload générique pour les images du module Événementiel et les slides
+// éditoriales de la home (bannière événement, tarifs sur place, galerie,
+// location, couverture de service, hero) — même pattern que les autres
+// uploads : resize sharp, bucket `assets`, chemin tenant-scoped par kind + uuid.
+const VALID_KINDS = ['event-banner', 'event-price-list', 'gallery', 'rental-item', 'service-cover', 'hero-slide'] as const;
 type Kind = typeof VALID_KINDS[number];
 
 export async function POST(req: NextRequest) {

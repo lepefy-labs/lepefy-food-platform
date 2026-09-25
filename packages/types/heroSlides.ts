@@ -11,6 +11,7 @@ export interface TenantHeroSlide {
   cta_primary_url: string | null;
   cta_secondary_label: string | null;
   cta_secondary_url: string | null;
+  image_url: string | null;
   background_variant: HeroSlideBackgroundVariant;
   active: boolean;
   created_at: string;

@@ -14,6 +14,12 @@ export const runtime = 'nodejs';
 
 const VALID_VARIANTS: HeroSlideBackgroundVariant[] = ['primary', 'secondary', 'accent'];
 
+function imageUrl(value: unknown): string | null {
+  const url = String(value ?? '').trim();
+  if (!url) return null;
+  return (url.startsWith('/') && !url.startsWith('//')) || /^https:\/\//i.test(url) ? url : null;
+}
+
 export async function GET() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
@@ -75,6 +81,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const nextPosition = (lastSlide?.position ?? -1) + 1;
 
+  const image = imageUrl(body.image_url);
   const { data, error } = await supabase
     .from('tenant_hero_slides')
     .insert({
@@ -87,6 +94,7 @@ export async function POST(req: NextRequest) {
       cta_primary_url:      body.cta_primary_url ? String(body.cta_primary_url).trim() : null,
       cta_secondary_label:  ctaSecondaryLabel || null,
       cta_secondary_url:    ctaSecondaryUrl || null,
+      ...(image ? { image_url: image } : {}),
       background_variant:   backgroundVariant,
       active:                body.active === undefined ? true : Boolean(body.active),
     })

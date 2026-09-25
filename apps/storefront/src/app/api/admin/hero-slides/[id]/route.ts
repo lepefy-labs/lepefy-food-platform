@@ -8,6 +8,12 @@ export const runtime = 'nodejs';
 
 const VALID_VARIANTS: HeroSlideBackgroundVariant[] = ['primary', 'secondary', 'accent'];
 
+function imageUrl(value: unknown): string | null {
+  const url = String(value ?? '').trim();
+  if (!url) return null;
+  return (url.startsWith('/') && !url.startsWith('//')) || /^https:\/\//i.test(url) ? url : null;
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -47,6 +53,7 @@ export async function PATCH(
   if ('cta_primary_url'     in body) updatePayload.cta_primary_url     = body.cta_primary_url ? String(body.cta_primary_url).trim() : null;
   if ('cta_secondary_label' in body) updatePayload.cta_secondary_label = body.cta_secondary_label ? String(body.cta_secondary_label).trim() : null;
   if ('cta_secondary_url'   in body) updatePayload.cta_secondary_url   = body.cta_secondary_url ? String(body.cta_secondary_url).trim() : null;
+  if ('image_url'           in body) updatePayload.image_url           = imageUrl(body.image_url);
   if ('background_variant'  in body && VALID_VARIANTS.includes(body.background_variant as HeroSlideBackgroundVariant)) {
     updatePayload.background_variant = body.background_variant;
   }

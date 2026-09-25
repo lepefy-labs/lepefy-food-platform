@@ -10,7 +10,8 @@ import { CategoryBlock } from '@/components/home/CategoryBlock';
 import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
 import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
-import { EventBanner } from '@/components/home/EventBanner';
+import { formatDate, formatPrice } from '@/lib/utils/format';
+import type { EventRow, ServiceOffering } from '@lepefy/types';
 
 export const metadata: Metadata = {
   title: 'Découvrir',
@@ -36,19 +37,54 @@ export type HomeProduct = {
   order_quantity_step: number;
 };
 
+const HERO_LIMIT = 5;
+const EDITORIAL_IMAGES = [
+  '/images/hero/chloe-spices.webp',
+  '/images/hero/chloe-fresh-produce.webp',
+  '/images/hero/chloe-traiteur.webp',
+] as const;
+
+function eventHref(slug: string) {
+  const host = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
+  return host ? `https://${host}/evenements/${slug}` : `/evenementiel/evenements/${slug}`;
+}
+
+function serviceHref(slug: string) {
+  const host = process.env.NEXT_PUBLIC_EVENTS_SUBDOMAIN;
+  return host ? `https://${host}/services/${slug}` : `/evenementiel/services/${slug}`;
+}
+
+function heroProducts(products: SuggestionProduct[], currency: string) {
+  return products
+    .filter((product): product is SuggestionProduct & { image_url: string } => Boolean(product.image_url))
+    .slice(0, 3)
+    .map((product) => ({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      image_url: product.image_url,
+      price_label: formatPrice(product.price, currency),
+      compare_at_price_label: product.compare_at_price != null && product.compare_at_price > product.price
+        ? formatPrice(product.compare_at_price, currency)
+        : null,
+    }));
+}
+
 export default async function HomePage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);
   const supabase = createPublicClient();
 
-  // Ces 5 lectures ne dépendent que de tenant.id — aucune ne dépend du
+  // Ces lectures ne dépendent que de tenant.id — aucune ne dépend du
   // résultat d'une autre, elles partent toutes en parallèle.
   const [
     { data: categoriesRaw },
     { data: featuredRaw },
     { count: activeProductsCount },
     { data: discountCandidatesRaw },
-    { data: heroSlidesRaw },
+    { data: heroSlidesRaw, error: heroSlidesError },
+    nextEventResult,
+    servicesResult,
   ] = await Promise.all([
     // 1. Categorie
     supabase
@@ -87,10 +123,28 @@ export default async function HomePage() {
     // encore configuré aucune slide : l'hero ne doit jamais disparaître.
     supabase
       .from('tenant_hero_slides')
-      .select('id, badge_text, title, subtitle, cta_primary_label, cta_primary_url, cta_secondary_label, cta_secondary_url, background_variant')
+      .select('id, badge_text, title, subtitle, cta_primary_label, cta_primary_url, cta_secondary_label, cta_secondary_url, image_url, background_variant')
       .eq('tenant_id', tenant.id)
       .eq('active', true)
       .order('position', { ascending: true }),
+    tenant.events_enabled
+      ? supabase.from('events')
+          .select('id, slug, title, subtitle, date_start, location, banner_image_url')
+          .eq('tenant_id', tenant.id)
+          .eq('status', 'published')
+          .gte('date_start', new Date().toISOString())
+          .order('date_start', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    tenant.services_enabled
+      ? supabase.from('service_offerings')
+          .select('id, slug, type, title, description, cover_image_url, active, sort_order')
+          .eq('tenant_id', tenant.id)
+          .eq('active', true)
+          .in('type', ['traiteur', 'location_materiel'])
+          .order('sort_order', { ascending: true })
+      : Promise.resolve({ data: [] }),
   ]);
   const categories = categoriesRaw ?? [];
   const featuredProducts: HomeProduct[] = (featuredRaw as unknown as HomeProduct[] | null) ?? [];
@@ -163,11 +217,36 @@ export default async function HomePage() {
     .map((cat, index) => ({ cat, index, products: categoryProducts[cat.id] ?? [] }))
     .filter((entry) => entry.products.length > 0);
 
-  const heroSlides: HeroSlideData[] = heroSlidesRaw && heroSlidesRaw.length > 0
-    ? (heroSlidesRaw as HeroSlideData[])
+  // 4bis. Contenus événementiels réels. Les images restent la source des
+  // modules concernés : banner_image_url pour l'événement et cover_image_url
+  // pour les services. En leur absence, la slide garde le gradient tenant :
+  // aucune image éditoriale n'est substituée à un contenu métier.
+  const nextEvent = nextEventResult.data as Pick<EventRow, 'id' | 'slug' | 'title' | 'subtitle' | 'date_start' | 'location' | 'banner_image_url'> | null;
+  const activeServices = (servicesResult.data ?? []) as Pick<ServiceOffering, 'id' | 'slug' | 'type' | 'title' | 'description' | 'cover_image_url' | 'active' | 'sort_order'>[];
+
+  // A deployment may precede the additive database migration. Keep existing
+  // editorial slides visible while the new nullable column is being applied.
+  const editorialRows = heroSlidesError?.code === '42703'
+    ? (await supabase.from('tenant_hero_slides')
+        .select('id, badge_text, title, subtitle, cta_primary_label, cta_primary_url, cta_secondary_label, cta_secondary_url, background_variant')
+        .eq('tenant_id', tenant.id)
+        .eq('active', true)
+        .order('position', { ascending: true })).data
+    : heroSlidesRaw;
+
+  const editorialImage = (index: number) => slug === 'chloefood'
+    ? EDITORIAL_IMAGES[index % EDITORIAL_IMAGES.length] ?? EDITORIAL_IMAGES[0]
+    : null;
+
+  const editorialSlides: HeroSlideData[] = editorialRows && editorialRows.length > 0
+    ? (editorialRows as HeroSlideData[]).map((slide, index) => ({
+        ...slide,
+        kind: 'editorial',
+        image_url: slide.image_url || editorialImage(index),
+      }))
     : [
         {
-          id: 'fallback',
+          id: 'fallback-spices',
           badge_text: tenant.tagline ?? 'Épicerie africaine',
           title: "L'épicerie africaine qui a du caractère.",
           subtitle: "Produits frais, surgelés et d'épicerie fine, sélectionnés avec soin et livrés partout en Europe.",
@@ -175,18 +254,124 @@ export default async function HomePage() {
           cta_primary_url: '/',
           cta_secondary_label: storyEnabled ? 'Notre histoire' : null,
           cta_secondary_url: storyEnabled ? '#origine' : null,
+          image_url: editorialImage(0),
           background_variant: 'primary',
+          kind: 'editorial',
+        },
+        {
+          id: 'fallback-fresh',
+          badge_text: 'Fraîcheur & sélection',
+          title: 'Des produits qui donnent envie de cuisiner.',
+          subtitle: 'Légumes, racines et essentiels choisis pour retrouver les saveurs de chez nous.',
+          cta_primary_label: 'Voir le catalogue',
+          cta_primary_url: '/',
+          cta_secondary_label: null,
+          cta_secondary_url: null,
+          image_url: editorialImage(1),
+          background_variant: 'primary',
+          kind: 'editorial',
+        },
+        {
+          id: 'fallback-table',
+          badge_text: 'Les saveurs de chez nous',
+          title: 'De bons produits, de beaux moments à partager.',
+          subtitle: 'Retrouvez les essentiels qui font vivre une cuisine généreuse au quotidien.',
+          cta_primary_label: 'Explorer le catalogue',
+          cta_primary_url: '/',
+          cta_secondary_label: null,
+          cta_secondary_url: null,
+          image_url: editorialImage(2),
+          background_variant: 'primary',
+          kind: 'editorial',
         },
       ];
+
+  const dynamicSlides: HeroSlideData[] = [];
+
+  if (nextEvent) {
+    dynamicSlides.push({
+      id: `event-${nextEvent.id}`,
+      badge_text: 'Prochain événement',
+      title: nextEvent.title,
+      subtitle: nextEvent.subtitle ?? 'Retrouvez-nous pour un prochain rendez-vous gourmand et convivial.',
+      meta: [formatDate(nextEvent.date_start), nextEvent.location].filter(Boolean).join(' · '),
+      cta_primary_label: "Découvrir l'événement",
+      cta_primary_url: eventHref(nextEvent.slug),
+      cta_secondary_label: null,
+      cta_secondary_url: null,
+      image_url: nextEvent.banner_image_url,
+      background_variant: 'accent',
+      kind: 'event',
+    });
+  }
+
+  const offerHeroProducts = heroProducts(offerProducts, tenant.currency);
+  if (offerHeroProducts.length > 0) {
+    dynamicSlides.push({
+      id: 'offers-live',
+      badge_text: 'Offres du moment',
+      title: 'De belles saveurs à prix doux.',
+      subtitle: 'Une sélection réellement remisée, mise à jour automatiquement depuis le catalogue.',
+      cta_primary_label: 'Voir les offres',
+      cta_primary_url: '/accueil#offres',
+      cta_secondary_label: null,
+      cta_secondary_url: null,
+      image_url: null,
+      background_variant: 'accent',
+      kind: 'offers',
+      products: offerHeroProducts,
+    });
+  }
+
+  for (const type of ['traiteur', 'location_materiel'] as const) {
+    const service = activeServices.find((candidate) => candidate.type === type);
+    if (!service) continue;
+    const isCatering = service.type === 'traiteur';
+    dynamicSlides.push({
+      id: `service-${service.id}`,
+      badge_text: isCatering ? 'Service traiteur' : 'Location de matériel',
+      title: service.title,
+      subtitle: service.description ?? (isCatering
+        ? 'Des plats généreux et une prestation pensée pour vos invités.'
+        : 'Tout le matériel nécessaire pour recevoir simplement et avec style.'),
+      cta_primary_label: isCatering ? 'Découvrir le traiteur' : 'Découvrir la location',
+      cta_primary_url: serviceHref(service.slug),
+      cta_secondary_label: null,
+      cta_secondary_url: null,
+      image_url: service.cover_image_url,
+      background_variant: 'primary',
+      kind: 'service',
+    });
+  }
+
+  const recentHeroProducts = heroProducts(recentProducts, tenant.currency);
+  if (recentHeroProducts.length > 0) {
+    dynamicSlides.push({
+      id: 'new-arrivals-live',
+      badge_text: 'Nouveautés',
+      title: 'Tout juste arrivés en boutique.',
+      subtitle: `Découvrez les derniers produits ajoutés au catalogue ${tenant.name}.`,
+      cta_primary_label: 'Voir les nouveautés',
+      cta_primary_url: '/accueil#nouveautes',
+      cta_secondary_label: null,
+      cta_secondary_url: null,
+      image_url: null,
+      background_variant: 'primary',
+      kind: 'new-arrivals',
+      products: recentHeroProducts,
+    });
+  }
+
+  const heroSlides = [
+    ...dynamicSlides.slice(0, HERO_LIMIT - 1),
+    ...editorialSlides.slice(0, HERO_LIMIT - Math.min(dynamicSlides.length, HERO_LIMIT - 1)),
+  ];
 
   return (
     <div className="min-h-screen bg-[#f7f9f8]">
 
       {/* ── HERO CAROUSEL ── */}
       <HeroCarousel slides={heroSlides} />
-
-      {/* ── BANNIÈRE ÉVÉNEMENTIEL (052) — cross-promo vers /evenementiel ── */}
-      <EventBanner tenant={tenant} />
 
       {/* Contenuto centrato */}
       <div className="max-w-6xl mx-auto w-full">
@@ -270,8 +455,8 @@ export default async function HomePage() {
       )}
 
       {/* ── SUGGESTIONS POUR VOUS ── */}
-      <SuggestionsRow label="Offre pour vous" products={offerProducts} currency={tenant.currency} />
-      <SuggestionsRow label="Sélection du moment" products={recentProducts} currency={tenant.currency} />
+      <SuggestionsRow id="offres" label="Offre pour vous" products={offerProducts} currency={tenant.currency} />
+      <SuggestionsRow id="nouveautes" label="Sélection du moment" products={recentProducts} currency={tenant.currency} />
 
       {/* ── NOTRE ORIGINE ── */}
       <StorySection

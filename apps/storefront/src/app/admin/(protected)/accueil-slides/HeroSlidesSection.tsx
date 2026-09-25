@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { IconChevronUp, IconChevronDown, IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconChevronUp, IconChevronDown, IconPhoto, IconTrash, IconPlus } from '@tabler/icons-react';
 import { VARIANT_BACKGROUND } from '@/components/home/HeroCarousel';
 import type { TenantHeroSlide, HeroSlideBackgroundVariant } from '@lepefy/types';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
@@ -24,6 +24,7 @@ interface SlideFormState {
   cta_primary_url: string;
   cta_secondary_label: string;
   cta_secondary_url: string;
+  image_url: string;
   background_variant: HeroSlideBackgroundVariant;
   active: boolean;
 }
@@ -37,6 +38,7 @@ function toFormState(slide?: TenantHeroSlide): SlideFormState {
     cta_primary_url:     slide?.cta_primary_url ?? '',
     cta_secondary_label: slide?.cta_secondary_label ?? '',
     cta_secondary_url:   slide?.cta_secondary_url ?? '',
+    image_url:            slide?.image_url ?? '',
     background_variant:  slide?.background_variant ?? 'primary',
     active:              slide?.active ?? true,
   };
@@ -61,6 +63,7 @@ interface SlideFormProps {
 function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: SlideFormProps) {
   const [form, setForm] = useState<SlideFormState>(toFormState(initial));
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   function set<K extends keyof SlideFormState>(key: K, value: SlideFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -74,6 +77,24 @@ function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Slide
     }
     setError(null);
     onSubmit(form);
+  }
+
+  async function uploadImage(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('kind', 'hero-slide');
+      const response = await fetch('/api/admin/evenementiel/upload-image', { method: 'POST', body });
+      const data = await response.json() as { imageUrl?: string; error?: string };
+      if (!response.ok || !data.imageUrl) throw new Error(data.error ?? "Échec du téléversement.");
+      set('image_url', data.imageUrl);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Échec du téléversement.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -158,6 +179,38 @@ function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Slide
       </div>
 
       <div>
+        <label className={LABEL_CLS}>Image éditoriale (optionnelle)</label>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+          {form.image_url ? (
+            <div className="aspect-[16/6] bg-cover bg-center" style={{ backgroundImage: `url(${form.image_url})` }} />
+          ) : (
+            <div className="flex aspect-[16/6] items-center justify-center text-gray-300"><IconPhoto size={28} /></div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 p-3">
+            <label className="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium">
+              {uploading ? 'Téléversement…' : form.image_url ? 'Remplacer l’image' : 'Ajouter une image'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadImage(file);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+            {form.image_url && (
+              <button type="button" onClick={() => set('image_url', '')} className="min-h-11 px-3 py-2 text-xs text-red-600">
+                Retirer
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div>
         <label className={LABEL_CLS}>Fond</label>
         <div className="flex items-center gap-3">
           <select
@@ -193,7 +246,7 @@ function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Slide
       <div className="flex items-center gap-2 pt-1">
         <button
           onClick={handleSubmit}
-          disabled={isSaving}
+          disabled={isSaving || uploading}
           className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
         >
           {submitLabel}
@@ -268,7 +321,10 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
 
   async function handleUpdate(id: string, form: SlideFormState) {
     setSavingId(id);
-    const ok = await patchSlide(id, form);
+    const current = slides.find((slide) => slide.id === id);
+    const payload: Partial<SlideFormState> = { ...form };
+    if (form.image_url === (current?.image_url ?? '')) delete payload.image_url;
+    const ok = await patchSlide(id, payload);
     if (ok) {
       setSlides((prev) => prev.map((s) => (s.id === id ? { ...s, ...form } : s)));
       setEditingId(null);

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 24 settembre 2026 — **v6.71 Current-State Snapshot**
+> **Aggiornato:** 25 settembre 2026 — **v6.72 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -88,6 +88,8 @@ Le route storefront canoniche sono:
 ```
 
 La root `/` possiede ricerca, filtro categoria e paginazione tramite query string (`?q=`, `?category=`, `?page=`). I link di navigazione al Catalogue puntano direttamente a `/`; il logo storefront continua a puntare a `/`. La pagina editoriale secondaria è esposta in UI come **Découvrir**, non “Accueil”.
+
+L'hero di `/accueil` è un carousel ibrido limitato a cinque slide. Compone automaticamente, quando i dati pubblici esistono, il prossimo evento, i prodotti realmente in offerta, i servizi attivi `traiteur` e `location_materiel` e gli ultimi prodotti inseriti; completa gli slot restanti con le slide editoriali tenant. Evento e servizi riusano esclusivamente rispettivamente `events.banner_image_url` e `service_offerings.cover_image_url`, senza duplicare media; quando l'immagine del modulo manca, resta il gradient tenant. Le slide prodotto usano immagini e prezzi correnti del catalogo. Il carousel avanza ogni 6,5 secondi, si sospende su hover/focus o tramite controllo esplicito e non parte con `prefers-reduced-motion`. Il banner événementiel separato dalla home è stato rimosso per evitare doppie promozioni. Le slide editoriali supportano `tenant_hero_slides.image_url` e upload admin; gli asset locali generati sono riservati ai fallback editoriali.
 
 Il branding PWA usa `tenants.app_icon_url` come artwork quadrato dedicato per manifest, Apple touch icon e futuri wrapper native/TWA; `NULL` mantiene il fallback compatibile su `logo_url`. L’upload admin è PNG-only, 512×512, massimo 1 MB, tenant-scoped e versionato per invalidare le cache. Sia `app_icon_url` sia il fallback `logo_url` sono sorgenti grafiche: la pipeline rimuove il padding uniforme, conserva le proporzioni e centra l’artwork sul canvas pieno `primary_color`, con scala più prudente per il purpose maskable. L’icona Digital Card resta separata e continua a usare `logo_url`; Digital Asset Links resta configurato tramite `android_package_name` e `android_sha256_fingerprint`. Nel repository non è presente una pipeline Android/Gradle/AAB: un nuovo launcher icon richiede la rigenerazione esterna del wrapper/AAB dal manifest live e un nuovo `versionCode`.
 
@@ -689,6 +691,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 124_shipping_tariff_versions.sql
 125_shipping_tariff_activation.sql
 126_tenant_payment_apple_pay.sql
+127_hero_slide_images.sql
 ```
 
 `087` aggiunge le capability emerse dal full admin authorization audit e le assegna ai system role `platform_owner` e `tenant_admin`; non amplia automaticamente alcun custom role.
@@ -734,6 +737,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `104` abilita la cancellazione account cliente tenant-scoped. Introduce soltanto lo stato minimo service-role-only per retry/manual review, rende esplicite le FK CASCADE/SET NULL necessarie a separare dati di profilo e storico durevole, e aggiunge una RPC transazionale per il cleanup dati. La migration deve essere applicata manualmente prima di usare il flusso; il build Vercel non la esegue.
 
 `113` introduce Reviews V1 verificato: entitlement/settings tenant, capability RBAC dedicate, recensioni service one-per-order paid+delivered, inviti token-hashati, moderazione umana obbligatoria con contenuto immutabile e audit append-only, blacklist deterministica, statistiche pubbliche sulle sole recensioni published e dispatcher retry-safe. L’AI moderation resta disabilitata in V1. La migration è additiva e richiede applicazione manuale in Supabase prima dell’attivazione del modulo.
+
+`127` aggiunge `tenant_hero_slides.image_url` nullable per l'artwork editoriale dell'hero Découvrir. Non esegue backfill, non modifica le slide dinamiche e deve essere applicata prima del codice che seleziona la colonna.
 
 Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/098/099 esistente tramite query service-role tenant-scoped e mantiene invariati retention, checkout, payment e order lifecycle.
 
@@ -837,8 +842,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.71
+# Fine snapshot v6.72
 
-**Base audit:** `main` @ `876a4ac` — `Shipping Intelligence V1A–V1E (qualità dati: equivalenza stretta per CAP, costo operativo per scenario, copertura CAP verificabile, campionamento progressivo, disambiguazione geografica, retrotest per scenario) + n8n scheduler cutover template + city-wide postal campaign expansion + tenant-admin immediate campaign tick + verified service reviews V1 + loyalty Wallet issuance + compact review submission UI + Purchase quantity rules (minimo/step prodotto e gruppo combinabile, migration 121/122) + gate checkout client-side + consolidamento ProductCard`
-**Data:** 22 settembre 2026
+**Base audit:** `main` @ `3bdc64c` — Shipping Intelligence V1A–V1E, loyalty Wallet, verified service reviews, purchase quantity rules, ProductCard consolidato, e hero Découvrir con contenuti live.
+**Data:** 25 settembre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
