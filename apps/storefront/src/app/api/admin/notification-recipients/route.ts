@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json() as {
     email?: unknown; label?: unknown; notify_card_payment?: unknown;
     notify_external_payment_pending?: unknown; notify_order_stock_conflict?: unknown;
-    notify_event_booking_closed_reports?: unknown;
+    notify_event_booking_closed_reports?: unknown; notify_daily_digest?: unknown;
   };
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   if (!isValidEmail(email)) return NextResponse.json({ error: 'Email invalide.' }, { status: 400 });
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     notify_external_payment_pending: typeof body.notify_external_payment_pending === 'boolean' ? body.notify_external_payment_pending : true,
     notify_order_stock_conflict: typeof body.notify_order_stock_conflict === 'boolean' ? body.notify_order_stock_conflict : false,
     notify_event_booking_closed_reports: typeof body.notify_event_booking_closed_reports === 'boolean' ? body.notify_event_booking_closed_reports : true,
+    notify_daily_digest: typeof body.notify_daily_digest === 'boolean' ? body.notify_daily_digest : false,
   }).select('*').single();
 
   if (error) {

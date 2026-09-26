@@ -7,6 +7,7 @@ export interface TenantNotificationRecipient {
   notify_external_payment_pending: boolean;
   notify_order_stock_conflict: boolean;
   notify_event_booking_closed_reports?: boolean;
+  notify_daily_digest?: boolean;
   active: boolean;
   created_at: string;
 }

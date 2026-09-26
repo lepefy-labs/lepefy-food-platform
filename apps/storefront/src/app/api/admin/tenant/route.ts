@@ -39,15 +39,26 @@ const EDITABLE_TENANT_FIELDS = [
   'ambassador_commission_mode',
   'ambassador_split_pool_amount',
   'ambassador_split_pool_ambassador_percent',
+  'daily_digest_enabled',
+  'daily_digest_timezone',
+  'daily_digest_include_empty',
+  'daily_digest_prepare_hours',
+  'daily_digest_pickup_hours',
+  'daily_digest_payment_hours',
+  'daily_digest_shipping_hours',
 ] as const;
 
 const NUMERIC_FIELDS = new Set<string>([
   'countries_served',
   'referral_max_depth',
   'referral_fraud_period_days',
+  'daily_digest_prepare_hours',
+  'daily_digest_pickup_hours',
+  'daily_digest_payment_hours',
+  'daily_digest_shipping_hours',
 ]);
 
-const BOOLEAN_FIELDS = new Set<string>(['loyalty_enabled', 'ambassador_loyalty_from_second_order']);
+const BOOLEAN_FIELDS = new Set<string>(['loyalty_enabled', 'ambassador_loyalty_from_second_order', 'daily_digest_enabled', 'daily_digest_include_empty']);
 
 const DECIMAL_FIELDS = new Set<string>([
   'purchase_points_rate',
@@ -125,6 +136,24 @@ async function handlePATCH(req: NextRequest) {
     const reviewUrl = typeof rawReviewUrl === 'string' ? rawReviewUrl.trim() : '';
     if (reviewUrl && !isHttpsUrl(reviewUrl)) {
       return NextResponse.json({ error: 'Le lien d’avis Google doit commencer par https://.' }, { status: 400 });
+    }
+  }
+
+  if ('daily_digest_timezone' in body) {
+    if (typeof body.daily_digest_timezone !== 'string' || !body.daily_digest_timezone.trim()) {
+      return NextResponse.json({ error: 'Fuseau horaire invalide.' }, { status: 400 });
+    }
+    try { new Intl.DateTimeFormat('en-US', { timeZone: body.daily_digest_timezone.trim() }); }
+    catch { return NextResponse.json({ error: 'Fuseau horaire IANA invalide.' }, { status: 400 }); }
+  }
+  for (const field of ['daily_digest_prepare_hours', 'daily_digest_pickup_hours', 'daily_digest_payment_hours', 'daily_digest_shipping_hours'] as const) {
+    if (field in body && (!Number.isInteger(body[field]) || (body[field] as number) < (field === 'daily_digest_shipping_hours' ? 24 : 1) || (body[field] as number) > 336)) {
+      return NextResponse.json({ error: 'Les seuils doivent être compris entre 1 et 336 heures.' }, { status: 400 });
+    }
+  }
+  for (const field of ['daily_digest_enabled', 'daily_digest_include_empty'] as const) {
+    if (field in body && typeof body[field] !== 'boolean') {
+      return NextResponse.json({ error: 'Paramètre booléen invalide.' }, { status: 400 });
     }
   }
 
