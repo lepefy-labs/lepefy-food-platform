@@ -28,11 +28,6 @@ const EDITABLE_TENANT_FIELDS = [
   'referral_unlock_spending_threshold',
   'referral_fraud_max_conversions',
   'referral_fraud_period_days',
-  'daily_digest_prepare_hours',
-  'daily_digest_pickup_hours',
-  'daily_digest_payment_hours',
-  'daily_digest_shipping_hours',
-  'daily_digest_shipping_hours',
   'referral_fraud_action',
   'ambassador_min_purchase_amount',
   'ambassador_min_commission_amount',
@@ -50,12 +45,17 @@ const EDITABLE_TENANT_FIELDS = [
   'daily_digest_prepare_hours',
   'daily_digest_pickup_hours',
   'daily_digest_payment_hours',
+  'daily_digest_shipping_hours',
 ] as const;
 
 const NUMERIC_FIELDS = new Set<string>([
   'countries_served',
   'referral_max_depth',
   'referral_fraud_period_days',
+  'daily_digest_prepare_hours',
+  'daily_digest_pickup_hours',
+  'daily_digest_payment_hours',
+  'daily_digest_shipping_hours',
 ]);
 
 const BOOLEAN_FIELDS = new Set<string>(['loyalty_enabled', 'ambassador_loyalty_from_second_order', 'daily_digest_enabled', 'daily_digest_include_empty']);
