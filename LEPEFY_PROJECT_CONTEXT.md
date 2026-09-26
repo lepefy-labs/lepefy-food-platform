@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.83 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.84 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -78,7 +78,7 @@ Profondità, bonus d'iscrizione, modalità di disponibilità, soglia di sblocco 
 - riga assente (tenant mai configurato) → valori predefiniti della 040, come un nuovo tenant prima;
 - disattivata, invalida o illeggibile → `null`, cioè programma non disponibile: nessun codice, nessuna idoneità automatica, nessun bonus, nessun punto referral. Le superfici cliente usano `REFERRAL_UNAVAILABLE_VIEW`.
 
-Scrittura admin: `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, come prima), che rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0; il primo salvataggio di un tenant senza riga la crea attiva. **132 è applicata in produzione** (26/09/2026, verificata). La **133** (distruttiva, da applicare solo dopo il deploy del codice senza ripiego legacy) rimuove i trigger della 132, la funzione `referral_config_from_tenant` e le sette colonne; si interrompe se una riga manca o diverge. Fino ad allora i trigger continuano ad allineare le colonne.
+Scrittura admin: `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, come prima), che rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0; il primo salvataggio di un tenant senza riga la crea attiva. **132 e 133 sono applicate in produzione** (26/09/2026, verificate): le sette colonne `tenants.referral_*` di configurazione, i trigger di mirror e `referral_config_from_tenant` non esistono più; `customers.referral_*` e `referral_codes` sono intatti.
 
 ### Carta fedeltà cliente e Wallet
 
@@ -893,7 +893,6 @@ supabase/migrations/*
 - SSO esplicito cross-subdomain shop/events non introdotto;
 - colonne billing legacy in `tenants` restano temporaneamente;
 - le colonne ambassador restano leggibili via PostgREST per il grant di colonna 076: da revocare durante la migrazione del dominio (loyalty: revocato da 130; referral: revocato da 132);
-- referral: finché la 133 non è applicata, le sette colonne `tenants.referral_*` e i trigger di mirror della 132 restano nel DB (nessun lettore applicativo);
 - la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
 - ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è completata per loyalty (130/131) e per referral (132; pulizia 133);
 - Console Platform non è ancora CRUD completo di piani/tenant;
