@@ -1,7 +1,7 @@
 # Rapport opérationnel quotidien (08:00)
 
 ## État / activation
-Migration `129_tenant_daily_digest.sql` is additive and **disabled by default**. It is **applied in production** (26 Sept 2026; verified: `daily_order_digest` registered as non-billable, no settings rows, no runs, no opted-in recipients, Nala row intact). NO email is sent until all of the following are done: secret provisioned, scheduler active, n8n webhook configured and tested, at least one recipient opted in, and the tenant enabled.
+Migration `129_tenant_daily_digest.sql` is additive and **disabled by default**. It is **applied in production** (26 Sept 2026; verified: `daily_order_digest` registered as non-billable, no settings rows, no runs, no opted-in recipients, Nala row intact). As of 26 Sept 2026 evening, ChloeFood is **enabled** from Paramètres (valid config, `include_empty = true`) with one opted-in recipient; no run recorded yet. Emails are actually sent only once the secret, the scheduler and the n8n webhook are also in place — these are outside the repository: check `tenant_daily_digest_runs` after 08:00.
 
 1. ~~Apply migration 129~~ — done (26 Sept 2026). In an environment without it the code fails safe: the internal endpoint answers 503 and Paramètres shows "migration 129 requise".
 2. Set `DAILY_DIGEST_CRON_SECRET` in the storefront production environment (server-side only).

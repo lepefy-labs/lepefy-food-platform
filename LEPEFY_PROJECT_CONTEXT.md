@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.77 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.78 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -27,7 +27,7 @@ Il rapporto operativo alle ore 08:00 locali per tenant usa `POST /api/internal/d
 
 **Payload n8n.** Il payload per `/webhook/daily-order-digest` include HTML in francese, riepilogo, link protetti admin, snapshot precedente e chiave idempotente tenant/data. Il trasporto email resta n8n.
 
-**Stato.** La migration 129 **è applicata in produzione** (26/09/2026; verificato: feature registrata non fatturabile, nessuna riga di settings, nessuna esecuzione, nessun destinatario abilitato, Nala intatta). L'invio resta inattivo: mancano secret, scheduler, webhook n8n collaudato, opt-in dei destinatari e attivazione del tenant. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
+**Stato.** La migration 129 **è applicata in produzione** (26/09/2026; verificato: feature registrata non fatturabile, nessuna riga di settings, nessuna esecuzione, Nala intatta). Stato al 26/09/2026 sera: il tenant ChloeFood è attivato da Paramètres (config valida, `include_empty = true`) con 1 destinatario opt-in; nessuna esecuzione registrata. L'invio effettivo dipende ancora da secret `DAILY_DIGEST_CRON_SECRET`, scheduler n8n e webhook `/webhook/daily-order-digest`, non verificabili dal repository: controllare `tenant_daily_digest_runs` dopo le 08:00. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
 
 ---
 
@@ -69,7 +69,7 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 
 ### Configurazione programma fedeltà (migration 130)
 
-Attivazione e tassi del programma vivono in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` restano come mirror identico mantenuto da due trigger con guardia, così la RPC `process_manual_purchase_points_atomic` e i lettori legacy restano coerenti. Il codice legge tramite `getLoyaltySettings()`: riga valida → riga; riga assente (130 non applicata) o errore → colonne legacy; riga invalida → programma sospeso. Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima), che prima della 130 ripiega sulle colonne legacy con la stessa validazione. Le soglie referral restano su `tenants` e passano ancora da `/api/admin/tenant`. **130 non è applicata in produzione.**
+Attivazione e tassi del programma vivono in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` restano come mirror identico mantenuto da due trigger con guardia, così la RPC `process_manual_purchase_points_atomic` e i lettori legacy restano coerenti. Il codice legge tramite `getLoyaltySettings()`: riga valida → riga; riga assente (130 non applicata) o errore → colonne legacy; riga invalida → programma sospeso. Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima), che prima della 130 ripiega sulle colonne legacy con la stessa validazione. Le soglie referral restano su `tenants` e passano ancora da `/api/admin/tenant`. **130 è applicata in produzione** (26/09/2026; verificato: una riga per tenant identica alle colonne legacy, feature non fatturabile senza piani/override, grant pubblico revocato, altri moduli intatti).
 
 ### Carta fedeltà cliente e Wallet
 
