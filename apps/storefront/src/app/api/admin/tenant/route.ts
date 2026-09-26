@@ -31,6 +31,8 @@ const EDITABLE_TENANT_FIELDS = [
   'daily_digest_prepare_hours',
   'daily_digest_pickup_hours',
   'daily_digest_payment_hours',
+  'daily_digest_shipping_hours',
+  'daily_digest_shipping_hours',
   'referral_fraud_action',
   'ambassador_min_purchase_amount',
   'ambassador_min_commission_amount',
@@ -144,8 +146,8 @@ async function handlePATCH(req: NextRequest) {
     try { new Intl.DateTimeFormat('en-US', { timeZone: body.daily_digest_timezone.trim() }); }
     catch { return NextResponse.json({ error: 'Fuseau horaire IANA invalide.' }, { status: 400 }); }
   }
-  for (const field of ['daily_digest_prepare_hours', 'daily_digest_pickup_hours', 'daily_digest_payment_hours'] as const) {
-    if (field in body && (!Number.isInteger(body[field]) || (body[field] as number) < 1 || (body[field] as number) > 336)) {
+  for (const field of ['daily_digest_prepare_hours', 'daily_digest_pickup_hours', 'daily_digest_payment_hours', 'daily_digest_shipping_hours'] as const) {
+    if (field in body && (!Number.isInteger(body[field]) || (body[field] as number) < (field === 'daily_digest_shipping_hours' ? 24 : 1) || (body[field] as number) > 336)) {
       return NextResponse.json({ error: 'Les seuils doivent être compris entre 1 et 336 heures.' }, { status: 400 });
     }
   }
