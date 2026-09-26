@@ -7,12 +7,17 @@ export interface DigestSettings {
   daily_digest_prepare_hours: number;
   daily_digest_pickup_hours: number;
   daily_digest_payment_hours: number;
+  daily_digest_shipping_hours: number;
 }
 export interface DigestOrder {
   id: string; full_name: string | null; email: string | null;
   payment_status: string; status: string; fulfillment_type: string;
   created_at: string; updated_at: string;
   shipping_normalized_status: string | null; shipping_sync_error: string | null;
+  shipping_provider_reference: string | null;
+  shipping_estimated_delivery_at: string | null;
+  shipping_provider_synced_at: string | null;
+  shipping_tracking_events: Array<{occurredAt?:string}> | null;
 }
 export interface DigestPreorder {
   id: string; full_name: string | null; email: string | null; phone: string | null;
@@ -47,6 +52,20 @@ export function classifyDigest(
       priority='urgent';reason='Suivi transporteur en erreur';action='Vérifier la référence et relancer la synchronisation.';
     }else if(order.payment_status!=='paid'){
       priority='urgent';reason='Statut de paiement incohérent';action='Vérifier le paiement, sans confirmer automatiquement.';
+    }else if(order.status==='shipped' && order.fulfillment_type==='delivery' &&
+      order.shipping_provider_reference && order.shipping_estimated_delivery_at &&
+      Date.parse(order.shipping_estimated_delivery_at)<now.getTime() &&
+      ['in_transit','out_for_delivery','ready_for_collection'].includes(order.shipping_normalized_status??'')){
+      priority='urgent';reason='Date de livraison estimée dépassée';
+      action='Vérifier le suivi transporteur et contacter le client si nécessaire.';
+    }else if(order.status==='shipped' && order.fulfillment_type==='delivery' &&
+      order.shipping_provider_reference && ['in_transit','out_for_delivery'].includes(order.shipping_normalized_status??'')){
+      const times=(order.shipping_tracking_events??[])
+        .map(event=>Date.parse(event.occurredAt??'')).filter(Number.isFinite);
+      const lastMove=times.length?Math.max(...times):NaN;
+      if(!Number.isFinite(lastMove)||age(now,new Date(lastMove).toISOString())<settings.daily_digest_shipping_hours)continue;
+      priority='monitor';reason='Aucun nouvel événement transporteur depuis '+Math.floor(age(now,new Date(lastMove).toISOString())/24)+' j';
+      action='Vérifier le suivi et contacter le transporteur si nécessaire.';
     }else if(order.status==='ready_for_pickup'){
       const overdue=age(now,order.updated_at)>=settings.daily_digest_pickup_hours;
       priority=overdue?'urgent':'monitor';reason=overdue?'Retrait en retard':'Retrait en attente';
