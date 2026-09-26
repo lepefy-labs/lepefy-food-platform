@@ -6,38 +6,36 @@ import {
 import { mergeModuleConfig, resolveModuleConfig } from '../../src/lib/tenantConfig/moduleConfig';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 
-const legacy = { loyalty_enabled: true, purchase_points_rate: 1.5, points_to_currency_rate: 0.02 };
-
-function dbReturning(result: { data: unknown; error: unknown } | Error): SupabaseClient {
+function dbReturning(result: { data: unknown; error: unknown } | Error) {
+  const eqCalls: unknown[][] = [];
   const builder: unknown = new Proxy({}, {
     get(_target, prop) {
       if (prop === 'then') {
         return (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
           (result instanceof Error ? Promise.reject(result) : Promise.resolve(result)).then(resolve, reject);
       }
-      return () => builder;
+      return (...args: unknown[]) => { if (prop === 'eq') eqCalls.push(args); return builder; };
     },
   });
-  return { from: () => builder } as unknown as SupabaseClient;
+  return { db: { from: () => builder } as unknown as SupabaseClient, eqCalls };
 }
 
-test('missing settings row (migration 130 not applied) keeps legacy behavior', () => {
-  expect(resolveLoyaltySettings(resolveModuleConfig(loyaltyModule, null), legacy)).toEqual({
-    enabled: true, purchasePointsRate: 1.5, pointsToCurrencyRate: 0.02, source: 'legacy',
-  });
-  expect(resolveLoyaltySettings(null, { ...legacy, loyalty_enabled: false }).enabled).toBe(false);
-});
-
-test('settings row wins over legacy columns', () => {
-  const state = resolveModuleConfig(loyaltyModule, { enabled: false, config: { version: 1, purchase_points_rate: 2, points_to_currency_rate: 0.05 } });
-  expect(resolveLoyaltySettings(state, legacy)).toEqual({
-    enabled: false, purchasePointsRate: 2, pointsToCurrencyRate: 0.05, source: 'module',
+test('missing settings row (tenant created after 131) keeps the program off', () => {
+  expect(resolveLoyaltySettings(resolveModuleConfig(loyaltyModule, null))).toEqual({
+    enabled: false,
+    purchasePointsRate: LOYALTY_DEFAULTS.purchase_points_rate,
+    pointsToCurrencyRate: LOYALTY_DEFAULTS.points_to_currency_rate,
   });
 });
 
-test('partial settings row falls back to the legacy defaults per key', () => {
+test('stored row is used as-is', () => {
+  const state = resolveModuleConfig(loyaltyModule, { enabled: true, config: { version: 1, purchase_points_rate: 2, points_to_currency_rate: 0.05 } });
+  expect(resolveLoyaltySettings(state)).toEqual({ enabled: true, purchasePointsRate: 2, pointsToCurrencyRate: 0.05 });
+});
+
+test('partial row falls back to the centralized defaults per key', () => {
   const state = resolveModuleConfig(loyaltyModule, { enabled: true, config: { purchase_points_rate: 3 } });
-  expect(resolveLoyaltySettings(state, legacy)).toMatchObject({ purchasePointsRate: 3, pointsToCurrencyRate: LOYALTY_DEFAULTS.points_to_currency_rate });
+  expect(resolveLoyaltySettings(state)).toEqual({ enabled: true, purchasePointsRate: 3, pointsToCurrencyRate: LOYALTY_DEFAULTS.points_to_currency_rate });
 });
 
 test('invalid settings suspend accrual instead of guessing a rate', () => {
@@ -50,21 +48,19 @@ test('invalid settings suspend accrual instead of guessing a rate', () => {
   ]) {
     const state = resolveModuleConfig(loyaltyModule, { enabled: true, config });
     expect(state.status, JSON.stringify(config)).toBe('invalid');
-    expect(resolveLoyaltySettings(state, legacy)).toMatchObject({ enabled: false, purchasePointsRate: 0, source: 'module' });
+    expect(resolveLoyaltySettings(state).enabled).toBe(false);
   }
 });
 
-test('read failure falls back to the mirrored legacy columns', async () => {
-  const settings = await getLoyaltySettings(dbReturning(new Error('network')), 'tenant-a', legacy);
-  expect(settings).toMatchObject({ enabled: true, purchasePointsRate: 1.5, source: 'legacy' });
+test('read failure fails closed (no points at an unknown rate)', async () => {
+  const { db } = dbReturning(new Error('network'));
+  expect((await getLoyaltySettings(db, 'tenant-a')).enabled).toBe(false);
 });
 
-test('stored row is read tenant-scoped and used as-is', async () => {
-  const settings = await getLoyaltySettings(
-    dbReturning({ data: { enabled: true, config: { version: 1, purchase_points_rate: 0.5, points_to_currency_rate: 0.01 } }, error: null }),
-    'tenant-a', { ...legacy, loyalty_enabled: false },
-  );
-  expect(settings).toEqual({ enabled: true, purchasePointsRate: 0.5, pointsToCurrencyRate: 0.01, source: 'module' });
+test('read is tenant-scoped on the loyalty row', async () => {
+  const { db, eqCalls } = dbReturning({ data: { enabled: true, config: { version: 1, purchase_points_rate: 0.5, points_to_currency_rate: 0.01 } }, error: null });
+  expect(await getLoyaltySettings(db, 'tenant-a')).toEqual({ enabled: true, purchasePointsRate: 0.5, pointsToCurrencyRate: 0.01 });
+  expect(eqCalls).toEqual([['tenant_id', 'tenant-a'], ['feature_key', 'loyalty']]);
 });
 
 test('partial admin update keeps other values and current activation', () => {

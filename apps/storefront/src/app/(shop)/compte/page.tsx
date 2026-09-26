@@ -24,7 +24,7 @@ export default async function ComptePage() {
   await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte');
 
   const supabase = createServiceClient();
-  const loyalty = await getLoyaltySettings(supabase, tenant.id, tenant);
+  const loyalty = await getLoyaltySettings(supabase, tenant.id);
   const [member, addresses, points, orders, reviewsAvailable] = await Promise.all([
     supabase.from('customers')
       .select('full_name, phone, loyalty_card_number, is_ambassador, ambassador_profile_completed_at, referral_access_granted, referral_suspended')

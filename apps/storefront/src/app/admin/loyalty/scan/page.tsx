@@ -54,7 +54,7 @@ export default async function LoyaltyScanPage() {
     redirect('/admin/login?error=unauthorized');
   }
 
-  const loyalty = await getLoyaltySettings(adminClient, tenant.id, tenant);
+  const loyalty = await getLoyaltySettings(adminClient, tenant.id);
 
   return (
     <div className="min-h-screen bg-gray-50">

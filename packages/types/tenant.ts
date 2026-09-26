@@ -68,11 +68,8 @@ export interface Tenant {
   story_text: string | null;
   story_image_url: string | null;
   countries_served: number | null;
-  // Loyalty & referral
-  loyalty_enabled: boolean;
+  // Referral (loyalty program settings: tenant_feature_settings 'loyalty', migrations 130/131)
   referral_max_depth: number;
-  purchase_points_rate: number;
-  points_to_currency_rate: number;
   referral_signup_bonus_points: number;
   referral_fraud_max_conversions: number;
   referral_fraud_period_days: number;

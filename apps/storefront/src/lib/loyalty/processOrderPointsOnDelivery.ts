@@ -61,13 +61,13 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
   // ── 2. Fetch config tenant ─────────────────────────────────────────────────
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('loyalty_enabled, referral_max_depth, purchase_points_rate, points_to_currency_rate, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action, ambassador_loyalty_from_second_order')
+    .select('referral_max_depth, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action, ambassador_loyalty_from_second_order')
     .eq('id', tenantId)
     .single();
 
   // ── 3. Feature flag ────────────────────────────────────────────────────────
   if (!tenant) return;
-  const loyalty = await getLoyaltySettings(supabase, tenantId, tenant);
+  const loyalty = await getLoyaltySettings(supabase, tenantId);
   if (!loyalty.enabled) return;
 
   // ── 4. Costruisci entries ──────────────────────────────────────────────────

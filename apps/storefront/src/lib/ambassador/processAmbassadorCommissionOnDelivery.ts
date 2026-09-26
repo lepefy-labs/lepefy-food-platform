@@ -11,7 +11,7 @@ export interface AmbassadorDeliveryContext {
 
 /**
  * Punto d'ingresso "ambassador" al momento della consegna — gira SEMPRE,
- * indipendentemente da tenants.loyalty_enabled (il programma ambassador è
+ * indipendentemente dall'attivazione loyalty (il programma ambassador è
  * separato dal sistema loyalty/referral esistente, vedi 046). Chiamata dallo
  * stesso punto esatto di processOrderPointsOnDelivery (PATCH
  * /admin/orders/[id]), non dentro di essa, per non far dipendere l'una

@@ -2,7 +2,7 @@
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
 > **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130, fasi 1–4; rimozione delle colonne non ancora fatta). Gli altri domini sono solo inventariati. **129 e 130 sono applicate in produzione (26/09/2026, verificate).**
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131). Gli altri domini sono solo inventariati. **129 e 130 sono applicate in produzione (26/09/2026, verificate); 131 non ancora.**
 
 ## 1. Problema
 
@@ -79,15 +79,15 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Migrazione:** bassa priorità.
 - **Rischio:** medio (checkout).
 
-### 3.4 Loyalty — **migrata (130 applicata; fase 5 aperta)**
-- **Struttura:** `tenant_feature_settings('loyalty')`, con `enabled` e config `{version: 1, purchase_points_rate, points_to_currency_rate}` (numeric(10,4): 0–999999.9999, al più 4 decimali; CHECK `is_valid_loyalty_config`). Feature `billable = false`, senza piani: il comportamento attuale dei tenant non cambia.
-- **Colonne legacy:** `tenants.loyalty_enabled`, `purchase_points_rate`, `points_to_currency_rate` restano, **mantenute identiche da due trigger con guardia** (`sync_loyalty_settings_to_tenant`, `sync_tenant_loyalty_to_settings`). Scrivono solo se i valori differiscono, quindi non vanno in ricorsione. Un nuovo tenant riceve automaticamente la riga (disattivata).
+### 3.4 Loyalty — **migrata (130 applicata; 131 di pulizia pronta, da applicare dopo il deploy del codice)**
+- **Struttura:** `tenant_feature_settings('loyalty')`, con `enabled` e config `{version: 1, purchase_points_rate, points_to_currency_rate}` (numeric(10,4): 0–999999.9999, al più 4 decimali; CHECK `is_valid_loyalty_config`). Feature `billable = false`, senza piani. **Unica fonte di verità.**
+- **Colonne legacy:** la 130 le teneva allineate con due trigger. La **131** (distruttiva, rollback nei commenti) le rimuove insieme ai trigger. Prima verifica che ogni tenant abbia una riga identica alle colonne, altrimenti si ferma senza eliminare nulla. Dopo la 131 un nuovo tenant non riceve alcuna riga: riga assente = programma disattivato.
 - **Fuori dal modulo:** `referral_signup_bonus_points` appartiene al referral (3.5); `loyalty_card_sequence` è una sequenza (3.15).
-- **Letture:** `getLoyaltySettings()` in `lib/loyalty/loyaltyConfig.ts`. Precedenza: riga valida → riga; riga assente (130 non applicata) o illeggibile → colonne legacy; riga invalida → programma sospeso. Punti di lettura: `processOrderPointsOnDelivery`, `/compte`, `/compte/carte-fidelite`, wallet, scan admin (pagina e conferma), `/admin/loyalty`. La RPC SQL `process_manual_purchase_points_atomic` legge ancora la colonna legacy, che è il mirror.
-- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/loyalty/settings` (permesso `tenant_settings.manage`, invariato rispetto a `/api/admin/tenant`). Prima della 130 la route scrive le colonne legacy con la stessa validazione. `/api/admin/tenant` non accetta più i campi loyalty.
-- **Esposizione:** S. La 130 revoca il grant pubblico 076 sulle tre colonne.
-- **Prossimo passo (fase 5):** far leggere alla RPC la riga settings, poi rimuovere trigger e colonne in una migrazione separata, dopo aver verificato in produzione che non ci sono altri lettori.
-- **Rischio:** medio (valore economico dei punti). Mitigato dal mirror transazionale e dal controllo di conteggio e valori nel backfill.
+- **Letture:** `getLoyaltySettings(db, tenantId)` in `lib/loyalty/loyaltyConfig.ts`. Riga valida → valori salvati. Riga assente, invalida o illeggibile → programma disattivato: nessun punto a un tasso incerto. Punti di lettura: `processOrderPointsOnDelivery`, `/compte`, `/compte/carte-fidelite`, wallet, scan admin (pagina e conferma), `/admin/loyalty`. Con la 131 anche la RPC `process_manual_purchase_points_atomic` legge la riga settings, con stessa firma e stesso calcolo.
+- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/loyalty/settings` (permesso `tenant_settings.manage`, invariato rispetto a `/api/admin/tenant`). `/api/admin/tenant` non accetta i campi loyalty.
+- **Esposizione:** S.
+- **Ordine di rilascio della 131:** prima il deploy del codice che non seleziona più le colonne, poi la migrazione.
+- **Rischio:** medio (valore economico dei punti). Mitigato dai controlli preliminari della 131 e dai test SQL: storico `points_ledger` invariato e RPC con lo stesso risultato.
 
 ### 3.5 Referral
 - **Colonne:** `referral_signup_bonus_points`, `referral_max_depth`, `referral_availability_mode`, `referral_unlock_spending_threshold`, `referral_fraud_max_conversions`, `referral_fraud_period_days`, `referral_fraud_action`.
@@ -197,7 +197,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 |---|---|---|---|
 | 0 | **Fatto.** Proiezione client esplicita (`toPublicTenant`) nel root layout e in ogni pagina che passa il tenant a Client Components; `PATCH /api/admin/tenant` restituisce solo i campi modificabili (con 129) | Chiude l'esposizione di segreti, billing e anti-frode senza migrazioni | — |
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
-| 2 | Loyalty — **fatto fino alla fase 4 (130 applicata)**; resta la fase 5 | Pochi campi, schema semplice, un solo writer | Medio |
+| 2 | Loyalty — **fatto (130 applicata; 131 di rimozione colonne da applicare dopo il deploy)** | Pochi campi, schema semplice, un solo writer | Medio |
 | 3 | Referral | Dipende dalla loyalty; soglie anti-frode da rendere private | Medio-alto |
 | 4 | AI/Nala (flag, limiti, contesto privato) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |

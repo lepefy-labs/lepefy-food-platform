@@ -12,9 +12,8 @@ interface ManualPurchaseRpcRow {
 }
 
 // Attribue les points d'un achat en caisse via process_manual_purchase_points_atomic
-// (047_loyalty_card_system.sql) — réutilise tenants.purchase_points_rate (miroir
-// de tenant_feature_settings.loyalty maintenu par les triggers de la migration
-// 130), le même taux que les commandes en ligne, sans créer de ligne orders.
+// (047, réécrite par 131) — lit le taux de tenant_feature_settings('loyalty'),
+// le même que pour les commandes en ligne, sans créer de ligne orders.
 // Accessible à tenant_admin ET tenant_cashier.
 export async function POST(req: NextRequest) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -23,7 +22,7 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
   if (denied) return denied;
 
-  const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id, tenant);
+  const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id);
   if (!loyalty.enabled) {
     return NextResponse.json(
       { error: 'Le programme de fidélité n\'est pas activé pour cette boutique.' },

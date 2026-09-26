@@ -24,7 +24,7 @@ export default async function CarteFideliteePage() {
   // La carte affiche un solde de points — sans programme actif pour ce
   // tenant, rien de pertinent à montrer (même principe que le bandeau points
   // conditionnel de AccountDashboard, cf. tenant.loyaltyEnabled).
-  const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id, tenant);
+  const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id);
   if (!loyalty.enabled) redirect('/compte');
 
   const supabase = createServiceClient();

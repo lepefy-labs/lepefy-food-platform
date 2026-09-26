@@ -5,7 +5,7 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 import { LOYALTY_FEATURE_KEY, loyaltyModule, loyaltyPatchSchema, getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import {
-  isModuleRegistered, mergeModuleConfig, updateModuleConfig, ModuleConfigValidationError,
+  isModuleRegistered, updateModuleConfig, ModuleConfigValidationError,
 } from '@/lib/tenantConfig/moduleConfig';
 
 export const runtime = 'nodejs';
@@ -23,25 +23,12 @@ async function handlePATCH(req: NextRequest) {
 
   const db = createServiceClient();
   try {
-    if (await isModuleRegistered(db, LOYALTY_FEATURE_KEY)) {
-      // Migration 130 applied: the settings row is the source of truth and a
-      // trigger mirrors it to the legacy tenants columns in the same transaction.
-      await updateModuleConfig(db, loyaltyModule, tenant.id, parsed.data);
-    } else {
-      // Before migration 130: validate identically, then write the legacy columns.
-      const current = await getLoyaltySettings(db, tenant.id, tenant);
-      const next = mergeModuleConfig(loyaltyModule, {
-        enabled: current.enabled,
-        config: { purchase_points_rate: current.purchasePointsRate, points_to_currency_rate: current.pointsToCurrencyRate },
-      }, parsed.data);
-      const { error } = await db.from('tenants').update({
-        loyalty_enabled: next.enabled,
-        purchase_points_rate: next.config.purchase_points_rate,
-        points_to_currency_rate: next.config.points_to_currency_rate,
-      }).eq('id', tenant.id);
-      if (error) throw new Error(error.message);
+    if (!(await isModuleRegistered(db, LOYALTY_FEATURE_KEY))) {
+      return NextResponse.json({ error: 'La migration 130 doit être appliquée.' }, { status: 409 });
     }
-    return NextResponse.json(await getLoyaltySettings(db, tenant.id, tenant));
+    // The settings row is the only source of truth (legacy columns: migration 131).
+    await updateModuleConfig(db, loyaltyModule, tenant.id, parsed.data);
+    return NextResponse.json(await getLoyaltySettings(db, tenant.id));
   } catch (error) {
     if (error instanceof ModuleConfigValidationError) {
       return NextResponse.json({ error: 'Configuration fidélité invalide.', issues: error.issues }, { status: 400 });
@@ -51,5 +38,5 @@ async function handlePATCH(req: NextRequest) {
   }
 }
 
-// Legacy columns are part of the cached tenant row: refresh it after a write.
+// Refresh tenant-scoped cached pages after a program change.
 export const PATCH = withStorefrontInvalidation(['tenant'], handlePATCH);

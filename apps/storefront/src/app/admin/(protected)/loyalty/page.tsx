@@ -18,7 +18,7 @@ export default async function AdminLoyaltyPage() {
   const tenant = await getTenant(slug);
 
   const supabase = createServiceClient();
-  const loyalty = await getLoyaltySettings(supabase, tenant.id, tenant);
+  const loyalty = await getLoyaltySettings(supabase, tenant.id);
 
   const [{ data: tiers }, { data: pendingEntries }, stuckSignupBonuses] = await Promise.all([
     supabase

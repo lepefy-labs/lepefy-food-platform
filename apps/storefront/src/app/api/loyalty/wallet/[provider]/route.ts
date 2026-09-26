@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: { provider: s
     const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
     const customer = await getSessionCustomer(tenant.id);
     if (!customer) return failure(401, 'Connectez-vous à votre compte pour ajouter votre carte.');
-    const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id, tenant);
+    const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id);
     if (!loyalty.enabled) return failure(404, 'Le programme fidélité est indisponible.');
     if (!await hasValidTermsConsent(tenant.id, customer.id)) {
       return failure(403, 'Acceptez les conditions dans votre compte avant d’ajouter la carte.');
