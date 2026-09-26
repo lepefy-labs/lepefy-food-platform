@@ -10,11 +10,12 @@ type Settings = {
   daily_digest_prepare_hours: number;
   daily_digest_pickup_hours: number;
   daily_digest_payment_hours: number;
+  daily_digest_shipping_hours: number;
 };
 const fallback: Settings = {
   daily_digest_enabled: false, daily_digest_timezone: 'Europe/Rome',
   daily_digest_include_empty: false, daily_digest_prepare_hours: 24,
-  daily_digest_pickup_hours: 48, daily_digest_payment_hours: 48,
+  daily_digest_pickup_hours: 48, daily_digest_payment_hours: 48, daily_digest_shipping_hours: 72,
 };
 const inputClass='min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
 export function DailyDigestSettingsSection({ initial, available }: { initial: Partial<Settings> | null; available: boolean }) {
@@ -58,9 +59,10 @@ export function DailyDigestSettingsSection({ initial, available }: { initial: Pa
             ['daily_digest_prepare_hours','Préparation en retard (h)'],
             ['daily_digest_pickup_hours','Retrait en retard (h)'],
             ['daily_digest_payment_hours','Paiement à vérifier (h)'],
+            ['daily_digest_shipping_hours','Suivi transporteur sans mouvement (h)'],
           ] as const).map(([key,label])=>(
             <label key={key} className="block text-xs font-medium text-gray-600 dark:text-gray-300">{label}
-              <input className={inputClass+' mt-1'} type="number" min={1} max={336} step={1}
+              <input className={inputClass+' mt-1'} type="number" min={key==='daily_digest_shipping_hours'?24:1} max={336} step={1}
                 disabled={!available||saving} value={form[key]}
                 onChange={e=>set(key,Number(e.target.value))}/>
             </label>
