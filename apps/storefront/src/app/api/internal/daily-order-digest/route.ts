@@ -48,7 +48,7 @@ async function deliverTenant(db:SupabaseClient,tenant:TenantRow,now:Date):Promis
   try{
     const [orders,preorders,prior]=await Promise.all([
       readAll<DigestOrder>(db,'orders',tenant.id,
-        'id,full_name,email,payment_status,status,fulfillment_type,created_at,updated_at,shipping_normalized_status,shipping_sync_error'),
+        'id,full_name,email,payment_status,status,fulfillment_type,created_at,updated_at,shipping_normalized_status,shipping_sync_error,shipping_provider_reference,shipping_estimated_delivery_at,shipping_provider_synced_at,shipping_tracking_events'),
       readAll<DigestPreorder>(db,'checkout_sessions',tenant.id,
         'id,full_name,email,phone,origin,status,created_at,declared_payment_at'),
       db.from('tenant_daily_digest_runs').select('snapshot')
@@ -108,7 +108,7 @@ export async function POST(request:NextRequest){
   }
   const db=createServiceClient(),now=new Date();
   const {data,error}=await db.from('tenants').select(
-    'id,daily_digest_timezone,daily_digest_include_empty,daily_digest_prepare_hours,daily_digest_pickup_hours,daily_digest_payment_hours',
+    'id,daily_digest_timezone,daily_digest_include_empty,daily_digest_prepare_hours,daily_digest_pickup_hours,daily_digest_payment_hours,daily_digest_shipping_hours',
   ).eq('active',true).eq('daily_digest_enabled',true);
   if(error)return NextResponse.json({error:'Daily digest schema unavailable'},{status:503});
   const outcomes:Record<string,number>={accepted:0,failed:0,not_due:0,no_recipients:0,already_claimed:0,empty:0};
