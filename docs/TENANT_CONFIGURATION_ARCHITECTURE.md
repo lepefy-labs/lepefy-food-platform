@@ -2,7 +2,7 @@
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
 > **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132, fasi 1–4). Gli altri domini sono solo inventariati. **129, 130, 131 e 132 sono applicate in produzione (26/09/2026, verificate).**
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132; la pulizia delle colonne legacy è la 133). Gli altri domini sono solo inventariati. **129, 130, 131 e 132 sono applicate in produzione (26/09/2026, verificate); 133 non ancora.**
 
 ## 1. Problema
 
@@ -89,14 +89,14 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Ordine di rilascio della 131:** prima il deploy del codice che non seleziona più le colonne, poi la migrazione.
 - **Rischio:** medio (valore economico dei punti). Mitigato dai controlli preliminari della 131 e dai test SQL: storico `points_ledger` invariato e RPC con lo stesso risultato.
 
-### 3.5 Referral — **migrata (132 applicata; fase 5 aperta)**
+### 3.5 Referral — **migrata (132 applicata; 133 di pulizia pronta, da applicare dopo il deploy)**
 - **Struttura:** `tenant_feature_settings('referral')` con config `{version: 1, max_depth, signup_bonus_points, availability_mode, unlock_spending_threshold, fraud_max_conversions, fraud_period_days, fraud_action}`. Tipi e intervalli ricalcano la 040 (profondità 1–5, enum invariati, soglia di sblocco `null` oppure 0–99 999 999,99 con 2 decimali, periodo anti-frode 1–3650 giorni); CHECK `is_valid_referral_config`, scritto in plpgsql in modo che un tipo sbagliato venga rifiutato e non provochi un errore di cast. Feature `billable = false`, senza piani.
 - **Attivazione:** il programma non ha un interruttore proprio e continua a seguire `loyalty.enabled`. Il backfill imposta `enabled = true` per tutti. `enabled = false` (riservato, non esposto in UI) oppure una riga invalida rendono il referral **non disponibile**: nessun codice, nessuna idoneità automatica, nessun bonus, nessun punto referral.
-- **Colonne legacy:** i sette `tenants.referral_*` restano, allineati da due trigger con guardia (`sync_referral_settings_to_tenant`, `sync_tenant_referral_to_settings`). Un nuovo tenant riceve la riga con i valori predefiniti.
-- **Letture:** `getReferralSettings(db, tenantId)` in `lib/loyalty/referralConfig.ts`. Restituisce un oggetto con le **stesse chiavi delle colonne**, così la logica esistente non cambia. Precedenza: riga valida e attiva → riga; riga assente (132 non applicata) o illeggibile → colonne legacy dello stesso tenant; disattivata o invalida → `null`. Lettori: `processOrderPointsOnDelivery` (catena e anti-frode), `registerWithReferral`, `checkReferralAccessUnlock`, API `/api/loyalty/referrals/{eligibility,generate-code,tree}`, `/compte`, `/compte/parrainage`, `/admin/loyalty`. Le superfici cliente usano `REFERRAL_UNAVAILABLE_VIEW` (`ADMIN_GRANTED_ONLY`, nessun bonus) quando il programma non è disponibile.
-- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, invariato). La route rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0, regola documentata dalla 040 ma prima non applicata. Prima della 132 scrive le colonne legacy con la stessa validazione. `/api/admin/tenant` non accetta più campi referral. Il bonus d'iscrizione non è esposto in UI.
+- **Colonne legacy:** la 132 le teneva allineate con due trigger. La **133** (distruttiva, rollback nei commenti) le rimuove insieme ai trigger e alla funzione `referral_config_from_tenant`. Prima verifica che ogni tenant abbia una riga identica alle sette colonne, altrimenti si ferma senza eliminare nulla. Non tocca `customers.referral_*`, `referral_codes` e le catene.
+- **Letture:** `getReferralSettings(db, tenantId)` in `lib/loyalty/referralConfig.ts`. Restituisce un oggetto con le **stesse chiavi delle ex colonne**, così la logica esistente non cambia. Precedenza: riga valida e attiva → riga; riga assente (tenant mai configurato dopo la 133) → valori predefiniti della 040, gli stessi che un nuovo tenant aveva con le colonne; disattivata, invalida o illeggibile → `null` (fail closed). Nessun ripiego su `tenants`. Lettori: `processOrderPointsOnDelivery` (catena e anti-frode), `registerWithReferral`, `checkReferralAccessUnlock`, API `/api/loyalty/referrals/{eligibility,generate-code,tree}`, `/compte`, `/compte/parrainage`, `/admin/loyalty`. Le superfici cliente usano `REFERRAL_UNAVAILABLE_VIEW` (`ADMIN_GRANTED_ONLY`, nessun bonus) quando il programma non è disponibile.
+- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, invariato). La route rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0, regola documentata dalla 040 ma prima non applicata. Il primo salvataggio di un tenant senza riga la crea attiva; altrimenti l'attivazione esistente resta invariata. `/api/admin/tenant` non accetta campi referral. Il bonus d'iscrizione non è esposto in UI.
 - **Esposizione:** S. La 132 revoca il grant pubblico 076 sui sette campi, soglie anti-frode incluse.
-- **Prossimo passo (fase 5):** rimuovere trigger e colonne, come la 131 per la loyalty.
+- **Ordine di rilascio della 133:** prima il deploy del codice senza ripiego legacy, poi la migrazione.
 - **Rischio:** medio-alto (anti-frode, punti). Mitigato da backfill con verifica, mirror transazionale e fail closed.
 
 ### 3.6 Ambassador
@@ -199,7 +199,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 | 0 | **Fatto.** Proiezione client esplicita (`toPublicTenant`) nel root layout e in ogni pagina che passa il tenant a Client Components; `PATCH /api/admin/tenant` restituisce solo i campi modificabili (con 129) | Chiude l'esposizione di segreti, billing e anti-frode senza migrazioni | — |
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
 | 2 | Loyalty — **completato (130 e 131 applicate; colonne legacy rimosse)** | Pochi campi, schema semplice, un solo writer | Medio |
-| 3 | Referral — **fasi 1–4 fatte (132 applicata)**; resta la fase 5 | Dipende dalla loyalty; soglie anti-frode rese private dalla 132 | Medio-alto |
+| 3 | Referral — **fatto (132 applicata; 133 di rimozione colonne da applicare dopo il deploy)** | Dipende dalla loyalty; soglie anti-frode rese private dalla 132 | Medio-alto |
 | 4 | AI/Nala (flag, limiti, contesto privato) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |
 | 6 | Notifiche | Solo se i tipi continuano a crescere | Basso |

@@ -1,4 +1,3 @@
-import type { ReferralAvailabilityMode, ReferralFraudAction } from './loyalty';
 import type { AmbassadorCommissionMode, AmbassadorDiscountType } from './ambassador';
 
 export type ShippingProvider = 'packlink' | 'flat_rate' | 'pickup_only';
@@ -68,14 +67,8 @@ export interface Tenant {
   story_text: string | null;
   story_image_url: string | null;
   countries_served: number | null;
-  // Referral (loyalty program settings: tenant_feature_settings 'loyalty', migrations 130/131)
-  referral_max_depth: number;
-  referral_signup_bonus_points: number;
-  referral_fraud_max_conversions: number;
-  referral_fraud_period_days: number;
-  referral_fraud_action: ReferralFraudAction;
-  referral_availability_mode: ReferralAvailabilityMode;
-  referral_unlock_spending_threshold: number | null;
+  // Loyalty and referral program settings live in tenant_feature_settings
+  // ('loyalty' 130/131, 'referral' 132/133): see lib/loyalty/*Config.ts.
   // Ambassador (commissioni + sconto primo ordine)
   ambassador_min_purchase_amount: number;
   ambassador_min_commission_amount: number;

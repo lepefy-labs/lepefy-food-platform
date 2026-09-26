@@ -7,7 +7,7 @@ import {
   REFERRAL_FEATURE_KEY, referralModule, referralPatchSchema, getReferralSettings,
 } from '@/lib/loyalty/referralConfig';
 import {
-  isModuleRegistered, mergeModuleConfig, updateModuleConfig, ModuleConfigValidationError,
+  isModuleRegistered, readModuleConfig, updateModuleConfig, ModuleConfigValidationError,
 } from '@/lib/tenantConfig/moduleConfig';
 
 export const runtime = 'nodejs';
@@ -29,36 +29,14 @@ async function handlePATCH(req: NextRequest) {
 
   const db = createServiceClient();
   try {
-    if (await isModuleRegistered(db, REFERRAL_FEATURE_KEY)) {
-      // Migration 132 applied: the settings row is the source of truth; a
-      // trigger mirrors it to the legacy tenants columns in the same transaction.
-      await updateModuleConfig(db, referralModule, tenant.id, { config });
-    } else {
-      // Before migration 132: validate identically, then write the legacy columns.
-      const current = await getReferralSettings(db, tenant.id);
-      if (!current) throw new Error('referral_settings_unavailable');
-      const next = mergeModuleConfig(referralModule, {
-        enabled: true,
-        config: {
-          max_depth: current.referral_max_depth,
-          signup_bonus_points: current.referral_signup_bonus_points,
-          availability_mode: current.referral_availability_mode,
-          unlock_spending_threshold: current.referral_unlock_spending_threshold,
-          fraud_max_conversions: current.referral_fraud_max_conversions,
-          fraud_period_days: current.referral_fraud_period_days,
-          fraud_action: current.referral_fraud_action,
-        },
-      }, { config }).config;
-      const { error } = await db.from('tenants').update({
-        referral_max_depth: next.max_depth,
-        referral_availability_mode: next.availability_mode,
-        referral_unlock_spending_threshold: next.unlock_spending_threshold,
-        referral_fraud_max_conversions: next.fraud_max_conversions,
-        referral_fraud_period_days: next.fraud_period_days,
-        referral_fraud_action: next.fraud_action,
-      }).eq('id', tenant.id);
-      if (error) throw new Error(error.message);
+    if (!(await isModuleRegistered(db, REFERRAL_FEATURE_KEY))) {
+      return NextResponse.json({ error: 'La migration 132 doit être appliquée.' }, { status: 409 });
     }
+    // The settings row is the only source of truth (legacy columns: migration 133).
+    // A never-configured tenant runs on the defaults with the program available,
+    // so its first save creates an enabled row; otherwise activation is kept.
+    const current = await readModuleConfig(db, referralModule, tenant.id);
+    await updateModuleConfig(db, referralModule, tenant.id, current.status === 'missing' ? { enabled: true, config } : { config });
     return NextResponse.json(await getReferralSettings(db, tenant.id));
   } catch (error) {
     if (error instanceof ModuleConfigValidationError) {
@@ -69,5 +47,5 @@ async function handlePATCH(req: NextRequest) {
   }
 }
 
-// Legacy columns are part of the cached tenant row: refresh it after a write.
+// Refresh tenant-scoped cached pages after a program change.
 export const PATCH = withStorefrontInvalidation(['tenant'], handlePATCH);

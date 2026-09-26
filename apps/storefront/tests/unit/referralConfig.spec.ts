@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   REFERRAL_DEFAULTS, REFERRAL_UNAVAILABLE_VIEW, getReferralSettings, referralModule, referralPatchSchema,
-  referralSettingsFromLegacy, resolveReferralSettings,
+  resolveReferralSettings,
 } from '../../src/lib/loyalty/referralConfig';
 import { resolveModuleConfig } from '../../src/lib/tenantConfig/moduleConfig';
 import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
@@ -29,12 +29,6 @@ function fakeDb(results: Record<string, Result>) {
   return { db: { from } as unknown as SupabaseClient, calls };
 }
 
-const legacyRow = {
-  referral_max_depth: 3, referral_signup_bonus_points: 50, referral_availability_mode: 'SPENDING_THRESHOLD',
-  referral_unlock_spending_threshold: '120.50', referral_fraud_max_conversions: '10', referral_fraud_period_days: 30,
-  referral_fraud_action: 'AUTO_BLOCK',
-};
-
 const storedConfig = {
   version: 1, max_depth: 4, signup_bonus_points: 20, availability_mode: 'ALL_CUSTOMERS',
   unlock_spending_threshold: null, fraud_max_conversions: 5, fraud_period_days: 7, fraud_action: 'CAP_AT_THRESHOLD',
@@ -49,8 +43,12 @@ test('valid enabled row maps to the legacy-shaped settings', () => {
   });
 });
 
-test('missing row is reported so callers fall back to the legacy columns', () => {
-  expect(resolveReferralSettings(resolveModuleConfig(referralModule, null))).toBe('missing');
+test('missing row (tenant never configured after 133) runs on the 040 defaults', () => {
+  expect(resolveReferralSettings(resolveModuleConfig(referralModule, null))).toEqual({
+    referral_max_depth: 2, referral_signup_bonus_points: 0, referral_availability_mode: 'ALL_CUSTOMERS',
+    referral_unlock_spending_threshold: null, referral_fraud_max_conversions: 10, referral_fraud_period_days: 30,
+    referral_fraud_action: 'FLAG_FOR_REVIEW',
+  });
 });
 
 test('disabled or invalid rows make the program unavailable', () => {
@@ -71,14 +69,7 @@ test('partial row falls back to the 040 defaults per key', () => {
   expect(resolveReferralSettings(state)).toMatchObject({ referral_max_depth: 1, referral_fraud_period_days: REFERRAL_DEFAULTS.fraud_period_days });
 });
 
-test('legacy numerics returned as strings are normalized', () => {
-  expect(referralSettingsFromLegacy(legacyRow)).toMatchObject({
-    referral_unlock_spending_threshold: 120.5, referral_fraud_max_conversions: 10, referral_max_depth: 3,
-  });
-  expect(referralSettingsFromLegacy({ ...legacyRow, referral_unlock_spending_threshold: null }).referral_unlock_spending_threshold).toBeNull();
-});
-
-test('reads the settings row first, tenant-scoped', async () => {
+test('reads only the tenant-scoped settings row', async () => {
   const { db, calls } = fakeDb({ tenant_feature_settings: { data: { enabled: true, config: storedConfig }, error: null } });
   expect((await getReferralSettings(db, 'tenant-a'))?.referral_max_depth).toBe(4);
   expect(calls.map((c) => c.table)).toEqual(['tenant_feature_settings']);
@@ -86,18 +77,16 @@ test('reads the settings row first, tenant-scoped', async () => {
   expect(calls[0]!.ops).toContainEqual(['eq', ['feature_key', 'referral']]);
 });
 
-test('before migration 132 (no row) the legacy columns of the same tenant are used', async () => {
-  const { db, calls } = fakeDb({ tenant_feature_settings: { data: null, error: null }, tenants: { data: legacyRow, error: null } });
-  expect(await getReferralSettings(db, 'tenant-a')).toMatchObject({ referral_availability_mode: 'SPENDING_THRESHOLD', referral_fraud_action: 'AUTO_BLOCK' });
-  expect(calls[1]!.table).toBe('tenants');
-  expect(calls[1]!.ops).toContainEqual(['eq', ['id', 'tenant-a']]);
+test('no legacy fallback: a missing row never queries the tenants table', async () => {
+  const { db, calls } = fakeDb({ tenant_feature_settings: { data: null, error: null } });
+  expect((await getReferralSettings(db, 'tenant-a'))?.referral_max_depth).toBe(REFERRAL_DEFAULTS.max_depth);
+  expect(calls.map((c) => c.table)).toEqual(['tenant_feature_settings']);
 });
 
-test('settings read error falls back to legacy; both unavailable means no referral', async () => {
-  const fallback = fakeDb({ tenant_feature_settings: new Error('network'), tenants: { data: legacyRow, error: null } });
-  expect((await getReferralSettings(fallback.db, 'tenant-a'))?.referral_max_depth).toBe(3);
-  const none = fakeDb({ tenant_feature_settings: new Error('network'), tenants: { data: null, error: { message: 'down' } } });
-  expect(await getReferralSettings(none.db, 'tenant-a')).toBeNull();
+test('unreadable settings fail closed (program unavailable for the request)', async () => {
+  const { db, calls } = fakeDb({ tenant_feature_settings: new Error('network') });
+  expect(await getReferralSettings(db, 'tenant-a')).toBeNull();
+  expect(calls.map((c) => c.table)).toEqual(['tenant_feature_settings']);
 });
 
 test('unavailable view never makes anyone eligible automatically', () => {

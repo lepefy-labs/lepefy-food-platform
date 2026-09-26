@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Tenant } from '@lepefy/types';
+import type { ReferralAvailabilityMode, ReferralFraudAction } from '@lepefy/types';
 import { readModuleConfig, type ModuleConfigDefinition, type ModuleConfigState } from '@/lib/tenantConfig/moduleConfig';
 
 /**
- * Referral program settings, stored in tenant_feature_settings (feature_key
- * 'referral', migration 132) and mirrored to the legacy tenants.referral_*
- * columns by a two-way trigger until they are dropped. Keys and ranges mirror
- * public.is_valid_referral_config() and the 040 column constraints.
+ * Referral program settings: the single source of truth is
+ * tenant_feature_settings (feature_key 'referral', migration 132); the former
+ * tenants.referral_* columns are dropped by migration 133. Keys and ranges
+ * mirror public.is_valid_referral_config() and the 040 column constraints.
  */
 export const REFERRAL_FEATURE_KEY = 'referral';
 
@@ -49,13 +49,16 @@ export const referralPatchSchema = z.object({
   config: referralConfigSchema.omit({ version: true, signup_bonus_points: true }).partial().strict(),
 }).strict();
 
-/** Same keys as the legacy tenant columns, so readers keep their existing logic. */
-export type ReferralSettings = Pick<Tenant,
-  | 'referral_max_depth' | 'referral_signup_bonus_points' | 'referral_availability_mode'
-  | 'referral_unlock_spending_threshold' | 'referral_fraud_max_conversions'
-  | 'referral_fraud_period_days' | 'referral_fraud_action'>;
-
-const LEGACY_COLUMNS = 'referral_max_depth, referral_signup_bonus_points, referral_availability_mode, referral_unlock_spending_threshold, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action';
+/** Same keys as the former tenant columns, so readers keep their existing logic. */
+export interface ReferralSettings {
+  referral_max_depth: number;
+  referral_signup_bonus_points: number;
+  referral_availability_mode: ReferralAvailabilityMode;
+  referral_unlock_spending_threshold: number | null;
+  referral_fraud_max_conversions: number;
+  referral_fraud_period_days: number;
+  referral_fraud_action: ReferralFraudAction;
+}
 
 function fromConfig(config: ReferralConfig): ReferralSettings {
   return {
@@ -79,55 +82,31 @@ export const REFERRAL_UNAVAILABLE_VIEW: ReferralSettings = {
   referral_signup_bonus_points: 0,
 };
 
-function numberOrNull(value: unknown): number | null {
-  return value == null ? null : Number(value);
-}
-
-/** Legacy tenant columns (PostgREST may return numerics as strings) → settings. */
-export function referralSettingsFromLegacy(row: Record<string, unknown>): ReferralSettings {
-  return {
-    referral_max_depth: Number(row.referral_max_depth),
-    referral_signup_bonus_points: Number(row.referral_signup_bonus_points),
-    referral_availability_mode: row.referral_availability_mode as ReferralSettings['referral_availability_mode'],
-    referral_unlock_spending_threshold: numberOrNull(row.referral_unlock_spending_threshold),
-    referral_fraud_max_conversions: Number(row.referral_fraud_max_conversions),
-    referral_fraud_period_days: Number(row.referral_fraud_period_days),
-    referral_fraud_action: row.referral_fraud_action as ReferralSettings['referral_fraud_action'],
-  };
-}
-
 /**
- * Pure precedence: a valid enabled row wins; a disabled or invalid row makes
- * the referral program unavailable (null — callers already treat a missing
- * tenant row as "no referral effect"); a missing row means migration 132 is
- * not applied yet, so the caller falls back to the legacy columns.
+ * Pure precedence (the settings row is the only source since migration 133):
+ * - valid enabled row → stored values;
+ * - missing row (tenant created after 133, never configured) → the 040
+ *   defaults, i.e. exactly what a new tenant had with the former columns;
+ * - disabled or invalid row → null: the program is unavailable (no code, no
+ *   automatic eligibility, no bonus, no referral points).
  */
-export function resolveReferralSettings(
-  state: ModuleConfigState<ReferralConfig>,
-): ReferralSettings | null | 'missing' {
-  if (state.status === 'missing') return 'missing';
+export function resolveReferralSettings(state: ModuleConfigState<ReferralConfig>): ReferralSettings | null {
+  if (state.status === 'missing') return fromConfig(REFERRAL_DEFAULTS);
   if (state.status === 'invalid' || !state.enabled) return null;
   return fromConfig(state.config);
 }
 
 /**
- * Tenant-scoped read for server code. Returns null when the program is
- * unavailable for this tenant (disabled/invalid settings or unreadable data).
+ * Tenant-scoped read for server code. Never throws: unreadable settings make
+ * the program unavailable for this request (fail closed).
  */
 export async function getReferralSettings(db: SupabaseClient, tenantId: string): Promise<ReferralSettings | null> {
   try {
     const state = await readModuleConfig(db, referralModule, tenantId);
     if (state.status === 'invalid') console.error('[referral] invalid settings, program suspended', tenantId, state.issues);
-    const resolved = resolveReferralSettings(state);
-    if (resolved !== 'missing') return resolved;
+    return resolveReferralSettings(state);
   } catch (error) {
-    // Falls through to the legacy columns, kept identical by the 132 triggers.
-    console.error('[referral] settings unavailable, using tenant columns', tenantId, error);
-  }
-  const { data, error } = await db.from('tenants').select(LEGACY_COLUMNS).eq('id', tenantId).maybeSingle();
-  if (error || !data) {
-    console.error('[referral] legacy settings unavailable', tenantId, error);
+    console.error('[referral] settings unavailable, program suspended for this request', tenantId, error);
     return null;
   }
-  return referralSettingsFromLegacy(data as unknown as Record<string, unknown>);
 }
