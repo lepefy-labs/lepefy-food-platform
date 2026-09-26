@@ -6,13 +6,11 @@ Use these instructions whenever a requester asks to improve a module or route gl
 
 ## Execution environment
 
-This agent operates in **cloud-only mode** unless the requester explicitly says otherwise.
+This agent may work in **local or cloud environments**, depending on the execution environment available and the requester's instructions.
 
-Never execute commands on the requester's local computer.
-Never require the requester to install or run Git, Node.js, pnpm, npm, build tools, test runners, or repository scripts locally.
-Never use a local working copy on the requester's device as part of this workflow.
+When a local workspace and command execution are available, the agent may inspect and edit the local repository and run Git, Node.js, package managers, tests, typecheck, lint and builds locally. When only cloud tools are available, use connected GitHub capabilities and approved remote CI/deployment systems such as GitHub Actions and Vercel.
 
-Use connected GitHub capabilities and approved remote CI/deployment systems such as GitHub Actions and Vercel.
+Do not assume access to the requester's device or local filesystem. Do not require the requester to install tools or execute commands manually unless they explicitly choose that workflow. Respect the requested branch, batching rules and deployment approvals regardless of execution environment.
 
 
 ### Storefront product-image runbook
@@ -84,7 +82,7 @@ This includes, when needed:
 - editing multiple files
 - creating new components or endpoints
 - performing frontend/backend/schema work already included in the approved plan
-- running remote validation
+- running local or remote validation
 - reading CI/Vercel failures
 - correcting build, type, lint, test or deployment errors introduced by the work
 - repeating the fix -> validate -> push -> deploy verification loop when necessary
@@ -277,9 +275,7 @@ This batching rule exists to reduce unnecessary production deployments, avoid co
 
 ## 6. VALIDATE AND FIX LOOP
 
-Validation remains remote/cloud-only.
-
-Never execute validation commands on the requester's device.
+Validation may run locally in an available agent workspace or through approved cloud/remote tools. Never assume access to the requester's device. Final remote push, CI and deployment verification requirements remain unchanged.
 
 Before the normal final push:
 
@@ -288,15 +284,15 @@ Before the normal final push:
 3. Check for debug code, temporary assets and accidental unrelated changes.
 4. Confirm `LEPEFY_PROJECT_CONTEXT.md` was updated when required by the maintenance rule above.
 5. Re-fetch `AGENTS.md` from the target branch and confirm the planned write strategy still complies with the current batching/deployment rules.
-6. Use available remote/static checks that do not require publishing intermediate production commits.
+6. Use available local, cloud or remote/static checks that do not require publishing intermediate production commits.
 
 After the final push:
 
 1. Inspect GitHub Actions and/or Vercel when available.
-2. Use remote checks such as typecheck, lint, tests and build when available.
+2. Use available local or remote checks such as typecheck, lint, tests and build. Inspect GitHub CI when available.
 3. If validation fails, inspect the actual logs.
 4. Determine whether the failure was introduced by this work.
-5. Apply the complete fix remotely.
+5. Apply the complete fix in the available local or cloud workspace, then push the corrective commit.
 6. Update project context too if the corrective fix changes the documented architecture/state.
 7. Push one corrective commit.
 8. Re-check validation and the new matching deployment.
@@ -304,7 +300,7 @@ After the final push:
 
 Never stop merely to report an implementation-introduced CI/build error that the agent can reasonably fix.
 
-Do not claim a check passed unless remote evidence shows it passed.
+Do not claim a check passed unless actual local test output or remote evidence shows it passed. Final CI/deployment success still requires remote evidence.
 
 ---
 
