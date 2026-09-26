@@ -5,7 +5,8 @@ alter table public.tenants
   add column if not exists daily_digest_include_empty boolean not null default false,
   add column if not exists daily_digest_prepare_hours integer not null default 24 check (daily_digest_prepare_hours between 1 and 336),
   add column if not exists daily_digest_pickup_hours integer not null default 48 check (daily_digest_pickup_hours between 1 and 336),
-  add column if not exists daily_digest_payment_hours integer not null default 48 check (daily_digest_payment_hours between 1 and 336);
+  add column if not exists daily_digest_payment_hours integer not null default 48 check (daily_digest_payment_hours between 1 and 336),
+  add column if not exists daily_digest_shipping_hours integer not null default 72 check (daily_digest_shipping_hours between 24 and 336);
 
 alter table public.tenant_notification_recipients
   add column if not exists notify_daily_digest boolean not null default false;
