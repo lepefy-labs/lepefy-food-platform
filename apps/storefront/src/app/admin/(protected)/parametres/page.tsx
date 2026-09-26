@@ -9,6 +9,7 @@ import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
 import { NotificationRecipientsSection } from './NotificationRecipientsSection';
+import { DailyDigestSettingsSection } from './DailyDigestSettingsSection';
 import { AppIconSection } from './AppIconSection';
 import type { TenantSocialLink, TenantNotificationRecipient } from '@lepefy/types';
 
@@ -20,9 +21,10 @@ export default async function ParametresPage() {
   const tenant = await getTenant(slug);
   const supabase = createServiceClient();
 
-  const [{ data: socialLinks }, { data: notificationRecipients }] = await Promise.all([
+  const [{ data: socialLinks }, { data: notificationRecipients }, digestSettings] = await Promise.all([
     supabase.from('tenant_social_links').select('*').eq('tenant_id', tenant.id).order('sort_order', { ascending: true }),
     supabase.from('tenant_notification_recipients').select('*').eq('tenant_id', tenant.id).order('created_at', { ascending: true }),
+    supabase.from('tenants').select('daily_digest_enabled,daily_digest_timezone,daily_digest_include_empty,daily_digest_prepare_hours,daily_digest_pickup_hours,daily_digest_payment_hours').eq('id', tenant.id).maybeSingle(),
   ]);
 
   const tenantContext = (
@@ -80,6 +82,7 @@ export default async function ParametresPage() {
 
         <LegalInfoSection legal_name={tenant.legal_name} legal_address={tenant.legal_address} legal_email={tenant.legal_email} />
         <NotificationRecipientsSection initialRecipients={(notificationRecipients ?? []) as TenantNotificationRecipient[]} />
+        <DailyDigestSettingsSection initial={(digestSettings.data ?? null) as Parameters<typeof DailyDigestSettingsSection>[0]['initial']} available={!digestSettings.error && !!digestSettings.data} />
 
         <div className="xl:col-span-2">
           <SocialLinksSection initialLinks={(socialLinks ?? []) as TenantSocialLink[]} />
