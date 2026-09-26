@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import { formatBarcodeDisplay } from '@/lib/barcode';
 import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 import { getWalletAvailability } from '@/lib/loyalty/wallet/config';
@@ -23,6 +24,7 @@ export default async function ComptePage() {
   await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte');
 
   const supabase = createServiceClient();
+  const loyalty = await getLoyaltySettings(supabase, tenant.id, tenant);
   const [member, addresses, points, orders, reviewsAvailable] = await Promise.all([
     supabase.from('customers')
       .select('full_name, phone, loyalty_card_number, is_ambassador, ambassador_profile_completed_at, referral_access_granted, referral_suspended')
@@ -30,7 +32,7 @@ export default async function ComptePage() {
     supabase.from('addresses').select('*')
       .eq('tenant_id', tenant.id).eq('customer_id', customer.id)
       .order('is_default', { ascending: false }).order('created_at', { ascending: false }),
-    tenant.loyalty_enabled
+    loyalty.enabled
       ? supabase.from('customer_points_balance').select('confirmed_balance')
         .eq('tenant_id', tenant.id).eq('customer_id', customer.id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -57,14 +59,14 @@ export default async function ComptePage() {
     } catch { orderError = true; }
   }
   const brand = getLoyaltyBrand(tenant);
-  const wallets = tenant.loyalty_enabled ? getWalletAvailability(tenant.slug, tenant.logo_url) : { google: false, apple: false };
+  const wallets = loyalty.enabled ? getWalletAvailability(tenant.slug, tenant.logo_url) : { google: false, apple: false };
   const primaryDarkApprox = mixWithBlack(tenant.primary_color, 75);
   const accountAccentForeground = contrastRatio(tenant.accent_light, primaryDarkApprox) >= 3 ? primaryDarkApprox : '#374151';
   const cardNumber = row.loyalty_card_number ?? null;
 
   return (
     <AccountDashboard
-      tenant={{ name: tenant.name, loyaltyEnabled: tenant.loyalty_enabled, currency: tenant.currency }}
+      tenant={{ name: tenant.name, loyaltyEnabled: loyalty.enabled, currency: tenant.currency }}
       email={customer.email}
       fullName={row.full_name ?? customer.full_name}
       phone={row.phone}
@@ -80,7 +82,7 @@ export default async function ComptePage() {
       reviewsAvailable={reviewsAvailable}
       errors={{ points: !!points.error, addresses: !!addresses.error, orders: orderError }}
       referral={{
-        state: accountReferralState(tenant.loyalty_enabled, row.referral_access_granted, row.referral_suspended),
+        state: accountReferralState(loyalty.enabled, row.referral_access_granted, row.referral_suspended),
         mode: tenant.referral_availability_mode,
         threshold: tenant.referral_unlock_spending_threshold,
       }}

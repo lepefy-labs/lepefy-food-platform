@@ -4,6 +4,7 @@ import { checkReferralAccessUnlock } from './checkReferralAccessUnlock';
 import { checkFraudSignals } from './checkFraudSignals';
 import { confirmSignupBonus } from './confirmSignupBonus';
 import { processAmbassadorCommissionOnDelivery } from '@/lib/ambassador/processAmbassadorCommissionOnDelivery';
+import { getLoyaltySettings } from './loyaltyConfig';
 
 interface OrderPointsEntry {
   tenantId: string;
@@ -60,15 +61,17 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
   // ── 2. Fetch config tenant ─────────────────────────────────────────────────
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('loyalty_enabled, referral_max_depth, purchase_points_rate, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action, ambassador_loyalty_from_second_order')
+    .select('loyalty_enabled, referral_max_depth, purchase_points_rate, points_to_currency_rate, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action, ambassador_loyalty_from_second_order')
     .eq('id', tenantId)
     .single();
 
   // ── 3. Feature flag ────────────────────────────────────────────────────────
-  if (!tenant || !tenant.loyalty_enabled) return;
+  if (!tenant) return;
+  const loyalty = await getLoyaltySettings(supabase, tenantId, tenant);
+  if (!loyalty.enabled) return;
 
   // ── 4. Costruisci entries ──────────────────────────────────────────────────
-  const basePoints = Math.round(Number(order.total) * tenant.purchase_points_rate);
+  const basePoints = Math.round(Number(order.total) * loyalty.purchasePointsRate);
 
   // Regole programma ambassador (046) sui punti del buyer stesso:
   // - primo ordine consegnato + sconto applicato → 0 punti per il buyer su

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getAdminId } from '@/lib/auth/getAdminId';
@@ -11,9 +12,10 @@ interface ManualPurchaseRpcRow {
 }
 
 // Attribue les points d'un achat en caisse via process_manual_purchase_points_atomic
-// (047_loyalty_card_system.sql) — réutilise tenants.purchase_points_rate, le
-// même taux que process_order_points_atomic pour les commandes en ligne, sans
-// créer de ligne orders. Accessible à tenant_admin ET tenant_cashier.
+// (047_loyalty_card_system.sql) — réutilise tenants.purchase_points_rate (miroir
+// de tenant_feature_settings.loyalty maintenu par les triggers de la migration
+// 130), le même taux que les commandes en ligne, sans créer de ligne orders.
+// Accessible à tenant_admin ET tenant_cashier.
 export async function POST(req: NextRequest) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant     = await getTenant(tenantSlug);
@@ -21,7 +23,8 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
   if (denied) return denied;
 
-  if (!tenant.loyalty_enabled) {
+  const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id, tenant);
+  if (!loyalty.enabled) {
     return NextResponse.json(
       { error: 'Le programme de fidélité n\'est pas activé pour cette boutique.' },
       { status: 400 },

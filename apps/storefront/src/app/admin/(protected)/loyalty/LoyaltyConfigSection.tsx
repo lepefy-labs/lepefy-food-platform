@@ -54,16 +54,28 @@ export function LoyaltyConfigSection({
 
   async function handleSave() {
     setIsSaving(true);
+    const { loyalty_enabled: enabled, purchase_points_rate: purchasePointsRate, ...referral } = form;
     try {
+      // Loyalty settings live in tenant_feature_settings (migration 130);
+      // referral settings stay on the tenant row for now.
+      const loyaltyRes = await fetch('/api/admin/loyalty/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, config: { purchase_points_rate: purchasePointsRate } }),
+      });
+      if (!loyaltyRes.ok) {
+        const body = await loyaltyRes.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Erreur lors de l\'enregistrement du programme fidélité');
+      }
       const res = await fetch('/api/admin/tenant', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(referral),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error('Erreur lors de l\'enregistrement du parrainage');
       showToast('Enregistré', 'success');
-    } catch {
-      showToast('Erreur lors de l\'enregistrement', 'error');
+    } catch (error) {
+      showToast(error instanceof Error && error.message ? error.message : 'Erreur lors de l\'enregistrement', 'error');
     } finally {
       setIsSaving(false);
     }

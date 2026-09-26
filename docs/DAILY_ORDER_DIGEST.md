@@ -1,9 +1,9 @@
 # Rapport opérationnel quotidien (08:00)
 
 ## État / activation
-Migration `129_tenant_daily_digest.sql` is additive and **disabled by default**. It is **not applied in production** (verified 26 Sept 2026). NO email is sent until all of the following are done: migration applied, secret provisioned, scheduler active, n8n webhook configured and tested, at least one recipient opted in, and the tenant enabled.
+Migration `129_tenant_daily_digest.sql` is additive and **disabled by default**. It is **applied in production** (26 Sept 2026; verified: `daily_order_digest` registered as non-billable, no settings rows, no runs, no opted-in recipients, Nala row intact). NO email is sent until all of the following are done: secret provisioned, scheduler active, n8n webhook configured and tested, at least one recipient opted in, and the tenant enabled.
 
-1. Apply migration 129 manually (requires explicit approval for production). The code already deployed fails safe without it: the internal endpoint answers 503 and Paramètres shows "migration 129 requise".
+1. ~~Apply migration 129~~ — done (26 Sept 2026). In an environment without it the code fails safe: the internal endpoint answers 503 and Paramètres shows "migration 129 requise".
 2. Set `DAILY_DIGEST_CRON_SECRET` in the storefront production environment (server-side only).
 3. In n8n (Hetzner), import `ops/n8n/daily-order-digest-dispatcher.json` and attach an HTTP Header Auth credential (`Authorization: Bearer <secret>`). The inactive template has a Schedule Trigger every hour at minute 0. POST `https://<tenant-storefront>/api/internal/daily-order-digest` with `Authorization: Bearer <secret>`. The server checks the tenant's IANA timezone and sends only if it is currently 08:00 locally (DST safe).
 4. Create the n8n POST webhook `/webhook/daily-order-digest`. It receives `subject`, the already rendered and escaped `html`, `recipients[]`, `idempotencyKey` (`tenantId:localDate`), `snapshot` and branding. Configure a transactional email node using only `recipients[]`, HTML and subject. Return 2xx **only after the email provider accepted the send**, otherwise non-2xx. Implement provider-side deduplication with `idempotencyKey`.

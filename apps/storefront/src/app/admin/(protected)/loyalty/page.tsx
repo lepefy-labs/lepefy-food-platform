@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getStuckSignupBonuses } from '@/lib/loyalty/getStuckSignupBonuses';
+import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { LoyaltyConfigSection } from './LoyaltyConfigSection';
@@ -17,6 +18,7 @@ export default async function AdminLoyaltyPage() {
   const tenant = await getTenant(slug);
 
   const supabase = createServiceClient();
+  const loyalty = await getLoyaltySettings(supabase, tenant.id, tenant);
 
   const [{ data: tiers }, { data: pendingEntries }, stuckSignupBonuses] = await Promise.all([
     supabase
@@ -40,15 +42,15 @@ export default async function AdminLoyaltyPage() {
       <AdminPageHeader
         title="Fidélité & parrainage"
         description="Configurez le programme, gérez les accès et traitez les éléments qui nécessitent une revue manuelle."
-        meta={tenant.loyalty_enabled ? 'Programme actif' : 'Programme désactivé'}
+        meta={loyalty.enabled ? 'Programme actif' : 'Programme désactivé'}
       />
 
       <div className="space-y-6">
         <AdminBlockAccent tone="primary">
           <LoyaltyConfigSection
-            loyalty_enabled={tenant.loyalty_enabled}
+            loyalty_enabled={loyalty.enabled}
             referral_max_depth={tenant.referral_max_depth}
-            purchase_points_rate={tenant.purchase_points_rate}
+            purchase_points_rate={loyalty.purchasePointsRate}
             referral_availability_mode={tenant.referral_availability_mode}
             referral_unlock_spending_threshold={tenant.referral_unlock_spending_threshold}
             referral_fraud_max_conversions={tenant.referral_fraud_max_conversions}

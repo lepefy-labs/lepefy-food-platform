@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import { renderBarcodeSVG, formatBarcodeDisplay } from '@/lib/barcode';
 import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
@@ -23,7 +24,8 @@ export default async function CarteFideliteePage() {
   // La carte affiche un solde de points — sans programme actif pour ce
   // tenant, rien de pertinent à montrer (même principe que le bandeau points
   // conditionnel de AccountDashboard, cf. tenant.loyaltyEnabled).
-  if (!tenant.loyalty_enabled) redirect('/compte');
+  const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id, tenant);
+  if (!loyalty.enabled) redirect('/compte');
 
   const supabase = createServiceClient();
 

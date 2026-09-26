@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { hasValidTermsConsent } from '@/lib/legal/hasValidTermsConsent';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 import { getWalletConfig, getWalletAvailability } from '@/lib/loyalty/wallet/config';
 import { issueGoogleWallet, type WalletCard } from '@/lib/loyalty/wallet/google';
@@ -24,7 +25,8 @@ export async function GET(_request: Request, { params }: { params: { provider: s
     const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
     const customer = await getSessionCustomer(tenant.id);
     if (!customer) return failure(401, 'Connectez-vous à votre compte pour ajouter votre carte.');
-    if (!tenant.loyalty_enabled) return failure(404, 'Le programme fidélité est indisponible.');
+    const loyalty = await getLoyaltySettings(createServiceClient(), tenant.id, tenant);
+    if (!loyalty.enabled) return failure(404, 'Le programme fidélité est indisponible.');
     if (!await hasValidTermsConsent(tenant.id, customer.id)) {
       return failure(403, 'Acceptez les conditions dans votre compte avant d’ajouter la carte.');
     }

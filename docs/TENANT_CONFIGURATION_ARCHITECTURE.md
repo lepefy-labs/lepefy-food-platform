@@ -1,8 +1,8 @@
 # Architettura delle configurazioni tenant
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@3a48abe0711512e442e1b85186015f30c0d1953f` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Il rapporto delle 08:00 è il primo modulo sulla struttura di destinazione. Gli altri domini sono solo inventariati: nessuno è stato migrato.
+> **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130, fasi 1–4; rimozione delle colonne non ancora fatta). Gli altri domini sono solo inventariati. **129 è applicata in produzione (26/09/2026); 130 non ancora.**
 
 ## 1. Problema
 
@@ -79,19 +79,18 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Migrazione:** bassa priorità.
 - **Rischio:** medio (checkout).
 
-### 3.4 Loyalty
-- **Colonne:** `loyalty_enabled`, `purchase_points_rate`, `points_to_currency_rate`, `referral_signup_bonus_points`, `loyalty_card_sequence` (sequenza, vedi 3.11).
-- **Responsabilità:** punti fedeltà e carta.
-- **Letture:** `lib/loyalty/processOrderPointsOnDelivery.ts`, `registerWithReferral.ts`, `/compte`, `/compte/carte-fidelite`, wallet, scan admin.
-- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/tenant`.
-- **Esposizione:** P (grant 076, leggibile via PostgREST); non più L.
-- **Vincoli:** tassi numerici che incidono sul valore economico dei punti.
-- **Destinazione:** `tenant_feature_settings('loyalty')`, con config `{version, purchase_points_rate, points_to_currency_rate, signup_bonus_points}` ed `enabled` al posto di `loyalty_enabled`.
-- **Migrazione:** vedi §4.
-- **Rischio:** medio.
+### 3.4 Loyalty — **in migrazione (130)**
+- **Struttura:** `tenant_feature_settings('loyalty')`, con `enabled` e config `{version: 1, purchase_points_rate, points_to_currency_rate}` (numeric(10,4): 0–999999.9999, al più 4 decimali; CHECK `is_valid_loyalty_config`). Feature `billable = false`, senza piani: il comportamento attuale dei tenant non cambia.
+- **Colonne legacy:** `tenants.loyalty_enabled`, `purchase_points_rate`, `points_to_currency_rate` restano, **mantenute identiche da due trigger con guardia** (`sync_loyalty_settings_to_tenant`, `sync_tenant_loyalty_to_settings`). Scrivono solo se i valori differiscono, quindi non vanno in ricorsione. Un nuovo tenant riceve automaticamente la riga (disattivata).
+- **Fuori dal modulo:** `referral_signup_bonus_points` appartiene al referral (3.5); `loyalty_card_sequence` è una sequenza (3.15).
+- **Letture:** `getLoyaltySettings()` in `lib/loyalty/loyaltyConfig.ts`. Precedenza: riga valida → riga; riga assente (130 non applicata) o illeggibile → colonne legacy; riga invalida → programma sospeso. Punti di lettura: `processOrderPointsOnDelivery`, `/compte`, `/compte/carte-fidelite`, wallet, scan admin (pagina e conferma), `/admin/loyalty`. La RPC SQL `process_manual_purchase_points_atomic` legge ancora la colonna legacy, che è il mirror.
+- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/loyalty/settings` (permesso `tenant_settings.manage`, invariato rispetto a `/api/admin/tenant`). Prima della 130 la route scrive le colonne legacy con la stessa validazione. `/api/admin/tenant` non accetta più i campi loyalty.
+- **Esposizione:** S. La 130 revoca il grant pubblico 076 sulle tre colonne.
+- **Prossimo passo (fase 5):** far leggere alla RPC la riga settings, poi rimuovere trigger e colonne in una migrazione separata, dopo aver verificato in produzione che non ci sono altri lettori.
+- **Rischio:** medio (valore economico dei punti). Mitigato dal mirror transazionale e dal controllo di conteggio e valori nel backfill.
 
 ### 3.5 Referral
-- **Colonne:** `referral_max_depth`, `referral_availability_mode`, `referral_unlock_spending_threshold`, `referral_fraud_max_conversions`, `referral_fraud_period_days`, `referral_fraud_action`.
+- **Colonne:** `referral_signup_bonus_points`, `referral_max_depth`, `referral_availability_mode`, `referral_unlock_spending_threshold`, `referral_fraud_max_conversions`, `referral_fraud_period_days`, `referral_fraud_action`.
 - **Letture:** `lib/loyalty/checkFraudSignals.ts`, `checkReferralAccessUnlock.ts`, `registerWithReferral.ts`, `processOrderPointsOnDelivery.ts`, API `/api/loyalty/referrals/*`, `/compte/parrainage`.
 - **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/tenant`.
 - **Esposizione:** P (grant 076); non più L. Le soglie anti-frode restano leggibili via PostgREST per il grant di colonna 076: **revocare nella migrazione del dominio**.
@@ -198,7 +197,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 |---|---|---|---|
 | 0 | **Fatto.** Proiezione client esplicita (`toPublicTenant`) nel root layout e in ogni pagina che passa il tenant a Client Components; `PATCH /api/admin/tenant` restituisce solo i campi modificabili (con 129) | Chiude l'esposizione di segreti, billing e anti-frode senza migrazioni | — |
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
-| 2 | Loyalty | Pochi campi, schema semplice, un solo writer | Medio |
+| 2 | Loyalty — **fatto fino alla fase 4 (130, da applicare)**; resta la fase 5 | Pochi campi, schema semplice, un solo writer | Medio |
 | 3 | Referral | Dipende dalla loyalty; soglie anti-frode da rendere private | Medio-alto |
 | 4 | AI/Nala (flag, limiti, contesto privato) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |

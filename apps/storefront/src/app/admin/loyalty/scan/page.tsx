@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
 import LogoutButton from '../../LogoutButton';
 import { ScanClient } from './ScanClient';
 
@@ -53,6 +54,8 @@ export default async function LoyaltyScanPage() {
     redirect('/admin/login?error=unauthorized');
   }
 
+  const loyalty = await getLoyaltySettings(adminClient, tenant.id, tenant);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
@@ -72,7 +75,7 @@ export default async function LoyaltyScanPage() {
       </header>
 
       <main className="px-4 py-6 max-w-md mx-auto">
-        <ScanClient tenantId={tenant.id} loyaltyEnabled={tenant.loyalty_enabled} />
+        <ScanClient tenantId={tenant.id} loyaltyEnabled={loyalty.enabled} />
       </main>
     </div>
   );

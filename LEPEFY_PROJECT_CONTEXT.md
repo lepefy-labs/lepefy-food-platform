@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.76 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.77 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -27,7 +27,7 @@ Il rapporto operativo alle ore 08:00 locali per tenant usa `POST /api/internal/d
 
 **Payload n8n.** Il payload per `/webhook/daily-order-digest` include HTML in francese, riepilogo, link protetti admin, snapshot precedente e chiave idempotente tenant/data. Il trasporto email resta n8n.
 
-**Stato.** La migration 129 **non è applicata in produzione** (verificato il 26/09/2026): il codice deployato fallisce in modo chiuso (503 sull'endpoint interno, sezione Paramètres in sola lettura). Non attivare senza migration, secret, scheduler, webhook e opt-in collaudati. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
+**Stato.** La migration 129 **è applicata in produzione** (26/09/2026; verificato: feature registrata non fatturabile, nessuna riga di settings, nessuna esecuzione, nessun destinatario abilitato, Nala intatta). L'invio resta inattivo: mancano secret, scheduler, webhook n8n collaudato, opt-in dei destinatari e attivazione del tenant. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
 
 ---
 
@@ -66,6 +66,10 @@ L’account mostra profilo con modifica esplicita, anteprima compatta della cart
 Le letture account sono parallele e tenant/customer-scoped. L’ultimo ordine reale è letto con `limit(1)`, riusa `getCustomerOrderPresentation` e il token tracking canonico senza alterare ordini o autorizzazioni. Errori saldo/indirizzi/ordini mostrano feedback e retry per sezione; un errore profilo canonico attiva l’error boundary e non simula privilegi/eligibilità. Il saldo non leggibile è `null` (—), distinto da zero; nessun ordine è distinto da errore di lettura.
 
 L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, coerente con la pagina canonica; non genera codici o cambia l’accesso. Il logout UI verifica risposta HTTP e conferma `ok` prima di notificare e reindirizzare; sessione e provider auth restano invariati. La cancellazione resta raggiungibile in `Gestion du compte`, senza modifica al flusso dedicato. Nessuna migrazione DB.
+
+### Configurazione programma fedeltà (migration 130)
+
+Attivazione e tassi del programma vivono in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` restano come mirror identico mantenuto da due trigger con guardia, così la RPC `process_manual_purchase_points_atomic` e i lettori legacy restano coerenti. Il codice legge tramite `getLoyaltySettings()`: riga valida → riga; riga assente (130 non applicata) o errore → colonne legacy; riga invalida → programma sospeso. Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima), che prima della 130 ripiega sulle colonne legacy con la stessa validazione. Le soglie referral restano su `tenants` e passano ancora da `/api/admin/tenant`. **130 non è applicata in produzione.**
 
 ### Carta fedeltà cliente e Wallet
 
@@ -735,6 +739,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 127_hero_slide_images.sql
 128_assisted_orders.sql
 129_tenant_daily_digest.sql
+130_tenant_loyalty_settings.sql
 ```
 
 `128` è additiva ma **operativamente significativa** (checkout, pagamenti, ordini): origine/canale/link/audit su `checkout_sessions`, stato `draft`, e-mail nullable per le sole sessioni/ordini assistiti (vincoli CHECK), colonne di audit incasso e `order_origin` su `orders`, `payment_method = 'manual'`, indice unico `orders.checkout_session_id`, indice «una sessione open per cliente» limitato allo storefront, trigger funnel e vista `checkout_funnel_30d` limitati allo storefront, journal `assisted_order_events` service-role only e RPC `convert_checkout_session_to_order` (EXECUTE solo service_role). Deve essere applicata **prima** del codice (recovery storefront e conferme esterne ne dipendono), poi verificata con `supabase/verification/128_assisted_orders_verification.sql` (transazione annullata). Runbook e rollback: `docs/ASSISTED_ORDERS.md` §10.
@@ -760,6 +765,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.
 
 `129` è additiva e opt-in: registra `daily_order_digest` (non fatturabile, senza piani) e il CHECK di config limitato a quella feature, aggiunge `notify_daily_digest` ai destinatari, il registro `tenant_daily_digest_runs` e la RPC di claim service-role-only. Non crea righe di settings e non tocca Nala/reviews; il backfill condizionale da eventuali colonne `tenants.daily_digest_*` di una bozza precedente conserva le colonne, revocandone la lettura pubblica.
+
+`130` è additiva: registra `loyalty` (non fatturabile, senza piani), fa il backfill di una riga `tenant_feature_settings` per ogni tenant con verifica di conteggio e valori, installa i trigger di mirror bidirezionale con le colonne legacy (anche per i nuovi tenant) e revoca il grant pubblico 076 sulle tre colonne loyalty. Nessuna colonna rimossa, `points_ledger` non toccato. Il codice deployato funziona prima e dopo l'applicazione.
 
 `097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk e le nuove risoluzioni Fast Resolver possono essere completate deterministicamente senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention. Il provider non è più hardcoded: la classificazione passa dalla policy AI Core `nala_semantic_enrichment / classification`, con preflight prima del claim per non consumare tentativi quando il routing non è operativo.
 
@@ -867,9 +874,10 @@ supabase/migrations/*
 - URL Events resta temporaneamente env-based;
 - SSO esplicito cross-subdomain shop/events non introdotto;
 - colonne billing legacy in `tenants` restano temporaneamente;
-- le colonne loyalty/referral/ambassador restano leggibili via PostgREST per il grant di colonna 076 (soglie anti-frode incluse): da revocare durante la migrazione dei rispettivi domini;
+- le colonne referral/ambassador restano leggibili via PostgREST per il grant di colonna 076 (soglie anti-frode incluse): da revocare durante la migrazione dei rispettivi domini (loyalty: revocato da 130);
+- loyalty: la RPC `process_manual_purchase_points_atomic` legge ancora `tenants.purchase_points_rate` (mirror); trigger e colonne legacy vanno rimossi in una migrazione successiva (fase 5);
 - la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
-- loyalty, referral, ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è pianificata ma non avviata;
+- referral, ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è avviata con loyalty (130);
 - Console Platform non è ancora CRUD completo di piani/tenant;
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;
