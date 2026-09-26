@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
@@ -177,7 +178,8 @@ async function handlePOST(req: NextRequest) {
     );
   }
 
-  if (!tenant.ai_image_generation) {
+  const aiCapabilities = await getAiCapabilities(createServiceClient(), tenant.id, tenant);
+  if (!aiCapabilities.imageGeneration) {
     return NextResponse.json(
       { error: 'Génération IA non activée pour ce tenant' },
       { status: 403 },

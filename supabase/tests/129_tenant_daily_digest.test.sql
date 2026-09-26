@@ -28,11 +28,11 @@ begin
     (select tenant_id, feature_key, enabled, config, created_at, updated_at from public._fixture_settings_before)
     except
     (select tenant_id, feature_key, enabled, config, created_at, updated_at from public.tenant_feature_settings)
-  ) or (select count(*) from public.tenant_feature_settings) <> (select count(*) from public._fixture_settings_before)
+  ) or (select count(*) from public.tenant_feature_settings) is distinct from (select count(*) from public._fixture_settings_before)
     then raise exception 'Existing tenant_feature_settings rows were modified'; end if;
   if (select enabled from public.tenant_feature_settings where tenant_id = a and feature_key = 'nala') is not true
      or (select enabled from public.tenant_feature_settings where tenant_id = b and feature_key = 'nala') is not false
-     or (select config from public.tenant_feature_settings where tenant_id = b and feature_key = 'nala') <> '{"tone": "warm"}'::jsonb
+     or (select config from public.tenant_feature_settings where tenant_id = b and feature_key = 'nala') is distinct from '{"tone": "warm"}'::jsonb
     then raise exception 'Nala operational settings were not preserved'; end if;
 
   -- Recipient opt-in exists and defaults off for existing recipients.
@@ -44,7 +44,7 @@ begin
   values (a, 'daily_order_digest', false, '{"version": 1, "timezone": "Europe/Rome", "include_empty": false, "prepare_hours": 24, "pickup_hours": 48, "payment_verification_hours": 48, "tracking_stale_hours": 72}');
   insert into public.tenant_feature_settings (tenant_id, feature_key, enabled)
   values (b, 'daily_order_digest', false);
-  if (select enabled from public.tenant_feature_settings where tenant_id = b and feature_key = 'daily_order_digest') <> false
+  if (select enabled from public.tenant_feature_settings where tenant_id = b and feature_key = 'daily_order_digest') is distinct from false
     then raise exception 'Explicit disabled row expected'; end if;
 
   begin

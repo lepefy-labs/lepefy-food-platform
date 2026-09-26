@@ -2,7 +2,7 @@
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
 > **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132; la pulizia delle colonne legacy è la 133). Gli altri domini sono solo inventariati. **129–133 sono applicate in produzione (26/09/2026, verificate).**
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132; la pulizia delle colonne legacy è la 133), AI/Nala (134, fasi 1–4). Gli altri domini sono solo inventariati. **129–133 sono applicate in produzione (26/09/2026, verificate); 134 non ancora.**
 
 ## 1. Problema
 
@@ -123,16 +123,22 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Esposizione:** S.
 - **Dettagli:** `docs/DAILY_ORDER_DIGEST.md`.
 
-### 3.9 AI e Nala
-- **Colonne:** `ai_image_generation`, `ai_description_generation`, `ai_semantic_search`, `catalogue_search_threshold`, `ai_rate_limit_public_per_minute`, `ai_rate_limit_public_per_day`, `ai_rate_limit_admin_per_day`, `chatbox_extra_context`.
-- **Tabelle:** l'attivazione di Nala è già in `tenant_feature_settings('nala')` (096).
-- **Letture:** `/api/chat`, `/api/search/semantic`, `lib/ai/nalaFastResolver.ts`, `lib/ai/usageTracking.ts`, generazione descrizioni e immagini, pagine prodotto e home.
-- **Scritture:** manuali (piattaforma).
-- **Esposizione:** P per flag e limiti pubblici; S per `ai_rate_limit_admin_per_day` e `chatbox_extra_context` (esclusi dalla proiezione pubblica).
-- **Destinazione:**
-  - flag e limiti → `feature_settings('ai')` / `('nala').config`;
-  - `chatbox_extra_context` → tabella di contesto privata o `tenant_knowledge_base`.
-- **Rischio:** medio.
+### 3.9 AI e Nala — **in migrazione (134, da applicare)**
+- **Struttura:**
+  - `tenant_feature_settings('ai')`: `enabled = true` (riservato: oggi non esiste un interruttore AI globale) e config `{version: 1, image_generation, description_generation, semantic_search, rate_limit_public_per_minute, rate_limit_public_per_day, rate_limit_admin_per_day}`. Flag booleani, limiti interi 0–1 000 000; CHECK `is_valid_ai_config`. La voce di catalogo `ai` (094, fatturabile, inclusa nel piano) mantiene la sua semantica commerciale.
+  - Contesto privato dell'assistente: `tenant_feature_settings('nala').config.extra_context` (stringa ≤ 20 000 caratteri, CHECK `is_valid_nala_config` limitato a quella chiave, così la config Nala resta aperta a chiavi future). L'attivazione Nala (096) non viene mai modificata.
+- **Colonne legacy:** `tenants.ai_*` (6) e `chatbox_extra_context` restano, allineate da trigger con guardia (`sync_ai_settings_to_tenant`, `sync_nala_context_to_tenant`, `sync_tenant_ai_to_settings`). Un cambio di attivazione Nala senza la chiave `extra_context` non cancella mai il contesto. Un nuovo tenant riceve la riga `ai`, e una riga Nala solo se ha un contesto.
+- **Letture:**
+  - `getAiCapabilities(db, tenantId, tenant)` in `lib/ai/aiSettings.ts`. Precedenza: riga valida e attiva → riga; riga assente (134 non applicata) o illeggibile → colonne legacy; disattivata o invalida → tutte le capacità spente.
+  - Lettori: home (ricerca semantica), pagina prodotto e `/api/products/[id]/recommendations` (prodotti correlati), `/api/search/semantic`, catalogo admin (nuovo e modifica), `/api/admin/generate-product-{description,image}`, e gli script `scripts/generate-product-{descriptions,embeddings}.mjs` (GitHub Actions) con la stessa precedenza.
+  - Le impostazioni si leggono sempre con il client service-role, anche nelle pagine storefront che per il resto usano il client anon.
+  - `getNalaExtraContext()` legge la chiave `extra_context` della riga Nala; senza la chiave usa la colonna legacy. Lo usa `/api/chat` (prompt di sistema e resolver rapido degli orari).
+- **Rate limiting:** `check_ai_rate_limit` (027) legge ancora i limiti da `tenants`, che sono il mirror della riga `ai`. La riscrittura è prevista nella fase 5.
+- **Scritture:** nessuna UI (gestione manuale della piattaforma). Si scrive la riga `ai` o la chiave `extra_context` della riga `nala`; i trigger aggiornano le colonne.
+- **Esposizione:** S. La 134 revoca il grant pubblico 013/076 su flag e limiti. `chatbox_extra_context` non era concesso.
+- **Fuori dal modulo:** `catalogue_search_threshold` (015) non è un'impostazione AI e **non ha lettori** nel codice: candidato alla rimozione.
+- **Prossimo passo (fase 5):** `check_ai_rate_limit` sulla riga settings, poi rimozione di trigger e colonne (come 131/133).
+- **Rischio:** medio (ricerca pubblica, costi AI tramite i limiti). Mitigato da backfill con verifica, mirror transazionale e test del rate limiter sui limiti allineati.
 
 ### 3.10 Moduli attivi (Événementiel e servizi)
 - **Colonne:** `events_enabled`, `services_enabled`, `rental_delivery_enabled`, `rental_delivery_countries`.
@@ -200,7 +206,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
 | 2 | Loyalty — **completato (130 e 131 applicate; colonne legacy rimosse)** | Pochi campi, schema semplice, un solo writer | Medio |
 | 3 | Referral — **completato (132 e 133 applicate; colonne legacy rimosse)** | Dipende dalla loyalty; soglie anti-frode rese private dalla 132 | Medio-alto |
-| 4 | AI/Nala (flag, limiti, contesto privato) | Nala già attiva in `feature_settings` | Medio |
+| 4 | AI/Nala — **fasi 1–4 fatte (134, da applicare)**; resta la fase 5 (rate limiter e rimozione colonne) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |
 | 6 | Notifiche | Solo se i tipi continuano a crescere | Basso |
 | 7 | Shipping: segreto Packlink in un archivio dedicato; modalità e fallback in Shipping Intelligence | Segreto | Alto |

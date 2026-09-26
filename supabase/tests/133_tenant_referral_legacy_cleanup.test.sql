@@ -19,7 +19,7 @@ begin
     (select tenant_id, feature_key, enabled, config, created_at, updated_at from public._fixture_settings_before_133)
     except
     (select tenant_id, feature_key, enabled, config, created_at, updated_at from public.tenant_feature_settings)
-  ) or (select count(*) from public.tenant_feature_settings) <> (select count(*) from public._fixture_settings_before_133)
+  ) or (select count(*) from public.tenant_feature_settings) is distinct from (select count(*) from public._fixture_settings_before_133)
     then raise exception 'Module settings changed'; end if;
 
   -- The validator still guards the settings row.

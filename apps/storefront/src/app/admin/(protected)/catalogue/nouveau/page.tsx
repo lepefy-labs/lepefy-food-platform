@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import ProductEditClient from '../[id]/ProductEditClient';
 import ProductEditWorkspace from '../[id]/ProductEditWorkspace';
 
@@ -15,6 +16,7 @@ export default async function AdminNouveauProduitPage() {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);
   const supabase = createServiceClient();
+  const ai = await getAiCapabilities(supabase, tenant.id, tenant);
 
   const { data: categories } = await supabase
     .from('categories')
@@ -105,9 +107,9 @@ export default async function AdminNouveauProduitPage() {
           importers={importers ?? []}
           tenantId={tenant.id}
           tenantCurrency={tenant.currency}
-          aiEnabled={tenant.ai_image_generation}
+          aiEnabled={ai.imageGeneration}
           tenantLocales={tenant.locales ?? ['fr']}
-          aiDescriptionsEnabled={tenant.ai_description_generation ?? false}
+          aiDescriptionsEnabled={ai.descriptionGeneration}
           isNew={true}
         />
       </ProductEditWorkspace>

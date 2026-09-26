@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import { CatalogClient } from '@/components/catalog/CatalogClient';
 import { catalogRankingDay, getCatalogPage, parseCatalogSort, parsePageParam, PRODUCTS_PAGE_SIZE } from '@/lib/catalog/pagination';
 import { getActiveQuantityGroupFilter } from '@/lib/catalog/quantityGroupFilter';
@@ -28,6 +29,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(tenantSlug);
   const supabase = createClient();
+  // AI settings are server-only (tenant_feature_settings, migration 134).
+  const ai = await getAiCapabilities(createServiceClient(), tenant.id, tenant);
 
   const categories = await getShopCategories(tenant.id).catch(() => []);
   const searchQuery = searchParams.q?.trim() ?? '';
@@ -80,7 +83,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       products={products}
       activeSlug={searchQuery ? undefined : searchParams.category}
       initialQuery={searchQuery}
-      semanticEnabled={Boolean(tenant.ai_semantic_search) && !quantityGroupId}
+      semanticEnabled={ai.semanticSearch && !quantityGroupId}
       quantityGroupId={quantityGroup?.id}
       quantityGroupName={quantityGroup?.name}
       totalCount={totalCount}

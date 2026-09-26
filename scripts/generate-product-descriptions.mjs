@@ -105,7 +105,18 @@ async function logAiUsage({
 async function getTenant() {
   const tenants = await sbGet(`tenants?slug=eq.${TENANT_SLUG}&select=id,locales,ai_description_generation`);
   if (!tenants.length) throw new Error(`Tenant '${TENANT_SLUG}' non trovato`);
-  return tenants[0];
+  const tenant = tenants[0];
+  return { ...tenant, ai_description_generation: await resolveAiFlag(tenant) };
+}
+
+// AI flags live in tenant_feature_settings('ai') since migration 134; the
+// legacy column is the fallback until that row exists. Same precedence as
+// apps/storefront/src/lib/ai/aiSettings.ts (disabled row = capability off).
+async function resolveAiFlag(tenant) {
+  const rows = await sbGet(`tenant_feature_settings?tenant_id=eq.${tenant.id}&feature_key=eq.ai&select=enabled,config`);
+  if (!rows.length) return tenant.ai_description_generation === true;
+  const row = rows[0];
+  return row.enabled === true && row.config?.description_generation === true;
 }
 
 async function getProducts(tenantId) {

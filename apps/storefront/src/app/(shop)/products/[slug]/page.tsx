@@ -6,6 +6,8 @@ import { ProductDetail } from '@/components/product/ProductDetail';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
 import type { ProductWithCategory } from '@lepefy/types';
 import { getRelatedProducts } from '@/lib/catalog/getRelatedProducts';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 
 // ISR : ni cette page ni generateMetadata ne lisent de donnée personnalisée
 // (pas de panier/session ici — ProductDetail lit le panier côté client via
@@ -71,7 +73,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) notFound();
 
   const goodies = (product as unknown as ProductWithCategory).category?.catalog_scope === 'gadgets';
-  const related = await getRelatedProducts(supabase, goodies ? { ...tenant, ai_semantic_search: false } : tenant, product);
+  const ai = await getAiCapabilities(createServiceClient(), tenant.id, tenant);
+  const related = await getRelatedProducts(supabase, { id: tenant.id, ai_semantic_search: ai.semanticSearch && !goodies }, product);
 
   return (
     <div className="max-w-7xl mx-auto px-4 pt-8 pb-20 md:py-8">

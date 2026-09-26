@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createPublicClient } from '@/lib/supabase/public';
 import { getRelatedProducts } from '@/lib/catalog/getRelatedProducts';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import type { Category } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
@@ -21,9 +23,10 @@ export async function GET(req: NextRequest, { params }: { params: { productId: s
     const requested = Number(req.nextUrl.searchParams.get('limit') ?? 4);
     const limit = Number.isFinite(requested) ? Math.max(1, Math.min(4, Math.floor(requested))) : 4;
     const category = product.category as unknown as Pick<Category, 'catalog_scope'> | null;
+    const ai = await getAiCapabilities(createServiceClient(), tenant.id, tenant);
     const products = await getRelatedProducts(
       supabase,
-      category?.catalog_scope === 'gadgets' ? { ...tenant, ai_semantic_search: false } : tenant,
+      { id: tenant.id, ai_semantic_search: ai.semanticSearch && category?.catalog_scope !== 'gadgets' },
       product,
       limit,
     );

@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { embedText } from '@/lib/ai/embeddings';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import type { SemanticMatch } from '@lepefy/types';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,8 @@ export async function GET(req: NextRequest) {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  if (!tenant.ai_semantic_search) {
+  const ai = await getAiCapabilities(createServiceClient(), tenant.id, tenant);
+  if (!ai.semanticSearch) {
     return NextResponse.json({ error: 'not_enabled' }, { status: 404 });
   }
 

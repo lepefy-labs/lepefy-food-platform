@@ -15,7 +15,7 @@ begin
     then raise exception 'loyalty must not create plan features or overrides'; end if;
 
   -- Backfill: exactly one identical row per tenant, activation preserved.
-  if (select count(*) from public.tenant_feature_settings where feature_key = 'loyalty') <> 3
+  if (select count(*) from public.tenant_feature_settings where feature_key = 'loyalty') is distinct from 3
     then raise exception 'Expected one loyalty row per tenant'; end if;
   if not exists (select 1 from public.tenant_feature_settings where tenant_id = a and feature_key = 'loyalty' and enabled
       and (config->>'purchase_points_rate')::numeric = 1.5 and (config->>'points_to_currency_rate')::numeric = 0.02 and config->'version' = '1')
@@ -39,10 +39,10 @@ begin
   update public.tenant_feature_settings
   set config = config || '{"purchase_points_rate": 3.25}', enabled = false
   where tenant_id = a and feature_key = 'loyalty';
-  if (select purchase_points_rate from public.tenants where id = a) <> 3.25
+  if (select purchase_points_rate from public.tenants where id = a) is distinct from 3.25
      or (select loyalty_enabled from public.tenants where id = a) is not false
     then raise exception 'Settings change not mirrored to tenants'; end if;
-  if (select points_to_currency_rate from public.tenants where id = a) <> 0.02
+  if (select points_to_currency_rate from public.tenants where id = a) is distinct from 0.02
     then raise exception 'Unchanged rate must be preserved'; end if;
 
   -- Tenants -> settings mirror (writes still reaching the legacy columns).
@@ -54,12 +54,12 @@ begin
   -- No-op writes do not touch the other side.
   select updated_at into before_updated from public.tenant_feature_settings where tenant_id = c and feature_key = 'loyalty';
   update public.tenants set name = 'Tenant C renamed', purchase_points_rate = 2.2575 where id = c;
-  if (select updated_at from public.tenant_feature_settings where tenant_id = c and feature_key = 'loyalty') <> before_updated
+  if (select updated_at from public.tenant_feature_settings where tenant_id = c and feature_key = 'loyalty') is distinct from before_updated
     then raise exception 'Unchanged loyalty values must not rewrite settings'; end if;
 
   -- Tenant isolation: mirrors only touch the tenant being written.
-  if (select purchase_points_rate from public.tenants where id = c) <> 2.2575
-     or (select (config->>'purchase_points_rate')::numeric from public.tenant_feature_settings where tenant_id = c and feature_key = 'loyalty') <> 2.2575
+  if (select purchase_points_rate from public.tenants where id = c) is distinct from 2.2575
+     or (select (config->>'purchase_points_rate')::numeric from public.tenant_feature_settings where tenant_id = c and feature_key = 'loyalty') is distinct from 2.2575
     then raise exception 'Another tenant was modified'; end if;
 
   -- New tenants get their loyalty row automatically (disabled by default).

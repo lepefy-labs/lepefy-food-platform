@@ -28,6 +28,7 @@ import {
 import { resolveCartPlanIngredients } from '@/lib/ai/nalaCartPlanResolver';
 import { getRelatedProducts } from '@/lib/catalog/productRelationships';
 import { resolveNalaFastStoreInformation } from '@/lib/ai/nalaFastResolver';
+import { getNalaExtraContext } from '@/lib/ai/aiSettings';
 import {
   extractNalaAvailabilityProductQuery,
   resolveNalaFastProductAvailability,
@@ -73,6 +74,9 @@ export async function POST(req: NextRequest) {
   if (!(await canUseNala(tenant.id))) {
     return NextResponse.json({ error: 'not_enabled' }, { status: 404 });
   }
+  // Private assistant context: tenant_feature_settings('nala').config.extra_context
+  // (migration 134), legacy column until the key exists. Server-only.
+  const extraContext = await getNalaExtraContext(createServiceClient(), tenant.id, tenant.chatbox_extra_context);
 
   const body = await req.json().catch(() => null);
   const rawMessage = typeof body?.message === 'string' ? body.message : '';
@@ -140,7 +144,7 @@ export async function POST(req: NextRequest) {
     const fastResolution = hadPendingAction ? null : resolveNalaFastStoreInformation({
       message,
       locale,
-      tenant,
+      tenant: { ...tenant, chatbox_extra_context: extraContext },
     });
     if (fastResolution) {
       const fastDecision = {
@@ -354,7 +358,7 @@ export async function POST(req: NextRequest) {
       tenantName: tenant.name,
       locales: tenant.locales ?? ['fr'],
       whatsappNumber: tenant.whatsapp_number ?? null,
-      extraContext: tenant.chatbox_extra_context?.slice(0, 4000) ?? null,
+      extraContext: extraContext?.slice(0, 4000) ?? null,
       matchedProducts,
       knowledgeSnippets,
     });

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.84 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.85 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -79,6 +79,21 @@ Profondità, bonus d'iscrizione, modalità di disponibilità, soglia di sblocco 
 - disattivata, invalida o illeggibile → `null`, cioè programma non disponibile: nessun codice, nessuna idoneità automatica, nessun bonus, nessun punto referral. Le superfici cliente usano `REFERRAL_UNAVAILABLE_VIEW`.
 
 Scrittura admin: `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, come prima), che rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0; il primo salvataggio di un tenant senza riga la crea attiva. **132 e 133 sono applicate in produzione** (26/09/2026, verificate): le sette colonne `tenants.referral_*` di configurazione, i trigger di mirror e `referral_config_from_tenant` non esistono più; `customers.referral_*` e `referral_codes` sono intatti.
+
+### Configurazione AI e contesto Nala (migration 134)
+
+Flag AI (generazione immagini, generazione descrizioni, ricerca semantica) e limiti di rate limiting vivono in `tenant_feature_settings('ai')`. Il contesto privato dell'assistente vive in `tenant_feature_settings('nala').config.extra_context`, senza toccare l'attivazione Nala.
+
+`src/lib/ai/aiSettings.ts` offre due letture:
+- `getAiCapabilities(db, tenantId, tenant)`: riga valida e attiva → riga; riga assente o illeggibile → colonne `tenants.ai_*` (mirror); disattivata o invalida → tutto spento.
+- `getNalaExtraContext()`: chiave `extra_context` se presente, altrimenti la colonna legacy.
+
+Regole:
+- Le impostazioni si leggono sempre con il client service-role, anche nelle pagine storefront che usano il client anon.
+- Gli script `scripts/generate-product-{descriptions,embeddings}.mjs` applicano la stessa precedenza.
+- Nessuna UI di scrittura: gestione manuale della piattaforma sulle righe settings, con i trigger che aggiornano le colonne.
+
+**134 non è applicata in produzione.**
 
 ### Carta fedeltà cliente e Wallet
 
@@ -752,6 +767,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 131_tenant_loyalty_legacy_cleanup.sql
 132_tenant_referral_settings.sql
 133_tenant_referral_legacy_cleanup.sql
+134_tenant_ai_settings.sql
 ```
 
 `128` è additiva ma **operativamente significativa** (checkout, pagamenti, ordini): origine/canale/link/audit su `checkout_sessions`, stato `draft`, e-mail nullable per le sole sessioni/ordini assistiti (vincoli CHECK), colonne di audit incasso e `order_origin` su `orders`, `payment_method = 'manual'`, indice unico `orders.checkout_session_id`, indice «una sessione open per cliente» limitato allo storefront, trigger funnel e vista `checkout_funnel_30d` limitati allo storefront, journal `assisted_order_events` service-role only e RPC `convert_checkout_session_to_order` (EXECUTE solo service_role). Deve essere applicata **prima** del codice (recovery storefront e conferme esterne ne dipendono), poi verificata con `supabase/verification/128_assisted_orders_verification.sql` (transazione annullata). Runbook e rollback: `docs/ASSISTED_ORDERS.md` §10.
@@ -785,6 +801,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `132` è additiva (referral, fasi 1–4): registra `referral` (non fatturabile, senza piani), fa il backfill di una riga `tenant_feature_settings` per ogni tenant (`enabled = true`, config con i sette valori `referral_*`) con verifica dei valori, installa il mirror bidirezionale con le colonne legacy (anche per i nuovi tenant) e revoca il grant pubblico 076 sui sette campi, soglie anti-frode incluse. Nessuna colonna rimossa; `referral_codes`, catene e storico punti non toccati.
 
 `133` è **distruttiva** (fase 5 referral): verifica che ogni tenant abbia una riga referral identica alle sette colonne legacy (altrimenti abort senza modifiche), elimina trigger e funzioni di mirror della 132 (incluso `referral_config_from_tenant`) e le colonne `tenants.referral_*` di configurazione. Non tocca `customers.referral_*`, `referral_codes` né le catene. Rollback nei commenti. Ordine obbligatorio: deploy del codice, poi migration.
+
+`134` è additiva (AI/Nala, fasi 1–4): crea una riga `tenant_feature_settings('ai')` per tenant (`enabled = true`, flag immagini/descrizioni/ricerca semantica e i tre limiti di rate limiting) senza cambiare la semantica commerciale della voce `ai` (094). Sposta `chatbox_extra_context` in `tenant_feature_settings('nala').config.extra_context` senza toccare l'attivazione Nala. Installa il mirror bidirezionale con le colonne legacy e revoca il grant pubblico 013/076 su flag e limiti. `check_ai_rate_limit` (027) continua a leggere i limiti dal mirror. `catalogue_search_threshold` non viene toccato. Il codice deployato funziona prima e dopo l'applicazione.
 
 `097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk e le nuove risoluzioni Fast Resolver possono essere completate deterministicamente senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention. Il provider non è più hardcoded: la classificazione passa dalla policy AI Core `nala_semantic_enrichment / classification`, con preflight prima del claim per non consumare tentativi quando il routing non è operativo.
 
@@ -894,7 +912,8 @@ supabase/migrations/*
 - colonne billing legacy in `tenants` restano temporaneamente;
 - le colonne ambassador restano leggibili via PostgREST per il grant di colonna 076: da revocare durante la migrazione del dominio (loyalty: revocato da 130; referral: revocato da 132);
 - la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
-- ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è completata per loyalty (130/131) e per referral (132; pulizia 133);
+- ambassador, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è completata per loyalty (130/131) e referral (132/133) e avviata per AI/Nala (134);
+- AI/Nala: fino alla fase 5 `check_ai_rate_limit` legge i limiti da `tenants` (mirror della 134) e le colonne `tenants.ai_*`/`chatbox_extra_context` restano; `catalogue_search_threshold` non ha lettori (candidato alla rimozione);
 - Console Platform non è ancora CRUD completo di piani/tenant;
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;

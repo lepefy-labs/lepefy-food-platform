@@ -15,14 +15,14 @@ begin
     then raise exception 'referral must not create plan features or overrides'; end if;
 
   -- Backfill: one enabled row per tenant, values identical to the columns.
-  if (select count(*) from public.tenant_feature_settings where feature_key = 'referral' and enabled) <> 3
+  if (select count(*) from public.tenant_feature_settings where feature_key = 'referral' and enabled) is distinct from 3
     then raise exception 'Expected one enabled referral row per tenant'; end if;
   if (select config from public.tenant_feature_settings where tenant_id = a and feature_key = 'referral') <>
      '{"version": 1, "max_depth": 3, "signup_bonus_points": 50, "availability_mode": "SPENDING_THRESHOLD", "unlock_spending_threshold": 120.50, "fraud_max_conversions": 10, "fraud_period_days": 30, "fraud_action": "AUTO_BLOCK"}'::jsonb
     then raise exception 'Tenant A referral backfill mismatch'; end if;
-  if (select config->'unlock_spending_threshold' from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') <> 'null'::jsonb
+  if (select config->'unlock_spending_threshold' from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') is distinct from 'null'::jsonb
     then raise exception 'Null threshold must stay null'; end if;
-  if (select (config->>'fraud_max_conversions')::numeric from public.tenant_feature_settings where tenant_id = c and feature_key = 'referral') <> 2.5
+  if (select (config->>'fraud_max_conversions')::numeric from public.tenant_feature_settings where tenant_id = c and feature_key = 'referral') is distinct from 2.5
     then raise exception 'Fractional fraud threshold must be preserved'; end if;
 
   -- Other modules (loyalty after 131, Nala, reviews, digest) untouched.
@@ -36,25 +36,25 @@ begin
   update public.tenant_feature_settings
   set config = config || '{"max_depth": 5, "fraud_action": "CAP_AT_THRESHOLD", "unlock_spending_threshold": null}'
   where tenant_id = a and feature_key = 'referral';
-  if (select referral_max_depth from public.tenants where id = a) <> 5
-     or (select referral_fraud_action from public.tenants where id = a) <> 'CAP_AT_THRESHOLD'
+  if (select referral_max_depth from public.tenants where id = a) is distinct from 5
+     or (select referral_fraud_action from public.tenants where id = a) is distinct from 'CAP_AT_THRESHOLD'
      or (select referral_unlock_spending_threshold from public.tenants where id = a) is not null
-     or (select referral_signup_bonus_points from public.tenants where id = a) <> 50
+     or (select referral_signup_bonus_points from public.tenants where id = a) is distinct from 50
     then raise exception 'Settings change not mirrored to tenants'; end if;
 
   -- Tenants -> settings mirror.
   update public.tenants set referral_fraud_period_days = 90, referral_signup_bonus_points = 15 where id = b;
-  if (select (config->>'fraud_period_days')::int from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') <> 90
-     or (select (config->>'signup_bonus_points')::int from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') <> 15
-     or (select config->'version' from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') <> '1'::jsonb
+  if (select (config->>'fraud_period_days')::int from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') is distinct from 90
+     or (select (config->>'signup_bonus_points')::int from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') is distinct from 15
+     or (select config->'version' from public.tenant_feature_settings where tenant_id = b and feature_key = 'referral') is distinct from '1'::jsonb
     then raise exception 'Tenant change not mirrored to settings'; end if;
 
   -- No-op writes do not rewrite the other side; other tenants untouched.
   select updated_at into before_updated from public.tenant_feature_settings where tenant_id = c and feature_key = 'referral';
   update public.tenants set name = 'Tenant C renamed', referral_fraud_period_days = 7 where id = c;
-  if (select updated_at from public.tenant_feature_settings where tenant_id = c and feature_key = 'referral') <> before_updated
+  if (select updated_at from public.tenant_feature_settings where tenant_id = c and feature_key = 'referral') is distinct from before_updated
     then raise exception 'Unchanged referral values must not rewrite settings'; end if;
-  if (select referral_availability_mode from public.tenants where id = c) <> 'ADMIN_GRANTED_ONLY'
+  if (select referral_availability_mode from public.tenants where id = c) is distinct from 'ADMIN_GRANTED_ONLY'
     then raise exception 'Another tenant was modified'; end if;
 
   -- New tenants get a referral row with the column defaults.

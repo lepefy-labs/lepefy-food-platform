@@ -3,6 +3,8 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getAiCapabilities } from '@/lib/ai/aiSettings';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -91,7 +93,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!tenant.ai_description_generation) {
+  const aiCapabilities = await getAiCapabilities(createServiceClient(), tenant.id, tenant);
+  if (!aiCapabilities.descriptionGeneration) {
     return NextResponse.json(
       { error: 'Génération IA des descriptions non activée pour ce tenant' },
       { status: 403 },
