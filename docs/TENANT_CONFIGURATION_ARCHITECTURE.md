@@ -2,7 +2,7 @@
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
 > **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131). Gli altri domini sono solo inventariati. **129 e 130 sono applicate in produzione (26/09/2026, verificate); 131 non ancora.**
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131). Gli altri domini sono solo inventariati. **129, 130 e 131 sono applicate in produzione (26/09/2026, verificate).**
 
 ## 1. Problema
 
@@ -79,7 +79,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Migrazione:** bassa priorità.
 - **Rischio:** medio (checkout).
 
-### 3.4 Loyalty — **migrata (130 applicata; 131 di pulizia pronta, da applicare dopo il deploy del codice)**
+### 3.4 Loyalty — **migrazione completata (130 e 131 applicate)**
 - **Struttura:** `tenant_feature_settings('loyalty')`, con `enabled` e config `{version: 1, purchase_points_rate, points_to_currency_rate}` (numeric(10,4): 0–999999.9999, al più 4 decimali; CHECK `is_valid_loyalty_config`). Feature `billable = false`, senza piani. **Unica fonte di verità.**
 - **Colonne legacy:** la 130 le teneva allineate con due trigger. La **131** (distruttiva, rollback nei commenti) le rimuove insieme ai trigger. Prima verifica che ogni tenant abbia una riga identica alle colonne, altrimenti si ferma senza eliminare nulla. Dopo la 131 un nuovo tenant non riceve alcuna riga: riga assente = programma disattivato.
 - **Fuori dal modulo:** `referral_signup_bonus_points` appartiene al referral (3.5); `loyalty_card_sequence` è una sequenza (3.15).
@@ -197,7 +197,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 |---|---|---|---|
 | 0 | **Fatto.** Proiezione client esplicita (`toPublicTenant`) nel root layout e in ogni pagina che passa il tenant a Client Components; `PATCH /api/admin/tenant` restituisce solo i campi modificabili (con 129) | Chiude l'esposizione di segreti, billing e anti-frode senza migrazioni | — |
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
-| 2 | Loyalty — **fatto (130 applicata; 131 di rimozione colonne da applicare dopo il deploy)** | Pochi campi, schema semplice, un solo writer | Medio |
+| 2 | Loyalty — **completato (130 e 131 applicate; colonne legacy rimosse)** | Pochi campi, schema semplice, un solo writer | Medio |
 | 3 | Referral | Dipende dalla loyalty; soglie anti-frode da rendere private | Medio-alto |
 | 4 | AI/Nala (flag, limiti, contesto privato) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |

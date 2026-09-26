@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.79 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.80 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -69,7 +69,7 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 
 ### Configurazione programma fedeltà (migration 130/131)
 
-Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le soglie referral restano su `tenants` e passano ancora da `/api/admin/tenant`. **130 è applicata in produzione** (26/09/2026, verificata). La **131** (distruttiva, da applicare solo dopo il deploy del codice che non legge più le colonne) riscrive `process_manual_purchase_points_atomic` sulla riga settings, rimuove i trigger di mirror della 130 e le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate`; si interrompe se una riga manca o diverge. Fino all'applicazione della 131 i trigger della 130 continuano ad allineare le colonne.
+Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le soglie referral restano su `tenants` e passano ancora da `/api/admin/tenant`. **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
 
 ### Carta fedeltà cliente e Wallet
 
@@ -878,7 +878,6 @@ supabase/migrations/*
 - SSO esplicito cross-subdomain shop/events non introdotto;
 - colonne billing legacy in `tenants` restano temporaneamente;
 - le colonne referral/ambassador restano leggibili via PostgREST per il grant di colonna 076 (soglie anti-frode incluse): da revocare durante la migrazione dei rispettivi domini (loyalty: revocato da 130);
-- loyalty: finché la 131 non è applicata, la RPC `process_manual_purchase_points_atomic` legge ancora `tenants.purchase_points_rate` (mirror della 130) e le colonne legacy restano nel DB;
 - la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
 - referral, ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è avviata con loyalty (130);
 - Console Platform non è ancora CRUD completo di piani/tenant;
