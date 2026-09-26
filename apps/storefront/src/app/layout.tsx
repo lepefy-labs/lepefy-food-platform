@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, Bricolage_Grotesque } from 'next/font/google';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { TenantProvider } from '@/providers/TenantProvider';
 import { PWARegister } from '@/components/PWARegister';
 import { buildPwaIconPath, getAppIconRevision } from '@/lib/tenant/appIcon';
@@ -52,15 +53,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const tenant = await getTenant(slug);
   const appIconRevision = getAppIconRevision(tenant.app_icon_url);
 
-  // Client Components need tenant branding/configuration, but they must never
-  // receive provider credentials or private assistant instructions. Keep the
-  // canonical Tenant type for backwards-compatible consumers while replacing
-  // server-only values before React serializes the provider prop.
-  const clientTenant = {
-    ...tenant,
-    packlink_api_key: null,
-    chatbox_extra_context: null,
-  };
+  // Client Components receive only the explicit public projection: provider
+  // credentials, assistant context, billing and internal settings never reach
+  // the RSC payload (new tenants columns are private by default).
+  const clientTenant = toPublicTenant(tenant);
 
   return (
     <html lang={tenant.locale.split('-')[0]} suppressHydrationWarning>

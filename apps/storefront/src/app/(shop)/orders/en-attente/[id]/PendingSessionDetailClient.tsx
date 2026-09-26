@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconArrowLeft } from '@tabler/icons-react';
 import { CheckoutSessionEditor } from '@/components/checkout-session/CheckoutSessionEditor';
-import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
+import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 
 // Wrapper client minimal : la page (Server Component) ne peut pas passer de
 // fonction (onCancelled → useRouter) à CheckoutSessionEditor à travers la
@@ -14,7 +14,7 @@ export function PendingSessionDetailClient({
   externalPaymentMethods,
   sessionId,
 }: {
-  tenant: Tenant;
+  tenant: PublicTenant;
   externalPaymentMethods: TenantPaymentMethod[];
   sessionId: string;
 }) {

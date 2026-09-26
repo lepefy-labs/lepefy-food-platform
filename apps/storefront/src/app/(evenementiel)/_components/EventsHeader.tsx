@@ -3,12 +3,12 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { IconArrowRight, IconMenu2 } from '@tabler/icons-react';
-import type { Tenant, TenantSocialLink } from '@lepefy/types';
+import type { PublicTenant, TenantSocialLink } from '@lepefy/types';
 import { TenantLogo } from '@/components/branding/TenantLogo';
 import { BrandNavigationDrawer, type BrandNavigationSection } from '@/components/layout/BrandNavigationDrawer';
 
 interface EventsHeaderProps {
-  tenant: Tenant;
+  tenant: PublicTenant;
   socialLinks: TenantSocialLink[];
   featuredEventSlug: string | null;
   hasTraiteur: boolean;

@@ -103,3 +103,44 @@ export interface Tenant {
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * Explicit allow-list of tenant fields that may reach the browser (Client
+ * Component props, TenantProvider, RSC payloads). Everything else — provider
+ * keys, private assistant context, billing, anti-fraud thresholds, internal
+ * limits, sequences — stays server-only. Adding a field here publishes it to
+ * every visitor: add only public branding/storefront data.
+ */
+export const PUBLIC_TENANT_FIELDS = [
+  'id',
+  'slug',
+  'name',
+  'tagline',
+  'logo_url',
+  'app_icon_url',
+  'hero_image_url',
+  'primary_color',
+  'secondary_color',
+  'accent_light',
+  'city',
+  'country',
+  'currency',
+  'locale',
+  'locales',
+  'storefront_url',
+  'click_collect_enabled',
+  'click_collect_address',
+  'click_collect_hours',
+  'click_collect_hours_it',
+  'google_maps_url',
+  'whatsapp_number',
+  'legal_name',
+  'legal_address',
+  'legal_email',
+  'legal_website',
+  'show_powered_by',
+  'events_enabled',
+  'services_enabled',
+] as const satisfies ReadonlyArray<keyof Tenant>;
+
+export type PublicTenant = Pick<Tenant, (typeof PUBLIC_TENANT_FIELDS)[number]>;

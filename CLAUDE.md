@@ -48,7 +48,7 @@ supabase start                      # Start local Supabase instance
 Tenant is resolved at startup via `NEXT_PUBLIC_TENANT_SLUG` env var. The flow:
 
 1. `apps/storefront/src/lib/tenant/getTenant.ts` fetches the tenant row from Supabase (Next.js `cache()`)
-2. Root layout (`src/app/layout.tsx`) calls `getTenant()`, applies CSS custom properties from tenant config, and wraps the tree in `TenantProvider`
+2. Root layout (`src/app/layout.tsx`) calls `getTenant()`, applies CSS custom properties from tenant config, and wraps the tree in `TenantProvider` with `toPublicTenant(tenant)`. The full row (provider keys, billing, private AI context) is server-only: anything passed to a Client Component must go through `toPublicTenant()` (`src/lib/tenant/publicTenant.ts`, allow-list `PUBLIC_TENANT_FIELDS` in `packages/types/tenant.ts`) or an explicit hand-built projection — never `tenant={tenant}` from `getTenant()`
 3. All Supabase queries filter by `tenant_id` — enforced both in application code and via Supabase RLS policies (`supabase/migrations/002_rls_policies.sql`)
 
 ### Data Flow: Checkout

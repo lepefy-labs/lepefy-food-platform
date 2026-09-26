@@ -28,7 +28,7 @@ import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation
 import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
-import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
+import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 
 const formSchema = z.object({
   firstName:   z.string().min(1, 'Prénom requis'),
@@ -119,7 +119,7 @@ export default function CheckoutForm({
   consentState,
   isE2ETest = false,
 }: {
-  tenant: Tenant;
+  tenant: PublicTenant;
   externalPaymentMethods?: TenantPaymentMethod[];
   consentState: CheckoutConsentState;
   // Agente e2e Fase 0 — calculé côté serveur (page.tsx) via isE2ERequest().

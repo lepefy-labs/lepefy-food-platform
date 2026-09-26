@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.75 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.76 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -78,6 +78,8 @@ Il saldo del pass è aggiornato al ri-aggiungimento della carta, con identità s
 ---
 
 ## 2. Multi-tenancy, domini e workspace
+
+**Boundary server → client del tenant.** `getTenant()` restituisce la riga completa solo lato server. Tutto ciò che raggiunge il browser (`TenantProvider`, props di Client Components, payload RSC) passa da `toPublicTenant()` (`src/lib/tenant/publicTenant.ts`), che copia la allow-list `PUBLIC_TENANT_FIELDS` / tipo `PublicTenant` di `packages/types/tenant.ts`. Una nuova colonna di `tenants` è privata per default; aggiungerla alla allow-list la pubblica a ogni visitatore. `tests/unit/publicTenant.spec.ts` blocca i Client Components tipizzati con il `Tenant` completo. I componenti che ricevono proiezioni ad hoc (`/card`, `/pay/[token]`, `/compte`, `order-confirmation`) le costruiscono esplicitamente.
 
 Il tenant applicativo è ancora risolto principalmente da `NEXT_PUBLIC_TENANT_SLUG`; `getTenant()` e le query applicative filtrano per `tenant_id`.
 
@@ -865,7 +867,8 @@ supabase/migrations/*
 - URL Events resta temporaneamente env-based;
 - SSO esplicito cross-subdomain shop/events non introdotto;
 - colonne billing legacy in `tenants` restano temporaneamente;
-- il root layout serializza al client `{...tenant}` azzerando solo `packlink_api_key` e `chatbox_extra_context`: billing (`bank_*`, `stripe_*`, `subscription_*`), soglie anti-frode referral e sequenze arrivano al browser; va sostituito da una proiezione esplicita (Fase 0 di `docs/TENANT_CONFIGURATION_ARCHITECTURE.md`);
+- le colonne loyalty/referral/ambassador restano leggibili via PostgREST per il grant di colonna 076 (soglie anti-frode incluse): da revocare durante la migrazione dei rispettivi domini;
+- la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
 - loyalty, referral, ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è pianificata ma non avviata;
 - Console Platform non è ancora CRUD completo di piani/tenant;
 - tenant Team self-service non esiste ancora;

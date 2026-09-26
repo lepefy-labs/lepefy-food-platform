@@ -16,7 +16,7 @@ import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import ConfirmActionModal from '@/components/ui/ConfirmActionModal';
-import type { Tenant, TenantPaymentMethod, ShippingAddress } from '@lepefy/types';
+import type { PublicTenant, TenantPaymentMethod, ShippingAddress } from '@lepefy/types';
 
 const COUNTRIES = [
   { value: 'IT', label: 'Italie' },
@@ -65,7 +65,7 @@ interface SessionData {
 }
 
 interface CheckoutSessionEditorProps {
-  tenant:       Tenant;
+  tenant:       PublicTenant;
   externalPaymentMethods: TenantPaymentMethod[];
   sessionId:    string;
   accessToken?: string;

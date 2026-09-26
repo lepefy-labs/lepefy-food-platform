@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useCartStore } from '@/stores/cartStore';
 import { CheckoutSessionEditor } from '@/components/checkout-session/CheckoutSessionEditor';
-import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
+import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 
 // Écran affiché après une demande de paiement via lien externe
 // (PayPal/Revolut/autre) — Phase 1, devenu point d'entrée A de l'édition en
@@ -28,7 +28,7 @@ export default function PendingPaymentClient({
   externalPaymentMethods,
 }: {
   sessionId: string | null;
-  tenant: Tenant;
+  tenant: PublicTenant;
   externalPaymentMethods: TenantPaymentMethod[];
 }) {
   const [resolved, setResolved] = useState<{ sessionId: string; accessToken?: string } | null | undefined>(undefined);

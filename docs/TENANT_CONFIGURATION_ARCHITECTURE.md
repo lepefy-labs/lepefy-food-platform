@@ -1,16 +1,18 @@
 # Architettura delle configurazioni tenant
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@264bbd151b1ba41f9fb13a42e99a1b7fd0795886` (26 settembre 2026)
-> **Stato:** il rapporto delle 08:00 è il primo modulo sulla struttura di destinazione. Gli altri domini sono solo inventariati: nessuno è stato migrato.
+> **Base codice verificata:** `main@3a48abe0711512e442e1b85186015f30c0d1953f` (26 settembre 2026)
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Il rapporto delle 08:00 è il primo modulo sulla struttura di destinazione. Gli altri domini sono solo inventariati: nessuno è stato migrato.
 
 ## 1. Problema
 
 `public.tenants` contiene circa 90 colonne. Ogni funzionalità ne ha aggiunte (loyalty, referral, ambassador, AI, shipping, moduli, billing, Android…), mescolando identità, branding, impostazioni operative, dati commerciali e segreti in una sola riga. Le conseguenze verificate nel codice sono:
 
-- **Esposizione indiscriminata.**
+- **Esposizione indiscriminata (situazione prima della Fase 0, corretta).**
   - `getTenant()` legge `select('*')` con service role.
-  - `app/layout.tsx` serializza `{...tenant}` verso il client e azzera solo `packlink_api_key` e `chatbox_extra_context`. Arrivano quindi al browser di ogni visitatore anche `bank_iban`, `bank_bic`, `bank_beneficiary`, `stripe_account_id`, `stripe_payment_link`, `subscription_*`, `ai_rate_limit_admin_per_day`, `barcode_*` e le sequenze.
+  - `app/layout.tsx` serializzava `{...tenant}` verso il client azzerando solo `packlink_api_key` e `chatbox_extra_context`: `bank_iban`, `subscription_*`, `referral_fraud_*`, limiti AI interni e sequenze arrivavano al browser di ogni visitatore.
+  - Le pagine `/cart`, `/checkout`, `/checkout/en-attente`, `/checkout/reprendre/[id]` e il layout Événementiel passavano **la riga intera** a Client Components, **compresi `packlink_api_key` e `chatbox_extra_context` valorizzati** (verificato nel payload RSC di produzione il 26/09/2026).
+  - **Correzione (Fase 0):** `PUBLIC_TENANT_FIELDS` / `PublicTenant` (`packages/types/tenant.ts`) e `toPublicTenant()` (`lib/tenant/publicTenant.ts`) copiano solo i campi ammessi. Una nuova colonna di `tenants` è quindi privata per default. `TenantProvider` e tutti i Client Components sono tipizzati `PublicTenant`, e il test `tests/unit/publicTenant.spec.ts` impedisce la reintroduzione del tipo `Tenant` completo lato client.
   - Ogni nuova colonna aggiunta a `tenants` finisce automaticamente nel browser.
 - **Grant a livello di colonna da mantenere a mano** (076): ogni colonna nuova richiede una decisione esplicita di grant o revoke.
 - **Gating duplicato.** `events_enabled` convive con la feature commerciale `events`, e `subscription_*` convive con `tenant_subscriptions` (084).
@@ -45,7 +47,7 @@ Limite noto: l'aggiornamento è un read-modify-write senza lock. Due salvataggi 
 
 ## 3. Inventario delle configurazioni attuali
 
-Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated); **L** = serializzata al client dal root layout (`{...tenant}`); **S** = solo server.
+Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated); **L** = inclusa in `PUBLIC_TENANT_FIELDS`, quindi inviata al client (prima della Fase 0 lo erano tutte le colonne); **S** = solo server.
 
 ### 3.1 Identità tenant
 - **Colonne:** `id`, `slug`, `name`, `active`, `country`, `currency`, `locale`, `locales`, `city`, `created_at`, `updated_at`.
@@ -62,7 +64,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Responsabilità:** identità visiva e informazioni pubbliche.
 - **Letture:** layout, storefront, email, etichette.
 - **Scritture:** `PATCH /api/admin/tenant` (Paramètres: sezioni Boutique, Origine e Legale) e `/api/admin/app-icon`.
-- **Esposizione:** P (`app_icon_url` concessa da 105, `storefront_url` da 079; `google_review_url` non concessa: S) e L.
+- **Esposizione:** P (`app_icon_url` concessa da 105, `storefront_url` da 079; `google_review_url` non concessa). L solo per i campi di `PUBLIC_TENANT_FIELDS` (esclusi `google_review_url`, `label_logo_url`, `story_*`, `countries_served`, letti lato server).
 - **Destinazione:** restano su `tenants`, ma il client deve ricevere una **proiezione esplicita** dei campi.
 - **Migrazione:** Fase 0.
 - **Rischio:** basso.
@@ -72,7 +74,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Responsabilità:** ritiro in negozio e disponibilità dello storefront.
 - **Letture:** checkout, carrello, `/livraison`, conferma ordine, layout (shop).
 - **Scritture:** `PATCH /api/admin/tenant`.
-- **Esposizione:** P, L.
+- **Esposizione:** P; L tranne `storefront_ready`.
 - **Destinazione:** `feature_settings('click_collect')`, oppure restano colonne (sono pubbliche e poche).
 - **Migrazione:** bassa priorità.
 - **Rischio:** medio (checkout).
@@ -82,7 +84,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Responsabilità:** punti fedeltà e carta.
 - **Letture:** `lib/loyalty/processOrderPointsOnDelivery.ts`, `registerWithReferral.ts`, `/compte`, `/compte/carte-fidelite`, wallet, scan admin.
 - **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/tenant`.
-- **Esposizione:** P, L.
+- **Esposizione:** P (grant 076, leggibile via PostgREST); non più L.
 - **Vincoli:** tassi numerici che incidono sul valore economico dei punti.
 - **Destinazione:** `tenant_feature_settings('loyalty')`, con config `{version, purchase_points_rate, points_to_currency_rate, signup_bonus_points}` ed `enabled` al posto di `loyalty_enabled`.
 - **Migrazione:** vedi §4.
@@ -92,7 +94,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Colonne:** `referral_max_depth`, `referral_availability_mode`, `referral_unlock_spending_threshold`, `referral_fraud_max_conversions`, `referral_fraud_period_days`, `referral_fraud_action`.
 - **Letture:** `lib/loyalty/checkFraudSignals.ts`, `checkReferralAccessUnlock.ts`, `registerWithReferral.ts`, `processOrderPointsOnDelivery.ts`, API `/api/loyalty/referrals/*`, `/compte/parrainage`.
 - **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/tenant`.
-- **Esposizione:** P, L. Le soglie anti-frode sono leggibili pubblicamente: **da rendere private**.
+- **Esposizione:** P (grant 076); non più L. Le soglie anti-frode restano leggibili via PostgREST per il grant di colonna 076: **revocare nella migrazione del dominio**.
 - **Vincoli:** enum `availability_mode` e `fraud_action`.
 - **Destinazione:** `feature_settings('referral')`.
 - **Rischio:** medio-alto (anti-frode).
@@ -101,7 +103,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Colonne:** `ambassador_min_purchase_amount`, `ambassador_min_commission_amount`, `ambassador_max_commission_amount`, `ambassador_loyalty_from_second_order`, `ambassador_first_order_discount_type`, `ambassador_first_order_discount_value`, `ambassador_payout_threshold_amount`, `ambassador_commission_mode`, `ambassador_split_pool_amount`, `ambassador_split_pool_ambassador_percent`.
 - **Letture:** checkout (`/api/checkout`, `/api/checkout/external-link`, `/api/checkout/ambassador-discount`, `checkout-sessions/[id]`), `lib/ambassador/*`, `processOrderPointsOnDelivery.ts`, `/compte/ambassadeur`.
 - **Scritture:** `AmbassadorConfigSection` → `PATCH /api/admin/tenant`.
-- **Esposizione:** P, L.
+- **Esposizione:** P (grant 076); non più L.
 - **Vincoli:** importi e percentuali che determinano sconti al checkout e commissioni pagate.
 - **Destinazione:** `feature_settings('ambassador')`, con validazione zod e CHECK SQL.
 - **Rischio:** **alto** (denaro e checkout): va migrato per ultimo, con doppia lettura e confronto.
@@ -126,7 +128,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Tabelle:** l'attivazione di Nala è già in `tenant_feature_settings('nala')` (096).
 - **Letture:** `/api/chat`, `/api/search/semantic`, `lib/ai/nalaFastResolver.ts`, `lib/ai/usageTracking.ts`, generazione descrizioni e immagini, pagine prodotto e home.
 - **Scritture:** manuali (piattaforma).
-- **Esposizione:** P per flag e limiti pubblici; S per `ai_rate_limit_admin_per_day` e `chatbox_extra_context` (azzerato nel layout).
+- **Esposizione:** P per flag e limiti pubblici; S per `ai_rate_limit_admin_per_day` e `chatbox_extra_context` (esclusi dalla proiezione pubblica).
 - **Destinazione:**
   - flag e limiti → `feature_settings('ai')` / `('nala').config`;
   - `chatbox_extra_context` → tabella di contesto privata o `tenant_knowledge_base`.
@@ -136,7 +138,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Colonne:** `events_enabled`, `services_enabled`, `rental_delivery_enabled`, `rental_delivery_countries`.
 - **Letture:** layout e pagine `(evenementiel)`, `/accueil`, scan admin, `livraison-materiel`.
 - **Scritture:** `/api/admin/evenementiel/settings` (`ModuleSettingsToggle`) e l'admin delle zone di consegna noleggio.
-- **Esposizione:** P per `events_enabled`/`services_enabled`, L per tutte.
+- **Esposizione:** P e L per `events_enabled`/`services_enabled`; `rental_delivery_*` esclusi dalla proiezione pubblica.
 - **Vincoli:** `events_enabled` duplica il permesso commerciale `events`.
 - **Destinazione:** permesso `events` + `feature_settings('events', {services_enabled, rental_delivery…})`. Le zone e i paesi di consegna sono liste: vanno in tabelle proprie, non nel JSONB.
 - **Rischio:** medio.
@@ -145,7 +147,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Colonne:** `shipping_provider`, `packlink_api_key` (**segreto**), `flat_rate_amount`, `shipping_pricing_mode`, `shipping_tariff_fallback`, `shipping_public_grid_enabled`.
 - **Letture:** `/api/shipping/quote`, `lib/shipping/providers/packlink.ts`, `lib/shipping/tariff/*`, `lib/shipping/syncOrderShipment.ts` (`select('*')`), simulatore e inspector admin.
 - **Scritture:** `/api/admin/shipping-pricing-mode`; il resto manualmente.
-- **Esposizione:** P per `shipping_provider`/`flat_rate_amount`; S per la chiave (esclusa da 076 e azzerata nel layout).
+- **Esposizione:** P per `shipping_provider`/`flat_rate_amount`; S per la chiave (esclusa da 076 e dalla proiezione pubblica). **Fino alla Fase 0 la chiave era inviata ai visitatori da `/cart` e `/checkout`: va ruotata.**
 - **Vincoli:** checkout e costi di spedizione.
 - **Destinazione:**
   - `packlink_api_key` → archivio segreti dedicato (priorità di sicurezza);
@@ -157,14 +159,14 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Tabelle:** `tenant_subscriptions`, `platform_plans`, `platform_plan_features`, `platform_billing_settings` (084), `tenant_feature_overrides` (094).
 - **Letture:** `/admin/billing`, `lib/admin/platformBilling.ts`, webhook Stripe.
 - **Scritture:** manuali o dal webhook.
-- **Esposizione:** S secondo 076, ma **L** tramite il root layout.
+- **Esposizione:** S (fino alla Fase 0 inviata al browser tramite il root layout).
 - **Destinazione:** solo il dominio billing (084). Le colonne su `tenants` sono legacy.
 - **Rischio:** medio (riguarda il fatturato della piattaforma, non i pagamenti dei clienti).
 
 ### 3.13 Integrazioni app
 - **Colonne:** `android_package_name`, `android_sha256_fingerprint`, `android_public`.
 - **Letture:** `/.well-known/assetlinks.json`, `/go`.
-- **Esposizione:** P, L. Dati pubblici per natura.
+- **Esposizione:** P (grant 076); non più L. Dati pubblici per natura (serviti da `/.well-known/assetlinks.json`).
 - **Destinazione:** `feature_settings('android_app')` o nessuna modifica.
 - **Rischio:** basso.
 
@@ -176,7 +178,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 ### 3.15 Dati transazionali e sequenze su `tenants`
 - **Colonne:** `barcode_prefix`, `barcode_sequence`, `loyalty_card_sequence`.
 - **Scritture:** funzioni SQL di 031 e 047.
-- **Esposizione:** L.
+- **Esposizione:** S (fino alla Fase 0 L).
 - **Destinazione:** restano colonne, oppure tabelle o sequence dedicate. **Mai nel JSONB.**
 - **Rischio:** medio (concorrenza).
 
@@ -194,7 +196,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 
 | # | Intervento | Motivo | Rischio |
 |---|---|---|---|
-| 0 | **Proiezione client esplicita** nel root layout (lista di campi pubblici al posto di `{...tenant}`), e `PATCH /api/admin/tenant` che restituisce solo i campi modificabili (già fatto con 129) | Chiude subito l'esposizione di billing e anti-frode senza migrazioni | Medio (molti consumer di `useTenant()`) |
+| 0 | **Fatto.** Proiezione client esplicita (`toPublicTenant`) nel root layout e in ogni pagina che passa il tenant a Client Components; `PATCH /api/admin/tenant` restituisce solo i campi modificabili (con 129) | Chiude l'esposizione di segreti, billing e anti-frode senza migrazioni | — |
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
 | 2 | Loyalty | Pochi campi, schema semplice, un solo writer | Medio |
 | 3 | Referral | Dipende dalla loyalty; soglie anti-frode da rendere private | Medio-alto |

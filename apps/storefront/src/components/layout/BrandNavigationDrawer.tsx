@@ -24,7 +24,7 @@ import {
   IconUserCircle,
   IconX,
 } from '@tabler/icons-react';
-import type { Tenant, TenantSocialLink } from '@lepefy/types';
+import type { PublicTenant, TenantSocialLink } from '@lepefy/types';
 import { SOCIAL_PLATFORM_REGISTRY } from '@lepefy/types';
 import { TenantLogo } from '@/components/branding/TenantLogo';
 
@@ -77,7 +77,7 @@ interface BrandNavigationDrawerProps {
   id: string;
   open: boolean;
   onClose: () => void;
-  tenant: Tenant;
+  tenant: PublicTenant;
   sections: BrandNavigationSection[];
   socialLinks?: TenantSocialLink[];
   eyebrow?: string;

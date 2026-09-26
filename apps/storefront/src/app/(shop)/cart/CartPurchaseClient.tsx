@@ -14,12 +14,12 @@ import { useCartStore } from '@/stores/cartStore';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
 import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
-import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
+import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 import { useEffect, useState } from 'react';
 
 const UNDO_TIMEOUT_MS = 5000;
 
-export default function CartPurchaseClient({ tenant }: { tenant: Tenant }) {
+export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant }) {
   const router = useRouter();
   const items = useCartStore(selectCartItems);
   const itemCount = useCartStore(selectCartItemCount);

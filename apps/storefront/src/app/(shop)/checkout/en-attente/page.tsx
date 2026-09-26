@@ -1,4 +1,5 @@
 import { getTenant } from '@/lib/tenant/getTenant';
+import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import PendingPaymentClient from './PendingPaymentClient';
 
@@ -23,7 +24,7 @@ export default async function PendingPaymentPage({ searchParams }: PageProps) {
   return (
     <PendingPaymentClient
       sessionId={searchParams.ref ?? null}
-      tenant={tenant}
+      tenant={toPublicTenant(tenant)}
       externalPaymentMethods={externalPaymentMethods}
     />
   );

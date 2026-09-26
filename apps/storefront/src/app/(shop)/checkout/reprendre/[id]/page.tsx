@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -104,7 +105,7 @@ export default async function CheckoutRecoveryPage({
 
   return (
     <CheckoutRecoveryClient
-      tenant={tenant}
+      tenant={toPublicTenant(tenant)}
       externalPaymentMethods={externalPaymentMethods}
       sessionId={session.id}
       accessToken={validToken ? accessToken ?? undefined : undefined}

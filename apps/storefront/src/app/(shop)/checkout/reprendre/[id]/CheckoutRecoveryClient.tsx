@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconAlertTriangle, IconArrowLeft, IconLock } from '@tabler/icons-react';
 import { CheckoutSessionEditor } from '@/components/checkout-session/CheckoutSessionEditor';
-import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
+import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 
 export function CheckoutRecoveryClient({
   tenant,
@@ -13,7 +13,7 @@ export function CheckoutRecoveryClient({
   accessToken,
   awaitingVerification = false,
 }: {
-  tenant: Tenant;
+  tenant: PublicTenant;
   externalPaymentMethods: TenantPaymentMethod[];
   sessionId: string;
   accessToken?: string;

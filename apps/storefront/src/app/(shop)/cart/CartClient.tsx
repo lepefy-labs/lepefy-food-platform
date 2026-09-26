@@ -18,7 +18,7 @@ import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { useSessionCustomer } from '@/hooks/useSessionCustomer';
 import { useCartStore } from '@/stores/cartStore';
 import { formatPrice } from '@/lib/utils/format';
-import type { CartItem as CartItemType, Tenant } from '@lepefy/types';
+import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 
 const COUNTRIES = [
   { value: 'IT', label: 'Italie' }, { value: 'FR', label: 'France' },
@@ -35,7 +35,7 @@ function splitLine1(line1: string): { street: string; houseNumber: string } {
   return { street: parts.join(' '), houseNumber: '' };
 }
 
-export default function CartClient({ tenant }: { tenant: Tenant }) {
+export default function CartClient({ tenant }: { tenant: PublicTenant }) {
   const items = useCartStore(selectCartItems);
   const itemCount = useCartStore(selectCartItemCount);
   const subtotal = useCartStore(selectCartSubtotal);

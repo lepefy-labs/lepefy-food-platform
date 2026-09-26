@@ -37,7 +37,7 @@ import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
-import type { Tenant, TenantPaymentMethod } from '@lepefy/types';
+import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
 
 const COUNTRIES = [
@@ -120,7 +120,7 @@ export default function CheckoutFlow({
   consentState,
   isE2ETest = false,
 }: {
-  tenant: Tenant;
+  tenant: PublicTenant;
   externalPaymentMethods?: TenantPaymentMethod[];
   consentState: CheckoutConsentState;
   isE2ETest?: boolean;

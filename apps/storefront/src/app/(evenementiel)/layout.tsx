@@ -1,4 +1,5 @@
 import { getTenant } from '@/lib/tenant/getTenant';
+import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { createPublicClient } from '@/lib/supabase/public';
 import { EventsHeader } from './_components/EventsHeader';
@@ -51,7 +52,7 @@ export default async function EvenementielLayout({ children }: { children: React
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f3eb]">
       <EventsHeader
-        tenant={tenant}
+        tenant={toPublicTenant(tenant)}
         socialLinks={socialLinks}
         featuredEventSlug={featuredEventRes.data?.slug ?? null}
         hasTraiteur={hasTraiteur}

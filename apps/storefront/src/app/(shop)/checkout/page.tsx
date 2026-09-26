@@ -1,4 +1,5 @@
 import { getTenant } from '@/lib/tenant/getTenant';
+import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentState';
@@ -23,7 +24,7 @@ export default async function CheckoutPage() {
   return (
     <div className={styles.checkoutFunnel}>
       <CheckoutFlow
-        tenant={tenant}
+        tenant={toPublicTenant(tenant)}
         externalPaymentMethods={externalPaymentMethods}
         consentState={consentState}
         isE2ETest={isE2ERequest()}
