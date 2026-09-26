@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = await req.json() as Record<string, unknown>;
   const updatePayload: Record<string, unknown> = {};
   if ('label' in body) updatePayload.label = body.label ? String(body.label).trim() : null;
-  for (const field of ['notify_card_payment', 'notify_external_payment_pending', 'notify_order_stock_conflict', 'notify_event_booking_closed_reports', 'active'] as const) {
+  for (const field of ['notify_card_payment', 'notify_external_payment_pending', 'notify_order_stock_conflict', 'notify_event_booking_closed_reports', 'notify_daily_digest', 'active'] as const) {
     if (field in body) updatePayload[field] = Boolean(body[field]);
   }
 

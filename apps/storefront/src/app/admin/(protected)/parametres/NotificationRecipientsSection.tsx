@@ -15,10 +15,11 @@ interface NewForm {
   notify_external_payment_pending: boolean;
   notify_order_stock_conflict: boolean;
   notify_event_booking_closed_reports: boolean;
+  notify_daily_digest: boolean;
 }
 
 function emptyForm(): NewForm {
-  return { email: '', label: '', notify_card_payment: true, notify_external_payment_pending: true, notify_order_stock_conflict: false, notify_event_booking_closed_reports: true };
+  return { email: '', label: '', notify_card_payment: true, notify_external_payment_pending: true, notify_order_stock_conflict: false, notify_event_booking_closed_reports: true, notify_daily_digest: false };
 }
 
 export function NotificationRecipientsSection({ initialRecipients }: { initialRecipients: TenantNotificationRecipient[] }) {
@@ -50,7 +51,7 @@ export function NotificationRecipientsSection({ initialRecipients }: { initialRe
     catch { showToast('Erreur lors de la suppression', 'error'); } finally { setIsSaving(null); }
   }
 
-  const toggle = (r: TenantNotificationRecipient, field: keyof Pick<TenantNotificationRecipient, 'notify_card_payment' | 'notify_external_payment_pending' | 'notify_order_stock_conflict' | 'notify_event_booking_closed_reports'>, label: string) => (
+  const toggle = (r: TenantNotificationRecipient, field: keyof Pick<TenantNotificationRecipient, 'notify_card_payment' | 'notify_external_payment_pending' | 'notify_order_stock_conflict' | 'notify_event_booking_closed_reports' | 'notify_daily_digest'>, label: string) => (
     <label className="flex min-h-9 items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 text-xs text-gray-600 dark:bg-gray-800"><span>{label}</span><input type="checkbox" checked={Boolean(r[field])} onChange={(e) => handlePatch(r.id, { [field]: e.target.checked } as Partial<TenantNotificationRecipient>)} disabled={isSaving === r.id} /></label>
   );
 
@@ -67,6 +68,7 @@ export function NotificationRecipientsSection({ initialRecipients }: { initialRe
               {toggle(r, 'notify_external_payment_pending', 'Paiement externe à vérifier')}
               {toggle(r, 'notify_order_stock_conflict', 'Conflit de stock')}
               {toggle(r, 'notify_event_booking_closed_reports', 'Rapports fin réservations événement')}
+              {toggle(r, 'notify_daily_digest', 'Rapport quotidien (08h)')}
               <div className="flex items-center justify-between gap-2 sm:col-span-2"><label className="flex min-h-9 flex-1 items-center justify-between rounded-lg bg-gray-50 px-3 text-xs text-gray-600 dark:bg-gray-800"><span>Actif</span><input type="checkbox" checked={r.active} onChange={(e) => handlePatch(r.id, { active: e.target.checked })} disabled={isSaving === r.id} /></label><button onClick={() => handleDelete(r.id)} disabled={isSaving === r.id} className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50" aria-label={`Supprimer ${r.email}`}><IconTrash size={15} /></button></div>
             </div>
           </div>)}
@@ -74,7 +76,7 @@ export function NotificationRecipientsSection({ initialRecipients }: { initialRe
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-sky-200 bg-sky-50/30 p-3"><p className="mb-3 text-xs font-semibold text-sky-700">Ajouter un destinataire</p><div className="grid gap-3 sm:grid-cols-2"><div><label className={LABEL_CLS}>Email</label><input type="email" value={newForm.email} onChange={(e) => setNewForm({ ...newForm, email: e.target.value })} placeholder="contact@boutique.com" className={INPUT_CLS} /></div><div><label className={LABEL_CLS}>Étiquette</label><input type="text" value={newForm.label} onChange={(e) => setNewForm({ ...newForm, label: e.target.value })} placeholder="Ex : Dalice" className={INPUT_CLS} /></div></div>
-          <div className="mt-3 flex flex-wrap gap-4"><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_card_payment} onChange={(e) => setNewForm({ ...newForm, notify_card_payment: e.target.checked })} />Paiement carte</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_external_payment_pending} onChange={(e) => setNewForm({ ...newForm, notify_external_payment_pending: e.target.checked })} />Paiement externe à vérifier</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_order_stock_conflict} onChange={(e) => setNewForm({ ...newForm, notify_order_stock_conflict: e.target.checked })} />Conflit de stock</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_event_booking_closed_reports} onChange={(e) => setNewForm({ ...newForm, notify_event_booking_closed_reports: e.target.checked })} />Rapports fin réservations événement</label></div>
+          <div className="mt-3 flex flex-wrap gap-4"><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_card_payment} onChange={(e) => setNewForm({ ...newForm, notify_card_payment: e.target.checked })} />Paiement carte</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_external_payment_pending} onChange={(e) => setNewForm({ ...newForm, notify_external_payment_pending: e.target.checked })} />Paiement externe à vérifier</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_order_stock_conflict} onChange={(e) => setNewForm({ ...newForm, notify_order_stock_conflict: e.target.checked })} />Conflit de stock</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_event_booking_closed_reports} onChange={(e) => setNewForm({ ...newForm, notify_event_booking_closed_reports: e.target.checked })} />Rapports fin réservations événement</label><label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={newForm.notify_daily_digest} onChange={(e) => setNewForm({ ...newForm, notify_daily_digest: e.target.checked })} />Rapport quotidien (08h)</label></div>
           <Button onClick={handleCreate} loading={isSaving === 'new'} disabled={!newForm.email.trim()} className="mt-3">{isSaving !== 'new' && <IconPlus size={14} />}Ajouter</Button>
         </div>
       </div>
