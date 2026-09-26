@@ -24,7 +24,7 @@ export default async function ParametresPage() {
   const [{ data: socialLinks }, { data: notificationRecipients }, digestSettings] = await Promise.all([
     supabase.from('tenant_social_links').select('*').eq('tenant_id', tenant.id).order('sort_order', { ascending: true }),
     supabase.from('tenant_notification_recipients').select('*').eq('tenant_id', tenant.id).order('created_at', { ascending: true }),
-    supabase.from('tenants').select('daily_digest_enabled,daily_digest_timezone,daily_digest_include_empty,daily_digest_prepare_hours,daily_digest_pickup_hours,daily_digest_payment_hours').eq('id', tenant.id).maybeSingle(),
+    supabase.from('tenants').select('daily_digest_enabled,daily_digest_timezone,daily_digest_include_empty,daily_digest_prepare_hours,daily_digest_pickup_hours,daily_digest_payment_hours,daily_digest_shipping_hours').eq('id', tenant.id).maybeSingle(),
   ]);
 
   const tenantContext = (
