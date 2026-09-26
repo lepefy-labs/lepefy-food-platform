@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.74 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.75 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -10,7 +10,24 @@
 
 ## Briefing operativo mattutino ordini (migration 129; attivazione separata)
 
-Il rapporto operativo alle ore 08:00 locali per tenant usa `POST /api/internal/daily-order-digest` (Bearer `DAILY_DIGEST_CRON_SECRET`), richiamato ogni ora da n8n. L'applicazione classifica gli ordini pagati senza toccarne gli stati; i preordini e i pagamenti esterni ancora da verificare rimangono checkout session distinte. Le categorie sono urgente, da trattare oggi e da monitorare. I tracking gestiti senza avanzamenti oltre soglia entrano in monitoraggio, mentre una data di consegna stimata superata è segnalata come urgente senza cambiare lo stato ordine. Le soglie operative, il fuso orario e l'attivazione sono configurabili dall'admin Paramètres (tenant_settings.manage). I destinatari interni sono opt-in mediante `tenant_notification_recipients.notify_daily_digest`, il tenant è disabilitato per default (`tenants.daily_digest_enabled=false`). La migration 129 crea impostazioni tenant e il registro idempotente `tenant_daily_digest_runs` con RPC di claim service-role-only. Il payload per `/webhook/daily-order-digest` include HTML in francese, riepilogo, link protetti admin, snapshot precedente e chiave idempotente tenant/data; il trasporto email resta n8n. Non eseguire l'attivazione senza migration, secret, scheduler e webhook configurati. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
+Il rapporto operativo alle ore 08:00 locali per tenant usa `POST /api/internal/daily-order-digest` (Bearer `DAILY_DIGEST_CRON_SECRET`), richiamato ogni ora da n8n. L'applicazione classifica gli ordini pagati senza toccarne gli stati; i preordini e i pagamenti esterni ancora da verificare restano checkout session distinte. Le categorie sono: urgente, da trattare oggi, da monitorare. I tracking gestiti senza avanzamenti oltre soglia entrano in monitoraggio; una data di consegna stimata superata è segnalata come urgente senza cambiare lo stato dell'ordine.
+
+**Configurazione.** Nessuna colonna `tenants.daily_digest_*`. Una riga `tenant_feature_settings (tenant_id, 'daily_order_digest')`:
+- `enabled` è l'attivazione operativa; se la riga manca il modulo è disattivato, e la migration non crea righe;
+- `config` è un JSONB versionato con fuso IANA, `include_empty` e le soglie preparazione, ritiro, verifica pagamento e inattività tracking;
+- è validato da zod in `lib/notifications/dailyDigestConfig.ts` e dal CHECK `is_valid_daily_digest_config`, limitato a questa feature_key.
+
+**Catalogo.** `daily_order_digest` è registrata in `platform_features` come `billable = false` / `operations`, senza piani né override: è inclusa nella piattaforma e non viene risolta da `hasTenantFeature()`.
+
+**Comportamento del runner.** Una configurazione invalida sospende il tenant (`invalid_config`) senza ripiegare sui valori predefiniti.
+
+**Admin.** `GET/PATCH /api/admin/daily-digest` con `tenant_settings.view/manage`, usato dalla sezione Paramètres. `/api/admin/tenant` non gestisce più il digest.
+
+**Destinatari e registro.** I destinatari restano opt-in in `tenant_notification_recipients.notify_daily_digest`. Il registro idempotente `tenant_daily_digest_runs` è accessibile con RPC di claim service-role-only.
+
+**Payload n8n.** Il payload per `/webhook/daily-order-digest` include HTML in francese, riepilogo, link protetti admin, snapshot precedente e chiave idempotente tenant/data. Il trasporto email resta n8n.
+
+**Stato.** La migration 129 **non è applicata in produzione** (verificato il 26/09/2026): il codice deployato fallisce in modo chiuso (503 sull'endpoint interno, sezione Paramètres in sola lettura). Non attivare senza migration, secret, scheduler, webhook e opt-in collaudati. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
 
 ---
 
@@ -365,7 +382,7 @@ tenant_feature_settings
 
 `platform_features` è il catalogo canonico estensibile delle capability commerciali. `platform_plan_features.feature_key` referenzia il catalogo senza CHECK hardcoded. `tenant_feature_overrides` contiene soltanto eccezioni temporali o permanenti al piano (`manual`, `addon`, `trial`, `promotion`); in assenza di una riga il tenant eredita il piano attivo. Catalogo e override sono service-role-only, con RLS e nessuna policy browser.
 
-`src/lib/entitlements/tenantEntitlements.ts` è il resolver canonico server-side: un override applicabile secondo `starts_at` / `expires_at` prevale sull'entitlement del piano. `tenant_feature_settings` è invece il layer canonico di configurazione operativa, separato da piani, billing e override commerciali. Nala è disponibile soltanto quando coesistono entitlement commerciale `nala` e setting operativo `nala.enabled`; assenza del setting o errori di risoluzione fanno fallire il gating in modo chiuso senza interrompere lo storefront.
+`src/lib/entitlements/tenantEntitlements.ts` è il resolver canonico server-side: un override applicabile secondo `starts_at` / `expires_at` prevale sull'entitlement del piano. `tenant_feature_settings` è invece il layer canonico di configurazione operativa (`enabled` + `config` JSONB versionato), separato da piani, billing e override commerciali. L'accesso tipizzato passa da `src/lib/tenantConfig/moduleConfig.ts` (schema zod, valori predefiniti centralizzati, stati `missing`/`ok`/`invalid`, aggiornamento parziale della sola riga del modulo). Le feature `billable = false` (es. `daily_order_digest`) sono moduli operativi inclusi, registrati nel catalogo solo per la FK dei settings e mai risolti tramite piani. Nuove configurazioni di modulo non aggiungono colonne a `tenants`: architettura, inventario e piano di consolidamento in `docs/TENANT_CONFIGURATION_ARCHITECTURE.md`. Nala è disponibile soltanto quando coesistono entitlement commerciale `nala` e setting operativo `nala.enabled`; assenza del setting o errori di risoluzione fanno fallire il gating in modo chiuso senza interrompere lo storefront.
 
 `src/lib/admin/platformBilling.ts` resta il resolver dello snapshot billing; `/admin/billing` legge piano, features, subscription e coordinate Lepefy dal dominio platform con fallback legacy temporaneo.
 
@@ -715,6 +732,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 126_tenant_payment_apple_pay.sql
 127_hero_slide_images.sql
 128_assisted_orders.sql
+129_tenant_daily_digest.sql
 ```
 
 `128` è additiva ma **operativamente significativa** (checkout, pagamenti, ordini): origine/canale/link/audit su `checkout_sessions`, stato `draft`, e-mail nullable per le sole sessioni/ordini assistiti (vincoli CHECK), colonne di audit incasso e `order_origin` su `orders`, `payment_method = 'manual'`, indice unico `orders.checkout_session_id`, indice «una sessione open per cliente» limitato allo storefront, trigger funnel e vista `checkout_funnel_30d` limitati allo storefront, journal `assisted_order_events` service-role only e RPC `convert_checkout_session_to_order` (EXECUTE solo service_role). Deve essere applicata **prima** del codice (recovery storefront e conferme esterne ne dipendono), poi verificata con `supabase/verification/128_assisted_orders_verification.sql` (transazione annullata). Runbook e rollback: `docs/ASSISTED_ORDERS.md` §10.
@@ -738,6 +756,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `095` è additiva: introduce l'entitlement `nala_analytics`, le tabelle service-role-only `nala_sessions` e `nala_interactions`, la risoluzione atomica delle sessioni e la purge raw a 90 giorni. I customer sono referenziati solo per UUID nullable; geografia e metadata sono minimizzati. Lo scheduling giornaliero della purge resta da collegare a infrastruttura approvata.
 
 `096` introduce `tenant_feature_settings` come configuration layer operativo service-role-only, effettua il backfill verificato del toggle Nala per ogni tenant e rimuove dal current schema il boolean legacy. I nuovi tenant senza setting Nala restano operationally disabled per default.
+
+`129` è additiva e opt-in: registra `daily_order_digest` (non fatturabile, senza piani) e il CHECK di config limitato a quella feature, aggiunge `notify_daily_digest` ai destinatari, il registro `tenant_daily_digest_runs` e la RPC di claim service-role-only. Non crea righe di settings e non tocca Nala/reviews; il backfill condizionale da eventuali colonne `tenants.daily_digest_*` di una bozza precedente conserva le colonne, revocandone la lettura pubblica.
 
 `097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk e le nuove risoluzioni Fast Resolver possono essere completate deterministicamente senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention. Il provider non è più hardcoded: la classificazione passa dalla policy AI Core `nala_semantic_enrichment / classification`, con preflight prima del claim per non consumare tentativi quando il routing non è operativo.
 
@@ -845,6 +865,8 @@ supabase/migrations/*
 - URL Events resta temporaneamente env-based;
 - SSO esplicito cross-subdomain shop/events non introdotto;
 - colonne billing legacy in `tenants` restano temporaneamente;
+- il root layout serializza al client `{...tenant}` azzerando solo `packlink_api_key` e `chatbox_extra_context`: billing (`bank_*`, `stripe_*`, `subscription_*`), soglie anti-frode referral e sequenze arrivano al browser; va sostituito da una proiezione esplicita (Fase 0 di `docs/TENANT_CONFIGURATION_ARCHITECTURE.md`);
+- loyalty, referral, ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è pianificata ma non avviata;
 - Console Platform non è ancora CRUD completo di piani/tenant;
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { classifyDigest, renderDigestHtml, tenantClock } from '../../src/lib/notifications/dailyOrderDigest';
 
-const settings = {daily_digest_prepare_hours:24,daily_digest_pickup_hours:48,daily_digest_payment_hours:48,daily_digest_shipping_hours:72};
+const settings = {prepareHours:24,pickupHours:48,paymentVerificationHours:48,trackingStaleHours:72};
 const now = new Date('2026-09-26T06:00:00Z');
 test('8am follows Rome summer and winter time',()=>{
   expect(tenantClock(now,'Europe/Rome').hour).toBe(8);

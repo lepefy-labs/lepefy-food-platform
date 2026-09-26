@@ -9,12 +9,29 @@ import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
 import { NotificationRecipientsSection } from './NotificationRecipientsSection';
-import { DailyDigestSettingsSection } from './DailyDigestSettingsSection';
+import { DailyDigestSettingsSection, type DailyDigestSettingsInitial } from './DailyDigestSettingsSection';
 import { AppIconSection } from './AppIconSection';
+import { dailyDigestModule, DAILY_DIGEST_FEATURE_KEY } from '@/lib/notifications/dailyDigestConfig';
+import { isModuleRegistered, readModuleConfig } from '@/lib/tenantConfig/moduleConfig';
 import type { TenantSocialLink, TenantNotificationRecipient } from '@lepefy/types';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+// Fails closed: before migration 129 (or on read error) the section is read-only.
+async function loadDailyDigestSettings(
+  supabase: ReturnType<typeof createServiceClient>,
+  tenantId: string,
+): Promise<{ available: boolean; initial: DailyDigestSettingsInitial | null }> {
+  try {
+    if (!(await isModuleRegistered(supabase, DAILY_DIGEST_FEATURE_KEY))) return { available: false, initial: null };
+    const state = await readModuleConfig(supabase, dailyDigestModule, tenantId);
+    return { available: true, initial: { status: state.status, enabled: state.enabled, config: state.config } };
+  } catch (error) {
+    console.error('[parametres] daily digest settings unavailable', error);
+    return { available: false, initial: null };
+  }
+}
 
 export default async function ParametresPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -24,7 +41,7 @@ export default async function ParametresPage() {
   const [{ data: socialLinks }, { data: notificationRecipients }, digestSettings] = await Promise.all([
     supabase.from('tenant_social_links').select('*').eq('tenant_id', tenant.id).order('sort_order', { ascending: true }),
     supabase.from('tenant_notification_recipients').select('*').eq('tenant_id', tenant.id).order('created_at', { ascending: true }),
-    supabase.from('tenants').select('daily_digest_enabled,daily_digest_timezone,daily_digest_include_empty,daily_digest_prepare_hours,daily_digest_pickup_hours,daily_digest_payment_hours,daily_digest_shipping_hours').eq('id', tenant.id).maybeSingle(),
+    loadDailyDigestSettings(supabase, tenant.id),
   ]);
 
   const tenantContext = (
@@ -82,7 +99,7 @@ export default async function ParametresPage() {
 
         <LegalInfoSection legal_name={tenant.legal_name} legal_address={tenant.legal_address} legal_email={tenant.legal_email} />
         <NotificationRecipientsSection initialRecipients={(notificationRecipients ?? []) as TenantNotificationRecipient[]} />
-        <DailyDigestSettingsSection initial={(digestSettings.data ?? null) as Parameters<typeof DailyDigestSettingsSection>[0]['initial']} available={!digestSettings.error && !!digestSettings.data} />
+        <DailyDigestSettingsSection initial={digestSettings.initial} available={digestSettings.available} />
 
         <div className="xl:col-span-2">
           <SocialLinksSection initialLinks={(socialLinks ?? []) as TenantSocialLink[]} />

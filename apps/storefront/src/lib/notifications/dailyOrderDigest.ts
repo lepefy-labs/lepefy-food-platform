@@ -3,11 +3,12 @@ export interface DigestItem {
   key: string; priority: Priority; reference: string; customer: string;
   reason: string; action: string; url: string; createdAt: string;
 }
-export interface DigestSettings {
-  daily_digest_prepare_hours: number;
-  daily_digest_pickup_hours: number;
-  daily_digest_payment_hours: number;
-  daily_digest_shipping_hours: number;
+/** Classification thresholds in hours; resolved from dailyDigestConfig.ts. */
+export interface DigestThresholds {
+  prepareHours: number;
+  pickupHours: number;
+  paymentVerificationHours: number;
+  trackingStaleHours: number;
 }
 export interface DigestOrder {
   id: string; full_name: string | null; email: string | null;
@@ -36,7 +37,7 @@ export function tenantClock(date:Date,timezone:string):{localDate:string;hour:nu
 }
 /** Never treat a declared payment or an unresolved checkout as a paid order. */
 export function classifyDigest(
-  orders:DigestOrder[],preorders:DigestPreorder[],settings:DigestSettings,now:Date,baseUrl:string,
+  orders:DigestOrder[],preorders:DigestPreorder[],settings:DigestThresholds,now:Date,baseUrl:string,
 ):DigestItem[]{
   const items:DigestItem[]=[];
   for(const order of orders){
@@ -63,15 +64,15 @@ export function classifyDigest(
       const times=(order.shipping_tracking_events??[])
         .map(event=>Date.parse(event.occurredAt??'')).filter(Number.isFinite);
       const lastMove=times.length?Math.max(...times):NaN;
-      if(!Number.isFinite(lastMove)||age(now,new Date(lastMove).toISOString())<settings.daily_digest_shipping_hours)continue;
+      if(!Number.isFinite(lastMove)||age(now,new Date(lastMove).toISOString())<settings.trackingStaleHours)continue;
       priority='monitor';reason='Aucun nouvel événement transporteur depuis '+Math.floor(age(now,new Date(lastMove).toISOString())/24)+' j';
       action='Vérifier le suivi et contacter le transporteur si nécessaire.';
     }else if(order.status==='ready_for_pickup'){
-      const overdue=age(now,order.updated_at)>=settings.daily_digest_pickup_hours;
+      const overdue=age(now,order.updated_at)>=settings.pickupHours;
       priority=overdue?'urgent':'monitor';reason=overdue?'Retrait en retard':'Retrait en attente';
       action='Vérifier le retrait et contacter le client si nécessaire.';
     }else if(order.status==='new'||order.status==='preparing'){
-      const overdue=age(now,order.created_at)>=settings.daily_digest_prepare_hours;
+      const overdue=age(now,order.created_at)>=settings.prepareHours;
       priority=overdue?'urgent':'today';reason=overdue?'Préparation en retard':'Commande payée à préparer';
       action='Préparer la commande et organiser sa remise.';
     }else continue;
@@ -84,10 +85,10 @@ export function classifyDigest(
       url:baseUrl+(preorder.origin==='assisted'?'/admin/orders/precommandes/':'/admin/paiements-en-attente/')+encodeURIComponent(preorder.id),
       createdAt:preorder.created_at};
     if(preorder.status==='awaiting_verification'){
-      const overdue=age(now,preorder.declared_payment_at||preorder.created_at)>=settings.daily_digest_payment_hours;
+      const overdue=age(now,preorder.declared_payment_at||preorder.created_at)>=settings.paymentVerificationHours;
       items.push({...base,priority:overdue?'urgent':'today',reason:'Paiement externe à vérifier',
         action:'Vérifier la réception effective avant de confirmer la commande.'});
-    }else if(preorder.status==='open'&&age(now,preorder.created_at)>=settings.daily_digest_payment_hours){
+    }else if(preorder.status==='open'&&age(now,preorder.created_at)>=settings.paymentVerificationHours){
       items.push({...base,priority:'monitor',reason:'Lien de paiement sans confirmation',
         action:'Vérifier avant toute relance pour éviter un double paiement.'});
     }else if(preorder.status==='draft'&&age(now,preorder.created_at)>=24){
