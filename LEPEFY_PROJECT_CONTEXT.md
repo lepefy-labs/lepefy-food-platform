@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.85 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.86 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -93,7 +93,7 @@ Regole:
 - Gli script `scripts/generate-product-{descriptions,embeddings}.mjs` applicano la stessa precedenza.
 - Nessuna UI di scrittura: gestione manuale della piattaforma sulle righe settings, con i trigger che aggiornano le colonne.
 
-**134 non è applicata in produzione.**
+**134 è applicata in produzione** (26/09/2026; verificato: riga `ai` identica alle colonne, contesto Nala copiato con attivazione invariata, voce di catalogo `ai` invariata, grant pubblici revocati, altri moduli intatti). Colonne e trigger legacy restano fino alla fase 5.
 
 ### Carta fedeltà cliente e Wallet
 

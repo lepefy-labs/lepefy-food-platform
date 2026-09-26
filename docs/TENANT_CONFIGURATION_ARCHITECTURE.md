@@ -2,7 +2,7 @@
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
 > **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132; la pulizia delle colonne legacy è la 133), AI/Nala (134, fasi 1–4). Gli altri domini sono solo inventariati. **129–133 sono applicate in produzione (26/09/2026, verificate); 134 non ancora.**
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132; la pulizia delle colonne legacy è la 133), AI/Nala (134, fasi 1–4). Gli altri domini sono solo inventariati. **129–134 sono applicate in produzione (26/09/2026, verificate).**
 
 ## 1. Problema
 
@@ -123,7 +123,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Esposizione:** S.
 - **Dettagli:** `docs/DAILY_ORDER_DIGEST.md`.
 
-### 3.9 AI e Nala — **in migrazione (134, da applicare)**
+### 3.9 AI e Nala — **migrata (134 applicata; fase 5 aperta)**
 - **Struttura:**
   - `tenant_feature_settings('ai')`: `enabled = true` (riservato: oggi non esiste un interruttore AI globale) e config `{version: 1, image_generation, description_generation, semantic_search, rate_limit_public_per_minute, rate_limit_public_per_day, rate_limit_admin_per_day}`. Flag booleani, limiti interi 0–1 000 000; CHECK `is_valid_ai_config`. La voce di catalogo `ai` (094, fatturabile, inclusa nel piano) mantiene la sua semantica commerciale.
   - Contesto privato dell'assistente: `tenant_feature_settings('nala').config.extra_context` (stringa ≤ 20 000 caratteri, CHECK `is_valid_nala_config` limitato a quella chiave, così la config Nala resta aperta a chiavi future). L'attivazione Nala (096) non viene mai modificata.
@@ -206,7 +206,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
 | 2 | Loyalty — **completato (130 e 131 applicate; colonne legacy rimosse)** | Pochi campi, schema semplice, un solo writer | Medio |
 | 3 | Referral — **completato (132 e 133 applicate; colonne legacy rimosse)** | Dipende dalla loyalty; soglie anti-frode rese private dalla 132 | Medio-alto |
-| 4 | AI/Nala — **fasi 1–4 fatte (134, da applicare)**; resta la fase 5 (rate limiter e rimozione colonne) | Nala già attiva in `feature_settings` | Medio |
+| 4 | AI/Nala — **fasi 1–4 fatte (134 applicata)**; resta la fase 5 (rate limiter e rimozione colonne) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |
 | 6 | Notifiche | Solo se i tipi continuano a crescere | Basso |
 | 7 | Shipping: segreto Packlink in un archivio dedicato; modalità e fallback in Shipping Intelligence | Segreto | Alto |
