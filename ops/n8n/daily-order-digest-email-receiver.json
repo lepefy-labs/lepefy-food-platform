@@ -1,0 +1,332 @@
+{
+  "name": "Lepefy · Daily order digest email receiver",
+  "nodes": [
+    {
+      "id": "a39d814c-dc7b-4ce8-bd27-6fd11ff6a111",
+      "name": "Receive Lepefy digest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        140,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "daily-order-digest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "c1a9d05c-35cc-4601-9bc0-123c70636bdf"
+    },
+    {
+      "id": "60f2ef79-a36d-46c6-a294-814942c8e120",
+      "name": "Validate payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const p = $input.first().json.body ?? $input.first().json;\nif (!p || typeof p !== 'object') throw new Error('Invalid request body');\nif (typeof p.idempotencyKey !== 'string' || !/^[0-9a-f-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}$/i.test(p.idempotencyKey)) throw new Error('Invalid idempotency key');\nif (!Array.isArray(p.recipients) || p.recipients.length < 1 || p.recipients.length > 20 ||\n    !p.recipients.every(v => typeof v === 'string' && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v))) throw new Error('Invalid recipient list');\nif (typeof p.subject !== 'string' || !p.subject.length || p.subject.length > 300) throw new Error('Invalid subject');\nif (typeof p.html !== 'string' || !p.html.length || p.html.length > 200000) throw new Error('Invalid HTML');\nreturn [{json:{idempotencyKey:p.idempotencyKey,recipients:p.recipients,subject:p.subject,html:p.html,localDate:p.localDate}}];"
+      }
+    },
+    {
+      "id": "e3c0f1d3-148a-4495-a070-cf56312e8b39",
+      "name": "Claim delivery key",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        580,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH claimed AS (\n  INSERT INTO lepefy_n8n.digest_email_claims(idempotency_key,status,claimed_at,updated_at)\n  VALUES ($1,'processing',now(),now())\n  ON CONFLICT(idempotency_key) DO UPDATE\n    SET status='processing',claimed_at=now(),updated_at=now()\n  WHERE lepefy_n8n.digest_email_claims.status='failed'\n     OR (lepefy_n8n.digest_email_claims.status='processing'\n         AND lepefy_n8n.digest_email_claims.claimed_at < now()-interval '30 minutes')\n  RETURNING 'claimed'::text AS claim_status\n)\nSELECT COALESCE(\n  (SELECT claim_status FROM claimed LIMIT 1),\n  (SELECT CASE WHEN status='accepted' THEN 'duplicate' ELSE 'busy' END\n   FROM lepefy_n8n.digest_email_claims WHERE idempotency_key=$1 LIMIT 1),\n  'busy'\n) AS claim_status;",
+        "options": {
+          "queryReplacement": "={{ $('Validate payload').first().json.idempotencyKey }}"
+        }
+      }
+    },
+    {
+      "id": "96844515-5024-4492-8abc-3a7216faf91b",
+      "name": "Claim acquired?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c8bf3621-3570-4e58-b584-23d974f6da1a",
+              "leftValue": "={{ $json.claim_status }}",
+              "rightValue": "claimed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a8577531-1c5f-4317-8af9-5cda252acc22",
+      "name": "Send digest email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1010,
+        160
+      ],
+      "parameters": {
+        "fromEmail": "CONFIGURE_SENDER@example.invalid",
+        "toEmail": "={{ $('Validate payload').first().json.recipients.join(',') }}",
+        "subject": "={{ $('Validate payload').first().json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $('Validate payload').first().json.html }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "bf695150-b1a4-42d8-9aae-5b4cb7181523",
+      "name": "Mark delivery accepted",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1220,
+        160
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE lepefy_n8n.digest_email_claims SET status='accepted',accepted_at=now(),updated_at=now() WHERE idempotency_key=$1 AND status='processing' RETURNING idempotency_key,status;",
+        "options": {
+          "queryReplacement": "={{ $('Validate payload').first().json.idempotencyKey }}"
+        }
+      }
+    },
+    {
+      "id": "7378c7ee-9cd9-44e7-81a3-39f4b9f1247c",
+      "name": "Verify accepted row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1430,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const row=$input.first()?.json; if (!row || row.status!=='accepted') throw new Error('Claim not marked accepted'); return [{json:{accepted:true,idempotencyKey:row.idempotency_key}}];"
+      }
+    },
+    {
+      "id": "5adbd620-3d09-4490-9299-47f657f0215c",
+      "name": "Respond accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1650,
+        160
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"accepted\":true}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "d809d48d-4964-4210-9490-d7f8afbd82bb",
+      "name": "Already accepted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1020,
+        430
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c8bf3621-3570-4e58-b584-23d974f6da1a",
+              "leftValue": "={{ $json.claim_status }}",
+              "rightValue": "duplicate",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d0b3c528-7540-42cf-a55e-8825f3974fbb",
+      "name": "Respond duplicate (safe)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1240,
+        350
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"accepted\":true,\"duplicate\":true}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "4c948316-400d-4f92-962b-a5d8fa6a5783",
+      "name": "Respond busy (retry)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1240,
+        510
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"accepted\":false,\"error\":\"already_processing\"}",
+        "options": {
+          "responseCode": 503
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Lepefy digest": {
+      "main": [
+        [
+          {
+            "node": "Validate payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate payload": {
+      "main": [
+        [
+          {
+            "node": "Claim delivery key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send digest email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Mark delivery accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark delivery accepted": {
+      "main": [
+        [
+          {
+            "node": "Verify accepted row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify accepted row": {
+      "main": [
+        [
+          {
+            "node": "Respond accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim delivery key": {
+      "main": [
+        [
+          {
+            "node": "Claim acquired?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim acquired?": {
+      "main": [
+        [
+          {
+            "node": "Send digest email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Already accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already accepted?": {
+      "main": [
+        [
+          {
+            "node": "Respond duplicate (safe)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond busy (retry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

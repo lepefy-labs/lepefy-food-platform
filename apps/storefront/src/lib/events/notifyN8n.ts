@@ -9,12 +9,27 @@ export async function notifyN8n(webhookPath: string, payload: Record<string, unk
     return false;
   }
 
+  // Dedicated secret only for the operational digest. Other existing n8n
+  // notifications retain their current transport contract.
+  const isDailyDigest = webhookPath.replace(/^\/+/, '') === 'webhook/daily-order-digest';
+  const digestSecret = process.env.N8N_DAILY_DIGEST_WEBHOOK_SECRET;
+  if (isDailyDigest && !digestSecret) {
+    console.error('[events] N8N_DAILY_DIGEST_WEBHOOK_SECRET missing — digest not sent');
+    return false;
+  }
+
   try {
     const baseUrl = process.env.N8N_WEBHOOK_URL.replace(/\/$/, '');
     const normalizedPath = webhookPath.startsWith('/') ? webhookPath : `/${webhookPath}`;
-    const res = await fetch(`${baseUrl}${normalizedPath}`, {
+    // Both https://n8n.example and https://n8n.example/webhook are accepted as base URLs.
+    const suffix = baseUrl.endsWith('/webhook') && normalizedPath.startsWith('/webhook/')
+      ? normalizedPath.slice('/webhook'.length) : normalizedPath;
+    const res = await fetch(`${baseUrl}${suffix}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(isDailyDigest ? { 'X-Lepefy-Webhook-Secret': digestSecret! } : {}),
+      },
       body: JSON.stringify(payload),
     });
     console.info(`[events] n8n notification ${normalizedPath} — status:`, res.status);

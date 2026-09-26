@@ -67,3 +67,16 @@ Migration `129_tenant_daily_digest.sql` is additive and **disabled by default**.
   - Asserts catalog semantics, Nala/reviews preservation, no auto-activation, scoped CHECK, grants and claim idempotency.
   - A legacy variant proves the backfill from draft columns.
 - Validate on staging with one dedicated recipient and a non-production tenant; observe the response and the run ledger. Do not send real customer messages in this workflow. Avoid putting raw email content in external log aggregation.
+
+## n8n import bundle (two separate workflows)
+
+Files in `ops/n8n/`:
+- `daily-order-digest-dispatcher.json`: existing hourly schedule, inactive by default.
+- `daily-order-digest-email-receiver.json`: inbound POST `/webhook/daily-order-digest`, authenticated with Header Auth, input validation, atomic PostgreSQL claim, SMTP send, accepted/duplicate/busy response.
+- `daily-order-digest-idempotency.sql`: schema for a dedicated n8n-accessible PostgreSQL database. Do not run it on production Supabase without separate approval.
+
+Configure Vercel production `DAILY_DIGEST_CRON_SECRET` for the dispatcher and a **different** `N8N_DAILY_DIGEST_WEBHOOK_SECRET` for the receiver. The outbound helper sends `X-Lepefy-Webhook-Secret` only for the daily digest, and fails closed if that variable is absent. In n8n, attach the matching Header Auth credential to the receiver Webhook. Set `N8N_WEBHOOK_URL` to the n8n root URL (or to its `/webhook` prefix, both are normalized). The SMTP, Postgres and Header Auth credentials never belong in exported JSON.
+
+Import both workflows, create the Postgres table, attach their credentials and replace the placeholder verified sender. Leave both workflows inactive until a synthetic-payload test verifies 200 after SMTP acceptance, duplicate returns 200 without resending, and in-progress retries return 503. Only then activate the receiver and dispatcher. The tenant's current database/opt-in state must be verified before the first live run.
+
+The SQL claim prevents concurrent sends and standard retries. SMTP cannot guarantee exactly-once across the crash window after the provider accepted email but before the PostgreSQL row was marked accepted; for stronger guarantees use a provider with durable request idempotency. Existing `tenant_daily_digest_runs` continues protecting tenant/day on the application side.
