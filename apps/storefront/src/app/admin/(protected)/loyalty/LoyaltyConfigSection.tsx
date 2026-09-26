@@ -54,10 +54,10 @@ export function LoyaltyConfigSection({
 
   async function handleSave() {
     setIsSaving(true);
-    const { loyalty_enabled: enabled, purchase_points_rate: purchasePointsRate, ...referral } = form;
+    const { loyalty_enabled: enabled, purchase_points_rate: purchasePointsRate } = form;
     try {
-      // Loyalty settings live in tenant_feature_settings (migration 130);
-      // referral settings stay on the tenant row for now.
+      // Loyalty (migration 130) and referral (migration 132) settings live in
+      // tenant_feature_settings, each behind its own validated admin route.
       const loyaltyRes = await fetch('/api/admin/loyalty/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -67,12 +67,24 @@ export function LoyaltyConfigSection({
         const body = await loyaltyRes.json().catch(() => null) as { error?: string } | null;
         throw new Error(body?.error ?? 'Erreur lors de l\'enregistrement du programme fidélité');
       }
-      const res = await fetch('/api/admin/tenant', {
+      const res = await fetch('/api/admin/loyalty/referral', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(referral),
+        body: JSON.stringify({
+          config: {
+            max_depth: form.referral_max_depth,
+            availability_mode: form.referral_availability_mode,
+            unlock_spending_threshold: form.referral_unlock_spending_threshold,
+            fraud_max_conversions: form.referral_fraud_max_conversions,
+            fraud_period_days: form.referral_fraud_period_days,
+            fraud_action: form.referral_fraud_action,
+          },
+        }),
       });
-      if (!res.ok) throw new Error('Erreur lors de l\'enregistrement du parrainage');
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? 'Erreur lors de l\'enregistrement du parrainage');
+      }
       showToast('Enregistré', 'success');
     } catch (error) {
       showToast(error instanceof Error && error.message ? error.message : 'Erreur lors de l\'enregistrement', 'error');

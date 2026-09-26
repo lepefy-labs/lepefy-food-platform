@@ -7,7 +7,7 @@ interface ResolveReferralChainRow {
 
 /**
  * Chiama RPC resolve_referral_chain. Nessuna logica ricorsiva lato Node — la
- * profondità è dinamica per tenant (tenants.referral_max_depth) e la CTE
+ * profondità è dinamica per tenant (max_depth dei settings referral, migration 132) e la CTE
  * ricorsiva lato SQL è già limitata a p_max_depth.
  */
 export async function resolveReferralChain(

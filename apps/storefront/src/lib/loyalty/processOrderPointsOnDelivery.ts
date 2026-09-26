@@ -5,6 +5,7 @@ import { checkFraudSignals } from './checkFraudSignals';
 import { confirmSignupBonus } from './confirmSignupBonus';
 import { processAmbassadorCommissionOnDelivery } from '@/lib/ambassador/processAmbassadorCommissionOnDelivery';
 import { getLoyaltySettings } from './loyaltyConfig';
+import { getReferralSettings } from './referralConfig';
 
 interface OrderPointsEntry {
   tenantId: string;
@@ -61,7 +62,7 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
   // ── 2. Fetch config tenant ─────────────────────────────────────────────────
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('referral_max_depth, referral_fraud_max_conversions, referral_fraud_period_days, referral_fraud_action, ambassador_loyalty_from_second_order')
+    .select('ambassador_loyalty_from_second_order')
     .eq('id', tenantId)
     .single();
 
@@ -98,9 +99,12 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
       ]
     : [];
 
-  const chain = await resolveReferralChain(tenantId, buyerId, tenant.referral_max_depth);
+  // Referral settings (migration 132). Unavailable settings mean no referral
+  // rewards for this order, as when the tenant row could not be read before.
+  const referral = await getReferralSettings(supabase, tenantId);
+  const chain = referral ? await resolveReferralChain(tenantId, buyerId, referral.referral_max_depth) : [];
 
-  if (chain.length > 0) {
+  if (referral && chain.length > 0) {
     const { data: activeTiers } = await supabase
       .from('tenant_referral_tiers')
       .select('level, pct')
@@ -113,7 +117,7 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
     const buyerAddressKey = normalizeAddress(order.shipping_address);
 
     const cutoffIso = new Date(
-      Date.now() - tenant.referral_fraud_period_days * 24 * 60 * 60 * 1000,
+      Date.now() - referral.referral_fraud_period_days * 24 * 60 * 60 * 1000,
     ).toISOString();
 
     for (const node of chain) {
@@ -166,13 +170,13 @@ export async function processOrderPointsOnDelivery(orderId: string): Promise<voi
         .eq('status', 'CONFIRMED')
         .gte('created_at', cutoffIso);
 
-      const overThreshold = (recentConversions ?? 0) >= tenant.referral_fraud_max_conversions;
+      const overThreshold = (recentConversions ?? 0) >= referral.referral_fraud_max_conversions;
 
       if (overThreshold) {
-        if (tenant.referral_fraud_action === 'CAP_AT_THRESHOLD') {
+        if (referral.referral_fraud_action === 'CAP_AT_THRESHOLD') {
           continue; // riga omessa silenziosamente
         }
-        if (tenant.referral_fraud_action === 'AUTO_BLOCK') {
+        if (referral.referral_fraud_action === 'AUTO_BLOCK') {
           await supabase
             .from('customers')
             .update({ referral_suspended: true })

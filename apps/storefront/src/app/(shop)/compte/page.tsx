@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
+import { getReferralSettings, REFERRAL_UNAVAILABLE_VIEW } from '@/lib/loyalty/referralConfig';
 import { formatBarcodeDisplay } from '@/lib/barcode';
 import { getLoyaltyBrand } from '@/lib/loyalty/wallet/brand';
 import { getWalletAvailability } from '@/lib/loyalty/wallet/config';
@@ -24,7 +25,11 @@ export default async function ComptePage() {
   await requireTermsConsentOrRedirect(tenant.id, customer.id, '/compte');
 
   const supabase = createServiceClient();
-  const loyalty = await getLoyaltySettings(supabase, tenant.id);
+  const [loyalty, referralSettings] = await Promise.all([
+    getLoyaltySettings(supabase, tenant.id),
+    getReferralSettings(supabase, tenant.id),
+  ]);
+  const referralView = referralSettings ?? REFERRAL_UNAVAILABLE_VIEW;
   const [member, addresses, points, orders, reviewsAvailable] = await Promise.all([
     supabase.from('customers')
       .select('full_name, phone, loyalty_card_number, is_ambassador, ambassador_profile_completed_at, referral_access_granted, referral_suspended')
@@ -82,9 +87,9 @@ export default async function ComptePage() {
       reviewsAvailable={reviewsAvailable}
       errors={{ points: !!points.error, addresses: !!addresses.error, orders: orderError }}
       referral={{
-        state: accountReferralState(loyalty.enabled, row.referral_access_granted, row.referral_suspended),
-        mode: tenant.referral_availability_mode,
-        threshold: tenant.referral_unlock_spending_threshold,
+        state: accountReferralState(loyalty.enabled && referralSettings !== null, row.referral_access_granted, row.referral_suspended),
+        mode: referralView.referral_availability_mode,
+        threshold: referralView.referral_unlock_spending_threshold,
       }}
     />
   );

@@ -4,6 +4,7 @@ import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
 import { generateReferralCode } from '@/lib/loyalty/generateReferralCode';
 import { resolveReferralDownline } from '@/lib/loyalty/resolveReferralDownline';
+import { getReferralSettings, REFERRAL_UNAVAILABLE_VIEW } from '@/lib/loyalty/referralConfig';
 import { requireTermsConsentOrRedirect } from '@/lib/legal/requireTermsConsentOrRedirect';
 import { ParrainageClient } from './ParrainageClient';
 
@@ -22,7 +23,8 @@ export default async function ParrainagePage() {
 
   const supabase = createServiceClient();
 
-  const [{ data: customerRow }, { data: balanceRow }] = await Promise.all([
+  const [referralSettings, { data: customerRow }, { data: balanceRow }] = await Promise.all([
+    getReferralSettings(supabase, tenant.id),
     supabase
       .from('customers')
       .select('referral_access_granted, referral_suspended')
@@ -37,7 +39,10 @@ export default async function ParrainagePage() {
       .maybeSingle(),
   ]);
 
-  const eligible = (customerRow?.referral_access_granted ?? false) && !customerRow?.referral_suspended;
+  // Referral settings (migration 132); unavailable settings: nobody is eligible.
+  const referral = referralSettings ?? REFERRAL_UNAVAILABLE_VIEW;
+  const eligible = referralSettings !== null
+    && (customerRow?.referral_access_granted ?? false) && !customerRow?.referral_suspended;
 
   let code: string | null = null;
   let progress: { currentSpend: number; threshold: number | null } | null = null;
@@ -53,7 +58,7 @@ export default async function ParrainagePage() {
         fullName: customer.full_name,
         email: customer.email,
       }),
-      resolveReferralDownline(tenant.id, customer.id, tenant.referral_max_depth),
+      resolveReferralDownline(tenant.id, customer.id, referral.referral_max_depth),
     ]);
     code = generatedCode;
 
@@ -75,7 +80,7 @@ export default async function ParrainagePage() {
       pointsByReferredId.set(row.reference_customer_id, (pointsByReferredId.get(row.reference_customer_id) ?? 0) + row.amount);
     }
     nodes = downline.map(({ customerId, level }) => ({ customerId, level, points: pointsByReferredId.get(customerId) ?? 0 }));
-  } else if (tenant.referral_availability_mode === 'SPENDING_THRESHOLD') {
+  } else if (referral.referral_availability_mode === 'SPENDING_THRESHOLD') {
     const { data: orders } = await supabase
       .from('orders')
       .select('total')
@@ -83,13 +88,13 @@ export default async function ParrainagePage() {
       .eq('customer_id', customer.id)
       .eq('status', 'delivered');
     const currentSpend = (orders ?? []).reduce((sum, o) => sum + Number(o.total), 0);
-    progress = { currentSpend, threshold: tenant.referral_unlock_spending_threshold };
+    progress = { currentSpend, threshold: referral.referral_unlock_spending_threshold };
   }
 
   return (
     <ParrainageClient
       eligible={eligible}
-      mode={tenant.referral_availability_mode}
+      mode={referral.referral_availability_mode}
       code={code}
       confirmedBalance={balanceRow?.confirmed_balance ?? 0}
       pendingBalance={balanceRow?.pending_balance ?? 0}

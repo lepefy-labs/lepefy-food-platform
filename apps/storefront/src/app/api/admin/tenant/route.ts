@@ -21,13 +21,7 @@ const EDITABLE_TENANT_FIELDS = [
   'story_heading',
   'story_text',
   'countries_served',
-  // loyalty_enabled / purchase_points_rate: /api/admin/loyalty/settings (migration 130)
-  'referral_max_depth',
-  'referral_availability_mode',
-  'referral_unlock_spending_threshold',
-  'referral_fraud_max_conversions',
-  'referral_fraud_period_days',
-  'referral_fraud_action',
+  // Loyalty: /api/admin/loyalty/settings (130). Referral: /api/admin/loyalty/referral (132).
   'ambassador_min_purchase_amount',
   'ambassador_min_commission_amount',
   'ambassador_max_commission_amount',
@@ -42,15 +36,11 @@ const EDITABLE_TENANT_FIELDS = [
 
 const NUMERIC_FIELDS = new Set<string>([
   'countries_served',
-  'referral_max_depth',
-  'referral_fraud_period_days',
 ]);
 
 const BOOLEAN_FIELDS = new Set<string>(['ambassador_loyalty_from_second_order']);
 
 const DECIMAL_FIELDS = new Set<string>([
-  'referral_unlock_spending_threshold',
-  'referral_fraud_max_conversions',
   'ambassador_min_purchase_amount',
   'ambassador_min_commission_amount',
   'ambassador_max_commission_amount',

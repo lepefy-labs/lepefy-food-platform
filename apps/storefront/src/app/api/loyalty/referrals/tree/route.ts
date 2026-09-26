@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
+import { getReferralSettings } from '@/lib/loyalty/referralConfig';
 import { resolveReferralDownline } from '@/lib/loyalty/resolveReferralDownline';
 
 // Lecture seule : visiteur non authentifié → arbre vide plutôt qu'une 401
@@ -17,13 +18,15 @@ export async function GET() {
   const tenant     = await getTenant(tenantSlug);
   const customer   = await getSessionCustomer(tenant.id);
 
-  if (!customer) {
+  const supabase = createServiceClient();
+  const referral = customer ? await getReferralSettings(supabase, tenant.id) : null;
+
+  if (!customer || !referral) {
     return NextResponse.json({ nodes: [] });
   }
 
-  const downline = await resolveReferralDownline(tenant.id, customer.id, tenant.referral_max_depth);
+  const downline = await resolveReferralDownline(tenant.id, customer.id, referral.referral_max_depth);
 
-  const supabase = createServiceClient();
 
   const nodes = await Promise.all(
     downline.map(async ({ customerId, level }) => {

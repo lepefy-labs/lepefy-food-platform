@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { grantReferralAccess } from './grantReferralAccess';
+import { getReferralSettings } from './referralConfig';
 
 /**
  * No-op salvo mode === SPENDING_THRESHOLD e accesso non ancora concesso.
@@ -13,11 +14,7 @@ import { grantReferralAccess } from './grantReferralAccess';
 export async function checkReferralAccessUnlock(tenantId: string, customerId: string): Promise<void> {
   const supabase = createServiceClient();
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('referral_availability_mode, referral_unlock_spending_threshold')
-    .eq('id', tenantId)
-    .single();
+  const tenant = await getReferralSettings(supabase, tenantId);
 
   if (!tenant || tenant.referral_availability_mode !== 'SPENDING_THRESHOLD') return;
 

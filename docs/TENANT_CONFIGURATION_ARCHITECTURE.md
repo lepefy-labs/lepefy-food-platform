@@ -2,7 +2,7 @@
 
 > **Repository:** `lepefy-labs/lepefy-food-platform`
 > **Base codice verificata:** `main@8bf7b61b5277b12b460eed49e4a874a227c7811c` (26 settembre 2026)
-> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131). Gli altri domini sono solo inventariati. **129, 130 e 131 sono applicate in produzione (26/09/2026, verificate).**
+> **Stato:** Fase 0 completata (proiezione pubblica esplicita del tenant). Sulla struttura di destinazione: rapporto delle 08:00 (129) e loyalty (130; la pulizia delle colonne legacy è la 131), referral (132, fasi 1–4). Gli altri domini sono solo inventariati. **129, 130 e 131 sono applicate in produzione (26/09/2026, verificate); 132 non ancora.**
 
 ## 1. Problema
 
@@ -89,14 +89,15 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Ordine di rilascio della 131:** prima il deploy del codice che non seleziona più le colonne, poi la migrazione.
 - **Rischio:** medio (valore economico dei punti). Mitigato dai controlli preliminari della 131 e dai test SQL: storico `points_ledger` invariato e RPC con lo stesso risultato.
 
-### 3.5 Referral
-- **Colonne:** `referral_signup_bonus_points`, `referral_max_depth`, `referral_availability_mode`, `referral_unlock_spending_threshold`, `referral_fraud_max_conversions`, `referral_fraud_period_days`, `referral_fraud_action`.
-- **Letture:** `lib/loyalty/checkFraudSignals.ts`, `checkReferralAccessUnlock.ts`, `registerWithReferral.ts`, `processOrderPointsOnDelivery.ts`, API `/api/loyalty/referrals/*`, `/compte/parrainage`.
-- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/tenant`.
-- **Esposizione:** P (grant 076); non più L. Le soglie anti-frode restano leggibili via PostgREST per il grant di colonna 076: **revocare nella migrazione del dominio**.
-- **Vincoli:** enum `availability_mode` e `fraud_action`.
-- **Destinazione:** `feature_settings('referral')`.
-- **Rischio:** medio-alto (anti-frode).
+### 3.5 Referral — **in migrazione (132, da applicare)**
+- **Struttura:** `tenant_feature_settings('referral')` con config `{version: 1, max_depth, signup_bonus_points, availability_mode, unlock_spending_threshold, fraud_max_conversions, fraud_period_days, fraud_action}`. Tipi e intervalli ricalcano la 040 (profondità 1–5, enum invariati, soglia di sblocco `null` oppure 0–99 999 999,99 con 2 decimali, periodo anti-frode 1–3650 giorni); CHECK `is_valid_referral_config`, scritto in plpgsql in modo che un tipo sbagliato venga rifiutato e non provochi un errore di cast. Feature `billable = false`, senza piani.
+- **Attivazione:** il programma non ha un interruttore proprio e continua a seguire `loyalty.enabled`. Il backfill imposta `enabled = true` per tutti. `enabled = false` (riservato, non esposto in UI) oppure una riga invalida rendono il referral **non disponibile**: nessun codice, nessuna idoneità automatica, nessun bonus, nessun punto referral.
+- **Colonne legacy:** i sette `tenants.referral_*` restano, allineati da due trigger con guardia (`sync_referral_settings_to_tenant`, `sync_tenant_referral_to_settings`). Un nuovo tenant riceve la riga con i valori predefiniti.
+- **Letture:** `getReferralSettings(db, tenantId)` in `lib/loyalty/referralConfig.ts`. Restituisce un oggetto con le **stesse chiavi delle colonne**, così la logica esistente non cambia. Precedenza: riga valida e attiva → riga; riga assente (132 non applicata) o illeggibile → colonne legacy dello stesso tenant; disattivata o invalida → `null`. Lettori: `processOrderPointsOnDelivery` (catena e anti-frode), `registerWithReferral`, `checkReferralAccessUnlock`, API `/api/loyalty/referrals/{eligibility,generate-code,tree}`, `/compte`, `/compte/parrainage`, `/admin/loyalty`. Le superfici cliente usano `REFERRAL_UNAVAILABLE_VIEW` (`ADMIN_GRANTED_ONLY`, nessun bonus) quando il programma non è disponibile.
+- **Scritture:** `LoyaltyConfigSection` → `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, invariato). La route rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0, regola documentata dalla 040 ma prima non applicata. Prima della 132 scrive le colonne legacy con la stessa validazione. `/api/admin/tenant` non accetta più campi referral. Il bonus d'iscrizione non è esposto in UI.
+- **Esposizione:** S. La 132 revoca il grant pubblico 076 sui sette campi, soglie anti-frode incluse.
+- **Prossimo passo (fase 5):** rimuovere trigger e colonne, come la 131 per la loyalty.
+- **Rischio:** medio-alto (anti-frode, punti). Mitigato da backfill con verifica, mirror transazionale e fail closed.
 
 ### 3.6 Ambassador
 - **Colonne:** `ambassador_min_purchase_amount`, `ambassador_min_commission_amount`, `ambassador_max_commission_amount`, `ambassador_loyalty_from_second_order`, `ambassador_first_order_discount_type`, `ambassador_first_order_discount_value`, `ambassador_payout_threshold_amount`, `ambassador_commission_mode`, `ambassador_split_pool_amount`, `ambassador_split_pool_ambassador_percent`.
@@ -198,7 +199,7 @@ Per ogni dominio si procede in cinque fasi, ciascuna in una consegna separata:
 | 0 | **Fatto.** Proiezione client esplicita (`toPublicTenant`) nel root layout e in ogni pagina che passa il tenant a Client Components; `PATCH /api/admin/tenant` restituisce solo i campi modificabili (con 129) | Chiude l'esposizione di segreti, billing e anti-frode senza migrazioni | — |
 | 1 | Rapporto delle 08:00 | Fatto (129) | — |
 | 2 | Loyalty — **completato (130 e 131 applicate; colonne legacy rimosse)** | Pochi campi, schema semplice, un solo writer | Medio |
-| 3 | Referral | Dipende dalla loyalty; soglie anti-frode da rendere private | Medio-alto |
+| 3 | Referral — **fasi 1–4 fatte (132, da applicare)**; resta la fase 5 | Dipende dalla loyalty; soglie anti-frode rese private dalla 132 | Medio-alto |
 | 4 | AI/Nala (flag, limiti, contesto privato) | Nala già attiva in `feature_settings` | Medio |
 | 5 | Moduli Événementiel | Riconciliare il permesso `events` con `events_enabled` | Medio |
 | 6 | Notifiche | Solo se i tipi continuano a crescere | Basso |

@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 26 settembre 2026 — **v6.80 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.81 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -69,7 +69,16 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 
 ### Configurazione programma fedeltà (migration 130/131)
 
-Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le soglie referral restano su `tenants` e passano ancora da `/api/admin/tenant`. **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Configurazione parrainage (migration 132)
+
+Profondità, bonus d'iscrizione, modalità di disponibilità, soglia di sblocco e soglie anti-frode vivono in `tenant_feature_settings('referral')` (feature `billable = false`, senza piani). La config è validata da zod (`src/lib/loyalty/referralConfig.ts`) e dal CHECK `is_valid_referral_config`. Il programma continua a seguire `loyalty.enabled`; `referral.enabled` è `true` per tutti e `false` è riservato, non esposto in UI. `getReferralSettings(db, tenantId)` restituisce le stesse chiavi delle colonne legacy:
+- riga valida e attiva → riga;
+- riga assente o illeggibile → colonne `tenants.referral_*` (mirror);
+- disattivata o invalida → `null`, cioè programma non disponibile: nessun codice, nessuna idoneità automatica, nessun bonus, nessun punto referral. Le superfici cliente usano `REFERRAL_UNAVAILABLE_VIEW`.
+
+Scrittura admin: `PATCH /api/admin/loyalty/referral` (`tenant_settings.manage`, come prima), che rifiuta `SPENDING_THRESHOLD` con soglia ≤ 0. **132 non è applicata in produzione.**
 
 ### Carta fedeltà cliente e Wallet
 
@@ -741,6 +750,7 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 129_tenant_daily_digest.sql
 130_tenant_loyalty_settings.sql
 131_tenant_loyalty_legacy_cleanup.sql
+132_tenant_referral_settings.sql
 ```
 
 `128` è additiva ma **operativamente significativa** (checkout, pagamenti, ordini): origine/canale/link/audit su `checkout_sessions`, stato `draft`, e-mail nullable per le sole sessioni/ordini assistiti (vincoli CHECK), colonne di audit incasso e `order_origin` su `orders`, `payment_method = 'manual'`, indice unico `orders.checkout_session_id`, indice «una sessione open per cliente» limitato allo storefront, trigger funnel e vista `checkout_funnel_30d` limitati allo storefront, journal `assisted_order_events` service-role only e RPC `convert_checkout_session_to_order` (EXECUTE solo service_role). Deve essere applicata **prima** del codice (recovery storefront e conferme esterne ne dipendono), poi verificata con `supabase/verification/128_assisted_orders_verification.sql` (transazione annullata). Runbook e rollback: `docs/ASSISTED_ORDERS.md` §10.
@@ -770,6 +780,8 @@ La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 `130` è additiva: registra `loyalty` (non fatturabile, senza piani), fa il backfill di una riga `tenant_feature_settings` per ogni tenant con verifica di conteggio e valori, installa i trigger di mirror bidirezionale con le colonne legacy (anche per i nuovi tenant) e revoca il grant pubblico 076 sulle tre colonne loyalty. Nessuna colonna rimossa, `points_ledger` non toccato.
 
 `131` è **distruttiva** (fase 5 loyalty): verifica che ogni tenant abbia una riga loyalty identica alle colonne legacy (altrimenti abort senza modifiche), riscrive `process_manual_purchase_points_atomic` per leggere il tasso da `tenant_feature_settings` (stessa firma e calcolo), elimina i trigger/funzioni di mirror della 130 e le colonne `tenants.loyalty_enabled`, `purchase_points_rate`, `points_to_currency_rate`. Rollback nei commenti della migration. Ordine obbligatorio: deploy del codice, poi migration.
+
+`132` è additiva (referral, fasi 1–4): registra `referral` (non fatturabile, senza piani), fa il backfill di una riga `tenant_feature_settings` per ogni tenant (`enabled = true`, config con i sette valori `referral_*`) con verifica dei valori, installa il mirror bidirezionale con le colonne legacy (anche per i nuovi tenant) e revoca il grant pubblico 076 sui sette campi, soglie anti-frode incluse. Nessuna colonna rimossa; `referral_codes`, catene e storico punti non toccati. Il codice deployato funziona prima e dopo l'applicazione.
 
 `097` è additiva e operativa: estende `nala_interactions` con classificazioni semantiche controllate, stato/versione/tentativi, indici dashboard-ready e claim RPC service-role-only concurrency-safe. Le righe esistenti restano eleggibili e vengono drenate in piccoli batch; small talk e le nuove risoluzioni Fast Resolver possono essere completate deterministicamente senza AI. Il worker scheduled non modifica outcome, chat response, retrieval o retention. Il provider non è più hardcoded: la classificazione passa dalla policy AI Core `nala_semantic_enrichment / classification`, con preflight prima del claim per non consumare tentativi quando il routing non è operativo.
 
@@ -877,9 +889,10 @@ supabase/migrations/*
 - URL Events resta temporaneamente env-based;
 - SSO esplicito cross-subdomain shop/events non introdotto;
 - colonne billing legacy in `tenants` restano temporaneamente;
-- le colonne referral/ambassador restano leggibili via PostgREST per il grant di colonna 076 (soglie anti-frode incluse): da revocare durante la migrazione dei rispettivi domini (loyalty: revocato da 130);
+- le colonne ambassador restano leggibili via PostgREST per il grant di colonna 076: da revocare durante la migrazione del dominio (loyalty: revocato da 130; referral: revocato da 132 quando applicata);
+- referral: le sette colonne `tenants.referral_*` e i trigger di mirror della 132 vanno rimossi in una migrazione successiva (fase 5, come la 131);
 - la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
-- referral, ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è avviata con loyalty (130);
+- ambassador, AI, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è completata per loyalty (130/131) e avviata per referral (132);
 - Console Platform non è ancora CRUD completo di piani/tenant;
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;

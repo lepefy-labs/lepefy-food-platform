@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getStuckSignupBonuses } from '@/lib/loyalty/getStuckSignupBonuses';
 import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
+import { getReferralSettings, REFERRAL_UNAVAILABLE_VIEW } from '@/lib/loyalty/referralConfig';
 import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { LoyaltyConfigSection } from './LoyaltyConfigSection';
@@ -18,7 +19,11 @@ export default async function AdminLoyaltyPage() {
   const tenant = await getTenant(slug);
 
   const supabase = createServiceClient();
-  const loyalty = await getLoyaltySettings(supabase, tenant.id);
+  const [loyalty, referralSettings] = await Promise.all([
+    getLoyaltySettings(supabase, tenant.id),
+    getReferralSettings(supabase, tenant.id),
+  ]);
+  const referral = referralSettings ?? REFERRAL_UNAVAILABLE_VIEW;
 
   const [{ data: tiers }, { data: pendingEntries }, stuckSignupBonuses] = await Promise.all([
     supabase
@@ -49,13 +54,13 @@ export default async function AdminLoyaltyPage() {
         <AdminBlockAccent tone="primary">
           <LoyaltyConfigSection
             loyalty_enabled={loyalty.enabled}
-            referral_max_depth={tenant.referral_max_depth}
+            referral_max_depth={referral.referral_max_depth}
             purchase_points_rate={loyalty.purchasePointsRate}
-            referral_availability_mode={tenant.referral_availability_mode}
-            referral_unlock_spending_threshold={tenant.referral_unlock_spending_threshold}
-            referral_fraud_max_conversions={tenant.referral_fraud_max_conversions}
-            referral_fraud_period_days={tenant.referral_fraud_period_days}
-            referral_fraud_action={tenant.referral_fraud_action}
+            referral_availability_mode={referral.referral_availability_mode}
+            referral_unlock_spending_threshold={referral.referral_unlock_spending_threshold}
+            referral_fraud_max_conversions={referral.referral_fraud_max_conversions}
+            referral_fraud_period_days={referral.referral_fraud_period_days}
+            referral_fraud_action={referral.referral_fraud_action}
             initialTiers={(tiers ?? []) as TenantReferralTier[]}
           />
         </AdminBlockAccent>

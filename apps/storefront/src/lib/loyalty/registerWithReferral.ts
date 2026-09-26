@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkFraudSignals } from './checkFraudSignals';
 import { grantReferralAccess } from './grantReferralAccess';
+import { getReferralSettings } from './referralConfig';
 
 type RegisterWithReferralResult =
   | { referred: true; sponsorId: string }
@@ -28,11 +29,9 @@ export async function registerWithReferral(params: {
   const { tenantId, newCustomerId, referralCode, signupIp, deviceFingerprint } = params;
   const supabase = createServiceClient();
 
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('referral_signup_bonus_points, referral_availability_mode')
-    .eq('id', tenantId)
-    .single();
+  // Referral settings (migration 132); null = program unavailable, as a
+  // missing tenant row was before: no default grant, no signup bonus.
+  const tenant = await getReferralSettings(supabase, tenantId);
 
   async function grantDefaultAccessIfApplicable() {
     if (tenant?.referral_availability_mode === 'ALL_CUSTOMERS') {

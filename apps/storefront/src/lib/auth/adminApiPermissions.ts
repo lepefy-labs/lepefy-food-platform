@@ -46,6 +46,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/loyalty/scan')) return 'loyalty.scan';
   // Program settings keep the permission of their former route (/api/admin/tenant).
   if (path === '/api/admin/loyalty/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  if (path === '/api/admin/loyalty/referral') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/loyalty')) return 'loyalty.manage';
   if (/^\/api\/admin\/ambassador\/commissions\/[^/]+\/pay$/.test(path)) return 'growth.payouts.manage';
   if (path.startsWith('/api/admin/ambassador')) return 'growth.manage';
