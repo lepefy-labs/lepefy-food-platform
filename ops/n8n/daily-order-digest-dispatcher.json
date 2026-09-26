@@ -1,0 +1,98 @@
+{
+  "name": "Lepefy · Daily order digest dispatcher (hourly)",
+  "nodes": [
+    {
+      "id": "c69326f7-2777-46f4-acdd-88bb1bf0e850",
+      "name": "Hourly (minute 00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0d847c24-8fb5-45e2-9f03-d53607700bca",
+      "name": "Manual diagnostic",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        420
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "991848ff-c7c2-4684-8627-81a53f12ac5e",
+      "name": "Dispatch due tenant reports",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        330
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/daily-order-digest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 15000
+    }
+  ],
+  "connections": {
+    "Hourly (minute 00)": {
+      "main": [
+        [
+          {
+            "node": "Dispatch due tenant reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual diagnostic": {
+      "main": [
+        [
+          {
+            "node": "Dispatch due tenant reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

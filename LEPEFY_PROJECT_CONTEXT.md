@@ -2,9 +2,15 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 25 settembre 2026 — **v6.73 Current-State Snapshot**
+> **Aggiornato:** 26 settembre 2026 — **v6.74 Current-State Snapshot**
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
+
+---
+
+## Briefing operativo mattutino ordini (migration 129; attivazione separata)
+
+Il rapporto operativo alle ore 08:00 locali per tenant usa `POST /api/internal/daily-order-digest` (Bearer `DAILY_DIGEST_CRON_SECRET`), richiamato ogni ora da n8n. L'applicazione classifica gli ordini pagati senza toccarne gli stati; i preordini e i pagamenti esterni ancora da verificare rimangono checkout session distinte. Le categorie sono urgente, da trattare oggi e da monitorare. I tracking gestiti senza avanzamenti oltre soglia entrano in monitoraggio, mentre una data di consegna stimata superata è segnalata come urgente senza cambiare lo stato ordine. Le soglie operative, il fuso orario e l'attivazione sono configurabili dall'admin Paramètres (tenant_settings.manage). I destinatari interni sono opt-in mediante `tenant_notification_recipients.notify_daily_digest`, il tenant è disabilitato per default (`tenants.daily_digest_enabled=false`). La migration 129 crea impostazioni tenant e il registro idempotente `tenant_daily_digest_runs` con RPC di claim service-role-only. Il payload per `/webhook/daily-order-digest` include HTML in francese, riepilogo, link protetti admin, snapshot precedente e chiave idempotente tenant/data; il trasporto email resta n8n. Non eseguire l'attivazione senza migration, secret, scheduler e webhook configurati. Runbook: `docs/DAILY_ORDER_DIGEST.md`.
 
 ---
 
