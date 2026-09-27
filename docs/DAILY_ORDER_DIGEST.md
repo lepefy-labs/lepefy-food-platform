@@ -72,8 +72,10 @@ Migration `129_tenant_daily_digest.sql` is additive and **disabled by default**.
 
 Files in `ops/n8n/`:
 - `daily-order-digest-dispatcher.json`: existing hourly schedule, inactive by default.
-- `daily-order-digest-email-receiver.json`: inbound POST `/webhook/daily-order-digest`, authenticated with Header Auth, input validation, atomic PostgreSQL claim, SMTP send, accepted/duplicate/busy response.
-- `daily-order-digest-idempotency.sql`: schema for a dedicated n8n-accessible PostgreSQL database. Do not run it on production Supabase without separate approval.
+- `daily-order-digest-email-receiver.json`: inbound POST `/webhook/daily-order-digest`, authenticated with Header Auth, input validation, atomic PostgreSQL claim, SMTP send. Responses: 200 accepted (after SMTP acceptance and the claim marked `accepted`), 200 duplicate (key already accepted, nothing sent), 503 busy (claim in progress), 400 invalid payload, 502 provider rejected (claim marked `failed`, so a retry in the same hour can re-claim immediately). Any other node error (e.g. PostgreSQL unreachable) makes n8n answer 500, never 2xx.
+- `daily-order-digest-idempotency.sql`: schema for a dedicated n8n-accessible PostgreSQL database, plus the least-privilege role grants (SELECT/INSERT/UPDATE on the claims table only). Do not run it on production Supabase without separate approval.
+
+**Activation status (27 Sept 2026):** not yet activated. `https://n8n.lepefy.com/webhook/daily-order-digest` answers 404 (receiver not imported/active). The n8n import, the PostgreSQL table, the credentials, the Vercel secrets and the synthetic-send tests still require an operator with n8n, Hetzner SSH and Vercel access.
 
 Configure Vercel production `DAILY_DIGEST_CRON_SECRET` for the dispatcher and a **different** `N8N_DAILY_DIGEST_WEBHOOK_SECRET` for the receiver. The outbound helper sends `X-Lepefy-Webhook-Secret` only for the daily digest, and fails closed if that variable is absent. In n8n, attach the matching Header Auth credential to the receiver Webhook. Set `N8N_WEBHOOK_URL` to the n8n root URL (or to its `/webhook` prefix, both are normalized). The SMTP, Postgres and Header Auth credentials never belong in exported JSON.
 

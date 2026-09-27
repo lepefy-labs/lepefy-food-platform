@@ -12,3 +12,7 @@ CREATE INDEX IF NOT EXISTS digest_email_claims_pending_idx
   ON lepefy_n8n.digest_email_claims (claimed_at) WHERE status = 'processing';
 -- The n8n credential role needs SELECT, INSERT and UPDATE only on this table.
 -- Keep accepted rows for the entire replay/retry window.
+-- Least-privilege role (password from the secret manager, never committed):
+--   CREATE ROLE lepefy_n8n_digest LOGIN PASSWORD '<secret>';
+--   GRANT USAGE ON SCHEMA lepefy_n8n TO lepefy_n8n_digest;
+--   GRANT SELECT, INSERT, UPDATE ON lepefy_n8n.digest_email_claims TO lepefy_n8n_digest;

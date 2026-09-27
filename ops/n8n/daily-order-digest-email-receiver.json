@@ -31,7 +31,8 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "jsCode": "const p = $input.first().json.body ?? $input.first().json;\nif (!p || typeof p !== 'object') throw new Error('Invalid request body');\nif (typeof p.idempotencyKey !== 'string' || !/^[0-9a-f-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}$/i.test(p.idempotencyKey)) throw new Error('Invalid idempotency key');\nif (!Array.isArray(p.recipients) || p.recipients.length < 1 || p.recipients.length > 20 ||\n    !p.recipients.every(v => typeof v === 'string' && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v))) throw new Error('Invalid recipient list');\nif (typeof p.subject !== 'string' || !p.subject.length || p.subject.length > 300) throw new Error('Invalid subject');\nif (typeof p.html !== 'string' || !p.html.length || p.html.length > 200000) throw new Error('Invalid HTML');\nreturn [{json:{idempotencyKey:p.idempotencyKey,recipients:p.recipients,subject:p.subject,html:p.html,localDate:p.localDate}}];"
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "e3c0f1d3-148a-4495-a070-cf56312e8b39",
@@ -98,7 +99,8 @@
         "emailFormat": "html",
         "html": "={{ $('Validate payload').first().json.html }}",
         "options": {}
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "bf695150-b1a4-42d8-9aae-5b4cb7181523",
@@ -213,6 +215,58 @@
           "responseCode": 503
         }
       }
+    },
+    {
+      "id": "3f0b7a52-6c1e-4d8a-9b41-2e7d5c0a9f10",
+      "name": "Respond invalid payload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        580,
+        500
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"accepted\":false,\"error\":\"invalid_payload\"}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "8d2e4f61-0a7b-4c39-a5e8-6b1f3d9c7e22",
+      "name": "Mark delivery failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1220,
+        -20
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE lepefy_n8n.digest_email_claims SET status='failed',updated_at=now() WHERE idempotency_key=$1 AND status='processing';",
+        "options": {
+          "queryReplacement": "={{ $('Validate payload').first().json.idempotencyKey }}"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c47a9e13-5b2d-4f80-8e6c-1a9d2b7f4e35",
+      "name": "Respond provider rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1430,
+        -20
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"accepted\":false,\"error\":\"provider_rejected\"}",
+        "options": {
+          "responseCode": 502
+        }
+      }
     }
   ],
   "connections": {
@@ -235,6 +289,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Respond invalid payload",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -243,6 +304,13 @@
         [
           {
             "node": "Mark delivery accepted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark delivery failed",
             "type": "main",
             "index": 0
           }
@@ -312,6 +380,17 @@
         [
           {
             "node": "Respond busy (retry)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark delivery failed": {
+      "main": [
+        [
+          {
+            "node": "Respond provider rejected",
             "type": "main",
             "index": 0
           }
