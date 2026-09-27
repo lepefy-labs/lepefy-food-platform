@@ -509,3 +509,29 @@ ${cta(input.loginUrl, 'Se connecter')}
     }),
   };
 }
+
+/** Final booking reports sent when event reservations close (attachments are added by the caller). */
+export function eventBookingClosedReportsEmail(context: TenantNotificationContext, input: {
+  eventTitle: string; eventDateStart: string | null; reservations: number; people: number; testMode?: boolean;
+}): RenderedEmail {
+  return {
+    subject: subject(input.testMode, `Rapports définitifs · ${input.eventTitle}`),
+    replyTo: context.emailBranding?.supportEmail,
+    html: page(context, {
+      testMode: input.testMode,
+      testLabel: '🧪 EMAIL DE TEST — aucune réservation réelle',
+      title: '📋 Rapports définitifs de l’événement',
+      body: `<p>Les réservations de l’événement <strong>${esc(input.eventTitle)}</strong> sont désormais clôturées.</p>
+<p>Les documents opérationnels définitifs sont joints à cet e-mail.</p>
+${infoBox([
+    ['Événement', input.eventTitle],
+    ['Date', dateTime(context, input.eventDateStart, 'full')],
+    ['Réservations valides', String(input.reservations)],
+    ['Personnes', String(input.people)],
+  ])}
+<div class="items-box"><div class="items-title">Documents joints</div><div class="item">📊 Rapport détaillé des réservations</div><div class="item">🖨️ Liste imprimable</div><div class="item">🎟️ Codes de réservation A5</div></div>
+<div class="notice-box"><strong>ℹ️ Ces documents correspondent à l’état des réservations au moment de la clôture.</strong><br><br>Les réservations manuelles ajoutées ultérieurement par l’administration ne sont pas incluses dans cet envoi automatique.</div>
+<p class="note">Généré automatiquement par Lepefy.</p>`,
+    }),
+  };
+}

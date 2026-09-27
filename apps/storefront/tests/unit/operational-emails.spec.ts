@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { TenantNotificationContext } from '../../src/lib/notifications/getTenantNotificationContext';
-import { deliverEmail, SEND_EMAIL_WEBHOOK } from '../../src/lib/notifications/sendEmail';
+import { deliverEmail, emailRequest, SEND_EMAIL_WEBHOOK } from '../../src/lib/notifications/sendEmail';
 import {
   eventCapacityConflictEmail,
   marketingCampaignEmail,
@@ -87,4 +87,14 @@ test('deliverEmail posts the rendered email to the generic webhook and skips emp
     notificationType: 'service_inquiry_created', idempotencyKey: 'service-inquiry:1', recipients: ['admin@shop.example'],
     replyTo: 'a@b.it', emailBranding: context.emailBranding,
   });
+});
+
+test('attachments are forwarded only when present', () => {
+  const base = { subject: 'S', html: '<p>x</p>', notificationType: 'event_booking_closed_reports', idempotencyKey: 'k:123456', recipients: ['a@b.it'] };
+  expect(emailRequest(context, base, false)[1]).not.toHaveProperty('attachments');
+  const [, payload, ledger] = emailRequest(context, {
+    ...base, attachments: [{ filename: 'r.csv', contentType: 'text/csv; charset=utf-8', contentBase64: 'YQ==' }],
+  }, false);
+  expect(payload.attachments).toEqual([{ filename: 'r.csv', contentType: 'text/csv; charset=utf-8', contentBase64: 'YQ==' }]);
+  expect(ledger).toBeUndefined();
 });

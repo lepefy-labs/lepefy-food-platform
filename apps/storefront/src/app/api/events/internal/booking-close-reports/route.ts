@@ -4,6 +4,8 @@ import { getNotificationRecipients } from '@/lib/notifications/getNotificationRe
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { getEventsBaseUrl } from '@/lib/events/ticketUrl';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { eventBookingClosedReportsEmail } from '@/lib/notifications/customerEmails';
 import { htmlToPdf } from '@/lib/labels/gotenberg';
 import {
   buildReservationListHtml,
@@ -18,7 +20,9 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 function safeFilePart(value: string) {
-  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'evenement';
+  // send-email accepts attachment names up to 120 characters.
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').slice(0, 60)
+    .replace(/^-|-$/g, '') || 'evenement';
 }
 
 async function setError(supabase: ReturnType<typeof createServiceClient>, eventId: string, token: string, message: string) {
@@ -82,20 +86,24 @@ export async function POST(req: NextRequest) {
     const validReservations = exportData.reservations.filter((reservation) => reservation.status === 'confirmed' && reservation.quantity_remaining > 0);
     const peopleTotal = validReservations.reduce((sum, reservation) => sum + reservation.quantity_total, 0);
 
-    const accepted = await notifyN8n('/webhook/event-booking-closed-reports', {
-      ...tenantContext,
+    // The event dispatch token already guarantees one report per closure: no ledger
+    // (which would also store the attachments).
+    const accepted = await deliverEmail(tenantContext, {
+      ...eventBookingClosedReportsEmail(tenantContext, {
+        eventTitle: event.title,
+        eventDateStart: event.date_start,
+        reservations: validReservations.length,
+        people: peopleTotal,
+      }),
       notificationType: 'event_booking_closed_reports',
-      deliveryId: `event-booking-close-reports:${eventId}:${dispatchToken}`,
+      idempotencyKey: `event-booking-close-reports:${eventId}:${dispatchToken}`,
       recipients,
-      event: { id: eventId, title: event.title, dateStart: event.date_start },
-      summary: { reservations: validReservations.length, people: peopleTotal },
-      generatedAt: sentAt,
       attachments: [
         { filename: `reservations-${filePart}.csv`, contentType: 'text/csv; charset=utf-8', contentBase64: Buffer.from(csv, 'utf8').toString('base64') },
         { filename: `liste-reservations-${filePart}.pdf`, contentType: 'application/pdf', contentBase64: listPdf.toString('base64') },
         { filename: `codes-reservations-a5-${filePart}.pdf`, contentType: 'application/pdf', contentBase64: cardsPdf.toString('base64') },
       ],
-    });
+    }, notifyN8n, false);
     if (!accepted) throw new Error('n8n_report_email_not_accepted');
 
     const { error: sentStateError } = await supabase.from('events').update({

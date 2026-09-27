@@ -30,7 +30,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const p = $input.first().json.body ?? $input.first().json;\nif (!p || typeof p !== 'object') throw new Error('Invalid request body');\nif (typeof p.idempotencyKey !== 'string' || !/^[a-z][a-z0-9-]{2,40}:[A-Za-z0-9:._-]{6,160}$/.test(p.idempotencyKey)) throw new Error('Invalid idempotency key');\nif (typeof p.notificationType !== 'string' || !/^[a-z0-9_]{3,60}$/.test(p.notificationType)) throw new Error('Invalid notification type');\nconst isEmail = v => typeof v === 'string' && v.length <= 254 && /^[^\\s@,;<>]+@[^\\s@,;<>]+\\.[^\\s@,;<>]+$/.test(v);\nif (!Array.isArray(p.recipients) || p.recipients.length < 1 || p.recipients.length > 20 || !p.recipients.every(isEmail)) throw new Error('Invalid recipient list');\nif (typeof p.subject !== 'string' || !p.subject.trim() || p.subject.length > 300 || /[\\r\\n]/.test(p.subject)) throw new Error('Invalid subject');\nif (typeof p.html !== 'string' || !p.html.length || p.html.length > 200000) throw new Error('Invalid HTML');\nif (p.replyTo != null && p.replyTo !== '' && !isEmail(p.replyTo)) throw new Error('Invalid replyTo');\nconst b = p.emailBranding;\nif (!b || typeof b.fromName !== 'string' || !b.fromName.trim() || b.fromName.length > 100 || /[\\r\\n<>\"]/.test(b.fromName) || !isEmail(b.fromEmail)) throw new Error('Invalid sender');\n// Sender allowlist: only the verified Lepefy sending domain.\nif (!/@lepefy\\.com$/i.test(b.fromEmail)) throw new Error('Sender not allowed');\nreturn [{json:{idempotencyKey:p.idempotencyKey,notificationType:p.notificationType,tenantId:p.tenantId ?? null,recipients:p.recipients,subject:p.subject,html:p.html,replyTo:p.replyTo || '',fromName:b.fromName.trim(),fromEmail:b.fromEmail}}];"
+        "jsCode": "const p = $input.first().json.body ?? $input.first().json;\nif (!p || typeof p !== 'object') throw new Error('Invalid request body');\nif (typeof p.idempotencyKey !== 'string' || !/^[a-z][a-z0-9-]{2,40}:[A-Za-z0-9:._-]{6,160}$/.test(p.idempotencyKey)) throw new Error('Invalid idempotency key');\nif (typeof p.notificationType !== 'string' || !/^[a-z0-9_]{3,60}$/.test(p.notificationType)) throw new Error('Invalid notification type');\nconst isEmail = v => typeof v === 'string' && v.length <= 254 && /^[^\\s@,;<>]+@[^\\s@,;<>]+\\.[^\\s@,;<>]+$/.test(v);\nif (!Array.isArray(p.recipients) || p.recipients.length < 1 || p.recipients.length > 20 || !p.recipients.every(isEmail)) throw new Error('Invalid recipient list');\nif (typeof p.subject !== 'string' || !p.subject.trim() || p.subject.length > 300 || /[\\r\\n]/.test(p.subject)) throw new Error('Invalid subject');\nif (typeof p.html !== 'string' || !p.html.length || p.html.length > 200000) throw new Error('Invalid HTML');\nif (p.replyTo != null && p.replyTo !== '' && !isEmail(p.replyTo)) throw new Error('Invalid replyTo');\nconst b = p.emailBranding;\nif (!b || typeof b.fromName !== 'string' || !b.fromName.trim() || b.fromName.length > 100 || /[\\r\\n<>\"]/.test(b.fromName) || !isEmail(b.fromEmail)) throw new Error('Invalid sender');\n// Sender allowlist: only the verified Lepefy sending domain.\nif (!/@lepefy\\.com$/i.test(b.fromEmail)) throw new Error('Sender not allowed');\n// Optional file attachments: at most 5, known document types, ~10 MB of base64 in total.\nconst TYPES = { pdf: 'application/pdf', csv: 'text/csv', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };\nconst attachments = p.attachments == null ? [] : p.attachments;\nif (!Array.isArray(attachments) || attachments.length > 5) throw new Error('Invalid attachments');\nlet total = 0;\nfor (const a of attachments) {\n  const ext = typeof a?.filename === 'string' ? (a.filename.match(/\\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase() : null;\n  if (!ext || !TYPES[ext] || !/^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,119}$/.test(a.filename)) throw new Error('Invalid attachment name');\n  if (typeof a.contentType !== 'string' || a.contentType.split(';')[0].trim().toLowerCase() !== TYPES[ext]) throw new Error('Invalid attachment type');\n  if (typeof a.contentBase64 !== 'string' || !a.contentBase64.length || !/^[A-Za-z0-9+/]+={0,2}$/.test(a.contentBase64)) throw new Error('Invalid attachment content');\n  total += a.contentBase64.length;\n}\nif (total > 14000000) throw new Error('Attachments too large');\nreturn [{json:{idempotencyKey:p.idempotencyKey,notificationType:p.notificationType,tenantId:p.tenantId ?? null,recipients:p.recipients,subject:p.subject,html:p.html,replyTo:p.replyTo || '',fromName:b.fromName.trim(),fromEmail:b.fromEmail,attachments:attachments.map(a => ({filename:a.filename,contentType:a.contentType,contentBase64:a.contentBase64}))}}];"
       },
       "onError": "continueErrorOutput"
     },
@@ -100,7 +100,8 @@
         "html": "={{ $('Validate payload').first().json.html }}",
         "options": {
           "appendAttribution": false,
-          "replyTo": "={{ $('Validate payload').first().json.replyTo }}"
+          "replyTo": "={{ $('Validate payload').first().json.replyTo }}",
+          "fileAttachments": "={{ Object.keys($binary || {}).join(',') }}"
         }
       },
       "onError": "continueErrorOutput"
@@ -270,6 +271,19 @@
           "responseCode": 502
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns the validated attachments into binary properties for the SMTP node.\nconst attachments = $('Validate payload').first().json.attachments || [];\nconst binary = {};\nattachments.forEach((a, i) => {\n  binary[`attachment_${i}`] = { data: a.contentBase64, mimeType: a.contentType, fileName: a.filename };\n});\nreturn [{ json: { attachmentCount: attachments.length }, binary }];"
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+      "name": "Attach files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        0
+      ]
     }
   ],
   "connections": {
@@ -357,7 +371,7 @@
       "main": [
         [
           {
-            "node": "Send email (SMTP)",
+            "node": "Attach files",
             "type": "main",
             "index": 0
           }
@@ -394,6 +408,17 @@
         [
           {
             "node": "Respond provider rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach files": {
+      "main": [
+        [
+          {
+            "node": "Send email (SMTP)",
             "type": "main",
             "index": 0
           }

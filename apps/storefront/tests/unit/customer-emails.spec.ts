@@ -13,6 +13,7 @@ import {
   reviewInviteEmail,
   cardQuickPaymentEmail,
   adminInvitedEmail,
+  eventBookingClosedReportsEmail,
 } from '../../src/lib/notifications/customerEmails';
 
 const context = {
@@ -142,4 +143,11 @@ test('card quick payment and admin invitation', () => {
   expect(invite.subject).toBe('Accès administrateur activé — Chloé Food');
   expect(invite.html).toContain('Lepefy Food Platform');
   expect(invite.html).toContain('Se connecter');
+});
+
+test('event closing reports email lists the attached documents', () => {
+  const email = eventBookingClosedReportsEmail(context, { eventTitle: 'Gala', eventDateStart: '2026-10-10T19:00:00Z', reservations: 12, people: 30 });
+  expect(email.subject).toBe('Rapports définitifs · Gala');
+  expect(email.html).toContain('Codes de réservation A5');
+  expect(email.html).toContain('30');
 });

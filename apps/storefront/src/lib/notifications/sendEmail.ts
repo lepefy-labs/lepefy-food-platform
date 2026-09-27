@@ -21,11 +21,23 @@ export interface RenderedEmail {
   replyTo?: string | null;
 }
 
+/**
+ * File attachment accepted by send-email: at most 5, PDF/CSV/XLSX/PNG/JPEG,
+ * about 10 MB of base64 in total (validated again by the n8n workflow).
+ */
+export interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+}
+
 export interface EmailDelivery extends RenderedEmail {
   notificationType: string;
   /** Stable per logical message: a retry with the same key never sends twice. */
   idempotencyKey: string;
   recipients: string[];
+  /** Keep attachments out of the delivery ledger (useLedger = false): the payload would store them. */
+  attachments?: EmailAttachment[];
 }
 
 export async function deliverEmail(
@@ -60,6 +72,7 @@ export function emailRequest(
     html: delivery.html,
     replyTo: delivery.replyTo ?? null,
     emailBranding: context.emailBranding,
+    ...(delivery.attachments?.length ? { attachments: delivery.attachments } : {}),
   }, useLedger
     ? { tenantId: context.tenantId, idempotencyKey: delivery.idempotencyKey, notificationType: delivery.notificationType }
     : undefined];
