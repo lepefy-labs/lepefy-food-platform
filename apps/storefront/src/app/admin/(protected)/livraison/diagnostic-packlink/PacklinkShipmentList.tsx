@@ -313,6 +313,8 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
   const [selected, setSelected] = useState<PacklinkListedShipment | null>(null);
   // Failure while moving to another page: the page already shown stays visible.
   const [pageFailure, setPageFailure] = useState<Extract<PacklinkListResult, { available: false }> | null>(null);
+  // Once Packlink ignores a page request, stop offering navigation that cannot work.
+  const [paginationUnsupported, setPaginationUnsupported] = useState(false);
 
   const pagination = result?.available ? result.diagnostics.pagination : null;
   const currentPage = pagination?.requestedPage ?? 1;
@@ -329,6 +331,7 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
         setNetworkError(data.error ?? `Réponse inattendue (HTTP ${response.status}).`);
       } else if (!data.available && result?.available && targetPage !== currentPage) {
         setPageFailure(data);
+        if (data.reason === 'page_not_honored') setPaginationUnsupported(true);
       } else {
         setResult(data);
         setSelected(null);
@@ -551,7 +554,7 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
         </div>
       )}
 
-      {pagination?.verified && (pagination.totalPages ?? 0) > 1 && (
+      {pagination?.verified && !paginationUnsupported && (pagination.totalPages ?? 0) > 1 && (
         <Pager
           page={pagination.currentPage ?? currentPage}
           totalPages={pagination.totalPages ?? 1}

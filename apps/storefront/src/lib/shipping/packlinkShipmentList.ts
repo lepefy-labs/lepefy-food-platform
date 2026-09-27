@@ -5,7 +5,12 @@
 // used by third-party clients but is not officially documented, nor is any
 // pagination. The real response carries `pagination { current_page,
 // total_pages, total_registers, is_one_indexed }` (observed 2026-09-28: 10
-// records per page). Pages are requested with `?page=N` and every page is
+// records per page). `?page=N` is ignored by v1/shipments (verified
+// 2026-09-28: current_page stays 1). Packlink's own web app pages its shipment
+// list with `limit` + `offset` (pro.packlink.com bundle: `{inbox, limit: 20,
+// offset: (page - 1) * 20}`), so pages > 1 are requested with
+// `?limit=10&offset=(N-1)*10`; 10 matches the observed default page size, so
+// offsets stay consistent even if `limit` were ignored. Every page is
 // self-verified: a response whose current_page differs from the requested
 // page is rejected (`page_not_honored`), never shown as that page. Totals are
 // presented as announced by Packlink.
@@ -24,6 +29,13 @@ export const PACKLINK_LIST_MAX_BYTES = 512_000;
 export const PACKLINK_LIST_TIMEOUT_MS = 12_000;
 export const PACKLINK_LIST_ROW_LIMIT = 200;
 export const PACKLINK_LIST_MAX_PAGE = 10_000;
+export const PACKLINK_LIST_PAGE_SIZE = 10;
+
+export function packlinkShipmentsUrl(page: number): string {
+  if (page <= 1) return PACKLINK_SHIPMENTS_URL;
+  const offset = (page - 1) * PACKLINK_LIST_PAGE_SIZE;
+  return `${PACKLINK_SHIPMENTS_URL}?limit=${PACKLINK_LIST_PAGE_SIZE}&offset=${offset}`;
+}
 
 const SENSITIVE_FIELD = /^(authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|password|secret|token)$/i;
 const PAGINATION_KEYS = ['total', 'total_count', 'totalCount', 'count', 'page', 'pages', 'total_pages', 'per_page', 'limit', 'offset', 'next', 'previous', 'prev', 'cursor', 'has_more', 'links', 'meta', 'pagination'];
@@ -344,7 +356,7 @@ export async function listPacklinkShipments(input: ListPacklinkShipmentsInput): 
   if (!apiKey) return fail('tenant_api_key_missing');
   const page = input.page ?? 1;
   if (!Number.isInteger(page) || page < 1 || page > PACKLINK_LIST_MAX_PAGE) return fail('invalid_page');
-  const url = page > 1 ? `${PACKLINK_SHIPMENTS_URL}?page=${page}` : PACKLINK_SHIPMENTS_URL;
+  const url = packlinkShipmentsUrl(page);
 
   const startedAt = now();
   const diagnostics: PacklinkListDiagnostics = {

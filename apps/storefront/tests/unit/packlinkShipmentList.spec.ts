@@ -6,6 +6,7 @@ import {
   PACKLINK_SHIPMENTS_URL,
   listPacklinkShipments,
   locateShipmentArray,
+  packlinkShipmentsUrl,
   parsePageParam,
   readPacklinkPagination,
   summarizePacklinkShipment,
@@ -251,11 +252,17 @@ test.describe('pagination (observed shape: current_page, total_pages, total_regi
     });
   });
 
-  test('page N sends ?page=N and is accepted only when Packlink returns page N', async () => {
+  test('page N sends limit/offset and is accepted only when Packlink returns page N', async () => {
     const { impl, calls } = mockFetch(page(2));
     const result = await run(impl, { page: 2 });
-    expect(calls[0]?.url).toBe(`${PACKLINK_SHIPMENTS_URL}?page=2`);
-    expect(result).toMatchObject({ available: true, completeness: 'paginated', diagnostics: { endpoint: `GET ${PACKLINK_SHIPMENTS_URL}?page=2` } });
+    expect(calls[0]?.url).toBe(`${PACKLINK_SHIPMENTS_URL}?limit=10&offset=10`);
+    expect(result).toMatchObject({ available: true, completeness: 'paginated', diagnostics: { endpoint: `GET ${PACKLINK_SHIPMENTS_URL}?limit=10&offset=10` } });
+  });
+
+  test('offset follows the 10-record page size up to the last page', () => {
+    expect(packlinkShipmentsUrl(1)).toBe(PACKLINK_SHIPMENTS_URL);
+    expect(packlinkShipmentsUrl(3)).toBe(`${PACKLINK_SHIPMENTS_URL}?limit=10&offset=20`);
+    expect(packlinkShipmentsUrl(245)).toBe(`${PACKLINK_SHIPMENTS_URL}?limit=10&offset=2440`);
   });
 
   test('an ignored page parameter is rejected, never shown as the requested page', async () => {
