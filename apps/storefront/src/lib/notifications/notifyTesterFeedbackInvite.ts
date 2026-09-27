@@ -1,4 +1,6 @@
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { PLATFORM_EMAIL_CONTEXT } from '@/lib/notifications/customerEmails';
 import {
   buildTesterFeedbackInviteEmail,
   LEPEFY_PLATFORM_SIGNATURE,
@@ -55,15 +57,14 @@ export async function sendTesterFeedbackInvite(inviteId: string) {
   if (rotateError) return { ok: false, error: 'Impossible de préparer l’invitation.' };
 
   const email = buildTesterFeedbackInviteEmail(tenant.tenantName, tenant.branding.logoUrl, campaign.google_play_test_url, feedbackUrl);
-  const accepted = await notifyN8n(TESTER_FEEDBACK_INVITE_WEBHOOK, {
-    type: 'tester_feedback_invite',
-    tenant: { id: tenant.tenantId, name: tenant.tenantName, logo_url: tenant.branding.logoUrl },
-    campaign: { id: campaign.id, name: campaign.name, version_label: campaign.version_label },
-    recipient: { email: invite.email },
-    links: { google_play_test_url: campaign.google_play_test_url, feedback_invite_url: feedbackUrl },
-    email: { subject: email.subject, html: email.html, text: email.text, platform_signature: LEPEFY_PLATFORM_SIGNATURE, platform_tagline: LEPEFY_PLATFORM_TAGLINE },
-    testMode: false,
-  });
+  // Sent as Lepefy Food Platform, as before; the invite row keeps its own delivery status.
+  const accepted = await deliverEmail({ ...PLATFORM_EMAIL_CONTEXT, tenantId: tenant.tenantId }, {
+    subject: email.subject,
+    html: email.html,
+    notificationType: 'tester_feedback_invite',
+    idempotencyKey: `tester-invite:${invite.id}:${tokenHash.slice(0, 16)}`,
+    recipients: [invite.email],
+  }, notifyN8n, false);
 
   const statusUpdate = accepted
     ? { delivery_status: 'sent', sent_at: now, delivery_failed_at: null }

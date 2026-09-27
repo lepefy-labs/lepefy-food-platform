@@ -27,13 +27,17 @@ interface Shell {
   testMode?: boolean;
   title: string;
   body: string;
+  /** Footer link; defaults to the storefront ("Visiter notre boutique"). */
+  footerLink?: { url: string | null | undefined; label: string };
+  /** Banner text in test mode. */
+  testLabel?: string;
 }
 
 function page(context: TenantNotificationContext, shell: Shell) {
   const primary = color(context.branding?.primaryColor, '#25222b');
   const secondary = color(context.branding?.secondaryColor, primary);
   const logo = safeUrl(context.branding?.logoUrl);
-  const storefront = safeUrl(context.storefrontUrl);
+  const footerLink = safeUrl(shell.footerLink ? shell.footerLink.url : context.storefrontUrl);
   const business = context.business;
   const place = business?.legalAddress
     ? business.legalAddress
@@ -58,6 +62,14 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:
 .info-label{display:block;font-weight:700;margin-bottom:3px}
 .mono{font-family:monospace;overflow-wrap:anywhere}
 .warning-box{background:#fff8e6;border-left:4px solid #f0b429;padding:16px 18px;border-radius:6px;margin:20px 0;font-size:14px;line-height:1.6}
+.customer-box{background:#f8fafc;border-radius:8px;padding:18px;margin:20px 0}
+.customer-box h2{font-size:15px;margin:0 0 10px}
+.customer-box p{margin:0 0 6px !important}
+.items-box{border:1px solid #eef0f3;border-radius:8px;padding:16px 18px;margin:20px 0}
+.items-title{font-weight:700;margin-bottom:10px}
+.item{padding:8px 0;border-top:1px solid #f0f2f4;font-size:14px;line-height:1.5}
+.item:first-of-type{border-top:none}
+.muted{color:#777777}
 .notice-box{background:#f8fafc;padding:16px 18px;border-radius:6px;margin:20px 0;font-size:14px;line-height:1.6;color:#555555}
 .cta-wrap{text-align:center;margin:30px 0 18px}
 .cta{display:inline-block;background:${primary};color:#ffffff !important;text-decoration:none;padding:15px 24px;border-radius:8px;font-weight:700;font-size:15px}
@@ -75,7 +87,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:
 </head>
 <body>
 <div class="container">
-${shell.testMode ? '<div class="test-banner">🧪 EMAIL DE TEST — aucune commande réelle</div>' : ''}
+${shell.testMode ? `<div class="test-banner">${esc(shell.testLabel ?? '🧪 EMAIL DE TEST — aucune commande réelle')}</div>` : ''}
 <div class="header">
 ${logo ? `<img src="${logo}" alt="${esc(context.tenantName)}" class="logo">` : ''}
 <h1>${esc(shell.title)}</h1>
@@ -86,7 +98,7 @@ ${shell.body}
 <div class="footer">
 <strong>${esc(context.tenantName)}</strong>
 ${place ? `<br>📍 ${esc(place)}` : ''}
-${storefront ? `<br><a href="${storefront}">🛍️ Visiter notre boutique</a>` : ''}
+${footerLink ? `<br><a href="${footerLink}">${esc(shell.footerLink?.label ?? '🛍️ Visiter notre boutique')}</a>` : ''}
 </div>
 </div>
 </body>
@@ -295,6 +307,205 @@ ${cta(input.resumeLink, 'Reprendre mon achat')}
 <p class="note">Si vous avez déjà effectué le paiement, ne cliquez pas pour payer à nouveau.</p>
 ${supportBox(context, '💬 Une question concernant votre paiement ?')}
 ${signature(context, 'Merci pour votre confiance.')}`,
+    }),
+  };
+}
+
+// ─── Batch B ────────────────────────────────────────────────────────────────
+
+function dateTime(context: TenantNotificationContext, value: string | null | undefined, style: 'long' | 'medium' | 'full' = 'long') {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(context.locale || 'fr-FR', { dateStyle: style, timeStyle: 'short', timeZone: 'Europe/Rome' }).format(date);
+}
+
+function itemsBox(context: TenantNotificationContext, title: string, items: Array<{ quantity: number; name: string; unitPrice: number }>) {
+  if (!items.length) return '';
+  return `<div class="items-box"><div class="items-title">${esc(title)}</div>${items.map(item =>
+    `<div class="item"><strong>${esc(item.quantity)} × ${esc(item.name)}</strong><br><span class="muted">${esc(formatMoney(context, item.unitPrice * item.quantity))}</span></div>`).join('')}</div>`;
+}
+
+function customerBox(context: TenantNotificationContext, customer: { fullName: string | null; email: string | null; phone: string | null }) {
+  const primary = color(context.branding?.primaryColor, '#25222b');
+  const phone = customer.phone ? String(customer.phone).replace(/[^\d+]/g, '') : '';
+  return `<div class="customer-box"><h2>👤 Coordonnées du client</h2>${
+    customer.fullName ? `<p><strong>${esc(customer.fullName)}</strong></p>` : ''}${
+    customer.email ? `<p><a href="mailto:${esc(customer.email)}" style="color:${primary};">${esc(customer.email)}</a></p>` : ''}${
+    phone ? `<p><a href="tel:${esc(phone)}" style="color:${primary};">${esc(customer.phone)}</a></p>` : ''}</div>`;
+}
+
+export function eventReservationConfirmedEmail(context: TenantNotificationContext, input: {
+  customerName: string | null; eventTitle: string | null; eventDateStart: string | null; eventLocation: string | null;
+  amountPaid: number; items: Array<{ quantity: number; label: string | null; unitPrice: number }>;
+  ticketUrl: string | null; eventsUrl: string | null; testMode?: boolean;
+}): RenderedEmail {
+  const title = input.eventTitle ?? 'votre événement';
+  return {
+    subject: subject(input.testMode, `✅ Votre réservation pour ${title} est confirmée !`),
+    replyTo: context.emailBranding?.supportEmail,
+    html: page(context, {
+      testMode: input.testMode,
+      testLabel: '🧪 EMAIL DE TEST — aucune réservation réelle',
+      title: '🎉 Réservation confirmée !',
+      footerLink: { url: input.eventsUrl, label: 'Accéder aux événements' },
+      body: `<p>Bonjour <strong>${esc(input.customerName || 'cher client')}</strong>,</p>
+<p>Votre réservation pour <strong>${esc(title)}</strong> est confirmée.</p>
+<p>Nous avons hâte de vous accueillir !</p>
+${infoBox([
+    ['📅 Date et heure', dateTime(context, input.eventDateStart)],
+    ['📍 Lieu', input.eventLocation],
+    ['💰 Total payé', formatMoney(context, input.amountPaid)],
+  ])}
+${itemsBox(context, 'Détail de votre réservation', input.items.map(item => ({ quantity: item.quantity, name: item.label || 'Billet', unitPrice: item.unitPrice })))}
+${cta(input.ticketUrl, 'Voir mon billet et QR code →')}
+<div class="notice-box"><strong>🎟️ Votre billet est important.</strong><br><br>Présentez le QR code disponible sur votre billet lors de votre arrivée. Il pourra être demandé pour valider votre réservation et accéder à l’événement.</div>
+<p class="note">Conservez cet email ou ouvrez votre billet depuis votre téléphone avant votre arrivée.</p>
+${supportBox(context, '💬 Une question concernant votre réservation ?')}
+${signature(context, 'Merci et à très bientôt !')}`,
+    }),
+  };
+}
+
+export function externalPaymentAwaitingVerificationEmail(context: TenantNotificationContext, input: {
+  paymentReference: string; paymentMethodLabel: string; amount: number; fulfillmentType: string | null;
+  customer: { fullName: string | null; email: string | null; phone: string | null };
+  items: Array<{ name: string; price: number; quantity: number }>; adminPaymentLink: string | null; testMode?: boolean;
+}): RenderedEmail {
+  const method = esc(input.paymentMethodLabel);
+  return {
+    subject: subject(input.testMode, `💳 Paiement externe à vérifier · ${input.paymentReference} · ${formatMoney(context, input.amount)}`),
+    replyTo: input.customer.email,
+    html: page(context, {
+      testMode: input.testMode,
+      testLabel: '🧪 EMAIL DE TEST — aucun paiement réel',
+      title: '💳 Paiement externe à vérifier',
+      body: `<p>Un client a choisi <strong>${method}</strong> pour finaliser son achat.</p>
+<p>Vérifiez la réception du paiement avant de confirmer la commande.</p>
+${infoBox([
+    ['Référence', input.paymentReference],
+    ['💳 Moyen de paiement', input.paymentMethodLabel],
+    ['Montant à vérifier', formatMoney(context, input.amount)],
+    ['Mode de remise', input.fulfillmentType === 'pickup' ? 'Click & Collect' : 'Livraison'],
+  ])}
+${customerBox(context, input.customer)}
+${itemsBox(context, 'Détail de l’achat', input.items.map(item => ({ quantity: Number(item.quantity), name: item.name, unitPrice: Number(item.price) })))}
+<div class="warning-box"><strong>⚠️ Ne confirmez pas le paiement sans avoir vérifié sa réception.</strong><br>Le fait que le client ait ouvert ou utilisé le lien de paiement ne confirme pas que les fonds ont été reçus. Vérifiez directement le compte du prestataire <strong>${method}</strong> avant de valider la réception.</div>
+${cta(input.adminPaymentLink, 'Vérifier le paiement')}
+<p class="note">Tant que le paiement n’est pas confirmé, aucun stock n’est réservé et aucune commande définitive n’est créée.</p>`,
+    }),
+  };
+}
+
+export function eventExternalPaymentAwaitingVerificationEmail(context: TenantNotificationContext, input: {
+  event: { title: string; dateStart: string | null; location: string | null };
+  paymentReference: string; paymentMethodLabel: string; amount: number; quantityTotal: number;
+  customer: { fullName: string | null; email: string | null; phone: string | null };
+  items: Array<{ name: string; price: number; quantity: number }>; adminPaymentLink: string | null;
+  eventsUrl: string | null; testMode?: boolean;
+}): RenderedEmail {
+  const method = esc(input.paymentMethodLabel);
+  return {
+    subject: subject(input.testMode, `🎟️ Réservation à vérifier · ${input.event.title} · ${input.paymentReference} · ${formatMoney(context, input.amount)}`),
+    replyTo: input.customer.email,
+    html: page(context, {
+      testMode: input.testMode,
+      testLabel: '🧪 EMAIL DE TEST — aucun paiement réel',
+      title: '🎟️ Réservation à vérifier',
+      footerLink: { url: input.eventsUrl, label: 'Accéder aux événements' },
+      body: `<p>Une nouvelle demande de réservation a été créée pour <strong>${esc(input.event.title)}</strong>.</p>
+<p>Le client a choisi <strong>${method}</strong> pour effectuer son paiement.</p>
+<p>Vérifiez la réception du paiement avant de confirmer la réservation.</p>
+${infoBox([
+    ['Événement', input.event.title],
+    ['📅 Date', dateTime(context, input.event.dateStart, 'medium')],
+    ['📍 Lieu', input.event.location],
+    ['Référence', input.paymentReference],
+    ['💳 Moyen de paiement', input.paymentMethodLabel],
+    ['Montant à vérifier', formatMoney(context, input.amount)],
+    ['Places demandées', String(input.quantityTotal)],
+  ])}
+${customerBox(context, input.customer)}
+${itemsBox(context, 'Détail de la réservation', input.items.map(item => ({ quantity: Number(item.quantity), name: item.name, unitPrice: Number(item.price) })))}
+<div class="warning-box"><strong>⚠️ Ne confirmez pas la réservation sans avoir vérifié la réception du paiement.</strong><br><br>Le fait que le client ait ouvert ou utilisé le lien de paiement ne signifie pas que les fonds ont été reçus.<br><br>Vérifiez directement le compte du prestataire <strong>${method}</strong> avant de valider la réservation.</div>
+${cta(input.adminPaymentLink, 'Vérifier et confirmer la réservation')}
+<p class="note">Tant que le paiement n’est pas confirmé, aucune place n’est réservée et aucun billet n’est créé.</p>`,
+    }),
+  };
+}
+
+export function reviewInviteEmail(context: TenantNotificationContext, input: {
+  kind: 'initial' | 'reminder'; orderNumber: string; reviewUrl: string; expiresAt: string; testMode?: boolean;
+}): RenderedEmail {
+  const reminder = input.kind === 'reminder';
+  const tenant = `<strong>${esc(context.tenantName)}</strong>`;
+  const expires = new Date(input.expiresAt);
+  return {
+    subject: subject(input.testMode, reminder
+      ? `Un petit rappel : partagez votre expérience avec ${context.tenantName}`
+      : `Votre avis compte pour ${context.tenantName}`),
+    replyTo: context.emailBranding?.supportEmail,
+    html: page(context, {
+      testMode: input.testMode,
+      title: reminder ? 'Votre avis nous intéresse toujours' : 'Comment s’est passée votre expérience ?',
+      body: `<p>Bonjour,</p>
+<p>${reminder
+    ? `Vous avez récemment effectué une commande chez ${tenant}. Si vous avez quelques instants, vous pouvez encore partager votre expérience.`
+    : `Merci pour votre commande chez ${tenant}. Nous aimerions connaître votre expérience.`}</p>
+<p class="note">Votre avis est lié à une commande vérifiée et sera soumis à modération avant publication.</p>
+${cta(input.reviewUrl, 'Donner mon avis')}
+<p class="note">Commande vérifiée ${esc(input.orderNumber)}${Number.isNaN(expires.getTime()) ? '' : `<br>Ce lien personnel expire le ${esc(expires.toLocaleDateString('fr-FR', { timeZone: 'Europe/Rome' }))}.`}</p>`,
+    }),
+  };
+}
+
+export function cardQuickPaymentEmail(context: TenantNotificationContext, input: {
+  amount: number; currency: string; customerName: string | null; customerEmail: string | null; paidAt: string; paymentIntentId: string;
+}): RenderedEmail {
+  const amount = new Intl.NumberFormat(context.locale || 'fr-FR', { style: 'currency', currency: (input.currency || 'EUR').toUpperCase() })
+    .format(input.amount);
+  return {
+    subject: `Paiement carte reçu · ${amount} — ${context.tenantName}`,
+    replyTo: input.customerEmail,
+    html: page(context, {
+      title: '💳 Paiement carte reçu',
+      body: `<p>Un paiement par carte vient d’être reçu sur <strong>${esc(context.tenantName)}</strong>.</p>
+${infoBox([
+    ['Montant', amount],
+    ['Client', input.customerName || 'Non renseigné'],
+    ['Email', input.customerEmail || 'Non renseigné'],
+    ['Date', dateTime(context, input.paidAt, 'medium')],
+    ['Référence Stripe', input.paymentIntentId, { mono: true }],
+  ])}
+<p class="note">Notification automatique · Lepefy Food Platform</p>`,
+    }),
+  };
+}
+
+/** Sender identity of platform emails (admin invitation, tester invitation). */
+export const PLATFORM_EMAIL_CONTEXT = {
+  tenantId: '', tenantSlug: 'lepefy', tenantName: 'Lepefy Food Platform', storefrontUrl: '', locale: 'fr-FR', currency: 'EUR',
+  branding: { logoUrl: null, primaryColor: '#111827', secondaryColor: '#6b7280', accentColor: '#f3f4f6' },
+  emailBranding: { fromName: 'Lepefy Food Platform', fromEmail: 'noreply@lepefy.com', supportEmail: null, whatsappNumber: null },
+  business: { city: null, country: '', legalAddress: null },
+  pickup: { address: null, mapsUrl: null, hours: null },
+} satisfies TenantNotificationContext;
+
+/** Platform email (not tenant-branded): the sender and header are Lepefy. */
+export function adminInvitedEmail(input: {
+  tenantName: string; role: string; invitedByEmail: string; loginUrl: string;
+}): RenderedEmail {
+  return {
+    subject: `Accès administrateur activé — ${input.tenantName}`,
+    html: page(PLATFORM_EMAIL_CONTEXT, {
+      title: 'Accès administrateur activé',
+      footerLink: { url: null, label: '' },
+      body: `<p>Bonjour,</p>
+<p>Un accès administrateur vient de vous être attribué sur la plateforme <strong>${esc(input.tenantName)}</strong>, avec le rôle <strong>${esc(input.role)}</strong>.</p>
+<p>Ajouté par : ${esc(input.invitedByEmail)}</p>
+<p>Aucun mot de passe n’est nécessaire : connectez-vous avec cette adresse email, un code de vérification à 6 chiffres vous sera envoyé automatiquement.</p>
+${cta(input.loginUrl, 'Se connecter')}
+<p class="note">Si vous ne vous attendiez pas à recevoir cet email, vous pouvez l’ignorer en toute sécurité.</p>`,
     }),
   };
 }

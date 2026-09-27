@@ -1,13 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { notifyN8n } from '@/lib/events/notifyN8n';
+import { sendEventReservationConfirmation } from '@/lib/events/sendEventReservationConfirmation';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
 
-// Rejoue la notification n8n '/webhook/event-reservation-confirmed' pour une
-// réservation déjà existante (correction d'email, ou simple renvoi si le
-// message est parti en spam). Ne touche ni au qr_token, ni à la capacité,
-// ni à Stripe — relit l'état actuel et renvoie exactement le même payload
-// que createEventReservationFromRequest.ts, pour que le template email
-// Brevo/n8n existant l'interprète sans modification.
+// Renvoie la confirmation de réservation d'une réservation déjà existante
+// (correction d'email, ou simple renvoi si le message est parti en spam).
+// Ne touche ni au qr_token, ni à la capacité, ni à Stripe — relit l'état
+// actuel et produit le même email que createEventReservationFromRequest.ts
+// (sendEventReservationConfirmation, template in-app via send-email).
 
 export type ResendReservationConfirmationResult = { success: true } | { error: string };
 
@@ -55,29 +54,20 @@ export async function resendReservationConfirmation(
     eventLocation:  eventRow?.location ?? null,
   };
 
-  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-  await notifyN8n('/webhook/event-reservation-confirmed', {
-    reservationId:  reservation.id,
-    eventId:        reservation.event_id,
-    customerName:   reservation.customer_name,
-    customerEmail:  reservation.customer_email,
-    customerPhone:  reservation.customer_phone,
-    amountPaid:     reservation.amount_paid,
+  await sendEventReservationConfirmation({
+    tenantId: reservation.tenant_id,
+    // Each explicit resend is a new message (fresh key), still retried on failure.
+    idempotencyKey: `event-reservation-resend:${reservation.id}:${crypto.randomUUID()}`,
+    customerName: reservation.customer_name,
+    customerEmail: reservation.customer_email,
+    amountPaid: reservation.amount_paid,
     ...eventDetails,
     items: typedItems.map((i) => ({
-      reservation_id:  i.reservation_id,
-      ticket_type_id:  i.ticket_type_id,
-      quantity:        i.quantity,
-      unit_price:      i.unit_price,
-      ticketTypeLabel: labelByTicketType.get(i.ticket_type_id) ?? null,
+      quantity: i.quantity,
+      label: labelByTicketType.get(i.ticket_type_id) ?? null,
+      unitPrice: i.unit_price,
     })),
-    ticketUrl:  getTicketUrl(reservation.qr_token),
-    adminLink:  `${storefrontUrl}/admin/evenementiel/evenements`,
-  }, {
-    // Each explicit resend is a new message (fresh key), still retried on failure.
-    tenantId: reservation.tenant_id,
-    idempotencyKey: `event-reservation-resend:${reservation.id}:${crypto.randomUUID()}`,
-    notificationType: 'event_reservation_confirmed',
+    ticketUrl: getTicketUrl(reservation.qr_token),
   });
 
   console.info('[resendReservationConfirmation] Notification resent — reservation:', reservationId);

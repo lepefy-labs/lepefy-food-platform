@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import { generateEventQrToken } from '@/lib/events/qrToken';
-import { notifyN8n } from '@/lib/events/notifyN8n';
+import { sendEventReservationConfirmation } from '@/lib/events/sendEventReservationConfirmation';
 import { getTicketUrl } from '@/lib/events/ticketUrl';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventReservationPaymentMethod, EventReservationSource } from '@lepefy/types';
@@ -184,24 +184,20 @@ export async function createEventReservationFromRequest(
 
   console.info('[createEventReservationFromRequest] Reservation created — id:', reservationId, '— event:', eventId, '— qty:', totalQuantity, '— source:', source);
 
-  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-  await notifyN8n('/webhook/event-reservation-confirmed', {
-    reservationId,
-    eventId,
+  await sendEventReservationConfirmation({
+    tenantId,
+    idempotencyKey: `event-reservation-confirmed:${reservationId}`,
     customerName,
     customerEmail,
-    customerPhone,
     amountPaid,
-    source,
-    paymentMethod,
     ...eventDetails,
     items: itemsPayload.map((item) => ({
-      ...item,
-      ticketTypeLabel: labelByTicketType.get(item.ticket_type_id) ?? null,
+      quantity: item.quantity,
+      label: labelByTicketType.get(item.ticket_type_id) ?? null,
+      unitPrice: item.unit_price,
     })),
     ticketUrl: getTicketUrl(qrToken),
-    adminLink: `${storefrontUrl}/admin/evenementiel/evenements`,
-  }, { tenantId, idempotencyKey: `event-reservation-confirmed:${reservationId}`, notificationType: 'event_reservation_confirmed' });
+  });
 
   return { reservationId };
 }

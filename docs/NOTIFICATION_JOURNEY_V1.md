@@ -57,7 +57,11 @@ Marketing emails have **no automatic unsubscribe link yet** (decision of 27 Sept
 
 Batch A (27 Sept 2026): `order-confirmed`, `order-shipped`, `order-ready-for-pickup`, `order-completed`, `order-cancelled` and `payment-reminder` are rendered by `lib/notifications/customerEmails.ts` (same copy and structure as the former n8n templates, escaped values, `[TEST]` banner/subject in test mode) and delivered through `send-email` with the ledger, so every one of them is deduplicated on its key. `notificationType`: `order_confirmed`, `order_shipped`, `order_ready_for_pickup`, `order_completed`, `order_cancelled`, `payment_reminder`. The platform test console renders these events with the same builders and sends them through `send-email` (`console_test_*`, key `console-test:<uuid>`).
 
-The six former n8n workflows ("Notifica conferma ordine cliente", "spedizione cliente", "ordine pronto per il ritiro", "ordine completato", "ordine annullato", "attesa pagamento") are no longer called by the application. They stay active only as a rollback path until the in-app emails are validated in production, then they are deactivated. Remaining per-template workflows (batch B): event reservation confirmed, external payment alerts (shop and events), card quick payment, admin invitation, review invite, tester invite, event booking closed reports.
+The six former n8n workflows ("Notifica conferma ordine cliente", "spedizione cliente", "ordine pronto per il ritiro", "ordine completato", "ordine annullato", "attesa pagamento") were validated with console test emails and deactivated on 27 Sept 2026.
+
+Batch B (27 Sept 2026): `event_reservation_confirmed` (create and resend, `lib/events/sendEventReservationConfirmation.ts`, with ledger), `external_payment_awaiting_verification` and `event_external_payment_awaiting_verification` (their session/request claim stays the dedup mechanism: no ledger), `card_quick_payment` (ledger, key `card-quick-payment:<intent>`), `review_invite` (`review_invites` keeps its processing state: no ledger), `tester_feedback_invite` and `admin_invited` (platform emails sent as "Lepefy Food Platform" via `PLATFORM_EMAIL_CONTEXT`, no ledger). Templates live in `customerEmails.ts` with the same structure; the console renders them too. Their former n8n workflows stay active as a rollback path until validated.
+
+Still on a dedicated n8n workflow: "Event booking closed reports" (three file attachments; `send-email` does not carry attachments yet).
 
 ## Delivery ledger and retries (migration `136`)
 

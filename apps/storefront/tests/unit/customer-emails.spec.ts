@@ -7,6 +7,12 @@ import {
   orderReadyForPickupEmail,
   orderShippedEmail,
   paymentReminderEmail,
+  eventReservationConfirmedEmail,
+  externalPaymentAwaitingVerificationEmail,
+  eventExternalPaymentAwaitingVerificationEmail,
+  reviewInviteEmail,
+  cardQuickPaymentEmail,
+  adminInvitedEmail,
 } from '../../src/lib/notifications/customerEmails';
 
 const context = {
@@ -83,4 +89,57 @@ test('unsafe links are dropped', () => {
   const email = orderCancelledEmail(context, { ...order, orderTrackingLink: 'javascript:alert(1)' });
   expect(email.html).not.toContain('javascript:');
   expect(email.html).not.toContain('class="cta"');
+});
+
+test('event reservation confirmation lists tickets and links the ticket and events site', () => {
+  const email = eventReservationConfirmedEmail(context, {
+    customerName: 'Awa', eventTitle: 'Soirée <jazz>', eventDateStart: '2026-10-10T19:00:00Z', eventLocation: 'Milano',
+    amountPaid: 40, items: [{ quantity: 2, label: 'Formule', unitPrice: 20 }], ticketUrl: 'https://events.example/t/abc',
+    eventsUrl: 'https://events.example',
+  });
+  expect(email.subject).toBe('✅ Votre réservation pour Soirée <jazz> est confirmée !');
+  expect(email.html).toContain('Soirée &lt;jazz&gt;');
+  expect(email.html).toContain('2 × Formule');
+  expect(email.html).toContain('Voir mon billet et QR code');
+  expect(email.html).toContain('Accéder aux événements');
+});
+
+test('external payment alerts warn against confirming unverified payments and reply to the customer', () => {
+  const shop = externalPaymentAwaitingVerificationEmail(context, {
+    paymentReference: '#S1', paymentMethodLabel: 'PayPal', amount: 50, fulfillmentType: 'pickup',
+    customer: { fullName: 'Awa', email: 'awa@example.com', phone: '+39 333 1' }, items: [{ name: 'Riz', price: 25, quantity: 2 }],
+    adminPaymentLink: 'https://shop.example/admin/paiements-en-attente/1',
+  });
+  expect(shop.html).toContain('Ne confirmez pas le paiement');
+  expect(shop.html).toContain('tel:+393331');
+  expect(shop.html).toContain('Click &amp; Collect');
+  expect(shop.replyTo).toBe('awa@example.com');
+  const event = eventExternalPaymentAwaitingVerificationEmail(context, {
+    event: { title: 'Gala', dateStart: '2026-10-10T19:00:00Z', location: null }, paymentReference: '#R1', paymentMethodLabel: 'Wero',
+    amount: 30, quantityTotal: 3, customer: { fullName: null, email: 'b@example.com', phone: null }, items: [],
+    adminPaymentLink: null, eventsUrl: null,
+  });
+  expect(event.subject).toContain('Réservation à vérifier · Gala · #R1');
+  expect(event.html).toContain('aucune place n’est réservée');
+});
+
+test('review invite wording differs for reminders', () => {
+  const base = { orderNumber: '#O1', reviewUrl: 'https://shop.example/avis/donner?token=x', expiresAt: '2026-10-27T00:00:00Z' };
+  expect(reviewInviteEmail(context, { ...base, kind: 'initial' }).subject).toBe('Votre avis compte pour Chloé Food');
+  const reminder = reviewInviteEmail(context, { ...base, kind: 'reminder' });
+  expect(reminder.subject).toContain('Un petit rappel');
+  expect(reminder.html).toContain('Donner mon avis');
+});
+
+test('card quick payment and admin invitation', () => {
+  const card = cardQuickPaymentEmail(context, {
+    amount: 12.5, currency: 'eur', customerName: null, customerEmail: null, paidAt: '2026-09-27T10:00:00Z', paymentIntentId: 'pi_123',
+  });
+  expect(card.subject).toContain('Paiement carte reçu');
+  expect(card.html).toContain('Non renseigné');
+  expect(card.html).toContain('pi_123');
+  const invite = adminInvitedEmail({ tenantName: 'Chloé Food', role: 'tenant_admin', invitedByEmail: 'owner@lepefy.com', loginUrl: 'https://shop.example/admin/login' });
+  expect(invite.subject).toBe('Accès administrateur activé — Chloé Food');
+  expect(invite.html).toContain('Lepefy Food Platform');
+  expect(invite.html).toContain('Se connecter');
 });

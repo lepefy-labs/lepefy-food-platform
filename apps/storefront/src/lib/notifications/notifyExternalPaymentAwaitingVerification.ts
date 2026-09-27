@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { externalPaymentAwaitingVerificationEmail } from '@/lib/notifications/customerEmails';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 
@@ -115,29 +117,21 @@ export async function notifyExternalPaymentAwaitingVerification({
       ? `${tenantContext.storefrontUrl.replace(/\/$/, '')}/admin/paiements-en-attente/${session.id}`
       : null;
 
-    const delivered = await notifyN8n('/webhook/external-payment-awaiting-verification', {
-      ...tenantContext,
+    // The session claim above already guarantees one alert per session.
+    const delivered = await deliverEmail(tenantContext, {
+      ...externalPaymentAwaitingVerificationEmail(tenantContext, {
+        paymentReference: `#${session.id.slice(0, 8).toUpperCase()}`,
+        paymentMethodLabel: session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
+        amount,
+        fulfillmentType: session.fulfillment_type,
+        customer: { fullName: session.full_name ?? '', email: session.email, phone: session.phone },
+        items: session.items ?? [],
+        adminPaymentLink,
+      }),
       notificationType: 'external_payment_awaiting_verification',
+      idempotencyKey: `external-payment:${session.id}:${claimedAt}`,
       recipients,
-      checkoutSessionId: session.id,
-      paymentReference: `#${session.id.slice(0, 8).toUpperCase()}`,
-      customer: {
-        fullName: session.full_name ?? '',
-        email: session.email,
-        phone: session.phone,
-      },
-      paymentMethod: {
-        type: session.external_payment_type,
-        label: session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
-      },
-      amount,
-      fulfillmentType: session.fulfillment_type,
-      items: session.items ?? [],
-      shippingAddress: session.shipping_address,
-      adminPaymentLink,
-      createdAt: session.created_at,
-      notificationSentAt: claimedAt,
-    });
+    }, notifyN8n, false);
 
     if (!delivered) {
       await releaseClaim(supabase, tenantId, checkoutSessionId, claimedAt);

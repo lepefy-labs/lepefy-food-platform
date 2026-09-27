@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEventsBaseUrl } from '@/lib/events/ticketUrl';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { eventExternalPaymentAwaitingVerificationEmail } from '@/lib/notifications/customerEmails';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 
@@ -46,24 +48,22 @@ export async function notifyEventExternalPaymentAwaitingVerification({
       ? `${tenantContext.storefrontUrl.replace(/\/$/, '')}/admin/evenementiel/paiements-en-attente/${requestId}`
       : null;
 
-    return await notifyN8n('/webhook/event-external-payment-awaiting-verification', {
-      ...tenantContext,
-      eventsUrl,
+    return await deliverEmail({ ...tenantContext, currency: currency.toUpperCase() }, {
+      ...eventExternalPaymentAwaitingVerificationEmail({ ...tenantContext, currency: currency.toUpperCase() }, {
+        event,
+        paymentReference: `#${requestId.slice(0, 8).toUpperCase()}`,
+        paymentMethodLabel: paymentMethod.label,
+        amount,
+        quantityTotal: items.reduce((sum, item) => sum + Number(item.quantity), 0),
+        customer,
+        items,
+        adminPaymentLink,
+        eventsUrl,
+      }),
       notificationType: 'event_external_payment_awaiting_verification',
+      idempotencyKey: `event-external-payment:${requestId}`,
       recipients,
-      requestId,
-      paymentReference: `#${requestId.slice(0, 8).toUpperCase()}`,
-      event,
-      customer,
-      paymentMethod,
-      amount,
-      currency: currency.toUpperCase(),
-      quantityTotal: items.reduce((sum, item) => sum + Number(item.quantity), 0),
-      items,
-      adminPaymentLink,
-      createdAt,
-      notificationSentAt: new Date().toISOString(),
-    });
+    }, notifyN8n, false);
   } catch (error) {
     console.warn('[event external payment tenant notification] unexpected failure:', error, '— request:', requestId);
     return false;

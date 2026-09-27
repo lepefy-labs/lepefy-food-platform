@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
 import { notifyN8n } from '@/lib/events/notifyN8n';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { reviewInviteEmail } from '@/lib/notifications/customerEmails';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { createReviewToken, hashReviewToken } from '@/lib/reviews/reviewInvites';
 import { reviewDispatchAuthorized } from '@/lib/reviews/reviewDispatchAuth';
@@ -81,17 +83,17 @@ export async function POST(req: NextRequest) {
   }
 
   const reviewUrl = `${tenant.storefrontUrl.replace(/\/$/, '')}/avis/donner?token=${encodeURIComponent(rawToken)}`;
-  const accepted = await notifyN8n('/webhook/review-invite', {
-    ...tenant,
-    kind: claim.delivery_kind,
-    orderId: invite.order_id,
-    orderNumber: `#${String(invite.order_id).slice(0, 8).toUpperCase()}`,
-    email: invite.email,
-    fullName: invite.full_name ?? '',
-    reviewUrl,
-    expiresAt: invite.expires_at,
-    verifiedPurchase: true,
-  });
+  const accepted = await deliverEmail(tenant, {
+    ...reviewInviteEmail(tenant, {
+      kind: claim.delivery_kind === 'reminder' ? 'reminder' : 'initial',
+      orderNumber: `#${String(invite.order_id).slice(0, 8).toUpperCase()}`,
+      reviewUrl,
+      expiresAt: invite.expires_at,
+    }),
+    notificationType: 'review_invite',
+    idempotencyKey: `review-invite:${invite.id}:${claim.delivery_kind}:${tokenRow.id}`,
+    recipients: [invite.email],
+  }, notifyN8n, false);
 
   if (!accepted) {
     await db.from('review_invite_tokens').delete().eq('id', tokenRow.id).eq('tenant_id', invite.tenant_id);

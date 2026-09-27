@@ -8,8 +8,9 @@ import { n8nWebhookHeaders, n8nWebhookUrl } from '@/lib/events/notifyN8n';
 import { buildOrderStockConflictNotification } from '@/lib/notifications/orderStockConflictEmail';
 import { emailRequest, SEND_EMAIL_WEBHOOK, type RenderedEmail } from '@/lib/notifications/sendEmail';
 import {
+  eventExternalPaymentAwaitingVerificationEmail, eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail,
   orderCancelledEmail, orderCompletedEmail, orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail,
-  paymentReminderEmail, type ShippingAddressLike,
+  paymentReminderEmail, PLATFORM_EMAIL_CONTEXT, reviewInviteEmail, type ShippingAddressLike,
 } from '@/lib/notifications/customerEmails';
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import {
@@ -107,6 +108,56 @@ function renderInAppTestEmail(
         amount: Number(p.amount ?? 0), providerHandoffStarted: p.providerHandoffStarted === true,
         resumeLink: String(p.resumeLink ?? ''), testMode: true,
       });
+    case 'external-payment-awaiting-verification': {
+      const customer = (p.customer ?? {}) as { fullName?: string; email?: string; phone?: string };
+      return externalPaymentAwaitingVerificationEmail(context, {
+        paymentReference: String(p.paymentReference ?? ''),
+        paymentMethodLabel: (p.paymentMethod as { label?: string } | undefined)?.label ?? 'Paiement externe',
+        amount: Number(p.amount ?? 0), fulfillmentType: (p.fulfillmentType as string | undefined) ?? null,
+        customer: { fullName: customer.fullName ?? null, email: customer.email ?? null, phone: customer.phone ?? null },
+        items: (p.items as Array<{ name: string; price: number; quantity: number }> | undefined) ?? [],
+        adminPaymentLink: (p.adminPaymentLink as string | null | undefined) ?? null, testMode: true,
+      });
+    }
+    case 'event-external-payment-awaiting-verification': {
+      const customer = (p.customer ?? {}) as { fullName?: string; email?: string; phone?: string };
+      const event = (p.event ?? {}) as { title?: string; dateStart?: string; location?: string | null };
+      return eventExternalPaymentAwaitingVerificationEmail(context, {
+        event: { title: event.title ?? 'Événement test', dateStart: event.dateStart ?? null, location: event.location ?? null },
+        paymentReference: String(p.paymentReference ?? ''),
+        paymentMethodLabel: (p.paymentMethod as { label?: string } | undefined)?.label ?? 'Paiement externe',
+        amount: Number(p.amount ?? 0), quantityTotal: Number(p.quantityTotal ?? 0),
+        customer: { fullName: customer.fullName ?? null, email: customer.email ?? null, phone: customer.phone ?? null },
+        items: (p.items as Array<{ name: string; price: number; quantity: number }> | undefined) ?? [],
+        adminPaymentLink: (p.adminPaymentLink as string | null | undefined) ?? null,
+        eventsUrl: (p.eventsUrl as string | undefined) ?? null, testMode: true,
+      });
+    }
+    case 'event-reservation-confirmed':
+      return eventReservationConfirmedEmail(context, {
+        customerName: (p.customerName as string | undefined) ?? null,
+        eventTitle: (p.eventTitle as string | undefined) ?? null,
+        eventDateStart: (p.eventDateStart as string | undefined) ?? null,
+        eventLocation: (p.eventLocation as string | undefined) ?? null,
+        amountPaid: Number(p.amountPaid ?? 0),
+        items: ((p.items as Array<{ quantity: number; unit_price: number; ticketTypeLabel?: string | null }> | undefined) ?? [])
+          .map(item => ({ quantity: item.quantity, label: item.ticketTypeLabel ?? null, unitPrice: item.unit_price })),
+        ticketUrl: (p.ticketUrl as string | undefined) ?? null,
+        eventsUrl: getEventsBaseUrl(),
+        testMode: true,
+      });
+    case 'review-invite':
+      return reviewInviteEmail(context, {
+        kind: p.kind === 'reminder' ? 'reminder' : 'initial',
+        orderNumber: String(p.orderNumber ?? ''),
+        reviewUrl: String(p.reviewUrl ?? ''),
+        expiresAt: String(p.expiresAt ?? ''),
+        testMode: true,
+      });
+    case 'tester-feedback-invite': {
+      const email = (p.email ?? {}) as { subject?: string; html?: string };
+      return email.subject && email.html ? { subject: `[TEST] ${email.subject}`, html: email.html } : null;
+    }
     default:
       return null;
   }
@@ -432,7 +483,8 @@ export async function POST(req: NextRequest) {
   const rendered = renderInAppTestEmail(body.event, tenantContext, payload);
   if (rendered) {
     webhookPath = SEND_EMAIL_WEBHOOK;
-    payload = emailRequest(tenantContext, {
+    const sender = body.event === 'tester-feedback-invite' ? { ...PLATFORM_EMAIL_CONTEXT, tenantId: tenantContext.tenantId } : tenantContext;
+    payload = emailRequest(sender, {
       ...rendered,
       notificationType: `console_test_${body.event.replace(/-/g, '_')}`,
       idempotencyKey: `console-test:${testId}`,

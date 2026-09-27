@@ -8,8 +8,8 @@ import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
-import { emailRequest } from '@/lib/notifications/sendEmail';
-import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
+import { emailRequest, sendTenantEmail } from '@/lib/notifications/sendEmail';
+import { cardQuickPaymentEmail, orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
@@ -615,29 +615,26 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     return NextResponse.json({ received: true });
   }
 
-  const { data: tenantRow } = await supabase
-    .from('tenants')
-    .select('name')
-    .eq('id', payment.tenant_id)
-    .maybeSingle();
-
   const recipients = await getNotificationRecipients(supabase, payment.tenant_id, 'notify_card_payment');
 
   if (recipients.length === 0) {
     console.warn('[webhook] Nessun destinatario notify_card_payment configurato per tenant:', payment.tenant_id, '— email non verrà inviata');
   }
 
-  await notifyN8n('/webhook/card-quick-payment', {
-    tenant_id:                payment.tenant_id,
-    tenant_name:               tenantRow?.name ?? null,
-    amount:                    payment.amount,
-    currency:                  payment.currency,
-    customer_name:             payment.customer_name,
-    customer_email:            payment.customer_email,
-    paid_at:                   paidAt,
-    stripe_payment_intent_id:  intent.id,
+  await sendTenantEmail({
+    tenantId:         payment.tenant_id,
+    notificationType: 'card_quick_payment',
+    idempotencyKey:   `card-quick-payment:${intent.id}`,
     recipients,
-  }, { tenantId: payment.tenant_id, idempotencyKey: `card-quick-payment:${intent.id}`, notificationType: 'card_quick_payment' });
+    render: (context) => cardQuickPaymentEmail(context, {
+      amount:          payment.amount,
+      currency:        payment.currency,
+      customerName:    payment.customer_name,
+      customerEmail:   payment.customer_email,
+      paidAt,
+      paymentIntentId: intent.id,
+    }),
+  });
 
   return NextResponse.json({ received: true });
 }
