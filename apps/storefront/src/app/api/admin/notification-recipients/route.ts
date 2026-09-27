@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     email?: unknown; label?: unknown; notify_card_payment?: unknown;
     notify_external_payment_pending?: unknown; notify_order_stock_conflict?: unknown;
     notify_event_booking_closed_reports?: unknown; notify_daily_digest?: unknown;
+    notify_service_inquiries?: unknown; notify_rental_reservations?: unknown;
   };
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   if (!isValidEmail(email)) return NextResponse.json({ error: 'Email invalide.' }, { status: 400 });
@@ -43,6 +44,10 @@ export async function POST(req: NextRequest) {
     notify_order_stock_conflict: typeof body.notify_order_stock_conflict === 'boolean' ? body.notify_order_stock_conflict : false,
     notify_event_booking_closed_reports: typeof body.notify_event_booking_closed_reports === 'boolean' ? body.notify_event_booking_closed_reports : true,
     notify_daily_digest: typeof body.notify_daily_digest === 'boolean' ? body.notify_daily_digest : false,
+    // Migration 135 columns: written only when opted in, so adding a recipient
+    // keeps working on a database where 135 is not applied yet.
+    ...(body.notify_service_inquiries === true ? { notify_service_inquiries: true } : {}),
+    ...(body.notify_rental_reservations === true ? { notify_rental_reservations: true } : {}),
   }).select('*').single();
 
   if (error) {

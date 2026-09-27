@@ -8,6 +8,8 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventReservationPaymentMethod, EventReservationSource } from '@lepefy/types';
 import { resolveOrCreateCustomer } from '@/lib/customers/resolveOrCreateCustomer';
 import { recordCustomerEvents } from '@/lib/customers/recordCustomerEvents';
+import { sendTenantEmail } from '@/lib/notifications/sendEmail';
+import { eventCapacityConflictEmail } from '@/lib/notifications/operationalEmails';
 
 export interface CreateEventReservationInput {
   eventId: string;
@@ -109,16 +111,19 @@ export async function createEventReservationFromRequest(
       }
     }
 
-    await notifyN8n('/webhook/event-reservation-capacity-conflict', {
-      eventId,
-      intentId: input.stripePaymentIntentId ?? null,
-      customerName,
-      customerEmail,
-      refundSucceeded: isStripe ? refundSucceeded : null,
-      manualRefundRequired: !isStripe,
-      source,
-      paymentMethod,
-      ...eventDetails,
+    await sendTenantEmail({
+      tenantId,
+      notificationType: 'event_capacity_conflict',
+      idempotencyKey: `event-capacity-conflict:${input.stripePaymentIntentId ?? crypto.randomUUID()}`,
+      recipientFlag: 'notify_order_stock_conflict',
+      render: (context) => eventCapacityConflictEmail(context, {
+        eventTitle: eventDetails.eventTitle,
+        eventDateStart: eventDetails.eventDateStart,
+        customerName,
+        customerEmail,
+        refundSucceeded: isStripe ? refundSucceeded : null,
+        manualRefundRequired: !isStripe,
+      }),
     });
 
     return { error: 'stock_conflict' };

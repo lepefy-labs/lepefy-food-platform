@@ -5,7 +5,9 @@ export type NotificationFlag =
   | 'notify_external_payment_pending'
   | 'notify_order_stock_conflict'
   | 'notify_event_booking_closed_reports'
-  | 'notify_daily_digest';
+  | 'notify_daily_digest'
+  | 'notify_service_inquiries'
+  | 'notify_rental_reservations';
 
 // Best-effort : une erreur ici ne doit jamais bloquer le flux appelant.
 export async function getNotificationRecipients(

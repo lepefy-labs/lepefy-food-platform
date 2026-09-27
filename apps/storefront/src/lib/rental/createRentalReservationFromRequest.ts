@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { RentalCheckoutItemInput } from '@lepefy/types';
+import { sendTenantEmail } from '@/lib/notifications/sendEmail';
+import {
+  rentalDeliveryQuotePendingEmail, rentalReservationAdminEmail, rentalReservationCustomerEmail, rentalStockConflictEmail,
+} from '@/lib/notifications/operationalEmails';
 
 const stripe = getStripeClient('rental');
 
@@ -52,12 +55,15 @@ export async function createRentalReservationFromRequest(
 
   const { data: rentalItems } = await supabase
     .from('rental_items')
-    .select('id, price_per_unit')
+    .select('id, price_per_unit, name')
     .in('id', items.map((i) => i.rental_item_id));
 
-  const priceByItem = new Map<string, number>(
-    ((rentalItems ?? []) as { id: string; price_per_unit: number }[]).map((r) => [r.id, r.price_per_unit]),
-  );
+  const typedRentalItems = (rentalItems ?? []) as { id: string; price_per_unit: number; name: string | null }[];
+  const priceByItem = new Map<string, number>(typedRentalItems.map((r) => [r.id, r.price_per_unit]));
+  const nameByItem = new Map<string, string>(typedRentalItems.map((r) => [r.id, r.name ?? 'Article']));
+  const { data: offeringRow } = await supabase
+    .from('service_offerings').select('title').eq('id', serviceOfferingId).maybeSingle();
+  const serviceTitle = (offeringRow as { title: string } | null)?.title ?? null;
 
   // Décrément atomique de chaque article, un par un — rollback (restore) de
   // ce qui a déjà été décrémenté si un article échoue en cours de boucle.
@@ -100,10 +106,16 @@ export async function createRentalReservationFromRequest(
       }
     }
 
-    await notifyN8n('/webhook/rental-reservation-stock-conflict', {
-      serviceOfferingId, intentId: input.stripePaymentIntentId ?? null, customerName, customerEmail,
-      refundSucceeded: isStripe ? refundSucceeded : null,
-      manualRefundRequired: !isStripe,
+    await sendTenantEmail({
+      tenantId,
+      notificationType: 'rental_stock_conflict',
+      idempotencyKey: `rental-stock-conflict:${input.stripePaymentIntentId ?? crypto.randomUUID()}`,
+      recipientFlag: 'notify_order_stock_conflict',
+      render: (context) => rentalStockConflictEmail(context, {
+        serviceTitle, customerName, customerEmail,
+        refundSucceeded: isStripe ? refundSucceeded : null,
+        manualRefundRequired: !isStripe,
+      }),
     });
 
     return { error: 'stock_conflict' };
@@ -164,24 +176,40 @@ export async function createRentalReservationFromRequest(
 
   console.info('[createRentalReservationFromRequest] Reservation created — id:', reservation.id, '— service:', serviceOfferingId);
 
-  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-  const adminLink = `${storefrontUrl}/admin/evenementiel/reservations-materiel`;
-
-  await notifyN8n('/webhook/rental-reservation-confirmed', {
-    reservationId: reservation.id, serviceOfferingId, customerName, customerEmail, customerPhone,
-    pickupDate, amountPaid, items: itemsPayload,
+  const rentalEmailInput = {
+    reservationId: reservation.id, serviceTitle, customerName, customerEmail,
+    customerPhone: customerPhone || null, pickupDate, amountPaid,
+    items: itemsPayload.map((item) => ({ name: nameByItem.get(item.rental_item_id) ?? 'Article', quantity: item.quantity })),
     fulfillmentType: input.fulfillmentType, deliveryFeeStatus,
-    adminLink,
+  };
+  await sendTenantEmail({
+    tenantId,
+    notificationType: 'rental_reservation_confirmed_customer',
+    idempotencyKey: `rental-reservation:${reservation.id}:customer`,
+    recipients: [customerEmail],
+    render: (context) => rentalReservationCustomerEmail(context, rentalEmailInput),
+  });
+  await sendTenantEmail({
+    tenantId,
+    notificationType: 'rental_reservation_confirmed_admin',
+    idempotencyKey: `rental-reservation:${reservation.id}:admin`,
+    recipientFlag: 'notify_rental_reservations',
+    render: (context) => rentalReservationAdminEmail(context, rentalEmailInput),
   });
 
   if (deliveryFeeStatus === 'pending_quote') {
-    await notifyN8n('/webhook/rental-delivery-quote-pending', {
-      reservationId: reservation.id, serviceOfferingId, customerName, customerEmail, customerPhone,
-      deliveryAddress: {
-        street: input.deliveryStreet, houseNumber: input.deliveryHouseNumber,
-        city: input.deliveryCity, postalCode: input.deliveryPostalCode, country: input.deliveryCountry,
-      },
-      adminLink,
+    await sendTenantEmail({
+      tenantId,
+      notificationType: 'rental_delivery_quote_pending',
+      idempotencyKey: `rental-delivery-quote:${reservation.id}`,
+      recipientFlag: 'notify_rental_reservations',
+      render: (context) => rentalDeliveryQuotePendingEmail(context, {
+        reservationId: reservation.id, customerName, customerEmail, customerPhone: customerPhone || null,
+        address: {
+          street: input.deliveryStreet, houseNumber: input.deliveryHouseNumber,
+          city: input.deliveryCity, postalCode: input.deliveryPostalCode, country: input.deliveryCountry,
+        },
+      }),
     });
   }
 

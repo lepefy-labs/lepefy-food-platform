@@ -8,6 +8,8 @@ export interface TenantNotificationRecipient {
   notify_order_stock_conflict: boolean;
   notify_event_booking_closed_reports?: boolean;
   notify_daily_digest?: boolean;
+  notify_service_inquiries?: boolean;
+  notify_rental_reservations?: boolean;
   active: boolean;
   created_at: string;
 }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { notifyN8n } from '@/lib/events/notifyN8n';
+import { sendTenantEmail } from '@/lib/notifications/sendEmail';
+import { serviceInquiryEmail } from '@/lib/notifications/operationalEmails';
 
 interface InquiryBody {
   customer_name:   string;
@@ -64,17 +65,20 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     console.info('[services/inquiry] inquiry created — id:', inquiry.id, '— service:', offering.id);
 
-    const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-    await notifyN8n('/webhook/service-inquiry-created', {
-      inquiryId:      inquiry.id,
-      serviceTitle:   offering.title,
-      customerName:   customer_name.trim(),
-      customerEmail:  customer_email.trim(),
-      customerPhone:  customer_phone?.trim() || null,
-      dateSouhaitee:  date_souhaitee || null,
-      nombreInvites:  nombre_invites ?? null,
-      message:        message?.trim() || null,
-      adminLink:      `${storefrontUrl}/admin/evenementiel/devis`,
+    await sendTenantEmail({
+      tenantId: tenant.id,
+      notificationType: 'service_inquiry_created',
+      idempotencyKey: `service-inquiry:${inquiry.id}`,
+      recipientFlag: 'notify_service_inquiries',
+      render: (context) => serviceInquiryEmail(context, {
+        serviceTitle:  offering.title,
+        customerName:  customer_name.trim(),
+        customerEmail: customer_email.trim(),
+        customerPhone: customer_phone?.trim() || null,
+        dateSouhaitee: date_souhaitee || null,
+        nombreInvites: nombre_invites ?? null,
+        message:       message?.trim() || null,
+      }),
     });
 
     return NextResponse.json({ success: true, inquiryId: inquiry.id });

@@ -3,9 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getCustomers, applyCustomSegment } from '@/lib/admin/crm';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import type { CrmCustomerListItem, SegmentDefinition } from '@lepefy/types';
-import { n8nWebhookHeaders, n8nWebhookUrl } from '@/lib/events/notifyN8n';
-
-const MARKETING_WEBHOOK = '/webhook/marketing-campaign-recipient';
+import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { marketingCampaignEmail } from '@/lib/notifications/operationalEmails';
 
 export function isEligibleMarketingRecipient(customer: Pick<CrmCustomerListItem, 'marketing_consent' | 'email'>): boolean {
   return customer.marketing_consent === true && !!customer.email?.trim();
@@ -79,28 +79,26 @@ export async function dispatchMarketingCampaign(tenantId: string, campaignId: st
   let sent = 0;
   let failed = 0;
   const suppressDelivery = isE2ERequest() || process.env.NODE_ENV === 'test';
-  const endpoint = n8nWebhookUrl(MARKETING_WEBHOOK);
-  const authHeaders = n8nWebhookHeaders(MARKETING_WEBHOOK) ?? {};
+  const context = suppressDelivery ? null : await getTenantNotificationContext(tenantId);
+  const email = context
+    ? marketingCampaignEmail(context, { subject: campaign.subject, content: campaign.content, campaignName: campaign.name })
+    : null;
   for (const recipient of recipients ?? []) {
     let ok = false;
     let failure: string | null = null;
     try {
       if (suppressDelivery) {
         failure = 'delivery_suppressed_in_test';
-      } else if (!endpoint) {
+      } else if (!process.env.N8N_WEBHOOK_URL || !context || !email) {
         failure = 'provider_not_configured';
       } else {
-        const response = await fetch(endpoint, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': recipient.idempotency_key, ...authHeaders },
-          body: JSON.stringify({
-            tenant: { id: tenantId },
-            campaign: { id: campaign.id, name: campaign.name, channel: campaign.channel, subject: campaign.subject, content: campaign.content },
-            recipient: { id: recipient.id, target: recipient.channel_target, idempotencyKey: recipient.idempotency_key },
-            customer: { id: recipient.customer_id },
-          }),
+        ok = await deliverEmail(context, {
+          ...email,
+          notificationType: 'marketing_campaign',
+          idempotencyKey: `marketing-campaign:${recipient.idempotency_key}`,
+          recipients: [recipient.channel_target],
         });
-        ok = response.ok;
-        if (!ok) failure = `provider_http_${response.status}`;
+        if (!ok) failure = 'provider_rejected';
       }
     } catch (deliveryError) {
       failure = deliveryError instanceof Error ? deliveryError.message.slice(0, 500) : 'provider_error';

@@ -35,6 +35,24 @@ Internal tenant notifications use `tenant_notification_recipients`; recipient ad
 
 Transport: every outbound call goes through `notifyN8n` / `n8nWebhookUrl` / `n8nWebhookHeaders` (`lib/events/notifyN8n.ts`), never a hand-built `fetch`. Each request carries `X-Lepefy-Webhook-Secret`: the daily digest uses its dedicated `N8N_DAILY_DIGEST_WEBHOOK_SECRET` (fails closed), every other notification uses `N8N_NOTIFICATION_WEBHOOK_SECRET`. While the shared secret is not configured the header is omitted and a warning is logged (rollout only). Each n8n webhook must attach the matching Header Auth credential, and should answer only after the SMTP result (`responseMode: lastNode` or a Respond node), otherwise the application's `accepted`/`sent` booleans do not reflect delivery.
 
+## Generic email channel (`/webhook/send-email`)
+
+New notifications are rendered by the application and delivered through one n8n workflow, "Lepefy · Send email" (`ops/n8n/send-email.json`), instead of one n8n workflow per template. The application uses `sendTenantEmail` / `deliverEmail` (`lib/notifications/sendEmail.ts`) with templates in `lib/notifications/operationalEmails.ts` (escaped HTML, tenant branding). Payload: `notificationType`, `tenantId`, `idempotencyKey` (`<prefix>:<stable id>`), `recipients[]` (max 20), `subject`, `html`, optional `replyTo`, `emailBranding`. The workflow checks the shared webhook secret, validates the payload, only accepts senders `@lepefy.com`, claims the key in `lepefy_n8n.digest_email_claims`, sends via SMTP and answers 200 (accepted or duplicate), 400 (invalid), 502 (SMTP rejected) or 503 (claim busy).
+
+| `notificationType` | Trigger | Recipients | Key |
+| --- | --- | --- | --- |
+| `event_capacity_conflict` | Paid event reservation refused, capacity reached | `notify_order_stock_conflict` | `event-capacity-conflict:<intent>` |
+| `rental_stock_conflict` | Paid rental refused, stock unavailable | `notify_order_stock_conflict` | `rental-stock-conflict:<intent>` |
+| `service_inquiry_created` | New quote request (`/api/services/[slug]/inquiry`) | `notify_service_inquiries` (reply goes to the customer) | `service-inquiry:<inquiryId>` |
+| `rental_reservation_confirmed_customer` | Rental reservation created | the customer | `rental-reservation:<id>:customer` |
+| `rental_reservation_confirmed_admin` | Rental reservation created | `notify_rental_reservations` | `rental-reservation:<id>:admin` |
+| `rental_delivery_quote_pending` | Rental delivery without zone price | `notify_rental_reservations` | `rental-delivery-quote:<id>` |
+| `marketing_campaign` | Admin dispatches an email campaign | each consenting customer | `marketing-campaign:<recipient key>` |
+
+`notify_service_inquiries` and `notify_rental_reservations` come from migration `135` (additive, default `false`). Without the migration, or when no recipient opted in, the internal alert is skipped and logged; adding a recipient keeps working because the new flags are written only when enabled.
+
+Marketing emails have **no automatic unsubscribe link yet** (decision of 27 Sept 2026, to be implemented later). Until then each campaign email ends with a manual opt-out sentence, and replies go to the tenant support address (`replyTo`). Opt-out requests must be processed by hand by revoking `customers.marketing_consent`.
+
 ## Customer journey
 
 | Event | Trigger | Customer meaning | Primary CTA | v1 channel |
