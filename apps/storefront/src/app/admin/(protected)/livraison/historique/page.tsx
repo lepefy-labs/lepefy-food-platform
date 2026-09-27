@@ -35,7 +35,7 @@ export default async function AdminShippingHistoryPage() {
         </p>
         {summary.groups.length === 0 ? (
           <p className="text-sm text-gray-400">
-            Aucune observation encore — utilisez le laboratoire (test rapide ou campagne) pour commencer à construire l&apos;historique.
+            Aucune observation encore — l&apos;historique se construit à partir des simulations Packlink lancées par l&apos;équipe Lepefy.
           </p>
         ) : (
           <div className="overflow-x-auto">

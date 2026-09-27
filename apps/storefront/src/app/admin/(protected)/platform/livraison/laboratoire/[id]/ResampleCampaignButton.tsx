@@ -60,7 +60,7 @@ export function ResampleCampaignButton({
         Campagne de remesure créée : {created.scenarios} scénario(s) en file.
         {created.deferred > 0 && <> {created.deferred} scénario(s) au-delà de la limite restent à remesurer ensuite.</>}
         {created.profileMissing > 0 && <> {created.profileMissing} scénario(s) ignoré(s) : profil d&apos;emballage supprimé.</>}
-        {' '}<Link href={`/admin/livraison/laboratoire/${created.id}`} className="underline">Ouvrir</Link>
+        {' '}<Link href={`/admin/platform/livraison/laboratoire/${created.id}`} className="underline">Ouvrir</Link>
       </div>
     );
   }

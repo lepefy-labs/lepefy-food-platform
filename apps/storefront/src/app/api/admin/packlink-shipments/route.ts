@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import {
@@ -20,7 +20,7 @@ const noStore = { 'Cache-Control': 'private, no-store, max-age=0' };
 // on the tenant's orders. Never creates, updates or links shipments/orders.
 export async function GET(request: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const denied = await requireAdmin(tenant.id);
+  const denied = await requirePlatformOwner();
   if (denied) return denied;
 
   const page = parsePageParam(request.nextUrl.searchParams.get('page'));

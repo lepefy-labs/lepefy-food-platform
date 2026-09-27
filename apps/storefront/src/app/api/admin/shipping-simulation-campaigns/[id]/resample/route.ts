@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { loadCampaignCoverage } from '@/lib/shipping/intelligence/campaignData';
 import { needsResample } from '@/lib/shipping/intelligence/campaignCoverage';
@@ -26,7 +26,7 @@ export const runtime = 'nodejs';
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const denied = await requireAdmin(tenant.id);
+  const denied = await requirePlatformOwner();
   if (denied) return denied;
 
   const body = await req.json().catch(() => ({})) as { confirm?: unknown };

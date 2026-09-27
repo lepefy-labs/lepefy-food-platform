@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import { buildCampaignScenarios, validateScenarioMatrix } from '@/lib/shipping/intelligence/scenarioMatrix';
 import { resolveZoneCodeFromRows } from '@/lib/shipping/intelligence/resolveZone';
@@ -27,7 +27,7 @@ export const runtime = 'nodejs';
 export async function GET() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const denied = await requireAdmin(tenant.id);
+  const denied = await requirePlatformOwner();
   if (denied) return denied;
 
   const supabase = createServiceClient();
@@ -45,7 +45,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const denied = await requireAdmin(tenant.id);
+  const denied = await requirePlatformOwner();
   if (denied) return denied;
 
   const adminId = await getAdminId();

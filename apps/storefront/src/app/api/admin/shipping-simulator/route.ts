@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getAdminId } from '@/lib/auth/getAdminId';
 import {
   fetchAllPacklinkServices,
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant     = await getTenant(tenantSlug);
 
-  const denied = await requireAdmin(tenant.id); // default: tenant_admin + platform_owner — tenant_cashier exclu
+  const denied = await requirePlatformOwner(); // outil technique : platform_owner uniquement
   if (denied) return denied;
 
   const adminId = await getAdminId();

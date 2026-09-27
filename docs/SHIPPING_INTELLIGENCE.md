@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@286e3e82e31945b64d1007c791061f8717851dda`
+> **Base codice verificata:** `main@01b613e39d820ac3dd7f52de6f10f4d44f2ba384`
 > **Ultima verifica:** 28 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
@@ -75,30 +75,37 @@ Comprende:
 
 ## 3. Navigazione Admin
 
-`Admin → Livraison` contiene attualmente otto superfici:
+`Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sei superfici di business:
 
 | Tab | Route | Responsabilità |
 |---|---|---|
 | Tarification | `/admin/livraison` | regole paese esistenti + zone logistiche |
 | Emballages | `/admin/livraison/emballages` | catalogo profili di imballaggio |
-| Laboratoire | `/admin/livraison/laboratoire` | test rapido Packlink + campagne |
 | Assistant expédition | `/admin/livraison/assistant` | stima deterministica dallo storico |
 | Historique des coûts | `/admin/livraison/historique` | aggregati delle osservazioni |
 | Analyse tarifaire | `/admin/livraison/analyse-tarifaire` | bozze e retrotest forfait |
 | Forfait | `/admin/livraison/forfait-shadow` | versioni immutabili, collecte shadow, attivazione commerciale e rollback, fallback, qualità pesi, rapporto ordini reali (§18.5) |
-| Diagnostic Packlink | `/admin/livraison/diagnostic-packlink` | elenco «Expéditions Packlink PRO» (sola lettura) + diagnostica per riferimento |
 
 Source:
 `apps/storefront/src/app/admin/(protected)/livraison/LivraisonTabs.tsx`.
 
+Gli strumenti tecnici sono nella console piattaforma, gruppo **Platform → Livraison technique** (`platformNavConfig.ts`, id `shipping`), riservati al `platform_owner` (layout `platform/layout.tsx` + `requirePlatformOwner()` in ogni pagina e in ogni API):
+
+| Pagina | Route | Responsabilità |
+|---|---|---|
+| Laboratoire | `/admin/platform/livraison/laboratoire` (+ `/:id`) | test rapido Packlink, campagne, indice CAP |
+| Diagnostic Packlink | `/admin/platform/livraison/diagnostic-packlink` | elenco «Expéditions Packlink PRO» (sola lettura, paginato) + diagnostica per riferimento |
+
+Il layout `platform/livraison/layout.tsx` mostra il tenant interrogato (quello del deploy, `NEXT_PUBLIC_TENANT_SLUG`). I vecchi URL `/admin/livraison/laboratoire`, `/admin/livraison/laboratoire/:id`, `/admin/livraison/diagnostic-packlink` e `/admin/livraison/simulateur` reindirizzano ai nuovi; un `tenant_admin` viene poi rimandato a `/admin` dal layout piattaforma. I dati prodotti dal Laboratoire (osservazioni) continuano ad alimentare Assistant, Historique, Analyse tarifaire e Forfait del tenant.
+
 ### Diagnostic Packlink: elenco «Expéditions Packlink PRO»
 
-La pagina `/admin/livraison/diagnostic-packlink` (`PacklinkWorkspace.tsx`) contiene due blocchi indipendenti:
+La pagina `/admin/platform/livraison/diagnostic-packlink` (`PacklinkWorkspace.tsx`, solo `platform_owner`) contiene due blocchi indipendenti:
 
 1. **Expéditions Packlink PRO** (`PacklinkShipmentList.tsx`, solo se `shipping_provider = 'packlink'`): pulsante «Charger les expéditions» / «Actualiser», nessuna interrogazione automatica né polling. Mostra ora dell'ultimo aggiornamento, «page X sur Y», record della pagina, numero associati a un ordine e totale «annoncées par Packlink». Paginazione: «Précédente» / «Suivante» / «Page N sur Y» + «Aller» (una chiamata per clic). Pagina verificata → avviso informativo (totale annunciato da Packlink, ricerca e filtri **limitati alla pagina mostrata**); risposta senza metadati di pagina → avviso «liste potentiellement incomplète». Se una pagina richiesta fallisce (es. `page_not_honored`) la pagina già mostrata resta visibile con l'errore e il diagnostico della richiesta fallita. Ricerca client-side (riferimento, riferimento cliente, destinatario, tracking, ordine), filtro per stato costruito **solo** dai valori presenti nella risposta (etichetta = valore Packlink grezzo, nessuna traduzione inventata), filtro associato / non associato. Desktop (`lg`): tabella; sotto `lg`: schede compatte. La colonna «Suivi» appare solo se almeno un record contiene un codice. Il clic su una riga apre un pannello laterale (bottom sheet su mobile) con destinatario, indirizzo, colli/peso/dimensioni, corriere/servizio, costo, tracking, date, origine, ordine Lepefy, JSON redatto del record e il pulsante «Diagnostic complet» che precompila ed esegue il diagnostico per riferimento qui sotto. Sezione espandibile «Diagnostic technique»: endpoint (con `?page=N`), HTTP Packlink, durata, record ricevuti/mostrati, pagina richiesta/renvoyée, stato della paginazione (pagine, totale, base 0/1), contenitore, chiavi radice, campi del primo record, contenuto grezzo (redatto) degli indizi di paginazione o della risposta di forma sconosciuta.
 2. **Diagnostic par référence** (`PacklinkDiagnostic.tsx`, invariato nel comportamento): `POST /api/admin/packlink-inspector` su shipment/track/labels; accetta ora anche una richiesta programmata dall'elenco (`request {reference, nonce}`). Nota: questo endpoint usa ancora `tenant.packlink_api_key ?? PACKLINK_API_KEY` (fallback globale mantenuto per scelta esplicita del 28/09/2026).
 
-`GET /api/admin/packlink-shipments` (logica in `lib/shipping/packlinkShipmentList.ts`, route sottile) è in sola lettura, `requireAdmin(tenant.id)` + RBAC `shipping.view` solo per GET (gli altri metodi non sono mappati → 403). Usa **esclusivamente** `tenant.packlink_api_key` (nessun fallback globale) e non accetta chiavi o tenant dal browser; l'unico parametro accettato è `?page=N` (solo cifre, 1–10 000, altrimenti `400 invalid_page` senza chiamare Packlink). Una sola chiamata `GET https://api.packlink.com/v1/shipments` (pagina 1 senza parametro, pagina N con `?limit=10&offset=(N-1)*10`) per clic, timeout 12 s, `redirect: 'error'`, corpo letto in streaming con tetto 512 KB, massimo 200 record restituiti (`truncated` se di più), redazione ricorsiva delle chiavi sensibili (`authorization`, `api_key`, `*token`, `password`, `secret`). Una sola `SELECT id, status, created_at, shipping_provider_reference FROM orders` filtrata per `tenant_id`, `shipping_provider_key = 'packlink'` e i riferimenti ricevuti: indica l'ordine già associato (`#` + 8 caratteri dell'id), non crea mai associazioni; se la lettura fallisce l'elenco resta visibile con `orderLookup: 'error'`. Nessuna scrittura su DB o Packlink.
+`GET /api/admin/packlink-shipments` (logica in `lib/shipping/packlinkShipmentList.ts`, route sottile) è in sola lettura e protetto da `requirePlatformOwner()` (solo GET; assente dalla mappa di capability tenant). Anche `POST /api/admin/packlink-inspector` usa `requirePlatformOwner()`. Usa **esclusivamente** `tenant.packlink_api_key` (nessun fallback globale) e non accetta chiavi o tenant dal browser; l'unico parametro accettato è `?page=N` (solo cifre, 1–10 000, altrimenti `400 invalid_page` senza chiamare Packlink). Una sola chiamata `GET https://api.packlink.com/v1/shipments` (pagina 1 senza parametro, pagina N con `?limit=10&offset=(N-1)*10`) per clic, timeout 12 s, `redirect: 'error'`, corpo letto in streaming con tetto 512 KB, massimo 200 record restituiti (`truncated` se di più), redazione ricorsiva delle chiavi sensibili (`authorization`, `api_key`, `*token`, `password`, `secret`). Una sola `SELECT id, status, created_at, shipping_provider_reference FROM orders` filtrata per `tenant_id`, `shipping_provider_key = 'packlink'` e i riferimenti ricevuti: indica l'ordine già associato (`#` + 8 caratteri dell'id), non crea mai associazioni; se la lettura fallisce l'elenco resta visibile con `orderLookup: 'error'`. Nessuna scrittura su DB o Packlink.
 
 **Paginazione auto-verificata:** `readPacklinkPagination` legge `pagination { current_page, total_pages, total_registers, is_one_indexed }` e normalizza a pagine 1-based. Una pagina è `verified` (e il risultato `completeness: 'paginated'`) solo se `current_page` restituito = pagina richiesta e `total_pages` è presente. Se Packlink restituisce un'altra pagina, oppure nessun metadato per pagina > 1, l'esito è `502 page_not_honored` e **nessun record** viene restituito: una pagina non è mai presentata come un'altra. Pagina 1 senza metadati resta visibile con `completeness: 'unverified'`. Dopo un primo `page_not_honored` la UI nasconde la navigazione fino al ricaricamento.
 
@@ -506,9 +513,9 @@ Il cron legacy chiama `scripts/process-shipping-campaign-worker.mjs`; n8n chiama
 
 Il worker `runCampaignBatch.ts` elabora fino a **40 scenari per tick** (scheduler e `Traiter maintenant`), con **3 chiamate Packlink simultanee per invocazione** e un **budget di 30 secondi** (`TICK_TIME_BUDGET_MS`) oltre il quale non reclama più item: quelli non reclamati restano `pending` per il tick successivo. Con il timeout di 20 s di una chiamata Packlink (`packlinkQuote.ts`) un tick resta sotto ~50 s, entro il timeout HTTP n8n (55 s) e `maxDuration` Vercel (60 s). I riusi (nessuna chiamata) sono rapidi, quindi un tick ne elabora in genere molti di più delle nuove quotazioni. `Traiter maintenant` mantiene il cooldown da dieci secondi. `STALE_RUNNING_ITEM_MS` è pari a dieci minuti. Il claim compare-and-set `pending → running` evita l'elaborazione concorrente dello stesso item; scheduler e trigger manuale simultanei possono comunque sommare il parallelismo verso Packlink.
 
-### 10.3 Tenant admin
+### 10.3 Platform owner
 
-L'admin mantiene `Lancer la campagne`, `Traiter maintenant` e `Annuler`. L'endpoint manuale `POST /api/admin/shipping-simulation-campaigns/:id/process` usa autenticazione admin e capability `shipping.manage`, senza esporre il token dello scheduler.
+Il `platform_owner` mantiene `Lancer la campagne`, `Traiter maintenant` e `Annuler` (Platform → Livraison technique → Laboratoire). L'endpoint manuale `POST /api/admin/shipping-simulation-campaigns/:id/process` usa la sessione `platform_owner` (`requirePlatformOwner()`), senza esporre il token dello scheduler. Tutte le API `shipping-simulation-campaigns/**`, `shipping-simulator` e `shipping-postal-code-import` sono riservate al `platform_owner`; il worker interno (`/api/internal/shipping-campaign-worker`) e l'import interno dei CAP restano sul loro bearer dedicato.
 
 ---
 
@@ -594,7 +601,7 @@ Il Test rapide (simulatore admin) conserva la propria logica di scelta allineata
 
 ## 13. Copertura verificabile per CAP
 
-Route: `/admin/livraison/laboratoire/:id` — API equivalente: `GET /api/admin/shipping-simulation-campaigns/:id`.
+Route: `/admin/platform/livraison/laboratoire/:id` — API equivalente: `GET /api/admin/shipping-simulation-campaigns/:id`.
 
 ### 13.1 Caricamento
 
@@ -644,7 +651,7 @@ La colonna «Traités» della lista campagne resta `completed_scenarios/total_sc
 
 ### 13.4 Remesure
 
-`POST /api/admin/shipping-simulation-campaigns/:id/resample` (`shipping.manage`), su conferma esplicita (`{ confirm: true }`) dal pulsante «Remesurer N scénario(s)»:
+`POST /api/admin/shipping-simulation-campaigns/:id/resample` (`platform_owner`), su conferma esplicita (`{ confirm: true }`) dal pulsante «Remesurer N scénario(s)»:
 
 - disponibile solo a campagna terminata/annullata; rifiutata (409) se una remesure della stessa campagna è già `queued/running`;
 - seleziona gli item il cui motivo è rimisurabile (`needsResample`): incidenti, errori storici ambigui, dati storici incompatibili, `no_service`; **esclude** i rifiuti deterministici (`provider_rejected*`, `no_eligible_service`, profilo eliminato); deduplica per CAP × profilo × peso;
@@ -910,8 +917,9 @@ Regole obbligatorie:
 - tutte le query intelligence devono essere `tenant_id` scoped, comprese le letture paginate (`.range()`) e per lotti di id (`.in('id', …)` sempre accompagnato da `tenant_id`);
 - i costi provider interni non devono diventare pubblici;
 - API admin passano dal sistema admin/capability esistente;
-- letture operative usano `shipping.view`;
-- mutazioni/campagne usano `shipping.manage`;
+- letture operative del tenant usano `shipping.view`;
+- mutazioni del tenant (tariffe, imballaggi, zone, forfait) usano `shipping.manage`;
+- Laboratoire, campagne, test rapido, import CAP e diagnostica Packlink sono riservati al `platform_owner` (`requirePlatformOwner()`), non figurano nella mappa `adminApiPermissions.ts` e sono verificati da `tests/unit/shippingPlatformTools.spec.ts`;
 - il worker interno usa service-role bearer;
 - non loggare secret, URL sensibili o payload provider raw;
 - non indebolire RLS/grant esistenti.
@@ -989,13 +997,23 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 ### UI Admin
 
 ```text
-apps/storefront/src/app/admin/(protected)/livraison/
+apps/storefront/src/app/admin/(protected)/livraison/       (tenant: shipping.view / shipping.manage)
   LivraisonTabs.tsx
   page.tsx
   ZonesSection.tsx
   emballages/
+  assistant/
+  historique/
+  analyse-tarifaire/
+  forfait-shadow/
+  laboratoire/page.tsx, laboratoire/[id]/page.tsx,
+  diagnostic-packlink/page.tsx, simulateur/page.tsx      solo redirect verso /admin/platform/livraison/…
+
+apps/storefront/src/app/admin/(protected)/platform/livraison/   (solo platform_owner)
+  layout.tsx                         intestazione «Livraison technique», tenant interrogato, schede
   laboratoire/
     page.tsx
+    ShippingSimulator.tsx            Test rapide
     CampaignManager.tsx              modalità di campionamento, limite, suddivisione
     CampaignDestinationPicker.tsx    ricerca/disambiguazione commune
     ZoneSentinelPicker.tsx           Couverture par zone (CAP campione)
@@ -1004,24 +1022,23 @@ apps/storefront/src/app/admin/(protected)/livraison/
     [id]/CampaignCoverageTable.tsx   Couverture par CAP (filtri, mobile)
     [id]/CampaignErrorDiagnostic.tsx Diagnostic des erreurs
     [id]/ResampleCampaignButton.tsx  remesure esplicita (motivi inclusi/esclusi)
-  assistant/
-  historique/
-  analyse-tarifaire/
   diagnostic-packlink/
     page.tsx
     PacklinkWorkspace.tsx            elenco + diagnostico (richiesta di diagnostico dall'elenco)
     PacklinkShipmentList.tsx         Expéditions Packlink PRO (tabella/schede, filtri, pannello, diagnostic technique)
     PacklinkDiagnostic.tsx           diagnostico per riferimento (shipment/track/labels)
+
+apps/storefront/src/app/admin/_components/platformNavConfig.ts   gruppo «Livraison technique» (id shipping)
 ```
 
 ### API Admin
 
 ```text
 apps/storefront/src/app/api/admin/
-  shipping-simulator/
+  shipping-simulator/              (platform_owner)
   shipping-packaging-profiles/
   shipping-zones/
-  shipping-simulation-campaigns/
+  shipping-simulation-campaigns/   (platform_owner, tutte le route)
     route.ts                    GET lista / POST creazione (samplingMode, contesto città, destinationMode)
     zone-sentinels/route.ts     GET anteprima CAP campione per zona (sola lettura)
     city-postal-codes/route.ts  search / resolve (resolved | ambiguous)
@@ -1029,7 +1046,7 @@ apps/storefront/src/app/api/admin/
     [id]/process/route.ts
     [id]/cancel/route.ts
     [id]/resample/route.ts      POST remesure
-  shipping-postal-code-import/
+  shipping-postal-code-import/     (platform_owner)
   shipping-observations/summary/
   shipping-advisor/
   shipping-tariff-drafts/
@@ -1038,8 +1055,8 @@ apps/storefront/src/app/api/admin/
   shipping-shadow-report/          GET rapporto ordini reali (+ ordini al forfait)
   shipping-tariff-versions/[id]/activate/  POST attivazione commerciale (conferma + checklist)
   shipping-tariff-versions/retire/         POST ritiro della tariffa di un paese
-  packlink-shipments/route.ts      GET elenco spedizioni Packlink del tenant (sola lettura, shipping.view)
-  packlink-inspector/route.ts      POST diagnostico per riferimento (shipment/track/labels)
+  packlink-shipments/route.ts      GET elenco spedizioni Packlink del tenant (sola lettura, platform_owner)
+  packlink-inspector/route.ts      POST diagnostico per riferimento (shipment/track/labels, platform_owner)
 ```
 
 ### Intelligence core
@@ -1093,6 +1110,7 @@ apps/storefront/tests/unit/shadowTariff.spec.ts
 apps/storefront/tests/unit/shadowReport.spec.ts
 apps/storefront/tests/unit/tariffCheckout.spec.ts
 apps/storefront/tests/unit/packlinkShipmentList.spec.ts     (elenco Packlink: mock fetch, nessuna chiamata reale)
+apps/storefront/tests/unit/shippingPlatformTools.spec.ts    (API tecniche solo requirePlatformOwner, navigazione, redirect)
 ```
 
 ### Worker

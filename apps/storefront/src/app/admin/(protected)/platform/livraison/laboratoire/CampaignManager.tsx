@@ -288,7 +288,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                 return (
                   <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/60">
                     <td className="py-2.5 pr-3">
-                      <Link href={`/admin/livraison/laboratoire/${c.id}`} className="text-[var(--color-primary-dark)] hover:underline">{c.name}</Link>
+                      <Link href={`/admin/platform/livraison/laboratoire/${c.id}`} className="text-[var(--color-primary-dark)] hover:underline">{c.name}</Link>
                       {mode && <span className="block text-2xs text-gray-400">{MODE_LABEL[mode] ?? mode}{matrix?.destinationMode === 'zone_sentinels' ? ' · CAP témoins par zone' : ''}</span>}
                     </td>
                     <td className="py-2.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${STATUS_CLS[c.status] ?? 'bg-gray-100 text-gray-500'}`}>{STATUS_LABEL[c.status] ?? c.status}</span></td>

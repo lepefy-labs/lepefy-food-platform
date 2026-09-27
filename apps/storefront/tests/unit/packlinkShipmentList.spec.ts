@@ -12,7 +12,6 @@ import {
   summarizePacklinkShipment,
   type LepefyOrderLink,
 } from '../../src/lib/shipping/packlinkShipmentList';
-import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 
 // Shape observed from the real GET /v1/shipments on 2026-09-28; values are fake.
 const listRecord = (reference: string, status = 'DELIVERED') => ({
@@ -312,11 +311,4 @@ test.describe('pagination (observed shape: current_page, total_pages, total_regi
     expect(readPacklinkPagination({ pagination: { current_page: 'x', total_pages: -3 } }, 1))
       .toMatchObject({ currentPage: null, totalPages: null, verified: false });
   });
-});
-
-test('packlink-shipments stays read-only under shipping.view', () => {
-  expect(permissionForAdminApi('/api/admin/packlink-shipments', 'GET')).toBe('shipping.view');
-  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-    expect(permissionForAdminApi('/api/admin/packlink-shipments', method)).toBeNull();
-  }
 });
