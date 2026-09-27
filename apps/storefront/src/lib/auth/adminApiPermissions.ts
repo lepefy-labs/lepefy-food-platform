@@ -52,6 +52,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/ambassador')) return 'growth.manage';
   if (path.startsWith('/api/admin/shipping-rules')) return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-simulator' || path === '/api/admin/packlink-inspector') return 'shipping.view';
+  if (path === '/api/admin/packlink-shipments') return read ? 'shipping.view' : null;
   if (path.startsWith('/api/admin/shipping-packaging-profiles')) return read ? 'shipping.view' : 'shipping.manage';
   if (path.startsWith('/api/admin/shipping-zones')) return read ? 'shipping.view' : 'shipping.manage';
   if (/^\/api\/admin\/shipping-simulation-campaigns\/[^/]+\/cancel$/.test(path)) return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
