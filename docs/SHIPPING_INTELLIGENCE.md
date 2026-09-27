@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@c95cbdb2d50a01790ab1efcef4b3e9ba7583ccad`
-> **Ultima verifica:** 24 settembre 2026
+> **Base codice verificata:** `main@cc60f479e5263de7ea6b3bde9cb9a9b31f41befd`
+> **Ultima verifica:** 28 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -90,6 +90,13 @@ Comprende:
 
 Source:
 `apps/storefront/src/app/admin/(protected)/livraison/LivraisonTabs.tsx`.
+
+### Diagnostic Packlink: esplorazione elenco spedizioni
+
+`GET /api/admin/packlink-shipments` è un endpoint esplorativo, in sola lettura e protetto da `requireAdmin(tenant.id)`. Usa **esclusivamente** `tenant.packlink_api_key` del tenant corrente (nessun fallback alla chiave globale), senza accettare chiavi o identificativi tenant dal browser. Interroga `GET https://api.packlink.com/v1/shipments` una sola volta su richiesta, con timeout 12 s e risposta massima 512 KB. Il codice ufficiale del connettore Packlink conferma creazione bozza e recupero per riferimento, **non** documenta la lista completa: questo percorso di listing resta sperimentale, da verificare con una chiave reale.
+
+In caso di risposta valida con array radice o campi `shipments`/`results`/`data`, l'endpoint espone al massimo 25 record redatti, i nomi dei campi rilevati, il conteggio restituito e `paginationVerified: false`. Non attribuire al conteggio valore di totale account: non è confermata la paginazione né la completezza. `404/405` a monte producono `501 list_endpoint_not_available`, non un falso elenco vuoto; gli altri errori sono distinti senza riportare il body Packlink o la chiave. Non scrive sul database, non crea bozze e non modifica ordine, tracking o stato del provider. Non è ancora collegato a una schermata pubblica né a una sincronizzazione pianificata; rimane uno strumento admin di ricognizione. Se la API di listing non è disponibile, la strada affidabile è elencare i riferimenti già associati agli ordini del tenant e recuperare i dettagli individuali tramite l'adapter esistente.
+
 
 ---
 
