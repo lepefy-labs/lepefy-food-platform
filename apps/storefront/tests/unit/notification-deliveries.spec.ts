@@ -116,11 +116,16 @@ test('history summary reads subject and recipients from the known payload shapes
   expect(summarizePayload({ customerEmail: 'e@f.it', email: { subject: 'Invite' } })).toEqual({ subject: 'Invite', recipients: ['e@f.it'] });
 });
 
-test('delivery history and manual retry are mapped to tenant settings permissions', () => {
-  expect(permissionForAdminApi('/api/admin/notification-deliveries', 'GET')).toBe('tenant_settings.view');
-  expect(permissionForAdminApi('/api/admin/notification-deliveries', 'DELETE')).toBeNull();
-  expect(permissionForAdminApi('/api/admin/notification-deliveries/abc/retry', 'POST')).toBe('tenant_settings.manage');
-  expect(permissionForAdminApi('/api/admin/notification-deliveries/abc/retry', 'GET')).toBeNull();
+test('delivery history is platform-owner support data: no tenant permission grants it', () => {
+  for (const path of [
+    '/api/admin/notification-deliveries',
+    '/api/admin/notification-deliveries/abc/retry',
+    '/api/admin/platform/notification-deliveries',
+    '/api/admin/platform/notification-deliveries/abc/retry',
+  ]) {
+    expect(permissionForAdminApi(path, 'GET')).toBeNull();
+    expect(permissionForAdminApi(path, 'POST')).toBeNull();
+  }
 });
 
 test('log mode records history without payload, re-sends on a new attempt and never retries', async () => {

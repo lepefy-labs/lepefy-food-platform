@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import NotificationTestConsole from './NotificationTestConsole';
+import { NotificationDeliveriesSection } from './NotificationDeliveriesSection';
 
 export default async function PlatformNotificationsPage() {
   const cookieStore = cookies();
@@ -47,11 +48,14 @@ export default async function PlatformNotificationsPage() {
     .maybeSingle();
 
   return (
-    <NotificationTestConsole
-      defaultEmail={user.email ?? ''}
-      tenantName={tenant.name}
-      tenantSlug={tenant.slug}
-      defaultGooglePlayTestUrl={activeFeedbackCampaign?.google_play_test_url ?? undefined}
-    />
+    <div className="space-y-6">
+      <NotificationTestConsole
+        defaultEmail={user.email ?? ''}
+        tenantName={tenant.name}
+        tenantSlug={tenant.slug}
+        defaultGooglePlayTestUrl={activeFeedbackCampaign?.google_play_test_url ?? undefined}
+      />
+      <NotificationDeliveriesSection />
+    </div>
   );
 }

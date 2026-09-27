@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const STATUSES = ['pending', 'processing', 'accepted', 'failed', 'dead'] as const;
 
-/** Latest notification deliveries of the tenant (payloads are never exposed). */
+/**
+ * Latest notification deliveries of the deployment tenant, platform owner only:
+ * transport, provider message ids and raw errors are support data and are
+ * never exposed to tenants. Payloads are never returned.
+ */
 export async function GET(req: NextRequest) {
+  const denied = await requirePlatformOwner();
+  if (denied) return denied;
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const denied = await requireAdmin(tenant.id);
-  if (denied) return denied;
 
   const status = req.nextUrl.searchParams.get('status');
   const load = (columns: string) => {

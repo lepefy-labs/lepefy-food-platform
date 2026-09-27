@@ -61,7 +61,7 @@ export function NotificationDeliveriesSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/notification-deliveries', { cache: 'no-store' });
+      const res = await fetch('/api/admin/platform/notification-deliveries', { cache: 'no-store' });
       if (!res.ok) throw new Error();
       const body = await res.json() as { available: boolean; deliveries: Delivery[] };
       setAvailable(body.available); setDeliveries(body.deliveries);
@@ -73,7 +73,7 @@ export function NotificationDeliveriesSection() {
   async function retry(id: string) {
     setRetrying(id); setMessage(null);
     try {
-      const res = await fetch(`/api/admin/notification-deliveries/${id}/retry`, { method: 'POST' });
+      const res = await fetch(`/api/admin/platform/notification-deliveries/${id}/retry`, { method: 'POST' });
       const body = await res.json().catch(() => null) as { accepted?: boolean; error?: string } | null;
       if (!res.ok) throw new Error(body?.error ?? 'Erreur');
       setMessage(body?.accepted ? { text: 'Envoi accepté.', ok: true } : { text: 'Nouvel échec : un autre essai est programmé.', ok: false });
@@ -87,7 +87,7 @@ export function NotificationDeliveriesSection() {
     <section className="overflow-hidden rounded-2xl border border-sky-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <header className="flex items-start gap-3 border-b border-sky-100 bg-sky-50/80 px-4 py-3.5 dark:border-gray-800 dark:bg-gray-900">
         <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80 text-sky-600 shadow-sm dark:bg-gray-800 dark:text-sky-300"><IconMailForward size={19} stroke={1.7} /></div>
-        <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-sky-700 dark:text-sky-200">Historique des envois</h2><p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">50 derniers emails automatiques, nouveaux essais automatiques en cas d’échec</p></div>
+        <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-sky-700 dark:text-sky-200">Historique des envois</h2><p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Support plateforme · 50 derniers emails automatiques du tenant, avec transport, identifiants et erreurs techniques (non visibles par le tenant)</p></div>
         <button onClick={() => void load()} disabled={loading} className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700" aria-label="Actualiser"><IconRefresh size={15} /></button>
       </header>
       <div className="p-4 sm:p-5">

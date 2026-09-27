@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { sendNotification } from '@/lib/events/notifyN8n';
 import { recordAttemptResult, type DeliveryRow } from '@/lib/notifications/deliveryLedger';
 
 export const runtime = 'nodejs';
 
 /**
- * Manual retry of a failed or abandoned delivery. The row is claimed with a
- * compare-and-set on its status, so a concurrent scheduler run cannot send it
- * at the same time; three more automatic attempts are granted afterwards.
+ * Manual retry of a failed or abandoned delivery (platform owner only). The
+ * row is claimed with a compare-and-set on its status, so a concurrent
+ * scheduler run cannot send it at the same time; three more automatic
+ * attempts are granted afterwards.
  */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+  const denied = await requirePlatformOwner();
+  if (denied) return denied;
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const denied = await requireAdmin(tenant.id);
-  if (denied) return denied;
 
   const db = createServiceClient();
   const { data: current } = await db.from('notification_deliveries').select('attempts, status, payload')
