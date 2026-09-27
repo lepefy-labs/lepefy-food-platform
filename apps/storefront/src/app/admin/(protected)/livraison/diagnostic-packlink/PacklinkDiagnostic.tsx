@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { IconCheck, IconInfoCircle, IconSearch, IconX } from '@tabler/icons-react';
 import type { ShippingProvider } from '@lepefy/types';
 
@@ -130,11 +130,32 @@ function StatusBadge({ probe }: { probe: ProbeResult }) {
   );
 }
 
-export function PacklinkDiagnostic({ shippingProvider }: { shippingProvider: ShippingProvider }) {
+export interface DiagnosticRequest {
+  reference: string;
+  nonce: number;
+}
+
+export function PacklinkDiagnostic({
+  shippingProvider,
+  request,
+}: {
+  shippingProvider: ShippingProvider;
+  // Set by the shipment list to run this diagnostic on a chosen reference.
+  request?: DiagnosticRequest | null;
+}) {
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InspectorSuccess | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!request) return;
+    setReference(request.reference);
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    void inspect(request.reference);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per request nonce
+  }, [request?.nonce]);
 
   const candidates = useMemo(() => {
     if (!result) return [];
@@ -155,10 +176,14 @@ export function PacklinkDiagnostic({ shippingProvider }: { shippingProvider: Shi
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await inspect(reference);
+  }
+
+  async function inspect(rawReference: string) {
     setError(null);
     setResult(null);
 
-    const normalizedReference = reference.trim().toUpperCase();
+    const normalizedReference = rawReference.trim().toUpperCase();
     if (!/^[A-Z0-9]{6,40}$/.test(normalizedReference)) {
       setError('Saisissez une référence Packlink valide, par exemple IT2026PRC0005858260.');
       return;
@@ -207,6 +232,7 @@ export function PacklinkDiagnostic({ shippingProvider }: { shippingProvider: Shi
       </section>
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:bg-gray-900"
       >

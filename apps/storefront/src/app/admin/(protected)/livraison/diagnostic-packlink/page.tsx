@@ -1,7 +1,7 @@
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import { LivraisonTabs } from '../LivraisonTabs';
-import { PacklinkDiagnostic } from './PacklinkDiagnostic';
+import { PacklinkWorkspace } from './PacklinkWorkspace';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -14,13 +14,13 @@ export default async function AdminPacklinkDiagnosticPage() {
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
         title="Diagnostic Packlink"
-        description="Interrogez une expédition Packlink PRO réelle et inspectez les données renvoyées par les endpoints shipment, tracking et labels."
+        description="Consultez les expéditions visibles avec la clé Packlink PRO du tenant, puis inspectez une expédition via les endpoints shipment, tracking et labels."
         meta="Lecture seule"
       />
 
       <LivraisonTabs active="packlink-diagnostic" />
 
-      <PacklinkDiagnostic shippingProvider={tenant.shipping_provider} />
+      <PacklinkWorkspace shippingProvider={tenant.shipping_provider} />
     </div>
   );
 }

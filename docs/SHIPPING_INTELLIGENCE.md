@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@cc60f479e5263de7ea6b3bde9cb9a9b31f41befd`
+> **Base codice verificata:** `main@1727eff9744f967e55c3053d1c828e0019e824aa`
 > **Ultima verifica:** 28 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
@@ -86,16 +86,25 @@ Comprende:
 | Historique des coûts | `/admin/livraison/historique` | aggregati delle osservazioni |
 | Analyse tarifaire | `/admin/livraison/analyse-tarifaire` | bozze e retrotest forfait |
 | Forfait | `/admin/livraison/forfait-shadow` | versioni immutabili, collecte shadow, attivazione commerciale e rollback, fallback, qualità pesi, rapporto ordini reali (§18.5) |
-| Diagnostic Packlink | `/admin/livraison/diagnostic-packlink` | diagnostica provider esistente |
+| Diagnostic Packlink | `/admin/livraison/diagnostic-packlink` | elenco «Expéditions Packlink PRO» (sola lettura) + diagnostica per riferimento |
 
 Source:
 `apps/storefront/src/app/admin/(protected)/livraison/LivraisonTabs.tsx`.
 
-### Diagnostic Packlink: esplorazione elenco spedizioni
+### Diagnostic Packlink: elenco «Expéditions Packlink PRO»
 
-`GET /api/admin/packlink-shipments` è un endpoint esplorativo, in sola lettura e protetto da `requireAdmin(tenant.id)` con mapping RBAC esplicito `shipping.view` solo per GET. Usa **esclusivamente** `tenant.packlink_api_key` del tenant corrente (nessun fallback alla chiave globale), senza accettare chiavi o identificativi tenant dal browser. Interroga `GET https://api.packlink.com/v1/shipments` una sola volta su richiesta, con timeout 12 s e risposta massima 512 KB. Il codice ufficiale del connettore Packlink conferma creazione bozza e recupero per riferimento, **non** documenta la lista completa: questo percorso di listing resta sperimentale, da verificare con una chiave reale.
+La pagina `/admin/livraison/diagnostic-packlink` (`PacklinkWorkspace.tsx`) contiene due blocchi indipendenti:
 
-In caso di risposta valida con array radice o campi `shipments`/`results`/`data`, l'endpoint espone al massimo 25 record redatti, i nomi dei campi rilevati, il conteggio restituito e `paginationVerified: false`. Non attribuire al conteggio valore di totale account: non è confermata la paginazione né la completezza. `404/405` a monte producono `501 list_endpoint_not_available`, non un falso elenco vuoto; gli altri errori sono distinti senza riportare il body Packlink o la chiave. Non scrive sul database, non crea bozze e non modifica ordine, tracking o stato del provider. Non è ancora collegato a una schermata pubblica né a una sincronizzazione pianificata; rimane uno strumento admin di ricognizione. Se la API di listing non è disponibile, la strada affidabile è elencare i riferimenti già associati agli ordini del tenant e recuperare i dettagli individuali tramite l'adapter esistente.
+1. **Expéditions Packlink PRO** (`PacklinkShipmentList.tsx`, solo se `shipping_provider = 'packlink'`): pulsante «Charger les expéditions» / «Actualiser», nessuna interrogazione automatica né polling. Mostra ora dell'ultimo aggiornamento, numero di record ricevuti, numero associati a un ordine, avviso permanente «liste potentiellement incomplète», ricerca client-side (riferimento, riferimento cliente, destinatario, tracking, ordine), filtro per stato costruito **solo** dai valori presenti nella risposta (etichetta = valore Packlink grezzo, nessuna traduzione inventata), filtro associato / non associato. Desktop (`lg`): tabella; sotto `lg`: schede compatte. La colonna «Suivi» appare solo se almeno un record contiene un codice. Il clic su una riga apre un pannello laterale (bottom sheet su mobile) con destinatario, indirizzo, colli/peso/dimensioni, corriere/servizio, costo, tracking, date, origine, ordine Lepefy, JSON redatto del record e il pulsante «Diagnostic complet» che precompila ed esegue il diagnostico per riferimento qui sotto. Sezione espandibile «Diagnostic technique»: endpoint, HTTP Packlink, durata, record ricevuti/mostrati, contenitore, chiavi radice, campi del primo record, contenuto grezzo (redatto) degli indizi di paginazione o della risposta di forma sconosciuta.
+2. **Diagnostic par référence** (`PacklinkDiagnostic.tsx`, invariato nel comportamento): `POST /api/admin/packlink-inspector` su shipment/track/labels; accetta ora anche una richiesta programmata dall'elenco (`request {reference, nonce}`). Nota: questo endpoint usa ancora `tenant.packlink_api_key ?? PACKLINK_API_KEY` (fallback globale mantenuto per scelta esplicita del 28/09/2026).
+
+`GET /api/admin/packlink-shipments` (logica in `lib/shipping/packlinkShipmentList.ts`, route sottile) è in sola lettura, `requireAdmin(tenant.id)` + RBAC `shipping.view` solo per GET (gli altri metodi non sono mappati → 403). Usa **esclusivamente** `tenant.packlink_api_key` (nessun fallback globale) e non accetta chiavi, tenant o parametri dal browser. Una sola chiamata `GET https://api.packlink.com/v1/shipments` per clic, timeout 12 s, `redirect: 'error'`, corpo letto in streaming con tetto 512 KB, massimo 200 record restituiti (`truncated` se di più), redazione ricorsiva delle chiavi sensibili (`authorization`, `api_key`, `*token`, `password`, `secret`). Una sola `SELECT id, status, created_at, shipping_provider_reference FROM orders` filtrata per `tenant_id`, `shipping_provider_key = 'packlink'` e i riferimenti ricevuti: indica l'ordine già associato (`#` + 8 caratteri dell'id), non crea mai associazioni; se la lettura fallisce l'elenco resta visibile con `orderLookup: 'error'`. Nessuna scrittura su DB o Packlink.
+
+Esiti (`available: false` + `reason` + `message` FR + `diagnostics`): `provider_not_packlink` 400, `tenant_api_key_missing` 409, `packlink_unavailable` 503 (rete/timeout), `list_endpoint_not_available` 501 (upstream 404/405 — **non** un elenco vuoto), `packlink_unauthorized` 502 (401/403), `packlink_error` 502, `response_too_large` 502, `invalid_packlink_response` 502, `list_response_shape_unknown` 502 (nessun array in radice, `shipments`, `results` o `data`). Il body Packlink d'errore non viene mai inoltrato.
+
+**Comportamento verificato con la chiave reale ChloeFood (28/09/2026):** HTTP 200, radice `{ shipments, pagination }`, **10** record (7 `DELIVERED`, 3 `IN_TRANSIT`). Campi per record: `reference` (es. `IT2026PRO…`), `status`, `delivery{name, surname, company, street1, street2, zip_code, postalcode, city, state, country, phone, email, address_id}`, `collection{…}` (mittente), `parcels[{width, height, length, weight}]` (stringhe), `weight` (totale, stringa), `parcel_number`, `carrier` (stringa, es. `brt`, `Poste Italiane`), `service`, `content`, `price` (stringa, osservato `"0"` su tutti i record: non è il costo reale), `orderDate`/`collectionDate` (`YYYY/MM/DD`), `shipment_custom_reference`, `has_customs`, `source` (`PRO`), `canceled`. **Nessun codice tracking** nell'elenco: si ottiene solo con il diagnostico per riferimento (`/track`). Il riepilogo legge prima questi campi e ripiega sulle chiavi dei DTO ufficiali (`packlink_reference`, `state`, `to`, `packages`, `trackings`, `order_date`, `price.base_price`).
+
+**Limiti:** il connettore ufficiale `packlink-dev/ecommerce_module_core` documenta solo `GET shipments/{reference}` (+ `/track`, `/labels`); la lista è usata da client terzi (`?inbox=STATUS`, dichiarata «BETA») ma non è documentata ufficialmente. La chiave `pagination` esiste nella risposta ma il suo contratto non è documentato: viene mostrata grezza nel diagnostico e **non** seguita. Un conteggio pari a 10 suggerisce una pagina parziale: il numero mostrato è sempre «reçues par cette requête», mai il totale dell'account. Il filtro `inbox` e la paginazione restano da verificare prima di qualsiasi implementazione. Per un elenco affidabile degli ordini Lepefy spediti, la fonte resta `orders.shipping_provider_reference` + adapter per riferimento.
 
 
 ---
@@ -995,6 +1004,10 @@ apps/storefront/src/app/admin/(protected)/livraison/
   historique/
   analyse-tarifaire/
   diagnostic-packlink/
+    page.tsx
+    PacklinkWorkspace.tsx            elenco + diagnostico (richiesta di diagnostico dall'elenco)
+    PacklinkShipmentList.tsx         Expéditions Packlink PRO (tabella/schede, filtri, pannello, diagnostic technique)
+    PacklinkDiagnostic.tsx           diagnostico per riferimento (shipment/track/labels)
 ```
 
 ### API Admin
@@ -1021,6 +1034,8 @@ apps/storefront/src/app/api/admin/
   shipping-shadow-report/          GET rapporto ordini reali (+ ordini al forfait)
   shipping-tariff-versions/[id]/activate/  POST attivazione commerciale (conferma + checklist)
   shipping-tariff-versions/retire/         POST ritiro della tariffa di un paese
+  packlink-shipments/route.ts      GET elenco spedizioni Packlink del tenant (sola lettura, shipping.view)
+  packlink-inspector/route.ts      POST diagnostico per riferimento (shipment/track/labels)
 ```
 
 ### Intelligence core
@@ -1073,6 +1088,7 @@ apps/storefront/tests/unit/shippingTariffEngine.spec.ts
 apps/storefront/tests/unit/shadowTariff.spec.ts
 apps/storefront/tests/unit/shadowReport.spec.ts
 apps/storefront/tests/unit/tariffCheckout.spec.ts
+apps/storefront/tests/unit/packlinkShipmentList.spec.ts     (elenco Packlink: mock fetch, nessuna chiamata reale)
 ```
 
 ### Worker
@@ -1101,6 +1117,7 @@ La V1E non introduce migration: i nuovi campi vivono nel JSON `scenario_matrix` 
 ```text
 apps/storefront/src/lib/shipping/calculateShipping.ts
 apps/storefront/src/lib/shipping/resolveCountryRule.ts
+apps/storefront/src/lib/shipping/packlinkShipmentList.ts   (elenco Packlink read-only: fetch limitato, riepilogo, redazione, esiti)
 apps/storefront/src/app/api/shipping/quote/route.ts
 apps/storefront/src/lib/auth/adminApiPermissions.ts
 ```
@@ -1206,6 +1223,13 @@ Vedere `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §11.6. Stop immediato: «Désactiv
 
 È normale: lo storico è decision support. Richiedere un preventivo provider live quando serve il prezzo corrente.
 
+### «Expéditions Packlink PRO»: poche spedizioni, nessun tracking, costo 0
+
+- Il conteggio è quello della singola risposta Packlink (osservati 10 record), non il totale dell'account: la paginazione non è documentata. Controllare la chiave `pagination` nel «Diagnostic technique» prima di concludere qualsiasi cosa.
+- L'elenco Packlink non contiene codici tracking: usare «Diagnostic complet» nel pannello (chiama `/track`).
+- `price` dell'elenco vale `"0"` sui record osservati: non usarlo come costo di spedizione.
+- `501 list_endpoint_not_available`: la chiave non espone l'elenco; non significa zero spedizioni. `409 tenant_api_key_missing`: il tenant non ha `packlink_api_key` (l'elenco non usa la chiave globale). «Non associée» significa solo che nessun ordine del tenant ha quel `shipping_provider_reference`.
+
 ---
 
 ## 25. Limiti correnti e sviluppi futuri
@@ -1214,6 +1238,7 @@ Non ancora implementato:
 
 - costo reale degli imballaggi e margine completo per ordine al forfait;
 - creazione automatica delle spedizioni/etichette Packlink (restano create a mano in Packlink PRO);
+- paginazione / filtro `inbox` dell'elenco Packlink (contratto non documentato; da verificare sul contenuto reale di `pagination` prima di implementarli) e associazione manuale spedizione ↔ ordine dall'elenco;
 - rétrotest delle bozze sul motore condiviso `priceFromTariff` (oggi `applyTariffDraft` distinto);
 - costi finali `real_shipment` acquisiti come consuntivo separato;
 - true 3D bin-packing per prodotto;
