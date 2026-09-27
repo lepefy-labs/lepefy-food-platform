@@ -84,6 +84,7 @@ function effects() {
   const deps: ConversionSideEffectDependencies = {
     notifyN8n: async (path, payload) => { messages.push({ path, payload }); return true; },
     getTenantNotificationContext: async () => ({ tenantId: TENANT, tenantName: 'Chloé', storefrontUrl: 'https://shop.example' } as TenantNotificationContext),
+    getNotificationRecipients: async () => ['admin@example.com'],
     registerCheckoutConsent: async () => undefined,
     recordOrderCustomerEvents: async (input) => { crm.push(input as unknown as Record<string, unknown>); },
     recordNalaPurchaseAttribution: async ({ orderId }) => { nala.push(orderId); },
@@ -327,6 +328,10 @@ test('stock exhausted at conversion: Stripe refund, admin alert, no customer con
   expect(result.ok && result.stockConflict && result.refundSucceeded).toBe(true);
   expect(fx.refunds).toEqual(['pi_1']);
   expect(fx.messages.map((m) => m.path)).toEqual(['/webhook/order-stock-conflict']);
+  const alert = fx.messages[0]!.payload;
+  expect(alert.recipients).toEqual(['admin@example.com']);
+  expect(alert.idempotencyKey).toBe(`order-stock-conflict:${ORDER_ID}`);
+  expect(String(alert.html)).toContain('remboursé automatiquement');
   expect(fx.crm).toEqual([]);
 });
 

@@ -5,6 +5,8 @@ import { notifyN8n } from '@/lib/events/notifyN8n';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
+import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
@@ -120,6 +122,8 @@ function rpcPayload(payment: ConversionPayment): Record<string, unknown> {
 export interface ConversionSideEffectDependencies {
   notifyN8n: typeof notifyN8n;
   getTenantNotificationContext: typeof getTenantNotificationContext;
+  /** Defaults to the tenant_notification_recipients lookup. */
+  getNotificationRecipients?: typeof getNotificationRecipients;
   registerCheckoutConsent: typeof registerCheckoutConsent;
   recordOrderCustomerEvents: typeof recordOrderCustomerEvents;
   recordNalaPurchaseAttribution: typeof recordNalaPurchaseAttribution;
@@ -240,19 +244,24 @@ export async function convertCheckoutSessionToOrder(
     }
     await assistedEvent('stock_conflict', { reason: result.stock_error ?? null, refund_succeeded: refundSucceeded });
 
-    await deps.notifyN8n('/webhook/order-stock-conflict', {
-      ...(tenantContext ?? { tenantId: input.tenantId }),
-      orderId: order.id,
-      orderNumber: orderNumberFor(order.id),
-      email: order.email,
-      fullName: order.full_name ?? '',
-      fulfillmentType: order.fulfillment_type,
-      total: order.total,
-      reason: result.stock_error ?? null,
-      refundSucceeded,
-      manualRefundRequired: !isStripe,
-      adminOrderLink: `${storefrontUrl}/admin/orders/${order.id}`,
-    });
+    const recipients = await (deps.getNotificationRecipients ?? getNotificationRecipients)(
+      supabase, input.tenantId, 'notify_order_stock_conflict');
+    if (!tenantContext || !recipients.length) {
+      console.error('[convertCheckoutSessionToOrder] stock conflict alert not sent — tenant context or recipients missing — order:', order.id);
+    } else {
+      await deps.notifyN8n(ORDER_STOCK_CONFLICT_WEBHOOK, buildOrderStockConflictNotification(tenantContext, recipients, {
+        orderId: order.id,
+        orderNumber: orderNumberFor(order.id),
+        email: order.email,
+        fullName: order.full_name ?? '',
+        fulfillmentType: order.fulfillment_type,
+        total: order.total,
+        reason: result.stock_error ?? null,
+        refundSucceeded,
+        manualRefundRequired: !isStripe,
+        adminOrderLink: `${storefrontUrl}/admin/orders/${order.id}`,
+      }));
+    }
 
     return {
       ok: true, order, created: true, stockConflict: true, refundSucceeded,

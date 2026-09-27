@@ -4,6 +4,8 @@ import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getEventsBaseUrl, getTicketUrl } from '@/lib/events/ticketUrl';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { n8nWebhookHeaders, n8nWebhookUrl } from '@/lib/events/notifyN8n';
+import { buildOrderStockConflictNotification } from '@/lib/notifications/orderStockConflictEmail';
 import {
   buildTesterFeedbackInviteEmail,
   LEPEFY_PLATFORM_SIGNATURE,
@@ -226,16 +228,19 @@ export async function POST(req: NextRequest) {
       completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered',
     };
   } else if (body.event === 'order-stock-conflict') {
-    payload = {
-      ...commonPayload,
+    const alert = buildOrderStockConflictNotification(tenantContext, [body.email.trim()], {
+      orderId: testId,
+      orderNumber: `#TEST-${shortId}`,
+      email: body.email.trim(),
+      fullName: body.fullName?.trim() || 'Client test',
+      fulfillmentType,
       total,
       reason: 'Test console — conflit de stock simulé',
       refundSucceeded: true,
       manualRefundRequired: false,
-      adminOrderLink: tenantContext.storefrontUrl
-        ? `${tenantContext.storefrontUrl}/admin/orders/${testId}`
-        : null,
-    };
+      adminOrderLink: tenantContext.storefrontUrl ? `${tenantContext.storefrontUrl}/admin/orders/${testId}` : '',
+    });
+    payload = { ...commonPayload, ...alert, subject: `[TEST] ${alert.subject}` };
   } else if (body.event === 'payment-reminder') {
     payload = {
       ...tenantContext,
@@ -375,12 +380,11 @@ export async function POST(req: NextRequest) {
   }
 
   const webhookPath = WEBHOOK_PATHS[body.event];
-  const baseUrl = process.env.N8N_WEBHOOK_URL.replace(/\/$/, '');
 
   try {
-    const response = await fetch(`${baseUrl}${webhookPath}`, {
+    const response = await fetch(n8nWebhookUrl(webhookPath)!, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(n8nWebhookHeaders(webhookPath) ?? {}) },
       body: JSON.stringify(payload),
       cache: 'no-store',
     });

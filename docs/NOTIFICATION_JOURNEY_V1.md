@@ -33,6 +33,8 @@ Email is the outbound channel in v1. WhatsApp is exposed as a support/contact ac
 
 Internal tenant notifications use `tenant_notification_recipients`; recipient addresses must never be hardcoded in application code or n8n workflows.
 
+Transport: every outbound call goes through `notifyN8n` / `n8nWebhookUrl` / `n8nWebhookHeaders` (`lib/events/notifyN8n.ts`), never a hand-built `fetch`. Each request carries `X-Lepefy-Webhook-Secret`: the daily digest uses its dedicated `N8N_DAILY_DIGEST_WEBHOOK_SECRET` (fails closed), every other notification uses `N8N_NOTIFICATION_WEBHOOK_SECRET`. While the shared secret is not configured the header is omitted and a warning is logged (rollout only). Each n8n webhook must attach the matching Header Auth credential, and should answer only after the SMTP result (`responseMode: lastNode` or a Respond node), otherwise the application's `accepted`/`sent` booleans do not reflect delivery.
+
 ## Customer journey
 
 | Event | Trigger | Customer meaning | Primary CTA | v1 channel |
@@ -199,6 +201,8 @@ The current payload contains operational fields such as:
 - `adminOrderLink`
 
 Therefore v1 treats this webhook as an internal/admin incident notification.
+
+Since 27 Sept 2026 the application renders this alert itself (`lib/notifications/orderStockConflictEmail.ts`), resolves `recipients[]` from `tenant_notification_recipients.notify_order_stock_conflict` and adds `subject`, escaped `html` and `idempotencyKey` (`order-stock-conflict:<orderId>`). The n8n workflow "Lepefy · Order stock conflict alert" only validates, claims the key in `lepefy_n8n.digest_email_claims` and delivers via SMTP, like the daily digest receiver. Both the central conversion service and the storefront Stripe card path use it. No alert is sent (error logged) when the tenant has no opted-in recipient.
 
 A future customer incident flow must be designed separately around the actual refund/resolution state before sending automated customer copy.
 

@@ -3,6 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getCustomers, applyCustomSegment } from '@/lib/admin/crm';
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import type { CrmCustomerListItem, SegmentDefinition } from '@lepefy/types';
+import { n8nWebhookHeaders, n8nWebhookUrl } from '@/lib/events/notifyN8n';
+
+const MARKETING_WEBHOOK = '/webhook/marketing-campaign-recipient';
 
 export function isEligibleMarketingRecipient(customer: Pick<CrmCustomerListItem, 'marketing_consent' | 'email'>): boolean {
   return customer.marketing_consent === true && !!customer.email?.trim();
@@ -76,7 +79,8 @@ export async function dispatchMarketingCampaign(tenantId: string, campaignId: st
   let sent = 0;
   let failed = 0;
   const suppressDelivery = isE2ERequest() || process.env.NODE_ENV === 'test';
-  const endpoint = process.env.N8N_WEBHOOK_URL ? `${process.env.N8N_WEBHOOK_URL.replace(/\/$/, '')}/webhook/marketing-campaign-recipient` : null;
+  const endpoint = n8nWebhookUrl(MARKETING_WEBHOOK);
+  const authHeaders = n8nWebhookHeaders(MARKETING_WEBHOOK) ?? {};
   for (const recipient of recipients ?? []) {
     let ok = false;
     let failure: string | null = null;
@@ -87,7 +91,7 @@ export async function dispatchMarketingCampaign(tenantId: string, campaignId: st
         failure = 'provider_not_configured';
       } else {
         const response = await fetch(endpoint, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': recipient.idempotency_key },
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': recipient.idempotency_key, ...authHeaders },
           body: JSON.stringify({
             tenant: { id: tenantId },
             campaign: { id: campaign.id, name: campaign.name, channel: campaign.channel, subject: campaign.subject, content: campaign.content },

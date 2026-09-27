@@ -44,3 +44,35 @@ test('digest sends secret only to its own webhook and normalizes the base URL', 
     else process.env.N8N_DAILY_DIGEST_WEBHOOK_SECRET = oldSecret;
   }
 });
+
+test('other notifications carry the shared webhook secret, never the digest one', async () => {
+  const saved = {
+    url: process.env.N8N_WEBHOOK_URL,
+    digest: process.env.N8N_DAILY_DIGEST_WEBHOOK_SECRET,
+    shared: process.env.N8N_NOTIFICATION_WEBHOOK_SECRET,
+  };
+  const oldFetch = globalThis.fetch;
+  const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+  try {
+    process.env.N8N_WEBHOOK_URL = 'https://n8n.example';
+    process.env.N8N_DAILY_DIGEST_WEBHOOK_SECRET = 'digest-only';
+    process.env.N8N_NOTIFICATION_WEBHOOK_SECRET = 'shared-only';
+    globalThis.fetch = async (url, init) => {
+      requests.push({ url: String(url), init });
+      return new Response(null, { status: 200 });
+    };
+    expect(await notifyN8n('/webhook/order-stock-conflict', { test: true })).toBe(true);
+    expect(await notifyN8n('/webhook/daily-order-digest', { test: true })).toBe(true);
+    expect(new Headers(requests[0]!.init?.headers).get('X-Lepefy-Webhook-Secret')).toBe('shared-only');
+    expect(new Headers(requests[1]!.init?.headers).get('X-Lepefy-Webhook-Secret')).toBe('digest-only');
+  } finally {
+    globalThis.fetch = oldFetch;
+    for (const [key, value] of [
+      ['N8N_WEBHOOK_URL', saved.url],
+      ['N8N_DAILY_DIGEST_WEBHOOK_SECRET', saved.digest],
+      ['N8N_NOTIFICATION_WEBHOOK_SECRET', saved.shared],
+    ] as const) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});

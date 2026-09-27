@@ -7,6 +7,8 @@ import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
+import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
@@ -493,39 +495,24 @@ export async function POST(req: NextRequest) {
           '— order:', order.id);
       }
 
-      if (process.env.N8N_WEBHOOK_URL) {
-        try {
-          const storefrontUrl  = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-          const adminOrderLink = `${storefrontUrl}/admin/orders/${order.id}`;
-
-          const n8nConflictPayload = {
-            orderId:         order.id,
-            email:           checkoutSession.email,
-            fullName:        checkoutSession.full_name ?? '',
-            total,
-            reason:          stockError.message, // "insufficient_stock:<product_id>"
-            refundSucceeded,
-            adminOrderLink,
-          };
-
-          console.info('[webhook] Notifying n8n (stock conflict) — url:',
-            `${process.env.N8N_WEBHOOK_URL}/webhook/order-stock-conflict`);
-
-          const n8nRes = await fetch(
-            `${process.env.N8N_WEBHOOK_URL}/webhook/order-stock-conflict`,
-            {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify(n8nConflictPayload),
-            },
-          );
-
-          console.info('[webhook] n8n (stock conflict) response status:', n8nRes.status);
-        } catch (n8nErr) {
-          console.error('[webhook] n8n stock-conflict notification failed:', n8nErr);
-        }
+      const conflictContext = await getTenantNotificationContext(resolvedTenantId);
+      const conflictRecipients = await getNotificationRecipients(supabase, resolvedTenantId, 'notify_order_stock_conflict');
+      if (!conflictContext || !conflictRecipients.length) {
+        console.error('[webhook] stock conflict alert not sent — tenant context or recipients missing — order:', order.id);
       } else {
-        console.warn('[webhook] N8N_WEBHOOK_URL not set — skipping stock-conflict admin notification');
+        const storefrontUrl = conflictContext.storefrontUrl || process.env.NEXT_PUBLIC_STOREFRONT_URL || '';
+        await notifyN8n(ORDER_STOCK_CONFLICT_WEBHOOK, buildOrderStockConflictNotification(conflictContext, conflictRecipients, {
+          orderId:              order.id,
+          orderNumber:          `#${order.id.slice(0, 8).toUpperCase()}`,
+          email:                checkoutSession.email,
+          fullName:             checkoutSession.full_name ?? '',
+          fulfillmentType:      checkoutSession.fulfillment_type,
+          total,
+          reason:               stockError.message, // "insufficient_stock:<product_id>"
+          refundSucceeded,
+          manualRefundRequired: false,
+          adminOrderLink:       `${storefrontUrl}/admin/orders/${order.id}`,
+        }));
       }
 
       return NextResponse.json({ received: true });
@@ -533,16 +520,23 @@ export async function POST(req: NextRequest) {
 
     // ── Notify n8n ───────────────────────────────────────────────────────────
     if (process.env.N8N_WEBHOOK_URL && process.env.TRACKING_SECRET) {
-      try {
-        const trackingToken     = generateTrackingToken(order.id, checkoutSession.email);
-        const storefrontUrl     = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? '';
-        const orderTrackingLink = `${storefrontUrl}/orders/${order.id}?token=${trackingToken}`;
+      const trackingToken     = generateTrackingToken(order.id, checkoutSession.email);
+      // Tenant context carries emailBranding (sender): without it the n8n
+      // template has no valid From and SMTP rejects the confirmation.
+      const tenantContext     = await getTenantNotificationContext(resolvedTenantId);
+      const storefrontUrl     = tenantContext?.storefrontUrl || process.env.NEXT_PUBLIC_STOREFRONT_URL || '';
+      const orderTrackingLink = `${storefrontUrl}/orders/${order.id}?token=${trackingToken}`;
 
-        const n8nPayload = {
+      if (!tenantContext) {
+        console.error('[webhook] order-confirmed not sent — tenant notification context unavailable — order:', order.id);
+      } else {
+        await notifyN8n('/webhook/order-confirmed', {
+          ...tenantContext,
           orderId:                  order.id,
           orderNumber:              `#${order.id.slice(0, 8).toUpperCase()}`,
           email:                    checkoutSession.email,
           fullName:                 checkoutSession.full_name ?? '',
+          fulfillmentType:          checkoutSession.fulfillment_type,
           total,
           shippingTotal:            checkoutSession.shipping_total ?? 0,
           shippingAddress:          checkoutSession.shipping_address ?? null,
@@ -550,23 +544,7 @@ export async function POST(req: NextRequest) {
             (checkoutSession.shipping_address as ShippingAddress | null) ?? null,
           ),
           orderTrackingLink,
-        };
-
-        console.info('[webhook] Notifying n8n — url:',
-          `${process.env.N8N_WEBHOOK_URL}/webhook/order-confirmed`);
-
-        const n8nRes = await fetch(
-          `${process.env.N8N_WEBHOOK_URL}/webhook/order-confirmed`,
-          {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(n8nPayload),
-          },
-        );
-
-        console.info('[webhook] n8n response status:', n8nRes.status);
-      } catch (n8nErr) {
-        console.error('[webhook] n8n notification failed:', n8nErr);
+        });
       }
     } else {
       console.warn('[webhook] N8N_WEBHOOK_URL or TRACKING_SECRET not set — skipping n8n');
