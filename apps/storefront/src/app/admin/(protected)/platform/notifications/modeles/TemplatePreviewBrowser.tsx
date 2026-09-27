@@ -1,0 +1,104 @@
+'use client';
+
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { IconDeviceDesktop, IconDeviceMobile, IconSend } from '@tabler/icons-react';
+import type { TemplatePreview } from '@/lib/notifications/templateCatalog';
+
+const AUDIENCE_CLS: Record<TemplatePreview['audience'], string> = {
+  Client: 'bg-sky-50 text-sky-700 ring-sky-200',
+  'Équipe du tenant': 'bg-amber-50 text-amber-700 ring-amber-200',
+  Plateforme: 'bg-violet-50 text-violet-700 ring-violet-200',
+};
+
+export default function TemplatePreviewBrowser({ previews, tenantName }: { previews: TemplatePreview[]; tenantName: string }) {
+  const [selectedId, setSelectedId] = useState(previews[0]?.id ?? '');
+  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const selected = previews.find((preview) => preview.id === selectedId) ?? previews[0];
+  const groups = useMemo(() => {
+    const map = new Map<string, TemplatePreview[]>();
+    for (const preview of previews) map.set(preview.group, [...(map.get(preview.group) ?? []), preview]);
+    return [...map.entries()];
+  }, [previews]);
+
+  if (!selected) return null;
+
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Modèles d’emails</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {previews.length} emails rendus avec les modèles de production et l’identité de {tenantName}, sur des données fictives. Aucun envoi.
+          </p>
+        </div>
+        <Link href="/admin/platform/notifications/tests" className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--admin-primary)] hover:opacity-80">
+          <IconSend size={17} />Envoyer un test réel
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="lg:hidden">
+          <select value={selected.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900" aria-label="Modèle">
+            {groups.map(([group, items]) => (
+              <optgroup key={group} label={group}>
+                {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        <nav className="hidden max-h-[760px] overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800 lg:block" aria-label="Modèles">
+          {groups.map(([group, items]) => (
+            <div key={group}>
+              <p className="sticky top-0 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:border-gray-800 dark:bg-gray-800">{group}</p>
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedId(item.id)}
+                  aria-current={item.id === selected.id ? 'true' : undefined}
+                  className={`block w-full border-b border-gray-100 px-3 py-2.5 text-left text-sm transition last:border-b-0 dark:border-gray-800 ${item.id === selected.id
+                    ? 'bg-[var(--admin-primary-soft)] font-semibold text-[var(--admin-primary-fg)] shadow-[inset_3px_0_0_var(--admin-primary)]'
+                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60'}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        <div className="min-w-0">
+          <div className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500">Objet</p>
+              <p className="break-words font-semibold text-gray-900 dark:text-gray-100">{selected.subject}</p>
+              <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${AUDIENCE_CLS[selected.audience]}`}>Destinataire : {selected.audience}</span>
+            </div>
+            <div className="flex shrink-0 rounded-lg border border-gray-200 p-0.5 dark:border-gray-700" role="group" aria-label="Largeur d’aperçu">
+              {(['desktop', 'mobile'] as const).map((value) => (
+                <button key={value} type="button" onClick={() => setDevice(value)} aria-pressed={device === value}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${device === value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-600 dark:text-gray-300'}`}>
+                  {value === 'desktop' ? <IconDeviceDesktop size={15} /> : <IconDeviceMobile size={15} />}
+                  {value === 'desktop' ? 'Ordinateur' : 'Mobile'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 flex justify-center overflow-x-auto rounded-xl bg-gray-100 p-4 dark:bg-gray-950">
+            {/* No scripts, no same-origin access: the preview is inert HTML. */}
+            <iframe
+              key={`${selected.id}-${device}`}
+              title={`Aperçu : ${selected.label}`}
+              srcDoc={selected.html}
+              sandbox=""
+              className="h-[720px] shrink-0 rounded-lg border-0 bg-white shadow-sm"
+              style={{ width: device === 'desktop' ? 680 : 375 }}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

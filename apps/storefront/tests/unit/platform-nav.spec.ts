@@ -16,7 +16,8 @@ test('active state: console is exact, groups follow their pages and sub-pages', 
   expect(isNavHrefActive('/admin/platform/prospects/abc', '/admin/platform/prospects')).toBe(true);
   expect(isNavHrefActive('/admin/platform/prospectsx', '/admin/platform/prospects')).toBe(false);
   const notifications = platformNavGroup('notifications')!;
-  expect(notifications.children!.map((item) => item.label)).toEqual(['Historique', 'Tests']);
+  expect(notifications.children!.map((item) => item.label)).toEqual(['Historique', 'Modèles', 'Tests', 'Transport & santé']);
+  expect(platformNavGroup('development')!.label).toBe('Développement');
   expect(isGroupActive('/admin/platform/notifications/tests', notifications)).toBe(true);
   expect(isGroupActive('/admin/team', platformNavGroup('access')!)).toBe(true);
   expect(isGroupActive('/admin/team', notifications)).toBe(false);

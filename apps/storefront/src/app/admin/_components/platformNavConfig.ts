@@ -38,11 +38,13 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
   {
     id: 'notifications', label: 'Notifications', icon: IconBell, children: [
       { label: 'Historique', href: '/admin/platform/notifications/historique' },
+      { label: 'Modèles', href: '/admin/platform/notifications/modeles' },
       { label: 'Tests', href: '/admin/platform/notifications/tests' },
+      { label: 'Transport & santé', href: '/admin/platform/notifications/sante' },
     ],
   },
   {
-    id: 'growth', label: 'Croissance', icon: IconBriefcase, children: [
+    id: 'development', label: 'Développement', icon: IconBriefcase, children: [
       { label: 'Prospects', href: '/admin/platform/prospects' },
       { label: 'Feedback testeurs', href: '/admin/platform/feedback' },
     ],

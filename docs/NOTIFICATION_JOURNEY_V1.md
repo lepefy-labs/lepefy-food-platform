@@ -83,6 +83,15 @@ Where to look when an email fails:
 
 Platform emails without a tenant (admin invitation) are not recorded in the history; they appear in the Vercel logs only.
 
+## Platform console (Admin → Plateforme → Notifications)
+
+Platform owner only (`app/admin/(protected)/platform/layout.tsx` + `requirePlatformOwner` on the APIs); menu entries come from `app/admin/_components/platformNavConfig.ts`.
+
+- **Historique** (`/historique`): delivery log with status/keyword/date filters, detail row (transport, Brevo message id, raw error) and CSV export.
+- **Modèles** (`/modeles`): every email rendered by `lib/notifications/templateCatalog.ts` with the production builders, the tenant branding and fictitious data; preview in a sandboxed iframe (desktop/mobile width). Nothing is sent. Add every new template to the catalog.
+- **Tests** (`/tests`): real test sends through the active transport.
+- **Transport & santé** (`/sante`, `lib/notifications/notificationHealth.ts`): active transport and presence of keys/secrets (never their values), Brevo account check (`GET /v3/account`: key validity, plan credits), deliveries by status over 24 h / 7 days, retries overdue by more than 10 minutes and stuck sends (signal that the n8n "Notification retry scheduler" is not calling Lepefy), last daily digest run, and opted-in internal recipients per flag.
+
 ## Delivery ledger and retries (migration `136`)
 
 `notification_deliveries` records every notification sent with `notifyN8n(path, payload, { tenantId, idempotencyKey, notificationType })` (`lib/notifications/deliveryLedger.ts`):

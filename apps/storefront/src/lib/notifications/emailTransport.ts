@@ -126,3 +126,30 @@ export async function sendViaBrevo(
     return { ok: false, transport: 'brevo', error: name === 'TimeoutError' ? 'brevo_timeout' : `brevo_network_error ${error instanceof Error ? error.message : ''}`.trim().slice(0, 500) };
   }
 }
+
+export interface BrevoAccountStatus {
+  ok: boolean;
+  error?: string;
+  plans?: Array<{ type: string; credits: number | null; creditsType: string | null }>;
+}
+
+/** Read-only Brevo account check (key validity and remaining credits); never throws. */
+export async function checkBrevoAccount(fetchImpl: typeof fetch = fetch): Promise<BrevoAccountStatus> {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) return { ok: false, error: 'brevo_api_key_missing' };
+  try {
+    const response = await fetchImpl('https://api.brevo.com/v3/account', {
+      headers: { 'api-key': apiKey, accept: 'application/json' },
+      signal: AbortSignal.timeout(5_000),
+      cache: 'no-store',
+    });
+    if (!response.ok) return { ok: false, error: `brevo_http_${response.status}` };
+    const body = await response.json() as { plan?: Array<{ type?: string; credits?: number; creditsType?: string }> };
+    return {
+      ok: true,
+      plans: (body.plan ?? []).map((plan) => ({ type: plan.type ?? 'inconnu', credits: plan.credits ?? null, creditsType: plan.creditsType ?? null })),
+    };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error && error.name === 'TimeoutError' ? 'brevo_timeout' : 'brevo_network_error' };
+  }
+}
