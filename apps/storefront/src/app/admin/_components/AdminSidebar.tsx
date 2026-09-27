@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconBell, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle } from '@tabler/icons-react';
+import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle } from '@tabler/icons-react';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
+import PlatformNav from './PlatformNav';
 
 interface AdminSidebarProps {
   categories: { id: string; name: string; slug: string }[];
@@ -59,6 +60,6 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
     {has('tenant_settings.view') && <Link href="/admin/parametres" className={linkClass(pathname.startsWith('/admin/parametres'))}><IconSettings size={20}/>Paramètres</Link>}
     {has('billing.view') && <Link href="/admin/billing" className={linkClass(pathname === '/admin/billing')}><IconCreditCard size={20}/>Abonnement</Link>}
     {has('ai_usage.view') && <Link href="/admin/ai-usage" className={linkClass(pathname === '/admin/ai-usage')}><IconChartBar size={20}/>Utilisation IA</Link>}
-    {isPlatformOwner && <><p className={groupLabel}>Plateforme</p><Link href="/admin/platform" className={linkClass(pathname === '/admin/platform')}><IconSettings size={20}/>Console Lepefy</Link><Link href="/admin/team" className={linkClass(pathname === '/admin/team')}><IconUsers size={20}/>Utilisateurs</Link><Link href="/admin/platform/feedback" className={linkClass(pathname.startsWith('/admin/platform/feedback'))}><IconMessageCircle size={20}/>Feedback testeurs</Link><Link href="/admin/platform/prospects" className={linkClass(pathname.startsWith('/admin/platform/prospects'))}><IconBriefcase size={20}/>Prospects</Link><Link href="/admin/platform/access" className={linkClass(pathname.startsWith('/admin/platform/access'))}><IconUsers size={20}/>Rôles &amp; permissions</Link><Link href="/admin/platform/ai-routing" className={linkClass(pathname.startsWith('/admin/platform/ai-routing'))}><IconSparkles size={20}/>Routage IA</Link><Link href="/admin/platform/ai-usage" className={linkClass(pathname.startsWith('/admin/platform/ai-usage'))}><IconSparkles size={20}/>Coûts IA</Link><Link href="/admin/platform/notifications" className={linkClass(pathname.startsWith('/admin/platform/notifications'))}><IconBell size={20}/>Tests notifications</Link></>}
+    {isPlatformOwner && <PlatformNav pathname={pathname} linkClass={linkClass} groupLabel={groupLabel} />}
   </nav>;
 }

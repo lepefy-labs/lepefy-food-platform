@@ -126,15 +126,15 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-violet-700 dark:text-violet-300">
             <IconShieldLock size={16} /> Platform owner
           </div>
-          <h1 className="text-2xl font-bold text-gray-950 dark:text-white">Console de test des notifications</h1>
+          <h2 className="text-xl font-semibold text-gray-950 dark:text-white">Tests des modèles</h2>
           <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-            Envoie un payload de test au vrai workflow n8n sans créer de commande, réservation, invitation d’avis ou invitation testeur, ni modifier le stock, la capacité, la fidélité ou un paiement.
+            Envoie un email de test réel, rendu avec le modèle de production et transmis par le transport actif, sans créer de commande, réservation, invitation d’avis ou invitation testeur, ni modifier le stock, la capacité, la fidélité ou un paiement.
           </p>
         </div>
         <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">

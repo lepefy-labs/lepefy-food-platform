@@ -1,0 +1,63 @@
+import { IconBell, IconBriefcase, IconSettings, IconShieldLock, IconSparkles, type Icon } from '@tabler/icons-react';
+
+/**
+ * Platform-owner navigation, single source of truth for the sidebar groups and
+ * the in-page section tabs. Adding a platform page = adding an entry here.
+ */
+export interface PlatformNavItem {
+  label: string;
+  href: string;
+  /** 'prefix' (default) also marks sub-pages as active. */
+  match?: 'exact' | 'prefix';
+}
+
+export interface PlatformNavGroup {
+  id: string;
+  label: string;
+  icon: Icon;
+  /** Single-link entry (no children). */
+  href?: string;
+  match?: 'exact' | 'prefix';
+  children?: PlatformNavItem[];
+}
+
+export const PLATFORM_NAV: PlatformNavGroup[] = [
+  { id: 'console', label: 'Console Lepefy', icon: IconSettings, href: '/admin/platform', match: 'exact' },
+  {
+    id: 'access', label: 'Accès', icon: IconShieldLock, children: [
+      { label: 'Utilisateurs', href: '/admin/team' },
+      { label: 'Rôles & permissions', href: '/admin/platform/access' },
+    ],
+  },
+  {
+    id: 'ai', label: 'Intelligence artificielle', icon: IconSparkles, children: [
+      { label: 'Routage', href: '/admin/platform/ai-routing' },
+      { label: 'Coûts', href: '/admin/platform/ai-usage' },
+    ],
+  },
+  {
+    id: 'notifications', label: 'Notifications', icon: IconBell, children: [
+      { label: 'Historique', href: '/admin/platform/notifications/historique' },
+      { label: 'Tests', href: '/admin/platform/notifications/tests' },
+    ],
+  },
+  {
+    id: 'growth', label: 'Croissance', icon: IconBriefcase, children: [
+      { label: 'Prospects', href: '/admin/platform/prospects' },
+      { label: 'Feedback testeurs', href: '/admin/platform/feedback' },
+    ],
+  },
+];
+
+export function isNavHrefActive(pathname: string, href: string, match: 'exact' | 'prefix' = 'prefix') {
+  return match === 'exact' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function isGroupActive(pathname: string, group: PlatformNavGroup) {
+  if (group.href) return isNavHrefActive(pathname, group.href, group.match);
+  return (group.children ?? []).some((item) => isNavHrefActive(pathname, item.href, item.match));
+}
+
+export function platformNavGroup(id: string) {
+  return PLATFORM_NAV.find((group) => group.id === id);
+}

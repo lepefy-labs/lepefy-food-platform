@@ -34,7 +34,7 @@ export default async function PlatformConsolePage() {
           <Link href="/admin/team" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Utilisateurs</Link>
           <Link href="/admin/platform/access" className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm font-semibold text-violet-800 hover:bg-violet-50 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200">Rôles &amp; permissions</Link>
           <Link href="/admin/platform/ai-usage" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Coûts IA</Link>
-          <Link href="/admin/platform/notifications" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Diagnostics notifications</Link>
+          <Link href="/admin/platform/notifications/historique" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Notifications</Link>
         </div>
       </section>
 
