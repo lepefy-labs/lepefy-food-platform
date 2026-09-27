@@ -70,6 +70,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/payment-methods') || path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  if (path === '/api/admin/notification-deliveries') return read ? 'tenant_settings.view' : null;
+  if (/^\/api\/admin\/notification-deliveries\/[^/]+\/retry$/.test(path)) return method.toUpperCase() === 'POST' ? 'tenant_settings.manage' : null;
 
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';
   if (/^\/api\/admin\/evenementiel\/rental-reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';

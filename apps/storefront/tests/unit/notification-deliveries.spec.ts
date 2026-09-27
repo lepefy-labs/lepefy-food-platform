@@ -6,6 +6,7 @@ import {
   sendWithLedger,
   summarizePayload,
 } from '../../src/lib/notifications/deliveryLedger';
+import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 
 type Row = Record<string, unknown>;
 
@@ -112,4 +113,11 @@ test('history summary reads subject and recipients from the known payload shapes
   expect(summarizePayload({ subject: 'S', recipients: ['a@b.it', 'x'] })).toEqual({ subject: 'S', recipients: ['a@b.it'] });
   expect(summarizePayload({ email: 'c@d.it' })).toEqual({ subject: null, recipients: ['c@d.it'] });
   expect(summarizePayload({ customerEmail: 'e@f.it', email: { subject: 'Invite' } })).toEqual({ subject: 'Invite', recipients: ['e@f.it'] });
+});
+
+test('delivery history and manual retry are mapped to tenant settings permissions', () => {
+  expect(permissionForAdminApi('/api/admin/notification-deliveries', 'GET')).toBe('tenant_settings.view');
+  expect(permissionForAdminApi('/api/admin/notification-deliveries', 'DELETE')).toBeNull();
+  expect(permissionForAdminApi('/api/admin/notification-deliveries/abc/retry', 'POST')).toBe('tenant_settings.manage');
+  expect(permissionForAdminApi('/api/admin/notification-deliveries/abc/retry', 'GET')).toBeNull();
 });
