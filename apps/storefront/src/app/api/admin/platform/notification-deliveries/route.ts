@@ -19,11 +19,19 @@ export async function GET(req: NextRequest) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
 
-  const status = req.nextUrl.searchParams.get('status');
+  const params = req.nextUrl.searchParams;
+  const status = params.get('status');
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  const from = params.get('from');
+  const to = params.get('to');
+  const limit = Math.min(Math.max(Number(params.get('limit')) || 100, 1), 500);
   const load = (columns: string) => {
     let query = createServiceClient().from('notification_deliveries').select(columns)
-      .eq('tenant_id', tenant.id).order('created_at', { ascending: false }).limit(50);
+      .eq('tenant_id', tenant.id).order('created_at', { ascending: false }).limit(limit);
     if (status && (STATUSES as readonly string[]).includes(status)) query = query.eq('status', status);
+    // Calendar days in Europe/Rome would need a timezone-aware bound; UTC days are close enough for support.
+    if (from && day.test(from)) query = query.gte('created_at', `${from}T00:00:00Z`);
+    if (to && day.test(to)) query = query.lt('created_at', new Date(Date.parse(`${to}T00:00:00Z`) + 86_400_000).toISOString());
     return query;
   };
   const base = 'id, notification_type, subject, recipients, status, attempts, max_attempts, next_attempt_at, last_error, created_at, accepted_at, retryable:payload';
