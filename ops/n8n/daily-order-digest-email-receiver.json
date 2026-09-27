@@ -30,7 +30,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const p = $input.first().json.body ?? $input.first().json;\nif (!p || typeof p !== 'object') throw new Error('Invalid request body');\nif (typeof p.idempotencyKey !== 'string' || !/^[0-9a-f-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}$/i.test(p.idempotencyKey)) throw new Error('Invalid idempotency key');\nif (!Array.isArray(p.recipients) || p.recipients.length < 1 || p.recipients.length > 20 ||\n    !p.recipients.every(v => typeof v === 'string' && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v))) throw new Error('Invalid recipient list');\nif (typeof p.subject !== 'string' || !p.subject.length || p.subject.length > 300) throw new Error('Invalid subject');\nif (typeof p.html !== 'string' || !p.html.length || p.html.length > 200000) throw new Error('Invalid HTML');\nreturn [{json:{idempotencyKey:p.idempotencyKey,recipients:p.recipients,subject:p.subject,html:p.html,localDate:p.localDate}}];"
+        "jsCode": "const p = $input.first().json.body ?? $input.first().json;\nif (!p || typeof p !== 'object') throw new Error('Invalid request body');\nif (typeof p.idempotencyKey !== 'string' || !/^[0-9a-f-]{36}:[0-9]{4}-[0-9]{2}-[0-9]{2}$/i.test(p.idempotencyKey)) throw new Error('Invalid idempotency key');\nif (!Array.isArray(p.recipients) || p.recipients.length < 1 || p.recipients.length > 20 ||\n    !p.recipients.every(v => typeof v === 'string' && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v))) throw new Error('Invalid recipient list');\nif (typeof p.subject !== 'string' || !p.subject.length || p.subject.length > 300) throw new Error('Invalid subject');\nif (typeof p.html !== 'string' || !p.html.length || p.html.length > 200000) throw new Error('Invalid HTML');\nif (!p.emailBranding || typeof p.emailBranding.fromName !== 'string' || !p.emailBranding.fromName.trim() || p.emailBranding.fromName.length > 100 ||\n    typeof p.emailBranding.fromEmail !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(p.emailBranding.fromEmail)) throw new Error('Invalid sender');\nreturn [{json:{idempotencyKey:p.idempotencyKey,recipients:p.recipients,subject:p.subject,html:p.html,localDate:p.localDate,fromName:p.emailBranding.fromName.trim(),fromEmail:p.emailBranding.fromEmail}}];"
       },
       "onError": "continueErrorOutput"
     },
@@ -93,7 +93,7 @@
         160
       ],
       "parameters": {
-        "fromEmail": "CONFIGURE_SENDER@example.invalid",
+        "fromEmail": "={{ $('Validate payload').first().json.fromName }} <{{ $('Validate payload').first().json.fromEmail }}>",
         "toEmail": "={{ $('Validate payload').first().json.recipients.join(',') }}",
         "subject": "={{ $('Validate payload').first().json.subject }}",
         "emailFormat": "html",
