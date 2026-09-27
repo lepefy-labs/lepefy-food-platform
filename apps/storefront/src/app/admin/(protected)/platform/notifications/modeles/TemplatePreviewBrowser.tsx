@@ -86,14 +86,15 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
               ))}
             </div>
           </div>
-          <div className="mt-4 flex justify-center overflow-x-auto rounded-xl bg-gray-100 p-4 dark:bg-gray-950">
+          {/* mx-auto (not justify-center) so a preview wider than the panel scrolls instead of being clipped on the left. */}
+          <div className="mt-4 overflow-x-auto rounded-xl bg-gray-100 p-4 dark:bg-gray-950">
             {/* No scripts, no same-origin access: the preview is inert HTML. */}
             <iframe
               key={`${selected.id}-${device}`}
               title={`Aperçu : ${selected.label}`}
               srcDoc={selected.html}
               sandbox=""
-              className="h-[720px] shrink-0 rounded-lg border-0 bg-white shadow-sm"
+              className="mx-auto block h-[720px] rounded-lg border-0 bg-white shadow-sm"
               style={{ width: device === 'desktop' ? 680 : 375 }}
             />
           </div>
