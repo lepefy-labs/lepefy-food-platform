@@ -11,12 +11,9 @@ interface NotifyAdminInvitedParams {
   loginUrl: string;
 }
 
-// Réutilise le canal n8n existant (notifyN8n, N8N_WEBHOOK_URL — voir
-// resendReservationConfirmation.ts) : best-effort, un échec ici ne doit
-// jamais faire échouer la création de l'admin, déjà écrite en base à ce
-// point. Le webhook '/webhook/admin-invited' n'existe pas encore côté n8n —
-// à créer manuellement (trigger + template email Brevo), hors scope Claude
-// Code.
+// Email plateforme (expéditeur « Lepefy Food Platform »), rendu in-app et
+// envoyé via send-email : best-effort, un échec ici ne doit jamais faire
+// échouer la création de l'admin, déjà écrite en base à ce point.
 export async function notifyAdminInvited(params: NotifyAdminInvitedParams): Promise<void> {
   await deliverEmail(PLATFORM_EMAIL_CONTEXT, {
     ...adminInvitedEmail(params),

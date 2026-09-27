@@ -10,7 +10,7 @@ function isValidEmail(value: string): boolean {
 }
 
 // Corrige (optionnellement) l'email d'une réservation événement puis
-// renvoie la notification n8n '/webhook/event-reservation-confirmed' —
+// renvoie l'email de confirmation (template in-app via send-email) —
 // mêmes garde-fous que refund/route.ts (requireAdmin + tenant check).
 // Aucun nouveau qr_token, aucune capacité touchée : le client reçoit
 // exactement le même billet.

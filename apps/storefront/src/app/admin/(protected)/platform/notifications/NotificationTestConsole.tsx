@@ -286,7 +286,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
 
             {isReviewInvite && (
               <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
-                Le payload reprend le contrat réel <code>/webhook/review-invite</code> avec commande et token entièrement synthétiques. Aucun <code>review_invite</code>, token ou avis n’est créé ou modifié.
+                L’email est rendu avec le template réel de l’invitation (envoi via <code>send-email</code>), avec commande et token entièrement synthétiques. Aucun <code>review_invite</code>, token ou avis n’est créé ou modifié.
               </div>
             )}
 
