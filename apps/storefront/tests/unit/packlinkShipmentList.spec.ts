@@ -1,10 +1,13 @@
 import { expect, test } from '@playwright/test';
 import {
   PACKLINK_LIST_MAX_BYTES,
+  PACKLINK_LIST_MAX_PAGE,
   PACKLINK_LIST_ROW_LIMIT,
   PACKLINK_SHIPMENTS_URL,
   listPacklinkShipments,
   locateShipmentArray,
+  parsePageParam,
+  readPacklinkPagination,
   summarizePacklinkShipment,
   type LepefyOrderLink,
 } from '../../src/lib/shipping/packlinkShipmentList';
@@ -228,6 +231,79 @@ test.describe('listPacklinkShipments', () => {
     const unknown = await run(mockFetch(jsonResponse({ items: [], token: 'leak' })).impl);
     expect(unknown).toMatchObject({ available: false, reason: 'list_response_shape_unknown', diagnostics: { responseKeys: ['items', 'token'] } });
     expect(JSON.stringify(unknown)).not.toContain('leak');
+  });
+});
+
+test.describe('pagination (observed shape: current_page, total_pages, total_registers, is_one_indexed)', () => {
+  const page = (current: number, extra: Record<string, unknown> = {}) => jsonResponse({
+    shipments: [listRecord(`IT2026PRO000000${String(current).padStart(4, '0')}`)],
+    pagination: { current_page: current, total_pages: 245, total_registers: 2448, is_one_indexed: true, ...extra },
+  });
+
+  test('page 1 is requested without a query parameter and is verified', async () => {
+    const { impl, calls } = mockFetch(page(1));
+    const result = await run(impl);
+    expect(calls[0]?.url).toBe(PACKLINK_SHIPMENTS_URL);
+    if (!result.available) throw new Error('expected success');
+    expect(result.completeness).toBe('paginated');
+    expect(result.diagnostics.pagination).toMatchObject({
+      requestedPage: 1, verified: true, currentPage: 1, totalPages: 245, totalRecords: 2448, oneIndexed: true,
+    });
+  });
+
+  test('page N sends ?page=N and is accepted only when Packlink returns page N', async () => {
+    const { impl, calls } = mockFetch(page(2));
+    const result = await run(impl, { page: 2 });
+    expect(calls[0]?.url).toBe(`${PACKLINK_SHIPMENTS_URL}?page=2`);
+    expect(result).toMatchObject({ available: true, completeness: 'paginated', diagnostics: { endpoint: `GET ${PACKLINK_SHIPMENTS_URL}?page=2` } });
+  });
+
+  test('an ignored page parameter is rejected, never shown as the requested page', async () => {
+    const result = await run(mockFetch(page(1)).impl, { page: 2 });
+    expect(result).toMatchObject({
+      available: false, reason: 'page_not_honored',
+      diagnostics: { pagination: { requestedPage: 2, currentPage: 1, verified: false } },
+    });
+    expect(JSON.stringify(result)).not.toContain('IT2026PRO0000000001');
+  });
+
+  test('page > 1 without pagination metadata is rejected', async () => {
+    const result = await run(mockFetch(jsonResponse({ shipments: [listRecord('IT2026PRO0000000001')] })).impl, { page: 3 });
+    expect(result).toMatchObject({ available: false, reason: 'page_not_honored' });
+  });
+
+  test('zero-indexed metadata is normalized to 1-based pages', async () => {
+    const result = await run(mockFetch(page(0, { is_one_indexed: false })).impl);
+    if (!result.available) throw new Error('expected success');
+    expect(result.diagnostics.pagination).toMatchObject({ currentPage: 1, verified: true, oneIndexed: false });
+  });
+
+  test('page 1 without pagination metadata stays unverified but visible', async () => {
+    const result = await run(mockFetch(jsonResponse({ shipments: [listRecord('IT2026PRO0000000001')] })).impl);
+    expect(result).toMatchObject({ available: true, completeness: 'unverified', diagnostics: { pagination: { verified: false, totalPages: null } } });
+  });
+
+  test('invalid pages never reach Packlink', async () => {
+    const { impl, calls } = mockFetch(page(1));
+    for (const bad of [0, -1, 1.5, PACKLINK_LIST_MAX_PAGE + 1]) {
+      expect(await run(impl, { page: bad })).toMatchObject({ available: false, reason: 'invalid_page' });
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  test('parsePageParam accepts only bounded decimal integers', () => {
+    expect(parsePageParam(null)).toBe(1);
+    expect(parsePageParam('')).toBe(1);
+    expect(parsePageParam('2')).toBe(2);
+    expect(parsePageParam('245')).toBe(245);
+    for (const bad of ['0', '-1', '1.5', 'abc', '2&x=1', '1e3', '99999', ' 2']) {
+      expect(parsePageParam(bad)).toBeNull();
+    }
+  });
+
+  test('readPacklinkPagination ignores malformed metadata', () => {
+    expect(readPacklinkPagination({ pagination: { current_page: 'x', total_pages: -3 } }, 1))
+      .toMatchObject({ currentPage: null, totalPages: null, verified: false });
   });
 });
 

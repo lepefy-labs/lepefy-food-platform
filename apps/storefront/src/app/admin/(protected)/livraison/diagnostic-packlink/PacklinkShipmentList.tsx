@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   IconAlertTriangle,
+  IconChevronLeft,
   IconChevronRight,
+  IconInfoCircle,
   IconListSearch,
   IconRefresh,
   IconSearch,
@@ -224,7 +226,10 @@ function TechnicalDiagnostics({ diagnostics }: { diagnostics: PacklinkListDiagno
             ['Enregistrements affichés', diagnostics.returnedCount],
             ['Conteneur de la liste', diagnostics.container ?? DASH],
             ['Clés racine', diagnostics.responseKeys.join(', ') || (diagnostics.container === 'root' ? '(tableau racine)' : DASH)],
-            ['Pagination', hints.length ? `indices non documentés : ${hints.join(', ')}` : 'aucune information de pagination dans la réponse'],
+            ['Page demandée / renvoyée', `${diagnostics.pagination.requestedPage} / ${diagnostics.pagination.currentPage ?? DASH}`],
+            ['Pagination', diagnostics.pagination.verified
+              ? `vérifiée · ${diagnostics.pagination.totalPages} pages · ${diagnostics.pagination.totalRecords ?? DASH} enregistrements annoncés · base ${diagnostics.pagination.oneIndexed === false ? '0' : '1'}`
+              : hints.length ? `non vérifiée · clés : ${hints.join(', ')}` : 'aucune information de pagination dans la réponse'],
           ].map(([label, value]) => (
             <div key={String(label)} className="flex gap-2 py-0.5">
               <dt className="shrink-0 text-gray-500">{label} :</dt>
@@ -252,6 +257,52 @@ function TechnicalDiagnostics({ diagnostics }: { diagnostics: PacklinkListDiagno
   );
 }
 
+function Pager({
+  page,
+  totalPages,
+  loading,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  loading: boolean;
+  onPage: (page: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(page));
+  useEffect(() => setDraft(String(page)), [page]);
+  const target = Number(draft);
+  const valid = Number.isInteger(target) && target >= 1 && target <= totalPages;
+  const BTN = 'inline-flex min-h-10 items-center gap-1 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2 text-sm font-semibold text-gray-900 transition hover:bg-[var(--admin-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-900 dark:text-gray-100';
+
+  return (
+    <nav aria-label="Pagination des expéditions" className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex gap-2">
+        <button type="button" className={BTN} disabled={loading || page <= 1} onClick={() => onPage(page - 1)}>
+          <IconChevronLeft size={16} /> Précédente
+        </button>
+        <button type="button" className={BTN} disabled={loading || page >= totalPages} onClick={() => onPage(page + 1)}>
+          Suivante <IconChevronRight size={16} />
+        </button>
+      </div>
+      <form
+        className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+        onSubmit={(event) => { event.preventDefault(); if (valid && target !== page) onPage(target); }}
+      >
+        <label htmlFor="packlink-page">Page</label>
+        <input
+          id="packlink-page"
+          inputMode="numeric"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value.replace(/\D/g, '').slice(0, 5))}
+          className="w-20 rounded-xl border border-[var(--admin-border)] bg-white px-2.5 py-2 text-center text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100"
+        />
+        <span>sur {totalPages.toLocaleString('fr-FR')}</span>
+        <button type="submit" className={BTN} disabled={loading || !valid || target === page}>Aller</button>
+      </form>
+    </nav>
+  );
+}
+
 export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: string) => void }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PacklinkListResult | null>(null);
@@ -260,15 +311,28 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
   const [status, setStatus] = useState('all');
   const [linkFilter, setLinkFilter] = useState<LinkFilter>('all');
   const [selected, setSelected] = useState<PacklinkListedShipment | null>(null);
+  // Failure while moving to another page: the page already shown stays visible.
+  const [pageFailure, setPageFailure] = useState<Extract<PacklinkListResult, { available: false }> | null>(null);
 
-  async function load() {
+  const pagination = result?.available ? result.diagnostics.pagination : null;
+  const currentPage = pagination?.requestedPage ?? 1;
+
+  async function load(targetPage = currentPage) {
     setLoading(true);
     setNetworkError(null);
+    setPageFailure(null);
     try {
-      const response = await fetch('/api/admin/packlink-shipments', { cache: 'no-store' });
+      const url = targetPage > 1 ? `/api/admin/packlink-shipments?page=${targetPage}` : '/api/admin/packlink-shipments';
+      const response = await fetch(url, { cache: 'no-store' });
       const data = await response.json() as PacklinkListResult | { error?: string };
-      if ('available' in data) setResult(data);
-      else setNetworkError(data.error ?? `Réponse inattendue (HTTP ${response.status}).`);
+      if (!('available' in data)) {
+        setNetworkError(data.error ?? `Réponse inattendue (HTTP ${response.status}).`);
+      } else if (!data.available && result?.available && targetPage !== currentPage) {
+        setPageFailure(data);
+      } else {
+        setResult(data);
+        setSelected(null);
+      }
     } catch {
       setNetworkError('Erreur réseau lors du chargement des expéditions.');
     } finally {
@@ -313,14 +377,16 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
             <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
               {result
                 ? <>Mis à jour le {new Date(result.queriedAt).toLocaleString('fr-FR')}
-                    {result.available && <> · {result.diagnostics.returnedCount} expédition{result.diagnostics.returnedCount > 1 ? 's' : ''} récupérée{result.diagnostics.returnedCount > 1 ? 's' : ''} · {linkedCount} associée{linkedCount > 1 ? 's' : ''} à une commande</>}
+                    {result.available && pagination?.verified && <> · page {pagination.currentPage} sur {pagination.totalPages?.toLocaleString('fr-FR')}</>}
+                    {result.available && <> · {result.diagnostics.returnedCount} expédition{result.diagnostics.returnedCount > 1 ? 's' : ''} {pagination?.verified ? 'sur cette page' : `récupérée${result.diagnostics.returnedCount > 1 ? 's' : ''}`} · {linkedCount} associée{linkedCount > 1 ? 's' : ''} à une commande</>}
+                    {result.available && pagination?.verified && pagination.totalRecords != null && <> · {pagination.totalRecords.toLocaleString('fr-FR')} annoncées par Packlink</>}
                   </>
                 : 'Consultez les expéditions visibles avec la clé API Packlink du tenant. Lecture seule, une requête par clic.'}
             </p>
           </div>
           <button
             type="button"
-            onClick={load}
+            onClick={() => load()}
             disabled={loading}
             className={result
               ? 'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:text-gray-100'
@@ -344,9 +410,28 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
           </div>
         )}
 
+        {pageFailure && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {pageFailure.message}
+            <span className="mt-1 block text-xs">La page {currentPage} reste affichée. Détails dans le diagnostic technique.</span>
+          </div>
+        )}
+
+        {result?.available && pagination?.verified && (
+          <div className="mt-4 flex gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-xs leading-5 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+            <IconInfoCircle size={16} className="mt-0.5 shrink-0" />
+            <p>
+              Pagination Packlink vérifiée : la page renvoyée correspond à la page demandée. Le total est celui annoncé par Packlink (liste non documentée officiellement).
+              {' '}La recherche et les filtres portent uniquement sur la page affichée.
+              {result.diagnostics.truncated && <> Seuls les {result.diagnostics.returnedCount} premiers enregistrements de la page sont affichés.</>}
+              {result.orderLookup === 'error' && <> Les associations Lepefy n’ont pas pu être vérifiées.</>}
+            </p>
+          </div>
+        )}
+
         {result?.available && (
           <>
-            <div className="mt-4 flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            {!pagination?.verified && <div className="mt-4 flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
               <IconAlertTriangle size={16} className="mt-0.5 shrink-0" />
               <p>
                 Liste potentiellement incomplète : Packlink ne documente officiellement ni cette liste ni sa pagination.
@@ -354,7 +439,7 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
                 {result.diagnostics.truncated && <> Seuls les {result.diagnostics.returnedCount} premiers sont affichés.</>}
                 {result.orderLookup === 'error' && <> Les associations Lepefy n’ont pas pu être vérifiées.</>}
               </p>
-            </div>
+            </div>}
 
             {shipments.length > 0 && (
               <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
@@ -466,7 +551,18 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
         </div>
       )}
 
-      {result?.diagnostics && <TechnicalDiagnostics diagnostics={result.diagnostics} />}
+      {pagination?.verified && (pagination.totalPages ?? 0) > 1 && (
+        <Pager
+          page={pagination.currentPage ?? currentPage}
+          totalPages={pagination.totalPages ?? 1}
+          loading={loading}
+          onPage={(target) => load(target)}
+        />
+      )}
+
+      {(pageFailure?.diagnostics ?? result?.diagnostics) && (
+        <TechnicalDiagnostics diagnostics={(pageFailure?.diagnostics ?? result?.diagnostics)!} />
+      )}
 
       {selected && (
         <ShipmentDetail

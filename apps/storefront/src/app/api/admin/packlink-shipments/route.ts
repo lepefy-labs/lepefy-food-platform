@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import {
   FAILURE_HTTP_STATUS,
+  FAILURE_MESSAGES,
   listPacklinkShipments,
+  parsePageParam,
   orderLabel,
   type LepefyOrderLink,
 } from '@/lib/shipping/packlinkShipmentList';
@@ -14,16 +16,25 @@ export const dynamic = 'force-dynamic';
 
 const noStore = { 'Cache-Control': 'private, no-store, max-age=0' };
 
-// Read-only: one Packlink GET per call, one SELECT on the tenant's orders.
-// Never creates, updates or links shipments/orders.
-export async function GET() {
+// Read-only: one Packlink GET per call (optional ?page=N, 1-based), one SELECT
+// on the tenant's orders. Never creates, updates or links shipments/orders.
+export async function GET(request: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
+  const page = parsePageParam(request.nextUrl.searchParams.get('page'));
+  if (page == null) {
+    return NextResponse.json(
+      { available: false, reason: 'invalid_page', message: FAILURE_MESSAGES.invalid_page, queriedAt: new Date().toISOString(), diagnostics: null },
+      { status: FAILURE_HTTP_STATUS.invalid_page, headers: noStore },
+    );
+  }
+
   const result = await listPacklinkShipments({
     shippingProvider: tenant.shipping_provider,
     apiKey: tenant.packlink_api_key,
+    page,
     lookupOrders: async (references) => {
       const { data, error } = await createServiceClient()
         .from('orders')

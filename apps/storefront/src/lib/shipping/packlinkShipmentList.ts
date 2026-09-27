@@ -3,8 +3,12 @@
 // Packlink's official connector (packlink-dev/ecommerce_module_core) only
 // documents GET shipments/{reference}; the account-wide GET /v1/shipments is
 // used by third-party clients but is not officially documented, nor is any
-// pagination. Everything here therefore treats the list as possibly partial
-// and never infers an account total from it.
+// pagination. The real response carries `pagination { current_page,
+// total_pages, total_registers, is_one_indexed }` (observed 2026-09-28: 10
+// records per page). Pages are requested with `?page=N` and every page is
+// self-verified: a response whose current_page differs from the requested
+// page is rejected (`page_not_honored`), never shown as that page. Totals are
+// presented as announced by Packlink.
 //
 // Field names read by summarizePacklinkShipment come first from a real list
 // response observed on 2026-09-28 (`{ shipments, pagination }`; per record:
@@ -19,6 +23,7 @@ export const PACKLINK_SHIPMENTS_URL = 'https://api.packlink.com/v1/shipments';
 export const PACKLINK_LIST_MAX_BYTES = 512_000;
 export const PACKLINK_LIST_TIMEOUT_MS = 12_000;
 export const PACKLINK_LIST_ROW_LIMIT = 200;
+export const PACKLINK_LIST_MAX_PAGE = 10_000;
 
 const SENSITIVE_FIELD = /^(authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|password|secret|token)$/i;
 const PAGINATION_KEYS = ['total', 'total_count', 'totalCount', 'count', 'page', 'pages', 'total_pages', 'per_page', 'limit', 'offset', 'next', 'previous', 'prev', 'cursor', 'has_more', 'links', 'meta', 'pagination'];
@@ -84,11 +89,25 @@ export interface PacklinkListDiagnostics {
   receivedCount: number | null;
   returnedCount: number;
   truncated: boolean;
-  pagination: { verified: false; hints: JsonRecord };
+  pagination: PacklinkPagination;
   unknownShapeSample?: unknown;
 }
 
+export interface PacklinkPagination {
+  requestedPage: number;
+  // True only when Packlink's own current_page equals the requested page.
+  verified: boolean;
+  currentPage: number | null;
+  totalPages: number | null;
+  totalRecords: number | null;
+  oneIndexed: boolean | null;
+  // Pagination-looking keys exactly as returned (redacted), for diagnostics.
+  hints: JsonRecord;
+}
+
 export type PacklinkListFailureReason =
+  | 'invalid_page'
+  | 'page_not_honored'
   | 'provider_not_packlink'
   | 'tenant_api_key_missing'
   | 'packlink_unavailable'
@@ -104,7 +123,8 @@ export type PacklinkListResult =
       available: true;
       source: 'packlink_account';
       queriedAt: string;
-      completeness: 'unverified';
+      // 'paginated': Packlink confirmed the page and announced its totals.
+      completeness: 'paginated' | 'unverified';
       orderLookup: 'ok' | 'error';
       shipments: PacklinkListedShipment[];
       diagnostics: PacklinkListDiagnostics;
@@ -118,6 +138,8 @@ export type PacklinkListResult =
     };
 
 export const FAILURE_MESSAGES: Record<PacklinkListFailureReason, string> = {
+  invalid_page: 'Numéro de page invalide.',
+  page_not_honored: 'Packlink n’a pas renvoyé la page demandée : la pagination n’est pas prise en charge de cette façon. Aucune donnée n’est affichée pour éviter de présenter une autre page.',
   provider_not_packlink: 'Ce tenant n’utilise pas Packlink comme provider de livraison.',
   tenant_api_key_missing: 'Aucune clé API Packlink n’est configurée pour ce tenant.',
   packlink_unavailable: 'Packlink n’a pas répondu (délai dépassé ou erreur réseau).',
@@ -131,6 +153,8 @@ export const FAILURE_MESSAGES: Record<PacklinkListFailureReason, string> = {
 
 // HTTP status returned by the Lepefy route for each failure.
 export const FAILURE_HTTP_STATUS: Record<PacklinkListFailureReason, number> = {
+  invalid_page: 400,
+  page_not_honored: 502,
   provider_not_packlink: 400,
   tenant_api_key_missing: 409,
   packlink_unavailable: 503,
@@ -185,13 +209,45 @@ export function locateShipmentArray(payload: unknown): { array: unknown[]; conta
   return null;
 }
 
-// Reports pagination-looking keys verbatim; they are never followed because
-// Packlink documents no pagination contract for this endpoint.
+// Reports pagination-looking keys verbatim for the technical diagnostics.
 export function paginationHints(payload: unknown): JsonRecord {
   if (!record(payload)) return {};
   return Object.fromEntries(PAGINATION_KEYS
     .filter(key => key in payload)
     .map(key => [key, redactPacklinkValue(payload[key], 6)]));
+}
+
+function positiveInt(value: unknown): number | null {
+  const parsed = num(value);
+  return parsed != null && Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
+// Reads the observed `pagination` object; anything else leaves fields null
+// and the page unverified.
+export function readPacklinkPagination(payload: unknown, requestedPage: number): PacklinkPagination {
+  const meta = record(payload) && record(payload.pagination) ? payload.pagination : {};
+  const oneIndexed = typeof meta.is_one_indexed === 'boolean' ? meta.is_one_indexed : null;
+  const rawCurrent = positiveInt(meta.current_page);
+  // Normalize to 1-based page numbers for the UI.
+  const currentPage = rawCurrent == null ? null : oneIndexed === false ? rawCurrent + 1 : rawCurrent;
+  const totalPages = positiveInt(meta.total_pages);
+  return {
+    requestedPage,
+    verified: currentPage === requestedPage && totalPages != null,
+    currentPage,
+    totalPages,
+    totalRecords: positiveInt(meta.total_registers),
+    oneIndexed,
+    hints: paginationHints(payload),
+  };
+}
+
+// Accepts only a plain decimal page number within bounds; null means invalid.
+export function parsePageParam(value: string | null): number | null {
+  if (value == null || value === '') return 1;
+  if (!/^\d{1,5}$/.test(value)) return null;
+  const page = Number(value);
+  return page >= 1 && page <= PACKLINK_LIST_MAX_PAGE ? page : null;
 }
 
 export function summarizePacklinkShipment(value: unknown): PacklinkShipmentSummary {
@@ -271,6 +327,8 @@ export interface ListPacklinkShipmentsInput {
   fetchImpl?: typeof fetch;
   // Read-only lookup of tenant orders already linked to these references.
   lookupOrders: (references: string[]) => Promise<Map<string, LepefyOrderLink>>;
+  // 1-based page; page 1 is requested without a query parameter.
+  page?: number;
   now?: () => number;
 }
 
@@ -284,10 +342,13 @@ export async function listPacklinkShipments(input: ListPacklinkShipmentsInput): 
   // Tenant key only: no fallback to the platform-wide key for this listing.
   const apiKey = input.apiKey?.trim();
   if (!apiKey) return fail('tenant_api_key_missing');
+  const page = input.page ?? 1;
+  if (!Number.isInteger(page) || page < 1 || page > PACKLINK_LIST_MAX_PAGE) return fail('invalid_page');
+  const url = page > 1 ? `${PACKLINK_SHIPMENTS_URL}?page=${page}` : PACKLINK_SHIPMENTS_URL;
 
   const startedAt = now();
   const diagnostics: PacklinkListDiagnostics = {
-    endpoint: `GET ${PACKLINK_SHIPMENTS_URL}`,
+    endpoint: `GET ${url}`,
     upstreamStatus: null,
     durationMs: 0,
     container: null,
@@ -296,12 +357,12 @@ export async function listPacklinkShipments(input: ListPacklinkShipmentsInput): 
     receivedCount: null,
     returnedCount: 0,
     truncated: false,
-    pagination: { verified: false, hints: {} },
+    pagination: readPacklinkPagination(null, page),
   };
 
   let response: Response;
   try {
-    response = await (input.fetchImpl ?? fetch)(PACKLINK_SHIPMENTS_URL, {
+    response = await (input.fetchImpl ?? fetch)(url, {
       method: 'GET',
       headers: { Authorization: apiKey, Accept: 'application/json' },
       cache: 'no-store',
@@ -334,12 +395,20 @@ export async function listPacklinkShipments(input: ListPacklinkShipmentsInput): 
   }
   diagnostics.durationMs = now() - startedAt;
   diagnostics.responseKeys = record(payload) ? Object.keys(payload).slice(0, 40) : [];
-  diagnostics.pagination.hints = paginationHints(payload);
+  diagnostics.pagination = readPacklinkPagination(payload, page);
 
   const located = locateShipmentArray(payload);
   if (!located) {
     diagnostics.unknownShapeSample = redactPacklinkValue(payload, 5);
     return fail('list_response_shape_unknown', diagnostics);
+  }
+
+  // Never present another page as the requested one.
+  const { currentPage } = diagnostics.pagination;
+  if (currentPage != null ? currentPage !== page : page > 1) {
+    diagnostics.container = located.container;
+    diagnostics.receivedCount = located.array.length;
+    return fail('page_not_honored', diagnostics);
   }
 
   const rows = located.array.slice(0, PACKLINK_LIST_ROW_LIMIT);
@@ -369,7 +438,7 @@ export async function listPacklinkShipments(input: ListPacklinkShipmentsInput): 
     available: true,
     source: 'packlink_account',
     queriedAt,
-    completeness: 'unverified',
+    completeness: diagnostics.pagination.verified ? 'paginated' : 'unverified',
     orderLookup,
     shipments: summaries.map((summary, index) => ({
       summary,
