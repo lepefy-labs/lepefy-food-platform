@@ -39,10 +39,19 @@ export async function deliverEmail(
     console.warn(`[sendEmail] ${delivery.notificationType} skipped — no recipient — tenant:`, context.tenantId);
     return false;
   }
-  const ledger = useLedger
-    ? { tenantId: context.tenantId, idempotencyKey: delivery.idempotencyKey, notificationType: delivery.notificationType }
-    : undefined;
-  return notify(SEND_EMAIL_WEBHOOK, {
+  return notify(...emailRequest(context, delivery, useLedger));
+}
+
+/**
+ * Arguments for `notifyN8n` delivering a rendered email through send-email,
+ * for callers that receive notifyN8n as an injected dependency.
+ */
+export function emailRequest(
+  context: TenantNotificationContext,
+  delivery: EmailDelivery,
+  useLedger = true,
+): [string, Record<string, unknown>, Parameters<typeof notifyN8n>[2]] {
+  return [SEND_EMAIL_WEBHOOK, {
     notificationType: delivery.notificationType,
     tenantId: context.tenantId,
     idempotencyKey: delivery.idempotencyKey,
@@ -51,7 +60,9 @@ export async function deliverEmail(
     html: delivery.html,
     replyTo: delivery.replyTo ?? null,
     emailBranding: context.emailBranding,
-  }, ledger);
+  }, useLedger
+    ? { tenantId: context.tenantId, idempotencyKey: delivery.idempotencyKey, notificationType: delivery.notificationType }
+    : undefined];
 }
 
 /**

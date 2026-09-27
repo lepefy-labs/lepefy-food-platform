@@ -53,6 +53,12 @@ New notifications are rendered by the application and delivered through one n8n 
 
 Marketing emails have **no automatic unsubscribe link yet** (decision of 27 Sept 2026, to be implemented later). Until then each campaign email ends with a manual opt-out sentence, and replies go to the tenant support address (`replyTo`). Opt-out requests must be processed by hand by revoking `customers.marketing_consent`.
 
+## Templates moved into Lepefy (phase 2)
+
+Batch A (27 Sept 2026): `order-confirmed`, `order-shipped`, `order-ready-for-pickup`, `order-completed`, `order-cancelled` and `payment-reminder` are rendered by `lib/notifications/customerEmails.ts` (same copy and structure as the former n8n templates, escaped values, `[TEST]` banner/subject in test mode) and delivered through `send-email` with the ledger, so every one of them is deduplicated on its key. `notificationType`: `order_confirmed`, `order_shipped`, `order_ready_for_pickup`, `order_completed`, `order_cancelled`, `payment_reminder`. The platform test console renders these events with the same builders and sends them through `send-email` (`console_test_*`, key `console-test:<uuid>`).
+
+The six former n8n workflows ("Notifica conferma ordine cliente", "spedizione cliente", "ordine pronto per il ritiro", "ordine completato", "ordine annullato", "attesa pagamento") are no longer called by the application. They stay active only as a rollback path until the in-app emails are validated in production, then they are deactivated. Remaining per-template workflows (batch B): event reservation confirmed, external payment alerts (shop and events), card quick payment, admin invitation, review invite, tester invite, event booking closed reports.
+
 ## Delivery ledger and retries (migration `136`)
 
 `notification_deliveries` records every notification sent with `notifyN8n(path, payload, { tenantId, idempotencyKey, notificationType })` (`lib/notifications/deliveryLedger.ts`):

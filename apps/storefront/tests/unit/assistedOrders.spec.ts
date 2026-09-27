@@ -239,8 +239,9 @@ test('Stripe-paid WhatsApp preorder converts once and emits one confirmation', a
   expect(result.ok && result.created).toBe(true);
   expect(fake.rpcCalls[0]).toMatchObject({ p_tenant_id: TENANT, p_session_id: SESSION,
     p_payment: { source: 'stripe_webhook', payment_method: 'stripe', stripe_payment_intent_id: 'pi_1' } });
-  expect(fx.messages.map((m) => m.path)).toEqual(['/webhook/order-confirmed']);
-  expect(fx.messages[0]!.payload.orderTrackingLink).toMatch(/^https:\/\/shop\.example\/orders\/9999/);
+  expect(fx.messages.map((m) => [m.path, m.payload.notificationType])).toEqual([['/webhook/send-email', 'order_confirmed']]);
+  expect(fx.messages[0]!.payload.idempotencyKey).toMatch(/^order-confirmed:/);
+  expect(String(fx.messages[0]!.payload.html)).toMatch(/href="https:\/\/shop\.example\/orders\/9999/);
   // Nala n'est jamais crédité d'une vente assistée ; le CRM connaît l'origine.
   expect(fx.nala).toEqual([]);
   expect(fx.crm[0]).toMatchObject({ source: 'assisted_order', orderMetadata: { order_origin: 'assisted', sales_channel: 'whatsapp' } });
@@ -272,7 +273,7 @@ test('two simultaneous admin confirmations create a single order and a single no
   ]);
   const createdCount = [first, second].filter((r) => r.ok && r.created).length;
   expect(createdCount).toBe(1);
-  expect(fx.messages.filter((m) => m.path === '/webhook/order-confirmed')).toHaveLength(1);
+  expect(fx.messages.filter((m) => m.payload.notificationType === 'order_confirmed')).toHaveLength(1);
   expect(fx.crm).toHaveLength(1);
 });
 
@@ -457,7 +458,7 @@ test('logistics workflow: an order without email still ships, loyalty runs, no e
   const messages: string[] = [];
   const deps = {
     processOrderPointsOnDelivery: async (id: string) => { hooks.push(id); },
-    notifyN8n: async (path: string) => { messages.push(path); return true; },
+    notifyN8n: async (_path: string, payload: Record<string, unknown>) => { messages.push(String(payload.notificationType)); return true; },
     getTenantNotificationContext: async () => ({ tenantId: TENANT, storefrontUrl: 'https://shop.example' } as TenantNotificationContext),
   };
   await runOrderTransitionSideEffects({ tenantId: TENANT, orderId: ORDER_ID, previousStatus: 'preparing', nextStatus: 'shipped', email: null, fullName: 'Awa', fulfillmentType: 'delivery', trackingCode: 'BRT1' }, deps);
@@ -465,5 +466,5 @@ test('logistics workflow: an order without email still ships, loyalty runs, no e
   expect(messages).toEqual([]);
   expect(hooks).toEqual([ORDER_ID]);
   await runOrderTransitionSideEffects({ tenantId: TENANT, orderId: ORDER_ID, previousStatus: 'preparing', nextStatus: 'shipped', email: 'awa@example.com', fullName: 'Awa', fulfillmentType: 'delivery', trackingCode: 'BRT1' }, deps);
-  expect(messages).toEqual(['/webhook/order-shipped']);
+  expect(messages).toEqual(['order_shipped']);
 });

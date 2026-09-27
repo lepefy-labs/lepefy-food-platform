@@ -6,6 +6,12 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { n8nWebhookHeaders, n8nWebhookUrl } from '@/lib/events/notifyN8n';
 import { buildOrderStockConflictNotification } from '@/lib/notifications/orderStockConflictEmail';
+import { emailRequest, SEND_EMAIL_WEBHOOK, type RenderedEmail } from '@/lib/notifications/sendEmail';
+import {
+  orderCancelledEmail, orderCompletedEmail, orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail,
+  paymentReminderEmail, type ShippingAddressLike,
+} from '@/lib/notifications/customerEmails';
+import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import {
   buildTesterFeedbackInviteEmail,
   LEPEFY_PLATFORM_SIGNATURE,
@@ -63,6 +69,47 @@ interface TestRequestBody {
     city?: string;
     country?: string;
   };
+}
+
+/** Test payloads of the events migrated to in-app templates, rendered with the production builders. */
+function renderInAppTestEmail(
+  event: TestEvent,
+  context: TenantNotificationContext,
+  payload: Record<string, unknown>,
+): RenderedEmail | null {
+  const p = payload;
+  const order = {
+    orderNumber: String(p.orderNumber ?? ''),
+    fullName: (p.fullName as string | undefined) ?? null,
+    orderTrackingLink: (p.orderTrackingLink as string | null | undefined) ?? null,
+    testMode: true,
+  };
+  switch (event) {
+    case 'order-confirmed':
+      return orderConfirmedEmail(context, {
+        ...order, fulfillmentType: (p.fulfillmentType as string | undefined) ?? null, total: Number(p.total ?? 0),
+        shippingTotal: Number(p.shippingTotal ?? 0), shippingAddress: (p.shippingAddress as ShippingAddressLike | null) ?? null,
+      });
+    case 'order-shipped':
+      return orderShippedEmail(context, {
+        ...order, trackingCode: (p.trackingCode as string | undefined) ?? null, trackingCarrier: (p.trackingCarrier as string | undefined) ?? null,
+      });
+    case 'order-ready-for-pickup':
+      return orderReadyForPickupEmail(context, order);
+    case 'order-completed':
+      return orderCompletedEmail(context, { ...order, completionType: p.completionType === 'picked_up' ? 'picked_up' : 'delivered' });
+    case 'order-cancelled':
+      return orderCancelledEmail(context, order);
+    case 'payment-reminder':
+      return paymentReminderEmail(context, {
+        paymentReference: String(p.paymentReference ?? ''), fullName: order.fullName,
+        paymentMethodLabel: (p.paymentMethod as { label?: string } | undefined)?.label ?? 'Paiement externe',
+        amount: Number(p.amount ?? 0), providerHandoffStarted: p.providerHandoffStarted === true,
+        resumeLink: String(p.resumeLink ?? ''), testMode: true,
+      });
+    default:
+      return null;
+  }
 }
 
 function isTestEvent(value: unknown): value is TestEvent {
@@ -379,7 +426,19 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  const webhookPath = WEBHOOK_PATHS[body.event];
+  // Phase 2: these events are rendered in-app and delivered through send-email,
+  // exactly like production; the console tests the real email.
+  let webhookPath = WEBHOOK_PATHS[body.event];
+  const rendered = renderInAppTestEmail(body.event, tenantContext, payload);
+  if (rendered) {
+    webhookPath = SEND_EMAIL_WEBHOOK;
+    payload = emailRequest(tenantContext, {
+      ...rendered,
+      notificationType: `console_test_${body.event.replace(/-/g, '_')}`,
+      idempotencyKey: `console-test:${testId}`,
+      recipients: [body.email.trim()],
+    }, false)[1];
+  }
 
   try {
     const response = await fetch(n8nWebhookUrl(webhookPath)!, {

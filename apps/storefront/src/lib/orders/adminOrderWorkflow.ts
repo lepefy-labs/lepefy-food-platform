@@ -3,6 +3,10 @@ import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { ensureReviewInviteForOrder } from '@/lib/reviews/reviewInvites';
+import { emailRequest, type RenderedEmail } from '@/lib/notifications/sendEmail';
+import {
+  orderCancelledEmail, orderCompletedEmail, orderReadyForPickupEmail, orderShippedEmail,
+} from '@/lib/notifications/customerEmails';
 import type { OrderStatus } from '@lepefy/types';
 
 export type FulfillmentType = 'delivery' | 'pickup';
@@ -138,34 +142,31 @@ export async function runOrderTransitionSideEffects({
     return;
   }
 
-  const orderTrackingLink = buildTrackingLink(orderId, email, tenant.storefrontUrl);
-  const commonPayload = {
-    ...tenant,
-    orderId,
+  // Rendered in-app and delivered through send-email (phase 2); one email per
+  // order and status thanks to the idempotency key.
+  const order = {
     orderNumber: `#${orderId.slice(0, 8).toUpperCase()}`,
-    email,
     fullName: fullName ?? '',
-    fulfillmentType,
-    orderTrackingLink,
+    orderTrackingLink: buildTrackingLink(orderId, email, tenant.storefrontUrl),
   };
+  const send = (notificationType: string, key: string, rendered: RenderedEmail) =>
+    dependencies.notifyN8n(...emailRequest(tenant, {
+      ...rendered, notificationType, idempotencyKey: `${key}:${orderId}`, recipients: [email],
+    }));
 
   if (nextStatus === 'shipped') {
-    await dependencies.notifyN8n('/webhook/order-shipped', { ...commonPayload, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null },
-      { tenantId, idempotencyKey: `order-shipped:${orderId}`, notificationType: 'order_shipped' });
+    await send('order_shipped', 'order-shipped',
+      orderShippedEmail(tenant, { ...order, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null }));
     return;
   }
   if (nextStatus === 'ready_for_pickup') {
-    await dependencies.notifyN8n('/webhook/order-ready-for-pickup', commonPayload,
-      { tenantId, idempotencyKey: `order-ready-for-pickup:${orderId}`, notificationType: 'order_ready_for_pickup' });
+    await send('order_ready_for_pickup', 'order-ready-for-pickup', orderReadyForPickupEmail(tenant, order));
     return;
   }
   if (nextStatus === 'delivered') {
-    await dependencies.notifyN8n('/webhook/order-completed', { ...commonPayload, completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered' },
-      { tenantId, idempotencyKey: `order-completed:${orderId}`, notificationType: 'order_completed' });
+    await send('order_completed', 'order-completed',
+      orderCompletedEmail(tenant, { ...order, completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered' }));
     return;
   }
-  if (nextStatus === 'cancelled') {
-    await dependencies.notifyN8n('/webhook/order-cancelled', commonPayload,
-      { tenantId, idempotencyKey: `order-cancelled:${orderId}`, notificationType: 'order_cancelled' });
-  }
+  if (nextStatus === 'cancelled') await send('order_cancelled', 'order-cancelled', orderCancelledEmail(tenant, order));
 }

@@ -4,17 +4,18 @@ import { revalidateTenantCache } from '@/lib/cache/storefrontCache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
-import { formatShippingAddress } from '@/lib/orders/formatShippingAddress';
 import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
+import { emailRequest } from '@/lib/notifications/sendEmail';
+import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
 import { getConfiguredWebhookSecrets, getStripeClient, type PaymentModule } from '@/lib/payments/stripeServerConfig';
 import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSignature';
-import type { ShippingAddress, EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
+import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { convertCheckoutSessionToOrder } from '@/lib/orders/convertCheckoutSessionToOrder';
@@ -530,21 +531,20 @@ export async function POST(req: NextRequest) {
       if (!tenantContext) {
         console.error('[webhook] order-confirmed not sent — tenant notification context unavailable — order:', order.id);
       } else {
-        await notifyN8n('/webhook/order-confirmed', {
-          ...tenantContext,
-          orderId:                  order.id,
-          orderNumber:              `#${order.id.slice(0, 8).toUpperCase()}`,
-          email:                    checkoutSession.email,
-          fullName:                 checkoutSession.full_name ?? '',
-          fulfillmentType:          checkoutSession.fulfillment_type,
-          total,
-          shippingTotal:            checkoutSession.shipping_total ?? 0,
-          shippingAddress:          checkoutSession.shipping_address ?? null,
-          shippingAddressFormatted: formatShippingAddress(
-            (checkoutSession.shipping_address as ShippingAddress | null) ?? null,
-          ),
-          orderTrackingLink,
-        }, { tenantId: resolvedTenantId, idempotencyKey: `order-confirmed:${order.id}`, notificationType: 'order_confirmed' });
+        await notifyN8n(...emailRequest(tenantContext, {
+          ...orderConfirmedEmail(tenantContext, {
+            orderNumber:       `#${order.id.slice(0, 8).toUpperCase()}`,
+            fullName:          checkoutSession.full_name ?? '',
+            orderTrackingLink,
+            fulfillmentType:   checkoutSession.fulfillment_type,
+            total,
+            shippingTotal:     checkoutSession.shipping_total ?? 0,
+            shippingAddress:   (checkoutSession.shipping_address as ShippingAddressLike | null) ?? null,
+          }),
+          notificationType: 'order_confirmed',
+          idempotencyKey:   `order-confirmed:${order.id}`,
+          recipients:       [checkoutSession.email],
+        }));
       }
     } else {
       console.warn('[webhook] N8N_WEBHOOK_URL or TRACKING_SECRET not set — skipping n8n');

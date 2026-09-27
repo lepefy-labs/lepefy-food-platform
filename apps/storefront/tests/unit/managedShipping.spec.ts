@@ -113,9 +113,9 @@ for (const [external, current, expected] of [
 test('repeated transit and delivered snapshots do not duplicate canonical webhooks or loyalty', async () => {
   const db = fakeService(); const spy = effects();
   for (const status of ['IN_TRANSIT', 'IN_TRANSIT', 'DELIVERED', 'DELIVERED']) await applyShipmentSnapshot(db.service, db.order(), snapshot(status), spy.run);
-  expect(spy.messages.map(message => message.path)).toEqual(['/webhook/order-shipped', '/webhook/order-completed']);
+  expect(spy.messages.map(message => message.payload.notificationType)).toEqual(['order_shipped', 'order_completed']);
   expect(spy.hooks).toEqual(['order-a']);
-  expect(spy.messages[1]!.payload.completionType).toBe('delivered');
+  expect(String(spy.messages[1]!.payload.subject)).toContain('a été livrée');
   expect(db.order().shipped_at).toBeTruthy();
 });
 test('initial delivered catch-up emits completion only; still requires preparation', async () => {
@@ -123,7 +123,7 @@ test('initial delivered catch-up emits completion only; still requires preparati
   await applyShipmentSnapshot(db.service, db.order(), parsePacklinkShipment(reference, payload, timeline), spy.run);
   expect(db.order().status).toBe('delivered');
   expect(db.order().shipped_at).toBe(new Date(1788973200 * 1000).toISOString());
-  expect(spy.messages.map(message => message.path)).toEqual(['/webhook/order-completed']);
+  expect(spy.messages.map(message => message.payload.notificationType)).toEqual(['order_completed']);
   expect(spy.hooks).toHaveLength(1);
   const blocked = fakeService(initialOrder({ packing_completed_at: null }));
   await expect(applyShipmentSnapshot(blocked.service, blocked.order(), snapshot('DELIVERED'), spy.run)).rejects.toThrow('Packing incomplet');

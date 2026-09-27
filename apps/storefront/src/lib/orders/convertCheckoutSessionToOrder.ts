@@ -7,6 +7,8 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
+import { emailRequest } from '@/lib/notifications/sendEmail';
+import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
@@ -297,19 +299,24 @@ export async function convertCheckoutSessionToOrder(
   } else if (!process.env.N8N_WEBHOOK_URL || !trackingLink) {
     console.warn('[convertCheckoutSessionToOrder] N8N_WEBHOOK_URL or TRACKING_SECRET not set — skipping n8n');
     customerNotification = 'skipped_unconfigured';
+  } else if (!tenantContext) {
+    console.error('[convertCheckoutSessionToOrder] order-confirmed not sent — tenant notification context unavailable — order:', order.id);
+    customerNotification = 'failed';
   } else {
-    const accepted = await deps.notifyN8n('/webhook/order-confirmed', {
-      ...(tenantContext ?? { tenantId: input.tenantId }),
-      orderId: order.id,
-      orderNumber: orderNumberFor(order.id),
-      email: order.email,
-      fullName: order.full_name ?? '',
-      fulfillmentType: order.fulfillment_type,
-      total: order.total,
-      shippingTotal: order.shipping_cost ?? 0,
-      shippingAddress: order.shipping_address ?? null,
-      orderTrackingLink: trackingLink,
-    }, { tenantId: input.tenantId, idempotencyKey: `order-confirmed:${order.id}`, notificationType: 'order_confirmed' });
+    const accepted = await deps.notifyN8n(...emailRequest(tenantContext, {
+      ...orderConfirmedEmail(tenantContext, {
+        orderNumber: orderNumberFor(order.id),
+        fullName: order.full_name ?? '',
+        orderTrackingLink: trackingLink,
+        fulfillmentType: order.fulfillment_type,
+        total: order.total,
+        shippingTotal: order.shipping_cost ?? 0,
+        shippingAddress: (order.shipping_address as ShippingAddressLike | null) ?? null,
+      }),
+      notificationType: 'order_confirmed',
+      idempotencyKey: `order-confirmed:${order.id}`,
+      recipients: [order.email],
+    }));
     customerNotification = accepted ? 'sent' : 'failed';
   }
   await assistedEvent(customerNotification === 'sent' ? 'notification_sent' : 'notification_skipped', {

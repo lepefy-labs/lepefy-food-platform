@@ -5,7 +5,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { generateCheckoutSessionAccessToken } from '@/lib/checkout/checkoutSessionAccessToken';
-import { notifyN8n } from '@/lib/events/notifyN8n';
+import { deliverEmail } from '@/lib/notifications/sendEmail';
+import { paymentReminderEmail } from '@/lib/notifications/customerEmails';
 
 const FIRST_REMINDER_DELAY_MS = 2 * 60 * 60 * 1000;
 const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -37,7 +38,6 @@ export async function POST(
 
   const supabase = createServiceClient();
   const now = new Date();
-  const nowIso = now.toISOString();
 
   const { data: rawSession, error: sessionError } = await supabase
     .from('checkout_sessions')
@@ -162,27 +162,19 @@ export async function POST(
     return NextResponse.json({ error: 'Impossible de réserver l’envoi du rappel.' }, { status: 500 });
   }
 
-  const payload: Record<string, unknown> = {
-    ...tenantContext,
-    checkoutSessionId: session.id,
-    paymentReference: `#${session.id.slice(0, 8).toUpperCase()}`,
-    email: session.email,
-    fullName: session.full_name ?? '',
-    paymentMethod: {
-      type: session.external_payment_type,
-      label: session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
-    },
-    amount,
-    resumeLink,
-    paymentStatus: session.status,
-    providerHandoffStarted: session.status === 'awaiting_verification',
-    reminderNumber,
+  const delivered = await deliverEmail(tenantContext, {
+    ...paymentReminderEmail(tenantContext, {
+      paymentReference: `#${session.id.slice(0, 8).toUpperCase()}`,
+      fullName: session.full_name ?? '',
+      paymentMethodLabel: session.external_payment_label ?? session.external_payment_type ?? 'Paiement externe',
+      amount,
+      resumeLink,
+      providerHandoffStarted: session.status === 'awaiting_verification',
+    }),
+    notificationType: 'payment_reminder',
     idempotencyKey,
-    reminderSentAt: nowIso,
-  };
-
-  const delivered = await notifyN8n('/webhook/payment-reminder', payload,
-    { tenantId: tenant.id, idempotencyKey, notificationType: 'payment_reminder' });
+    recipients: [session.email],
+  });
   if (!delivered) {
     await supabase
       .from('payment_funnel_logs')
