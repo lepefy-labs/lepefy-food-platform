@@ -150,16 +150,22 @@ export async function runOrderTransitionSideEffects({
   };
 
   if (nextStatus === 'shipped') {
-    await dependencies.notifyN8n('/webhook/order-shipped', { ...commonPayload, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null });
+    await dependencies.notifyN8n('/webhook/order-shipped', { ...commonPayload, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null },
+      { tenantId, idempotencyKey: `order-shipped:${orderId}`, notificationType: 'order_shipped' });
     return;
   }
   if (nextStatus === 'ready_for_pickup') {
-    await dependencies.notifyN8n('/webhook/order-ready-for-pickup', commonPayload);
+    await dependencies.notifyN8n('/webhook/order-ready-for-pickup', commonPayload,
+      { tenantId, idempotencyKey: `order-ready-for-pickup:${orderId}`, notificationType: 'order_ready_for_pickup' });
     return;
   }
   if (nextStatus === 'delivered') {
-    await dependencies.notifyN8n('/webhook/order-completed', { ...commonPayload, completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered' });
+    await dependencies.notifyN8n('/webhook/order-completed', { ...commonPayload, completionType: fulfillmentType === 'pickup' ? 'picked_up' : 'delivered' },
+      { tenantId, idempotencyKey: `order-completed:${orderId}`, notificationType: 'order_completed' });
     return;
   }
-  if (nextStatus === 'cancelled') await dependencies.notifyN8n('/webhook/order-cancelled', commonPayload);
+  if (nextStatus === 'cancelled') {
+    await dependencies.notifyN8n('/webhook/order-cancelled', commonPayload,
+      { tenantId, idempotencyKey: `order-cancelled:${orderId}`, notificationType: 'order_cancelled' });
+  }
 }

@@ -512,7 +512,7 @@ export async function POST(req: NextRequest) {
           refundSucceeded,
           manualRefundRequired: false,
           adminOrderLink:       `${storefrontUrl}/admin/orders/${order.id}`,
-        }));
+        }), { tenantId: resolvedTenantId, idempotencyKey: `order-stock-conflict:${order.id}`, notificationType: 'order_stock_conflict' });
       }
 
       return NextResponse.json({ received: true });
@@ -544,7 +544,7 @@ export async function POST(req: NextRequest) {
             (checkoutSession.shipping_address as ShippingAddress | null) ?? null,
           ),
           orderTrackingLink,
-        });
+        }, { tenantId: resolvedTenantId, idempotencyKey: `order-confirmed:${order.id}`, notificationType: 'order_confirmed' });
       }
     } else {
       console.warn('[webhook] N8N_WEBHOOK_URL or TRACKING_SECRET not set — skipping n8n');
@@ -637,7 +637,7 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     paid_at:                   paidAt,
     stripe_payment_intent_id:  intent.id,
     recipients,
-  });
+  }, { tenantId: payment.tenant_id, idempotencyKey: `card-quick-payment:${intent.id}`, notificationType: 'card_quick_payment' });
 
   return NextResponse.json({ received: true });
 }

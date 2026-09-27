@@ -201,7 +201,7 @@ export async function createEventReservationFromRequest(
     })),
     ticketUrl: getTicketUrl(qrToken),
     adminLink: `${storefrontUrl}/admin/evenementiel/evenements`,
-  });
+  }, { tenantId, idempotencyKey: `event-reservation-confirmed:${reservationId}`, notificationType: 'event_reservation_confirmed' });
 
   return { reservationId };
 }

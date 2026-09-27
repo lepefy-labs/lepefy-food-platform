@@ -97,7 +97,7 @@ export async function dispatchMarketingCampaign(tenantId: string, campaignId: st
           notificationType: 'marketing_campaign',
           idempotencyKey: `marketing-campaign:${recipient.idempotency_key}`,
           recipients: [recipient.channel_target],
-        });
+        }, undefined, false); // recipient status lives in marketing_campaign_recipients
         if (!ok) failure = 'provider_rejected';
       }
     } catch (deliveryError) {

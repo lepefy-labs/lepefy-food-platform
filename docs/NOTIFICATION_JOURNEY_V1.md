@@ -49,9 +49,22 @@ New notifications are rendered by the application and delivered through one n8n 
 | `rental_delivery_quote_pending` | Rental delivery without zone price | `notify_rental_reservations` | `rental-delivery-quote:<id>` |
 | `marketing_campaign` | Admin dispatches an email campaign | each consenting customer | `marketing-campaign:<recipient key>` |
 
-`notify_service_inquiries` and `notify_rental_reservations` come from migration `135` (additive, default `false`). Without the migration, or when no recipient opted in, the internal alert is skipped and logged; adding a recipient keeps working because the new flags are written only when enabled.
+`notify_service_inquiries` and `notify_rental_reservations` come from migration `135` (additive, default `false`; applied in production on 27 Sept 2026). Without the migration, or when no recipient opted in, the internal alert is skipped and logged; adding a recipient keeps working because the new flags are written only when enabled.
 
 Marketing emails have **no automatic unsubscribe link yet** (decision of 27 Sept 2026, to be implemented later). Until then each campaign email ends with a manual opt-out sentence, and replies go to the tenant support address (`replyTo`). Opt-out requests must be processed by hand by revoking `customers.marketing_consent`.
+
+## Delivery ledger and retries (migration `136`)
+
+`notification_deliveries` records every notification sent with `notifyN8n(path, payload, { tenantId, idempotencyKey, notificationType })` (`lib/notifications/deliveryLedger.ts`):
+
+- one row per `(tenant_id, idempotency_key)`: the same logical message is never queued or sent twice (e.g. `order-shipped:<orderId>`, `order-confirmed:<orderId>`); intentional resends use a fresh key (`payment-reminder:<session>:<n>`, `event-reservation-resend:<id>:<uuid>`);
+- the first attempt is immediate; on failure the row becomes `failed` with backoff 1, 5, 15, 60, 240 minutes, then `dead` after 5 attempts;
+- `POST /api/internal/notifications/dispatch` (Bearer `DAILY_DIGEST_CRON_SECRET`, the internal scheduler secret shared with the digest dispatcher) claims due rows with `claim_notification_deliveries` (`FOR UPDATE SKIP LOCKED`, 2-minute lock recovering crashed sends) and is called every 5 minutes by the n8n workflow "Lepefy · Notification retry scheduler" (`ops/n8n/notification-retry-scheduler.json`);
+- the payload (which contains personal data) is cleared as soon as n8n accepts it; subject and recipients stay for the admin history; accepted and dead rows are purged after 90 days;
+- Admin → Paramètres → "Historique des envois" lists the last 50 deliveries and offers "Réessayer" on failed/dead rows (compare-and-set claim, three more automatic attempts);
+- without migration 136 every call falls back to a single direct send, as before.
+
+Covered: order lifecycle (confirmed, shipped, ready for pickup, completed, cancelled, stock conflict), payment reminder, card quick payment, event reservation confirmation/resend, and every `send-email` notification except marketing. Not covered on purpose because they keep their own ledger or claim: daily digest (`tenant_daily_digest_runs`), external payment alerts (session claim), review invites, event close reports, tester invites and marketing (`marketing_campaign_recipients`). A retry after a timeout can still duplicate an email for workflows without n8n-side idempotency (the legacy per-template workflows); `send-email`, `order-stock-conflict` and the digest deduplicate on the key.
 
 ## Customer journey
 

@@ -9,6 +9,7 @@ import { BoutiqueInfoSection } from './BoutiqueInfoSection';
 import { OriginSection } from './OriginSection';
 import { LegalInfoSection } from './LegalInfoSection';
 import { NotificationRecipientsSection } from './NotificationRecipientsSection';
+import { NotificationDeliveriesSection } from './NotificationDeliveriesSection';
 import { DailyDigestSettingsSection, type DailyDigestSettingsInitial } from './DailyDigestSettingsSection';
 import { AppIconSection } from './AppIconSection';
 import { dailyDigestModule, DAILY_DIGEST_FEATURE_KEY } from '@/lib/notifications/dailyDigestConfig';
@@ -100,6 +101,10 @@ export default async function ParametresPage() {
         <LegalInfoSection legal_name={tenant.legal_name} legal_address={tenant.legal_address} legal_email={tenant.legal_email} />
         <NotificationRecipientsSection initialRecipients={(notificationRecipients ?? []) as TenantNotificationRecipient[]} />
         <DailyDigestSettingsSection initial={digestSettings.initial} available={digestSettings.available} />
+
+        <div className="xl:col-span-2">
+          <NotificationDeliveriesSection />
+        </div>
 
         <div className="xl:col-span-2">
           <SocialLinksSection initialLinks={(socialLinks ?? []) as TenantSocialLink[]} />

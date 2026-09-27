@@ -73,6 +73,11 @@ export async function resendReservationConfirmation(
     })),
     ticketUrl:  getTicketUrl(reservation.qr_token),
     adminLink:  `${storefrontUrl}/admin/evenementiel/evenements`,
+  }, {
+    // Each explicit resend is a new message (fresh key), still retried on failure.
+    tenantId: reservation.tenant_id,
+    idempotencyKey: `event-reservation-resend:${reservation.id}:${crypto.randomUUID()}`,
+    notificationType: 'event_reservation_confirmed',
   });
 
   console.info('[resendReservationConfirmation] Notification resent — reservation:', reservationId);

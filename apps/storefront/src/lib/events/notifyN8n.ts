@@ -40,7 +40,25 @@ export function n8nWebhookHeaders(webhookPath: string): Record<string, string> |
   return { [N8N_WEBHOOK_SECRET_HEADER]: secret };
 }
 
-export async function notifyN8n(webhookPath: string, payload: Record<string, unknown>): Promise<boolean> {
+/**
+ * With `ledger`, the notification is recorded in notification_deliveries,
+ * sent once now and retried by the scheduler on failure (a key is never sent
+ * twice). Without it, a single direct attempt as before.
+ */
+export async function notifyN8n(
+  webhookPath: string,
+  payload: Record<string, unknown>,
+  ledger?: { tenantId: string; idempotencyKey: string; notificationType: string },
+): Promise<boolean> {
+  if (ledger) {
+    const { sendWithLedger } = await import('@/lib/notifications/deliveryLedger');
+    return sendWithLedger(webhookPath, payload, ledger, postToN8n);
+  }
+  return postToN8n(webhookPath, payload);
+}
+
+/** One direct POST to n8n; true only when n8n answered 2xx. */
+export async function postToN8n(webhookPath: string, payload: Record<string, unknown>): Promise<boolean> {
   const url = n8nWebhookUrl(webhookPath);
   if (!url) {
     console.warn(`[events] N8N_WEBHOOK_URL not set — skipping notification ${webhookPath}`);

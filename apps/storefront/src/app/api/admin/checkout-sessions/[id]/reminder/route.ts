@@ -181,7 +181,8 @@ export async function POST(
     reminderSentAt: nowIso,
   };
 
-  const delivered = await notifyN8n('/webhook/payment-reminder', payload);
+  const delivered = await notifyN8n('/webhook/payment-reminder', payload,
+    { tenantId: tenant.id, idempotencyKey, notificationType: 'payment_reminder' });
   if (!delivered) {
     await supabase
       .from('payment_funnel_logs')

@@ -260,7 +260,7 @@ export async function convertCheckoutSessionToOrder(
         refundSucceeded,
         manualRefundRequired: !isStripe,
         adminOrderLink: `${storefrontUrl}/admin/orders/${order.id}`,
-      }));
+      }), { tenantId: input.tenantId, idempotencyKey: `order-stock-conflict:${order.id}`, notificationType: 'order_stock_conflict' });
     }
 
     return {
@@ -309,7 +309,7 @@ export async function convertCheckoutSessionToOrder(
       shippingTotal: order.shipping_cost ?? 0,
       shippingAddress: order.shipping_address ?? null,
       orderTrackingLink: trackingLink,
-    });
+    }, { tenantId: input.tenantId, idempotencyKey: `order-confirmed:${order.id}`, notificationType: 'order_confirmed' });
     customerNotification = accepted ? 'sent' : 'failed';
   }
   await assistedEvent(customerNotification === 'sent' ? 'notification_sent' : 'notification_skipped', {

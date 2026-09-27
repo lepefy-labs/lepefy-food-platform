@@ -32,11 +32,16 @@ export async function deliverEmail(
   context: TenantNotificationContext,
   delivery: EmailDelivery,
   notify: typeof notifyN8n = notifyN8n,
+  /** false for callers that keep their own delivery state (marketing recipients). */
+  useLedger = true,
 ): Promise<boolean> {
   if (!delivery.recipients.length) {
     console.warn(`[sendEmail] ${delivery.notificationType} skipped — no recipient — tenant:`, context.tenantId);
     return false;
   }
+  const ledger = useLedger
+    ? { tenantId: context.tenantId, idempotencyKey: delivery.idempotencyKey, notificationType: delivery.notificationType }
+    : undefined;
   return notify(SEND_EMAIL_WEBHOOK, {
     notificationType: delivery.notificationType,
     tenantId: context.tenantId,
@@ -46,7 +51,7 @@ export async function deliverEmail(
     html: delivery.html,
     replyTo: delivery.replyTo ?? null,
     emailBranding: context.emailBranding,
-  });
+  }, ledger);
 }
 
 /**

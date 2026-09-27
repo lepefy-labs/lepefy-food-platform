@@ -1,0 +1,97 @@
+{
+  "name": "Lepefy · Notification retry scheduler (5 min)",
+  "nodes": [
+    {
+      "id": "5e1f0a3b-7c2d-4e8f-9a6b-1c2d3e4f5a6b",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6f2a1b4c-8d3e-4f9a-8b7c-2d3e4f5a6b7c",
+      "name": "Manual diagnostic",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        420
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7a3b2c5d-9e4f-4a0b-9c8d-3e4f5a6b7c8d",
+      "name": "Retry due notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        330
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/notifications/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Retry due notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual diagnostic": {
+      "main": [
+        [
+          {
+            "node": "Retry due notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

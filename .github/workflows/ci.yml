@@ -284,3 +284,13 @@ jobs:
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/134_tenant_ai_settings.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/134_tenant_ai_settings.sql
           psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/134_tenant_ai_settings.test.sql
+
+      - name: Notification deliveries ledger, claim semantics and grants
+        if: ${{ !cancelled() }}
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/136_notification_deliveries.fixture.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/136_notification_deliveries.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/migrations/136_notification_deliveries.sql
+          psql -h localhost -U postgres -d ai_core_test -v ON_ERROR_STOP=1 -f supabase/tests/136_notification_deliveries.test.sql
