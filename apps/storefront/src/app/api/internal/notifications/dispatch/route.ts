@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { postToN8n } from '@/lib/events/notifyN8n';
+import { sendNotification } from '@/lib/events/notifyN8n';
 import { dispatchDueDeliveries } from '@/lib/notifications/deliveryLedger';
 
 export const runtime = 'nodejs';
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    return NextResponse.json(await dispatchDueDeliveries(postToN8n));
+    return NextResponse.json(await dispatchDueDeliveries(sendNotification));
   } catch (error) {
     console.error('[notifications dispatch] failed:', error);
     return NextResponse.json({ error: 'Notification ledger unavailable' }, { status: 503 });

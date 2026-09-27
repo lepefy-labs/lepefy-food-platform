@@ -3,6 +3,15 @@
 // notifications applicatives. Un échec de transport ne doit jamais faire
 // échouer une opération métier déjà validée; les callers qui ont besoin de
 // savoir si n8n a accepté la requête peuvent utiliser le booléen retourné.
+// Les emails déjà rendus peuvent partir directement par Brevo
+// (EMAIL_TRANSPORT=brevo, voir lib/notifications/emailTransport.ts).
+
+import {
+  configuredEmailTransport,
+  RENDERED_EMAIL_WEBHOOKS,
+  sendViaBrevo,
+  type TransportResult,
+} from '@/lib/notifications/emailTransport';
 
 export const N8N_WEBHOOK_SECRET_HEADER = 'X-Lepefy-Webhook-Secret';
 
@@ -40,35 +49,62 @@ export function n8nWebhookHeaders(webhookPath: string): Record<string, string> |
   return { [N8N_WEBHOOK_SECRET_HEADER]: secret };
 }
 
+export interface LedgerRequest {
+  tenantId: string;
+  idempotencyKey: string;
+  notificationType: string;
+  /**
+   * 'retry' (default): recorded, sent once, retried by the scheduler on failure.
+   * 'log': recorded for the admin history only (no payload kept, no retry), for
+   * flows that already own their dedup/retry state.
+   */
+  mode?: 'retry' | 'log';
+}
+
 /**
- * With `ledger`, the notification is recorded in notification_deliveries,
- * sent once now and retried by the scheduler on failure (a key is never sent
- * twice). Without it, a single direct attempt as before.
+ * With `ledger`, the notification is recorded in notification_deliveries (see
+ * LedgerRequest.mode). Without it, a single direct attempt.
  */
 export async function notifyN8n(
   webhookPath: string,
   payload: Record<string, unknown>,
-  ledger?: { tenantId: string; idempotencyKey: string; notificationType: string },
+  ledger?: LedgerRequest,
 ): Promise<boolean> {
   if (ledger) {
     const { sendWithLedger } = await import('@/lib/notifications/deliveryLedger');
-    return sendWithLedger(webhookPath, payload, ledger, postToN8n);
+    return sendWithLedger(webhookPath, payload, ledger, sendNotification);
   }
-  return postToN8n(webhookPath, payload);
+  return (await sendNotification(webhookPath, payload)).ok;
 }
 
-/** One direct POST to n8n; true only when n8n answered 2xx. */
+/** One direct attempt; true only when the transport accepted the notification. */
 export async function postToN8n(webhookPath: string, payload: Record<string, unknown>): Promise<boolean> {
+  return (await sendNotification(webhookPath, payload)).ok;
+}
+
+/**
+ * One attempt through the configured transport: rendered emails go to Brevo
+ * when EMAIL_TRANSPORT=brevo, everything else (and every email by default)
+ * goes to its n8n webhook.
+ */
+export async function sendNotification(webhookPath: string, payload: Record<string, unknown>): Promise<TransportResult> {
+  if (RENDERED_EMAIL_WEBHOOKS.has(webhookPath) && configuredEmailTransport() === 'brevo') {
+    const result = await sendViaBrevo(payload);
+    if (result.ok) console.info(`[email] brevo accepted ${String(payload.notificationType ?? webhookPath)} — message:`, result.messageId);
+    else console.error(`[email] brevo rejected ${String(payload.notificationType ?? webhookPath)} —`, result.error);
+    return result;
+  }
+
   const url = n8nWebhookUrl(webhookPath);
   if (!url) {
     console.warn(`[events] N8N_WEBHOOK_URL not set — skipping notification ${webhookPath}`);
-    return false;
+    return { ok: false, transport: 'n8n', error: 'n8n_not_configured' };
   }
 
   const authHeaders = n8nWebhookHeaders(webhookPath);
   if (!authHeaders) {
     console.error('[events] N8N_DAILY_DIGEST_WEBHOOK_SECRET missing — digest not sent');
-    return false;
+    return { ok: false, transport: 'n8n', error: 'n8n_secret_missing' };
   }
 
   try {
@@ -78,9 +114,11 @@ export async function postToN8n(webhookPath: string, payload: Record<string, unk
       body: JSON.stringify(payload),
     });
     console.info(`[events] n8n notification ${webhookPath} — status:`, res.status);
-    return res.ok;
+    return res.ok
+      ? { ok: true, transport: 'n8n', httpStatus: res.status }
+      : { ok: false, transport: 'n8n', httpStatus: res.status, error: `n8n_http_${res.status}` };
   } catch (err) {
     console.error(`[events] n8n notification ${webhookPath} failed:`, err);
-    return false;
+    return { ok: false, transport: 'n8n', error: `n8n_network_error ${err instanceof Error ? err.message : ''}`.trim().slice(0, 500) };
   }
 }

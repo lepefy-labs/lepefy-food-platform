@@ -17,12 +17,13 @@ function fakeDb(options: { rows?: Row[]; missingTable?: boolean; claim?: Row[] }
   const db = {
     from() {
       return {
-        upsert(row: Row) {
+        upsert(row: Row, upsertOptions?: { ignoreDuplicates?: boolean }) {
           return {
             select: async () => {
               if (options.missingTable) return { data: null, error: { code: 'PGRST205', message: 'notification_deliveries' } };
               const exists = rows.find((r) => r.tenant_id === row.tenant_id && r.idempotency_key === row.idempotency_key);
-              if (exists) return { data: [], error: null };
+              if (exists && upsertOptions?.ignoreDuplicates !== false) return { data: [], error: null };
+              if (exists) { Object.assign(exists, row); return { data: [exists], error: null }; }
               const created = { id: `d${rows.length + 1}`, max_attempts: 5, ...row };
               rows.push(created);
               return { data: [created], error: null };
@@ -120,4 +121,22 @@ test('delivery history and manual retry are mapped to tenant settings permission
   expect(permissionForAdminApi('/api/admin/notification-deliveries', 'DELETE')).toBeNull();
   expect(permissionForAdminApi('/api/admin/notification-deliveries/abc/retry', 'POST')).toBe('tenant_settings.manage');
   expect(permissionForAdminApi('/api/admin/notification-deliveries/abc/retry', 'GET')).toBeNull();
+});
+
+test('log mode records history without payload, re-sends on a new attempt and never retries', async () => {
+  const fx = fakeDb({ rows: [{ id: 'd1', tenant_id: 't1', idempotency_key: 'review-invite:1', status: 'dead', attempts: 1, max_attempts: 1 }] });
+  let calls = 0;
+  const ok = await sendWithLedger('/webhook/send-email', { subject: 'Avis', recipients: ['a@b.it'] },
+    { tenantId: 't1', idempotencyKey: 'review-invite:1', notificationType: 'review_invite', mode: 'log' },
+    async () => { calls += 1; return { ok: true, transport: 'brevo', messageId: '<m1@brevo>' }; }, fx.db);
+  expect(ok).toBe(true);
+  expect(calls).toBe(1);
+  expect(fx.rows[0]).toMatchObject({ status: 'accepted', payload: null, max_attempts: 1, subject: 'Avis', provider_message_id: '<m1@brevo>', transport: 'brevo' });
+});
+
+test('transport errors are stored as the delivery error', async () => {
+  const fx = fakeDb();
+  await sendWithLedger('/webhook/send-email', { subject: 'x' }, ledger,
+    async () => ({ ok: false, transport: 'brevo', error: 'brevo_http_400 invalid_parameter: sender not valid' }), fx.db);
+  expect(fx.rows[0]).toMatchObject({ status: 'failed', last_error: 'brevo_http_400 invalid_parameter: sender not valid', transport: 'brevo' });
 });

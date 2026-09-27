@@ -65,6 +65,24 @@ Active Lepefy n8n workflows after phase 2: "Send email", "Order stock conflict a
 
 Attachments (27 Sept 2026): `send-email` accepts an optional `attachments[]` (`filename`, `contentType`, `contentBase64`; at most 5 files, PDF/CSV/XLSX/PNG/JPEG with a matching content type, names up to 120 safe characters, about 10 MB of base64 in total). The "Attach files" node turns them into binary properties sent as regular file attachments (`fileAttachments`). Deliveries with attachments should not use the ledger, which would store them in its payload. The event booking closed reports (`event_booking_closed_reports`, key `event-booking-close-reports:<event>:<dispatch token>`, CSV + two PDFs) are rendered in-app (`eventBookingClosedReportsEmail`) and sent this way; the event dispatch token remains their dedup mechanism.
 
+## Direct email transport (phase 3, Brevo API)
+
+`EMAIL_TRANSPORT` selects how rendered emails leave the application (`lib/notifications/emailTransport.ts`, `sendNotification` in `lib/events/notifyN8n.ts`):
+
+- `n8n` (default): payloads go to the n8n webhooks `send-email`, `order-stock-conflict` and `daily-order-digest` as before;
+- `brevo`: the same payloads are sent to the Brevo transactional API (`POST https://api.brevo.com/v3/smtp/email`, key `BREVO_API_KEY`, server-side only), with the checks the n8n workflow applied (sender `@lepefy.com` only, 1–20 recipients, no newline in the subject, attachment rules, 15 s timeout). The key goes in a custom header `X-Lepefy-Idempotency-Key` and the notification type in Brevo `tags`. Brevo has no idempotency keys: deduplication stays in Lepefy (ledger, claims), so a retry after a timeout can still duplicate in rare cases.
+
+Every other n8n webhook is unaffected, and switching back to `n8n` only needs the environment variable (plus a redeploy). The current SMTP account behind n8n is Brevo (`smtp-relay.brevo.com`), so the sender domain is already authenticated.
+
+Where to look when an email fails:
+
+1. Admin → Paramètres → "Historique des envois": every tenant email (retry ledger rows and "log" rows for flows that own their dedup: external payment alerts, review/tester invites, closing reports, marketing, daily digest), with status, attempts, the exact transport error (for example `brevo_http_400 …`) and, since migration `137`, the transport and Brevo message id with a link to the Brevo logs;
+2. Brevo → Transactional → Logs: what happened after acceptance (delivered, bounced, blocked, spam), searchable by message id or recipient;
+3. Vercel → project logs: `[email] brevo accepted|rejected …` lines and runtime errors (short retention);
+4. n8n keeps the schedulers (daily digest dispatcher, notification retry scheduler, shipping campaign scheduler) and, while `EMAIL_TRANSPORT=n8n`, the email executions.
+
+Platform emails without a tenant (admin invitation) are not recorded in the history; they appear in the Vercel logs only.
+
 ## Delivery ledger and retries (migration `136`)
 
 `notification_deliveries` records every notification sent with `notifyN8n(path, payload, { tenantId, idempotencyKey, notificationType })` (`lib/notifications/deliveryLedger.ts`):

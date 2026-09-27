@@ -4,7 +4,8 @@ import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getEventsBaseUrl, getTicketUrl } from '@/lib/events/ticketUrl';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
-import { n8nWebhookHeaders, n8nWebhookUrl } from '@/lib/events/notifyN8n';
+import { n8nWebhookHeaders, n8nWebhookUrl, sendNotification } from '@/lib/events/notifyN8n';
+import { RENDERED_EMAIL_WEBHOOKS } from '@/lib/notifications/emailTransport';
 import { buildOrderStockConflictNotification } from '@/lib/notifications/orderStockConflictEmail';
 import { emailRequest, SEND_EMAIL_WEBHOOK, type RenderedEmail } from '@/lib/notifications/sendEmail';
 import {
@@ -490,6 +491,20 @@ export async function POST(req: NextRequest) {
       idempotencyKey: `console-test:${testId}`,
       recipients: [body.email.trim()],
     }, false)[1];
+  }
+
+  // Rendered emails follow the production transport switch (n8n or Brevo API).
+  if (RENDERED_EMAIL_WEBHOOKS.has(webhookPath)) {
+    const result = await sendNotification(webhookPath, payload);
+    return NextResponse.json({
+      ok: result.ok,
+      event: body.event,
+      webhookPath,
+      transport: result.transport,
+      status: result.httpStatus ?? (result.ok ? 200 : 502),
+      response: JSON.stringify(result.ok ? { accepted: true, messageId: result.messageId ?? null } : { accepted: false, error: result.error }),
+      payload,
+    }, { status: result.ok ? 200 : 502 });
   }
 
   try {

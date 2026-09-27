@@ -6,6 +6,7 @@ import {
 import { dailyDigestModule, toDigestThresholds, DAILY_DIGEST_FEATURE_KEY, type DailyDigestConfig } from '@/lib/notifications/dailyDigestConfig';
 import { resolveModuleConfig, type ModuleConfigRow } from '@/lib/tenantConfig/moduleConfig';
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import type { LedgerRequest } from '@/lib/events/notifyN8n';
 
 export type DigestOutcome =
   | 'accepted' | 'failed' | 'not_due' | 'no_recipients' | 'already_claimed' | 'empty' | 'invalid_config';
@@ -15,7 +16,7 @@ export interface DigestRunnerDeps {
   db: SupabaseClient;
   getRecipients: (tenantId: string) => Promise<string[]>;
   getBranding: (tenantId: string) => Promise<TenantNotificationContext | null>;
-  notify: (path: string, payload: Record<string, unknown>) => Promise<boolean>;
+  notify: (path: string, payload: Record<string, unknown>, ledger?: LedgerRequest) => Promise<boolean>;
 }
 
 export interface DigestTenant {
@@ -117,6 +118,10 @@ export async function deliverTenantDigest(deps: DigestRunnerDeps, tenant: Digest
       localDate: clock.localDate, generatedAt: now.toISOString(),
       idempotencyKey: tenantId + ':' + clock.localDate, subject, html, items,
       snapshot, adminUrl,
+    }, {
+      // History only: tenant_daily_digest_runs stays the dedup/retry mechanism.
+      tenantId, idempotencyKey: 'daily-order-digest:' + tenantId + ':' + clock.localDate,
+      notificationType: 'daily_order_digest', mode: 'log',
     });
     if (!accepted) throw new Error('n8n_not_accepted');
     const { error } = await db.from('tenant_daily_digest_runs').update({

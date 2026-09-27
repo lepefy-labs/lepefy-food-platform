@@ -15,6 +15,8 @@ interface Delivery {
   last_error: string | null;
   created_at: string;
   retryable: boolean;
+  transport?: 'n8n' | 'brevo' | null;
+  provider_message_id?: string | null;
 }
 
 const STATUS: Record<Delivery['status'], { label: string; cls: string }> = {
@@ -32,7 +34,19 @@ const TYPES: Record<string, string> = {
   event_capacity_conflict: 'Événement complet', rental_stock_conflict: 'Matériel indisponible',
   service_inquiry_created: 'Demande de devis', rental_reservation_confirmed_customer: 'Réservation matériel (client)',
   rental_reservation_confirmed_admin: 'Réservation matériel (équipe)', rental_delivery_quote_pending: 'Livraison à chiffrer',
+  external_payment_awaiting_verification: 'Paiement externe à vérifier', event_external_payment_awaiting_verification: 'Réservation à vérifier',
+  review_invite: 'Invitation avis', tester_feedback_invite: 'Invitation testeur', event_booking_closed_reports: 'Rapports de clôture',
+  marketing_campaign: 'Campagne marketing', daily_order_digest: 'Rapport quotidien (08h)',
 };
+
+/** Brevo transactional logs, searchable by message id or recipient. */
+const BREVO_LOGS_URL = 'https://app.brevo.com/transactional/email/logs';
+
+function statusOf(d: Delivery) {
+  // Logged-only deliveries (no retry payload) are retried by their own module.
+  if (d.status === 'dead' && !d.retryable && d.max_attempts <= 1) return { label: 'Échec', cls: STATUS.dead.cls };
+  return STATUS[d.status];
+}
 
 const dateFmt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -91,11 +105,17 @@ export function NotificationDeliveriesSection() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{d.subject ?? TYPES[d.notification_type] ?? d.notification_type}</p>
                     <p className="truncate text-xs text-gray-500">{TYPES[d.notification_type] ?? d.notification_type} · {dateFmt.format(new Date(d.created_at))}{d.recipients.length ? ` · ${d.recipients.join(', ')}` : ''}</p>
-                    {d.last_error && d.status !== 'accepted' && <p className="mt-1 truncate text-xs text-red-600">{d.last_error}</p>}
+                    {d.last_error && d.status !== 'accepted' && <p className="mt-1 break-words text-xs text-red-600">{d.last_error}</p>}
+                    {(d.transport || d.provider_message_id) && (
+                      <p className="mt-1 truncate text-[11px] text-gray-400">
+                        {d.transport === 'brevo' ? 'Brevo' : d.transport === 'n8n' ? 'n8n' : ''}
+                        {d.provider_message_id && <> · ID <span className="select-all font-mono">{d.provider_message_id}</span> · <a href={BREVO_LOGS_URL} target="_blank" rel="noreferrer" className="underline">logs Brevo</a></>}
+                      </p>
+                    )}
                     {d.status === 'failed' && <p className="mt-1 text-xs text-amber-700">Essai {d.attempts}/{d.max_attempts} · prochain essai {dateFmt.format(new Date(d.next_attempt_at))}</p>}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${STATUS[d.status].cls}`}>{STATUS[d.status].label}</span>
+                    <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${statusOf(d).cls}`}>{statusOf(d).label}</span>
                     {(d.status === 'failed' || d.status === 'dead') && d.retryable && (
                       <button onClick={() => void retry(d.id)} disabled={retrying === d.id} className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">{retrying === d.id ? 'Envoi…' : 'Réessayer'}</button>
                     )}

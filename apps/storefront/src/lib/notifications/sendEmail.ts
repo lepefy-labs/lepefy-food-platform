@@ -1,4 +1,4 @@
-import { notifyN8n } from '@/lib/events/notifyN8n';
+import { notifyN8n, type LedgerRequest } from '@/lib/events/notifyN8n';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getNotificationRecipients, type NotificationFlag } from '@/lib/notifications/getNotificationRecipients';
 import {
@@ -7,10 +7,10 @@ import {
 } from '@/lib/notifications/getTenantNotificationContext';
 
 /**
- * Generic n8n delivery channel: the application renders the email and n8n
- * only validates, claims the idempotency key and sends it over SMTP
- * (workflow "Lepefy · Send email"). New notifications should use this
- * instead of adding a dedicated n8n workflow with its own template.
+ * Generic delivery channel for emails rendered by the application. The
+ * transport is EMAIL_TRANSPORT: n8n workflow "Lepefy · Send email" (validates,
+ * claims the key, SMTP) or the Brevo API directly (lib/notifications/emailTransport.ts).
+ * New notifications should use this instead of a dedicated n8n workflow.
  */
 export const SEND_EMAIL_WEBHOOK = '/webhook/send-email';
 
@@ -73,9 +73,24 @@ export function emailRequest(
     replyTo: delivery.replyTo ?? null,
     emailBranding: context.emailBranding,
     ...(delivery.attachments?.length ? { attachments: delivery.attachments } : {}),
-  }, useLedger
-    ? { tenantId: context.tenantId, idempotencyKey: delivery.idempotencyKey, notificationType: delivery.notificationType }
-    : undefined];
+  }, ledgerFor(context.tenantId, delivery, useLedger)];
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * useLedger: recorded and retried. Otherwise the caller owns dedup/retry and
+ * the email is still recorded for the admin history ("log" mode), except for
+ * platform emails without a tenant.
+ */
+function ledgerFor(tenantId: string, delivery: EmailDelivery, useLedger: boolean): LedgerRequest | undefined {
+  if (!UUID.test(tenantId)) return undefined;
+  return {
+    tenantId,
+    idempotencyKey: delivery.idempotencyKey,
+    notificationType: delivery.notificationType,
+    mode: useLedger ? 'retry' : 'log',
+  };
 }
 
 /**

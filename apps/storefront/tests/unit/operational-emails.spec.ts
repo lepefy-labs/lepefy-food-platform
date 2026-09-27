@@ -96,5 +96,7 @@ test('attachments are forwarded only when present', () => {
     ...base, attachments: [{ filename: 'r.csv', contentType: 'text/csv; charset=utf-8', contentBase64: 'YQ==' }],
   }, false);
   expect(payload.attachments).toEqual([{ filename: 'r.csv', contentType: 'text/csv; charset=utf-8', contentBase64: 'YQ==' }]);
-  expect(ledger).toBeUndefined();
+  // Without the retry ledger the email is still recorded for the admin history.
+  expect(ledger).toMatchObject({ mode: 'log', idempotencyKey: 'k:123456' });
+  expect(emailRequest({ ...context, tenantId: '' }, base, false)[2]).toBeUndefined();
 });

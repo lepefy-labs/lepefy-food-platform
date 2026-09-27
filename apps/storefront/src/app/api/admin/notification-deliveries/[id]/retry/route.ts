@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import { postToN8n } from '@/lib/events/notifyN8n';
+import { sendNotification } from '@/lib/events/notifyN8n';
 import { recordAttemptResult, type DeliveryRow } from '@/lib/notifications/deliveryLedger';
 
 export const runtime = 'nodejs';
@@ -35,7 +35,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (!claimed) return NextResponse.json({ error: 'Envoi déjà en cours de traitement.' }, { status: 409 });
 
   const row = claimed as DeliveryRow;
-  const ok = row.payload ? await postToN8n(row.webhook_path, row.payload) : false;
-  await recordAttemptResult(db, row, ok);
-  return NextResponse.json({ accepted: ok });
+  const outcome = row.payload ? await sendNotification(row.webhook_path, row.payload) : { ok: false, error: 'payload_missing' };
+  await recordAttemptResult(db, row, outcome);
+  return NextResponse.json({ accepted: outcome.ok, error: outcome.ok ? undefined : outcome.error });
 }
