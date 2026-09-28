@@ -11,7 +11,7 @@ import { emailRequest, SEND_EMAIL_WEBHOOK, type RenderedEmail } from '@/lib/noti
 import {
   eventExternalPaymentAwaitingVerificationEmail, eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail,
   orderCancelledEmail, orderCompletedEmail, orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail,
-  paymentReminderEmail, PLATFORM_EMAIL_CONTEXT, reviewInviteEmail, type ShippingAddressLike,
+  cardQuickPaymentCustomerEmail, paymentReminderEmail, PLATFORM_EMAIL_CONTEXT, reviewInviteEmail, type ShippingAddressLike,
 } from '@/lib/notifications/customerEmails';
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import {
@@ -33,7 +33,8 @@ type TestEvent =
   | 'event-external-payment-awaiting-verification'
   | 'event-reservation-confirmed'
   | 'review-invite'
-  | 'tester-feedback-invite';
+  | 'tester-feedback-invite'
+  | 'card-quick-payment-customer';
 
 type FulfillmentType = 'delivery' | 'pickup';
 type ReviewInviteKind = 'initial' | 'reminder';
@@ -51,6 +52,7 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'event-reservation-confirmed': '/webhook/event-reservation-confirmed',
   'review-invite': '/webhook/review-invite',
   'tester-feedback-invite': TESTER_FEEDBACK_INVITE_WEBHOOK,
+  'card-quick-payment-customer': SEND_EMAIL_WEBHOOK,
 };
 
 interface TestRequestBody {
@@ -154,6 +156,11 @@ function renderInAppTestEmail(
         reviewUrl: String(p.reviewUrl ?? ''),
         expiresAt: String(p.expiresAt ?? ''),
         testMode: true,
+      });
+    case 'card-quick-payment-customer':
+      return cardQuickPaymentCustomerEmail(context, {
+        quickPaymentId: String(p.orderId ?? ''), amount: Number(p.total ?? 0), currency: context.currency || 'EUR',
+        customerName: order.fullName, paidAt: String(p.testSentAt ?? new Date().toISOString()), testMode: true,
       });
     case 'tester-feedback-invite': {
       const email = (p.email ?? {}) as { subject?: string; html?: string };
@@ -312,6 +319,8 @@ export async function POST(req: NextRequest) {
           }
         : null,
     };
+  } else if (body.event === 'card-quick-payment-customer') {
+    payload = { ...commonPayload, total };
   } else if (body.event === 'order-shipped') {
     payload = {
       ...commonPayload,
