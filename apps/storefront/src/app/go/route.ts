@@ -3,8 +3,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 
 // Smart-link stabile: il QR "QR Shop" (api/shop/qr-code) incorpora questa
 // URL, mai la destinazione finale. Oggi reindirizza sempre allo shop; il
-// giorno del lancio pubblico Android basta valorizzare tenants.android_public
-// a true in DB — nessun nuovo QR, nessuna nuova stampa.
+// giorno del lancio pubblico Android basta «Publier» in Plateforme →
+// Application mobile (tenants.android_public) — nessun nuovo QR, nessuna nuova stampa.
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {

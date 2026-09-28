@@ -144,7 +144,7 @@ export default function MobileAppClient({ initial, storefrontUrl }: { initial: A
           {!editingFingerprints ? (
             app.fingerprints.length ? (
               <ul className="mt-3 space-y-1.5">{app.fingerprints.map((fp) => (
-                <li key={fp} className="overflow-x-auto rounded-lg bg-gray-50 px-3 py-2 font-mono text-xs text-gray-700 dark:bg-gray-950 dark:text-gray-300">{fp}</li>
+                <li key={fp} className="break-all rounded-lg bg-gray-50 px-3 py-2 font-mono text-xs leading-relaxed text-gray-700 dark:bg-gray-950 dark:text-gray-300">{fp}</li>
               ))}</ul>
             ) : <p className="mt-3 text-sm text-gray-500">Aucune empreinte : assetlinks.json reste vide.</p>
           ) : (
