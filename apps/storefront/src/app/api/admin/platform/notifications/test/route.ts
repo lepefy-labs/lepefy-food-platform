@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
 import { getEventsBaseUrl, getTicketUrl } from '@/lib/events/ticketUrl';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
+import { androidAppState, getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { n8nWebhookHeaders, n8nWebhookUrl, sendNotification } from '@/lib/events/notifyN8n';
 import { RENDERED_EMAIL_WEBHOOKS } from '@/lib/notifications/emailTransport';
 import { buildOrderStockConflictNotification } from '@/lib/notifications/orderStockConflictEmail';
@@ -34,7 +34,8 @@ type TestEvent =
   | 'event-reservation-confirmed'
   | 'review-invite'
   | 'tester-feedback-invite'
-  | 'card-quick-payment-customer';
+  | 'card-quick-payment-customer'
+  | 'card-quick-payment-customer-app-live';
 
 type FulfillmentType = 'delivery' | 'pickup';
 type ReviewInviteKind = 'initial' | 'reminder';
@@ -53,6 +54,7 @@ const WEBHOOK_PATHS: Record<TestEvent, string> = {
   'review-invite': '/webhook/review-invite',
   'tester-feedback-invite': TESTER_FEEDBACK_INVITE_WEBHOOK,
   'card-quick-payment-customer': SEND_EMAIL_WEBHOOK,
+  'card-quick-payment-customer-app-live': SEND_EMAIL_WEBHOOK,
 };
 
 interface TestRequestBody {
@@ -158,6 +160,7 @@ function renderInAppTestEmail(
         testMode: true,
       });
     case 'card-quick-payment-customer':
+    case 'card-quick-payment-customer-app-live':
       return cardQuickPaymentCustomerEmail(context, {
         quickPaymentId: String(p.orderId ?? ''), amount: Number(p.total ?? 0), currency: context.currency || 'EUR',
         customerName: order.fullName, paidAt: String(p.testSentAt ?? new Date().toISOString()), testMode: true,
@@ -319,7 +322,7 @@ export async function POST(req: NextRequest) {
           }
         : null,
     };
-  } else if (body.event === 'card-quick-payment-customer') {
+  } else if (body.event === 'card-quick-payment-customer' || body.event === 'card-quick-payment-customer-app-live') {
     payload = { ...commonPayload, total };
   } else if (body.event === 'order-shipped') {
     payload = {
@@ -490,7 +493,11 @@ export async function POST(req: NextRequest) {
   // Phase 2: these events are rendered in-app and delivered through send-email,
   // exactly like production; the console tests the real email.
   let webhookPath = WEBHOOK_PATHS[body.event];
-  const rendered = renderInAppTestEmail(body.event, tenantContext, payload);
+  // Preview of the launch-day state: the Android app treated as public (badge + Play Store link).
+  const renderContext: TenantNotificationContext = body.event === 'card-quick-payment-customer-app-live'
+    ? { ...tenantContext, mobileApp: { android: androidAppState(tenant.android_package_name || 'com.example.app', true) } }
+    : tenantContext;
+  const rendered = renderInAppTestEmail(body.event, renderContext, payload);
   if (rendered) {
     webhookPath = SEND_EMAIL_WEBHOOK;
     const sender = body.event === 'tester-feedback-invite' ? { ...PLATFORM_EMAIL_CONTEXT, tenantId: tenantContext.tenantId } : tenantContext;

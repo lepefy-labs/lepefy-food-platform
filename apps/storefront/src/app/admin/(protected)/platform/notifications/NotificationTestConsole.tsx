@@ -16,7 +16,8 @@ type TestEvent =
   | 'event-reservation-confirmed'
   | 'review-invite'
   | 'tester-feedback-invite'
-  | 'card-quick-payment-customer';
+  | 'card-quick-payment-customer'
+  | 'card-quick-payment-customer-app-live';
 
 type FulfillmentType = 'delivery' | 'pickup';
 type ReviewInviteKind = 'initial' | 'reminder';
@@ -28,6 +29,7 @@ const EVENTS: { value: TestEvent; label: string; description: string }[] = [
   { value: 'order-completed', label: 'Commande terminée', description: 'Livrée ou retirée.' },
   { value: 'order-cancelled', label: 'Commande annulée', description: 'Annulation sans promesse de remboursement.' },
   { value: 'card-quick-payment-customer', label: 'Paiement carte confirmé (client)', description: 'Confirmation client après un paiement /card, avec la configuration réelle (boutique, app Android), sans paiement réel.' },
+  { value: 'card-quick-payment-customer-app-live', label: 'Paiement carte confirmé (client) · app publiée', description: 'Même e-mail en simulant l’app Android publique : badge Google Play et lien vers la fiche Play Store du package du tenant.' },
   { value: 'payment-reminder', label: 'Rappel paiement', description: 'Rappel prudent pour un paiement externe non encore confirmé.' },
   { value: 'external-payment-awaiting-verification', label: 'Paiement externe à vérifier', description: 'Alerte interne au tenant pour vérification et confirmation.' },
   { value: 'order-stock-conflict', label: 'Conflit de stock', description: 'Notification opérationnelle de test.' },
