@@ -1,5 +1,8 @@
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { RenderedEmail } from '@/lib/notifications/sendEmail';
+import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
+
+export { cardPaymentReference };
 
 // Customer order emails, moved from the per-template n8n workflows (phase 2).
 // Same copy and visual structure as the former n8n templates: optional test
@@ -483,11 +486,6 @@ ${infoBox([
 <p class="note">Notification automatique · Lepefy Food Platform</p>`,
     }),
   };
-}
-
-/** Customer-facing reference of a /card payment: short, stable, never the Stripe id. */
-export function cardPaymentReference(quickPaymentId: string) {
-  return `CP-${quickPaymentId.replace(/[^0-9a-z]/gi, '').slice(0, 6).toUpperCase()}`;
 }
 
 function channel(hex: string) {
