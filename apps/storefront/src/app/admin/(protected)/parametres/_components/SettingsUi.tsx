@@ -39,6 +39,8 @@ export function SettingsIconTile({ icon: TileIcon, accent, size = 'md' }: { icon
 export const SETTINGS_INPUT_CLS =
   'min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 export const SETTINGS_LABEL_CLS = 'mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200';
+// Shared Button 'outline' uses the tenant dark colour, unreadable on the dark theme.
+export const SETTINGS_OUTLINE_DARK_CLS = 'dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-800';
 export const SETTINGS_HINT_CLS = 'mt-1.5 text-xs leading-5 text-gray-500 dark:text-gray-400';
 
 const TONE_CLS: Record<SettingsStatus['tone'], { text: string; dot: string }> = {

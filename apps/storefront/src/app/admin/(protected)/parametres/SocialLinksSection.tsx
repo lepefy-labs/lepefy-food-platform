@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink, type SocialPlatform } from '@lepefy/types';
-import { SettingsFeedback, SettingsPanel, SETTINGS_INPUT_CLS, SETTINGS_LABEL_CLS } from './_components/SettingsUi';
+import { SettingsFeedback, SettingsPanel, SETTINGS_INPUT_CLS, SETTINGS_LABEL_CLS, SETTINGS_OUTLINE_DARK_CLS } from './_components/SettingsUi';
 import { useSettingsFeedback } from './_components/useSettingsFeedback';
 
 const PLATFORM_OPTIONS: SocialPlatform[] = ['instagram', 'facebook', 'tiktok', 'youtube', 'linkedin', 'x'];
@@ -120,7 +120,7 @@ export function SocialLinksSection({ initialLinks }: { initialLinks: TenantSocia
               <input id="social-new-order" type="number" value={newForm.sort_order} onChange={(e) => setNewForm({ ...newForm, sort_order: e.target.value })} className={SETTINGS_INPUT_CLS} />
             </div>
           </div>
-          <Button type="button" variant="outline" onClick={handleCreate} loading={isSaving === 'new'} disabled={!newForm.url.trim()} className="mt-3 min-h-11">{isSaving !== 'new' && <IconPlus size={16} aria-hidden="true" />}Ajouter</Button>
+          <Button type="button" variant="outline" onClick={handleCreate} loading={isSaving === 'new'} disabled={!newForm.url.trim()} className={`mt-3 min-h-11 ${SETTINGS_OUTLINE_DARK_CLS}`}>{isSaving !== 'new' && <IconPlus size={16} aria-hidden="true" />}Ajouter</Button>
         </div>
       )}
     </SettingsPanel>

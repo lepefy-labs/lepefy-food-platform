@@ -5,7 +5,7 @@ import type { ChangeEvent } from 'react';
 import { IconPhotoUp, IconTrash } from '@tabler/icons-react';
 import { buildPwaIconPath, getAppIconRevision } from '@/lib/tenant/appIcon';
 import Button from '../../_components/ui/Button';
-import { SettingsPanel } from './_components/SettingsUi';
+import { SettingsPanel, SETTINGS_OUTLINE_DARK_CLS } from './_components/SettingsUi';
 
 interface Props { initialAppIconUrl: string | null; hasLogoFallback: boolean; }
 type Feedback = { type: 'success' | 'error'; message: string } | null;
@@ -79,7 +79,7 @@ export function AppIconSection({ initialAppIconUrl, hasLogoFallback }: Props) {
           <input ref={inputRef} type="file" accept="image/png" onChange={handleFileChange} className="sr-only" aria-label="Choisir une icône PNG 512 par 512 pixels" />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" loading={isUploading} disabled={isRemoving} onClick={() => inputRef.current?.click()} className="min-h-11"><IconPhotoUp size={17} />{appIconUrl ? 'Remplacer' : 'Importer'}</Button>
-            {appIconUrl && <Button type="button" variant="outline" loading={isRemoving} disabled={isUploading} onClick={() => void remove()} className="min-h-11"><IconTrash size={17} />Revenir au logo</Button>}
+            {appIconUrl && <Button type="button" variant="outline" loading={isRemoving} disabled={isUploading} onClick={() => void remove()} className={`min-h-11 ${SETTINGS_OUTLINE_DARK_CLS}`}><IconTrash size={17} />Revenir au logo</Button>}
           </div>
         </div>
         {canPreview && <div className="flex items-end gap-4 self-start rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/30">

@@ -121,7 +121,7 @@ function ModulesCheckboxGroup({
               htmlFor={checkboxId}
               className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3 text-sm transition ${
                 isSelected
-                  ? 'border-[#D9D3FF] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]'
+                  ? 'border-[#D9D3FF] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-200'
                   : 'border-[var(--admin-border)] bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-gray-900'
               }`}
             >
