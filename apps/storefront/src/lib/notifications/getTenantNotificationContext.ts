@@ -39,6 +39,12 @@ export interface TenantNotificationContext {
   mobileApp?: {
     android: AndroidAppState | null;
   };
+  /**
+   * Origin of this deployment, which serves public/ (static email images).
+   * tenants.storefront_url, else NEXT_PUBLIC_APP_URL; never legal_website,
+   * which may be another site.
+   */
+  assetBaseUrl?: string | null;
 }
 
 export interface AndroidAppState {
@@ -156,6 +162,7 @@ export async function getTenantNotificationContext(
       mobileApp: {
         android: androidAppState(tenant.android_package_name, tenant.android_public),
       },
+      assetBaseUrl: tenantStorefront || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || null,
     };
   } catch (error) {
     console.error('[notifications] tenant context lookup failed:', error, '— tenant_id:', tenantId);

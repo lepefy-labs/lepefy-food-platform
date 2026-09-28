@@ -83,10 +83,18 @@ test('Android: public listing is a link, release in progress is plain text, no a
   const liveEmail = cardQuickPaymentCustomerEmail({ ...context, mobileApp: { android: live } }, input);
   expect(liveEmail.html).toContain('href="https://play.google.com/store/apps/details?id=com.example.shop"');
   expect(liveEmail.html).toContain('Disponible sur Google Play');
+  expect(liveEmail.html).not.toContain('badges/google-play-fr.png');
+
+  const badgeEmail = cardQuickPaymentCustomerEmail({ ...context, assetBaseUrl: 'https://shop.example/', mobileApp: { android: live } }, input);
+  expect(badgeEmail.html).toContain('<img src="https://shop.example/badges/google-play-fr.png"');
+  expect(badgeEmail.html).toContain('alt="Disponible sur Google Play"');
+  expect(badgeEmail.html).toContain('marques de Google LLC');
+  expect(badgeEmail.html).toContain('href="https://play.google.com/store/apps/details?id=com.example.shop"');
 
   const soon = androidAppState('com.example.shop', false);
   expect(soon).toEqual({ status: 'coming_soon', playStoreUrl: null });
-  const soonEmail = cardQuickPaymentCustomerEmail({ ...context, mobileApp: { android: soon } }, input);
+  const soonEmail = cardQuickPaymentCustomerEmail({ ...context, assetBaseUrl: 'https://shop.example', mobileApp: { android: soon } }, input);
+  expect(soonEmail.html).not.toContain('<img src="https://shop.example/badges');
   expect(soonEmail.html).toContain('Bientôt disponible sur Google Play');
   expect(soonEmail.html).not.toContain('play.google.com');
 

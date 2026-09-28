@@ -512,13 +512,19 @@ function androidAppBlock(context: TenantNotificationContext) {
   const url = android.status === 'available' ? safeUrl(android.playStoreUrl) : null;
   // A released app without a public listing yet is announced, never linked.
   if (android.status === 'available' && !url) return '';
+  const base = context.assetBaseUrl?.replace(/\/$/, '');
+  const badge = safeUrl(base ? `${base}/badges/google-play-fr.png` : null);
   const tenant = esc(context.tenantName);
   return `${DIVIDER}
 <div style="text-align:center;">
 <p style="margin:0 0 8px;font-size:17px;font-weight:700;color:#111827;">📱 ${url ? `${tenant} est disponible sur Android` : `${tenant} bientôt sur Android`}</p>
 <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">Retrouvez encore plus facilement votre boutique depuis votre téléphone.</p>
 ${url
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;"><tr><td style="border:2px solid #111827;border-radius:10px;"><a href="${url}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:700;color:#111827;text-decoration:none;">Disponible sur Google Play →</a></td></tr></table>`
+    ? badge
+      // Official Google Play badge (public/badges, downloaded from Google's badge page), unaltered, with the required attribution.
+      ? `<a href="${url}" style="display:inline-block;text-decoration:none;"><img src="${badge}" width="180" height="70" alt="Disponible sur Google Play" style="display:block;width:180px;max-width:100%;height:auto;border:0;"></a>
+<p style="margin:10px 0 0;font-size:11px;line-height:1.5;color:#9ca3af;">Google Play et le logo Google Play sont des marques de Google LLC.</p>`
+      : `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;"><tr><td style="border:2px solid #111827;border-radius:10px;"><a href="${url}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:700;color:#111827;text-decoration:none;">Disponible sur Google Play →</a></td></tr></table>`
     : '<span style="display:inline-block;padding:10px 18px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-size:14px;font-weight:600;">Bientôt disponible sur Google Play</span>'}
 </div>`;
 }
