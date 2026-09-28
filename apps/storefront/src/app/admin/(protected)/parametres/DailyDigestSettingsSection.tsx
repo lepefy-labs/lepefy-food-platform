@@ -113,7 +113,7 @@ export function DailyDigestSettingsSection({ initial, available, digestRecipient
                   <span className="flex items-center gap-2">
                     <input id={`digest-${key}`} className={`${SETTINGS_INPUT_CLS} w-24 text-right tabular-nums`} type="number" min={min} max={336} step={1}
                       disabled={disabled} value={Number.isFinite(form[key]) ? form[key] : ''} onChange={(e) => set(key, e.target.valueAsNumber)} />
-                    <span aria-hidden="true" className="text-sm text-gray-500">h</span>
+                    <span aria-hidden="true" className="text-sm text-gray-500 dark:text-gray-400">h</span>
                   </span>
                 </li>
               ))}

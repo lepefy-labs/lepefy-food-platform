@@ -260,7 +260,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
               <article key={pm.id} className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white dark:border-gray-800 dark:bg-gray-950/30">
                 <div className="flex flex-col gap-3 border-b border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800 dark:bg-gray-900/70">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800 dark:text-violet-300">
                       <span className="text-xs font-bold">{index + 1}</span>
                     </div>
                     <div>
@@ -364,7 +364,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                     <button
                       onClick={() => handleDelete(pm.id)}
                       disabled={isSaving === pm.id}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-red-950/30 dark:hover:text-red-300"
                     >
                       <IconTrash size={14} stroke={1.5} />
                       Supprimer

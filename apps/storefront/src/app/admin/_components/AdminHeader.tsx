@@ -47,7 +47,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
       <Suspense fallback={<div className="h-9 w-9 md:hidden" />}><AdminMobileNav categories={categories} workspace={workspace} isPlatformOwner={isPlatformOwner} permissions={permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} /></Suspense>
       <div className="hidden items-center gap-2 md:flex">{platformLogoUrl ? <Image src={platformLogoUrl} alt={platformName} width={112} height={30} className="h-7 w-auto object-contain" priority /> : <div className="flex items-center gap-2 text-[var(--admin-primary-fg)]"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--admin-primary)] text-sm font-bold text-white">L</span><span className="text-base font-semibold">{platformName}</span></div>}</div>
       <div className="hidden h-7 w-px bg-[var(--admin-border)] md:block" />
-      <details className="group relative">
+      <details className="group relative min-w-0">
         <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-[var(--admin-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)]">
           <span className="flex h-8 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--admin-border)] bg-white dark:bg-gray-950">
             {tenantLogoUrl ? (
@@ -56,7 +56,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
               <span className="text-[10px] font-bold text-gray-500 dark:text-gray-300">{tenantInitials(tenantName)}</span>
             )}
           </span>
-          <div className="min-w-0 text-left">
+          <div className="sr-only min-w-0 text-left sm:not-sr-only">
             <p className="flex max-w-36 items-center gap-1.5 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
               {workspace === 'events' ? <IconCalendarEvent size={15} className="shrink-0 text-[var(--admin-primary)]" /> : <IconBuildingStore size={15} className="shrink-0 text-[var(--admin-primary)]" />}
               <span className="truncate">{workspaceLabel}</span>
@@ -70,7 +70,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
           {eventsAdminUrl && canEvents && <a href={eventsAdminUrl} className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm ${workspace === 'events' ? 'bg-[var(--admin-primary-soft)] font-semibold text-[var(--admin-primary-fg)] dark:bg-violet-500/15 dark:text-violet-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800'}`}><IconCalendarEvent size={16} /><span className="flex-1">Événementiel</span>{workspace === 'events' && <span className="h-1.5 w-1.5 rounded-full bg-[var(--admin-primary)]" />}</a>}
         </div>
       </details>
-      <div className="flex min-w-0 flex-1 justify-end md:mx-3 md:max-w-xl md:justify-start"><AdminGlobalSearch workspace={workspace} permissions={permissions} isPlatformOwner={isPlatformOwner} /></div>
+      <div className="flex shrink-0 justify-end md:mx-3 md:min-w-0 md:max-w-xl md:flex-1 md:justify-start"><AdminGlobalSearch workspace={workspace} permissions={permissions} isPlatformOwner={isPlatformOwner} /></div>
       <div className="ml-auto flex items-center gap-0.5 sm:gap-1"><NotificationBell /><ThemeToggleButton /><AdminUserMenu adminEmail={adminEmail} adminDisplayName={adminDisplayName} /></div>
     </header>
   );

@@ -34,7 +34,7 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
       {has('orders.view') && <Link href="/admin/checkout-funnel" className={linkClass(pathname === '/admin/checkout-funnel')}><IconChartBar size={20}/>Funnel checkout</Link>}
       {has('catalog.view') && <Link href="/admin/catalogue" className={linkClass(pathname.startsWith('/admin/catalogue'))}><IconPackage size={20}/>Catalogue</Link>}
       {has('customers.view') && <Link href="/admin/clients" className={linkClass(pathname.startsWith('/admin/clients'))}><IconUsers size={20}/>Clients</Link>}
-      {has('growth.manage') && <div className="mx-1 flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-300 dark:text-gray-600"><IconTag size={20}/><span className="flex-1">Promotions</span><span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">Bientôt</span></div>}
+      {has('growth.manage') && <div className="mx-1 flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-300 dark:text-gray-600"><IconTag size={20}/><span className="flex-1">Promotions</span><span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">Bientôt</span></div>}
       {has('catalog.manage') && <Link href="/admin/accueil-slides" className={linkClass(pathname === '/admin/accueil-slides')}><IconPhoto size={20}/>Slides d&apos;accueil</Link>}
       {(has('loyalty.scan') || has('shipping.view')) && <p className={groupLabel}>Opérations</p>}
       {has('loyalty.scan') && <Link href="/admin/loyalty/scan" className={linkClass(pathname === '/admin/loyalty/scan')}><IconScan size={20}/>Scan fidélité</Link>}

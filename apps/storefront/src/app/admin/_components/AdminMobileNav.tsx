@@ -37,7 +37,7 @@ export default function AdminMobileNav({ categories, workspace = 'shop', isPlatf
       <button type="button" aria-label="Fermer le menu" className="absolute inset-0 h-full w-full bg-gray-950/45 backdrop-blur-[1px]" onClick={() => setOpen(false)} />
       <div className="absolute inset-y-0 left-0 flex h-[100dvh] w-72 max-w-[86vw] flex-col overflow-hidden bg-white shadow-2xl dark:bg-gray-900">
         <div className="flex min-h-[57px] shrink-0 items-center justify-between border-b border-[var(--admin-border)] px-4 dark:border-gray-800">
-          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]/70">{workspace === 'events' ? 'Événementiel' : 'Boutique'}</p><p className="mt-0.5 text-xs text-gray-400">Workspace Lepefy</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)] dark:text-violet-300">{workspace === 'events' ? 'Événementiel' : 'Boutique'}</p><p className="mt-0.5 text-xs text-gray-400">Workspace Lepefy</p></div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Fermer" className="rounded-xl p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)]"><IconX size={18} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
