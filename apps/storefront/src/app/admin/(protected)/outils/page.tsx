@@ -2,6 +2,7 @@ import { IconDownload, IconFileTypePdf } from '@tabler/icons-react';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import ShareLinkActions from '../../_components/ui/ShareLinkActions';
+import { SettingsIconTile } from '../parametres/_components/SettingsUi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -73,7 +74,7 @@ export default async function OutilsPage() {
       <section aria-labelledby="outils-affiches">
         <h2 id="outils-affiches" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">Affiches</h2>
         <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"><IconFileTypePdf size={20} stroke={1.7} aria-hidden="true" /></span>
+          <SettingsIconTile icon={IconFileTypePdf} accent="red" />
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100">Affiche carte digitale</h3>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">PDF prêt à imprimer avec le QR de votre carte.</p>

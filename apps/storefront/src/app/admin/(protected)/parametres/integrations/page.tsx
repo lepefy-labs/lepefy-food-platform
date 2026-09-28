@@ -3,9 +3,17 @@ import { IconBrandStripe, IconChevronRight, IconMail, IconPackage, IconPlugConne
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { SettingsPageShell } from '../_components/SettingsPageShell';
-import { SettingsStatusBadge } from '../_components/SettingsUi';
+import { SettingsIconTile, SettingsStatusBadge } from '../_components/SettingsUi';
 import { loadIntegrationStatuses, type IntegrationStatus } from '../_components/integrationsStatus';
-import type { SettingsStatus } from '../_components/settingsRegistry';
+import type { SettingsAccent, SettingsStatus } from '../_components/settingsRegistry';
+
+const ACCENTS: Record<IntegrationStatus['key'], SettingsAccent> = {
+  stripe: 'violet',
+  packlink: 'orange',
+  n8n: 'red',
+  brevo: 'sky',
+  wallet: 'emerald',
+};
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -39,7 +47,7 @@ export default async function ParametresIntegrationsPage() {
             <li key={item.key} id={item.key} className="scroll-mt-24">
               <article aria-labelledby={`${item.key}-title`} className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
                 <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"><ItemIcon size={20} stroke={1.7} aria-hidden="true" /></span>
+                  <SettingsIconTile icon={ItemIcon} accent={ACCENTS[item.key]} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <h2 id={`${item.key}-title`} className="text-base font-semibold text-gray-950 dark:text-gray-100">{item.name}</h2>

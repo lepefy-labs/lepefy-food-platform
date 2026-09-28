@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { IconChevronLeft } from '@tabler/icons-react';
 import { getSettingsSection, type SettingsSectionKey } from './settingsRegistry';
 import { SettingsSidebar } from './SettingsSidebar';
+import { SettingsIconTile } from './SettingsUi';
 
 interface SettingsPageShellProps {
   sectionKey: SettingsSectionKey;
@@ -36,9 +37,12 @@ export function SettingsPageShell({ sectionKey, description, children }: Setting
             </ol>
           </nav>
 
-          <header className="mb-6">
-            <h1 className="text-xl font-semibold tracking-tight text-gray-950 dark:text-gray-100 sm:text-2xl">{section.title}</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">{description ?? section.description}</p>
+          <header className="mb-6 flex items-start gap-4">
+            <SettingsIconTile icon={section.icon} accent={section.accent} size="lg" />
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight text-gray-950 dark:text-gray-100 sm:text-2xl">{section.title}</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">{description ?? section.description}</p>
+            </div>
           </header>
 
           <div className="space-y-5">{children}</div>

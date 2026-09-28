@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { IconCreditCard, IconPlus, IconTrash } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
 import { ApplePayDomainStatus } from './ApplePayDomainStatus';
+import { SettingsIconTile } from './_components/SettingsUi';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType, type PaymentModule } from '@lepefy/types';
 
 const INPUT_CLS =
@@ -234,9 +235,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
   return (
     <section id="moyens-de-paiement" aria-labelledby="moyens-de-paiement-title" className="scroll-mt-24 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <header className="flex items-start gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
-          <IconCreditCard size={20} stroke={1.7} aria-hidden="true" />
-        </div>
+        <SettingsIconTile icon={IconCreditCard} accent="orange" />
         <div>
           <h2 id="moyens-de-paiement-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Moyens de paiement</h2>
           <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">

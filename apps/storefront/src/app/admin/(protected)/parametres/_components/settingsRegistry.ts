@@ -27,6 +27,8 @@ export type SettingsSectionKey =
   | 'integrations'
   | 'legal';
 
+export type SettingsAccent = 'blue' | 'emerald' | 'fuchsia' | 'sky' | 'red' | 'amber' | 'orange' | 'violet' | 'teal';
+
 export interface SettingsEntry {
   title: string;
   description: string;
@@ -41,6 +43,7 @@ export interface SettingsSection {
   description: string;
   href: string;
   icon: Icon;
+  accent: SettingsAccent;
   keywords: string[];
   entries: SettingsEntry[];
 }
@@ -65,6 +68,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Nom public, slogan, contacts et URL.',
         href: `${BASE}/boutique`,
         icon: IconBuildingStore,
+        accent: 'blue',
         keywords: ['profil', 'boutique', 'nom', 'contact'],
         entries: [
           { title: 'Slogan', description: 'Phrase d’accroche affichée sur la boutique.', href: `${BASE}/boutique#profil`, keywords: ['tagline', 'accroche'] },
@@ -79,6 +83,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Points de retrait, adresse, accès et horaires.',
         href: `${BASE}/retrait`,
         icon: IconMapPin,
+        accent: 'emerald',
         keywords: ['retrait', 'click & collect', 'click and collect', 'point de retrait', 'magasin'],
         entries: [
           { title: 'Adresse de retrait', description: 'Adresse du point de retrait click & collect.', href: `${BASE}/retrait#point-principal`, keywords: ['adresse', 'click & collect'] },
@@ -93,6 +98,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Logo, application et identité de marque.',
         href: `${BASE}/apparence`,
         icon: IconPalette,
+        accent: 'fuchsia',
         keywords: ['apparence', 'logo', 'marque', 'couleurs', 'branding', 'identité'],
         entries: [
           { title: 'Logo et couleurs', description: 'Logo et couleurs de marque de la boutique.', href: `${BASE}/apparence#marque`, keywords: ['logo', 'couleur', 'branding'] },
@@ -106,6 +112,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Réseaux sociaux et visibilité publique.',
         href: `${BASE}/presence`,
         icon: IconWorld,
+        accent: 'sky',
         keywords: ['présence', 'web', 'visibilité'],
         entries: [
           { title: 'Réseaux sociaux', description: 'Instagram, Facebook, TikTok… affichés sur la carte digitale.', href: `${BASE}/presence#reseaux-sociaux`, keywords: ['social', 'instagram', 'facebook', 'tiktok', 'youtube', 'linkedin'] },
@@ -125,6 +132,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Destinataires et types de notifications.',
         href: `${BASE}/notifications`,
         icon: IconBell,
+        accent: 'red',
         keywords: ['notification', 'alerte', 'email', 'destinataire'],
         entries: [
           { title: 'Destinataires des notifications', description: 'Qui reçoit les alertes internes par email.', href: `${BASE}/notifications#destinataires`, keywords: ['email', 'destinataire', 'équipe'] },
@@ -138,6 +146,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Rapports programmés et règles automatiques.',
         href: `${BASE}/automatisations`,
         icon: IconClockPlay,
+        accent: 'amber',
         keywords: ['automatisation', 'rapport', 'programmé', 'scheduler'],
         entries: [
           { title: 'Rapport quotidien', description: 'Résumé des commandes à traiter, chaque matin à 08:00.', href: `${BASE}/automatisations#rapport-quotidien`, keywords: ['digest', 'rapport', 'quotidien', '08h', 'fuseau', 'timezone', 'seuils'] },
@@ -156,6 +165,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Moyens de paiement et services où ils sont proposés.',
         href: `${BASE}/paiements`,
         icon: IconCreditCard,
+        accent: 'orange',
         keywords: ['paiement', 'payer', 'encaissement'],
         entries: [
           { title: 'Méthodes de paiement', description: 'Carte, virement, liens externes, espèces…', href: `${BASE}/paiements#moyens-de-paiement`, keywords: ['carte', 'virement', 'iban', 'paypal', 'espèces', 'lien'] },
@@ -169,6 +179,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Services externes connectés à votre boutique.',
         href: `${BASE}/integrations`,
         icon: IconPlugConnected,
+        accent: 'violet',
         keywords: ['intégration', 'connecteur', 'api', 'service externe'],
         entries: [
           { title: 'Stripe', description: 'Paiements en ligne par carte.', href: `${BASE}/integrations#stripe`, keywords: ['stripe', 'carte', 'paiement'] },
@@ -189,6 +200,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         description: 'Raison sociale, adresse et email légaux.',
         href: `${BASE}/legal`,
         icon: IconScale,
+        accent: 'teal',
         keywords: ['légal', 'juridique', 'raison sociale', 'société', 'étiquettes'],
         entries: [
           { title: 'Raison sociale', description: 'Nom légal imprimé sur les étiquettes produits.', href: `${BASE}/legal#informations-legales`, keywords: ['société', 'entreprise'] },

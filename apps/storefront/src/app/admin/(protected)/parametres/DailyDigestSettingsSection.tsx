@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { IconClockPlay } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
 import type { DailyDigestConfig } from '@/lib/notifications/dailyDigestConfig';
-import { SettingsFeedback, SettingsStatusBadge, SETTINGS_HINT_CLS, SETTINGS_INPUT_CLS, SETTINGS_LABEL_CLS } from './_components/SettingsUi';
+import { SettingsFeedback, SettingsIconTile, SettingsStatusBadge, SETTINGS_HINT_CLS, SETTINGS_INPUT_CLS, SETTINGS_LABEL_CLS } from './_components/SettingsUi';
 import { useSettingsFeedback } from './_components/useSettingsFeedback';
 
 export interface DailyDigestSettingsInitial {
@@ -76,7 +76,7 @@ export function DailyDigestSettingsSection({ initial, available, digestRecipient
   return (
     <article id="rapport-quotidien" aria-labelledby="rapport-quotidien-title" className="scroll-mt-24 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <header className="flex items-start gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-800">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"><IconClockPlay size={20} stroke={1.7} aria-hidden="true" /></span>
+        <SettingsIconTile icon={IconClockPlay} accent="amber" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <h2 id="rapport-quotidien-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Rapport quotidien des commandes</h2>

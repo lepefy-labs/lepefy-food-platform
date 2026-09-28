@@ -2,9 +2,14 @@
 
 import Link from 'next/link';
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { IconChevronRight, IconFileText, IconQrcode, IconSearch, IconX } from '@tabler/icons-react';
-import { RELATED_DESTINATIONS, SETTINGS_GROUPS, type SettingsStatusMap } from './settingsRegistry';
-import { SettingsStatusBadge } from './SettingsUi';
+import { IconChevronRight, IconFileText, IconQrcode, IconSearch, IconX, type Icon } from '@tabler/icons-react';
+import { RELATED_DESTINATIONS, SETTINGS_GROUPS, type SettingsAccent, type SettingsStatusMap } from './settingsRegistry';
+import { SettingsIconTile, SettingsStatusBadge } from './SettingsUi';
+
+const RELATED_VISUALS: Record<string, { icon: Icon; accent: SettingsAccent }> = {
+  '/admin/contenu': { icon: IconFileText, accent: 'blue' },
+  '/admin/outils': { icon: IconQrcode, accent: 'teal' },
+};
 
 interface SearchItem {
   id: string;
@@ -13,6 +18,8 @@ interface SearchItem {
   category: string;
   href: string;
   haystack: string;
+  icon: Icon;
+  accent: SettingsAccent;
 }
 
 function normalize(value: string): string {
@@ -28,6 +35,8 @@ const SEARCH_INDEX: SearchItem[] = [
       category: group.label,
       href: section.href,
       haystack: normalize([section.title, section.description, group.label, ...section.keywords].join(' ')),
+      icon: section.icon,
+      accent: section.accent,
     },
     ...section.entries.map((entry, index) => ({
       id: `${section.key}-${index}`,
@@ -36,6 +45,8 @@ const SEARCH_INDEX: SearchItem[] = [
       category: `${group.label} › ${section.navLabel}`,
       href: entry.href,
       haystack: normalize([entry.title, entry.description, section.title, ...(entry.keywords ?? [])].join(' ')),
+      icon: section.icon,
+      accent: section.accent,
     })),
   ])),
   ...RELATED_DESTINATIONS.map((item) => ({
@@ -45,6 +56,8 @@ const SEARCH_INDEX: SearchItem[] = [
     category: `${item.category} (hors paramètres)`,
     href: item.href,
     haystack: normalize([item.title, item.description, ...item.keywords].join(' ')),
+    icon: RELATED_VISUALS[item.href]?.icon ?? IconFileText,
+    accent: RELATED_VISUALS[item.href]?.accent ?? 'blue',
   })),
 ];
 
@@ -119,6 +132,7 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
                 {results.map((result, index) => (
                   <li key={result.id}>
                     <Link href={result.href} onKeyDown={(event) => onResultKeyDown(event, index)} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-primary)] dark:hover:bg-white/5 dark:focus-visible:bg-white/5">
+                      <SettingsIconTile icon={result.icon} accent={result.accent} size="sm" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-gray-950 dark:text-gray-100">{result.title}</span>
                         <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{result.category}</span>
@@ -142,14 +156,11 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
             <h2 id={`settings-group-${group.key}`} className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{group.label}</h2>
             <ul className="overflow-hidden rounded-2xl border border-gray-200 bg-white max-md:divide-y max-md:divide-gray-100 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent dark:border-gray-800 dark:bg-gray-900 max-md:dark:divide-gray-800 md:dark:bg-transparent">
               {group.sections.map((section) => {
-                const Icon = section.icon;
                 const status = statuses[section.key];
                 return (
                   <li key={section.key}>
                     <Link href={section.href} className="group flex h-full min-h-16 items-center gap-4 px-4 py-3.5 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-primary)] md:rounded-2xl md:border md:border-gray-200 md:bg-white md:p-5 md:hover:border-gray-300 md:hover:shadow-sm dark:hover:bg-white/5 md:dark:border-gray-800 md:dark:bg-gray-900 md:dark:hover:border-gray-700">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                        <Icon size={20} stroke={1.7} aria-hidden="true" />
-                      </span>
+                      <SettingsIconTile icon={section.icon} accent={section.accent} />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold text-gray-950 dark:text-gray-100">{section.title}</span>
                         <span className="mt-0.5 hidden text-sm leading-5 text-gray-500 dark:text-gray-400 sm:block">{section.description}</span>
@@ -168,11 +179,11 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
           <h2 id="settings-related" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">Ailleurs dans l’administration</h2>
           <ul className="grid gap-2 sm:grid-cols-2">
             {RELATED_DESTINATIONS.map((item) => {
-              const Icon = item.href === '/admin/outils' ? IconQrcode : IconFileText;
+              const visual = RELATED_VISUALS[item.href] ?? { icon: IconFileText, accent: 'blue' as const };
               return (
                 <li key={item.href}>
                   <Link href={item.href} className="flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-white hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white">
-                    <Icon size={18} stroke={1.7} aria-hidden="true" className="shrink-0 text-gray-400" />
+                    <SettingsIconTile icon={visual.icon} accent={visual.accent} size="sm" />
                     <span className="min-w-0 flex-1"><span className="font-medium">{item.title}</span><span className="block truncate text-xs text-gray-500 dark:text-gray-400">{item.description}</span></span>
                     <IconChevronRight size={16} aria-hidden="true" className="shrink-0 text-gray-300" />
                   </Link>

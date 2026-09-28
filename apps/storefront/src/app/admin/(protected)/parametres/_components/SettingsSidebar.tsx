@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SETTINGS_GROUPS } from './settingsRegistry';
+import { ACCENT_TEXT_CLS } from './SettingsUi';
 
 /** Desktop-only internal navigation of the Settings area (mobile uses the hub list). */
 export function SettingsSidebar() {
@@ -29,7 +30,7 @@ export function SettingsSidebar() {
                         ? 'bg-gray-100 font-semibold text-gray-950 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-[var(--admin-primary)] dark:bg-white/10 dark:text-white'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'}`}
                     >
-                      <Icon size={17} stroke={1.7} aria-hidden="true" className={active ? 'text-[var(--admin-primary-fg)] dark:text-violet-300' : 'text-gray-400'} />
+                      <Icon size={17} stroke={1.7} aria-hidden="true" className={ACCENT_TEXT_CLS[section.accent]} />
                       {section.navLabel}
                     </Link>
                   </li>
