@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 settembre 2026 — **v6.89 Current-State Snapshot** (Settings Hub admin, base `main` @ `b58c359d`)
+> **Aggiornato:** 28 settembre 2026 — **v6.90 Current-State Snapshot** (admin layout/tema, base `main` @ `5bf638f9`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -877,6 +877,8 @@ Knowledge Suggestions V1 non richiede migration: deriva candidati temporanei dag
 Admin/storefront principale in francese. Tabler Icons, mobile-first, touch target ~44px+, focus visibile, safe-area, reduced motion, niente dati fake.
 
 Storefront usa branding tenant. Admin usa branding Lepefy con tenant identity contestuale nei touchpoint di accesso.
+
+Solo `app/layout.tsx` emette `<html>/<head>/<body>`: `app/admin/layout.tsx` è un layout annidato (token `--admin-*` in un `<style>` nel body, dopo il blocco `:root` del tenant, più un contenitore `min-h-screen`); un secondo `<html>` rompe l'idratazione di tutto il documento. Tema admin: chiave `localStorage` `lepefy-admin-theme`, classe `dark` su `<html>` (copre anche i portal); `AdminThemeProvider` (solo area protetta) emette uno script inline anti-flash, sincronizza la classe dopo il mount e la rimuove all'uscita dall'area protetta.
 
 ---
 

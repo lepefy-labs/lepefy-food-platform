@@ -9,6 +9,12 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+// Nested layout: the root layout (app/layout.tsx) already renders <html>,
+// <head> and <body>. Rendering them again here produced invalid nested markup
+// that broke hydration on every admin page (React #418/#423/#425) and made the
+// whole document re-render on the client. The admin tokens are emitted as a
+// <style> element in the body; it comes after the root :root block, so the
+// platform values still win the cascade.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const [tenant, platform] = await Promise.all([
@@ -17,36 +23,34 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]);
 
   return (
-    <html lang="fr" suppressHydrationWarning>
-      <head>
-        <style>{`
-          :root {
-            --admin-primary: ${platform.primary};
-            --admin-primary-hover: ${platform.primaryHover};
-            --admin-primary-soft: ${platform.primarySoft};
-            --admin-primary-fg: ${platform.primaryForeground};
-            --admin-surface: ${platform.surface};
-            --admin-surface-subtle: ${platform.surfaceSubtle};
-            --admin-page-bg: ${platform.pageBackground};
-            --admin-border: ${platform.border};
+    <>
+      <style>{`
+        :root {
+          --admin-primary: ${platform.primary};
+          --admin-primary-hover: ${platform.primaryHover};
+          --admin-primary-soft: ${platform.primarySoft};
+          --admin-primary-fg: ${platform.primaryForeground};
+          --admin-surface: ${platform.surface};
+          --admin-surface-subtle: ${platform.surfaceSubtle};
+          --admin-page-bg: ${platform.pageBackground};
+          --admin-border: ${platform.border};
 
-            /* Existing admin components keep working while progressively
-               migrating to explicit --admin-* tokens. */
-            --color-primary: ${platform.primary};
-            --color-primary-light: ${platform.primarySoft};
-            --color-primary-dark: ${platform.primaryForeground};
-            --color-secondary: ${platform.primaryHover};
+          /* Existing admin components keep working while progressively
+             migrating to explicit --admin-* tokens. */
+          --color-primary: ${platform.primary};
+          --color-primary-light: ${platform.primarySoft};
+          --color-primary-dark: ${platform.primaryForeground};
+          --color-secondary: ${platform.primaryHover};
 
-            /* Tenant branding is contextual only inside /admin. */
-            --tenant-primary: ${tenant.primary_color};
-            --tenant-primary-light: ${tenant.accent_light};
-            --tenant-secondary: ${tenant.secondary_color};
-          }
-        `}</style>
-      </head>
-      <body className="min-h-screen bg-[var(--admin-page-bg)]">
+          /* Tenant branding is contextual only inside /admin. */
+          --tenant-primary: ${tenant.primary_color};
+          --tenant-primary-light: ${tenant.accent_light};
+          --tenant-secondary: ${tenant.secondary_color};
+        }
+      `}</style>
+      <div className="min-h-screen bg-[var(--admin-page-bg)] dark:bg-gray-950">
         {children}
-      </body>
-    </html>
+      </div>
+    </>
   );
 }

@@ -20,7 +20,7 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ workspace = 'shop', permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, isPlatformOwner = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
-  function navClass(active: boolean) { return active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] font-semibold ring-1 ring-[#D9D3FF] shadow-[inset_3px_0_0_var(--admin-primary)]' : 'text-gray-600 dark:text-gray-300 hover:bg-white hover:text-gray-950 dark:hover:bg-white/5 dark:hover:text-white'; }
+  function navClass(active: boolean) { return active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] font-semibold ring-1 ring-[#D9D3FF] shadow-[inset_3px_0_0_var(--admin-primary)] dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-500/30' : 'text-gray-600 dark:text-gray-300 hover:bg-white hover:text-gray-950 dark:hover:bg-white/5 dark:hover:text-white'; }
   const groupLabel = 'mb-2 mt-5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]/60 dark:text-violet-300/60';
   const linkClass = (active: boolean) => `mx-1 flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all ${navClass(active)}`;
   const shopVisible = ['orders.view','catalog.view','customers.view','reviews.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage','ai_usage.view'].some(has);
