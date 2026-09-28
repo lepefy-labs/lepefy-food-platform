@@ -51,7 +51,7 @@ export default function AdminUserMenu({ adminEmail, adminDisplayName }: AdminUse
         aria-expanded={isOpen}
         className="flex items-center gap-1.5 rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary-dark)' }}>{initial}</span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--admin-primary-soft)] text-sm font-semibold text-[var(--admin-primary-fg)] dark:bg-violet-500/20 dark:text-violet-200">{initial}</span>
         <IconChevronDown size={16} stroke={1.5} className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 

@@ -55,7 +55,7 @@ export default function ShareLinkActions({
           href={buildWhatsAppShareUrl(phone, message)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1FA855] px-3 text-sm font-semibold text-white hover:opacity-90"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-3 text-sm font-semibold text-white hover:bg-green-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
         >
           <IconBrandWhatsapp size={18} /> Partager sur WhatsApp
         </a>
