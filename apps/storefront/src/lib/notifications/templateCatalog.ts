@@ -1,6 +1,6 @@
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import {
-  adminInvitedEmail, cardQuickPaymentEmail, eventBookingClosedReportsEmail, eventExternalPaymentAwaitingVerificationEmail,
+  adminInvitedEmail, cardQuickPaymentCustomerEmail, cardQuickPaymentEmail, eventBookingClosedReportsEmail, eventExternalPaymentAwaitingVerificationEmail,
   eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail, orderCancelledEmail, orderCompletedEmail,
   orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, reviewInviteEmail,
 } from '@/lib/notifications/customerEmails';
@@ -79,6 +79,15 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
   add('card-quick-payment', 'Paiements', 'Paiement carte reçu', 'Équipe du tenant', cardQuickPaymentEmail(context, {
     amount: 35, currency: context.currency || 'EUR', customerName: customer.fullName, customerEmail: customer.email, paidAt: now.toISOString(), paymentIntentId: 'pi_exemple',
   }));
+  // Real tenant configuration (shop options, Android state), then each app state.
+  const cardPayment = { quickPaymentId: 'a82f31c4-0000-4000-8000-000000000000', amount: 38, currency: context.currency || 'EUR', customerName: customer.fullName, paidAt: now.toISOString() };
+  add('card-quick-payment-customer', 'Paiements', 'Paiement carte confirmé · client', 'Client', cardQuickPaymentCustomerEmail(context, cardPayment));
+  add('card-quick-payment-customer-app-soon', 'Paiements', 'Paiement carte confirmé · app Android bientôt', 'Client', cardQuickPaymentCustomerEmail(
+    { ...context, mobileApp: { android: { status: 'coming_soon', playStoreUrl: null } } }, { ...cardPayment, customerName: null },
+  ));
+  add('card-quick-payment-customer-app-live', 'Paiements', 'Paiement carte confirmé · app Android publiée', 'Client', cardQuickPaymentCustomerEmail(
+    { ...context, mobileApp: { android: { status: 'available', playStoreUrl: 'https://play.google.com/store/apps/details?id=com.example.boutique' } } }, cardPayment,
+  ));
 
   // Événements
   const event = { title: 'Soirée afro-jazz', dateStart: inDays(14), location: 'Milano' };

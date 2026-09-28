@@ -31,7 +31,7 @@ const STATUS: Record<Delivery['status'], { label: string; cls: string }> = {
 const TYPES: Record<string, string> = {
   order_confirmed: 'Commande confirmée', order_shipped: 'Commande expédiée', order_ready_for_pickup: 'Prête au retrait',
   order_completed: 'Commande terminée', order_cancelled: 'Commande annulée', order_stock_conflict: 'Conflit de stock',
-  payment_reminder: 'Relance paiement', card_quick_payment: 'Paiement carte', event_reservation_confirmed: 'Réservation événement',
+  payment_reminder: 'Relance paiement', card_quick_payment: 'Paiement carte', card_quick_payment_customer: 'Paiement carte (client)', event_reservation_confirmed: 'Réservation événement',
   event_capacity_conflict: 'Événement complet', rental_stock_conflict: 'Matériel indisponible',
   service_inquiry_created: 'Demande de devis', rental_reservation_confirmed_customer: 'Réservation matériel (client)',
   rental_reservation_confirmed_admin: 'Réservation matériel (équipe)', rental_delivery_quote_pending: 'Livraison à chiffrer',

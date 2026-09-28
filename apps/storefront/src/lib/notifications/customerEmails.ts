@@ -31,6 +31,8 @@ interface Shell {
   footerLink?: { url: string | null | undefined; label: string };
   /** Banner text in test mode. */
   testLabel?: string;
+  /** Storefront footer credit, shown when the tenant keeps tenants.show_powered_by. */
+  poweredBy?: boolean;
 }
 
 function page(context: TenantNotificationContext, shell: Shell) {
@@ -99,6 +101,7 @@ ${shell.body}
 <strong>${esc(context.tenantName)}</strong>
 ${place ? `<br>📍 ${esc(place)}` : ''}
 ${footerLink ? `<br><a href="${footerLink}">${esc(shell.footerLink?.label ?? '🛍️ Visiter notre boutique')}</a>` : ''}
+${shell.poweredBy ? '<br><span style="color:#999999;">Propulsé par <a href="https://www.lepefy.com" style="color:#777777;font-weight:600;">Lepefy Labs</a></span>' : ''}
 </div>
 </div>
 </body>
@@ -478,6 +481,110 @@ ${infoBox([
     ['Référence Stripe', input.paymentIntentId, { mono: true }],
   ])}
 <p class="note">Notification automatique · Lepefy Food Platform</p>`,
+    }),
+  };
+}
+
+/** Customer-facing reference of a /card payment: short, stable, never the Stripe id. */
+export function cardPaymentReference(quickPaymentId: string) {
+  return `CP-${quickPaymentId.replace(/[^0-9a-z]/gi, '').slice(0, 6).toUpperCase()}`;
+}
+
+function channel(hex: string) {
+  const c = parseInt(hex, 16) / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** White or near-black text, whichever contrasts best with the brand color (WCAG). */
+function readableOn(background: string) {
+  let hex = background.replace('#', '');
+  if (hex.length === 3 || hex.length === 4) hex = hex.slice(0, 3).split('').map(c => c + c).join('');
+  hex = hex.slice(0, 6);
+  const luminance = 0.2126 * channel(hex.slice(0, 2)) + 0.7152 * channel(hex.slice(2, 4)) + 0.0722 * channel(hex.slice(4, 6));
+  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.05 ? '#ffffff' : '#111111';
+}
+
+const DIVIDER = '<div style="border-top:1px solid #e5e7eb;margin:32px 0;font-size:0;line-height:0;">&nbsp;</div>';
+
+function androidAppBlock(context: TenantNotificationContext) {
+  const android = context.mobileApp?.android;
+  if (!android) return '';
+  const url = android.status === 'available' ? safeUrl(android.playStoreUrl) : null;
+  // A released app without a public listing yet is announced, never linked.
+  if (android.status === 'available' && !url) return '';
+  const tenant = esc(context.tenantName);
+  return `${DIVIDER}
+<div style="text-align:center;">
+<p style="margin:0 0 8px;font-size:17px;font-weight:700;color:#111827;">📱 ${url ? `${tenant} est disponible sur Android` : `${tenant} bientôt sur Android`}</p>
+<p style="margin:0 0 18px;font-size:14px;color:#4b5563;">Retrouvez encore plus facilement votre boutique depuis votre téléphone.</p>
+${url
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;"><tr><td style="border:2px solid #111827;border-radius:10px;"><a href="${url}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:700;color:#111827;text-decoration:none;">Disponible sur Google Play →</a></td></tr></table>`
+    : '<span style="display:inline-block;padding:10px 18px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-size:14px;font-weight:600;">Bientôt disponible sur Google Play</span>'}
+</div>`;
+}
+
+/**
+ * Confirmation sent to the customer after a /card payment (cardQuickPaymentEmail
+ * is the tenant alert). Transactional first — status, amount, reference — then
+ * one entry point to the tenant storefront and the Android app state. No
+ * coupon, tracking parameter or marketing opt-in.
+ */
+export function cardQuickPaymentCustomerEmail(context: TenantNotificationContext, input: {
+  quickPaymentId: string; amount: number; currency: string; customerName: string | null; paidAt: string; testMode?: boolean;
+}): RenderedEmail {
+  const amount = new Intl.NumberFormat(context.locale || 'fr-FR', { style: 'currency', currency: (input.currency || 'EUR').toUpperCase() })
+    .format(input.amount);
+  const tenant = `<strong>${esc(context.tenantName)}</strong>`;
+  const name = input.customerName?.trim();
+  const paid = new Date(input.paidAt);
+  const locale = context.locale || 'fr-FR';
+  const when = Number.isNaN(paid.getTime()) ? null
+    : `${new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'Europe/Rome' }).format(paid)} · ${
+      new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: 'Europe/Rome' }).format(paid)}`;
+
+  const commerce = context.commerce;
+  const shopUrl = commerce?.storefrontReady === false ? null : safeUrl(context.storefrontUrl);
+  const primary = color(context.branding?.primaryColor, '#25222b');
+  const options = !commerce ? '' : commerce.clickCollectEnabled
+    ? ' et choisissez la livraison ou le retrait en boutique' : ' et faites-vous livrer';
+  const benefits = ['Commande en ligne', 'Paiement sécurisé', ...(commerce ? ['Livraison'] : []), ...(commerce?.clickCollectEnabled ? ['Retrait en boutique'] : [])];
+
+  const row = (label: string, value: string, first = false) =>
+    `<tr><td style="padding:13px 16px;font-size:14px;color:#6b7280;${first ? '' : 'border-top:1px solid #e5e7eb;'}">${esc(label)}</td><td align="right" style="padding:13px 16px;font-size:15px;color:#111827;text-align:right;${first ? '' : 'border-top:1px solid #e5e7eb;'}">${value}</td></tr>`;
+
+  const shopBlock = shopUrl ? `${DIVIDER}
+<div style="text-align:center;">
+<h2 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#111827;">Votre prochain panier peut venir directement à vous.</h2>
+<p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4b5563;">Retrouvez tous les produits de ${tenant} sur notre boutique en ligne. Commandez tranquillement depuis votre téléphone${options}.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;"><tr><td align="center" bgcolor="${primary}" style="background:${primary};border-radius:10px;"><a href="${shopUrl}" style="display:block;padding:17px 20px;font-size:16px;font-weight:700;letter-spacing:0.5px;line-height:20px;color:${readableOn(primary)};text-decoration:none;border-radius:10px;">COMMANDER EN LIGNE →</a></td></tr></table>
+<p style="margin:0;font-size:13px;color:#6b7280;">${benefits.map(esc).join(' · ')}</p>
+</div>` : '';
+
+  return {
+    subject: subject(input.testMode, `✅ Votre paiement de ${amount} chez ${context.tenantName} est confirmé`),
+    replyTo: context.emailBranding?.supportEmail,
+    html: page(context, {
+      testMode: input.testMode,
+      testLabel: '🧪 EMAIL DE TEST — aucun paiement réel',
+      title: '✓ Paiement confirmé',
+      footerLink: shopUrl ? undefined : { url: null, label: '' },
+      poweredBy: commerce?.showPoweredBy ?? false,
+      body: `<div style="text-align:center;margin:0 0 26px;">
+<div style="font-size:36px;font-weight:700;line-height:1.2;color:#111827;">${esc(amount)}</div>
+<div style="margin-top:6px;font-size:14px;color:#6b7280;">payé chez ${tenant}</div>
+</div>
+<p>${name ? `Bonjour <strong>${esc(name)}</strong>,` : 'Bonjour,'}</p>
+<p>Votre paiement de <strong>${esc(amount)}</strong> a bien été reçu.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin:22px 0;">
+${row('Montant', `<strong>${esc(amount)}</strong>`, true)}
+${when ? row('Date', esc(when)) : ''}
+${row('Statut', '<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:13px;font-weight:700;">✓ Payé</span>')}
+${row('Référence', `<span style="font-family:monospace;font-weight:700;">${esc(cardPaymentReference(input.quickPaymentId))}</span>`)}
+</table>
+<p>Votre paiement a été enregistré avec succès.<br>Merci pour votre confiance et votre visite chez ${tenant}.</p>
+${shopBlock}
+${androidAppBlock(context)}
+${supportBox(context, '💬 Une question concernant votre paiement ?')}`,
     }),
   };
 }

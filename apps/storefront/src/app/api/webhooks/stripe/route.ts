@@ -8,8 +8,9 @@ import { notifyN8n } from '@/lib/events/notifyN8n';
 import { getNotificationRecipients } from '@/lib/notifications/getNotificationRecipients';
 import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
-import { emailRequest, sendTenantEmail } from '@/lib/notifications/sendEmail';
-import { cardQuickPaymentEmail, orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
+import { emailRequest } from '@/lib/notifications/sendEmail';
+import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
+import { notifyCardQuickPaymentPaid } from '@/lib/notifications/notifyCardQuickPayment';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
 import { registerCheckoutConsent } from '@/lib/legal/registerCheckoutConsent';
@@ -571,8 +572,9 @@ export async function POST(req: NextRequest) {
 
 // ─── card_quick_payment — paiement carte à montant libre depuis /card ────────
 // Domaine indépendant de orders/checkout_sessions (voir api/card/quick-pay).
-// Notification n8n destinée au tenant (Dalice) uniquement — pas de reçu
-// automatique au client, customer_email ne sert ici qu'à informer le tenant.
+// Notification au tenant, puis confirmation au client si customer_email est
+// renseigné (lib/notifications/notifyCardQuickPayment.ts, clés d'idempotence
+// distinctes, échec isolé du paiement).
 async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Promise<NextResponse> {
   const quickPaymentId = intent.metadata?.quick_payment_id;
 
@@ -621,20 +623,9 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     console.warn('[webhook] Nessun destinatario notify_card_payment configurato per tenant:', payment.tenant_id, '— email non verrà inviata');
   }
 
-  await sendTenantEmail({
-    tenantId:         payment.tenant_id,
-    notificationType: 'card_quick_payment',
-    idempotencyKey:   `card-quick-payment:${intent.id}`,
-    recipients,
-    render: (context) => cardQuickPaymentEmail(context, {
-      amount:          payment.amount,
-      currency:        payment.currency,
-      customerName:    payment.customer_name,
-      customerEmail:   payment.customer_email,
-      paidAt,
-      paymentIntentId: intent.id,
-    }),
-  });
+  // Best-effort, after the paid update: never throws, never changes the
+  // payment row or the webhook response.
+  await notifyCardQuickPaymentPaid({ payment, paymentIntentId: intent.id, paidAt, tenantRecipients: recipients });
 
   return NextResponse.json({ received: true });
 }

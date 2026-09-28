@@ -29,6 +29,38 @@ export interface TenantNotificationContext {
     mapsUrl: string | null;
     hours: string | null;
   };
+  /** Shop capabilities, so customer emails never promise an unavailable option. */
+  commerce?: {
+    storefrontReady: boolean;
+    clickCollectEnabled: boolean;
+    showPoweredBy: boolean;
+  };
+  /** Android app state (tenants.android_package_name + android_public, same rule as /go). */
+  mobileApp?: {
+    android: AndroidAppState | null;
+  };
+}
+
+export interface AndroidAppState {
+  status: 'available' | 'coming_soon';
+  /** Only set when the listing is public: never a dead link. */
+  playStoreUrl: string | null;
+}
+
+const ANDROID_PACKAGE = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
+
+/**
+ * Same rule as /go: the Play Store listing is linked only once the app is
+ * public (android_public = true after closed testing). A package name without
+ * the public flag means the app is being released: "coming soon", no link.
+ * No package name: no app.
+ */
+export function androidAppState(packageName: string | null | undefined, isPublic: boolean | null | undefined): AndroidAppState | null {
+  const name = packageName?.trim();
+  if (!name || !ANDROID_PACKAGE.test(name)) return null;
+  return isPublic
+    ? { status: 'available', playStoreUrl: `https://play.google.com/store/apps/details?id=${name}` }
+    : { status: 'coming_soon', playStoreUrl: null };
 }
 
 interface TenantNotificationRow {
@@ -52,6 +84,11 @@ interface TenantNotificationRow {
   google_maps_url: string | null;
   click_collect_hours: string | null;
   click_collect_hours_it: string | null;
+  storefront_ready: boolean | null;
+  click_collect_enabled: boolean | null;
+  show_powered_by: boolean | null;
+  android_package_name: string | null;
+  android_public: boolean | null;
 }
 
 export async function getTenantNotificationContext(
@@ -62,7 +99,7 @@ export async function getTenantNotificationContext(
     const { data, error } = await supabase
       .from('tenants')
       .select(
-        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number, click_collect_address, google_maps_url, click_collect_hours, click_collect_hours_it',
+        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number, click_collect_address, google_maps_url, click_collect_hours, click_collect_hours_it, storefront_ready, click_collect_enabled, show_powered_by, android_package_name, android_public',
       )
       .eq('id', tenantId)
       .eq('active', true)
@@ -110,6 +147,14 @@ export async function getTenantNotificationContext(
         address: tenant.click_collect_address,
         mapsUrl: tenant.google_maps_url,
         hours: pickupHours,
+      },
+      commerce: {
+        storefrontReady: tenant.storefront_ready !== false,
+        clickCollectEnabled: Boolean(tenant.click_collect_enabled),
+        showPoweredBy: tenant.show_powered_by !== false,
+      },
+      mobileApp: {
+        android: androidAppState(tenant.android_package_name, tenant.android_public),
       },
     };
   } catch (error) {
