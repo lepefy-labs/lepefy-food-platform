@@ -1,3 +1,4 @@
+import { androidAppStatus, playStoreListingUrl } from '@/lib/mobileApp/androidApp';
 import { createServiceClient } from '@/lib/supabase/server';
 
 export interface TenantNotificationContext {
@@ -53,8 +54,6 @@ export interface AndroidAppState {
   playStoreUrl: string | null;
 }
 
-const ANDROID_PACKAGE = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
-
 /**
  * Same rule as /go: the Play Store listing is linked only once the app is
  * public (android_public = true after closed testing). A package name without
@@ -63,9 +62,10 @@ const ANDROID_PACKAGE = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
  */
 export function androidAppState(packageName: string | null | undefined, isPublic: boolean | null | undefined): AndroidAppState | null {
   const name = packageName?.trim();
-  if (!name || !ANDROID_PACKAGE.test(name)) return null;
-  return isPublic
-    ? { status: 'available', playStoreUrl: `https://play.google.com/store/apps/details?id=${name}` }
+  const status = androidAppStatus(name, isPublic);
+  if (status === 'none' || !name) return null;
+  return status === 'public'
+    ? { status: 'available', playStoreUrl: playStoreListingUrl(name) }
     : { status: 'coming_soon', playStoreUrl: null };
 }
 

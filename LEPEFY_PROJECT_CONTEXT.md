@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 settembre 2026 — **v6.92 Current-State Snapshot** (conferma cliente pagamento `/card`, base `main` @ `7d285a7d`)
+> **Aggiornato:** 28 settembre 2026 — **v6.93 Current-State Snapshot** (Plateforme → Application mobile, base `main` @ `8ea1c074`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -365,6 +365,7 @@ Console Platform interna Lepefy:
 /admin/platform/access
 /admin/platform/ai-usage
 /admin/platform/ai-routing
+/admin/platform/application-mobile
 /admin/platform/notifications
 /admin/platform/prospects
 /admin/platform/prospects/[id]
@@ -707,6 +708,8 @@ Le tabelle feedback/inviti non hanno accesso browser diretto e forzano RLS. Le m
 ## 13. Digital Card / shipping / notifiche
 
 `/card` è hub tenant; location usa `tenant.google_maps_url`, senza Google Maps API/iframe.
+
+**App Android (TWA) del tenant**: `tenants.android_package_name`, `android_sha256_fingerprint` (lista separata da virgole) e `android_public` pilotano `/go` (Android → scheda Play Store solo se package **e** `android_public`), `/.well-known/assetlinks.json` (package + fingerprint) e il blocco Google Play della mail cliente `/card`. Si gestiscono solo da **Plateforme → Application mobile** (`/admin/platform/application-mobile`, platform owner; API `GET/PATCH /api/admin/platform/mobile-app` e `POST …/mobile-app/listing`, nessuna capability tenant). Regole pure in `lib/mobileApp/androidApp.ts` (`planAndroidAppUpdate`): package validato; cambio package vietato mentre l’app è pubblica (409, prima «Repasser en test»); fingerprint modificabili solo dopo sblocco esplicito in UI + checkbox, e il PATCH le accetta solo con `fingerprints.confirm = true` (formato SHA-256 32 coppie, normalizzate maiuscole, deduplicate); pubblicazione/ritorno in test con conferma che elenca gli effetti. «Vérifier la fiche publique» interroga lato server solo `play.google.com` (404 = closed testing) e, se la scheda non è pubblica, la conferma mostra un avviso senza bloccare. Ogni scrittura chiama `revalidateTenantCache()`. Il tenant è quello del deploy (`NEXT_PUBLIC_TENANT_SLUG`).
 
 **Pagamento `/card` riuscito → notifiche**: `payment_intent.succeeded` con `metadata.type = 'card_quick_payment'` marca `tenant_card_payments` `paid` (idempotenza sul `status`), poi chiama `notifyCardQuickPaymentPaid` (`lib/notifications/notifyCardQuickPayment.ts`), best-effort e mai bloccante per il webhook: (1) alert tenant `cardQuickPaymentEmail` ai destinatari `notify_card_payment`, chiave `card-quick-payment:<pi>`; (2) solo se `customer_email` è presente, conferma cliente `cardQuickPaymentCustomerEmail`, `notificationType = card_quick_payment_customer`, chiave `card-quick-payment-customer:<pi>` (ledger `notification_deliveries`: un retry Stripe non reinvia nessuna delle due; un errore del secondo invio non tocca pagamento né alert tenant). La mail cliente è transazionale prima (importo, data, stato, riferimento `CP-XXXXXX` derivato dall'id `tenant_card_payments`, mai l'id Stripe), poi un solo ingresso commerciale: CTA «COMMANDER EN LIGNE» verso `storefrontUrl` (root = catalogo), colore primario con testo bianco/nero scelto per contrasto, benefit derivati da `click_collect_enabled` (livraison sempre offerta dal checkout); blocco assente se `storefrontUrl` manca o `storefront_ready = false`. Blocco Android con la stessa regola di `/go`: `android_package_name` + `android_public` → link Play Store; package senza `android_public` → «Bientôt disponible sur Google Play» non cliccabile; nessun package → nessun blocco. Nessuna PWA, coupon, UTM o opt-in marketing. Footer «Propulsé par Lepefy Labs» se `show_powered_by`. `TenantNotificationContext` espone `commerce` e `mobileApp` (colonne tenant esistenti, nessuna migration). Anteprime (config reale, app bientôt, app pubblicata) in Admin → Plateforme → Notifications → Modèles. Il campo email di `CardQuickPay` resta opzionale, con label «Email pour recevoir votre confirmation» e helper. Badge Google Play ufficiale (FR, non alterato) in `apps/storefront/public/badges/google-play-fr.png`, servito da `assetBaseUrl` (`storefront_url`, poi `NEXT_PUBLIC_APP_URL`; mai `legal_website`) con la menzione marchi Google LLC; senza `assetBaseUrl` il link resta testuale.
 

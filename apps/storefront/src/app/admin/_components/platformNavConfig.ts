@@ -1,4 +1,4 @@
-import { IconBell, IconBriefcase, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
+import { IconBell, IconBriefcase, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
  * Platform-owner navigation, single source of truth for the sidebar groups and
@@ -43,6 +43,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
       { label: 'Transport & santé', href: '/admin/platform/notifications/sante' },
     ],
   },
+  { id: 'mobile-app', label: 'Application mobile', icon: IconDeviceMobile, href: '/admin/platform/application-mobile' },
   {
     id: 'shipping', label: 'Livraison technique', icon: IconTruck, children: [
       { label: 'Laboratoire', href: '/admin/platform/livraison/laboratoire' },
