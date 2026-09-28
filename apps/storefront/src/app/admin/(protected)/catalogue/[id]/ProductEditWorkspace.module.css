@@ -50,3 +50,8 @@
     padding-top: 4px;
   }
 }
+
+:global(.dark) .workspace > div > div:first-child,
+:global(.dark) .workspace > div > div:nth-child(2) {
+  background: rgba(3, 7, 18, 0.96);
+}

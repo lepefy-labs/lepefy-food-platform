@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getPlatformBranding } from '@/lib/admin/platformBranding';
+import { ADMIN_DARK_CSS } from './_components/adminDarkTheme';
 
 export const metadata: Metadata = {
   title: 'Administration',
@@ -47,8 +48,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           --tenant-primary-light: ${tenant.accent_light};
           --tenant-secondary: ${tenant.secondary_color};
         }
+        ${ADMIN_DARK_CSS}
       `}</style>
-      <div className="min-h-screen bg-[var(--admin-page-bg)] dark:bg-gray-950">
+      <div className="min-h-screen bg-[var(--admin-page-bg)] text-gray-900 dark:bg-gray-950 dark:text-gray-100">
         {children}
       </div>
     </>

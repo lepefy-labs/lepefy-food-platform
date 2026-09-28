@@ -54,7 +54,7 @@ export default async function OutilsPage() {
           {QR_TOOLS.map((tool) => (
             <li key={tool.key} id={tool.key} className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={tool.preview} alt={`${tool.title} — aperçu`} width={96} height={96} className="h-24 w-24 shrink-0 rounded-lg border border-gray-200 bg-white" />
+              <img src={tool.preview} alt={`${tool.title} — aperçu`} width={96} height={96} className="h-24 w-24 shrink-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-white" />
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100">{tool.title}</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{tool.description}</p>

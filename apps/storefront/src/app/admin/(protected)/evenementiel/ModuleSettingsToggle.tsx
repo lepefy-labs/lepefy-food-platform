@@ -35,12 +35,9 @@ export default function ModuleSettingsToggle({ field, label, initialValue }: Pro
       type="button"
       onClick={toggle}
       disabled={saving}
-      className="flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl border disabled:opacity-50"
-      style={{
-        borderColor: enabled ? 'var(--color-primary)' : '#E5E7EB',
-        color: enabled ? 'var(--color-primary)' : '#6B7280',
-        backgroundColor: enabled ? 'var(--color-primary-light)' : 'white',
-      }}
+      className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl border disabled:opacity-50 ${enabled
+        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)] dark:border-violet-400/60 dark:text-violet-200'
+        : 'border-gray-200 bg-white text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400'}`}
     >
       <span
         className="w-8 h-4 rounded-full relative transition-colors"

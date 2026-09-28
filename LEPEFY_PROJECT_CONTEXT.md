@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 settembre 2026 — **v6.90 Current-State Snapshot** (admin layout/tema, base `main` @ `5bf638f9`)
+> **Aggiornato:** 28 settembre 2026 — **v6.91 Current-State Snapshot** (tema scuro admin, base `main` @ `dc898c03`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -878,7 +878,7 @@ Admin/storefront principale in francese. Tabler Icons, mobile-first, touch targe
 
 Storefront usa branding tenant. Admin usa branding Lepefy con tenant identity contestuale nei touchpoint di accesso.
 
-Solo `app/layout.tsx` emette `<html>/<head>/<body>`: `app/admin/layout.tsx` è un layout annidato (token `--admin-*` in un `<style>` nel body, dopo il blocco `:root` del tenant, più un contenitore `min-h-screen`); un secondo `<html>` rompe l'idratazione di tutto il documento. Tema admin: chiave `localStorage` `lepefy-admin-theme`, classe `dark` su `<html>` (copre anche i portal); `AdminThemeProvider` (solo area protetta) emette uno script inline anti-flash, sincronizza la classe dopo il mount e la rimuove all'uscita dall'area protetta.
+Solo `app/layout.tsx` emette `<html>/<head>/<body>`: `app/admin/layout.tsx` è un layout annidato (token `--admin-*` in un `<style>` nel body, dopo il blocco `:root` del tenant, più un contenitore `min-h-screen`); un secondo `<html>` rompe l'idratazione di tutto il documento. Tema admin: chiave `localStorage` `lepefy-admin-theme`, classe `dark` su `<html>` (copre anche i portal); `AdminThemeProvider` (solo area protetta) emette uno script inline anti-flash, sincronizza la classe dopo il mount e la rimuove all'uscita dall'area protetta. `app/admin/_components/adminDarkTheme.ts` (emesso nello stesso `<style>`) definisce i token `--admin-*` scuri su `:root.dark` (più `color-scheme: dark`) e una rete di sicurezza per le pagine legacy senza varianti `dark:` (grigi, bianchi, bordi, tinte di stato, `text-[var(--color-primary*)]`): ogni selettore è `:where(.dark) .utility`, quindi le utility `dark:` esplicite hanno sempre la precedenza; `--color-primary-dark` non è rimappato perché è anche lo sfondo del Button primario. Per mantenere un elemento volutamente chiaro (logo, QR) usare `dark:bg-white`; i CSS module con colori fissi richiedono regole `:global(.dark)` proprie.
 
 ---
 

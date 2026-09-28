@@ -146,6 +146,18 @@
   color: #f8fafc;
 }
 
+:global(.dark) .listPolish :global(tbody > tr > td:last-child a:last-child) {
+  border-color: #374151;
+  color: #e5e7eb;
+  background: #111827;
+}
+
+:global(.dark) .listPolish :global(tbody > tr > td:last-child a:last-child:hover) {
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(139, 92, 246, 0.16);
+  color: #ddd6fe;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .listPolish :global(tbody > tr > td) {
     transition: none;
