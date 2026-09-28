@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 settembre 2026 — **v6.88 Current-State Snapshot**
+> **Aggiornato:** 28 settembre 2026 — **v6.89 Current-State Snapshot** (Settings Hub admin, base `main` @ `b58c359d`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -21,7 +21,7 @@ Il rapporto operativo alle ore 08:00 locali per tenant usa `POST /api/internal/d
 
 **Comportamento del runner.** Una configurazione invalida sospende il tenant (`invalid_config`) senza ripiegare sui valori predefiniti.
 
-**Admin.** `GET/PATCH /api/admin/daily-digest` con `tenant_settings.view/manage`, usato dalla sezione Paramètres. `/api/admin/tenant` non gestisce più il digest.
+**Admin.** `GET/PATCH /api/admin/daily-digest` con `tenant_settings.view/manage`, usato dalla card "Rapport quotidien" di `/admin/parametres/automatisations`. `/api/admin/tenant` non gestisce più il digest.
 
 **Destinatari e registro.** I destinatari restano opt-in in `tenant_notification_recipients.notify_daily_digest`. Il registro idempotente `tenant_daily_digest_runs` è accessibile con RPC di claim service-role-only.
 
@@ -123,6 +123,28 @@ events host -> workspace events
 Resolver canonico: `src/lib/admin/workspace.ts`.
 
 La navigazione admin e la ricerca globale sono permission-aware. Lo switch workspace è mostrato solo se l'utente possiede almeno una capability della surface destinazione.
+
+### Admin Paramètres — Settings Hub
+
+`/admin/parametres` è un hub di configurazione del tenant, non una pagina di form. Registry unico `app/admin/(protected)/parametres/_components/settingsRegistry.ts` (gruppi → sezioni → voci ricercabili) alimenta card dell'hub, sotto-navigazione interna e ricerca client-side (titolo/descrizione/keyword, case- e accent-insensitive, tastiera ↑/↓/Esc); una nuova impostazione si aggiunge al registry con la propria pagina, mai a una pagina monolitica.
+
+```text
+/admin/parametres                  hub: ricerca + card con stato
+Boutique       /boutique           slogan, storefront_url, WhatsApp
+               /retrait            punto di ritiro (click_collect_address, google_maps_url, orari FR/IT); click_collect_enabled in sola lettura
+               /apparence          logo/colori in sola lettura + icona app (POST/DELETE /api/admin/app-icon)
+               /presence           tenant_social_links + google_review_url
+Communication  /notifications      matrice destinatari × notify_* (tenant_notification_recipients, schema invariato)
+               /automatisations    card automazione "Rapport quotidien" (tenant_feature_settings 'daily_order_digest')
+Commerce       /paiements          tenant_payment_methods (logica invariata)
+               /integrations       Stripe, Packlink, n8n (+ Brevo se EMAIL_TRANSPORT=brevo, Wallet se disponibile): solo presente/assente
+Organisation   /legal              legal_name, legal_address, legal_email
+```
+
+- Gli stati delle card (`loadSettingsData.ts`) derivano solo da dati reali (colonne tenant, conteggi di social link/destinatari/metodi attivi, stato digest, integrazioni); `integrationsStatus.ts` è `server-only` e non restituisce mai chiavi, URL o identificativi di account.
+- Le pagine di dettaglio usano `SettingsPageShell` (breadcrumb + sotto-navigazione verticale da `lg`, link "‹ Paramètres" sotto `lg`: su mobile il flusso è hub → dettaglio) e pannelli neutri `SettingsPanel`. I form tenant (`TenantFieldsForm`) inviano a `PATCH /api/admin/tenant` solo i campi della propria pagina.
+- La sidebar globale mostra una sola voce "Paramètres". Tutte le route ereditano `tenant_settings.view` dal prefisso; le API restano quelle esistenti (`tenant_settings.view/manage`).
+- Fuori da Paramètres, con lo stesso permesso `tenant_settings.view`: `/admin/contenu` (contenuto editoriale storefront: "Notre origine" `story_heading/story_text/story_image_url/countries_served`, upload `/api/admin/upload-story-photo`, link a Slides d'accueil se `catalog.manage`) e `/admin/outils` (QR boutique/carte SVG/PNG via `/api/shop/qr-code` e `/api/card/qr-code`, affiche PDF `/api/admin/card/poster`, link condivisibili). Entrambi sono voci "Commun" della sidebar e sono trovabili dalla ricerca dell'hub.
 
 ### Storefront routing, Catalogue, navigation e PWA
 
@@ -914,6 +936,7 @@ supabase/migrations/*
 - la `packlink_api_key` del tenant è stata inviata ai visitatori di `/cart` e `/checkout` fino alla Fase 0 (26/09/2026): va considerata compromessa e ruotata lato Packlink;
 - ambassador, moduli Événementiel e shipping restano colonne di `tenants`; la migrazione progressiva verso `tenant_feature_settings` è completata per loyalty (130/131) e referral (132/133) e avviata per AI/Nala (134);
 - AI/Nala: fino alla fase 5 `check_ai_rate_limit` legge i limiti da `tenants` (mirror della 134) e le colonne `tenants.ai_*`/`chatbox_extra_context` restano; `catalogue_search_threshold` non ha lettori (candidato alla rimozione);
+- Settings Hub: profilo, ritiro, avis Google, dati legali e contenuto "Notre origine" restano colonne di `tenants` (nessuna migration nel redesign); il ritiro è un solo punto (`click_collect_*` + orari testuali FR/IT): la UI è già organizzata come lista di punti in vista di una futura `tenant_locations` con orari strutturati; `click_collect_enabled`, logo e colori non sono modificabili dall'admin tenant;
 - Console Platform non è ancora CRUD completo di piani/tenant;
 - tenant Team self-service non esiste ancora;
 - `admin_users.role/tenant_id` restano compatibility mirror finché tutti i job/script non saranno auditati e migrati;

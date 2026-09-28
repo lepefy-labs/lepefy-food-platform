@@ -232,14 +232,14 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#E8E4FF] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <header className="flex items-start gap-3 border-b border-[#E8E4FF] bg-[var(--admin-primary-soft)] px-4 py-4 dark:border-gray-800 dark:bg-gray-900 sm:px-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/90 text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800">
-          <IconCreditCard size={20} stroke={1.7} />
+    <section id="moyens-de-paiement" aria-labelledby="moyens-de-paiement-title" className="scroll-mt-24 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <header className="flex items-start gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+          <IconCreditCard size={20} stroke={1.7} aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-[var(--admin-primary-fg)] dark:text-violet-200">Moyens de paiement</h2>
-          <p className="mt-0.5 text-xs leading-5 text-gray-500 dark:text-gray-400">
+          <h2 id="moyens-de-paiement-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Moyens de paiement</h2>
+          <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
             Configurez les moyens visibles par vos clients et les services où ils sont disponibles.
           </p>
         </div>
@@ -359,7 +359,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                   </div>
                 </div>
 
-                <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--admin-border)] bg-[#FCFBFF] px-4 py-3 dark:border-gray-800 dark:bg-gray-900/70 sm:px-5">
+                <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--admin-border)] bg-gray-50/60 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/70 sm:px-5">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Les modifications s’appliquent aux services sélectionnés après enregistrement.</p>
                   <div className="flex items-center gap-2">
                     <button
@@ -380,8 +380,8 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           })}
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-dashed border-[#CFC7FF] bg-[var(--admin-primary-soft)]/40 dark:border-gray-700 dark:bg-gray-950/20">
-          <div className="flex items-start gap-3 border-b border-[#E8E4FF] px-4 py-3.5 dark:border-gray-800 sm:px-5">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-950/20">
+          <div className="flex items-start gap-3 border-b border-gray-100 px-4 py-3.5 dark:border-gray-800 sm:px-5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800">
               <IconPlus size={18} stroke={1.7} />
             </div>
@@ -434,7 +434,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
 
             <ModulesCheckboxGroup idPrefix="new" selected={newForm.enabled_modules} onChange={(next) => setNewForm({ ...newForm, enabled_modules: next })} />
 
-            <div className="flex justify-end border-t border-[#E8E4FF] pt-4 dark:border-gray-800">
+            <div className="flex justify-end border-t border-gray-100 pt-4 dark:border-gray-800">
               <Button onClick={handleCreate} loading={isSaving === 'new'} disabled={newForm.enabled_modules.length === 0}>
                 {isSaving !== 'new' && <IconPlus size={14} stroke={1.5} />}
                 Ajouter

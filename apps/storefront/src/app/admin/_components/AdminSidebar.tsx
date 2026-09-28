@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle } from '@tabler/icons-react';
+import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode } from '@tabler/icons-react';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 import PlatformNav from './PlatformNav';
 
@@ -57,6 +57,8 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
       {has('scan.access') && <><p className={groupLabel}>Service sur place</p><Link href="/scan" className={`${linkClass(pathname === '/scan')} border border-violet-200 bg-violet-50/70 text-violet-800 hover:bg-violet-100 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-200`}><IconScan size={20}/>Service repas / Scan</Link></>}
     </> : null}
     {commonVisible && <p className={groupLabel}>Commun</p>}
+    {has('tenant_settings.view') && <Link href="/admin/contenu" className={linkClass(pathname.startsWith('/admin/contenu'))}><IconFileText size={20}/>Contenu public</Link>}
+    {has('tenant_settings.view') && <Link href="/admin/outils" className={linkClass(pathname.startsWith('/admin/outils'))}><IconQrcode size={20}/>Outils &amp; QR</Link>}
     {has('tenant_settings.view') && <Link href="/admin/parametres" className={linkClass(pathname.startsWith('/admin/parametres'))}><IconSettings size={20}/>Paramètres</Link>}
     {has('billing.view') && <Link href="/admin/billing" className={linkClass(pathname === '/admin/billing')}><IconCreditCard size={20}/>Abonnement</Link>}
     {has('ai_usage.view') && <Link href="/admin/ai-usage" className={linkClass(pathname === '/admin/ai-usage')}><IconChartBar size={20}/>Utilisation IA</Link>}

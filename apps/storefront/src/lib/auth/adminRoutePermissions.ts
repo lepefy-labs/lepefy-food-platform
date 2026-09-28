@@ -35,6 +35,9 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/nala-analytics', permission: 'ai_usage.view' },
   { prefix: '/admin/ai-lab', permission: 'ai_knowledge.manage' },
   { prefix: '/admin/parametres', permission: 'tenant_settings.view' },
+  // Moved out of Paramètres with the same access (story, QR/poster: tenant_settings.*).
+  { prefix: '/admin/contenu', permission: 'tenant_settings.view' },
+  { prefix: '/admin/outils', permission: 'tenant_settings.view' },
   { prefix: '/admin/billing', permission: 'billing.view' },
   { prefix: '/admin/ai-usage', permission: 'ai_usage.view' },
 ];
