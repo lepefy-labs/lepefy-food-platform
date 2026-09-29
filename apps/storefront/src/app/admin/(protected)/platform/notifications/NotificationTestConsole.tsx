@@ -65,6 +65,10 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
   const [shippingTotal, setShippingTotal] = useState('8.90');
   const [trackingCode, setTrackingCode] = useState('TEST-TRACKING-001');
   const [trackingCarrier, setTrackingCarrier] = useState('Transporteur test');
+  // Empty = no estimate (e-mail identical to a shipment without provider date).
+  const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState(
+    () => new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  );
   const [line1, setLine1] = useState('Adresse de test');
   const [postalCode, setPostalCode] = useState('00000');
   const [city, setCity] = useState('Reggio Emilia');
@@ -111,6 +115,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           shippingTotal: Number(shippingTotal),
           trackingCode,
           trackingCarrier,
+          shippingEstimatedDeliveryDate: estimatedDeliveryDate,
           googlePlayTestUrl,
           address: {
             line1,
@@ -260,6 +265,11 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Tracking
                   <input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                </label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Livraison estimée
+                  <input type="date" value={estimatedDeliveryDate} onChange={e => setEstimatedDeliveryDate(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <span className="mt-1 block text-xs font-normal text-gray-500">Laisser vide pour tester l’e-mail sans date estimée.</span>
                 </label>
               </>
             )}

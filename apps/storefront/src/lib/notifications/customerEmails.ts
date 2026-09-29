@@ -194,6 +194,13 @@ export function formatEstimatedDeliveryDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Rome' }).format(date);
 }
 
+/** `YYYY-MM-DD` (date input) → midnight UTC ISO, the shape the Packlink adapter persists; otherwise null. */
+export function estimatedDeliveryFromDateInput(value: unknown) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const iso = `${value}T00:00:00.000Z`;
+  return new Date(iso).toISOString() === iso ? iso : null;
+}
+
 export function orderShippedEmail(context: TenantNotificationContext, input: OrderBase & {
   trackingCode: string | null; trackingCarrier: string | null;
   /** Persisted orders.shipping_estimated_delivery_at — never fetched from the provider here. */

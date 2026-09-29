@@ -11,7 +11,8 @@ import { emailRequest, SEND_EMAIL_WEBHOOK, type RenderedEmail } from '@/lib/noti
 import {
   eventExternalPaymentAwaitingVerificationEmail, eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail,
   orderCancelledEmail, orderCompletedEmail, orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail,
-  cardQuickPaymentCustomerEmail, paymentReminderEmail, PLATFORM_EMAIL_CONTEXT, reviewInviteEmail, type ShippingAddressLike,
+  cardQuickPaymentCustomerEmail, estimatedDeliveryFromDateInput, paymentReminderEmail, PLATFORM_EMAIL_CONTEXT, reviewInviteEmail,
+  type ShippingAddressLike,
 } from '@/lib/notifications/customerEmails';
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import {
@@ -67,6 +68,8 @@ interface TestRequestBody {
   shippingTotal?: number;
   trackingCode?: string;
   trackingCarrier?: string;
+  /** `YYYY-MM-DD`; empty or invalid → email without the estimate. */
+  shippingEstimatedDeliveryDate?: string;
   googlePlayTestUrl?: string;
   address?: {
     line1?: string;
@@ -99,6 +102,7 @@ function renderInAppTestEmail(
     case 'order-shipped':
       return orderShippedEmail(context, {
         ...order, trackingCode: (p.trackingCode as string | undefined) ?? null, trackingCarrier: (p.trackingCarrier as string | undefined) ?? null,
+        shippingEstimatedDeliveryAt: (p.shippingEstimatedDeliveryAt as string | null | undefined) ?? null,
       });
     case 'order-ready-for-pickup':
       return orderReadyForPickupEmail(context, order);
@@ -330,6 +334,7 @@ export async function POST(req: NextRequest) {
       fulfillmentType: 'delivery',
       trackingCode: body.trackingCode?.trim() || 'TEST-TRACKING-001',
       trackingCarrier: body.trackingCarrier?.trim() || 'Transporteur test',
+      shippingEstimatedDeliveryAt: estimatedDeliveryFromDateInput(body.shippingEstimatedDeliveryDate),
     };
   } else if (body.event === 'order-ready-for-pickup') {
     payload = { ...commonPayload, fulfillmentType: 'pickup' };

@@ -6,6 +6,7 @@ import {
   orderConfirmedEmail,
   orderReadyForPickupEmail,
   orderShippedEmail,
+  estimatedDeliveryFromDateInput,
   paymentReminderEmail,
   eventReservationConfirmedEmail,
   externalPaymentAwaitingVerificationEmail,
@@ -78,6 +79,15 @@ test('shipped email shows the provider estimated delivery date after carrier and
   // Europe/Rome, not UTC: a late-evening UTC instant already falls on the next Italian day.
   expect(orderShippedEmail(context, { ...order, trackingCode: 'X', trackingCarrier: 'BRT', shippingEstimatedDeliveryAt: '2026-10-05T23:30:00.000Z' }).html)
     .toContain('6 oct. 2026');
+});
+
+test('test console date input maps to the persisted estimate shape', () => {
+  expect(estimatedDeliveryFromDateInput('2026-10-06')).toBe('2026-10-06T00:00:00.000Z');
+  for (const value of ['', null, undefined, 42, '2026-02-30', '06/10/2026', '2026-10-06T10:00']) {
+    expect(estimatedDeliveryFromDateInput(value)).toBeNull();
+  }
+  expect(orderShippedEmail(context, { ...order, trackingCode: 'X', trackingCarrier: 'BRT',
+    shippingEstimatedDeliveryAt: estimatedDeliveryFromDateInput('2026-10-06') }).html).toContain('6 oct. 2026');
 });
 
 test('shipped email without a valid estimate is unchanged', () => {
