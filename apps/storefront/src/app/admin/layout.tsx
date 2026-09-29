@@ -16,6 +16,13 @@ export const dynamic = 'force-dynamic';
 // whole document re-render on the client. The admin tokens are emitted as a
 // <style> element in the body; it comes after the root :root block, so the
 // platform values still win the cascade.
+//
+// The CSS is passed via dangerouslySetInnerHTML, never as a text child: React
+// SSR HTML-escapes text children (`>` -> `&gt;`), but <style> is a raw-text
+// element, so the browser kept the literal `&gt;` while the client rendered
+// `>`. That mismatch (#425 -> #418 -> #423) forced a client re-render of the
+// whole root on every admin page, which then crashed on still-dehydrated
+// Suspense boundaries (#329) and delayed hydration by seconds.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const [tenant, platform] = await Promise.all([
@@ -23,9 +30,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getPlatformBranding(),
   ]);
 
-  return (
-    <>
-      <style>{`
+  // `<` never appears in valid CSS; escaping it keeps DB-provided colour values
+  // from closing the raw <style> element.
+  const css = `
         :root {
           --admin-primary: ${platform.primary};
           --admin-primary-hover: ${platform.primaryHover};
@@ -49,7 +56,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           --tenant-secondary: ${tenant.secondary_color};
         }
         ${ADMIN_DARK_CSS}
-      `}</style>
+      `.replace(/</g, '\\3C ');
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: css }} />
       <div className="min-h-screen bg-[var(--admin-page-bg)] text-gray-900 dark:bg-gray-950 dark:text-gray-100">
         {children}
       </div>
