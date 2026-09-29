@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconCalendar, IconCheck, IconChevronDown, IconCopy, IconExternalLink, IconMail, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { shopDay, type CardPaymentDisplayStatus, type CardPaymentPeriod, type CardPaymentStatusFilter } from '@/lib/card/cardPaymentsAdmin';
@@ -80,7 +80,15 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
   const [resending, setResending] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
+  // Only the latest request may update the page: filters (dates especially)
+  // change faster than the API answers, and an older, slower response must
+  // not overwrite the current one.
+  const requestRef = useRef<AbortController | null>(null);
+
   const load = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError(null);
     try {
@@ -90,17 +98,21 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
         if (fromDay) params.set('from', fromDay);
         if (toDay) params.set('to', toDay);
       }
-      const response = await fetch(`/api/admin/card-payments?${params}`, { cache: 'no-store' });
+      const response = await fetch(`/api/admin/card-payments?${params}`, { cache: 'no-store', signal: controller.signal });
       const body = await response.json();
+      if (controller.signal.aborted) return;
       if (!response.ok) throw new Error(body.error ?? 'Impossible de charger les paiements.');
       setData(body as ListResponse);
       setUpdatedAt(new Date());
     } catch (loadError) {
+      if (controller.signal.aborted) return;
       setError(loadError instanceof Error ? loadError.message : 'Impossible de charger les paiements.');
     } finally {
-      setLoading(false);
+      if (requestRef.current === controller) setLoading(false);
     }
   }, [period, fromDay, toDay, status, page, appliedQuery]);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   useEffect(() => { load(); }, [load]);
   // A reference search opens its single result directly.
