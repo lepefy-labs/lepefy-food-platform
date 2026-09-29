@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { formatPrice } from '@/lib/utils/format';
+import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
+import { referenceRange } from '@/lib/card/cardPaymentsAdmin';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -52,6 +54,18 @@ export async function GET(req: NextRequest) {
   await Promise.all([
     scopes.includes('orders')
       ? (async () => {
+          // A /card reference (CP-XXXXXX) given by a customer leads to Paiements carte.
+          const range = referenceRange(q);
+          const cardPayments = range
+            ? (await supabase.from('tenant_card_payments').select('id, amount, customer_name, status').eq('tenant_id', tenant.id)
+              .gte('id', range.from).lte('id', range.to).limit(LIMIT)).data ?? []
+            : [];
+          const cardResults = (cardPayments as Array<{ id: string; amount: number; customer_name: string | null; status: string }>).map((payment) => ({
+            id: payment.id,
+            label: `${cardPaymentReference(payment.id)} — Paiement carte${payment.customer_name ? ` · ${payment.customer_name}` : ''}`,
+            sublabel: `${formatPrice(Number(payment.amount), tenant.currency)} · ${payment.status === 'paid' ? 'Payé' : 'Non finalisé'}`,
+            href: `/admin/paiements-carte?q=${cardPaymentReference(payment.id)}`,
+          }));
           const [byName, byEmail] = await Promise.all([
             supabase.from('orders').select('id, full_name, email, total, created_at').eq('tenant_id', tenant.id).ilike('full_name', like).order('created_at', { ascending: false }).limit(LIMIT),
             supabase.from('orders').select('id, full_name, email, total, created_at').eq('tenant_id', tenant.id).ilike('email', like).order('created_at', { ascending: false }).limit(LIMIT),
@@ -59,12 +73,12 @@ export async function GET(req: NextRequest) {
           type OrderRow = { id: string; full_name: string | null; email: string; total: number; created_at: string };
           const merged = new Map<string, OrderRow>();
           for (const row of [...(byName.data ?? []), ...(byEmail.data ?? [])] as OrderRow[]) merged.set(row.id, row);
-          results.orders = [...merged.values()].slice(0, LIMIT).map((order) => ({
+          results.orders = [...cardResults, ...[...merged.values()].map((order) => ({
             id: order.id,
             label: `#${order.id.slice(0, 8).toUpperCase()} — ${order.full_name ?? order.email}`,
             sublabel: formatPrice(order.total, tenant.currency),
             href: `/admin/orders/${order.id}`,
-          }));
+          }))].slice(0, LIMIT);
         })()
       : Promise.resolve(),
     scopes.includes('products')

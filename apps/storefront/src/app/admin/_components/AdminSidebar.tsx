@@ -31,6 +31,7 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
     {workspace === 'shop' && shopVisible ? <>
       <p className={groupLabel}>Boutique</p>
       {has('orders.view') && <Link href="/admin" className={linkClass(pathname === '/admin')}><IconShoppingBag size={20}/><span className="flex-1">Commandes</span>{pendingPaymentsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{pendingPaymentsCount}</span>}</Link>}
+      {has('orders.view') && <Link href="/admin/paiements-carte" className={linkClass(pathname.startsWith('/admin/paiements-carte'))}><IconCreditCard size={20}/>Paiements carte</Link>}
       {has('orders.view') && <Link href="/admin/checkout-funnel" className={linkClass(pathname === '/admin/checkout-funnel')}><IconChartBar size={20}/>Funnel checkout</Link>}
       {has('catalog.view') && <Link href="/admin/catalogue" className={linkClass(pathname.startsWith('/admin/catalogue'))}><IconPackage size={20}/>Catalogue</Link>}
       {has('customers.view') && <Link href="/admin/clients" className={linkClass(pathname.startsWith('/admin/clients'))}><IconUsers size={20}/>Clients</Link>}

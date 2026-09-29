@@ -32,6 +32,9 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/checkout-sessions')) return read ? 'orders.view' : 'orders.manage';
   if (/^\/api\/admin\/orders\/[^/]+\/shipment\/(attach|sync|manual)$/.test(path)) return method.toUpperCase() === 'POST' ? 'orders.manage' : null;
   if (path.startsWith('/api/admin/orders')) return read ? 'orders.view' : 'orders.manage';
+  // Paiements carte (/card): list is read-only; resending the customer confirmation is a manage action.
+  if (path === '/api/admin/card-payments') return read ? 'orders.view' : null;
+  if (/^\/api\/admin\/card-payments\/[^/]+\/resend-confirmation$/.test(path)) return method.toUpperCase() === 'POST' ? 'orders.manage' : null;
   if (path === '/api/admin/reviews/settings') return read ? 'reviews.view' : 'reviews.manage';
   if (/^\/api\/admin\/reviews\/[^/]+$/.test(path)) return read ? 'reviews.view' : 'reviews.moderate';
   if (path.startsWith('/api/admin/reviews')) return read ? 'reviews.view' : 'reviews.manage';

@@ -26,6 +26,7 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/avis', permission: 'reviews.view' },
   { prefix: '/admin/checkout-funnel', permission: 'orders.view' },
   { prefix: '/admin/paiements-en-attente', permission: 'orders.view' },
+  { prefix: '/admin/paiements-carte', permission: 'orders.view' },
   { prefix: '/admin/catalogue', permission: 'catalog.view' },
   { prefix: '/admin/accueil-slides', permission: 'catalog.manage' },
   { prefix: '/admin/loyalty/scan', permission: 'loyalty.scan' },
