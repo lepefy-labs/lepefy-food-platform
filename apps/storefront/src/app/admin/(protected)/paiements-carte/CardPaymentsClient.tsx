@@ -152,7 +152,7 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
       </div>
 
       {data && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <Kpi label={`Encaissé · ${PERIOD_LABEL[period]}`} value={formatPrice(data.summary.paidAmount, currency)} />
           <Kpi label="Paiements payés" value={String(data.summary.paidCount)} />
           <Kpi label="Non finalisés" value={String(data.summary.abandonedCount)} hint="En attente depuis plus d’une heure" />
@@ -254,10 +254,10 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className={`${card} p-4`}>
-      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-gray-950 dark:text-white">{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-gray-400">{hint}</p>}
+    <div className={`${card} min-w-0 p-3 sm:p-4`}>
+      <p className="text-[11px] leading-tight text-gray-500 dark:text-gray-400 sm:text-xs">{label}</p>
+      <p className="mt-1 truncate text-lg font-semibold text-gray-950 dark:text-white sm:text-2xl">{value}</p>
+      {hint && <p className="mt-0.5 hidden text-xs text-gray-400 sm:block">{hint}</p>}
     </div>
   );
 }
