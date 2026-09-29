@@ -102,6 +102,7 @@ export async function runOrderTransitionSideEffects({
   fulfillmentType,
   trackingCode,
   trackingCarrier,
+  shippingEstimatedDeliveryAt,
 }: {
   tenantId: string;
   orderId: string;
@@ -115,6 +116,7 @@ export async function runOrderTransitionSideEffects({
   fulfillmentType: FulfillmentType;
   trackingCode?: string | null;
   trackingCarrier?: string | null;
+  shippingEstimatedDeliveryAt?: string | null;
 }, dependencies: OrderTransitionSideEffectDependencies = { processOrderPointsOnDelivery, notifyN8n, getTenantNotificationContext, ensureReviewInviteForOrder }) {
   if (nextStatus === previousStatus) return;
 
@@ -156,7 +158,10 @@ export async function runOrderTransitionSideEffects({
 
   if (nextStatus === 'shipped') {
     await send('order_shipped', 'order-shipped',
-      orderShippedEmail(tenant, { ...order, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null }));
+      orderShippedEmail(tenant, {
+        ...order, trackingCode: trackingCode ?? null, trackingCarrier: trackingCarrier ?? null,
+        shippingEstimatedDeliveryAt: shippingEstimatedDeliveryAt ?? null,
+      }));
     return;
   }
   if (nextStatus === 'ready_for_pickup') {

@@ -63,6 +63,34 @@ test('shipped email shows carrier and tracking code only when provided', () => {
   expect(orderShippedEmail(context, { ...order, trackingCode: null, trackingCarrier: null }).html).not.toContain('Numéro de suivi');
 });
 
+test('shipped email shows the provider estimated delivery date after carrier and tracking', () => {
+  const html = orderShippedEmail(context, {
+    ...order, trackingCode: '179196133858963', trackingCarrier: 'BRT', shippingEstimatedDeliveryAt: '2026-10-06T00:00:00.000Z',
+  }).html;
+  expect(html).toContain('Livraison estimée</span>6 oct. 2026');
+  expect(html).toContain('estimation du transporteur');
+  const carrier = html.indexOf('BRT'), tracking = html.indexOf('179196133858963');
+  const estimate = html.indexOf('Livraison estimée'), cta = html.indexOf('Suivre ma commande');
+  expect(carrier).toBeGreaterThan(-1);
+  expect(carrier).toBeLessThan(tracking);
+  expect(tracking).toBeLessThan(estimate);
+  expect(estimate).toBeLessThan(cta);
+  // Europe/Rome, not UTC: a late-evening UTC instant already falls on the next Italian day.
+  expect(orderShippedEmail(context, { ...order, trackingCode: 'X', trackingCarrier: 'BRT', shippingEstimatedDeliveryAt: '2026-10-05T23:30:00.000Z' }).html)
+    .toContain('6 oct. 2026');
+});
+
+test('shipped email without a valid estimate is unchanged', () => {
+  const base = orderShippedEmail(context, { ...order, trackingCode: 'BRT123', trackingCarrier: 'BRT' }).html;
+  for (const value of [null, undefined, '', 'not-a-date']) {
+    const html = orderShippedEmail(context, { ...order, trackingCode: 'BRT123', trackingCarrier: 'BRT', shippingEstimatedDeliveryAt: value }).html;
+    expect(html).toBe(base);
+    expect(html).not.toContain('Livraison estimée');
+    expect(html).not.toContain('estimation du transporteur');
+    expect(html).toContain('BRT123');
+  }
+});
+
 test('ready for pickup: maps CTA first, order details as secondary link, hours on several lines', () => {
   const email = orderReadyForPickupEmail(context, order);
   expect(email.html).toContain('Itinéraire vers la boutique');

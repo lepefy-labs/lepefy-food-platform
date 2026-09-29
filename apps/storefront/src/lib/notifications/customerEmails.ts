@@ -187,9 +187,19 @@ ${signature(context, `🙏 Merci de faire confiance à <strong>${esc(context.ten
   };
 }
 
+/** Provider estimate as shown on the customer order page; null when absent or unparsable. */
+export function formatEstimatedDeliveryDate(value: string | null | undefined) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Rome' }).format(date);
+}
+
 export function orderShippedEmail(context: TenantNotificationContext, input: OrderBase & {
   trackingCode: string | null; trackingCarrier: string | null;
+  /** Persisted orders.shipping_estimated_delivery_at — never fetched from the provider here. */
+  shippingEstimatedDeliveryAt?: string | null;
 }): RenderedEmail {
+  const estimatedDelivery = formatEstimatedDeliveryDate(input.shippingEstimatedDeliveryAt);
   return {
     subject: subject(input.testMode, `🚚 Votre commande ${input.orderNumber} est en route !`),
     replyTo: context.emailBranding?.supportEmail,
@@ -202,9 +212,10 @@ ${infoBox([
     ['📦 Commande', input.orderNumber],
     ['🚛 Transporteur', input.trackingCarrier],
     ['🔎 Numéro de suivi', input.trackingCode, { mono: true }],
+    ['📅 Livraison estimée', estimatedDelivery],
   ])}
 ${cta(input.orderTrackingLink, '🚚 Suivre ma commande')}
-<p class="note">Les informations de suivi peuvent prendre un peu de temps avant d’être mises à jour après l’expédition.</p>
+<p class="note">${estimatedDelivery ? 'La date de livraison est une estimation du transporteur et peut évoluer. ' : ''}Les informations de suivi peuvent prendre un peu de temps avant d’être mises à jour après l’expédition.</p>
 ${supportBox(context, '💬 Une question concernant votre livraison ?')}
 ${signature(context, 'Merci pour votre confiance.')}`,
     }),

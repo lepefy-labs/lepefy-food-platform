@@ -56,7 +56,9 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
   add('order-confirmed-pickup', 'Commandes', 'Commande confirmée · retrait', 'Client',
     orderConfirmedEmail(context, { ...order, fulfillmentType: 'pickup', total: 42.5, shippingTotal: 0, shippingAddress: null }));
   add('order-shipped', 'Commandes', 'Commande expédiée', 'Client',
-    orderShippedEmail(context, { ...order, trackingCode: 'BRT0012345678', trackingCarrier: 'BRT' }));
+    orderShippedEmail(context, {
+      ...order, trackingCode: 'BRT0012345678', trackingCarrier: 'BRT', shippingEstimatedDeliveryAt: '2026-10-06T00:00:00.000Z',
+    }));
   add('order-ready-for-pickup', 'Commandes', 'Prête au retrait', 'Client', orderReadyForPickupEmail(context, order));
   add('order-completed-delivered', 'Commandes', 'Commande livrée', 'Client', orderCompletedEmail(context, { ...order, completionType: 'delivered' }));
   add('order-completed-picked-up', 'Commandes', 'Commande retirée', 'Client', orderCompletedEmail(context, { ...order, completionType: 'picked_up' }));

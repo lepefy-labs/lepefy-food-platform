@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@01b613e39d820ac3dd7f52de6f10f4d44f2ba384`
-> **Ultima verifica:** 28 settembre 2026
+> **Base codice verificata:** `main@6a284328444aaff8a13ba27a5529c04739faf70d`
+> **Ultima verifica:** 29 settembre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -45,6 +45,14 @@ packlink
 ```
 
 La logica reale di checkout continua a usare il flusso shipping esistente e non è stata sostituita da Shipping Intelligence.
+
+#### Data di consegna stimata (suivi automatique)
+
+- La data arriva dal provider (Packlink: `estimated_delivery_date`, `YYYY/MM/DD`) tramite l'adapter (`parsePacklinkShipment` → `snapshot.estimatedDeliveryAt`).
+- `syncOrderShipment` / `applyShipmentSnapshot` la persistono in `orders.shipping_estimated_delivery_at` nello stesso update compare-and-set che porta l'ordine a `shipped`.
+- È mostrata nella pagina cliente `/orders/[id]` e nel pannello admin della spedizione.
+- È inclusa nell'e-mail `order_shipped` («📅 Livraison estimée : 6 oct. 2026», dopo transporteur e numéro de suivi, prima del CTA, con nota che si tratta di una stima del trasportatore): `orderTransitionService.updateWorkflowOrder` passa la riga salvata a `runOrderTransitionSideEffects` → `orderShippedEmail`. Formato `fr-FR`, `dateStyle: 'medium'`, timezone `Europe/Rome` (`formatEstimatedDeliveryDate` in `customerEmails.ts`). Valore `null` o non valido → nessuna riga, e-mail identica a prima.
+- Il renderer non interroga mai il provider. Sync ripetute senza cambio di stato non emettono e-mail; il catch-up `preparing → delivered` continua a emettere solo `order_completed`.
 
 ### 2.2 Pricing cliente
 
@@ -1140,6 +1148,9 @@ La V1E non introduce migration: i nuovi campi vivono nel JSON `scenario_matrix` 
 apps/storefront/src/lib/shipping/calculateShipping.ts
 apps/storefront/src/lib/shipping/resolveCountryRule.ts
 apps/storefront/src/lib/shipping/packlinkShipmentList.ts   (elenco Packlink read-only: fetch limitato, riepilogo, redazione, esiti)
+apps/storefront/src/lib/shipping/syncOrderShipment.ts      (snapshot provider → orders.shipping_*; incl. shipping_estimated_delivery_at)
+apps/storefront/src/lib/orders/orderTransitionService.ts   (CAS + side effects; passa la stima salvata all'e-mail shipped)
+apps/storefront/src/lib/notifications/customerEmails.ts    (orderShippedEmail, formatEstimatedDeliveryDate)
 apps/storefront/src/app/api/shipping/quote/route.ts
 apps/storefront/src/lib/auth/adminApiPermissions.ts
 ```

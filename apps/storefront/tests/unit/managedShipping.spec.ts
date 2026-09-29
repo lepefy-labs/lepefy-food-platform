@@ -118,6 +118,9 @@ test('repeated transit and delivered snapshots do not duplicate canonical webhoo
   for (const status of ['IN_TRANSIT', 'IN_TRANSIT', 'DELIVERED', 'DELIVERED']) await applyShipmentSnapshot(db.service, db.order(), snapshot(status), spy.run);
   expect(spy.messages.map(message => message.payload.notificationType)).toEqual(['order_shipped', 'order_completed']);
   expect(spy.hooks).toEqual(['order-a']);
+  // The shipped email reads the estimate persisted by the same snapshot update, never Packlink directly.
+  expect(String(spy.messages[0]!.payload.html)).toContain('Livraison estimée</span>15 sept. 2026');
+  expect(String(spy.messages[0]!.payload.html)).toContain('179196133702310');
   expect(String(spy.messages[1]!.payload.subject)).toContain('a été livrée');
   expect(db.order().shipped_at).toBeTruthy();
 });

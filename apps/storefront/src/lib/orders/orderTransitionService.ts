@@ -93,7 +93,8 @@ export async function updateWorkflowOrder({ service, order, nextStatus, patch = 
   if (next !== order.status) {
     await sideEffects({ tenantId: order.tenant_id, orderId: order.id, previousStatus: order.status, nextStatus: next,
       email: order.email, fullName: order.full_name, fulfillmentType: order.fulfillment_type,
-      trackingCode: saved.tracking_code, trackingCarrier: saved.tracking_carrier });
+      trackingCode: saved.tracking_code, trackingCarrier: saved.tracking_carrier,
+      shippingEstimatedDeliveryAt: saved.shipping_estimated_delivery_at ?? null });
   }
   return saved;
 }
