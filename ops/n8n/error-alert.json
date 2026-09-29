@@ -1,0 +1,87 @@
+{
+  "name": "Lepefy · Error alert (all workflows)",
+  "nodes": [
+    {
+      "id": "0f6c3a2e-7d41-4b8a-9e25-1a3b5c7d9e01",
+      "name": "On workflow error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "6a2d8f14-3b9c-4e57-a1d0-2c4e6f8a0b12",
+      "name": "Format alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $input.first()?.json ?? {};\nconst execution = data.execution ?? {};\nconst trigger = data.trigger ?? {};\nconst workflowName = String(data.workflow?.name ?? 'Workflow sconosciuto').slice(0, 200);\nconst error = execution.error ?? trigger.error ?? {};\n// Only the error message, truncated: never the stack, node parameters or upstream bodies.\nconst message = String(error.message ?? 'Errore sconosciuto').slice(0, 500);\nconst node = String(execution.lastNodeExecuted ?? error.node?.name ?? '—').slice(0, 200);\nconst url = typeof execution.url === 'string' && execution.url.startsWith('https://') ? execution.url : null;\nconst when = new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Rome' }).format(new Date());\nconst esc = (s) => s.replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst rows = [\n  ['Workflow', workflowName],\n  ['Nodo', node],\n  ['Errore', message],\n  ['Modalità', String(execution.mode ?? (data.trigger ? 'trigger' : '—'))],\n  ['Quando', when],\n];\nconst html = '<h2 style=\"font-family:sans-serif\">Workflow n8n fallito</h2>'\n  + '<table style=\"font-family:sans-serif;border-collapse:collapse\">'\n  + rows.map(([k, v]) => `<tr><td style=\"padding:4px 12px 4px 0;color:#666\">${k}</td><td style=\"padding:4px 0\">${esc(v)}</td></tr>`).join('')\n  + '</table>'\n  + (url ? `<p style=\"font-family:sans-serif\"><a href=\"${esc(url)}\">Apri l'esecuzione in n8n</a></p>` : '');\nreturn [{ json: { subject: `[n8n] Errore: ${workflowName}`.slice(0, 200), html } }];"
+      }
+    },
+    {
+      "id": "b7e1c9d3-5f28-4a6b-8c04-9d2e4f6a8b23",
+      "name": "Send alert email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "fromEmail": "Lepefy n8n <noreply@lepefy.com>",
+        "toEmail": "robertin.smartinvestor@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "On workflow error": {
+      "main": [
+        [
+          {
+            "node": "Format alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format alert": {
+      "main": [
+        [
+          {
+            "node": "Send alert email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
