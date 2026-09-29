@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { IconCheck, IconChevronDown, IconCopy, IconExternalLink, IconMail, IconSearch } from '@tabler/icons-react';
+import { IconCalendar, IconCheck, IconChevronDown, IconCopy, IconExternalLink, IconMail, IconRefresh, IconSearch } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
-import type { CardPaymentDisplayStatus, CardPaymentPeriod, CardPaymentStatusFilter } from '@/lib/card/cardPaymentsAdmin';
+import { shopDay, type CardPaymentDisplayStatus, type CardPaymentPeriod, type CardPaymentStatusFilter } from '@/lib/card/cardPaymentsAdmin';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 
 interface CardPayment {
@@ -29,8 +29,15 @@ interface ListResponse {
   payments: CardPayment[];
 }
 
-const PERIODS: Array<[CardPaymentPeriod, string]> = [['today', 'Aujourd’hui'], ['7d', '7 jours'], ['30d', '30 jours'], ['all', 'Tout']];
-const PERIOD_LABEL: Record<CardPaymentPeriod, string> = { today: 'aujourd’hui', '7d': '7 jours', '30d': '30 jours', all: 'depuis le début' };
+const PERIODS: Array<[Exclude<CardPaymentPeriod, 'custom'>, string]> = [['today', 'Aujourd’hui'], ['7d', '7 jours'], ['30d', '30 jours'], ['all', 'Tout']];
+const PERIOD_LABEL: Record<Exclude<CardPaymentPeriod, 'custom'>, string> = { today: 'aujourd’hui', '7d': '7 jours', '30d': '30 jours', all: 'depuis le début' };
+
+// `YYYY-MM-DD` -> `29/09` (or `29/09/2025` outside the current year).
+const shortDay = (day: string, today: string) => {
+  const [y, m, d] = day.split('-');
+  return y === today.slice(0, 4) ? `${d}/${m}` : `${d}/${m}/${y}`;
+};
+const clockTime = (value: Date) => new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short', timeZone: 'Europe/Rome' }).format(value);
 
 const STATUS: Record<CardPaymentDisplayStatus, { label: string; tone: string }> = {
   paid: { label: 'Payé', tone: 'success' },
@@ -57,6 +64,9 @@ function Status({ status }: { status: CardPaymentDisplayStatus }) {
 
 export default function CardPaymentsClient({ initialQuery, canResend }: { initialQuery: string; canResend: boolean }) {
   const [period, setPeriod] = useState<CardPaymentPeriod>('7d');
+  const [fromDay, setFromDay] = useState('');
+  const [toDay, setToDay] = useState('');
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [status, setStatus] = useState<CardPaymentStatusFilter>('all');
   const [query, setQuery] = useState(initialQuery);
   const [appliedQuery, setAppliedQuery] = useState(initialQuery);
@@ -76,16 +86,21 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
     try {
       const params = new URLSearchParams({ period, status, page: String(page) });
       if (appliedQuery.trim()) params.set('q', appliedQuery.trim());
+      if (period === 'custom') {
+        if (fromDay) params.set('from', fromDay);
+        if (toDay) params.set('to', toDay);
+      }
       const response = await fetch(`/api/admin/card-payments?${params}`, { cache: 'no-store' });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'Impossible de charger les paiements.');
       setData(body as ListResponse);
+      setUpdatedAt(new Date());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Impossible de charger les paiements.');
     } finally {
       setLoading(false);
     }
-  }, [period, status, page, appliedQuery]);
+  }, [period, fromDay, toDay, status, page, appliedQuery]);
 
   useEffect(() => { load(); }, [load]);
   // A reference search opens its single result directly.
@@ -121,6 +136,22 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
   const currency = data?.currency ?? 'EUR';
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const referenceSearch = /^CP-?[0-9A-F]{6}$/i.test(appliedQuery.trim());
+  const today = shopDay();
+  const periodLabel = period !== 'custom' ? PERIOD_LABEL[period]
+    : fromDay && toDay ? `${shortDay(fromDay <= toDay ? fromDay : toDay, today)} – ${shortDay(fromDay <= toDay ? toDay : fromDay, today)}`
+    : fromDay ? `depuis le ${shortDay(fromDay, today)}`
+    : toDay ? `jusqu’au ${shortDay(toDay, today)}`
+    : 'depuis le début';
+
+  // First switch to "Personnalisé" starts on the current month so far.
+  function selectCustom() {
+    if (!fromDay && !toDay) {
+      setFromDay(`${today.slice(0, 8)}01`);
+      setToDay(today);
+    }
+    setPeriod('custom');
+    setPage(1);
+  }
 
   return (
     <div className="space-y-5">
@@ -139,6 +170,8 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
             <button key={value} type="button" aria-pressed={period === value} className={chip(period === value)} disabled={referenceSearch}
               onClick={() => { setPeriod(value); setPage(1); }}>{label}</button>
           ))}
+          <button type="button" aria-pressed={period === 'custom'} className={`${chip(period === 'custom')} inline-flex items-center gap-1.5`} disabled={referenceSearch}
+            onClick={selectCustom}><IconCalendar size={16} />Personnalisé</button>
           <select value={status} onChange={(e) => { setStatus(e.target.value as CardPaymentStatusFilter); setPage(1); }} aria-label="Statut"
             className="min-h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950">
             <option value="all">Tous les statuts</option>
@@ -147,13 +180,35 @@ export default function CardPaymentsClient({ initialQuery, canResend }: { initia
           </select>
           {appliedQuery && <button type="button" className="text-sm font-medium text-[var(--admin-primary-fg)] underline-offset-2 hover:underline dark:text-violet-300"
             onClick={() => { setQuery(''); setAppliedQuery(''); setPage(1); }}>Effacer la recherche</button>}
+          <button type="button" onClick={load} disabled={loading} className={`${chip(false)} ml-auto inline-flex items-center gap-1.5 disabled:opacity-60`}>
+            <IconRefresh size={16} className={loading ? 'animate-spin' : ''} />{loading ? 'Actualisation…' : 'Rafraîchir'}
+          </button>
         </div>
+        {(period === 'custom' && !referenceSearch) || updatedAt ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {period === 'custom' && !referenceSearch && (
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+                <label className="flex min-w-0 items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="shrink-0">Du</span>
+                  <input type="date" value={fromDay} max={today} onChange={(e) => { setFromDay(e.target.value); setPage(1); }}
+                    className="min-h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 sm:w-auto" />
+                </label>
+                <label className="flex min-w-0 items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="shrink-0">au</span>
+                  <input type="date" value={toDay} max={today} onChange={(e) => { setToDay(e.target.value); setPage(1); }}
+                    className="min-h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 sm:w-auto" />
+                </label>
+              </div>
+            )}
+            {updatedAt && <p className="ml-auto text-xs text-gray-400" aria-live="polite">Mis à jour à {clockTime(updatedAt)}</p>}
+          </div>
+        ) : null}
         {referenceSearch && <p className="text-xs text-gray-500">Recherche par référence : toutes les dates.</p>}
       </div>
 
       {data && (
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <Kpi label={`Encaissé · ${PERIOD_LABEL[period]}`} value={formatPrice(data.summary.paidAmount, currency)} />
+          <Kpi label={`Encaissé · ${periodLabel}`} value={formatPrice(data.summary.paidAmount, currency)} />
           <Kpi label="Paiements payés" value={String(data.summary.paidCount)} />
           <Kpi label="Non finalisés" value={String(data.summary.abandonedCount)} hint="En attente depuis plus d’une heure" />
         </div>

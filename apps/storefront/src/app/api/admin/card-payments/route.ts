@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
 import {
-  CARD_PAYMENTS_PAGE_SIZE, displayStatus, parsePage, parsePeriod, parseStatusFilter, periodStart, referenceRange, sanitizeSearch, stripeDashboardUrl,
+  CARD_PAYMENTS_PAGE_SIZE, displayStatus, parseDay, parsePage, parsePeriod, parseStatusFilter, periodBounds, referenceRange, sanitizeSearch, stripeDashboardUrl,
 } from '@/lib/card/cardPaymentsAdmin';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -38,7 +38,11 @@ export async function GET(req: NextRequest) {
   const page = parsePage(params.get('page'));
   const query = params.get('q') ?? '';
   const now = new Date();
-  const since = periodStart(period, now)?.toISOString() ?? null;
+  const fromDay = period === 'custom' ? parseDay(params.get('from')) : null;
+  const toDay = period === 'custom' ? parseDay(params.get('to')) : null;
+  const bounds = periodBounds(period, { from: fromDay, to: toDay }, now);
+  const since = bounds.since?.toISOString() ?? null;
+  const until = bounds.until?.toISOString() ?? null;
   const supabase = createServiceClient();
 
   let list = supabase
@@ -52,6 +56,7 @@ export async function GET(req: NextRequest) {
     list = list.gte('id', range.from).lte('id', range.to);
   } else {
     if (since) list = list.gte('created_at', since);
+    if (until) list = list.lt('created_at', until);
     const text = sanitizeSearch(query);
     if (text.length >= 2) list = list.or(`customer_name.ilike.%${text}%,customer_email.ilike.%${text}%`);
   }
@@ -61,6 +66,7 @@ export async function GET(req: NextRequest) {
   const from = (page - 1) * CARD_PAYMENTS_PAGE_SIZE;
   let totalsQuery = supabase.from('tenant_card_payments').select('amount, status, created_at').eq('tenant_id', tenant.id).limit(TOTALS_CAP);
   if (since) totalsQuery = totalsQuery.gte('created_at', since);
+  if (until) totalsQuery = totalsQuery.lt('created_at', until);
 
   const [{ data, count, error }, totals] = await Promise.all([
     list.order('created_at', { ascending: false }).range(from, from + CARD_PAYMENTS_PAGE_SIZE - 1),
@@ -76,6 +82,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     period,
+    from: fromDay,
+    to: toDay,
     status: statusFilter,
     page,
     pageSize: CARD_PAYMENTS_PAGE_SIZE,
