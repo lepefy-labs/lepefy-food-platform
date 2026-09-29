@@ -1,0 +1,125 @@
+{
+  "name": "Lepefy · Shipping sync scheduler (multi-tenant)",
+  "nodes": [
+    {
+      "id": "7b0c2f4e-5a61-4d8e-9f3a-2c1e8d6b4a10",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3e9a1d57-8c24-4b6f-a0d2-6f5b7c8e9d21",
+      "name": "Manual test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        440
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c5d8e2a1-4f37-4e9b-b1c6-8a2d3f4e5b32",
+      "name": "Synchronize active shipments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/shipping-sync",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 15000
+    },
+    {
+      "id": "e1f4a7b3-2d58-4c6e-9a0b-5d3c2e1f7a43",
+      "name": "Check sync outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        770,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const result = $input.first()?.json ?? {};\nconst processed = Number(result.processed ?? 0);\nconst failed = Number(result.failed ?? 0);\nif (result.ok !== true || !Number.isSafeInteger(processed) || !Number.isFinite(failed) || failed > 0) {\n  // Throw without echoing upstream responses, HTTP headers, or credentials.\n  throw new Error(\"shipping_sync_batch_failed\");\n}\nreturn [{ json: { ok: true, processed, succeeded: Number(result.succeeded ?? 0), failed: 0 } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Synchronize active shipments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual test": {
+      "main": [
+        [
+          {
+            "node": "Synchronize active shipments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synchronize active shipments": {
+      "main": [
+        [
+          {
+            "node": "Check sync outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

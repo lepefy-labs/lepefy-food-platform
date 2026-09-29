@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { shippingCampaignSchedulerAuthorized } from '../../src/lib/shipping/intelligence/schedulerAuth';
+import { shippingSyncSchedulerAuthorized } from '../../src/lib/shipping/shippingSyncAuth';
 
 test('dedicated n8n token authorizes a correctly formed bearer only', () => {
   const authorized = (header: string | null) => shippingCampaignSchedulerAuthorized(header, 'n8n-only-secret', 'old-service-role');
@@ -21,4 +22,12 @@ test('both auth paths fail closed when credentials are absent or incorrect', () 
   expect(shippingCampaignSchedulerAuthorized('Bearer any', undefined, '')).toBe(false);
   expect(shippingCampaignSchedulerAuthorized('Bearer wrong', 'dedicated', 'legacy')).toBe(false);
   expect(shippingCampaignSchedulerAuthorized('Bearer dedicated', 'dedicated', '')).toBe(true);
+});
+
+test('shipping sync accepts its own n8n token and the legacy service-role only', () => {
+  expect(shippingSyncSchedulerAuthorized('Bearer sync-token', 'sync-token', 'legacy')).toBe(true);
+  expect(shippingSyncSchedulerAuthorized('Bearer legacy', 'sync-token', 'legacy')).toBe(true);
+  expect(shippingSyncSchedulerAuthorized('Bearer campaign-token', 'sync-token', 'legacy')).toBe(false);
+  expect(shippingSyncSchedulerAuthorized('Bearer sync-token extra', 'sync-token', 'legacy')).toBe(false);
+  expect(shippingSyncSchedulerAuthorized('Bearer any', undefined, '')).toBe(false);
 });

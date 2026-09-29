@@ -14,9 +14,10 @@ export function normalizePacklinkStatus(raw: string | null): NormalizedShipmentS
   if (code.startsWith('OUT_FOR_DELIVERY')) return 'out_for_delivery';
   if (code === 'DELIVERED') return 'delivered';
   if (code === 'CANCELLED' || code === 'CANCELED') return 'cancelled';
-  if (code === 'RETURNED') return 'returned';
+  if (code === 'RETURNED' || code === 'RETURNED_TO_SENDER') return 'returned';
   if (['EXCEPTION', 'INCIDENT', 'DELIVERY_FAILED'].includes(code)) return 'exception';
-  if (['PENDING', 'DRAFT', 'PROCESSING'].includes(code)) return 'pending';
+  // Pre-collection Packlink PRO states (draft, awaiting payment, label to print).
+  if (['PENDING', 'DRAFT', 'PROCESSING', 'AWAITING_COMPLETION', 'READY_TO_PURCHASE', 'READY_TO_PRINT', 'CARRIER_PENDING'].includes(code)) return 'pending';
   return 'unknown';
 }
 

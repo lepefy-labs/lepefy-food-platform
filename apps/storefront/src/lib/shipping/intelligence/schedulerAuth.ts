@@ -1,5 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
-import { shippingSyncAuthorized } from '@/lib/shipping/shippingSyncAuth';
+import { schedulerBearerAuthorized } from '@/lib/shipping/shippingSyncAuth';
 
 /**
  * Dedicated bearer auth for n8n shipping campaign ticks. During the safe
@@ -12,15 +11,5 @@ export function shippingCampaignSchedulerAuthorized(
   schedulerToken: string | undefined = process.env.SHIPPING_CAMPAIGN_SCHEDULER_TOKEN,
   legacyServiceRole: string | undefined = process.env.SUPABASE_SERVICE_ROLE_KEY,
 ): boolean {
-  const supplied = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!supplied || supplied.includes(' ') || supplied.includes('\n')) return false;
-  const expected = schedulerToken?.trim() ?? '';
-  if (expected) {
-    const actualBuffer = Buffer.from(supplied);
-    const expectedBuffer = Buffer.from(expected);
-    if (actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)) return true;
-  }
-  // Legacy compatibility for the current GitHub scheduler and its manual
-  // recovery action. Remove only after n8n has been verified in production.
-  return shippingSyncAuthorized(authorization, legacyServiceRole ?? '');
+  return schedulerBearerAuthorized(authorization, schedulerToken, legacyServiceRole);
 }

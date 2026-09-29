@@ -173,6 +173,8 @@ test('unknown, exception and returned states never invent order transitions', as
   for (const status of ['UNRECOGNIZED', 'EXCEPTION', 'RETURNED', 'CANCELLED']) await applyShipmentSnapshot(db.service, db.order(), snapshot(status), spy.run);
   expect(db.order().status).toBe('preparing'); expect(spy.messages).toHaveLength(0);
   expect(normalizePacklinkStatus('UNRECOGNIZED')).toBe('unknown');
+  for (const code of ['READY_TO_PRINT', 'READY_TO_PURCHASE', 'AWAITING_COMPLETION']) expect(normalizePacklinkStatus(code)).toBe('pending');
+  expect(normalizePacklinkStatus('RETURNED_TO_SENDER')).toBe('returned');
 });
 test('admin endpoints are POST-only orders.manage and internal auth fails closed', () => {
   for (const action of ['attach', 'sync', 'manual']) {
