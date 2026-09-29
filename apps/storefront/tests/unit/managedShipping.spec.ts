@@ -94,6 +94,9 @@ test('real Packlink payload, primary tracking code, URL and complete timeline', 
   expect(shipmentEventLabel(shipmentEventsNewestFirst(result.events)[0]!)).toBe('Livré');
   expect(result.events[4]!.status).toBe('out_for_delivery');
   expect(parsePacklinkShipment(reference, { ...payload, carrier_shipment_tracking_number: null }, []).trackingCode).toBe('fallback');
+  const beforeCollection = parsePacklinkShipment(reference, { ...payload, state: 'READY_TO_PRINT' }, []);
+  expect(beforeCollection.providerStatus).toBe('READY_TO_PRINT');
+  expect(beforeCollection.normalizedStatus).toBe('pending');
 });
 test('literal and encoded placeholders encode tracking; unsafe links are discarded', () => {
   for (const template of ['[tracking]', '%5Btracking%5D']) expect(resolveTrackingUrl('https://example.invalid/?id=' + template, 'a b&c')).toBe('https://example.invalid/?id=a%20b%26c');

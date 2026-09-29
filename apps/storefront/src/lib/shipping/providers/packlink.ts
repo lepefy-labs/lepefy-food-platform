@@ -48,7 +48,7 @@ export function parsePacklinkShipment(reference: string, payload: unknown, timel
   }
   const shipment = object(payload);
   // A JSON error object returned with HTTP 200 is not a shipment.
-  if (!['reference', 'shipment_reference', 'carrier_product_id', 'carrier_shipment_tracking_number', 'trackings', 'status'].some(key => key in shipment)
+  if (!['reference', 'shipment_reference', 'carrier_product_id', 'carrier_shipment_tracking_number', 'trackings', 'status', 'state'].some(key => key in shipment)
     || shipment.error || shipment.errors) throw new ShippingProviderError('shipment_payload_invalid');
   const suppliedReference = text(shipment.reference ?? shipment.shipment_reference);
   if (suppliedReference && suppliedReference !== reference) throw new ShippingProviderError('shipment_reference_mismatch');
@@ -65,7 +65,8 @@ export function parsePacklinkShipment(reference: string, payload: unknown, timel
     return [{ occurredAt, description, providerStatus, status: normalizePacklinkStatus(providerStatus) }];
   }).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)).slice(-100);
   const latest = events.at(-1);
-  const providerStatus = latest?.providerStatus ?? text(shipment.status_code ?? shipment.status);
+  // Packlink PRO exposes the shipment status as `state` (e.g. READY_TO_PRINT).
+  const providerStatus = latest?.providerStatus ?? text(shipment.state ?? shipment.status_code ?? shipment.status);
   const product = text(shipment.carrier_product_id);
   const carrierObject = object(shipment.carrier);
   const carrier = text(shipment.carrier_name) ?? text(carrierObject.name) ?? text(shipment.carrier)
