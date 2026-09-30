@@ -180,14 +180,20 @@ export default function CheckoutFlow({
   const email = watch('email');
   const phone = watch('phone');
 
-  usePaymentRedirectRecovery('shop', () => {
+  // Set once the order exists: the cart is then emptied on purpose and the
+  // "empty cart → /cart" guard below must not override the confirmation redirect.
+  const checkoutCompletedRef = useRef(false);
+  const completeCheckout = useCallback((confirmationUrl: string) => {
+    checkoutCompletedRef.current = true;
     useCartStore.getState().clearCart();
     sessionStorage.removeItem('lepefy-checkout-shipping');
-    router.push('/order-confirmation');
-  });
+    router.push(confirmationUrl);
+  }, [router]);
+
+  usePaymentRedirectRecovery('shop', () => completeCheckout('/order-confirmation'));
 
   useEffect(() => {
-    if (items.length === 0) router.push('/cart');
+    if (items.length === 0 && !checkoutCompletedRef.current) router.push('/cart');
   }, [items.length, router]);
 
   useEffect(() => {
@@ -477,9 +483,7 @@ export default function CheckoutFlow({
         });
         const result = await response.json();
         if (!response.ok) { setSubmitError(result.error ?? 'Une erreur est survenue.'); return; }
-        useCartStore.getState().clearCart();
-        sessionStorage.removeItem('lepefy-checkout-shipping');
-        router.push(`/order-confirmation?order_id=${result.orderId}`);
+        completeCheckout(`/order-confirmation?order_id=${result.orderId}`);
         return;
       }
 
@@ -736,11 +740,7 @@ export default function CheckoutFlow({
             billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
             createIntent={createIntent}
             onError={(message) => setSubmitError(message)}
-            onSucceeded={(paymentIntentId) => {
-              useCartStore.getState().clearCart();
-              sessionStorage.removeItem('lepefy-checkout-shipping');
-              router.push(`/order-confirmation?payment_intent=${paymentIntentId ?? ''}`);
-            }}
+            onSucceeded={(paymentIntentId) => completeCheckout(`/order-confirmation?payment_intent=${paymentIntentId ?? ''}`)}
           />
         </div>
       )}
