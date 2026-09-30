@@ -1,3 +1,5 @@
+import { gestionApiPermission } from '@/lib/gestion/permissions';
+
 export type AdminApiPermission =
   | 'orders.view' | 'orders.manage' | 'shop_payments.confirm'
   | 'catalog.view' | 'catalog.manage'
@@ -9,7 +11,9 @@ export type AdminApiPermission =
   | 'events.view' | 'events.manage' | 'event_capacity.manage'
   | 'event_reservations.view' | 'event_reservations.manage'
   | 'event_payments.view' | 'event_payments.confirm' | 'event_payments.cancel' | 'event_payments.refund'
-  | 'event_content.manage' | 'tenant_settings.view' | 'tenant_settings.manage';
+  | 'event_content.manage' | 'tenant_settings.view' | 'tenant_settings.manage'
+  | 'suppliers.view' | 'suppliers.manage' | 'purchases.view' | 'purchases.manage'
+  | 'inventory.view' | 'inventory.manage' | 'treasury.view' | 'treasury.manage' | 'supplier_payments.verify';
 
 function isRead(method: string): boolean {
   const normalized = method.toUpperCase();
@@ -73,6 +77,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/feature-flags') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  // Gestion du commerce: mappa dedicata, fail-closed (null = nessuna capability).
+  if (path.startsWith('/api/admin/gestion/')) return gestionApiPermission(path, method) as AdminApiPermission | null;
   if (path.startsWith('/api/admin/payment-methods') || path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
 
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';

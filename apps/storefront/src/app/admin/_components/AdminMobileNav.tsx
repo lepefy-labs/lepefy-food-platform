@@ -12,13 +12,14 @@ interface AdminMobileNavProps {
   workspace?: AdminWorkspace;
   isPlatformOwner?: boolean;
   permissions?: string[];
+  gestionEnabled?: boolean;
   pendingPaymentsCount?: number;
   pendingEventRequestsCount?: number;
   pendingRentalRequestsCount?: number;
   newInquiriesCount?: number;
 }
 
-export default function AdminMobileNav({ categories, workspace = 'shop', isPlatformOwner = false, permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0 }: AdminMobileNavProps) {
+export default function AdminMobileNav({ categories, workspace = 'shop', isPlatformOwner = false, permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, gestionEnabled = false }: AdminMobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -41,7 +42,7 @@ export default function AdminMobileNav({ categories, workspace = 'shop', isPlatf
           <button type="button" onClick={() => setOpen(false)} aria-label="Fermer" className="rounded-xl p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)]"><IconX size={18} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <AdminSidebar categories={categories} workspace={workspace} permissions={permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={isPlatformOwner} />
+          <AdminSidebar categories={categories} workspace={workspace} permissions={permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={isPlatformOwner} gestionEnabled={gestionEnabled} />
         </div>
       </div>
     </div>

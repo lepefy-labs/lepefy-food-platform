@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode } from '@tabler/icons-react';
+import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode, IconBuildingWarehouse, IconTruckLoading, IconCash, IconLayoutDashboard } from '@tabler/icons-react';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 import PlatformNav from './PlatformNav';
 
@@ -15,9 +15,11 @@ interface AdminSidebarProps {
   pendingRentalRequestsCount?: number;
   newInquiriesCount?: number;
   isPlatformOwner?: boolean;
+  /** Flag business_management attivo per il tenant (risolto lato server). */
+  gestionEnabled?: boolean;
 }
 
-export default function AdminSidebar({ workspace = 'shop', permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, isPlatformOwner = false }: AdminSidebarProps) {
+export default function AdminSidebar({ workspace = 'shop', permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, isPlatformOwner = false, gestionEnabled = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
   function navClass(active: boolean) { return active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] font-semibold ring-1 ring-[#D9D3FF] shadow-[inset_3px_0_0_var(--admin-primary)] dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-500/30' : 'text-gray-600 dark:text-gray-300 hover:bg-white hover:text-gray-950 dark:hover:bg-white/5 dark:hover:text-white'; }
@@ -26,6 +28,7 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
   const shopVisible = ['orders.view','catalog.view','customers.view','reviews.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage','ai_usage.view'].some(has);
   const eventsVisible = ['events.view','event_reservations.view','event_payments.view','event_content.manage','scan.access'].some(has);
   const commonVisible = ['tenant_settings.view','billing.view','ai_usage.view'].some(has);
+  const gestionVisible = gestionEnabled && ['suppliers.view','purchases.view','treasury.view','inventory.view'].some(has);
 
   return <nav className="flex h-full flex-col pb-3">
     {workspace === 'shop' && shopVisible ? <>
@@ -46,6 +49,13 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
       {has('reviews.view') && <Link href="/admin/avis" className={linkClass(pathname.startsWith('/admin/avis'))}><IconMessageCircle size={20}/>Avis clients</Link>}
       {has('ai_usage.view') && <Link href="/admin/nala-analytics" className={linkClass(pathname.startsWith('/admin/nala-analytics'))}><IconSparkles size={20}/>Nala Analytics</Link>}
       {has('ai_knowledge.manage') && <Link href="/admin/ai-lab" className={linkClass(pathname === '/admin/ai-lab')}><IconSparkles size={20}/>IA — Base de connaissance</Link>}
+      {gestionVisible && <>
+        <p className={groupLabel}>Gestion</p>
+        <Link href="/admin/gestion" className={linkClass(pathname === '/admin/gestion')}><IconLayoutDashboard size={20}/>Vue d&apos;ensemble</Link>
+        {has('suppliers.view') && <Link href="/admin/gestion/fournisseurs" className={linkClass(pathname.startsWith('/admin/gestion/fournisseurs'))}><IconBuildingWarehouse size={20}/>Fournisseurs</Link>}
+        {has('purchases.view') && <Link href="/admin/gestion/achats" className={linkClass(pathname.startsWith('/admin/gestion/achats'))}><IconTruckLoading size={20}/>Achats &amp; réceptions</Link>}
+        {has('treasury.view') && <Link href="/admin/gestion/tresorerie" className={linkClass(pathname.startsWith('/admin/gestion/tresorerie'))}><IconCash size={20}/>Trésorerie</Link>}
+      </>}
     </> : workspace === 'events' && eventsVisible ? <>
       {(has('events.view') || has('event_reservations.view') || has('event_payments.view') || has('event_content.manage')) && <p className={groupLabel}>Événementiel</p>}
       {has('events.view') && <Link href="/admin" className={linkClass(pathname === '/admin' || pathname === '/admin/evenementiel')}><IconCalendarEvent size={20}/>Vue d’ensemble</Link>}

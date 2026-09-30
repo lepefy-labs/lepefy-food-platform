@@ -4,10 +4,20 @@ interface RoutePermissionRule {
   prefix: string;
   permission: string;
   exact?: boolean;
+  /** Alternative equivalenti a `permission`: basta averne una. */
+  anyOf?: string[];
 }
 
 const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/platform', permission: 'platform.access' },
+  // Gestion du commerce (visibile solo con il flag business_management, controllato dalle pagine).
+  { prefix: '/admin/gestion/fournisseurs/nouveau', permission: 'suppliers.manage' },
+  { prefix: '/admin/gestion/fournisseurs', permission: 'suppliers.view' },
+  { prefix: '/admin/gestion/achats/nouveau', permission: 'purchases.manage' },
+  { prefix: '/admin/gestion/achats', permission: 'purchases.view' },
+  { prefix: '/admin/gestion/tresorerie/nouveau', permission: 'treasury.manage' },
+  { prefix: '/admin/gestion/tresorerie', permission: 'treasury.view' },
+  { prefix: '/admin/gestion', permission: 'suppliers.view', anyOf: ['purchases.view', 'treasury.view', 'inventory.view'] },
   { prefix: '/admin/team', permission: 'platform.users.manage' },
   { prefix: '/admin/evenementiel/paiements-en-attente', permission: 'event_payments.view' },
   { prefix: '/admin/evenementiel/reservations', permission: 'event_reservations.view' },
@@ -47,10 +57,20 @@ export function isPersonalAdminPath(pathname: string): boolean {
   return pathname.startsWith('/admin/securite');
 }
 
+function ruleForAdminPath(pathname: string): RoutePermissionRule | undefined {
+  return RULES.find((candidate) => candidate.exact ? pathname === candidate.prefix : pathname.startsWith(candidate.prefix));
+}
+
 export function permissionForAdminPath(pathname: string, workspace: AdminWorkspace): string | null {
   if (pathname === '/admin' || pathname === '/admin/') return workspace === 'events' ? 'events.view' : 'orders.view';
-  const rule = RULES.find((candidate) => candidate.exact ? pathname === candidate.prefix : pathname.startsWith(candidate.prefix));
-  return rule?.permission ?? null;
+  return ruleForAdminPath(pathname)?.permission ?? null;
+}
+
+/** Tutte le capability che aprono la pagina (basta averne una); null = pagina non mappata. */
+export function permissionsForAdminPath(pathname: string, workspace: AdminWorkspace): string[] | null {
+  if (pathname === '/admin' || pathname === '/admin/') return [permissionForAdminPath(pathname, workspace)!];
+  const rule = ruleForAdminPath(pathname);
+  return rule ? [rule.permission, ...(rule.anyOf ?? [])] : null;
 }
 
 export function defaultAdminDestination(permissions: string[], workspace: AdminWorkspace): string | null {

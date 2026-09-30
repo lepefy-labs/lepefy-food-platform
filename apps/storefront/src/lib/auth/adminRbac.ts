@@ -26,6 +26,8 @@ const LEGACY_TENANT_ADMIN_PERMISSIONS = [
   'events.view','events.manage','event_reservations.view','event_reservations.manage','event_payments.view','event_payments.confirm','event_payments.cancel','event_payments.refund','event_content.manage',
   'scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own','scan.undo_any',
   'tenant_settings.view','tenant_settings.manage','billing.view','ai_usage.view',
+  'suppliers.view','suppliers.manage','purchases.view','purchases.manage','inventory.view','inventory.manage',
+  'treasury.view','treasury.manage','supplier_payments.verify',
 ];
 const LEGACY_CASHIER_PERMISSIONS = ['loyalty.scan','scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own'];
 

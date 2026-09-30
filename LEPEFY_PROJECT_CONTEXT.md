@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 28 settembre 2026 — **v6.95 Current-State Snapshot** (Admin → Paiements carte, base `main` @ `426af5b8`)
+> **Aggiornato:** 30 settembre 2026 — **v6.96 Current-State Snapshot** (Gestion du commerce dietro flag `business_management`, tenant di test `lepefy-test`, fix redirect post-pagamento, base `main` @ `58380c67`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -128,6 +128,8 @@ La navigazione admin e la ricerca globale sono permission-aware. Lo switch works
 
 **Tenant di test.** Slug `lepefy-test` (nome "Lepefy Test"), nello **stesso** progetto Supabase di produzione, isolato come ogni tenant via `tenant_id` + RLS. È marcato da `tenants.is_test = true` (colonna privata: niente grant di colonna, mai in `PUBLIC_TENANT_FIELDS`). Branding volutamente neutro (grigi `#4B5563`/`#9CA3AF`/`#F3F4F6`, nessun logo), così un valore hardcoded di un altro tenant salta subito all'occhio. `shipping_provider = 'flat_rate'` (5,90 €). Si deploya come un secondo progetto Vercel con `NEXT_PUBLIC_TENANT_SLUG=lepefy-test`.
 
+**Noindex.** Il root layout (`app/layout.tsx`, `generateMetadata`) aggiunge `robots: { index: false, follow: false }` quando `tenant.is_test` è vero. Ogni pagina lo eredita, salvo quelle che definiscono già `robots`. I tenant reali non ne sono toccati. L'app non ha `robots.txt`.
+
 **Guard sulle comunicazioni esterne** (`lib/tenant/testTenant.ts`, `lib/notifications/testTenantGuard.ts`). Sono applicati all'ingresso di `sendNotification()` (`lib/events/notifyN8n.ts`), unico punto da cui passano email Brevo/n8n, ledger, retry e dispatch. La notifica è di test se il `tenantId` del payload è un tenant `is_test`, oppure se il deployment corrente lo è.
 - Email renderizzate (`send-email`, `order-stock-conflict`, `daily-order-digest`): inviate **solo** ai destinatari di `TEST_TENANT_EMAIL_RECIPIENT` (lista separata da virgole), con oggetto prefissato `[TEST] `. Se la variabile manca, l'email è saltata.
 - Tutti gli altri webhook n8n: saltati.
@@ -152,12 +154,21 @@ Differenza con `tenant_feature_settings` (096): quella tabella resta per i **mod
 - Log per tabella: righe lette, righe da inserire dopo lo skip, inseriti e aggiornati.
 - Gli ordini esistenti non vengono mai riscritti. `DRY_RUN=true` non scrive nulla.
 
-**Passi manuali (Robertin):**
-1. Applicare `supabase/migrations/138_test_tenant_feature_flags.sql` nel Supabase SQL Editor.
-2. Creare un secondo progetto Vercel: Root Directory `apps/storefront`, `NEXT_PUBLIC_TENANT_SLUG=lepefy-test`, dominio `test.lepefy.com`.
-3. In quel progetto impostare le chiavi Stripe in modalità **TEST** (`STRIPE_SECRET_KEY*`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, webhook secret) e `TEST_TENANT_EMAIL_RECIPIENT`. Non impostare `PACKLINK_API_KEY`.
-4. Lanciare il workflow "Seed Test Tenant (lepefy-test)" da GitHub Actions (prima con `dry_run`, poi senza).
-5. Creare un admin per `lepefy-test` da `/admin/team`.
+**Stato al 30/09/2026 (setup completato e verificato):**
+- Migration 138 **applicata in produzione**. Verificato: tenant `lepefy-test` con `is_test = true`, unico tenant di test; `tenant_feature_flags` vuota; `anon` riceve `permission denied` su tabella, colonna `tenants.is_test` e `current_user_tenant_ids()`.
+- Seed eseguito da GitHub Actions: dry-run, poi reale (3 categorie, 12 prodotti, 1 metodo, 4 ordini). Un secondo lancio ha inserito 0 righe (idempotente).
+- Trigger `is_test` verificato su ordini reali: pagamento in negozio (l'API inserisce `is_test: false`, in DB risulta `true`) e due pagamenti Stripe con carta di test. La mail `order_confirmed` risulta `accepted` nel ledger.
+- Admin `tenant_admin` di `lepefy-test` creato da `/admin/team`.
+
+**Progetto Vercel `lepefy-food-test`** (dominio `test.lepefy.com`, Root Directory `apps/storefront`):
+- Variabili necessarie (il 30/09 ne sono state lette 10 sul progetto; le ultime tre, aggiunte dopo, sono confermate solo indirettamente da preventivo firmato ed email accettata): `NEXT_PUBLIC_TENANT_SLUG`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY` (test), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (test), `STRIPE_WEBHOOK_SECRET` (webhook di test su `/api/webhooks/stripe`, eventi `payment_intent.succeeded` e `payment_intent.payment_failed`), `TEST_TENANT_EMAIL_RECIPIENT`, `BREVO_API_KEY`, `EMAIL_TRANSPORT=brevo`, `N8N_WEBHOOK_URL`, `TRACKING_SECRET` (valore proprio).
+- Mai impostare `PACKLINK_API_KEY`, `STRIPE_SECRET_KEY_TEST`, `E2E_TEST_SECRET` o chiavi Stripe live.
+- Senza `STRIPE_SECRET_KEY` il **build** fallisce ("Failed to collect page data"): 5 route creano il client Stripe a livello di modulo.
+- Senza `TRACKING_SECRET` `/api/shipping/quote` risponde 500 e il checkout con consegna è bloccato.
+- Senza `N8N_WEBHOOK_URL` la conferma d'ordine non parte, anche con `EMAIL_TRANSPORT=brevo`.
+- **Ignored Build Step = "Only build production"**: solo `main` viene deployato, i branch non generano preview su questo progetto. `chloefood` non è toccato.
+
+**Estendere la procedura a un altro tenant di test o demo** (es. `lepefy-demo`): migration di insert con `is_test = true`, nuovo progetto Vercel con le stesse variabili, seed con `TEST_TENANT_SLUG`.
 
 ### Admin Paramètres — Settings Hub
 
@@ -328,8 +339,15 @@ tenant_settings.view
 tenant_settings.manage
 billing.view
 ai_usage.view
+suppliers.view / suppliers.manage
+purchases.view / purchases.manage
+inventory.view / inventory.manage
+treasury.view / treasury.manage
+supplier_payments.verify
 platform.*
 ```
+
+Le capability Gestion (139) sono `standard` in lettura, `sensitive` in scrittura, `supplier_payments.verify` è `critical`. Assegnate solo a `platform_owner`/`tenant_admin`, mai ai ruoli custom esistenti. `/api/admin/gestion/**` è mappata da `lib/gestion/permissions.ts` (fail-closed); le pagine `/admin/gestion/**` da `adminRoutePermissions.ts`, che supporta `anyOf` (la dashboard Gestion accetta una qualsiasi delle 4 capability `.view`).
 
 Le capability money-moving/manual-financial sono isolate e `critical`. La creazione di una prenotazione Events già incassata in negozio è mappata esplicitamente a `event_payments.confirm`, non alla generica `event_reservations.manage`.
 
@@ -510,6 +528,8 @@ cart -> checkout_session -> pagamento confermato -> order
 
 L'attribuzione Nala è un sidecar best-effort e non cambia questo state machine. `nala_checkout_attributions` lega per prodotto il checkout all'ultima interaction qualificante e sopravvive a resume/reuse; `nala_conversion_events` registra solo `add_to_cart`, `checkout_started` e `purchase_completed`. La purchase viene scritta dopo le `order_items` da una RPC idempotente e usa il subtotale lordo reale delle sole righe assistite, prima di sconti order-level e shipping. Errori o schema analytics non disponibile non bloccano carrello, checkout, pagamento o ordine.
 
+**Redirect dopo il pagamento** (`app/(shop)/checkout/CheckoutFlow.tsx`, fix del 30/09/2026). Pagamento con carta, ritiro con pagamento in negozio e ripresa dopo 3D Secure passano tutti da `completeCheckout(url)`: imposta `checkoutCompletedRef`, svuota il carrello e porta su `/order-confirmation`. L'effetto "carrello vuoto → `/cart`" è disattivato una volta che l'ordine esiste. Prima del fix il suo redirect vinceva e il cliente finiva sul carrello vuoto invece che sulla conferma (bug presente per tutti i tenant dal 24/08/2026).
+
 Checkout session lifecycle (`checkout_sessions.origin` = `storefront` | `assisted`, migration 128):
 
 ```text
@@ -551,6 +571,26 @@ Unico validatore server-only `lib/checkout/validateCheckoutItems.ts` rilegge gli
 Admin: editor SKU espone warning se stock e regole sono incompatibili, e create/PATCH rifiutano min/step non interi positivi anziché fare clamp silenzioso. CRUD gruppi supporta conflitti strutturati quando si tenta di riattivare un gruppo con SKU presenti in un altro gruppo attivo. Il vincolo di un solo gruppo attivo è ancora **application-side**, inclusi membership POST e group PATCH; resta un possibile rischio di race su richieste admin concorrenti. Una garanzia DB transazionale/trigger richiederebbe un intervento SQL separato e approvato (non incluso in questo hardening). La migration 121 RLS abilita lettura pubblica dei gruppi attivi e scritture service-role.
 
 Nala mantiene minimo/step in product action e Cart Builder, legge anche metadata dei gruppi attivi e mostra progresso e link a completare la selezione; non aggiunge automaticamente unità supplementari o SKU non richiesti. I test includono helper stock/step, store min4/step4/stock10, recovery con cambio min/gruppo/stock, DB group read fail-closed e regressioni cart. La documentazione operativa dettagliata vive in `docs/PURCHASE_QUANTITY_RULES.md`.
+
+---
+
+## 8.1 Gestion du commerce (migration 139, flag `business_management`)
+
+Documentazione completa: `docs/BUSINESS_MANAGEMENT.md`.
+
+Dominio gestionale del tenant **dentro l'admin Shop** (nessuna app separata, nessun `AdminWorkspace = 'gestion'`): fornitori, acquisti, ricezioni, ledger di inventario, debiti, pagamenti fornitore, tesoreria operativa, documenti privati, audit.
+
+- **Rollout**: flag di rilascio `business_management` (`tenant_feature_flags`), spento per tutti. Guard unico `lib/gestion/featureGate.ts`: pagine → 404 e API → 404 se il flag è spento o illeggibile; il layout admin legge il flag solo se l'utente ha una capability Gestion. Sidebar: sezione **GESTION** (Vue d'ensemble, Fournisseurs, Achats & réceptions, Trésorerie) solo con flag attivo.
+- **Route**: `/admin/gestion`, `/fournisseurs[/nouveau|/[id]]`, `/achats[/nouveau|/[id][/modifier]]`, `/tresorerie[/nouveau|/[id]]`; API `/api/admin/gestion/**` (tutte `force-dynamic` + `force-no-store`).
+- **Schema**: `suppliers`, `supplier_purchases`/`_items`, `supplier_receipts`/`_items`, `inventory_movements`, `supplier_payments`, `supplier_payment_allocations`, `business_documents`, `business_audit_events`, `business_reference_counters`; view `supplier_purchase_financials` e `supplier_balances` (`security_invoker`). FK composite `(tenant_id, id)` ovunque: nessun riferimento cross-tenant possibile (anche verso `products`, che riceve il solo vincolo additivo `products_tenant_id_id_key`).
+- **Stati separati**: merce `draft → ordered → partially_received → received` (derivati dalle quantità ricevute) o `cancelled`; finanza derivata dalle allocazioni. Pagamenti `recorded → verified` o `voided`: **solo le allocazioni di pagamenti verificati riducono il debito**. Pagamento a un terzo (`beneficiary_type = third_party`, nome obbligatorio): il creditore resta il fornitore.
+- **Stock**: `products.stock` resta il valore canonico di storefront e checkout (invariati). Una ricezione incrementa `products.stock` e scrive `inventory_movements` nella stessa transazione; una sola entrata per riga di ricezione (indice unico).
+- **RPC** `RETURNS TABLE (out_*)`, lock + request key univoca per tenant (idempotenza su doppio clic/retry), audit nella stessa transazione. Nessun DELETE per il service role sulle tabelle finanziarie e di audit (si storna o si annulla).
+- **Riferimenti** `FOU-000123`, `ACH-2026-000123`, `REC-2026-…`, `PAY-2026-…` da contatori transazionali per tenant (mai `count(*) + 1`).
+- **Documenti**: bucket privato `business-documents`, lettura solo via API autorizzata, tipo rilevato dai byte, cancellazione logica.
+- **Tesoreria** = uscite verso i fornitori; non è unificata con `tenant_card_payments` (incassi cliente `/card`).
+- **Seed**: `scripts/seed-test-tenant-gestion.mjs` (workflow "Seed Test Tenant", input `with_gestion`), solo tenant `is_test`, idempotente.
+- **Verifica**: `supabase/verification/139_business_management_verification.sql` (BEGIN/ROLLBACK, schema, privilegi, RPC reali, esempio 2 400 € → resta 1 000 €, cross-tenant, idempotenza).
 
 ---
 
@@ -906,7 +946,9 @@ Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/09
 
 `126` è additiva: ricrea soltanto `tenant_payment_methods_method_check` aggiungendo `'apple_pay'` (idempotente, nessun dato toccato, nessuna nuova tabella quindi nessun nuovo GRANT). Da applicare manualmente prima di attivare Apple Pay in admin: senza di essa l'insert di una riga `apple_pay` fallisce sulla CHECK, il resto è invariato.
 
-`138` è additiva: `tenants.is_test` (default false, privata), tabella `tenant_feature_flags` con RLS + GRANT espliciti, funzione `current_user_tenant_ids()`, trigger `mark_test_tenant_rows` su `orders`/`event_reservations` e inserimento del tenant `lepefy-test` (`on conflict do nothing`). Nessun tenant esistente viene modificato. Dettagli nella sezione 2 ("Tenant di test e feature flag di rilascio"). L'applicazione è manuale. Prima della 138, `isFeatureEnabled()` restituisce sempre `false` e la pagina Fonctionnalités mostra un errore di caricamento.
+`139` (Gestion du commerce) è additiva: 11 tabelle nuove con RLS senza policy e GRANT espliciti al solo `service_role` (niente DELETE sulle tabelle finanziarie/audit), 2 view `security_invoker`, RPC `RETURNS TABLE (out_*)`, bucket privato `business-documents`, 9 capability RBAC (solo `platform_owner`/`tenant_admin`), vincolo additivo `products_tenant_id_id_key`. Non attiva nessun tenant e non modifica dati esistenti. Verifica: `supabase/verification/139_business_management_verification.sql`. Vedi sezione 8.1 e `docs/BUSINESS_MANAGEMENT.md`.
+
+`138` è additiva: `tenants.is_test` (default false, privata), tabella `tenant_feature_flags` con RLS + GRANT espliciti, funzione `current_user_tenant_ids()`, trigger `mark_test_tenant_rows` su `orders`/`event_reservations` e inserimento del tenant `lepefy-test` (`on conflict do nothing`). Nessun tenant esistente viene modificato. Dettagli nella sezione 2 ("Tenant di test e feature flag di rilascio"). **Applicata in produzione il 30/09/2026** (verificata). Senza la 138, `isFeatureEnabled()` restituisce sempre `false` e la pagina Fonctionnalités mostra un errore di caricamento.
 
 `119` è additiva : 5 nuove tabelle (Shipping Intelligence, vedi sezione 13), zero colonne modificate su `tenants`/`orders`/`packaging_surcharges`/`shipping_country_rules`, zero impatto checkout. Seed non distruttivo: un `shipping_packaging_profiles` di default per tenant derivato da `packaging_surcharges` esistente. L'applicazione in Supabase resta manuale.
 

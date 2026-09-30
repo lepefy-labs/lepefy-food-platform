@@ -13,6 +13,11 @@ on:
         required: false
         default: false
         type: boolean
+      with_gestion:
+        description: 'Anche il seed Gestion du commerce (richiede la migration 139)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   seed-test-tenant:
@@ -36,3 +41,12 @@ jobs:
           SKIP_EXISTING: ${{ github.event.inputs.skip_existing }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: node scripts/seed-test-tenant.mjs
+
+      - name: Seed Gestion du commerce
+        if: ${{ github.event.inputs.with_gestion == 'true' }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_TENANT_SLUG: lepefy-test
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: node scripts/seed-test-tenant-gestion.mjs

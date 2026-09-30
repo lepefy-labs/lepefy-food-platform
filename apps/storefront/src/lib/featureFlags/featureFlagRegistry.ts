@@ -25,7 +25,14 @@ export interface FeatureFlagDefinition {
 /** Stesso formato del CHECK SQL tenant_feature_flags_key_format. */
 export const FEATURE_FLAG_KEY_PATTERN = /^[a-z][a-z0-9_]{1,63}$/;
 
-export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [];
+export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
+  {
+    // Gestion du commerce (migration 139, docs/BUSINESS_MANAGEMENT.md).
+    key: 'business_management',
+    label: 'Gestion du commerce',
+    description: 'Active l\'espace de gestion des fournisseurs, achats, dettes et trésorerie.',
+  },
+];
 
 export function featureFlagDefinition(key: string): FeatureFlagDefinition | undefined {
   return FEATURE_FLAG_DEFINITIONS.find((definition) => definition.key === key);

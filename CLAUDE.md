@@ -96,6 +96,13 @@ The shipping logic is the most complex part of the codebase:
 - Every conversion (assisted Stripe webhook `metadata.type = assisted_preorder`, manual confirmation, "Déjà payé") goes through `src/lib/orders/convertCheckoutSessionToOrder.ts` → RPC `convert_checkout_session_to_order` (migration 128): row lock + order/items/stock in one transaction, unique `orders.checkout_session_id`; side effects run only when `created = true`.
 - `orders.email` can be null for assisted orders: never assume an email; tracking tokens are `HMAC(orderId + (email ?? ''))`.
 
+### Gestion du commerce (suppliers, purchases, stock ledger, treasury) — `docs/BUSINESS_MANAGEMENT.md`
+
+- Admin domain under `/admin/gestion/**` + `/api/admin/gestion/**`, behind the release flag `business_management` (`tenant_feature_flags`). Every page calls `requireBusinessManagementPage()` and every handler `requireBusinessManagementApi()` (`lib/gestion/featureGate.ts`); flag off/unreadable = 404. Hiding the sidebar entry is not the security control.
+- Schema from migration 139: every cross-entity reference is a composite FK `(tenant_id, id)`; RLS without policies, service-role only, no DELETE on financial/audit tables (reverse or void instead). Balances are never stored: read `supplier_purchase_financials` / `supplier_balances`.
+- Only allocations of **verified** payments reduce supplier debt. `products.stock` stays the canonical storefront stock; a receipt increments it and writes `inventory_movements` in the same RPC transaction.
+- Writes go through `RETURNS TABLE (out_*)` RPCs with a per-tenant request key (idempotent retries); errors are `raise exception '<code>'` mapped to French messages in `lib/gestion/errors.ts`.
+
 ### State Management
 
 Cart state lives in Zustand (`src/stores/cartStore.ts`), persisted to `localStorage` under key `lepefy-cart`. No other global client state.

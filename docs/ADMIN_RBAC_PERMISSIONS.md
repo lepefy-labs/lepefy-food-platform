@@ -121,6 +121,17 @@ Sensitive controls are also gated in the UI to improve usability and error preve
 | Administration tenant | `tenant_settings.manage` | sensitive |
 | Administration tenant | `billing.view` | standard |
 | Administration tenant | `ai_usage.view` | standard |
+| Gestion · Fournisseurs | `suppliers.view` | standard |
+| Gestion · Fournisseurs | `suppliers.manage` | sensitive |
+| Gestion · Achats | `purchases.view` | standard |
+| Gestion · Achats | `purchases.manage` | sensitive |
+| Gestion · Stock | `inventory.view` | standard |
+| Gestion · Stock | `inventory.manage` | sensitive |
+| Gestion · Trésorerie | `treasury.view` | standard |
+| Gestion · Trésorerie | `treasury.manage` | sensitive |
+| Gestion · Trésorerie | `supplier_payments.verify` | critical |
+
+Les capabilities Gestion (migration 139, `docs/BUSINESS_MANAGEMENT.md`) ne sont utilisables que si le feature flag `business_management` est actif pour le tenant ; elles ne sont attribuées à aucun rôle custom existant.
 
 ### Platform-only capabilities
 
@@ -148,6 +159,7 @@ Dedicated permissions currently include:
 - `event_payments.cancel`
 - `event_payments.refund`
 - `scan.undo_any`
+- `supplier_payments.verify` (vérifier un paiement fournisseur, ou annuler un paiement déjà vérifié)
 
 Read access to a payment area does not implicitly grant confirm/cancel/refund rights.
 

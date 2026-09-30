@@ -7,7 +7,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getPlatformBranding } from '@/lib/admin/platformBranding';
 import { getAdminWorkspaceUrls, resolveAdminWorkspace } from '@/lib/admin/workspace';
 import { canAdmin, getAdminAccessContext } from '@/lib/auth/adminRbac';
-import { defaultAdminDestination, isPersonalAdminPath, permissionForAdminPath } from '@/lib/auth/adminRoutePermissions';
+import { defaultAdminDestination, isPersonalAdminPath, permissionsForAdminPath } from '@/lib/auth/adminRoutePermissions';
+import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
+import { GESTION_VIEW_PERMISSIONS } from '@/lib/gestion/domain';
 import AdminSidebar from '../_components/AdminSidebar';
 import AdminHeader from '../_components/AdminHeader';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
@@ -42,8 +44,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   if (!access.profileCompleted) redirect(`/admin/onboarding?next=${encodeURIComponent(requestedPath)}`);
 
   const personalPath = isPersonalAdminPath(requestedPath);
-  const requiredPermission = permissionForAdminPath(requestedPath, workspace);
-  if (!personalPath && requiredPermission && !canAdmin(access, requiredPermission)) {
+  const requiredPermissions = permissionsForAdminPath(requestedPath, workspace);
+  const requiredPermission = requiredPermissions?.[0] ?? null;
+  if (!personalPath && requiredPermissions && !requiredPermissions.some((permission) => canAdmin(access, permission))) {
     const destination = defaultAdminDestination(access.permissions, workspace);
     if (!destination) redirect('/admin/login?error=unauthorized');
     redirect(destination);
@@ -65,6 +68,10 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     adminClient.from('rental_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('service_inquiries').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'nouveau'),
   ]);
+  // Gestion: il flag viene letto solo se l'admin potrebbe vedere la sezione.
+  const gestionEnabled = workspace === 'shop' && GESTION_VIEW_PERMISSIONS.some((permission) => canAdmin(access, permission))
+    ? await isBusinessManagementEnabled(tenant.id)
+    : false;
   const pendingPaymentsCount = pendingPaymentsResult.count ?? 0;
   const pendingEventRequestsCount = pendingEventRequestsResult.count ?? 0;
   const pendingRentalRequestsCount = pendingRentalRequestsResult.count ?? 0;
@@ -73,9 +80,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
-      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={access.permissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} />
+      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={access.permissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} />
       <div className="flex min-h-[calc(100vh-57px)] bg-[var(--admin-page-bg)] dark:bg-gray-950">
-        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={access.permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} /></Suspense></aside>
+        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={access.permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} /></Suspense></aside>
         <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8">{children}</main>
       </div>
     </AdminThemeProvider>
