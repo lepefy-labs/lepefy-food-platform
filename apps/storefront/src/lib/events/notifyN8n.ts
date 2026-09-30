@@ -12,6 +12,9 @@ import {
   sendViaBrevo,
   type TransportResult,
 } from '@/lib/notifications/emailTransport';
+// Import statiques (pas de import() dynamique) : chargés via le même transform partout, y compris Node 20 en CI.
+import { isTestTenantNotification, logTestTenantSkip, testTenantEmailRecipients } from '@/lib/tenant/testTenant';
+import { decideTestTenantDelivery } from '@/lib/notifications/testTenantGuard';
 
 export const N8N_WEBHOOK_SECRET_HEADER = 'X-Lepefy-Webhook-Secret';
 
@@ -90,12 +93,10 @@ export async function postToN8n(webhookPath: string, payload: Record<string, unk
 export async function sendNotification(webhookPath: string, rawPayload: Record<string, unknown>): Promise<TransportResult> {
   // Tenant di test (tenants.is_test): mai verso clienti reali.
   let payload = rawPayload;
-  const testTenant = await import('@/lib/tenant/testTenant');
-  if (await testTenant.isTestTenantNotification(payload)) {
-    const { decideTestTenantDelivery } = await import('@/lib/notifications/testTenantGuard');
-    const decision = decideTestTenantDelivery(webhookPath, payload, testTenant.testTenantEmailRecipients());
+  if (await isTestTenantNotification(payload)) {
+    const decision = decideTestTenantDelivery(webhookPath, payload, testTenantEmailRecipients());
     if (decision.action === 'skip') {
-      testTenant.logTestTenantSkip(decision.channel, decision.reason);
+      logTestTenantSkip(decision.channel, decision.reason);
       return { ok: true, transport: RENDERED_EMAIL_WEBHOOKS.has(webhookPath) ? configuredEmailTransport() : 'n8n', skipped: true };
     }
     payload = decision.payload;
