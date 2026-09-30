@@ -1,3 +1,4 @@
+import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import { ShippingProviderError, type NormalizedShipmentStatus, type ProviderShipmentSnapshot, type ShippingProviderAdapter } from './types';
 
 const BASE = 'https://api.packlink.com/v1';
@@ -113,7 +114,7 @@ export const packlinkAdapter: ShippingProviderAdapter = {
   async resolveShipment(context, rawReference) {
     const reference = rawReference.trim().toUpperCase();
     if (!/^[A-Z0-9]{6,40}$/.test(reference)) throw new ShippingProviderError('shipment_reference_invalid');
-    const key = text(context.tenant.packlink_api_key, 4096) || process.env.PACKLINK_API_KEY;
+    const key = resolvePacklinkApiKey({ packlink_api_key: text(context.tenant.packlink_api_key, 4096), is_test: context.tenant.is_test === true });
     if (!key) throw new ShippingProviderError('shipping_provider_not_configured');
     const path = '/shipments/' + encodeURIComponent(reference);
     const [shipment, timeline] = await Promise.all([request(key, path), request(key, path + '/track')]);

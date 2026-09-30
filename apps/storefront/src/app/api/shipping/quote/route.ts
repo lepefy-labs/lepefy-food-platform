@@ -25,6 +25,7 @@
  *                            (shipping_tariff_fallback), mai implicito.
  */
 
+import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -168,7 +169,7 @@ async function quoteProviderCost(
     case 'packlink':
     default: {
       // ── API key ────────────────────────────────────────────────────────────
-      const packlinkApiKey = tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY;
+      const packlinkApiKey = resolvePacklinkApiKey(tenant);
       if (!packlinkApiKey) {
         console.error('[shipping/quote] PACKLINK_API_KEY missing — tenant:', tenant.id);
         return { available: false, message: 'Service de livraison non configuré.', status: 500 };
@@ -329,7 +330,7 @@ async function quoteTariff(
     supabase,
     tenantId: tenant.id,
     shippingProvider: tenant.shipping_provider,
-    apiKey: tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY ?? null,
+    apiKey: resolvePacklinkApiKey(tenant),
     priced: outcome,
     vatRate: resolveVatRate(outcome.destination.country, (vatResult.data ?? []) as VatRate[]),
     profiles: (profilesResult.data ?? []) as never,

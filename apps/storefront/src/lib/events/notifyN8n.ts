@@ -87,7 +87,20 @@ export async function postToN8n(webhookPath: string, payload: Record<string, unk
  * when EMAIL_TRANSPORT=brevo, everything else (and every email by default)
  * goes to its n8n webhook.
  */
-export async function sendNotification(webhookPath: string, payload: Record<string, unknown>): Promise<TransportResult> {
+export async function sendNotification(webhookPath: string, rawPayload: Record<string, unknown>): Promise<TransportResult> {
+  // Tenant di test (tenants.is_test): mai verso clienti reali.
+  let payload = rawPayload;
+  const testTenant = await import('@/lib/tenant/testTenant');
+  if (await testTenant.isTestTenantNotification(payload)) {
+    const { decideTestTenantDelivery } = await import('@/lib/notifications/testTenantGuard');
+    const decision = decideTestTenantDelivery(webhookPath, payload, testTenant.testTenantEmailRecipients());
+    if (decision.action === 'skip') {
+      testTenant.logTestTenantSkip(decision.channel, decision.reason);
+      return { ok: true, transport: RENDERED_EMAIL_WEBHOOKS.has(webhookPath) ? configuredEmailTransport() : 'n8n', skipped: true };
+    }
+    payload = decision.payload;
+  }
+
   if (RENDERED_EMAIL_WEBHOOKS.has(webhookPath) && configuredEmailTransport() === 'brevo') {
     const result = await sendViaBrevo(payload);
     if (result.ok) console.info(`[email] brevo accepted ${String(payload.notificationType ?? webhookPath)} — message:`, result.messageId);

@@ -124,6 +124,41 @@ Resolver canonico: `src/lib/admin/workspace.ts`.
 
 La navigazione admin e la ricerca globale sono permission-aware. Lo switch workspace è mostrato solo se l'utente possiede almeno una capability della surface destinazione.
 
+### Tenant di test e feature flag di rilascio (migration 138)
+
+**Tenant di test.** Slug `lepefy-test` (nome "Lepefy Test"), nello **stesso** progetto Supabase di produzione, isolato come ogni tenant via `tenant_id` + RLS. È marcato da `tenants.is_test = true` (colonna privata: niente grant di colonna, mai in `PUBLIC_TENANT_FIELDS`). Branding volutamente neutro (grigi `#4B5563`/`#9CA3AF`/`#F3F4F6`, nessun logo), così un valore hardcoded di un altro tenant salta subito all'occhio. `shipping_provider = 'flat_rate'` (5,90 €). Si deploya come un secondo progetto Vercel con `NEXT_PUBLIC_TENANT_SLUG=lepefy-test`.
+
+**Guard sulle comunicazioni esterne** (`lib/tenant/testTenant.ts`, `lib/notifications/testTenantGuard.ts`). Sono applicati all'ingresso di `sendNotification()` (`lib/events/notifyN8n.ts`), unico punto da cui passano email Brevo/n8n, ledger, retry e dispatch. La notifica è di test se il `tenantId` del payload è un tenant `is_test`, oppure se il deployment corrente lo è.
+- Email renderizzate (`send-email`, `order-stock-conflict`, `daily-order-digest`): inviate **solo** ai destinatari di `TEST_TENANT_EMAIL_RECIPIENT` (lista separata da virgole), con oggetto prefissato `[TEST] `. Se la variabile manca, l'email è saltata.
+- Tutti gli altri webhook n8n: saltati.
+- Packlink (`lib/shipping/packlinkApiKey.ts`, usato da preventivo, tracking, simulatore, inspector, campagne): per un tenant di test solo la chiave propria del tenant, mai `PACKLINK_API_KEY` di piattaforma.
+- Ogni salto è loggato come `[test-tenant] skipped: <canale>` e restituisce `ok` (`skipped: true`), così il ledger non riprova all'infinito.
+- WhatsApp Cloud API non esiste nel codice (solo link `wa.me`), quindi non c'è nulla da proteggere.
+- Eccezione nota: la console di test notifiche platform (`/api/admin/platform/notifications/test`) chiama n8n direttamente. È uno strumento esplicito del platform_owner.
+
+**Ordini e prenotazioni.** Il trigger `mark_test_tenant_rows` (BEFORE INSERT su `orders` ed `event_reservations`) forza `is_test = true` per ogni riga di un tenant di test. Copre checkout, webhook Stripe, RPC di conversione e qualsiasi percorso futuro, senza toccare la logica di checkout. Attenzione: `tests/e2e/scripts/cleanup-test-data.ts` cancella gli ordini `is_test` delle ultime 24 h **di tutti i tenant**. Il seed crea quindi ordini retrodatati di più di 48 h.
+
+**Feature flag di rilascio** (`tenant_feature_flags`: `tenant_id`, `flag_key`, `enabled`, `updated_at`, unique `(tenant_id, flag_key)`). RLS attiva: lettura solo del proprio tenant (`current_user_tenant_ids()`, admin attivo o cliente), scrittura solo service role. Regola: **ogni feature nuova nasce con un flag, spento di default**.
+1. Dichiara la chiave generica in `lib/featureFlags/featureFlagRegistry.ts`.
+2. Proteggi il codice server con `await isFeatureEnabled(tenant.id, '<chiave>')` (`lib/featureFlags/featureFlags.ts`). Riga assente o errore valgono `false`; cache 30 s invalidata a ogni scrittura.
+3. Accendi il flag da `/admin/parametres/fonctionnalites` (`GET/PATCH /api/admin/feature-flags`, permessi `tenant_settings.view`/`manage`), prima su `lepefy-test`, poi sugli altri tenant.
+4. Quando la feature è attiva ovunque, rimuovi il flag dal codice e dal registro.
+
+Differenza con `tenant_feature_settings` (096): quella tabella resta per i **moduli permanenti** con `config` e FK su `platform_features`. I flag di rilascio sono temporanei e non passano dal catalogo commerciale.
+
+**Seed.** `scripts/seed-test-tenant.mjs`, lanciato dal workflow manuale `.github/workflows/seed-test-tenant.yml`, crea 3 categorie, 12 prodotti, un metodo di pagamento esterno fittizio e 4 ordini finti.
+- Rifiuta di girare se il tenant non è `is_test`.
+- `SKIP_EXISTING` (default `true`) è applicato in JavaScript dopo la fetch, filtrando solo su `tenant_id`.
+- Log per tabella: righe lette, righe da inserire dopo lo skip, inseriti e aggiornati.
+- Gli ordini esistenti non vengono mai riscritti. `DRY_RUN=true` non scrive nulla.
+
+**Passi manuali (Robertin):**
+1. Applicare `supabase/migrations/138_test_tenant_feature_flags.sql` nel Supabase SQL Editor.
+2. Creare un secondo progetto Vercel: Root Directory `apps/storefront`, `NEXT_PUBLIC_TENANT_SLUG=lepefy-test`, dominio `test.lepefy.com`.
+3. In quel progetto impostare le chiavi Stripe in modalità **TEST** (`STRIPE_SECRET_KEY*`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, webhook secret) e `TEST_TENANT_EMAIL_RECIPIENT`. Non impostare `PACKLINK_API_KEY`.
+4. Lanciare il workflow "Seed Test Tenant (lepefy-test)" da GitHub Actions (prima con `dry_run`, poi senza).
+5. Creare un admin per `lepefy-test` da `/admin/team`.
+
 ### Admin Paramètres — Settings Hub
 
 `/admin/parametres` è un hub di configurazione del tenant, non una pagina di form. Registry unico `app/admin/(protected)/parametres/_components/settingsRegistry.ts` (gruppi → sezioni → voci ricercabili) alimenta card dell'hub, sotto-navigazione interna e ricerca client-side (titolo/descrizione/keyword, case- e accent-insensitive, tastiera ↑/↓/Esc); una nuova impostazione si aggiunge al registry con la propria pagina, mai a una pagina monolitica.
@@ -870,6 +905,8 @@ Nala Analytics Dashboard V1 non richiede migration: consuma lo schema 095/097/09
 `125` è additiva: `shipping_tariff_versions.activated_at/activated_by/retired_by`, `tenants.shipping_tariff_fallback` (default `unavailable`), `tenants.shipping_public_grid_enabled` (default false), `shipping_packaging_profiles.tare_g`, e le RPC service-role di attivazione/ritiro/rollback. Nessun backfill e nessun tenant attivato: il forfait è addebitato solo dopo l'attivazione esplicita in admin. Da applicare manualmente dopo la 124; senza di essa l'attivazione è indisponibile e il checkout resta invariato. Rollback documentato nel file SQL.
 
 `126` è additiva: ricrea soltanto `tenant_payment_methods_method_check` aggiungendo `'apple_pay'` (idempotente, nessun dato toccato, nessuna nuova tabella quindi nessun nuovo GRANT). Da applicare manualmente prima di attivare Apple Pay in admin: senza di essa l'insert di una riga `apple_pay` fallisce sulla CHECK, il resto è invariato.
+
+`138` è additiva: `tenants.is_test` (default false, privata), tabella `tenant_feature_flags` con RLS + GRANT espliciti, funzione `current_user_tenant_ids()`, trigger `mark_test_tenant_rows` su `orders`/`event_reservations` e inserimento del tenant `lepefy-test` (`on conflict do nothing`). Nessun tenant esistente viene modificato. Dettagli nella sezione 2 ("Tenant di test e feature flag di rilascio"). L'applicazione è manuale. Prima della 138, `isFeatureEnabled()` restituisce sempre `false` e la pagina Fonctionnalités mostra un errore di caricamento.
 
 `119` è additiva : 5 nuove tabelle (Shipping Intelligence, vedi sezione 13), zero colonne modificate su `tenants`/`orders`/`packaging_surcharges`/`shipping_country_rules`, zero impatto checkout. Seed non distruttivo: un `shipping_packaging_profiles` di default per tenant derivato da `packaging_surcharges` esistente. L'applicazione in Supabase resta manuale.
 

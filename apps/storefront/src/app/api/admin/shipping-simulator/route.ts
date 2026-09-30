@@ -17,6 +17,7 @@
  * coût par appel).
  */
 
+import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const packlinkApiKey = tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY;
+  const packlinkApiKey = resolvePacklinkApiKey(tenant);
   if (!packlinkApiKey) {
     console.error('[admin/shipping-simulator] PACKLINK_API_KEY manquant — tenant:', tenant.id);
     return NextResponse.json(

@@ -3,6 +3,7 @@ import {
   IconBuildingStore,
   IconClockPlay,
   IconCreditCard,
+  IconFlask,
   IconMapPin,
   IconPalette,
   IconPlugConnected,
@@ -25,7 +26,8 @@ export type SettingsSectionKey =
   | 'automatisations'
   | 'paiements'
   | 'integrations'
-  | 'legal';
+  | 'legal'
+  | 'fonctionnalites';
 
 export type SettingsAccent = 'blue' | 'emerald' | 'fuchsia' | 'sky' | 'red' | 'amber' | 'orange' | 'violet' | 'teal';
 
@@ -205,6 +207,19 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         entries: [
           { title: 'Raison sociale', description: 'Nom légal imprimé sur les étiquettes produits.', href: `${BASE}/legal#informations-legales`, keywords: ['société', 'entreprise'] },
           { title: 'Adresse et email légaux', description: 'Coordonnées légales de l’entreprise.', href: `${BASE}/legal#informations-legales`, keywords: ['adresse', 'email', 'siège'] },
+        ],
+      },
+      {
+        key: 'fonctionnalites',
+        title: 'Fonctionnalités en test',
+        navLabel: 'Fonctionnalités',
+        description: 'Activer ou désactiver les nouveautés en cours de déploiement.',
+        href: `${BASE}/fonctionnalites`,
+        icon: IconFlask,
+        accent: 'sky',
+        keywords: ['fonctionnalité', 'flag', 'feature flag', 'bêta', 'test', 'nouveauté'],
+        entries: [
+          { title: 'Nouveautés en déploiement', description: 'Fonctionnalités désactivées par défaut, activables pour votre boutique.', href: `${BASE}/fonctionnalites#fonctionnalites`, keywords: ['flag', 'bêta', 'activer'] },
         ],
       },
     ],

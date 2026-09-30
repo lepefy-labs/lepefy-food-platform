@@ -72,6 +72,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/shipping-shadow-report') return read ? 'shipping.view' : null;
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  if (path === '/api/admin/feature-flags') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/payment-methods') || path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
 
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';

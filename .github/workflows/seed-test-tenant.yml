@@ -1,0 +1,38 @@
+name: Seed Test Tenant (lepefy-test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_existing:
+        description: 'Salta le righe già presenti (false = riallinea categorie/prodotti/metodo al seed)'
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: 'Dry-run (nessuna scrittura)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  seed-test-tenant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Seed test tenant
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_TENANT_SLUG: lepefy-test
+          SKIP_EXISTING: ${{ github.event.inputs.skip_existing }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: node scripts/seed-test-tenant.mjs

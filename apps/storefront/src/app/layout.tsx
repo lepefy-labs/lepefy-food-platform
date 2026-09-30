@@ -45,6 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
       card:   'summary_large_image',
       images: ['/api/og-image'],
     },
+    // Tenant di test (tenants.is_test, migration 138): mai indicizzato.
+    // Ereditato da ogni pagina che non definisce robots.
+    ...(tenant.is_test ? { robots: { index: false, follow: false } } : {}),
   };
 }
 

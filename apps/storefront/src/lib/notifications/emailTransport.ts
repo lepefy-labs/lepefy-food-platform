@@ -17,6 +17,8 @@ export interface TransportResult {
   messageId?: string | null;
   error?: string;
   httpStatus?: number;
+  /** Not sent on purpose (test tenant guard, lib/tenant/testTenant.ts). */
+  skipped?: boolean;
 }
 
 /** n8n webhooks whose payload is a rendered email (recipients, subject, html, emailBranding). */

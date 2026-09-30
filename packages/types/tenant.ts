@@ -43,6 +43,8 @@ export interface Tenant {
   legal_email: string | null;
   legal_website: string | null;
   active: boolean;
+  /** Tenant di test (migration 138). Assente finché la 138 non è applicata. */
+  is_test?: boolean;
   storefront_ready: boolean;
   ai_image_generation: boolean;
   locales: string[];

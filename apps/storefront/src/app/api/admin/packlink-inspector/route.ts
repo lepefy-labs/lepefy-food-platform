@@ -1,3 +1,4 @@
+import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requirePlatformOwner } from '@/lib/auth/requirePlatformOwner';
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const packlinkApiKey = tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY;
+  const packlinkApiKey = resolvePacklinkApiKey(tenant);
   if (!packlinkApiKey) {
     return NextResponse.json(
       { available: false, message: 'Clé API Packlink non configurée.' },

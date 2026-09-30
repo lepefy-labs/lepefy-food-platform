@@ -1,3 +1,4 @@
+import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import type { createServiceClient } from '@/lib/supabase/server';
 import type {
   ShippingPackagingProfileRow,
@@ -59,7 +60,7 @@ export async function runCampaignBatch(
   if (tenant.shipping_provider !== 'packlink') {
     return { processed: 0, succeeded: 0, failed: 0, skipped: 0, rejected: 0 };
   }
-  const resolvedApiKey = tenant.packlink_api_key ?? process.env.PACKLINK_API_KEY;
+  const resolvedApiKey = resolvePacklinkApiKey(tenant);
   if (!resolvedApiKey) return { processed: 0, succeeded: 0, failed: 0, skipped: 0, rejected: 0 };
   const packlinkApiKey: string = resolvedApiKey;
 
