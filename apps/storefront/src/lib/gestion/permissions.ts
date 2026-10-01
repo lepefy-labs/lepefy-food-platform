@@ -7,6 +7,13 @@ export function gestionApiPermission(path: string, method: string): string | nul
   const read = verb === 'GET' || verb === 'HEAD';
   const rest = path.replace(/^\/api\/admin\/gestion/, '');
 
+  const exportType = rest.match(/^\/export\/(full|suppliers|purchases|treasury|stock)$/)?.[1];
+  if (exportType) {
+    if (!read) return null;
+    return ({ full: 'suppliers.view', suppliers: 'suppliers.view', purchases: 'purchases.view',
+      treasury: 'treasury.view', stock: 'inventory.view' } as Record<string, string>)[exportType] ?? null;
+  }
+
   if (rest === '/products') return read ? 'purchases.view' : null;
 
   if (/^\/purchases\/[^/]+\/receipts$/.test(rest)) return verb === 'POST' ? 'inventory.manage' : null;

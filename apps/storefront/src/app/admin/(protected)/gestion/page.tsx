@@ -10,6 +10,8 @@ import {
 } from '@/lib/gestion/domain';
 import { Badge, CARD_CLS, EmptyState, Panel, SECONDARY_LINK_CLS, Stat } from './_components/ui';
 import { DueList } from './_components/DueList';
+import ExportExcelButton from './_components/ExportExcelButton';
+import type { GestionExportType } from '@/lib/gestion/exportData';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -18,6 +20,13 @@ export default async function GestionDashboardPage() {
   const { tenant, can } = await requireBusinessManagementPage([...GESTION_VIEW_PERMISSIONS]);
   const data = await getDashboard(tenant.id, tenant.currency);
   const money = (value: number) => formatMoney(value, data.currency);
+  const exportPermissions: Record<Exclude<GestionExportType, 'full'>, string> = {
+    suppliers: 'suppliers.view', purchases: 'purchases.view', treasury: 'treasury.view', stock: 'inventory.view',
+  };
+  const allowedExports: GestionExportType[] = [
+    ...(GESTION_VIEW_PERMISSIONS.every((permission) => can(permission)) ? ['full' as const] : []),
+    ...Object.entries(exportPermissions).filter(([, permission]) => can(permission)).map(([type]) => type as GestionExportType),
+  ];
   const anomalies = [
     data.overdueReceipts > 0 && { text: `${data.overdueReceipts} achat(s) en retard de livraison (date prévue dépassée).`, href: '/admin/gestion/achats?status=to_receive' },
     data.staleUnverifiedPayments > 0 && { text: `${data.staleUnverifiedPayments} paiement(s) enregistré(s) depuis plus de 7 jours sans vérification.`, href: '/admin/gestion/tresorerie?status=recorded' },
@@ -34,6 +43,8 @@ export default async function GestionDashboardPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 pb-10">
       <AdminPageHeader title="Gestion" description="Fournisseurs, achats, réceptions, dettes et trésorerie de la boutique." />
+
+      <div className="flex flex-wrap justify-end"><ExportExcelButton allowed={allowedExports} /></div>
 
       {quickActions.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">

@@ -71,7 +71,8 @@ test('no em dash in Gestion UI copy', () => {
 test('every Gestion API route and method maps to a capability (fail-closed map)', () => {
   for (const file of apiRoutes) {
     const route = '/' + relative(join(SRC, 'app'), file).split(sep).join('/').replace(/\/route\.ts$/, '')
-      .replace(/\[entityType\]/, 'purchase').replace(/\[[^\]]+\]/g, '00000000-0000-0000-0000-000000000000');
+      .replace(/\[entityType\]/, 'purchase').replace(/\[type\]/, 'full')
+      .replace(/\[[^\]]+\]/g, '00000000-0000-0000-0000-000000000000');
     const methods = (readFileSync(file, 'utf8').match(/export async function (GET|POST|PATCH|DELETE)/g) ?? []).map((m) => m.split(' ').pop()!);
     for (const method of methods) expect(permissionForAdminApi(route, method), `${method} ${route}`).not.toBeNull();
   }
@@ -88,6 +89,11 @@ test('Gestion capabilities follow read/manage/critical semantics', () => {
   expect(gestionApiPermission('/api/admin/gestion/inventory/adjustments', 'POST')).toBe('inventory.manage');
   expect(gestionApiPermission('/api/admin/gestion/payments', 'GET')).toBe('treasury.view');
   expect(gestionApiPermission('/api/admin/gestion/payments', 'POST')).toBe('treasury.manage');
+  expect(gestionApiPermission('/api/admin/gestion/export/full', 'GET')).toBe('suppliers.view');
+  expect(gestionApiPermission('/api/admin/gestion/export/purchases', 'GET')).toBe('purchases.view');
+  expect(gestionApiPermission('/api/admin/gestion/export/treasury', 'GET')).toBe('treasury.view');
+  expect(gestionApiPermission('/api/admin/gestion/export/stock', 'GET')).toBe('inventory.view');
+  expect(gestionApiPermission('/api/admin/gestion/export/stock', 'POST')).toBeNull();
   expect(gestionApiPermission(`/api/admin/gestion/payments/${id}/verify`, 'POST')).toBe('supplier_payments.verify');
   expect(gestionApiPermission(`/api/admin/gestion/payments/${id}/void`, 'POST')).toBe('treasury.manage');
   expect(gestionApiPermission(`/api/admin/gestion/allocations/${id}/reverse`, 'POST')).toBe('treasury.manage');

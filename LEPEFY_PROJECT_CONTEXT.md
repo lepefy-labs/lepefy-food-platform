@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 1 ottobre 2026 — **v6.97 Current-State Snapshot** (Gestion Fase 1.1: quantità decimali, unità, conversione stock, costi prodotto, scadenze, schermata stock; base `main` @ `8d9b1a74`)
+> **Aggiornato:** 1 ottobre 2026 — **v6.98 Current-State Snapshot** (Gestion Excel export; base `main` @ `8e08df3789168364cf12b2a6beda769a2ffedc84`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -594,6 +594,7 @@ Dominio gestionale del tenant **dentro l'admin Shop** (nessuna app separata, nes
 - **Tesoreria** = uscite verso i fornitori; non è unificata con `tenant_card_payments` (incassi cliente `/card`).
 - **Seed**: `scripts/seed-test-tenant-gestion.mjs` (workflow "Seed Test Tenant", input `with_gestion`), solo tenant `is_test`, idempotente.
 - **Verifica**: `supabase/verification/139_business_management_verification.sql` (BEGIN/ROLLBACK, schema, privilegi, RPC reali, esempio 2 400 € → resta 1 000 €, cross-tenant, idempotenza).
+- **Excel export**: CTA `Exporter Excel` in `/admin/gestion`, endpoint server-side `GET /api/admin/gestion/export/[type]` (`full|suppliers|purchases|treasury|stock`, periodo `from`/`to` opzionale). Snapshot `.xlsx` on-demand con `Synthèse`, fogli di dominio, dettagli acquisti navigabili e link all'admin live del tenant. `full` richiede tutte le quattro capability Gestion `*.view`; gli export specifici richiedono la capability corrispondente. Query tenant-scoped, saldi dalle view Gestion, date Europe/Paris, paginazione e limiti sincroni; nessun import/sync, file persistito o migration. Dettagli separati fino a 100 acquisti, poi foglio condiviso. Vedi `docs/BUSINESS_MANAGEMENT.md`.
 
 ---
 
@@ -1063,8 +1064,8 @@ Prima di consegnare codice:
 
 ---
 
-# Fine snapshot v6.73
+# Fine snapshot v6.98
 
-**Base audit:** `main` @ `e0d5bf3` — Shipping Intelligence V1A–V1E, loyalty Wallet, verified service reviews, purchase quantity rules, ProductCard consolidato, e hero Découvrir con contenuti live.
-**Data:** 25 settembre 2026
+**Base audit:** `main` @ `8e08df3789168364cf12b2a6beda769a2ffedc84` — stato revisionato per l'export Excel Gestion.
+**Data:** 1 ottobre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.

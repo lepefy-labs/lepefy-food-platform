@@ -316,6 +316,18 @@ Il codice deployato prima della migration resta inerte finché il flag è spento
 | "Quantité trop précise" | più di 3 decimali | arrotondare consapevolmente la quantità |
 | Costo prodotto assente | nessuna ricezione valida di una riga collegata | registrare la ricezione; le rettifiche non creano costi |
 
+## Excel export
+
+`Exporter Excel` su `/admin/gestion` genera su richiesta un file `.xlsx` server-side. Lepefy rimane la fonte autorevole: il file è una fotografia consultabile offline, senza import, sincronizzazione o persistenza del download. L'endpoint è `GET /api/admin/gestion/export/[type]`, con `type=full|suppliers|purchases|treasury|stock` nel percorso e `from`/`to` opzionali in formato `YYYY-MM-DD`. Date e tipo sono validati sul server; richieste e risposta sono senza cache.
+
+Il flag `business_management` e la sessione admin sono obbligatori. Le opzioni specifiche richiedono rispettivamente `suppliers.view`, `purchases.view`, `treasury.view` e `inventory.view`. **Situation complète** è disponibile solo a chi possiede tutte e quattro; la mappa API richiede `suppliers.view` e il route handler verifica le altre tre. Nel solo export Achats, le sezioni dettagliate dei pagamenti sono incluse soltanto con `treasury.view`; i saldi derivati dalla view acquisti restano visibili come nella UI Achats. Tutte le query sono filtrate con il tenant risolto dal contesto server, mai da un parametro client.
+
+Il workbook completo contiene `Synthèse`, `Fournisseurs`, `Achats`, `Paiements`, `Affectations`, `Réceptions`, `Stock`, `Mouvements stock` e i dettagli degli acquisti. Gli export specifici mantengono `Synthèse` come indice e includono i fogli del dominio. Le celle `ACH-…` puntano al dettaglio nello stesso file; ogni dettaglio ha `Retour aux achats`, idealmente alla riga di origine. I link `Ouvrir dans Lepefy` usano l'URL canonico dello Shop del tenant. Fino a 100 acquisti ogni dettaglio ha un foglio; oltre 100, un solo foglio `Détails achats` contiene sezioni collegate. Date, importi, quantità e stock sono celle Excel numeriche reali. In `Achats`, le quantità aggregate non sono mostrate se le righe mescolano unità incompatibili; il dettaglio conserva quantità e UOM per articolo. I totali finanziari sono separati per valuta e i saldi provengono dalle view Gestion.
+
+Il periodo filtra per data di ordine, pagamento e per timestamp locale Europe/Paris di ricezioni e movimenti nei fogli tabellari. Il dettaglio di un acquisto incluso nel periodo mostra il suo intero storico di ricezioni e, se autorizzato, pagamenti, così quantità ricevute e saldo lifetime restano coerenti. Fornitori, saldi fornitori, stock attuale, costi e scadenze nella `Situation actuelle` restano fotografie correnti. `Export généré le` mostra l'ora locale Gestion. Non viene calcolata una valorizzazione dello stock, perché il costo corrente non equivale a un valore inventariale affidabile. Il file non contiene documenti binari, URL firmati o credenziali.
+
+L'export sincrono in memoria usa pagine da 500 righe e limiti espliciti: 1.000 fornitori, 1.500 acquisti, 10.000 articoli, 3.000 ricezioni, 3.000 pagamenti, 10.000 allocazioni, 3.000 prodotti stock e 10.000 movimenti. Oltre il limite risponde `413` con invito a ridurre il periodo. La libreria ExcelJS è usata per formati, hyperlink, freeze pane e autofilter; la precedente dipendenza `xlsx` non copre tutti questi requisiti di presentazione. Non è stata aggiunta alcuna migration.
+
 ## Known limitations
 
 - Nessuna chiusura "ricevuto con ammanco definitivo": un acquisto con merce mai consegnata resta `partially_received` (annotare in nota; storno/annullamento non applicabili se c'è già una ricezione).
