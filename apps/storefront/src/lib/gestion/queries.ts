@@ -1,17 +1,23 @@
 import 'server-only';
 import { createServiceClient } from '@/lib/supabase/server';
-import type {
-  BeneficiaryType, DocumentEntityType, DocumentType, PaymentMethod, PaymentStatus, PurchaseStatus,
+import {
+  DUE_SOON_DAYS, addDays, gestionToday, summarizeDues,
+  type BeneficiaryType, type DueTotals, type DocumentEntityType, type DocumentType, type MovementType, type PaymentMethod,
+  type PaymentStatus, type PurchaseStatus, type PurchaseUnit,
 } from '@/lib/gestion/domain';
 
 /**
  * Letture Gestion per le pagine admin (service role, sempre filtrate per
  * tenant_id). Nessun saldo calcolato qui: arrivano dalle view
- * supplier_purchase_financials / supplier_balances (migration 139).
+ * supplier_purchase_financials / supplier_balances / inventory_product_overview.
  */
 
 const db = () => createServiceClient();
 const num = (value: unknown) => (value === null || value === undefined ? 0 : Number(value));
+const numOrNull = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+
+export const STOCK_PAGE_SIZE = 25;
+export const MOVEMENT_PAGE_SIZE = 30;
 
 export interface SupplierRow {
   id: string;
@@ -27,6 +33,7 @@ export interface SupplierRow {
   currency: string;
   notes: string | null;
   active: boolean;
+  default_payment_terms_days: number | null;
   created_at: string;
 }
 
@@ -64,7 +71,7 @@ function toBalance(row: Record<string, unknown> | undefined): SupplierBalance {
   };
 }
 
-const SUPPLIER_COLUMNS = 'id, code, name, legal_name, contact_name, email, phone, whatsapp_phone, address, country, currency, notes, active, created_at';
+const SUPPLIER_COLUMNS = 'id, code, name, legal_name, contact_name, email, phone, whatsapp_phone, address, country, currency, notes, active, default_payment_terms_days, created_at';
 
 /** Caratteri speciali di PostgREST/ILIKE neutralizzati nella ricerca. */
 function searchTerm(value: string): string {
@@ -87,11 +94,13 @@ export async function listSuppliers(tenantId: string, options: { q?: string; sta
   return suppliers.map((supplier) => ({ ...supplier, balance: toBalance(byId.get(supplier.id)) }));
 }
 
-export async function listActiveSupplierOptions(tenantId: string): Promise<{ id: string; code: string; name: string; currency: string }[]> {
-  const { data, error } = await db().from('suppliers').select('id, code, name, currency')
+export interface SupplierOption { id: string; code: string; name: string; currency: string; default_payment_terms_days: number | null }
+
+export async function listActiveSupplierOptions(tenantId: string): Promise<SupplierOption[]> {
+  const { data, error } = await db().from('suppliers').select('id, code, name, currency, default_payment_terms_days')
     .eq('tenant_id', tenantId).eq('active', true).order('name').limit(500);
   if (error) throw new Error(`suppliers: ${error.message}`);
-  return data ?? [];
+  return (data ?? []) as SupplierOption[];
 }
 
 export async function getSupplier(tenantId: string, supplierId: string): Promise<SupplierListItem | null> {
@@ -112,6 +121,7 @@ export interface PurchaseListItem {
   supplier_reference: string | null;
   order_date: string;
   expected_date: string | null;
+  payment_due_date: string | null;
   currency: string;
   status: PurchaseStatus;
   total: number;
@@ -123,22 +133,46 @@ export interface PurchaseListItem {
   received_quantity: number;
 }
 
+/** Filtres de paiement / échéance (calculés côté serveur sur la vue des soldes). */
+export const PAYMENT_FILTERS = ['unpaid', 'due_soon', 'overdue', 'paid', 'no_due'] as const;
+export type PaymentFilter = (typeof PAYMENT_FILTERS)[number];
+
 export interface PurchaseFilters {
-  status?: PurchaseStatus | 'open' | 'to_receive' | 'unpaid';
+  status?: PurchaseStatus | 'open' | 'to_receive';
+  pay?: PaymentFilter;
   supplierId?: string;
   q?: string;
   limit?: number;
 }
 
+/** Identifiants d'achats correspondant à un filtre de paiement (tenant-scoped, côté base). */
+async function purchaseIdsForPaymentFilter(tenantId: string, pay: PaymentFilter, today: string): Promise<string[]> {
+  let query = db().from('supplier_purchase_financials').select('purchase_id').eq('tenant_id', tenantId).limit(2000);
+  if (pay === 'unpaid') query = query.gt('outstanding', 0);
+  else if (pay === 'due_soon') query = query.gt('outstanding', 0).gte('payment_due_date', today).lte('payment_due_date', addDays(today, DUE_SOON_DAYS));
+  else if (pay === 'overdue') query = query.gt('outstanding', 0).lt('payment_due_date', today);
+  else if (pay === 'paid') query = query.eq('outstanding', 0).gt('total', 0).not('status', 'in', '(draft,cancelled)');
+  else query = query.is('payment_due_date', null).not('status', 'in', '(draft,cancelled)').gt('outstanding', 0);
+  const { data, error } = await query;
+  if (error) throw new Error(`supplier_purchase_financials: ${error.message}`);
+  return (data ?? []).map((row) => row.purchase_id as string);
+}
+
 export async function listPurchases(tenantId: string, filters: PurchaseFilters = {}): Promise<PurchaseListItem[]> {
+  let restrictTo: string[] | null = null;
+  if (filters.pay) {
+    restrictTo = await purchaseIdsForPaymentFilter(tenantId, filters.pay, gestionToday());
+    if (!restrictTo.length) return [];
+  }
   let query = db().from('supplier_purchases')
-    .select('id, reference, supplier_id, supplier_reference, order_date, expected_date, currency, status, total, suppliers(name)')
+    .select('id, reference, supplier_id, supplier_reference, order_date, expected_date, payment_due_date, currency, status, total, suppliers(name)')
     .eq('tenant_id', tenantId).order('order_date', { ascending: false }).order('created_at', { ascending: false })
     .limit(filters.limit ?? 300);
+  if (restrictTo) query = query.in('id', restrictTo);
   if (filters.supplierId) query = query.eq('supplier_id', filters.supplierId);
   if (filters.status === 'open') query = query.in('status', ['draft', 'ordered', 'partially_received']);
   else if (filters.status === 'to_receive') query = query.in('status', ['ordered', 'partially_received']);
-  else if (filters.status && filters.status !== 'unpaid') query = query.eq('status', filters.status);
+  else if (filters.status) query = query.eq('status', filters.status);
   const term = filters.q ? searchTerm(filters.q) : '';
   if (term) query = query.or(`reference.ilike.%${term}%,supplier_reference.ilike.%${term}%`);
   const { data, error } = await query;
@@ -149,20 +183,19 @@ export async function listPurchases(tenantId: string, filters: PurchaseFilters =
     .eq('tenant_id', tenantId).in('purchase_id', purchases.map((purchase) => purchase.id));
   if (finError) throw new Error(`supplier_purchase_financials: ${finError.message}`);
   const byId = new Map((financials ?? []).map((row) => [row.purchase_id as string, row as Record<string, unknown>]));
-  const rows = purchases.map((purchase) => {
+  return purchases.map((purchase) => {
     const f = byId.get(purchase.id);
     const supplier = purchase.suppliers as unknown as { name: string } | null;
     return {
       id: purchase.id, reference: purchase.reference, supplier_id: purchase.supplier_id,
       supplier_name: supplier?.name ?? '', supplier_reference: purchase.supplier_reference,
-      order_date: purchase.order_date, expected_date: purchase.expected_date, currency: purchase.currency,
-      status: purchase.status as PurchaseStatus, total: num(purchase.total),
+      order_date: purchase.order_date, expected_date: purchase.expected_date, payment_due_date: purchase.payment_due_date,
+      currency: purchase.currency, status: purchase.status as PurchaseStatus, total: num(purchase.total),
       paid_verified: num(f?.paid_verified), paid_unverified: num(f?.paid_unverified),
       outstanding: num(f?.outstanding), allocatable: num(f?.allocatable),
       ordered_quantity: num(f?.ordered_quantity), received_quantity: num(f?.received_quantity),
     };
   });
-  return filters.status === 'unpaid' ? rows.filter((row) => row.outstanding > 0) : rows;
 }
 
 export interface PurchaseItemRow {
@@ -172,6 +205,8 @@ export interface PurchaseItemRow {
   description: string;
   ordered_quantity: number;
   received_quantity: number;
+  purchase_unit: PurchaseUnit;
+  stock_units_per_purchase_unit: number | null;
   unit_cost: number;
   line_total: number;
 }
@@ -185,7 +220,7 @@ export interface ReceiptRow {
   reversal_reason: string | null;
   reversed_at: string | null;
   created_by: string | null;
-  lines: { purchase_item_id: string; description: string; quantity: number }[];
+  lines: { purchase_item_id: string; description: string; quantity: number; purchase_unit: PurchaseUnit; stock_units: number | null }[];
 }
 
 export interface AllocationRow {
@@ -243,16 +278,16 @@ export async function adminNames(ids: (string | null | undefined)[]): Promise<Ma
 
 export async function getPurchaseDetail(tenantId: string, purchaseId: string): Promise<PurchaseDetail | null> {
   const { data: purchase, error } = await db().from('supplier_purchases')
-    .select('id, reference, supplier_id, supplier_reference, order_date, expected_date, currency, status, subtotal, additional_costs, total, notes, cancel_reason, created_at, created_by_admin_id, suppliers(name)')
+    .select('id, reference, supplier_id, supplier_reference, order_date, expected_date, payment_due_date, currency, status, subtotal, additional_costs, total, notes, cancel_reason, created_at, created_by_admin_id, suppliers(name)')
     .eq('tenant_id', tenantId).eq('id', purchaseId).maybeSingle();
   if (error) throw new Error(`supplier_purchase: ${error.message}`);
   if (!purchase) return null;
 
   const [financialsResult, itemsResult, receiptsResult, allocationsResult] = await Promise.all([
     db().from('supplier_purchase_financials').select('*').eq('tenant_id', tenantId).eq('purchase_id', purchaseId).maybeSingle(),
-    db().from('supplier_purchase_items').select('id, product_id, description, ordered_quantity, unit_cost, line_total, position, products(name)')
+    db().from('supplier_purchase_items').select('id, product_id, description, ordered_quantity, purchase_unit, stock_units_per_purchase_unit, unit_cost, line_total, position, products(name)')
       .eq('tenant_id', tenantId).eq('purchase_id', purchaseId).order('position'),
-    db().from('supplier_receipts').select('id, reference, received_at, notes, status, reversal_reason, reversed_at, created_by_admin_id, supplier_receipt_items(purchase_item_id, quantity)')
+    db().from('supplier_receipts').select('id, reference, received_at, notes, status, reversal_reason, reversed_at, created_by_admin_id, supplier_receipt_items(purchase_item_id, quantity, purchase_unit, stock_units)')
       .eq('tenant_id', tenantId).eq('purchase_id', purchaseId).order('received_at', { ascending: false }),
     db().from('supplier_payment_allocations').select(`id, amount, created_at, reversed_at, reversal_reason, supplier_payments(${PAYMENT_SUMMARY_COLUMNS})`)
       .eq('tenant_id', tenantId).eq('purchase_id', purchaseId).order('created_at'),
@@ -261,18 +296,23 @@ export async function getPurchaseDetail(tenantId: string, purchaseId: string): P
     if (result.error) throw new Error(`purchase detail: ${result.error.message}`);
   }
 
+  type ReceiptLine = { purchase_item_id: string; quantity: number; purchase_unit: PurchaseUnit; stock_units: number | null };
+  // Somme en millièmes entiers : pas d'erreur flottante sur 5 + 7,5.
   const receivedByItem = new Map<string, number>();
   for (const receipt of receiptsResult.data ?? []) {
     if (receipt.status !== 'recorded') continue;
-    for (const line of (receipt.supplier_receipt_items ?? []) as { purchase_item_id: string; quantity: number }[]) {
-      receivedByItem.set(line.purchase_item_id, (receivedByItem.get(line.purchase_item_id) ?? 0) + line.quantity);
+    for (const line of (receipt.supplier_receipt_items ?? []) as ReceiptLine[]) {
+      receivedByItem.set(line.purchase_item_id, (receivedByItem.get(line.purchase_item_id) ?? 0) + Math.round(num(line.quantity) * 1000));
     }
   }
   const items: PurchaseItemRow[] = (itemsResult.data ?? []).map((item) => ({
     id: item.id, product_id: item.product_id,
     product_name: (item.products as unknown as { name: string } | null)?.name ?? null,
-    description: item.description, ordered_quantity: item.ordered_quantity,
-    received_quantity: receivedByItem.get(item.id) ?? 0, unit_cost: num(item.unit_cost), line_total: num(item.line_total),
+    description: item.description, ordered_quantity: num(item.ordered_quantity),
+    received_quantity: (receivedByItem.get(item.id) ?? 0) / 1000,
+    purchase_unit: (item.purchase_unit ?? 'unit') as PurchaseUnit,
+    stock_units_per_purchase_unit: numOrNull(item.stock_units_per_purchase_unit),
+    unit_cost: num(item.unit_cost), line_total: num(item.line_total),
   }));
   const descriptionById = new Map(items.map((item) => [item.id, item.description]));
   const names = await adminNames([
@@ -284,6 +324,7 @@ export async function getPurchaseDetail(tenantId: string, purchaseId: string): P
     id: purchase.id, reference: purchase.reference, supplier_id: purchase.supplier_id,
     supplier_name: (purchase.suppliers as unknown as { name: string } | null)?.name ?? '',
     supplier_reference: purchase.supplier_reference, order_date: purchase.order_date, expected_date: purchase.expected_date,
+    payment_due_date: purchase.payment_due_date,
     currency: purchase.currency, status: purchase.status as PurchaseStatus, total: num(purchase.total),
     subtotal: num(purchase.subtotal), additional_costs: num(purchase.additional_costs), notes: purchase.notes,
     cancel_reason: purchase.cancel_reason, created_at: purchase.created_at,
@@ -295,8 +336,9 @@ export async function getPurchaseDetail(tenantId: string, purchaseId: string): P
       id: receipt.id, reference: receipt.reference, received_at: receipt.received_at, notes: receipt.notes,
       status: receipt.status as 'recorded' | 'reversed', reversal_reason: receipt.reversal_reason, reversed_at: receipt.reversed_at,
       created_by: receipt.created_by_admin_id ? names.get(receipt.created_by_admin_id) ?? null : null,
-      lines: ((receipt.supplier_receipt_items ?? []) as { purchase_item_id: string; quantity: number }[]).map((line) => ({
-        purchase_item_id: line.purchase_item_id, description: descriptionById.get(line.purchase_item_id) ?? '', quantity: line.quantity,
+      lines: ((receipt.supplier_receipt_items ?? []) as ReceiptLine[]).map((line) => ({
+        purchase_item_id: line.purchase_item_id, description: descriptionById.get(line.purchase_item_id) ?? '',
+        quantity: num(line.quantity), purchase_unit: (line.purchase_unit ?? 'unit') as PurchaseUnit, stock_units: numOrNull(line.stock_units),
       })),
     })),
     allocations: (allocationsResult.data ?? []).map((allocation) => ({
@@ -439,10 +481,55 @@ export async function listAuditEvents(tenantId: string, entities: { type: string
     }));
 }
 
+// ─── Échéances ───────────────────────────────────────────────────────────────
+
+export interface DueItem {
+  purchase_id: string;
+  reference: string;
+  supplier_name: string;
+  payment_due_date: string;
+  outstanding: number;
+  currency: string;
+}
+
+export interface DueSummary extends DueTotals {
+  today: string;
+  /** Échéances ouvertes, de la plus urgente (retard le plus ancien) à la plus lointaine. */
+  items: DueItem[];
+}
+
+export async function getDueSummary(tenantId: string, limit = 8): Promise<DueSummary> {
+  const today = gestionToday();
+  const { data, error } = await db().from('supplier_purchase_financials')
+    .select('purchase_id, outstanding, payment_due_date, currency').eq('tenant_id', tenantId).gt('outstanding', 0).limit(5000);
+  if (error) throw new Error(`dues: ${error.message}`);
+  const rows = (data ?? []).map((row) => ({
+    purchase_id: row.purchase_id as string, outstanding: num(row.outstanding),
+    payment_due_date: (row.payment_due_date as string | null) ?? null, currency: row.currency as string,
+  }));
+  const dated = rows.filter((row) => row.payment_due_date).sort((a, b) => a.payment_due_date!.localeCompare(b.payment_due_date!)).slice(0, limit);
+  let items: DueItem[] = [];
+  if (dated.length) {
+    const { data: purchases } = await db().from('supplier_purchases').select('id, reference, suppliers(name)')
+      .eq('tenant_id', tenantId).in('id', dated.map((row) => row.purchase_id));
+    const byId = new Map((purchases ?? []).map((purchase) => [purchase.id as string, purchase]));
+    items = dated.map((row) => {
+      const purchase = byId.get(row.purchase_id);
+      return {
+        purchase_id: row.purchase_id, reference: (purchase?.reference as string) ?? '',
+        supplier_name: (purchase?.suppliers as unknown as { name: string } | null)?.name ?? '',
+        payment_due_date: row.payment_due_date!, outstanding: row.outstanding, currency: row.currency,
+      };
+    });
+  }
+  return { today, ...summarizeDues(rows, today), items };
+}
+
+// ─── Tableau de bord ─────────────────────────────────────────────────────────
+
 export interface DashboardData {
-  openDebt: number;
+  dues: DueSummary;
   openPurchases: number;
-  purchasesWithBalance: number;
   paidVerified30d: number;
   toReceive: number;
   paymentsToVerifyCount: number;
@@ -456,12 +543,12 @@ export interface DashboardData {
 }
 
 export async function getDashboard(tenantId: string, currency: string): Promise<DashboardData> {
-  const today = new Date().toISOString().slice(0, 10);
-  const since30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const today = gestionToday();
+  const since30 = addDays(today, -30);
   const staleBefore = new Date(Date.now() - 7 * 864e5).toISOString();
 
-  const [financials, openPurchases, overdue, verified, toVerify, balances, recentPayments, recentPurchases] = await Promise.all([
-    db().from('supplier_purchase_financials').select('outstanding, status').eq('tenant_id', tenantId).neq('status', 'cancelled'),
+  const [dues, openPurchases, overdue, verified, toVerify, balances, recentPayments, recentPurchases] = await Promise.all([
+    getDueSummary(tenantId),
     db().from('supplier_purchases').select('id, status').eq('tenant_id', tenantId).in('status', ['draft', 'ordered', 'partially_received']),
     db().from('supplier_purchases').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
       .in('status', ['ordered', 'partially_received']).lt('expected_date', today),
@@ -471,15 +558,12 @@ export async function getDashboard(tenantId: string, currency: string): Promise<
     listPayments(tenantId, { limit: 5 }),
     listPurchases(tenantId, { limit: 5 }),
   ]);
-  for (const result of [financials, openPurchases, overdue, verified, toVerify, balances]) {
+  for (const result of [openPurchases, overdue, verified, toVerify, balances]) {
     if (result.error) throw new Error(`dashboard: ${result.error.message}`);
   }
-
-  const outstandingRows = financials.data ?? [];
   const recorded = toVerify.data ?? [];
   return {
-    openDebt: outstandingRows.reduce((sum, row) => sum + num(row.outstanding), 0),
-    purchasesWithBalance: outstandingRows.filter((row) => num(row.outstanding) > 0).length,
+    dues,
     openPurchases: (openPurchases.data ?? []).length,
     toReceive: (openPurchases.data ?? []).filter((row) => row.status !== 'draft').length,
     overdueReceipts: overdue.count ?? 0,
@@ -501,4 +585,185 @@ export async function searchProducts(tenantId: string, q: string): Promise<{ id:
     .eq('tenant_id', tenantId).ilike('name', `%${term}%`).order('active', { ascending: false }).order('name').limit(15);
   if (error) throw new Error(`products: ${error.message}`);
   return (data ?? []).map((product) => ({ id: product.id, name: product.name, stock: product.stock, active: product.active }));
+}
+
+// ─── Stock ───────────────────────────────────────────────────────────────────
+
+export const STOCK_FILTERS = ['all', 'with_movement', 'no_cost', 'out_of_stock'] as const;
+export type StockFilter = (typeof STOCK_FILTERS)[number];
+
+export interface StockProductRow {
+  product_id: string;
+  name: string;
+  active: boolean;
+  stock: number;
+  price: number;
+  last_movement_at: string | null;
+  last_movement_type: MovementType | null;
+  last_receipt_at: string | null;
+  current_purchase_cost: number | null;
+  cost_currency: string | null;
+}
+
+export interface StockProductQuery {
+  q?: string;
+  filter?: StockFilter;
+  /** Produits ayant au moins un mouvement de ce type et/ou sur cette période. */
+  movementType?: MovementType;
+  from?: string;
+  to?: string;
+  page?: number;
+}
+
+async function productIdsWithMovements(tenantId: string, movementType?: MovementType, from?: string, to?: string): Promise<string[]> {
+  let query = db().from('inventory_movements').select('product_id').eq('tenant_id', tenantId).not('product_id', 'is', null).limit(20000);
+  if (movementType) query = query.eq('movement_type', movementType);
+  if (from) query = query.gte('created_at', `${from}T00:00:00`);
+  if (to) query = query.lt('created_at', `${addDays(to, 1)}T00:00:00`);
+  const { data, error } = await query;
+  if (error) throw new Error(`inventory_movements: ${error.message}`);
+  return Array.from(new Set((data ?? []).map((row) => row.product_id as string)));
+}
+
+/** Produits du catalogue avec stock, derniers mouvements et coût courant (paginé côté serveur). */
+export async function listStockProducts(tenantId: string, options: StockProductQuery = {}): Promise<{ rows: StockProductRow[]; total: number; page: number }> {
+  const page = Math.max(1, options.page ?? 1);
+  let restrictTo: string[] | null = null;
+  if (options.movementType || options.from || options.to) {
+    restrictTo = await productIdsWithMovements(tenantId, options.movementType, options.from, options.to);
+    if (!restrictTo.length) return { rows: [], total: 0, page };
+  }
+  let query = db().from('inventory_product_overview')
+    .select('product_id, name, active, stock, price, last_movement_at, last_movement_type, last_receipt_at, current_purchase_cost, cost_currency', { count: 'exact' })
+    .eq('tenant_id', tenantId)
+    .order('active', { ascending: false }).order('name')
+    .range((page - 1) * STOCK_PAGE_SIZE, page * STOCK_PAGE_SIZE - 1);
+  if (restrictTo) query = query.in('product_id', restrictTo.slice(0, 1000));
+  const term = options.q ? searchTerm(options.q) : '';
+  if (term) query = query.ilike('name', `%${term}%`);
+  if (options.filter === 'with_movement') query = query.not('last_movement_at', 'is', null);
+  else if (options.filter === 'no_cost') query = query.is('current_purchase_cost', null);
+  else if (options.filter === 'out_of_stock') query = query.lte('stock', 0);
+  const { data, error, count } = await query;
+  if (error) throw new Error(`inventory_product_overview: ${error.message}`);
+  return {
+    page,
+    total: count ?? 0,
+    rows: (data ?? []).map((row) => ({
+      product_id: row.product_id as string, name: row.name as string, active: Boolean(row.active),
+      stock: num(row.stock), price: num(row.price),
+      last_movement_at: (row.last_movement_at as string | null) ?? null,
+      last_movement_type: (row.last_movement_type as MovementType | null) ?? null,
+      last_receipt_at: (row.last_receipt_at as string | null) ?? null,
+      current_purchase_cost: numOrNull(row.current_purchase_cost),
+      cost_currency: (row.cost_currency as string | null) ?? null,
+    })),
+  };
+}
+
+export interface MovementRow {
+  id: string;
+  created_at: string;
+  product_id: string | null;
+  product_name: string;
+  movement_type: MovementType;
+  quantity_delta: number;
+  stock_after: number | null;
+  source_quantity: number | null;
+  source_unit: PurchaseUnit | null;
+  conversion_factor: number | null;
+  source_reference: string | null;
+  reason: string | null;
+  note: string | null;
+  author: string | null;
+}
+
+export interface MovementQuery {
+  productId?: string;
+  movementType?: MovementType;
+  from?: string;
+  to?: string;
+  page?: number;
+}
+
+/** Ledger inventory_movements, paginé côté serveur. */
+export async function listMovements(tenantId: string, options: MovementQuery = {}): Promise<{ rows: MovementRow[]; total: number; page: number }> {
+  const page = Math.max(1, options.page ?? 1);
+  let query = db().from('inventory_movements')
+    .select('id, created_at, product_id, movement_type, quantity_delta, stock_after, source_quantity, source_unit, conversion_factor, source_reference, reason, note, created_by_admin_id', { count: 'exact' })
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .range((page - 1) * MOVEMENT_PAGE_SIZE, page * MOVEMENT_PAGE_SIZE - 1);
+  if (options.productId) query = query.eq('product_id', options.productId);
+  if (options.movementType) query = query.eq('movement_type', options.movementType);
+  if (options.from) query = query.gte('created_at', `${options.from}T00:00:00`);
+  if (options.to) query = query.lt('created_at', `${addDays(options.to, 1)}T00:00:00`);
+  const { data, error, count } = await query;
+  if (error) throw new Error(`inventory_movements: ${error.message}`);
+  const rows = data ?? [];
+  const productIds = Array.from(new Set(rows.map((row) => row.product_id).filter(Boolean))) as string[];
+  const [names, products] = await Promise.all([
+    adminNames(rows.map((row) => row.created_by_admin_id)),
+    productIds.length
+      ? db().from('products').select('id, name').eq('tenant_id', tenantId).in('id', productIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const productName = new Map((products.data ?? []).map((product) => [product.id as string, product.name as string]));
+  return {
+    page,
+    total: count ?? 0,
+    rows: rows.map((row) => ({
+      id: row.id, created_at: row.created_at, product_id: row.product_id,
+      product_name: row.product_id ? productName.get(row.product_id) ?? 'Produit' : 'Produit supprimé',
+      movement_type: row.movement_type as MovementType, quantity_delta: num(row.quantity_delta),
+      stock_after: numOrNull(row.stock_after), source_quantity: numOrNull(row.source_quantity),
+      source_unit: (row.source_unit as PurchaseUnit | null) ?? null, conversion_factor: numOrNull(row.conversion_factor),
+      source_reference: row.source_reference, reason: row.reason, note: row.note,
+      author: row.created_by_admin_id ? names.get(row.created_by_admin_id) ?? null : null,
+    })),
+  };
+}
+
+export async function getStockProduct(tenantId: string, productId: string): Promise<{ id: string; name: string; stock: number } | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(productId)) return null;
+  const { data } = await db().from('products').select('id, name, stock').eq('tenant_id', tenantId).eq('id', productId).maybeSingle();
+  return data ? { id: data.id, name: data.name, stock: data.stock } : null;
+}
+
+// ─── Coût d'achat ────────────────────────────────────────────────────────────
+
+export interface ProductCostSummary {
+  current_purchase_cost: number;
+  currency: string;
+  effective_at: string;
+  purchase_id: string;
+  purchase_reference: string;
+  supplier_name: string | null;
+  history: { received_at: string; cost_per_stock_unit: number; purchase_quantity: number; purchase_unit: PurchaseUnit; purchase_unit_cost: number; conversion_factor: number; status: 'active' | 'reversed' }[];
+}
+
+/** Dernier coût d'achat (par unité de stock) et historique récent. Données internes, admin uniquement. */
+export async function getProductCost(tenantId: string, productId: string): Promise<ProductCostSummary | null> {
+  const [{ data: cost }, { data: history }] = await Promise.all([
+    db().from('product_costs').select('current_purchase_cost, currency, effective_at, source_purchase_id, source_supplier_id')
+      .eq('tenant_id', tenantId).eq('product_id', productId).maybeSingle(),
+    db().from('product_cost_history').select('received_at, cost_per_stock_unit, purchase_quantity, purchase_unit, purchase_unit_cost, conversion_factor, status')
+      .eq('tenant_id', tenantId).eq('product_id', productId).order('received_at', { ascending: false }).limit(5),
+  ]);
+  if (!cost) return null;
+  const [{ data: purchase }, { data: supplier }] = await Promise.all([
+    db().from('supplier_purchases').select('reference').eq('tenant_id', tenantId).eq('id', cost.source_purchase_id).maybeSingle(),
+    cost.source_supplier_id
+      ? db().from('suppliers').select('name').eq('tenant_id', tenantId).eq('id', cost.source_supplier_id).maybeSingle()
+      : Promise.resolve({ data: null as { name: string } | null }),
+  ]);
+  return {
+    current_purchase_cost: num(cost.current_purchase_cost), currency: cost.currency, effective_at: cost.effective_at,
+    purchase_id: cost.source_purchase_id, purchase_reference: purchase?.reference ?? '', supplier_name: supplier?.name ?? null,
+    history: (history ?? []).map((row) => ({
+      received_at: row.received_at, cost_per_stock_unit: num(row.cost_per_stock_unit), purchase_quantity: num(row.purchase_quantity),
+      purchase_unit: row.purchase_unit as PurchaseUnit, purchase_unit_cost: num(row.purchase_unit_cost),
+      conversion_factor: num(row.conversion_factor), status: row.status as 'active' | 'reversed',
+    })),
+  };
 }

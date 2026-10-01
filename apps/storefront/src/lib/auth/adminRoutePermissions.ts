@@ -17,6 +17,7 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/gestion/achats', permission: 'purchases.view' },
   { prefix: '/admin/gestion/tresorerie/nouveau', permission: 'treasury.manage' },
   { prefix: '/admin/gestion/tresorerie', permission: 'treasury.view' },
+  { prefix: '/admin/gestion/stocks', permission: 'inventory.view' },
   { prefix: '/admin/gestion', permission: 'suppliers.view', anyOf: ['purchases.view', 'treasury.view', 'inventory.view'] },
   { prefix: '/admin/team', permission: 'platform.users.manage' },
   { prefix: '/admin/evenementiel/paiements-en-attente', permission: 'event_payments.view' },

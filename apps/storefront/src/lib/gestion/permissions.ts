@@ -12,6 +12,8 @@ export function gestionApiPermission(path: string, method: string): string | nul
   if (/^\/purchases\/[^/]+\/receipts$/.test(rest)) return verb === 'POST' ? 'inventory.manage' : null;
   if (/^\/receipts\/[^/]+\/reverse$/.test(rest)) return verb === 'POST' ? 'inventory.manage' : null;
   if (rest === '/inventory/adjustments') return verb === 'POST' ? 'inventory.manage' : null;
+  if (rest === '/inventory/products') return read ? 'inventory.view' : null;
+  if (/^\/purchases\/[^/]+\/due-date$/.test(rest)) return verb === 'POST' ? 'purchases.manage' : null;
 
   if (/^\/payments\/[^/]+\/verify$/.test(rest)) return verb === 'POST' ? 'supplier_payments.verify' : null;
   // Annullare un pagamento GIÀ verificato richiede anche supplier_payments.verify (controllo nel handler).

@@ -2,14 +2,15 @@ import Link from 'next/link';
 import { IconPaperclip, IconPlus } from '@tabler/icons-react';
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import { requireBusinessManagementPage } from '@/lib/gestion/featureGate';
-import { listActiveSupplierOptions, listPayments } from '@/lib/gestion/queries';
+import { getDueSummary, listActiveSupplierOptions, listPayments } from '@/lib/gestion/queries';
 import { formatDate, formatMoney } from '@/lib/gestion/format';
 import {
   BENEFICIARY_TYPES, PAYMENT_METHODS, PAYMENT_METHOD_LABELS, PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES,
   type BeneficiaryType, type PaymentMethod, type PaymentStatus,
 } from '@/lib/gestion/domain';
-import { Badge, Breadcrumb, CARD_CLS, EmptyState, INPUT_CLS, LABEL_CLS, PRIMARY_LINK_CLS, Stat } from '../_components/ui';
+import { Badge, Breadcrumb, CARD_CLS, EmptyState, INPUT_CLS, LABEL_CLS, Panel, PRIMARY_LINK_CLS, Stat } from '../_components/ui';
 import { SimpleAction } from '../_components/actions';
+import { DueList } from '../_components/DueList';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -31,7 +32,9 @@ export default async function TreasuryPage({ searchParams }: {
     status: pick<PaymentStatus>(PAYMENT_STATUSES, searchParams.status),
     beneficiaryType: pick<BeneficiaryType>(BENEFICIARY_TYPES, searchParams.beneficiary),
   };
-  const [payments, suppliers] = await Promise.all([listPayments(tenant.id, { ...filters, limit: 500 }), listActiveSupplierOptions(tenant.id)]);
+  const [payments, suppliers, dues] = await Promise.all([
+    listPayments(tenant.id, { ...filters, limit: 500 }), listActiveSupplierOptions(tenant.id), getDueSummary(tenant.id, 5),
+  ]);
   const sum = (status: PaymentStatus) => payments.filter((payment) => payment.status === status).reduce((total, payment) => total + payment.amount, 0);
   const voided = payments.filter((payment) => payment.status === 'voided');
   const money = (value: number) => formatMoney(value, tenant.currency);
@@ -52,6 +55,15 @@ export default async function TreasuryPage({ searchParams }: {
         <Stat label="Paiements annulés" value={String(voided.length)} hint={money(voided.reduce((total, payment) => total + payment.amount, 0))} />
       </div>
 
+      <div className="mb-4">
+        <Panel id="echeances" title="Échéances ouvertes"
+          description={`À payer ${money(dues.toPay)} • sous 7 jours ${money(dues.dueSoon)} • en retard ${money(dues.overdue)}. Date d'échéance de l'achat, distincte de la date de paiement ci-dessous.`}
+          actions={can('purchases.view') ? <Link href="/admin/gestion/achats?pay=unpaid" className="text-sm font-medium text-[var(--admin-primary-fg)] hover:underline">Tous les achats à payer</Link> : undefined}>
+          <DueList items={dues.items} today={dues.today} />
+        </Panel>
+      </div>
+
+      <h2 className="mb-2 text-base font-semibold text-gray-950 dark:text-gray-100">Paiements enregistrés</h2>
       <form className={`${CARD_CLS} mb-4 grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-6`} aria-label="Filtres">
         <label className="block"><span className={LABEL_CLS}>Du</span><input type="date" name="from" defaultValue={filters.from} className={INPUT_CLS} /></label>
         <label className="block"><span className={LABEL_CLS}>Au</span><input type="date" name="to" defaultValue={filters.to} className={INPUT_CLS} /></label>

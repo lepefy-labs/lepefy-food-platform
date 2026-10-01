@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireBusinessManagementApi } from '@/lib/gestion/featureGate';
-import { listPurchases, type PurchaseFilters } from '@/lib/gestion/queries';
+import { PAYMENT_FILTERS, listPurchases, type PaymentFilter, type PurchaseFilters } from '@/lib/gestion/queries';
 import { badRequest, callGestionRpc, revalidateGestion } from '@/lib/gestion/rpc';
 import { createPurchaseSchema, firstIssue } from '@/lib/gestion/schemas';
 import { PURCHASE_STATUSES } from '@/lib/gestion/domain';
@@ -9,17 +9,19 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const LIST_STATUSES: readonly string[] = [...PURCHASE_STATUSES, 'open', 'to_receive', 'unpaid'];
+const LIST_STATUSES: readonly string[] = [...PURCHASE_STATUSES, 'open', 'to_receive'];
 
 export async function GET(req: NextRequest) {
   const gate = await requireBusinessManagementApi();
   if (!gate.ok) return gate.response;
   const search = req.nextUrl.searchParams;
   const status = search.get('status') ?? '';
+  const pay = search.get('pay') ?? '';
   const purchases = await listPurchases(gate.tenant.id, {
     supplierId: search.get('supplier') ?? undefined,
     q: search.get('q') ?? undefined,
     status: LIST_STATUSES.includes(status) ? status as PurchaseFilters['status'] : undefined,
+    pay: (PAYMENT_FILTERS as readonly string[]).includes(pay) ? pay as PaymentFilter : undefined,
   });
   return NextResponse.json({ purchases });
 }

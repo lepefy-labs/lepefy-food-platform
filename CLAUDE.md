@@ -102,6 +102,7 @@ The shipping logic is the most complex part of the codebase:
 - Schema from migration 139: every cross-entity reference is a composite FK `(tenant_id, id)`; RLS without policies, service-role only, no DELETE on financial/audit tables (reverse or void instead). Balances are never stored: read `supplier_purchase_financials` / `supplier_balances`.
 - Only allocations of **verified** payments reduce supplier debt. `products.stock` stays the canonical storefront stock; a receipt increments it and writes `inventory_movements` in the same RPC transaction.
 - Writes go through `RETURNS TABLE (out_*)` RPCs with a per-tenant request key (idempotent retries); errors are `raise exception '<code>'` mapped to French messages in `lib/gestion/errors.ts`.
+- Procurement quantities are `numeric(14,3)` with a purchase unit and a stock conversion; `products.stock` stays an integer and a receipt must convert to whole stock units (rejected otherwise, never rounded). Use `lib/gestion/quantity.ts` (BigInt) for quantity math, never JS floats. Purchase costs live only in the server-only `product_costs` / `product_cost_history` tables (last received cost per stock unit), never on `products` or in client payloads.
 
 ### State Management
 

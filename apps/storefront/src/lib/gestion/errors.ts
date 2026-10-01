@@ -50,6 +50,11 @@ const MESSAGES: Record<string, [number, string]> = {
   payment_not_found: [404, 'Paiement introuvable.'],
   allocation_not_found: [404, 'Affectation introuvable.'],
   document_entity_not_found: [404, 'Élément introuvable pour ce document.'],
+  quantity_precision: [400, 'Quantité trop précise : 3 décimales au plus (ex. 12,375).'],
+  invalid_unit: [400, 'Unité d\'achat invalide.'],
+  invalid_conversion: [400, 'Conversion vers le stock invalide (nombre positif, 6 décimales au plus).'],
+  stock_units_not_integer: [409, 'La quantité reçue convertie en unités de stock doit être un nombre entier. Vérifiez la quantité ou la conversion.'],
+  invalid_payment_terms: [400, 'Conditions de paiement invalides (0 à 3650 jours).'],
 };
 
 export interface GestionErrorInfo {

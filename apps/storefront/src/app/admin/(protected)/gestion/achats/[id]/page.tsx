@@ -4,16 +4,18 @@ import { IconCash, IconPackageImport } from '@tabler/icons-react';
 import AdminPageHeader from '../../../../_components/ui/AdminPageHeader';
 import { requireBusinessManagementPage } from '@/lib/gestion/featureGate';
 import { getPurchaseDetail, listAuditEvents, listDocuments } from '@/lib/gestion/queries';
-import { formatDate, formatDateTime, formatMoney, formatQuantity } from '@/lib/gestion/format';
+import { formatDate, formatDateTime, formatMoney, formatQuantity, formatQuantityWithUnit, formatStockUnits } from '@/lib/gestion/format';
 import {
   PAYMENT_METHOD_LABELS, PAYMENT_STATE_LABELS, PAYMENT_STATE_TONES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES,
-  PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, purchasePaymentState, receivedPercent,
+  PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, PURCHASE_UNIT_LABELS, DUE_STATE_TONES, dueInfo, dueLabel, gestionToday,
+  purchasePaymentState, receiptProgress,
 } from '@/lib/gestion/domain';
 import { Badge, Breadcrumb, EmptyState, Panel, PRIMARY_LINK_CLS, SECONDARY_LINK_CLS, Stat } from '../../_components/ui';
 import { ReasonAction, SimpleAction } from '../../_components/actions';
 import { DocumentsPanel } from '../../_components/DocumentsPanel';
 import { AuditTimeline } from '../../_components/AuditTimeline';
 import { ReceiptForm } from './ReceiptForm';
+import { DueDateForm } from './DueDateForm';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -26,7 +28,9 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
 
   const money = (value: number) => formatMoney(value, purchase.currency);
   const state = purchasePaymentState(purchase);
-  const received = receivedPercent(purchase.ordered_quantity, purchase.received_quantity);
+  const progress = receiptProgress(purchase.items);
+  const received = progress.percent;
+  const due = dueInfo(purchase, gestionToday());
   const activeAllocations = purchase.allocations.filter((allocation) => !allocation.reversed_at);
   const editable = ['draft', 'ordered'].includes(purchase.status) && purchase.receipts.length === 0;
   const receivable = ['ordered', 'partially_received'].includes(purchase.status);
@@ -68,10 +72,19 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
 
       <section aria-label="Synthèse" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat label="Commandé" value={money(purchase.total)} hint={purchase.additional_costs ? `dont frais ${money(purchase.additional_costs)}` : undefined} />
-        <Stat label="Reçu" value={purchase.status === 'draft' ? '-' : `${received} %`} hint={`${formatQuantity(purchase.received_quantity)} / ${formatQuantity(purchase.ordered_quantity)} unités`} tone={received === 100 ? 'success' : received > 0 ? 'warn' : 'neutral'} />
+        <Stat label="Reçu" value={purchase.status === 'draft' ? '-' : `${received} %`} hint={`${progress.completeLines} / ${progress.lines} ligne(s) complète(s)`} tone={received === 100 ? 'success' : received > 0 ? 'warn' : 'neutral'} />
         <Stat label="Payé vérifié" value={money(purchase.paid_verified)} tone="success" />
         <Stat label="Enregistré à vérifier" value={money(purchase.paid_unverified)} hint="Ne réduit pas encore la dette" tone={purchase.paid_unverified > 0 ? 'warn' : 'neutral'} />
         <Stat label="Reste à payer" value={money(purchase.outstanding)} tone={purchase.outstanding > 0 ? 'warn' : 'success'} />
+      </section>
+
+      <section aria-label="Échéance de paiement" className="flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Échéance de paiement</span>
+          <span className="text-sm font-semibold text-gray-950 dark:text-gray-100">{purchase.payment_due_date ? formatDate(purchase.payment_due_date) : 'Aucune'}</span>
+          <Badge tone={DUE_STATE_TONES[due.state]}>{dueLabel(due)}</Badge>
+        </div>
+        {can('purchases.manage') && purchase.status !== 'cancelled' && <DueDateForm purchaseId={purchase.id} current={purchase.payment_due_date} />}
       </section>
 
       <div className="flex flex-wrap gap-2">
@@ -103,8 +116,11 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
                     <p className="text-xs text-gray-500 dark:text-gray-400">{item.product_id ? `Catalogue : ${item.product_name ?? 'produit'}` : 'Hors catalogue (stock non suivi)'}</p>
                   </div>
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {formatQuantity(item.ordered_quantity)} × {formatMoney(item.unit_cost, purchase.currency)}
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">Reçu {formatQuantity(item.received_quantity)} / {formatQuantity(item.ordered_quantity)}</span>
+                    {formatQuantityWithUnit(item.ordered_quantity, item.purchase_unit)} × {formatMoney(item.unit_cost, purchase.currency)} / {PURCHASE_UNIT_LABELS[item.purchase_unit]}
+                    <span className="block text-xs text-gray-500 dark:text-gray-400">Reçu {formatQuantityWithUnit(item.received_quantity, item.purchase_unit)} / {formatQuantity(item.ordered_quantity)}</span>
+                    {item.product_id && item.stock_units_per_purchase_unit !== null && (
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">1 {PURCHASE_UNIT_LABELS[item.purchase_unit]} = {formatStockUnits(item.stock_units_per_purchase_unit)} en stock</span>
+                    )}
                   </p>
                   <p className="text-sm font-semibold tabular-nums text-gray-900 sm:text-right dark:text-gray-100">{money(item.line_total)}</p>
                 </li>
@@ -126,6 +142,7 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
             <ReceiptForm purchaseId={purchase.id} lines={purchase.items.map((item) => ({
               id: item.id, description: item.description, linked: Boolean(item.product_id),
               ordered: item.ordered_quantity, received: item.received_quantity,
+              unit: item.purchase_unit, conversion: item.stock_units_per_purchase_unit,
             }))} />
           )}
           {purchase.status === 'draft' && <p className="text-sm text-gray-600 dark:text-gray-300">Passez la commande pour pouvoir enregistrer une réception.</p>}
@@ -142,7 +159,12 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
                     {receipt.status === 'reversed' ? <Badge tone="danger">Annulée</Badge> : <Badge tone="success">Reçue</Badge>}
                   </div>
                   <ul className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                    {receipt.lines.map((line) => <li key={line.purchase_item_id}>{formatQuantity(line.quantity)} × {line.description}</li>)}
+                    {receipt.lines.map((line) => (
+                      <li key={line.purchase_item_id}>
+                        {formatQuantityWithUnit(line.quantity, line.purchase_unit)} • {line.description}
+                        {line.stock_units !== null && <span className="text-gray-500 dark:text-gray-400"> (+{formatStockUnits(line.stock_units)} en stock)</span>}
+                      </li>
+                    ))}
                   </ul>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {receipt.created_by ? `Par ${receipt.created_by}` : ''}{receipt.notes ? ` • ${receipt.notes}` : ''}

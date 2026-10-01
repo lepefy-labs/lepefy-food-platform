@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Button from '../../../_components/ui/Button';
 import { ErrorText, useGestionMutation } from '../_components/useGestionMutation';
 import { HINT_CLS, INPUT_CLS, LABEL_CLS } from '../_components/ui';
+import { PAYMENT_TERMS_PRESETS } from '@/lib/gestion/domain';
 
 export interface SupplierFormValues {
   name: string;
@@ -18,11 +19,13 @@ export interface SupplierFormValues {
   currency: string;
   notes: string;
   active: boolean;
+  /** Jours (chaîne vide = non définies). */
+  payment_terms: string;
 }
 
 const EMPTY: SupplierFormValues = {
   name: '', legal_name: '', contact_name: '', email: '', phone: '', whatsapp_phone: '',
-  address: '', country: '', currency: 'EUR', notes: '', active: true,
+  address: '', country: '', currency: 'EUR', notes: '', active: true, payment_terms: '',
 };
 
 /** Création (POST) ou modification (PATCH) d'un fournisseur. */
@@ -30,14 +33,22 @@ export function SupplierForm({ supplierId, initial, defaultCurrency, onDone }: {
   supplierId?: string; initial?: Partial<SupplierFormValues>; defaultCurrency: string; onDone?: () => void;
 }) {
   const router = useRouter();
-  const { run, pending, error } = useGestionMutation();
+  const { run, pending, error, setError } = useGestionMutation();
   const [values, setValues] = useState<SupplierFormValues>({ ...EMPTY, currency: defaultCurrency, ...initial });
   const set = <K extends keyof SupplierFormValues>(key: K, value: SupplierFormValues[K]) => setValues((prev) => ({ ...prev, [key]: value }));
   const editing = Boolean(supplierId);
+  const isPreset = values.payment_terms === '' || PAYMENT_TERMS_PRESETS.some((preset) => String(preset.value) === values.payment_terms);
+  const [customTerms, setCustomTerms] = useState(!isPreset);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const payload = { ...values, country: values.country.trim().toUpperCase(), currency: values.currency.trim().toUpperCase() };
+    const { payment_terms, ...rest } = values;
+    const days = payment_terms.trim() === '' ? null : Number(payment_terms);
+    if (days !== null && (!Number.isInteger(days) || days < 0 || days > 3650)) {
+      setError('Conditions de paiement : un nombre de jours entre 0 et 3650.');
+      return;
+    }
+    const payload = { ...rest, default_payment_terms_days: days, country: rest.country.trim().toUpperCase(), currency: rest.currency.trim().toUpperCase() };
     if (editing) {
       const result = await run(`/api/admin/gestion/suppliers/${supplierId}`, { method: 'PATCH', body: payload });
       if (result) onDone?.();
@@ -71,6 +82,28 @@ export function SupplierForm({ supplierId, initial, defaultCurrency, onDone }: {
         {text('country', 'Pays (code à 2 lettres)', { max: 2, hint: 'Par exemple IT, FR, SN.' })}
         {text('currency', 'Devise', { max: 3, hint: 'Devise des achats et paiements, par exemple EUR.' })}
       </div>
+      <fieldset className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className={LABEL_CLS}>Conditions de paiement</span>
+          <select className={INPUT_CLS} value={customTerms ? 'custom' : values.payment_terms}
+            onChange={(event) => {
+              if (event.target.value === 'custom') { setCustomTerms(true); return; }
+              setCustomTerms(false);
+              set('payment_terms', event.target.value);
+            }}>
+            <option value="">Non définies</option>
+            {PAYMENT_TERMS_PRESETS.map((preset) => <option key={preset.value} value={String(preset.value)}>{preset.label}</option>)}
+            <option value="custom">Personnalisé</option>
+          </select>
+          <span className={HINT_CLS}>Échéance proposée pour les nouveaux achats : date de commande + délai. Les achats existants ne changent pas.</span>
+        </label>
+        {customTerms && (
+          <label className="block">
+            <span className={LABEL_CLS}>Délai en jours</span>
+            <input inputMode="numeric" className={INPUT_CLS} value={values.payment_terms} onChange={(event) => set('payment_terms', event.target.value)} placeholder="45" />
+          </label>
+        )}
+      </fieldset>
       <label className="block">
         <span className={LABEL_CLS}>Adresse</span>
         <textarea className={`${INPUT_CLS} min-h-20`} value={values.address} maxLength={500} onChange={(event) => set('address', event.target.value)} />

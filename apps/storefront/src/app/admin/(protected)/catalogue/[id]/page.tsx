@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import ProductEditClient from './ProductEditClient';
 import ProductEditWorkspace from './ProductEditWorkspace';
+import { ProductCostPanel } from '../../gestion/_components/ProductCostPanel';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -97,6 +98,8 @@ export default async function AdminProductEditPage({
           fromCategory={searchParams.from_category}
         />
       </ProductEditWorkspace>
+      {/* Gestion (flag business_management) : coût d'achat en lecture seule, rendu serveur uniquement. */}
+      <ProductCostPanel tenantId={tenant.id} productId={product.id} price={Number(product.price)} currency={tenant.currency} />
     </div>
   );
 }

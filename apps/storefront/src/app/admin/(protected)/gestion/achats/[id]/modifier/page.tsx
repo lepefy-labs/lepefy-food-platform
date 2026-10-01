@@ -18,7 +18,7 @@ export default async function EditPurchasePage({ params }: { params: { id: strin
   const suppliers = await listActiveSupplierOptions(tenant.id);
   const withCurrent = suppliers.some((supplier) => supplier.id === purchase.supplier_id)
     ? suppliers
-    : [...suppliers, { id: purchase.supplier_id, code: '', name: purchase.supplier_name, currency: purchase.currency }];
+    : [...suppliers, { id: purchase.supplier_id, code: '', name: purchase.supplier_name, currency: purchase.currency, default_payment_terms_days: null }];
 
   return (
     <div className="mx-auto w-full max-w-4xl pb-10">
@@ -38,11 +38,13 @@ export default async function EditPurchasePage({ params }: { params: { id: strin
             supplier_reference: purchase.supplier_reference ?? '',
             order_date: purchase.order_date,
             expected_date: purchase.expected_date ?? '',
+            payment_due_date: purchase.payment_due_date ?? '',
             additional_costs: purchase.additional_costs ? String(purchase.additional_costs) : '',
             notes: purchase.notes ?? '',
             items: purchase.items.map((item) => ({
               product_id: item.product_id, product_name: item.product_name, description: item.description,
               ordered_quantity: String(item.ordered_quantity), unit_cost: String(item.unit_cost),
+              purchase_unit: item.purchase_unit, conversion: String(item.stock_units_per_purchase_unit ?? 1),
             })),
           }}
         />

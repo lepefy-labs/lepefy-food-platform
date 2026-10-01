@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode, IconBuildingWarehouse, IconTruckLoading, IconCash, IconLayoutDashboard } from '@tabler/icons-react';
+import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode, IconBuildingWarehouse, IconTruckLoading, IconCash, IconLayoutDashboard, IconPackages } from '@tabler/icons-react';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 import PlatformNav from './PlatformNav';
 
@@ -54,6 +54,7 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
         <Link href="/admin/gestion" className={linkClass(pathname === '/admin/gestion')}><IconLayoutDashboard size={20}/>Vue d&apos;ensemble</Link>
         {has('suppliers.view') && <Link href="/admin/gestion/fournisseurs" className={linkClass(pathname.startsWith('/admin/gestion/fournisseurs'))}><IconBuildingWarehouse size={20}/>Fournisseurs</Link>}
         {has('purchases.view') && <Link href="/admin/gestion/achats" className={linkClass(pathname.startsWith('/admin/gestion/achats'))}><IconTruckLoading size={20}/>Achats &amp; réceptions</Link>}
+        {has('inventory.view') && <Link href="/admin/gestion/stocks" className={linkClass(pathname.startsWith('/admin/gestion/stocks'))}><IconPackages size={20}/>Stocks</Link>}
         {has('treasury.view') && <Link href="/admin/gestion/tresorerie" className={linkClass(pathname.startsWith('/admin/gestion/tresorerie'))}><IconCash size={20}/>Trésorerie</Link>}
       </>}
     </> : workspace === 'events' && eventsVisible ? <>

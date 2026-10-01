@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import Button from '../../../_components/ui/Button';
-import { formatMoney, todayIso } from '@/lib/gestion/format';
+import { PURCHASE_UNITS, PURCHASE_UNIT_LABELS, addDays, paymentTermsLabel, type PurchaseUnit } from '@/lib/gestion/domain';
+import { formatDate, formatMoney, formatQuantityWithUnit, formatStockUnits, todayIso } from '@/lib/gestion/format';
+import { canonicalConversion, canonicalQuantity, parseConversion, parseQuantity, stockUnitsFor } from '@/lib/gestion/quantity';
 import { ErrorText, useGestionMutation } from '../_components/useGestionMutation';
 import { HINT_CLS, INPUT_CLS, LABEL_CLS } from '../_components/ui';
 
-export interface SupplierOption { id: string; code: string; name: string; currency: string }
+export interface SupplierOption { id: string; code: string; name: string; currency: string; default_payment_terms_days?: number | null }
 
 export interface PurchaseItemDraft {
   key: string;
@@ -16,6 +18,8 @@ export interface PurchaseItemDraft {
   product_name: string | null;
   description: string;
   ordered_quantity: string;
+  purchase_unit: PurchaseUnit;
+  conversion: string;
   unit_cost: string;
 }
 
@@ -24,13 +28,15 @@ export interface PurchaseFormInitial {
   supplier_reference: string;
   order_date: string;
   expected_date: string;
+  payment_due_date: string;
   additional_costs: string;
   notes: string;
   items: Omit<PurchaseItemDraft, 'key'>[];
 }
 
+const newKey = () => Math.random().toString(36).slice(2);
 const newItem = (): PurchaseItemDraft => ({
-  key: Math.random().toString(36).slice(2), product_id: null, product_name: null, description: '', ordered_quantity: '1', unit_cost: '',
+  key: newKey(), product_id: null, product_name: null, description: '', ordered_quantity: '1', purchase_unit: 'unit', conversion: '1', unit_cost: '',
 });
 const toNumber = (value: string) => Number(value.replace(',', '.'));
 
@@ -67,6 +73,21 @@ function ProductPicker({ onPick }: { onPick: (product: { id: string; name: strin
   );
 }
 
+/** Aperçu exact (BigInt) de l'impact stock d'une réception complète de la ligne. */
+function StockPreview({ item }: { item: PurchaseItemDraft }) {
+  if (!item.product_id) return <p className={HINT_CLS}>Hors catalogue : la réception n&apos;augmente pas le stock de la boutique.</p>;
+  const quantity = parseQuantity(item.ordered_quantity);
+  const conversion = parseConversion(item.conversion);
+  if (quantity === null || conversion === null || conversion === BigInt(0)) {
+    return <p className={HINT_CLS}>Quantité (3 décimales au plus) et conversion positive requises.</p>;
+  }
+  const result = stockUnitsFor(quantity, conversion);
+  const quantityLabel = formatQuantityWithUnit(canonicalQuantity(item.ordered_quantity) ?? '0', item.purchase_unit);
+  return result.exact
+    ? <p className={HINT_CLS}>{quantityLabel} = {formatStockUnits(Number(result.units))} ajoutées au stock lors d&apos;une réception complète.</p>
+    : <p className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">{quantityLabel} × {canonicalConversion(item.conversion)} ne donne pas un nombre entier d&apos;unités : la réception complète sera refusée. Ajustez la quantité ou la conversion.</p>;
+}
+
 /** Création d'un achat ou modification avant toute réception. Le total final est calculé par le serveur. */
 export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchaseStatus }: {
   suppliers: SupplierOption[]; currency: string; initial?: Partial<PurchaseFormInitial>;
@@ -78,13 +99,17 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
   const [supplierReference, setSupplierReference] = useState(initial?.supplier_reference ?? '');
   const [orderDate, setOrderDate] = useState(initial?.order_date ?? todayIso());
   const [expectedDate, setExpectedDate] = useState(initial?.expected_date ?? '');
+  const [dueDate, setDueDate] = useState(initial?.payment_due_date ?? '');
   const [additionalCosts, setAdditionalCosts] = useState(initial?.additional_costs ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [items, setItems] = useState<PurchaseItemDraft[]>(
-    initial?.items?.length ? initial.items.map((item) => ({ ...item, key: Math.random().toString(36).slice(2) })) : [newItem()],
+    initial?.items?.length ? initial.items.map((item) => ({ ...item, key: newKey() })) : [newItem()],
   );
   const editing = Boolean(purchaseId);
-  const supplierCurrency = suppliers.find((supplier) => supplier.id === supplierId)?.currency ?? currency;
+  const supplier = suppliers.find((candidate) => candidate.id === supplierId);
+  const supplierCurrency = supplier?.currency ?? currency;
+  const terms = supplier?.default_payment_terms_days ?? null;
+  const derivedDue = !editing && !dueDate && terms !== null && orderDate ? addDays(orderDate, terms) : null;
 
   const estimate = useMemo(() => {
     const lines = items.reduce((sum, item) => {
@@ -100,23 +125,27 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
     setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
 
   function payload() {
-    const parsedItems = items
-      .filter((item) => item.product_id || item.description.trim() || item.unit_cost)
-      .map((item) => ({
-        product_id: item.product_id,
-        description: item.description.trim() || null,
-        ordered_quantity: Math.trunc(toNumber(item.ordered_quantity)),
-        unit_cost: toNumber(item.unit_cost),
-      }));
-    if (parsedItems.some((item) => !Number.isInteger(item.ordered_quantity) || item.ordered_quantity <= 0)) return { error: 'Chaque quantité doit être un nombre entier positif.' };
-    if (parsedItems.some((item) => !Number.isFinite(item.unit_cost) || item.unit_cost < 0)) return { error: 'Chaque coût unitaire doit être un nombre positif.' };
-    if (parsedItems.some((item) => !item.product_id && !item.description)) return { error: 'Chaque article doit avoir une description ou un produit.' };
+    const used = items.filter((item) => item.product_id || item.description.trim() || item.unit_cost);
+    const parsedItems = [];
+    for (const item of used) {
+      const quantity = canonicalQuantity(item.ordered_quantity);
+      if (quantity === null || quantity === '0') return { error: `Quantité invalide pour « ${item.description || item.product_name || 'article'} » (positive, 3 décimales au plus).` };
+      const cost = toNumber(item.unit_cost);
+      if (!Number.isFinite(cost) || cost < 0) return { error: 'Chaque coût unitaire doit être un nombre positif.' };
+      if (!item.product_id && !item.description.trim()) return { error: 'Chaque article doit avoir une description ou un produit.' };
+      const conversion = item.product_id ? canonicalConversion(item.conversion) : null;
+      if (item.product_id && conversion === null) return { error: `Conversion invalide pour « ${item.product_name} » (nombre positif, 6 décimales au plus).` };
+      parsedItems.push({
+        product_id: item.product_id, description: item.description.trim() || null, ordered_quantity: quantity,
+        purchase_unit: item.purchase_unit, stock_units_per_purchase_unit: conversion, unit_cost: cost,
+      });
+    }
     const extra = additionalCosts.trim() ? toNumber(additionalCosts) : 0;
     if (!Number.isFinite(extra) || extra < 0) return { error: 'Frais supplémentaires invalides.' };
     return {
       data: {
         supplier_reference: supplierReference, order_date: orderDate, expected_date: expectedDate,
-        additional_costs: extra, notes, items: parsedItems,
+        payment_due_date: dueDate, additional_costs: extra, notes, items: parsedItems,
       },
     };
   }
@@ -143,7 +172,7 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           <span className={LABEL_CLS}>Fournisseur *</span>
           <select className={INPUT_CLS} value={supplierId} disabled={editing} onChange={(event) => setSupplierId(event.target.value)} required>
             <option value="">Choisir un fournisseur</option>
-            {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.code})</option>)}
+            {suppliers.map((option) => <option key={option.id} value={option.id}>{option.name}{option.code ? ` (${option.code})` : ''}</option>)}
           </select>
           {editing && <span className={HINT_CLS}>Le fournisseur d&apos;un achat ne peut pas être changé.</span>}
         </label>
@@ -156,12 +185,22 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           <input type="date" className={INPUT_CLS} value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} />
         </label>
         <label className="block">
+          <span className={LABEL_CLS}>Échéance de paiement</span>
+          <input type="date" className={INPUT_CLS} value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+          <span className={HINT_CLS}>
+            {derivedDue
+              ? `Vide : ${formatDate(derivedDue)} (conditions du fournisseur : ${paymentTermsLabel(terms)}).`
+              : editing ? 'Date à laquelle le fournisseur doit être payé.' : 'Vide : aucune échéance (le fournisseur n\'a pas de conditions de paiement).'}
+          </span>
+        </label>
+        <label className="block">
           <span className={LABEL_CLS}>Référence du fournisseur</span>
           <input className={INPUT_CLS} value={supplierReference} maxLength={120} onChange={(event) => setSupplierReference(event.target.value)} placeholder="N° de facture ou de commande" />
         </label>
         <label className="block">
           <span className={LABEL_CLS}>Frais supplémentaires ({supplierCurrency})</span>
           <input inputMode="decimal" className={INPUT_CLS} value={additionalCosts} onChange={(event) => setAdditionalCosts(event.target.value)} placeholder="Transport, douane…" />
+          <span className={HINT_CLS}>Non inclus dans le coût d&apos;achat des produits.</span>
         </label>
       </div>
 
@@ -179,30 +218,44 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
                   </button>
                 )}
               </div>
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="space-y-2">
-                  {item.product_id ? (
-                    <div className="flex min-h-11 items-center justify-between gap-2 rounded-lg bg-[var(--admin-primary-soft)] px-3 text-sm">
-                      <span className="truncate font-medium text-[var(--admin-primary-fg)]">Catalogue : {item.product_name}</span>
-                      <button type="button" onClick={() => updateItem(item.key, { product_id: null, product_name: null })} aria-label="Délier le produit"
-                        className="inline-flex min-h-11 items-center"><IconX size={16} aria-hidden="true" /></button>
-                    </div>
-                  ) : (
-                    <ProductPicker onPick={(product) => updateItem(item.key, { product_id: product.id, product_name: product.name, description: item.description || product.name })} />
-                  )}
-                  <input className={INPUT_CLS} value={item.description} maxLength={300} onChange={(event) => updateItem(item.key, { description: event.target.value })}
-                    placeholder={item.product_id ? 'Description (optionnelle)' : 'Description (article hors catalogue)'} aria-label="Description" />
-                  {!item.product_id && <p className={HINT_CLS}>Sans produit lié, la réception n&apos;augmente pas le stock de la boutique.</p>}
-                </div>
+              <div className="space-y-2">
+                {item.product_id ? (
+                  <div className="flex min-h-11 items-center justify-between gap-2 rounded-lg bg-[var(--admin-primary-soft)] px-3 text-sm">
+                    <span className="truncate font-medium text-[var(--admin-primary-fg)]">Catalogue : {item.product_name}</span>
+                    <button type="button" onClick={() => updateItem(item.key, { product_id: null, product_name: null })} aria-label="Délier le produit"
+                      className="inline-flex min-h-11 items-center"><IconX size={16} aria-hidden="true" /></button>
+                  </div>
+                ) : (
+                  <ProductPicker onPick={(product) => updateItem(item.key, {
+                    product_id: product.id, product_name: product.name, description: item.description || product.name, purchase_unit: 'unit', conversion: '1',
+                  })} />
+                )}
+                <input className={INPUT_CLS} value={item.description} maxLength={300} onChange={(event) => updateItem(item.key, { description: event.target.value })}
+                  placeholder={item.product_id ? 'Description (optionnelle)' : 'Description (article hors catalogue)'} aria-label="Description" />
+              </div>
+              <div className={`mt-3 grid grid-cols-2 gap-3 ${item.product_id ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
                 <label className="block">
                   <span className={LABEL_CLS}>Quantité</span>
-                  <input inputMode="numeric" className={INPUT_CLS} value={item.ordered_quantity} onChange={(event) => updateItem(item.key, { ordered_quantity: event.target.value })} />
+                  <input inputMode="decimal" className={INPUT_CLS} value={item.ordered_quantity} onChange={(event) => updateItem(item.key, { ordered_quantity: event.target.value })} />
                 </label>
                 <label className="block">
-                  <span className={LABEL_CLS}>Coût unitaire</span>
+                  <span className={LABEL_CLS}>Unité</span>
+                  <select className={INPUT_CLS} value={item.purchase_unit} onChange={(event) => updateItem(item.key, { purchase_unit: event.target.value as PurchaseUnit })}>
+                    {PURCHASE_UNITS.map((unit) => <option key={unit} value={unit}>{PURCHASE_UNIT_LABELS[unit]}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={LABEL_CLS}>Coût / {PURCHASE_UNIT_LABELS[item.purchase_unit]}</span>
                   <input inputMode="decimal" className={INPUT_CLS} value={item.unit_cost} onChange={(event) => updateItem(item.key, { unit_cost: event.target.value })} placeholder="0,00" />
                 </label>
+                {item.product_id && (
+                  <label className="block">
+                    <span className={LABEL_CLS}>Unités stock / {PURCHASE_UNIT_LABELS[item.purchase_unit]}</span>
+                    <input inputMode="decimal" className={INPUT_CLS} value={item.conversion} onChange={(event) => updateItem(item.key, { conversion: event.target.value })} />
+                  </label>
+                )}
               </div>
+              <StockPreview item={item} />
             </li>
           ))}
         </ul>
@@ -233,7 +286,7 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           )}
         </div>
       </div>
-      {purchaseStatus === 'ordered' && <p className={HINT_CLS}>Achat déjà commandé : les modifications restent possibles tant qu&apos;aucune réception n&apos;est enregistrée.</p>}
+      {purchaseStatus === 'ordered' && <p className={HINT_CLS}>Achat déjà commandé : les articles restent modifiables tant qu&apos;aucune réception n&apos;est enregistrée.</p>}
       <ErrorText message={error} />
     </form>
   );

@@ -9,6 +9,7 @@ import {
   PAYMENT_STATE_LABELS, PAYMENT_STATE_TONES, PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, purchasePaymentState,
 } from '@/lib/gestion/domain';
 import { Badge, CARD_CLS, EmptyState, Panel, SECONDARY_LINK_CLS, Stat } from './_components/ui';
+import { DueList } from './_components/DueList';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -42,13 +43,15 @@ export default async function GestionDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Dette fournisseurs" value={money(data.openDebt)} hint={`${data.purchasesWithBalance} achat(s) avec reste à payer`} tone={data.openDebt > 0 ? 'warn' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?status=unpaid' : undefined} />
+      <section aria-label="Échéances" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="À payer" value={money(data.dues.toPay)} hint={`${data.dues.toPayCount} achat(s) engagé(s)`} tone={data.dues.toPay > 0 ? 'warn' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=unpaid' : undefined} />
+        <Stat label="À payer sous 7 jours" value={money(data.dues.dueSoon)} hint={`${data.dues.dueSoonCount} échéance(s)`} tone={data.dues.dueSoonCount > 0 ? 'warn' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=due_soon' : undefined} />
+        <Stat label="En retard" value={money(data.dues.overdue)} hint={`${data.dues.overdueCount} échéance(s) dépassée(s)`} tone={data.dues.overdueCount > 0 ? 'danger' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=overdue' : undefined} />
+        <Stat label="Paiements à vérifier" value={String(data.paymentsToVerifyCount)} hint={money(data.paymentsToVerifyAmount)} tone={data.paymentsToVerifyCount > 0 ? 'warn' : 'neutral'} href={can('treasury.view') ? '/admin/gestion/tresorerie?status=recorded' : undefined} />
+      </section>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Achats ouverts" value={String(data.openPurchases)} hint="Brouillons, commandés, reçus en partie" href={can('purchases.view') ? '/admin/gestion/achats?status=open' : undefined} />
         <Stat label="Réceptions en attente" value={String(data.toReceive)} hint="Commandés, pas encore tout reçu" tone={data.toReceive > 0 ? 'info' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?status=to_receive' : undefined} />
-        <Stat label="Paiements à vérifier" value={String(data.paymentsToVerifyCount)} hint={money(data.paymentsToVerifyAmount)} tone={data.paymentsToVerifyCount > 0 ? 'warn' : 'neutral'} href={can('treasury.view') ? '/admin/gestion/tresorerie?status=recorded' : undefined} />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
         <Stat label="Payé vérifié (30 jours)" value={money(data.paidVerified30d)} tone="success" />
         <div className={`${CARD_CLS} px-4 py-3.5`}>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Points d&apos;attention</p>
@@ -67,6 +70,13 @@ export default async function GestionDashboardPage() {
           )}
         </div>
       </div>
+
+      {(can('purchases.view') || can('treasury.view')) && (
+        <Panel id="echeances" title="Échéances fournisseurs" description={data.dues.noDueCount > 0 ? `${data.dues.noDueCount} achat(s) à payer sans échéance.` : 'Achats engagés avec un reste à payer, par urgence.'}
+          actions={can('purchases.view') ? <Link href="/admin/gestion/achats?pay=unpaid" className="text-sm font-medium text-[var(--admin-primary-fg)] hover:underline">Tout voir</Link> : undefined}>
+          <DueList items={data.dues.items} today={data.dues.today} />
+        </Panel>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {can('purchases.view') && (

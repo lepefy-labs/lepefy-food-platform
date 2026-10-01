@@ -6,7 +6,7 @@ import { getSupplier, listAuditEvents, listDocuments, listPayments, listPurchase
 import { formatDate, formatMoney } from '@/lib/gestion/format';
 import {
   PAYMENT_METHOD_LABELS, PAYMENT_STATE_LABELS, PAYMENT_STATE_TONES, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES,
-  PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, purchasePaymentState,
+  PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, paymentTermsLabel, purchasePaymentState,
 } from '@/lib/gestion/domain';
 import { Badge, Breadcrumb, EmptyState, Field, Panel, SECONDARY_LINK_CLS, Stat } from '../../_components/ui';
 import { AuditTimeline } from '../../_components/AuditTimeline';
@@ -66,6 +66,7 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
           email: supplier.email ?? '', phone: supplier.phone ?? '', whatsapp_phone: supplier.whatsapp_phone ?? '',
           address: supplier.address ?? '', country: supplier.country ?? '', currency: supplier.currency,
           notes: supplier.notes ?? '', active: supplier.active,
+          payment_terms: supplier.default_payment_terms_days === null ? '' : String(supplier.default_payment_terms_days),
         }} />
       ) : undefined}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -76,6 +77,7 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
           <Field label="WhatsApp">{supplier.whatsapp_phone ?? '-'}</Field>
           <Field label="Pays / devise">{[supplier.country, supplier.currency].filter(Boolean).join(' • ')}</Field>
           <Field label="Adresse">{supplier.address ?? '-'}</Field>
+          <Field label="Conditions de paiement">{paymentTermsLabel(supplier.default_payment_terms_days)}</Field>
         </div>
         {supplier.notes && (
           <div className="mt-4 rounded-xl bg-gray-50 p-3 dark:bg-gray-800/60">

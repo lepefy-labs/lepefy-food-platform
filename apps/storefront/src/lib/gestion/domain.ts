@@ -199,3 +199,182 @@ const REFERENCE_PATTERNS = {
 export function isBusinessReference(scope: keyof typeof REFERENCE_PATTERNS, value: string): boolean {
   return REFERENCE_PATTERNS[scope].test(value);
 }
+
+// ─── Fase 1.1: unità d'acquisto ──────────────────────────────────────────────
+
+export const PURCHASE_UNITS = ['unit', 'kg', 'g', 'l', 'ml', 'pack', 'box', 'carton', 'other'] as const;
+export type PurchaseUnit = (typeof PURCHASE_UNITS)[number];
+
+/** Libellé court (sélecteurs, colonnes). */
+export const PURCHASE_UNIT_LABELS: Record<PurchaseUnit, string> = {
+  unit: 'unité', kg: 'kg', g: 'g', l: 'L', ml: 'ml', pack: 'pack', box: 'boîte', carton: 'carton', other: 'autre',
+};
+
+// ─── Fase 1.1: échéances de paiement ─────────────────────────────────────────
+
+/** Fenêtre « bientôt dû ». */
+export const DUE_SOON_DAYS = 7;
+
+/**
+ * Fuseau de la date du jour pour les échéances. Les dates d'achat et
+ * d'échéance sont des dates calendaires ; seul « aujourd'hui » en dépend.
+ */
+export const GESTION_TIME_ZONE = 'Europe/Paris';
+
+/** Date du jour (YYYY-MM-DD) dans le fuseau Gestion. */
+export function gestionToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: GESTION_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+/** Ajoute n jours à une date calendaire YYYY-MM-DD. */
+export function addDays(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Écart en jours calendaires (b - a). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
+}
+
+export type DueState = 'cancelled' | 'not_committed' | 'paid' | 'no_due' | 'overdue' | 'today' | 'due_soon' | 'upcoming';
+
+export interface DueInfo {
+  state: DueState;
+  /** Jours restants (> 0), 0 aujourd'hui, jours de retard en négatif. Null sans échéance. */
+  days: number | null;
+}
+
+/**
+ * État d'échéance dérivé (jamais stocké) de payment_due_date + reste à payer + statut.
+ * Brouillon et annulé ne sont jamais en retard ; reste 0 = payé quelle que soit la date.
+ */
+export function dueInfo(
+  p: { status: PurchaseStatus; outstanding: number; total: number; payment_due_date: string | null },
+  today: string,
+): DueInfo {
+  if (p.status === 'cancelled') return { state: 'cancelled', days: null };
+  if (p.status === 'draft') return { state: 'not_committed', days: null };
+  if (p.outstanding <= 0) return { state: p.total > 0 ? 'paid' : 'no_due', days: null };
+  if (!p.payment_due_date) return { state: 'no_due', days: null };
+  const days = daysBetween(today, p.payment_due_date);
+  if (days < 0) return { state: 'overdue', days };
+  if (days === 0) return { state: 'today', days };
+  if (days <= DUE_SOON_DAYS) return { state: 'due_soon', days };
+  return { state: 'upcoming', days };
+}
+
+export function dueLabel(info: DueInfo): string {
+  switch (info.state) {
+    case 'cancelled': return 'Annulé';
+    case 'not_committed': return 'Pas encore engagé';
+    case 'paid': return 'Payé';
+    case 'no_due': return 'Pas d\'échéance';
+    case 'today': return 'Aujourd\'hui';
+    case 'overdue': {
+      const late = -(info.days ?? 0);
+      return `En retard de ${late} jour${late > 1 ? 's' : ''}`;
+    }
+    case 'due_soon': return `À payer sous ${info.days} jour${(info.days ?? 0) > 1 ? 's' : ''}`;
+    default: return 'À venir';
+  }
+}
+
+export const DUE_STATE_TONES: Record<DueState, Tone> = {
+  cancelled: 'neutral', not_committed: 'neutral', paid: 'success', no_due: 'neutral',
+  overdue: 'danger', today: 'warn', due_soon: 'warn', upcoming: 'info',
+};
+
+/** Conditions de paiement proposées (persistance : nombre de jours, aucune énumération figée). */
+export const PAYMENT_TERMS_PRESETS: { value: number; label: string }[] = [
+  { value: 0, label: 'Paiement immédiat' },
+  { value: 30, label: '30 jours' },
+  { value: 60, label: '60 jours' },
+  { value: 90, label: '90 jours' },
+];
+
+export function paymentTermsLabel(days: number | null): string {
+  if (days === null) return 'Non définies';
+  return PAYMENT_TERMS_PRESETS.find((preset) => preset.value === days)?.label ?? `${days} jours`;
+}
+
+// ─── Fase 1.1: stock ─────────────────────────────────────────────────────────
+
+export const MOVEMENT_TYPES = ['supplier_receipt', 'manual_adjustment', 'reversal'] as const;
+export type MovementType = (typeof MOVEMENT_TYPES)[number];
+
+export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
+  supplier_receipt: 'Réception fournisseur',
+  manual_adjustment: 'Rectification',
+  reversal: 'Annulation de réception',
+};
+
+/** Motifs proposés pour une rectification (motif libre accepté, toujours obligatoire). */
+export const ADJUSTMENT_REASONS = ['Erreur de comptage', 'Inventaire physique', 'Casse', 'Produit perdu', 'Produit périmé'] as const;
+
+/** Marge brute indicative (jamais présentée comme marge nette ou comptable). */
+export function indicativeMargin(price: number, cost: number): { amount: number; percent: number | null } {
+  const amount = Math.round((price - cost) * 100) / 100;
+  return { amount, percent: price > 0 ? Math.round((amount / price) * 1000) / 10 : null };
+}
+
+export interface DueTotals {
+  toPay: number;
+  toPayCount: number;
+  dueSoon: number;
+  dueSoonCount: number;
+  overdue: number;
+  overdueCount: number;
+  noDueCount: number;
+}
+
+/** Agrégats d'échéance (reste à payer des achats engagés, jamais les brouillons). */
+export function summarizeDues(
+  rows: { purchase_id: string; outstanding: number; payment_due_date: string | null }[],
+  today: string,
+): DueTotals {
+  const soonLimit = addDays(today, DUE_SOON_DAYS);
+  const open = rows.filter((row) => row.outstanding > 0);
+  const cents = (list: typeof open) => list.reduce((sum, row) => sum + Math.round(row.outstanding * 100), 0) / 100;
+  const overdue = open.filter((row) => row.payment_due_date !== null && row.payment_due_date < today);
+  const soon = open.filter((row) => row.payment_due_date !== null && row.payment_due_date >= today && row.payment_due_date <= soonLimit);
+  return {
+    toPay: cents(open), toPayCount: open.length,
+    dueSoon: cents(soon), dueSoonCount: soon.length,
+    overdue: cents(overdue), overdueCount: overdue.length,
+    noDueCount: open.filter((row) => row.payment_due_date === null).length,
+  };
+}
+
+
+/**
+ * Avancement de réception d'un achat, ligne par ligne (les unités kg, L, cartons
+ * ne s'additionnent pas) : moyenne des taux de réception, arrondie par défaut.
+ */
+export function receiptProgress(items: { ordered_quantity: number; received_quantity: number }[]): { percent: number; completeLines: number; lines: number } {
+  const lines = items.filter((item) => item.ordered_quantity > 0);
+  if (!lines.length) return { percent: 0, completeLines: 0, lines: 0 };
+  const ratios = lines.map((item) => Math.min(1, item.received_quantity / item.ordered_quantity));
+  const completeLines = lines.filter((item) => Math.round(item.received_quantity * 1000) >= Math.round(item.ordered_quantity * 1000)).length;
+  const percent = completeLines === lines.length ? 100 : Math.min(99, Math.floor((ratios.reduce((sum, ratio) => sum + ratio, 0) / lines.length) * 100));
+  return { percent, completeLines, lines: lines.length };
+}
+
+export interface CostHistoryEntry {
+  received_at: string;
+  created_at?: string;
+  cost_per_stock_unit: number;
+  status: 'active' | 'reversed';
+}
+
+/**
+ * Même règle que refresh_product_cost() (migration 141) : coût courant = dernière
+ * entrée ACTIVE par date de réception (puis création). Une réception annulée
+ * n'est jamais le coût courant ; sans entrée active, aucun coût.
+ */
+export function latestActiveCostEntry<T extends CostHistoryEntry>(entries: T[]): T | null {
+  return entries
+    .filter((entry) => entry.status === 'active')
+    .sort((a, b) => b.received_at.localeCompare(a.received_at) || (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0] ?? null;
+}
