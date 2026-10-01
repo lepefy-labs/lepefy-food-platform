@@ -373,4 +373,3 @@ export function receiptProgress(items: { ordered_quantity: number; received_quan
   const percent = completeLines === lines.length ? 100 : Math.min(99, Math.floor((ratios.reduce((sum, ratio) => sum + ratio, 0) / lines.length) * 100));
   return { percent, completeLines, lines: lines.length };
 }
-
