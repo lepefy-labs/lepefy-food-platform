@@ -1,7 +1,7 @@
 # Gestion du commerce (fornitori, acquisti, stock, debiti, tesoreria)
 
 > **Stato:** implementato nel codice, dietro il feature flag di rilascio `business_management` (spento per tutti i tenant).
-> Migration `139_business_management.sql` + verifica `supabase/verification/139_business_management_verification.sql`.
+> Migration `139_business_management.sql` e `140_business_management_draft_not_due.sql` (applicate in produzione), con le rispettive verifiche in `supabase/verification/`.
 > **Base analizzata:** `main@58380c67` (30/09/2026).
 
 ## Overview
@@ -113,7 +113,7 @@ draft ──(Passer la commande)──> ordered ──ricezione parziale──> 
 - `partially_received` / `received` sono **derivati** dalle quantità ricevute (`refresh_supplier_purchase_receipt_status`), mai scelti dall'utente. Uno storno di ricezione riporta lo stato indietro.
 - Modifica (righe, spese, date, note): solo `draft`/`ordered` **senza nessuna ricezione**; il totale non può scendere sotto l'importo già allocato.
 - Totali calcolati in DB: `line_total = round(qty × unit_cost, 2)`, `subtotal = Σ line_total`, `total = subtotal + additional_costs` (CHECK).
-- Stato finanziario (UI, `purchasePaymentState`): `À payer`, `Payé partiellement`, `Paiement à vérifier`, `Payé vérifié`, `Annulé`.
+- Stato finanziario (UI, `purchasePaymentState`): `Pas encore engagé` (bozza), `À payer`, `Payé partiellement`, `Paiement à vérifier`, `Payé vérifié`, `Annulé`.
 
 ## Receipt model
 
@@ -159,9 +159,11 @@ Per acquisto (view `supplier_purchase_financials`):
 ```text
 paid_verified   = Σ allocazioni attive di pagamenti verified
 paid_unverified = Σ allocazioni attive di pagamenti recorded
-outstanding     = total - paid_verified            (0 se annullato)
+outstanding     = total - paid_verified            (0 se bozza o annullato, migration 140)
 allocatable     = total - paid_verified - paid_unverified
 ```
+
+Una **bozza** non è un debito: non entra nel residuo né nei totali del fornitore (stato UI "Pas encore engagé"), ma resta allocabile (acconto). Diventa dovuta quando passa a `ordered`.
 
 Esempio verificato (verification SQL, seed): acquisto 2 400 € = 600 € bonifico fornitore + 500 € bonifico a un terzo + 300 € contanti, tutti verificati → **resta 1 000 €**. Il client non invia mai un saldo: il server lo calcola.
 

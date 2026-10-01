@@ -85,7 +85,7 @@ export interface PurchaseFinancials {
   outstanding: number;
 }
 
-export type PaymentState = 'cancelled' | 'paid' | 'to_verify' | 'partially_paid' | 'to_pay' | 'nothing_due';
+export type PaymentState = 'cancelled' | 'not_committed' | 'paid' | 'to_verify' | 'partially_paid' | 'to_pay' | 'nothing_due';
 
 /**
  * Stato finanziario leggibile di un acquisto, separato dallo stato merce.
@@ -94,6 +94,8 @@ export type PaymentState = 'cancelled' | 'paid' | 'to_verify' | 'partially_paid'
  */
 export function purchasePaymentState(f: PurchaseFinancials): PaymentState {
   if (f.status === 'cancelled') return 'cancelled';
+  // Un achat en brouillon n'engage pas encore : aucune dette (migration 140).
+  if (f.status === 'draft') return 'not_committed';
   if (f.total <= 0) return 'nothing_due';
   if (f.outstanding <= 0) return 'paid';
   if (f.paid_unverified > 0) return 'to_verify';
@@ -103,6 +105,7 @@ export function purchasePaymentState(f: PurchaseFinancials): PaymentState {
 
 export const PAYMENT_STATE_LABELS: Record<PaymentState, string> = {
   cancelled: 'Annulé',
+  not_committed: 'Pas encore engagé',
   paid: 'Payé vérifié',
   to_verify: 'Paiement à vérifier',
   partially_paid: 'Payé partiellement',
@@ -112,6 +115,7 @@ export const PAYMENT_STATE_LABELS: Record<PaymentState, string> = {
 
 export const PAYMENT_STATE_TONES: Record<PaymentState, Tone> = {
   cancelled: 'danger',
+  not_committed: 'neutral',
   paid: 'success',
   to_verify: 'warn',
   partially_paid: 'info',

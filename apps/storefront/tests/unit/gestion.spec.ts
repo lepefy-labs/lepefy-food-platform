@@ -136,6 +136,8 @@ test('recorded but unverified payments never read as paid', () => {
   expect(purchasePaymentState({ status: 'received', total: 100, paid_verified: 100, paid_unverified: 0, outstanding: 0 })).toBe('paid');
   expect(purchasePaymentState({ status: 'ordered', total: 100, paid_verified: 0, paid_unverified: 0, outstanding: 100 })).toBe('to_pay');
   expect(purchasePaymentState({ status: 'cancelled', total: 100, paid_verified: 0, paid_unverified: 0, outstanding: 0 })).toBe('cancelled');
+  // Un brouillon n'est pas une dette (migration 140) : jamais « payé » ni « à payer ».
+  expect(purchasePaymentState({ status: 'draft', total: 100, paid_verified: 0, paid_unverified: 0, outstanding: 0 })).toBe('not_committed');
 });
 
 test('allocation plan validation mirrors the database rules', () => {
