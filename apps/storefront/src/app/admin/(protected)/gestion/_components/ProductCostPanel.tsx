@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 import { getProductCost } from '@/lib/gestion/queries';
-import { PURCHASE_UNIT_LABELS, indicativeMargin, latestActiveCostEntry } from '@/lib/gestion/domain';
+import { PURCHASE_UNIT_LABELS, indicativeMargin } from '@/lib/gestion/domain';
 import { formatDate, formatMoney, formatQuantity, formatQuantityWithUnit } from '@/lib/gestion/format';
 import { Badge, Panel } from './ui';
 
@@ -22,7 +22,6 @@ export async function ProductCostPanel({ tenantId, productId, price, currency }:
 
   const cost = await getProductCost(tenantId, productId);
   const canOpenPurchase = canAdmin(access, 'purchases.view');
-  const current = cost ? latestActiveCostEntry(cost.history) : null;
 
   return (
     <div className="mt-6">
@@ -64,13 +63,13 @@ export async function ProductCostPanel({ tenantId, productId, price, currency }:
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Historique récent</p>
                 <ul className="divide-y divide-gray-100 text-sm dark:divide-gray-800">
                   {cost.history.map((entry) => (
-                    <li key={`${entry.received_at}-${entry.cost_per_stock_unit}-${entry.purchase_quantity}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                       <span className="text-gray-700 dark:text-gray-300">
                         {formatDate(entry.received_at)} • {formatQuantityWithUnit(entry.purchase_quantity, entry.purchase_unit)} à {formatMoney(entry.purchase_unit_cost, cost.currency)} / {PURCHASE_UNIT_LABELS[entry.purchase_unit]}
                         {' '}(× {formatQuantity(entry.conversion_factor)})
                       </span>
                       <span className="flex items-center gap-2">
-                        {entry === current && <Badge tone="success">Coût courant</Badge>}
+                        {entry.id === cost.source_history_id && <Badge tone="success">Coût courant</Badge>}
                         {entry.status === 'reversed' && <Badge tone="neutral">Réception annulée</Badge>}
                         <span className={`tabular-nums ${entry.status === 'reversed' ? 'text-gray-400 line-through' : 'font-medium'}`}>{formatMoney(entry.cost_per_stock_unit, cost.currency)} / unité</span>
                       </span>

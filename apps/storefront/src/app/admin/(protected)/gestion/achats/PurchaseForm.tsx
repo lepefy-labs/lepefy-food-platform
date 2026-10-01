@@ -188,9 +188,11 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           <span className={LABEL_CLS}>Échéance de paiement</span>
           <input type="date" className={INPUT_CLS} value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
           <span className={HINT_CLS}>
-            {derivedDue
+            {dueDate || editing
+              ? 'Date à laquelle le fournisseur doit être payé.'
+              : derivedDue
               ? `Vide : ${formatDate(derivedDue)} (conditions du fournisseur : ${paymentTermsLabel(terms)}).`
-              : editing ? 'Date à laquelle le fournisseur doit être payé.' : 'Vide : aucune échéance (le fournisseur n\'a pas de conditions de paiement).'}
+              : 'Vide : aucune échéance (le fournisseur n\'a pas de conditions de paiement).'}
           </span>
         </label>
         <label className="block">

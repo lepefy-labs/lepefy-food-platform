@@ -3,9 +3,9 @@ import {
   canonicalConversion, canonicalQuantity, costPerStockUnit, parseQuantity, quantityToString, remainingQuantity, stockUnitsFor,
   parseConversion,
 } from '../../src/lib/gestion/quantity';
-import { formatQuantity, formatQuantityWithUnit, formatStockUnits } from '../../src/lib/gestion/format';
+import { formatDate, formatDateTime, formatQuantity, formatQuantityWithUnit, formatStockUnits } from '../../src/lib/gestion/format';
 import {
-  addDays, dueInfo, dueLabel, gestionToday, indicativeMargin, latestActiveCostEntry, paymentTermsLabel, receiptProgress, summarizeDues,
+  addDays, dueInfo, dueLabel, gestionToday, indicativeMargin, paymentTermsLabel, receiptProgress, receivedAtForDate, summarizeDues,
 } from '../../src/lib/gestion/domain';
 import { adjustmentSchema, createPurchaseSchema, receiptSchema } from '../../src/lib/gestion/schemas';
 import { gestionApiPermission } from '../../src/lib/gestion/permissions';
@@ -156,15 +156,18 @@ test('calendar helpers and payment terms labels', () => {
 
 // ─── Coûts ───────────────────────────────────────────────────────────────────
 
-test('current cost = latest active entry; a reversed receipt restores the previous cost', () => {
-  const history = [
-    { received_at: '2026-09-01T10:00:00Z', cost_per_stock_unit: 4, status: 'active' as const },
-    { received_at: '2026-09-15T10:00:00Z', cost_per_stock_unit: 5, status: 'active' as const },
-  ];
-  expect(latestActiveCostEntry(history)?.cost_per_stock_unit).toBe(5);
-  history[1]!.status = 'reversed' as never;
-  expect(latestActiveCostEntry(history)?.cost_per_stock_unit).toBe(4);
-  expect(latestActiveCostEntry(history.map((entry) => ({ ...entry, status: 'reversed' as const })))).toBeNull();
+test('a receipt dated today is never sent with a future timestamp (server takes now())', () => {
+  expect(receivedAtForDate('2026-10-01', '2026-10-01')).toBeNull();
+  expect(receivedAtForDate('2026-10-02', '2026-10-01')).toBeNull();
+  const past = receivedAtForDate('2026-09-28', '2026-10-01');
+  expect(past).not.toBeNull();
+  expect(Date.parse(past!)).toBeLessThan(Date.parse('2026-09-29T00:00:00Z'));
+});
+
+test('dates and times are shown in the Gestion time zone, calendar dates unchanged', () => {
+  expect(formatDateTime('2026-10-01T09:55:00Z')).toBe('01/10/2026 11:55');
+  expect(formatDate('2026-09-30T22:30:00Z')).toBe('01/10/2026'); // déjà le 1er à Paris
+  expect(formatDate('2026-09-25')).toBe('25/09/2026');
 });
 
 test('indicative margin = price - last purchase cost', () => {

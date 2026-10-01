@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { IconPackageImport } from '@tabler/icons-react';
 import Button from '../../../../_components/ui/Button';
-import { PURCHASE_UNIT_LABELS, type PurchaseUnit } from '@/lib/gestion/domain';
+import { PURCHASE_UNIT_LABELS, receivedAtForDate, type PurchaseUnit } from '@/lib/gestion/domain';
 import { formatQuantityWithUnit, formatStockUnits, todayIso } from '@/lib/gestion/format';
 import { parseConversion, parseQuantity, quantityToString, remainingQuantity, stockUnitsFor } from '@/lib/gestion/quantity';
 import { ErrorText, useGestionMutation } from '../../_components/useGestionMutation';
@@ -70,7 +70,7 @@ export function ReceiptForm({ purchaseId, lines }: { purchaseId: string; lines: 
     }
     if (!items.length) { setError('Indiquez au moins une quantité reçue.'); return; }
     const result = await run<{ reference: string; created: boolean }>(`/api/admin/gestion/purchases/${purchaseId}/receipts`, {
-      body: { items, received_at: new Date(`${date}T12:00:00`).toISOString(), notes },
+      body: { items, received_at: receivedAtForDate(date, todayIso()), notes },
       withKey: true,
     });
     if (result) {

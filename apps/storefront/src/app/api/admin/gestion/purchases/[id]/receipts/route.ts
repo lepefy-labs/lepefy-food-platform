@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBusinessManagementApi } from '@/lib/gestion/featureGate';
 import { badRequest, callGestionRpc, revalidateGestion } from '@/lib/gestion/rpc';
 import { firstIssue, receiptSchema } from '@/lib/gestion/schemas';
+import { RECEIVED_AT_MAX_SKEW_MS } from '@/lib/gestion/domain';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!gate.ok) return gate.response;
   const parsed = receiptSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest(firstIssue(parsed.error));
+  // Une réception datée dans le futur fausserait l'ordre des coûts et du ledger.
+  if (parsed.data.received_at && Date.parse(parsed.data.received_at) > Date.now() + RECEIVED_AT_MAX_SKEW_MS) {
+    return badRequest('La date de réception ne peut pas être dans le futur.');
+  }
   const result = await callGestionRpc<{ out_receipt_id: string; out_reference: string; out_created: boolean; out_purchase_status: string }>(
     'record_supplier_receipt',
     {

@@ -1,15 +1,22 @@
 /** Formattazione fr-FR per Gestion (pura, server e client). */
 
-import { PURCHASE_UNIT_LABELS, type PurchaseUnit } from '@/lib/gestion/domain';
+import { GESTION_TIME_ZONE, PURCHASE_UNIT_LABELS, type PurchaseUnit } from '@/lib/gestion/domain';
 
 export function formatMoney(amount: number, currency = 'EUR'): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(amount);
 }
 
+/**
+ * Date fr-FR. Une date calendaire (YYYY-MM-DD) est affichée telle quelle ; un
+ * horodatage est affiché dans le fuseau Gestion, jamais dans celui du serveur (UTC).
+ */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '-';
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const calendar = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = calendar ? new Date(`${value}T12:00:00Z`) : new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '-'
+    : date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: calendar ? 'UTC' : GESTION_TIME_ZONE });
 }
 
 export function formatDateTime(value: string | null | undefined): string {
@@ -17,7 +24,7 @@ export function formatDateTime(value: string | null | undefined): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? '-'
-    : date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    : date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: GESTION_TIME_ZONE });
 }
 
 /** Quantité fr-FR : 12 / 12,5 / 12,75 / 12,375 (jamais 12,000). */

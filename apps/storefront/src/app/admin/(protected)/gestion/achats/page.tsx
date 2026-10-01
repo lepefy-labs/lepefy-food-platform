@@ -37,8 +37,10 @@ const chipClass = (active: boolean) => `inline-flex min-h-10 shrink-0 items-cent
 export default async function PurchasesPage({ searchParams }: { searchParams: { status?: string; pay?: string; q?: string; supplier?: string } }) {
   const { tenant, can } = await requireBusinessManagementPage('purchases.view');
   const pay = (PAYMENT_FILTERS as readonly string[]).includes(searchParams.pay ?? '') ? searchParams.pay as PaymentFilter : undefined;
-  // Avec un filtre de paiement, tous les états de marchandise par défaut.
-  const status = FILTERS.some((filter) => filter.value === searchParams.status) ? searchParams.status! : pay ? 'all' : 'open';
+  // Avec un filtre de paiement, tous les états de marchandise par défaut : un achat
+  // reçu mais impayé (ou en retard) doit rester visible sans choix explicite.
+  const explicitStatus = FILTERS.some((filter) => filter.value === searchParams.status) ? searchParams.status! : undefined;
+  const status = explicitStatus ?? (pay ? 'all' : 'open');
   const today = gestionToday();
   const q = (searchParams.q ?? '').slice(0, 80);
   const supplierId = /^[0-9a-f-]{36}$/i.test(searchParams.supplier ?? '') ? searchParams.supplier : undefined;
@@ -85,7 +87,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: { 
       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Paiement</p>
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Filtrer par paiement et échéance">
         {PAY_FILTERS.map((filter) => (
-          <Link key={filter.value || 'all'} href={{ query: { ...baseQuery, status, ...(filter.value ? { pay: filter.value } : {}) } }} aria-current={(pay ?? '') === filter.value ? 'page' : undefined} className={chipClass((pay ?? '') === filter.value)}>
+          <Link key={filter.value || 'all'} href={{ query: { ...baseQuery, ...(explicitStatus ? { status: explicitStatus } : {}), ...(filter.value ? { pay: filter.value } : {}) } }} aria-current={(pay ?? '') === filter.value ? 'page' : undefined} className={chipClass((pay ?? '') === filter.value)}>
             {filter.label}
           </Link>
         ))}

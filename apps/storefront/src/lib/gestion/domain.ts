@@ -238,7 +238,20 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
 }
 
-export type DueState = 'cancelled' | 'not_committed' | 'paid' | 'no_due' | 'overdue' | 'today' | 'due_soon' | 'upcoming';
+/**
+ * Horodatage envoyé pour une réception datée `date` (YYYY-MM-DD) : jamais dans le
+ * futur. Aujourd'hui (ou plus tard) = null, le serveur prend l'instant de
+ * l'enregistrement ; un jour passé = midi local de ce jour.
+ */
+export function receivedAtForDate(date: string, today: string): string | null {
+  if (date >= today) return null;
+  return new Date(`${date}T12:00:00`).toISOString();
+}
+
+/** Tolérance d'horloge client/serveur pour refuser une réception datée dans le futur. */
+export const RECEIVED_AT_MAX_SKEW_MS = 5 * 60 * 1000;
+
+export type DueState ='cancelled' | 'not_committed' | 'paid' | 'no_due' | 'overdue' | 'today' | 'due_soon' | 'upcoming';
 
 export interface DueInfo {
   state: DueState;
@@ -361,20 +374,3 @@ export function receiptProgress(items: { ordered_quantity: number; received_quan
   return { percent, completeLines, lines: lines.length };
 }
 
-export interface CostHistoryEntry {
-  received_at: string;
-  created_at?: string;
-  cost_per_stock_unit: number;
-  status: 'active' | 'reversed';
-}
-
-/**
- * Même règle que refresh_product_cost() (migration 141) : coût courant = dernière
- * entrée ACTIVE par date de réception (puis création). Une réception annulée
- * n'est jamais le coût courant ; sans entrée active, aucun coût.
- */
-export function latestActiveCostEntry<T extends CostHistoryEntry>(entries: T[]): T | null {
-  return entries
-    .filter((entry) => entry.status === 'active')
-    .sort((a, b) => b.received_at.localeCompare(a.received_at) || (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0] ?? null;
-}

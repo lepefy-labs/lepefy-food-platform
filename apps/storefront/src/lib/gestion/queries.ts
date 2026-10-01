@@ -739,16 +739,18 @@ export interface ProductCostSummary {
   purchase_id: string;
   purchase_reference: string;
   supplier_name: string | null;
-  history: { received_at: string; cost_per_stock_unit: number; purchase_quantity: number; purchase_unit: PurchaseUnit; purchase_unit_cost: number; conversion_factor: number; status: 'active' | 'reversed' }[];
+  source_history_id: string;
+  history: { id: string; received_at: string; cost_per_stock_unit: number; purchase_quantity: number; purchase_unit: PurchaseUnit; purchase_unit_cost: number; conversion_factor: number; status: 'active' | 'reversed' }[];
 }
 
 /** Dernier coût d'achat (par unité de stock) et historique récent. Données internes, admin uniquement. */
 export async function getProductCost(tenantId: string, productId: string): Promise<ProductCostSummary | null> {
   const [{ data: cost }, { data: history }] = await Promise.all([
-    db().from('product_costs').select('current_purchase_cost, currency, effective_at, source_purchase_id, source_supplier_id')
+    db().from('product_costs').select('current_purchase_cost, currency, effective_at, source_purchase_id, source_supplier_id, source_history_id')
       .eq('tenant_id', tenantId).eq('product_id', productId).maybeSingle(),
-    db().from('product_cost_history').select('received_at, cost_per_stock_unit, purchase_quantity, purchase_unit, purchase_unit_cost, conversion_factor, status')
-      .eq('tenant_id', tenantId).eq('product_id', productId).order('received_at', { ascending: false }).limit(5),
+    db().from('product_cost_history').select('id, received_at, cost_per_stock_unit, purchase_quantity, purchase_unit, purchase_unit_cost, conversion_factor, status')
+      .eq('tenant_id', tenantId).eq('product_id', productId)
+      .order('received_at', { ascending: false }).order('created_at', { ascending: false }).limit(5),
   ]);
   if (!cost) return null;
   const [{ data: purchase }, { data: supplier }] = await Promise.all([
@@ -759,9 +761,9 @@ export async function getProductCost(tenantId: string, productId: string): Promi
   ]);
   return {
     current_purchase_cost: num(cost.current_purchase_cost), currency: cost.currency, effective_at: cost.effective_at,
-    purchase_id: cost.source_purchase_id, purchase_reference: purchase?.reference ?? '', supplier_name: supplier?.name ?? null,
+    purchase_id: cost.source_purchase_id, source_history_id: cost.source_history_id, purchase_reference: purchase?.reference ?? '', supplier_name: supplier?.name ?? null,
     history: (history ?? []).map((row) => ({
-      received_at: row.received_at, cost_per_stock_unit: num(row.cost_per_stock_unit), purchase_quantity: num(row.purchase_quantity),
+      id: row.id, received_at: row.received_at, cost_per_stock_unit: num(row.cost_per_stock_unit), purchase_quantity: num(row.purchase_quantity),
       purchase_unit: row.purchase_unit as PurchaseUnit, purchase_unit_cost: num(row.purchase_unit_cost),
       conversion_factor: num(row.conversion_factor), status: row.status as 'active' | 'reversed',
     })),
