@@ -126,13 +126,13 @@ function cta(url: string | null | undefined, label: string) {
   return href ? `<div class="cta-wrap"><a class="cta" href="${href}">${esc(label)}</a></div>` : '';
 }
 
-function supportBox(context: TenantNotificationContext, heading: string) {
+function supportBox(context: TenantNotificationContext, heading: string, isIt = false) {
   const { supportEmail, whatsappNumber } = context.emailBranding ?? { supportEmail: null, whatsappNumber: null };
   if (!supportEmail && !whatsappNumber) return '';
   const phone = whatsappNumber ? String(whatsappNumber).replace(/\D/g, '') : '';
-  return `<div class="support-box"><p><strong>${esc(heading)}</strong><br>Notre équipe reste à votre disposition.</p>${
-    supportEmail ? `<a class="support-link" href="mailto:${esc(supportEmail)}">✉️ Nous contacter par email</a>` : ''}${
-    phone ? `<a class="support-link" href="https://wa.me/${phone}">💬 Nous contacter sur WhatsApp</a>` : ''}</div>`;
+  return `<div class="support-box"><p><strong>${esc(heading)}</strong><br>${isIt ? 'Il nostro team resta a tua disposizione.' : 'Notre équipe reste à votre disposition.'}</p>${
+    supportEmail ? `<a class="support-link" href="mailto:${esc(supportEmail)}">✉️ ${isIt ? 'Contattaci via email' : 'Nous contacter par email'}</a>` : ''}${
+    phone ? `<a class="support-link" href="https://wa.me/${phone}">💬 ${isIt ? 'Contattaci su WhatsApp' : 'Nous contacter sur WhatsApp'}</a>` : ''}</div>`;
 }
 
 function signature(context: TenantNotificationContext, line: string) {
@@ -522,27 +522,33 @@ function readableOn(background: string) {
 
 const DIVIDER = '<div style="border-top:1px solid #e5e7eb;margin:32px 0;font-size:0;line-height:0;">&nbsp;</div>';
 
-function androidAppBlock(context: TenantNotificationContext) {
+function androidAppBlock(context: TenantNotificationContext, isIt = false) {
   const android = context.mobileApp?.android;
   if (!android) return '';
   const url = android.status === 'available' ? safeUrl(android.playStoreUrl) : null;
-  // A released app without a public listing yet is announced, never linked.
   if (android.status === 'available' && !url) return '';
   const base = context.assetBaseUrl?.replace(/\/$/, '');
   const badge = safeUrl(base ? `${base}/badges/google-play-fr.png` : null);
   const tenant = esc(context.tenantName);
+  const title = url
+    ? (isIt ? `${tenant} è disponibile su Android` : `${tenant} est disponible sur Android`)
+    : (isIt ? `${tenant} presto su Android` : `${tenant} bientôt sur Android`);
+  const description = isIt
+    ? 'Ritrova il tuo negozio ancora più facilmente dal telefono.'
+    : 'Retrouvez encore plus facilement votre boutique depuis votre téléphone.';
+  const available = isIt ? 'Disponibile su Google Play' : 'Disponible sur Google Play';
+  const soon = isIt ? 'Presto disponibile su Google Play' : 'Bientôt disponible sur Google Play';
   return `${DIVIDER}
-<div style="text-align:center;">
-<p style="margin:0 0 8px;font-size:17px;font-weight:700;color:#111827;">📱 ${url ? `${tenant} est disponible sur Android` : `${tenant} bientôt sur Android`}</p>
-<p style="margin:0 0 18px;font-size:14px;color:#4b5563;">Retrouvez encore plus facilement votre boutique depuis votre téléphone.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#f8fafc;border-radius:14px;"><tr><td align="center" style="padding:22px 18px;text-align:center;">
+<p style="margin:0 0 8px;font-size:17px;font-weight:700;color:#111827;">📱 ${title}</p>
+<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:#4b5563;">${description}</p>
 ${url
-    ? badge
-      // Official Google Play badge (public/badges, downloaded from Google's badge page), unaltered, with the required attribution.
+    ? badge && !isIt
       ? `<a href="${url}" style="display:inline-block;text-decoration:none;"><img src="${badge}" width="180" height="70" alt="Disponible sur Google Play" style="display:block;width:180px;max-width:100%;height:auto;border:0;"></a>
 <p style="margin:10px 0 0;font-size:11px;line-height:1.5;color:#9ca3af;">Google Play et le logo Google Play sont des marques de Google LLC.</p>`
-      : `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;"><tr><td style="border:2px solid #111827;border-radius:10px;"><a href="${url}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:700;color:#111827;text-decoration:none;">Disponible sur Google Play →</a></td></tr></table>`
-    : '<span style="display:inline-block;padding:10px 18px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-size:14px;font-weight:600;">Bientôt disponible sur Google Play</span>'}
-</div>`;
+      : `<a href="${url}" style="display:inline-block;padding:12px 22px;border:2px solid #111827;border-radius:10px;font-size:15px;font-weight:700;color:#111827;text-decoration:none;">${available} →</a>`
+    : `<span style="display:inline-block;padding:10px 18px;border-radius:999px;background:#e5e7eb;color:#374151;font-size:14px;font-weight:600;">${soon}</span>`}
+</td></tr></table>`;
 }
 
 /**
@@ -560,53 +566,88 @@ export function cardQuickPaymentCustomerEmail(context: TenantNotificationContext
   const name = input.customerName?.trim();
   const paid = new Date(input.paidAt);
   const locale = context.locale || 'fr-FR';
+  const isIt = locale.toLowerCase().startsWith('it');
+  const copy = isIt ? {
+    confirmed: 'Pagamento confermato',
+    paidAt: 'pagato presso',
+    greeting: 'Buongiorno',
+    received: 'Abbiamo ricevuto il tuo pagamento di',
+    amount: 'Importo', date: 'Data', status: 'Stato', reference: 'Riferimento', paid: '✓ Pagato',
+    thanks: 'Il pagamento è stato registrato. Grazie per la fiducia e per la visita da',
+    shopTitle: 'I tuoi prodotti preferiti, anche a casa tua.',
+    shopText: 'Scopri tutti i prodotti del nostro negozio e ordina comodamente dal telefono',
+    delivery: 'con consegna a domicilio', pickup: 'oppure ritiro in negozio',
+    shopCta: 'ORDINA ONLINE →',
+    benefits: ['Ordina online', 'Pagamento sicuro', 'Consegna', 'Ritiro in negozio'],
+    help: '💬 Domande sul pagamento?',
+    footer: '🛍️ Visita il negozio',
+  } : {
+    confirmed: 'Paiement confirmé',
+    paidAt: 'payé chez',
+    greeting: 'Bonjour',
+    received: 'Votre paiement de',
+    amount: 'Montant', date: 'Date', status: 'Statut', reference: 'Référence', paid: '✓ Payé',
+    thanks: 'Votre paiement a été enregistré avec succès. Merci pour votre confiance et votre visite chez',
+    shopTitle: 'Vos produits préférés, aussi chez vous.',
+    shopText: 'Découvrez tous les produits de notre boutique et commandez depuis votre téléphone',
+    delivery: 'avec livraison', pickup: 'ou retrait en boutique',
+    shopCta: 'COMMANDER EN LIGNE →',
+    benefits: ['Commande en ligne', 'Paiement sécurisé', 'Livraison', 'Retrait en boutique'],
+    help: '💬 Une question concernant votre paiement ?',
+    footer: '🛍️ Visiter notre boutique',
+  };
   const when = Number.isNaN(paid.getTime()) ? null
     : `${new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'Europe/Rome' }).format(paid)} · ${
       new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: 'Europe/Rome' }).format(paid)}`;
 
   const commerce = context.commerce;
   const shopUrl = commerce?.storefrontReady === false ? null : safeUrl(context.storefrontUrl);
+  const heroImage = safeUrl(context.branding?.heroImageUrl);
   const primary = color(context.branding?.primaryColor, '#25222b');
+  const onPrimary = readableOn(primary);
   const options = !commerce ? '' : commerce.clickCollectEnabled
-    ? ' et choisissez la livraison ou le retrait en boutique' : ' et faites-vous livrer';
-  const benefits = ['Commande en ligne', 'Paiement sécurisé', ...(commerce ? ['Livraison'] : []), ...(commerce?.clickCollectEnabled ? ['Retrait en boutique'] : [])];
-
+    ? ` ${copy.delivery} ${copy.pickup}` : ` ${copy.delivery}`;
+  const benefits = copy.benefits.slice(0, commerce ? (commerce.clickCollectEnabled ? 4 : 3) : 2);
   const row = (label: string, value: string, first = false) =>
     `<tr><td style="padding:13px 16px;font-size:14px;color:#6b7280;${first ? '' : 'border-top:1px solid #e5e7eb;'}">${esc(label)}</td><td align="right" style="padding:13px 16px;font-size:15px;color:#111827;text-align:right;${first ? '' : 'border-top:1px solid #e5e7eb;'}">${value}</td></tr>`;
 
   const shopBlock = shopUrl ? `${DIVIDER}
-<div style="text-align:center;">
-<h2 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#111827;">Votre prochain panier peut venir directement à vous.</h2>
-<p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#4b5563;">Retrouvez tous les produits de ${tenant} sur notre boutique en ligne. Commandez tranquillement depuis votre téléphone${options}.</p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;"><tr><td align="center" bgcolor="${primary}" style="background:${primary};border-radius:10px;"><a href="${shopUrl}" style="display:block;padding:17px 20px;font-size:16px;font-weight:700;letter-spacing:0.5px;line-height:20px;color:${readableOn(primary)};text-decoration:none;border-radius:10px;">COMMANDER EN LIGNE →</a></td></tr></table>
-<p style="margin:0;font-size:13px;color:#6b7280;">${benefits.map(esc).join(' · ')}</p>
-</div>` : '';
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+${heroImage ? `<tr><td><a href="${shopUrl}" style="display:block;text-decoration:none;"><img src="${heroImage}" width="538" alt="${esc(context.tenantName)}" style="display:block;width:100%;height:auto;border:0;"></a></td></tr>` : ''}
+<tr><td bgcolor="${primary}" style="background:${primary};padding:26px 24px 24px;text-align:center;">
+<p style="margin:0 0 10px;font-size:24px;line-height:1.25;font-weight:800;color:${onPrimary};">${copy.shopTitle}</p>
+<p style="margin:0;font-size:15px;line-height:1.55;color:${onPrimary};">${copy.shopText}${options}.</p>
+</td></tr>
+<tr><td style="padding:22px 20px 20px;background:#ffffff;text-align:center;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;"><tr><td style="font-size:13px;line-height:1.5;color:#374151;text-align:center;font-weight:600;">${benefits.map(esc).join(' &nbsp;•&nbsp; ')}</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="${primary}" style="background:${primary};border-radius:10px;"><a href="${shopUrl}" style="display:block;padding:16px 20px;font-size:16px;font-weight:800;letter-spacing:0.3px;line-height:22px;color:${onPrimary};text-decoration:none;border-radius:10px;">${copy.shopCta}</a></td></tr></table>
+</td></tr></table>` : '';
 
   return {
-    subject: subject(input.testMode, `✅ Votre paiement de ${amount} chez ${context.tenantName} est confirmé`),
+    subject: subject(input.testMode, `✅ ${isIt ? 'Il tuo pagamento di' : 'Votre paiement de'} ${amount} ${isIt ? 'da' : 'chez'} ${context.tenantName} ${isIt ? 'è confermato' : 'est confirmé'}`),
     replyTo: context.emailBranding?.supportEmail,
     html: page(context, {
       testMode: input.testMode,
-      testLabel: '🧪 EMAIL DE TEST — aucun paiement réel',
-      title: '✓ Paiement confirmé',
-      footerLink: shopUrl ? undefined : { url: null, label: '' },
+      testLabel: isIt ? '🧪 EMAIL DI TEST — nessun pagamento reale' : '🧪 EMAIL DE TEST — aucun paiement réel',
+      title: `✓ ${copy.confirmed}`,
+      footerLink: shopUrl ? { url: shopUrl, label: copy.footer } : { url: null, label: '' },
       poweredBy: commerce?.showPoweredBy ?? false,
       body: `<div style="text-align:center;margin:0 0 26px;">
 <div style="font-size:36px;font-weight:700;line-height:1.2;color:#111827;">${esc(amount)}</div>
-<div style="margin-top:6px;font-size:14px;color:#6b7280;">payé chez ${tenant}</div>
+<div style="margin-top:6px;font-size:14px;color:#6b7280;">${copy.paidAt} ${tenant}</div>
 </div>
-<p>${name ? `Bonjour <strong>${esc(name)}</strong>,` : 'Bonjour,'}</p>
-<p>Votre paiement de <strong>${esc(amount)}</strong> a bien été reçu.</p>
+<p>${copy.greeting}${name ? ` <strong>${esc(name)}</strong>` : ''},</p>
+<p>${copy.received} <strong>${esc(amount)}</strong>.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin:22px 0;">
-${row('Montant', `<strong>${esc(amount)}</strong>`, true)}
-${when ? row('Date', esc(when)) : ''}
-${row('Statut', '<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:13px;font-weight:700;">✓ Payé</span>')}
-${row('Référence', `<span style="font-family:monospace;font-weight:700;">${esc(cardPaymentReference(input.quickPaymentId))}</span>`)}
+${row(copy.amount, `<strong>${esc(amount)}</strong>`, true)}
+${when ? row(copy.date, esc(when)) : ''}
+${row(copy.status, `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:13px;font-weight:700;">${copy.paid}</span>`)}
+${row(copy.reference, `<span style="font-family:monospace;font-weight:700;">${esc(cardPaymentReference(input.quickPaymentId))}</span>`)}
 </table>
-<p>Votre paiement a été enregistré avec succès.<br>Merci pour votre confiance et votre visite chez ${tenant}.</p>
+<p>${copy.thanks} ${tenant}.</p>
 ${shopBlock}
-${androidAppBlock(context)}
-${supportBox(context, '💬 Une question concernant votre paiement ?')}`,
+${androidAppBlock(context, isIt)}
+${supportBox(context, copy.help, isIt)}`,
     }),
   };
 }

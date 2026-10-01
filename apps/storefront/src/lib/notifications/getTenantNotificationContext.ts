@@ -10,6 +10,8 @@ export interface TenantNotificationContext {
   currency: string;
   branding: {
     logoUrl: string | null;
+    /** Existing tenant storefront hero, reused for the post-payment shop invitation. */
+    heroImageUrl?: string | null;
     primaryColor: string;
     secondaryColor: string;
     accentColor: string;
@@ -74,6 +76,7 @@ interface TenantNotificationRow {
   slug: string;
   name: string;
   logo_url: string | null;
+  hero_image_url: string | null;
   primary_color: string;
   secondary_color: string;
   accent_light: string;
@@ -105,7 +108,7 @@ export async function getTenantNotificationContext(
     const { data, error } = await supabase
       .from('tenants')
       .select(
-        'id, slug, name, logo_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number, click_collect_address, google_maps_url, click_collect_hours, click_collect_hours_it, storefront_ready, click_collect_enabled, show_powered_by, android_package_name, android_public',
+        'id, slug, name, logo_url, hero_image_url, primary_color, secondary_color, accent_light, city, country, currency, locale, storefront_url, legal_email, legal_website, legal_address, whatsapp_number, click_collect_address, google_maps_url, click_collect_hours, click_collect_hours_it, storefront_ready, click_collect_enabled, show_powered_by, android_package_name, android_public',
       )
       .eq('id', tenantId)
       .eq('active', true)
@@ -134,6 +137,7 @@ export async function getTenantNotificationContext(
       currency: tenant.currency,
       branding: {
         logoUrl: tenant.logo_url,
+        heroImageUrl: tenant.hero_image_url,
         primaryColor: tenant.primary_color,
         secondaryColor: tenant.secondary_color,
         accentColor: tenant.accent_light,

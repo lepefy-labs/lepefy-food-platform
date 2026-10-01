@@ -55,7 +55,8 @@ test('storefront CTA is absolute, brand-colored, and only promises configured op
   expect(email.html).toContain('COMMANDER EN LIGNE →');
   expect(email.html).toContain('bgcolor="#1f7a3a"');
   expect(email.html).toContain('color:#ffffff;text-decoration:none');
-  expect(email.html).toContain('Commande en ligne · Paiement sécurisé · Livraison · Retrait en boutique');
+  expect(email.html).toContain('Commande en ligne &nbsp;•&nbsp; Paiement sécurisé &nbsp;•&nbsp; Livraison &nbsp;•&nbsp; Retrait en boutique');
+  expect(email.html).toContain('Vos produits préférés, aussi chez vous.');
   expect(email.html).toContain('Propulsé par');
   expect(email.html).not.toMatch(/utm_|coupon|newsletter|PWA/i);
 
@@ -65,6 +66,28 @@ test('storefront CTA is absolute, brand-colored, and only promises configured op
 
   const light = cardQuickPaymentCustomerEmail({ ...context, branding: { ...context.branding, primaryColor: '#ffd84d' } }, input);
   expect(light.html).toContain('color:#111111;text-decoration:none');
+});
+
+test('tenant hero image leads to the storefront; missing or unsafe image keeps a branded fallback', () => {
+  const withImage = cardQuickPaymentCustomerEmail({ ...context, branding: { ...context.branding, heroImageUrl: 'https://cdn.example/tenant-hero.jpg' } }, input);
+  expect(withImage.html).toContain('<img src="https://cdn.example/tenant-hero.jpg"');
+  expect(withImage.html).toContain('alt="Chloé &lt;Food&gt;"');
+  expect(withImage.html).toContain('<a href="https://shop.example" style="display:block;text-decoration:none;"><img');
+  const withoutImage = cardQuickPaymentCustomerEmail(context, input);
+  expect(withoutImage.html).not.toContain('tenant-hero.jpg');
+  expect(withoutImage.html).toContain('bgcolor="#1f7a3a"');
+  const unsafe = cardQuickPaymentCustomerEmail({ ...context, branding: { ...context.branding, heroImageUrl: 'javascript:alert(1)' } }, input);
+  expect(unsafe.html).not.toContain('javascript:');
+});
+
+test('Italian tenant gets Italian receipt, shop and Android copy', () => {
+  const it = cardQuickPaymentCustomerEmail({ ...context, locale: 'it-IT', mobileApp: { android: androidAppState('com.example.shop', false) } }, input);
+  expect(it.subject).toContain('Il tuo pagamento di');
+  expect(it.html).toContain('✓ Pagamento confermato');
+  expect(it.html).toContain('I tuoi prodotti preferiti, anche a casa tua.');
+  expect(it.html).toContain('ORDINA ONLINE →');
+  expect(it.html).toContain('Presto disponibile su Google Play');
+  expect(it.html).not.toContain('Bientôt disponible sur Google Play');
 });
 
 test('no storefront URL or shop not ready: no commercial block and no dead link', () => {
