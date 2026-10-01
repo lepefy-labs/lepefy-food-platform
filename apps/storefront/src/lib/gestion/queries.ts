@@ -748,9 +748,9 @@ export async function getProductCost(tenantId: string, productId: string): Promi
   const [{ data: cost }, { data: history }] = await Promise.all([
     db().from('product_costs').select('current_purchase_cost, currency, effective_at, source_purchase_id, source_supplier_id, source_history_id')
       .eq('tenant_id', tenantId).eq('product_id', productId).maybeSingle(),
-    db().from('product_cost_history').select('id, received_at, cost_per_stock_unit, purchase_quantity, purchase_unit, purchase_unit_cost, conversion_factor, status')
+    db().from('product_cost_history').select('id, received_at, created_at, cost_per_stock_unit, purchase_quantity, purchase_unit, purchase_unit_cost, conversion_factor, status')
       .eq('tenant_id', tenantId).eq('product_id', productId)
-      .order('received_at', { ascending: false }).order('created_at', { ascending: false }).limit(5),
+      .order('received_at', { ascending: false }).order('created_at', { ascending: false }).limit(10),
   ]);
   if (!cost) return null;
   const [{ data: purchase }, { data: supplier }] = await Promise.all([
@@ -762,7 +762,10 @@ export async function getProductCost(tenantId: string, productId: string): Promi
   return {
     current_purchase_cost: num(cost.current_purchase_cost), currency: cost.currency, effective_at: cost.effective_at,
     purchase_id: cost.source_purchase_id, source_history_id: cost.source_history_id, purchase_reference: purchase?.reference ?? '', supplier_name: supplier?.name ?? null,
-    history: (history ?? []).map((row) => ({
+    // Même ordre que refresh_product_cost() (migration 142) : jour de réception
+    // (fuseau Gestion), puis ordre d'enregistrement. Marge de 10 lignes pour trier.
+    history: [...(history ?? [])].sort((x, y) => gestionToday(new Date(y.received_at)).localeCompare(gestionToday(new Date(x.received_at)))
+      || String(y.created_at).localeCompare(String(x.created_at))).slice(0, 5).map((row) => ({
       id: row.id, received_at: row.received_at, cost_per_stock_unit: num(row.cost_per_stock_unit), purchase_quantity: num(row.purchase_quantity),
       purchase_unit: row.purchase_unit as PurchaseUnit, purchase_unit_cost: num(row.purchase_unit_cost),
       conversion_factor: num(row.conversion_factor), status: row.status as 'active' | 'reversed',
