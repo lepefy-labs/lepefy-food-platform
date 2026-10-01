@@ -22,6 +22,10 @@ export function normalizePacklinkStatus(raw: string | null): NormalizedShipmentS
   return 'unknown';
 }
 
+const PROGRESS_RANK: Partial<Record<NormalizedShipmentStatus, number>> = {
+  pending: 0, ready_for_collection: 1, in_transit: 2, out_for_delivery: 2, delivered: 3,
+};
+
 export function resolveTrackingUrl(raw: unknown, trackingCode: string | null): string | null {
   const template = text(raw, 2048);
   if (!template) return null;
@@ -65,7 +69,12 @@ export function parsePacklinkShipment(reference: string, payload: unknown, timel
     if (!occurredAt || !description) return [];
     return [{ occurredAt, description, providerStatus, status: normalizePacklinkStatus(providerStatus) }];
   }).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)).slice(-100);
-  const latest = events.at(-1);
+  // Carriers emit late administrative events (BRT "DATI SPEDIZ. TRASMESSI" -> READY_FOR_COLLECTION
+  // after "PARTITA"): a forward-progress event never moves the shipment back behind one already reached.
+  const latest = events.reduce<(typeof events)[number] | undefined>((current, event) => {
+    const rank = PROGRESS_RANK[event.status], best = current ? PROGRESS_RANK[current.status] : undefined;
+    return rank !== undefined && best !== undefined && rank < best ? current : event;
+  }, undefined);
   // Packlink PRO exposes the shipment status as `state` (e.g. READY_TO_PRINT).
   const providerStatus = latest?.providerStatus ?? text(shipment.state ?? shipment.status_code ?? shipment.status);
   const product = text(shipment.carrier_product_id);

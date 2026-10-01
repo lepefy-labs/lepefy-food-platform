@@ -98,6 +98,27 @@ test('real Packlink payload, primary tracking code, URL and complete timeline', 
   expect(beforeCollection.providerStatus).toBe('READY_TO_PRINT');
   expect(beforeCollection.normalizedStatus).toBe('pending');
 });
+test('late READY_FOR_COLLECTION after PARTITA does not regress the shipment; order ships', async () => {
+  // Real BRT order IT2026PRO0006415025: data transmission logged 20 min after departure.
+  const late = parsePacklinkShipment(reference, payload, [
+    { timestamp: 1790755200, description: 'RITIRATA', status_code: 'READY_FOR_COLLECTION' },
+    { timestamp: 1790787600, description: 'PARTITA', status_code: 'IN_TRANSIT' },
+    { timestamp: 1790788800, description: 'DATI SPEDIZ. TRASMESSI A BRT', status_code: 'READY_FOR_COLLECTION' },
+  ]);
+  expect(late.providerStatus).toBe('IN_TRANSIT');
+  expect(late.normalizedStatus).toBe('in_transit');
+  expect(late.events).toHaveLength(3);
+  const db = fakeService(); const spy = effects();
+  await applyShipmentSnapshot(db.service, db.order(), late, spy.run);
+  expect(db.order().status).toBe('shipped');
+  expect(spy.messages.map(message => message.payload.notificationType)).toEqual(['order_shipped']);
+  // An off-path status (exception) after transit is still reported as latest.
+  const incident = parsePacklinkShipment(reference, payload, [
+    { timestamp: 1790787600, description: 'PARTITA', status_code: 'IN_TRANSIT' },
+    { timestamp: 1790788800, description: 'GIACENZA', status_code: 'EXCEPTION' },
+  ]);
+  expect(incident.normalizedStatus).toBe('exception');
+});
 test('literal and encoded placeholders encode tracking; unsafe links are discarded', () => {
   for (const template of ['[tracking]', '%5Btracking%5D']) expect(resolveTrackingUrl('https://example.invalid/?id=' + template, 'a b&c')).toBe('https://example.invalid/?id=a%20b%26c');
   expect(resolveTrackingUrl('javascript:alert(1)', 'abc')).toBeNull();
