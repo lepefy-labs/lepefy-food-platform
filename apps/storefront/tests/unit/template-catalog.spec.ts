@@ -14,11 +14,12 @@ const context = {
 } satisfies TenantNotificationContext;
 
 test('card confirmation previews use real tenant media and include the no-image fallback', () => {
-  const previews = buildTemplatePreviews({ ...context, branding: { ...context.branding, heroImageUrl: 'https://cdn.example/hero.jpg' } });
+  const previews = buildTemplatePreviews({ ...context, branding: { ...context.branding, heroImageUrl: 'https://cdn.example/hero.jpg', emailHeroImageUrl: 'https://shop.example/images/email/shop-art.png' } });
   const real = previews.find((preview) => preview.id === 'card-quick-payment-customer');
   const fallback = previews.find((preview) => preview.id === 'card-quick-payment-customer-no-image');
-  expect(real?.html).toContain('<img src="https://cdn.example/hero.jpg"');
+  expect(real?.html).toContain('<img src="https://shop.example/images/email/shop-art.png"');
   expect(fallback?.html).not.toContain('https://cdn.example/hero.jpg');
+  expect(fallback?.html).not.toContain('https://shop.example/images/email/shop-art.png');
   expect(fallback?.html).toContain('COMMANDER EN LIGNE →');
 });
 

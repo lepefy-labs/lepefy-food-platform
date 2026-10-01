@@ -602,7 +602,7 @@ export function cardQuickPaymentCustomerEmail(context: TenantNotificationContext
 
   const commerce = context.commerce;
   const shopUrl = commerce?.storefrontReady === false ? null : safeUrl(context.storefrontUrl);
-  const heroImage = safeUrl(context.branding?.heroImageUrl);
+  const heroImage = safeUrl(context.branding?.emailHeroImageUrl) || safeUrl(context.branding?.heroImageUrl);
   const primary = color(context.branding?.primaryColor, '#25222b');
   const onPrimary = readableOn(primary);
   const options = !commerce ? '' : commerce.clickCollectEnabled

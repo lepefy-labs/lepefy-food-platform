@@ -12,6 +12,8 @@ export interface TenantNotificationContext {
     logoUrl: string | null;
     /** Existing tenant storefront hero, reused for the post-payment shop invitation. */
     heroImageUrl?: string | null;
+    /** Email-specific shop art, selected per tenant without changing the storefront hero. */
+    emailHeroImageUrl?: string | null;
     primaryColor: string;
     secondaryColor: string;
     accentColor: string;
@@ -48,6 +50,15 @@ export interface TenantNotificationContext {
    * which may be another site.
    */
   assetBaseUrl?: string | null;
+}
+
+const TENANT_EMAIL_HERO_ASSETS: Record<string, string> = {
+  chloefood: '/images/email/chloefood-shop-assortment.png',
+};
+
+export function tenantEmailHeroUrl(slug: string, assetBaseUrl: string | null): string | null {
+  const path = TENANT_EMAIL_HERO_ASSETS[slug];
+  return path && assetBaseUrl && /^https?:\/\//.test(assetBaseUrl) ? `${assetBaseUrl}${path}` : null;
 }
 
 export interface AndroidAppState {
@@ -124,6 +135,7 @@ export async function getTenantNotificationContext(
     const tenantStorefront = tenant.storefront_url?.replace(/\/$/, '') ?? null;
     const legalWebsite = tenant.legal_website?.replace(/\/$/, '') ?? null;
     const legacyConfiguredStorefront = process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/\/$/, '') ?? null;
+    const assetBaseUrl = tenantStorefront || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || null;
     const pickupHours = tenant.locale.toLowerCase().startsWith('it')
       ? tenant.click_collect_hours_it ?? tenant.click_collect_hours
       : tenant.click_collect_hours ?? tenant.click_collect_hours_it;
@@ -138,6 +150,7 @@ export async function getTenantNotificationContext(
       branding: {
         logoUrl: tenant.logo_url,
         heroImageUrl: tenant.hero_image_url,
+        emailHeroImageUrl: tenantEmailHeroUrl(tenant.slug, assetBaseUrl),
         primaryColor: tenant.primary_color,
         secondaryColor: tenant.secondary_color,
         accentColor: tenant.accent_light,
@@ -166,7 +179,7 @@ export async function getTenantNotificationContext(
       mobileApp: {
         android: androidAppState(tenant.android_package_name, tenant.android_public),
       },
-      assetBaseUrl: tenantStorefront || process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || null,
+      assetBaseUrl,
     };
   } catch (error) {
     console.error('[notifications] tenant context lookup failed:', error, '— tenant_id:', tenantId);

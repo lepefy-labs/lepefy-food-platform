@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   androidAppState,
+  tenantEmailHeroUrl,
   type TenantNotificationContext,
 } from '../../src/lib/notifications/getTenantNotificationContext';
 import { cardPaymentReference, cardQuickPaymentCustomerEmail } from '../../src/lib/notifications/customerEmails';
@@ -73,6 +74,12 @@ test('tenant hero image leads to the storefront; missing or unsafe image keeps a
   expect(withImage.html).toContain('<img src="https://cdn.example/tenant-hero.jpg"');
   expect(withImage.html).toContain('alt="Chloé &lt;Food&gt;"');
   expect(withImage.html).toContain('<a href="https://shop.example" style="display:block;text-decoration:none;"><img');
+  const tenantSpecific = cardQuickPaymentCustomerEmail({ ...context, branding: { ...context.branding, heroImageUrl: 'https://cdn.example/storefront-hero.jpg', emailHeroImageUrl: 'https://shop.example/images/email/shop-art.png' } }, input);
+  expect(tenantSpecific.html).toContain('<img src="https://shop.example/images/email/shop-art.png"');
+  expect(tenantSpecific.html).not.toContain('storefront-hero.jpg');
+  expect(tenantEmailHeroUrl('chloefood', 'https://shop.example')).toBe('https://shop.example/images/email/chloefood-shop-assortment.png');
+  expect(tenantEmailHeroUrl('another-tenant', 'https://shop.example')).toBeNull();
+  expect(tenantEmailHeroUrl('chloefood', null)).toBeNull();
   const withoutImage = cardQuickPaymentCustomerEmail(context, input);
   expect(withoutImage.html).not.toContain('tenant-hero.jpg');
   expect(withoutImage.html).toContain('bgcolor="#1f7a3a"');
