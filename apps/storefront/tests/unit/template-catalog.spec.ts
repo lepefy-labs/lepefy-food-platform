@@ -13,6 +13,15 @@ const context = {
   pickup: { address: 'Via Roma 1', mapsUrl: 'https://maps.example/x', hours: 'Lun-Ven 9-18' },
 } satisfies TenantNotificationContext;
 
+test('card confirmation previews use real tenant media and include the no-image fallback', () => {
+  const previews = buildTemplatePreviews({ ...context, branding: { ...context.branding, heroImageUrl: 'https://cdn.example/hero.jpg' } });
+  const real = previews.find((preview) => preview.id === 'card-quick-payment-customer');
+  const fallback = previews.find((preview) => preview.id === 'card-quick-payment-customer-no-image');
+  expect(real?.html).toContain('<img src="https://cdn.example/hero.jpg"');
+  expect(fallback?.html).not.toContain('https://cdn.example/hero.jpg');
+  expect(fallback?.html).toContain('COMMANDER EN LIGNE →');
+});
+
 test('every template renders a subject and HTML with unique ids', () => {
   const previews = buildTemplatePreviews(context, new Date('2026-09-27T10:00:00Z'));
   expect(previews.length).toBeGreaterThanOrEqual(25);

@@ -83,7 +83,10 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
   }));
   // Real tenant configuration (shop options, Android state), then each app state.
   const cardPayment = { quickPaymentId: 'a82f31c4-0000-4000-8000-000000000000', amount: 38, currency: context.currency || 'EUR', customerName: customer.fullName, paidAt: now.toISOString() };
-  add('card-quick-payment-customer', 'Paiements', 'Paiement carte confirmé · client', 'Client', cardQuickPaymentCustomerEmail(context, cardPayment));
+  add('card-quick-payment-customer', 'Paiements', 'Paiement carte confirmé · configuration réelle', 'Client', cardQuickPaymentCustomerEmail(context, cardPayment));
+  add('card-quick-payment-customer-no-image', 'Paiements', 'Paiement carte confirmé · sans image', 'Client', cardQuickPaymentCustomerEmail(
+    { ...context, branding: { ...context.branding, heroImageUrl: null } }, cardPayment,
+  ));
   add('card-quick-payment-customer-app-soon', 'Paiements', 'Paiement carte confirmé · app Android bientôt', 'Client', cardQuickPaymentCustomerEmail(
     { ...context, mobileApp: { android: { status: 'coming_soon', playStoreUrl: null } } }, { ...cardPayment, customerName: null },
   ));
