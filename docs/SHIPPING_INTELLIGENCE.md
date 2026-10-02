@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@b2d58933a55ed36eac85855e48749d7f8c4150c4`
-> **Ultima verifica:** 29 settembre 2026
+> **Base codice verificata:** `main@7b09db7d4b10e67e1968f30e226a0d4948175a7f`
+> **Ultima verifica:** 2 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -83,6 +83,18 @@ Comprende:
 ---
 
 ## 3. Navigazione Admin
+
+### 3.0 Confine con il cockpit ordini
+
+Gli eventi tracking JSON sono caricati in un solo batch per le spedizioni associate della pagina corrente, evitando di serializzarli per ogni ordine nella query principale.
+
+`Admin → Commandes` (`/admin`) è la work queue di fulfillment: presenta separatamente stato interno dell'ordine, modalità delivery/pickup e snapshot logistico persistito. Sei card tenant-scoped (`À traiter`, `En préparation`, `À expédier`, `En transit`, `Incidents`, `Retraits prêts`) filtrano una lista server-side da 50 ordini/pagina; i conteggi supplementari sono query `count(head)` sulle sole `orders` del tenant, mentre i conteggi storici riusano `admin_order_dashboard_stats`. La ricerca server include nome, email, UUID e prefisso UUID di otto caratteri. Nessuna riga della lista interroga Packlink/BRT live.
+
+`À expédier` richiede ordine delivery in `preparing` con `picking_completed_at` e `packing_completed_at`; `En transit` richiede delivery `shipped` più stato provider `in_transit`/`out_for_delivery`. `Incidents` comprende solo `exception`/`returned`/`cancelled` normalizzati e `shipping_sync_error` persistito su ordini delivery attivi. `À traiter` include `new`, `preparing`, `ready_for_pickup`, `stock_conflict` e spedizioni attive con incidente: non equivale a tutti gli ordini non terminati. Le categorie possono sovrapporsi. `Tous` rimane la vista iniziale, con ordini terminati visivamente secondari e filtro `Terminés` dedicato.
+
+La riga espansa mostra preparazione, spedizione/ritiro e azioni. La sola suggestion carton viene caricata all'espansione tramite `GET /api/admin/orders/[id]/operation-detail` (`orders.view`, tenant-scoped), usando `loadCartonSuggestion`; le eventuali letture di profili/prodotti avvengono quindi soltanto per la riga aperta. Le CTA della lista navigano al dettaglio canonico, dove le mutazioni restano protette da `orders.manage` e dal transition service. La stampa usa la picking list esistente. Il badge di urgenza usa soglie `daily_order_digest` quando la config è valida, altrimenti i default dello stesso modulo; `picking_started_at` indica l'inizio della preparazione e `updated_at` è solo l'ultima attività disponibile per il ritiro, non un timestamp certo di «prêt depuis». La stasi tracking usa l'ultimo evento persistito e non una chiamata live. Il filtro globale `Urgents` copre le condizioni esprimibili su colonne ordine; la stasi da eventi JSON resta un badge contestuale sulla pagina caricata.
+
+Questo cockpit non sostituisce `Admin → Livraison`: quella sezione conserva tariffe, packaging, intelligence e strumenti tecnici. Il dettaglio ordine conserva la gestione completa della spedizione, comprese associazione reference e sincronizzazione. La sincronizzazione provider può già avanzare `orders.status` tramite `syncOrderShipment`/`orderTransitionService`; il cockpit non introduce nuove transizioni o side effects.
 
 `Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sei superfici di business:
 
@@ -1150,6 +1162,11 @@ apps/storefront/src/lib/shipping/calculateShipping.ts
 apps/storefront/src/lib/shipping/resolveCountryRule.ts
 apps/storefront/src/lib/shipping/packlinkShipmentList.ts   (elenco Packlink read-only: fetch limitato, riepilogo, redazione, esiti)
 apps/storefront/src/lib/shipping/syncOrderShipment.ts      (snapshot provider → orders.shipping_*; incl. shipping_estimated_delivery_at)
+apps/storefront/src/lib/orders/adminOrderOperations.ts      (classificazione e prossima azione del cockpit, pura)
+apps/storefront/src/lib/orders/loadOrderOperationDetail.ts  (letture tenant-scoped dell'espansione)
+apps/storefront/src/app/admin/(protected)/page.tsx          (conteggi e filtri tenant-scoped, lista paginata)
+apps/storefront/src/app/admin/(protected)/OrdersTable.tsx   (righe desktop e card mobile, stati separati)
+apps/storefront/src/app/api/admin/orders/[id]/operation-detail/route.ts  (carton suggestion lazy)
 apps/storefront/src/lib/orders/orderTransitionService.ts   (CAS + side effects; passa la stima salvata all'e-mail shipped)
 apps/storefront/src/lib/notifications/customerEmails.ts    (orderShippedEmail, formatEstimatedDeliveryDate)
 apps/storefront/src/app/api/shipping/quote/route.ts

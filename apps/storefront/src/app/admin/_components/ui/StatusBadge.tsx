@@ -4,7 +4,8 @@ type OrderStatus =
   | 'ready_for_pickup'
   | 'shipped'
   | 'delivered'
-  | 'cancelled';
+  | 'cancelled'
+  | 'stock_conflict';
 
 type Tone = 'info' | 'warn' | 'success' | 'danger' | 'neutral';
 
@@ -15,6 +16,7 @@ const STATUS_META: Record<OrderStatus, { label: string; tone: Tone }> = {
   shipped:          { label: 'Expédié',        tone: 'info'    },
   delivered:        { label: 'Livré',          tone: 'success' },
   cancelled:        { label: 'Annulé',         tone: 'danger'  },
+  stock_conflict:   { label: 'Conflit de stock', tone: 'danger'  },
 };
 
 const STATUS_META_IT: Record<OrderStatus, string> = {
@@ -24,17 +26,22 @@ const STATUS_META_IT: Record<OrderStatus, string> = {
   shipped:          'Spedito',
   delivered:        'Consegnato',
   cancelled:        'Annullato',
+  stock_conflict:   'Conflitto di stock',
 };
 
 export default function StatusBadge({
   status,
   lang = 'fr',
+  fulfillmentType,
 }: {
   status: string;
   lang?: 'fr' | 'it';
+  fulfillmentType?: 'delivery' | 'pickup';
 }) {
   const meta = STATUS_META[status as OrderStatus] ?? { label: status, tone: 'neutral' as Tone };
-  const label = lang === 'it'
+  const label = status === 'delivered' && fulfillmentType === 'pickup'
+    ? (lang === 'it' ? 'Ritirato' : 'Retiré')
+    : lang === 'it'
     ? (STATUS_META_IT[status as OrderStatus] ?? status)
     : meta.label;
 

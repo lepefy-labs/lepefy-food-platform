@@ -2,9 +2,15 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 1 ottobre 2026 — **v6.98 Current-State Snapshot** (Gestion Excel export; base `main` @ `8e08df3789168364cf12b2a6beda769a2ffedc84`)
+> **Aggiornato:** 2 ottobre 2026 — **v6.99 Current-State Snapshot** (cockpit ordini; base `main` @ `7b09db7d4b10e67e1968f30e226a0d4948175a7f`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
+
+---
+
+## Admin → Commandes: cockpit operativo
+
+`/admin` combina i conteggi storici della vista `admin_order_dashboard_stats` con `count(head)` tenant-scoped per `À traiter`, `À expédier`, `En transit` e `Incidents`; la lista resta paginata server-side a 50 ordini, con ricerca per nome/email/UUID o prefisso UUID e ordinamento server-side. La vista iniziale `Tous` mantiene accessibile lo storico; sei card e filtri rapidi rendono prioritario il lavoro attivo, mentre delivered/cancelled sono secondari. La riga distingue `orders.status`, `fulfillment_type` e snapshot provider senza inventare aggiornamenti live. Il dettaglio espanso carica il carton suggestion solo quando richiesto tramite `/api/admin/orders/[id]/operation-detail` (`orders.view`, tenant-scoped); le CTA rimandano al dettaglio canonico per le mutazioni `orders.manage`. L'urgenza usa le soglie del daily digest se valide, altrimenti i default dello stesso modulo. Non viene aggiunta migration né cambia la state machine; Admin → Livraison continua a gestire configurazione, tariffe, packaging e strumenti tecnici.
 
 ---
 
