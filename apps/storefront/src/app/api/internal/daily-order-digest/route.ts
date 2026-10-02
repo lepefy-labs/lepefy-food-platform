@@ -32,7 +32,7 @@ export async function POST(request:NextRequest){
   }
   const deps:DigestRunnerDeps={
     db,
-    getRecipients:(tenantId)=>getNotificationRecipients(db,tenantId,'notify_daily_digest'),
+    getRecipients:(tenantId)=>getNotificationRecipients(db,tenantId,'daily_digest'),
     getBranding:(tenantId)=>getTenantNotificationContext(tenantId),
     notify:notifyN8n,
   };

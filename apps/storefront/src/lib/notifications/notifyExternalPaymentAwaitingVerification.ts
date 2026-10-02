@@ -87,7 +87,7 @@ export async function notifyExternalPaymentAwaitingVerification({
     const recipients = await getNotificationRecipients(
       supabase,
       tenantId,
-      'notify_external_payment_pending',
+      'external_payment_pending',
     );
 
     if (recipients.length === 0) {

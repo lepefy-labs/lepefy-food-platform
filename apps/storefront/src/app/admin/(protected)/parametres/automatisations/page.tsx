@@ -17,7 +17,7 @@ export default async function ParametresAutomatisationsPage() {
     loadDailyDigestSettings(db, tenant.id),
     loadNotificationRecipients(db, tenant.id),
   ]);
-  const digestRecipients = recipients.filter((recipient) => recipient.active && recipient.notify_daily_digest).length;
+  const digestRecipients = recipients.filter((recipient) => recipient.active && recipient.subscriptions.includes('daily_digest')).length;
 
   return (
     <SettingsPageShell sectionKey="automatisations">

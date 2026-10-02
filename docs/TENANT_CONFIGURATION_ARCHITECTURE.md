@@ -109,7 +109,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Rischio:** **alto** (denaro e checkout): va migrato per ultimo, con doppia lettura e confronto.
 
 ### 3.7 Notifiche interne
-- **Tabelle:** `tenant_notification_recipients` (071, 080), con un flag `notify_*` per tipo: `card_payment`, `external_payment_pending`, `order_stock_conflict`, `event_booking_closed_reports`, `daily_digest`.
+- **Tabelle:** `tenant_notification_recipients` (071) + `tenant_notification_subscriptions` (143): un abbonamento per (destinatario, tipo, canale); catalogo dei tipi nel codice (`lib/notifications/notificationTypes.ts`). I flag `notify_*` (071–135) sono legacy, vedi `docs/NOTIFICATION_SUBSCRIPTIONS.md`.
 - **Letture:** `getNotificationRecipients()` (webhook Stripe, pagamenti esterni, conflitti di stock, report eventi, digest).
 - **Scritture:** `/api/admin/notification-recipients[/id]`.
 - **Esposizione:** S (RLS senza policy, solo service role).

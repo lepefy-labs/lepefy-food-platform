@@ -96,6 +96,12 @@ The shipping logic is the most complex part of the codebase:
 - Every conversion (assisted Stripe webhook `metadata.type = assisted_preorder`, manual confirmation, "Déjà payé") goes through `src/lib/orders/convertCheckoutSessionToOrder.ts` → RPC `convert_checkout_session_to_order` (migration 128): row lock + order/items/stock in one transaction, unique `orders.checkout_session_id`; side effects run only when `created = true`.
 - `orders.email` can be null for assisted orders: never assume an email; tracking tokens are `HMAC(orderId + (email ?? ''))`.
 
+### Internal notification recipients — `docs/NOTIFICATION_SUBSCRIPTIONS.md`
+
+- Notification types are a code catalogue (`src/lib/notifications/notificationTypes.ts`: `NOTIFICATION_TYPES`, groups, presets); the DB stores only `tenant_notification_subscriptions (tenant_id, recipient_id, type_key, channel)` (migration 143). Adding a type = one registry entry, never a new `notify_*` column (those are legacy, backfilled by 143).
+- Senders call `getNotificationRecipients(db, tenantId, '<type_key>')` (or `sendTenantEmail({ recipientFlag })`) → RPC `notification_recipient_emails`, which also drops recipients linked (`admin_user_id`) to an inactive admin/membership.
+- All subscription edits go through `POST /api/admin/notification-recipients/subscriptions` (batch of `{ recipientId, typeKey, subscribed }`); types of disabled modules (`events_enabled`) are hidden in the UI but their subscriptions are preserved.
+
 ### Gestion du commerce (suppliers, purchases, stock ledger, treasury) — `docs/BUSINESS_MANAGEMENT.md`
 
 - Admin domain under `/admin/gestion/**` + `/api/admin/gestion/**`, behind the release flag `business_management` (`tenant_feature_flags`). Every page calls `requireBusinessManagementPage()` and every handler `requireBusinessManagementApi()` (`lib/gestion/featureGate.ts`); flag off/unreadable = 404. Hiding the sidebar entry is not the security control.

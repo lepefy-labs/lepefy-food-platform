@@ -69,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       tenantId: tenant.id,
       notificationType: 'service_inquiry_created',
       idempotencyKey: `service-inquiry:${inquiry.id}`,
-      recipientFlag: 'notify_service_inquiries',
+      recipientFlag: 'service_inquiries',
       render: (context) => serviceInquiryEmail(context, {
         serviceTitle:  offering.title,
         customerName:  customer_name.trim(),

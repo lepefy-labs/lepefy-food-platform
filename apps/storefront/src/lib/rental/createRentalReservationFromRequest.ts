@@ -110,7 +110,7 @@ export async function createRentalReservationFromRequest(
       tenantId,
       notificationType: 'rental_stock_conflict',
       idempotencyKey: `rental-stock-conflict:${input.stripePaymentIntentId ?? crypto.randomUUID()}`,
-      recipientFlag: 'notify_order_stock_conflict',
+      recipientFlag: 'order_stock_conflict',
       render: (context) => rentalStockConflictEmail(context, {
         serviceTitle, customerName, customerEmail,
         refundSucceeded: isStripe ? refundSucceeded : null,
@@ -193,7 +193,7 @@ export async function createRentalReservationFromRequest(
     tenantId,
     notificationType: 'rental_reservation_confirmed_admin',
     idempotencyKey: `rental-reservation:${reservation.id}:admin`,
-    recipientFlag: 'notify_rental_reservations',
+    recipientFlag: 'rental_reservations',
     render: (context) => rentalReservationAdminEmail(context, rentalEmailInput),
   });
 
@@ -202,7 +202,7 @@ export async function createRentalReservationFromRequest(
       tenantId,
       notificationType: 'rental_delivery_quote_pending',
       idempotencyKey: `rental-delivery-quote:${reservation.id}`,
-      recipientFlag: 'notify_rental_reservations',
+      recipientFlag: 'rental_reservations',
       render: (context) => rentalDeliveryQuotePendingEmail(context, {
         reservationId: reservation.id, customerName, customerEmail, customerPhone: customerPhone || null,
         address: {

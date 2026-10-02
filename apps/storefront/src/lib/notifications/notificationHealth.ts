@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { NOTIFICATION_TYPES } from '@/lib/notifications/notificationTypes';
+import { countSubscribersByType } from '@/lib/notifications/notificationSubscriptions';
 import { checkBrevoAccount, configuredEmailTransport, type BrevoAccountStatus, type EmailTransportName } from '@/lib/notifications/emailTransport';
 
 /** Retries overdue by more than this mean the n8n retry scheduler is not calling Lepefy. */
@@ -23,18 +25,9 @@ export interface NotificationHealth {
     timezone: string | null;
     lastRun: { localDate: string; status: string; acceptedAt: string | null; errorCode: string | null } | null;
   };
-  recipients: Array<{ flag: string; label: string; count: number }>;
+  /** Deliverable subscribers per notification type (whole catalogue). */
+  recipients: Array<{ type: string; label: string; count: number }>;
 }
-
-const RECIPIENT_FLAGS: Array<[string, string]> = [
-  ['notify_daily_digest', 'Rapport quotidien (08h)'],
-  ['notify_order_stock_conflict', 'Conflit de stock'],
-  ['notify_external_payment_pending', 'Paiement externe à vérifier'],
-  ['notify_card_payment', 'Paiement carte'],
-  ['notify_event_booking_closed_reports', 'Rapports de clôture'],
-  ['notify_service_inquiries', 'Demandes de devis'],
-  ['notify_rental_reservations', 'Réservations matériel'],
-];
 
 function countByStatus(rows: Array<{ status: string }>) {
   return rows.reduce<Record<string, number>>((acc, row) => ({ ...acc, [row.status]: (acc[row.status] ?? 0) + 1 }), {});
@@ -67,11 +60,13 @@ export async function loadNotificationHealth(db: SupabaseClient, tenantId: strin
     db.from('tenant_feature_settings').select('enabled, config').eq('tenant_id', tenantId).eq('feature_key', 'daily_order_digest').maybeSingle(),
     db.from('tenant_daily_digest_runs').select('local_date, status, accepted_at, error_code').eq('tenant_id', tenantId)
       .order('local_date', { ascending: false }).limit(1).maybeSingle(),
-    db.from('tenant_notification_recipients').select('*').eq('tenant_id', tenantId).eq('active', true),
+    countSubscribersByType(db, tenantId).catch((error: unknown) => {
+      console.error('[notificationHealth] subscribers unavailable', error);
+      return {} as Record<string, number>;
+    }),
   ]);
 
   const rows = (deliveries.data ?? []) as Array<{ status: string; created_at: string }>;
-  const recipientRows = (recipients.data ?? []) as Array<Record<string, unknown>>;
   const run = digestRun.data as { local_date: string; status: string; accepted_at: string | null; error_code: string | null } | null;
   const settings = digestSettings.data as { enabled: boolean; config: { timezone?: string } | null } | null;
 
@@ -92,7 +87,7 @@ export async function loadNotificationHealth(db: SupabaseClient, tenantId: strin
       timezone: settings?.config?.timezone ?? (settings ? 'Europe/Rome' : null),
       lastRun: run ? { localDate: run.local_date, status: run.status, acceptedAt: run.accepted_at, errorCode: run.error_code } : null,
     },
-    recipients: RECIPIENT_FLAGS.map(([flag, label]) => ({ flag, label, count: recipientRows.filter((row) => row[flag] === true).length })),
+    recipients: NOTIFICATION_TYPES.map((type) => ({ type: type.key, label: type.label, count: recipients[type.key] ?? 0 })),
   };
 }
 

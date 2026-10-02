@@ -115,7 +115,7 @@ export async function createEventReservationFromRequest(
       tenantId,
       notificationType: 'event_capacity_conflict',
       idempotencyKey: `event-capacity-conflict:${input.stripePaymentIntentId ?? crypto.randomUUID()}`,
-      recipientFlag: 'notify_order_stock_conflict',
+      recipientFlag: 'order_stock_conflict',
       render: (context) => eventCapacityConflictEmail(context, {
         eventTitle: eventDetails.eventTitle,
         eventDateStart: eventDetails.eventDateStart,

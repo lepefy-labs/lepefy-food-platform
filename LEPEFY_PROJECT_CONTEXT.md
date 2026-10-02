@@ -180,7 +180,7 @@ Boutique       /boutique           slogan, storefront_url, WhatsApp
                /retrait            punto di ritiro (click_collect_address, google_maps_url, orari FR/IT); click_collect_enabled in sola lettura
                /apparence          logo/colori in sola lettura + icona app (POST/DELETE /api/admin/app-icon)
                /presence           tenant_social_links + google_review_url
-Communication  /notifications      matrice destinatari × notify_* (tenant_notification_recipients, schema invariato)
+Communication  /notifications      matrice destinatari × gruppi di tipi (tenant_notification_subscriptions, 143)
                /automatisations    card automazione "Rapport quotidien" (tenant_feature_settings 'daily_order_digest')
 Commerce       /paiements          tenant_payment_methods (logica invariata)
                /integrations       Stripe, Packlink, n8n (+ Brevo se EMAIL_TRANSPORT=brevo, Wallet se disponibile): solo presente/assente

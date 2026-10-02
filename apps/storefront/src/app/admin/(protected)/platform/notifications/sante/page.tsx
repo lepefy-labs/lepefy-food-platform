@@ -123,7 +123,7 @@ export default async function PlatformNotificationHealthPage() {
         <Card title="Destinataires internes du tenant">
           <ul className="grid gap-2 text-sm sm:grid-cols-2">
             {health.recipients.map((item) => (
-              <li key={item.flag} className="flex items-center gap-3">
+              <li key={item.type} className="flex items-center gap-3">
                 <span className={`inline-block h-2.5 w-2.5 rounded-full ${item.count > 0 ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden />
                 <span className="flex-1 text-gray-700 dark:text-gray-300">{item.label}</span>
                 <span className="font-semibold">{item.count}</span>

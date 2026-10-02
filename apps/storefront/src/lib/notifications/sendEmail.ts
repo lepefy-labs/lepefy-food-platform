@@ -1,6 +1,6 @@
 import { notifyN8n, type LedgerRequest } from '@/lib/events/notifyN8n';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getNotificationRecipients, type NotificationFlag } from '@/lib/notifications/getNotificationRecipients';
+import { getNotificationRecipients, type NotificationTypeKey } from '@/lib/notifications/getNotificationRecipients';
 import {
   getTenantNotificationContext,
   type TenantNotificationContext,
@@ -103,7 +103,7 @@ export async function sendTenantEmail(input: {
   notificationType: string;
   idempotencyKey: string;
   recipients?: string[];
-  recipientFlag?: NotificationFlag;
+  recipientFlag?: NotificationTypeKey;
   render: (context: TenantNotificationContext) => RenderedEmail;
 }): Promise<boolean> {
   try {

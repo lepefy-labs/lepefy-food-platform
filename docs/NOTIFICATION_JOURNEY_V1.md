@@ -31,7 +31,7 @@ All customer-facing order events receive the tenant notification context:
 
 Email is the outbound channel in v1. WhatsApp is exposed as a support/contact action, not as an automatic outbound status channel.
 
-Internal tenant notifications use `tenant_notification_recipients`; recipient addresses must never be hardcoded in application code or n8n workflows.
+Internal tenant notifications use `tenant_notification_recipients`; recipient addresses must never be hardcoded in application code or n8n workflows. Since migration 143 subscriptions live in `tenant_notification_subscriptions` (type keys = the `notify_*` flags below without the prefix); see `docs/NOTIFICATION_SUBSCRIPTIONS.md`.
 
 Transport: every outbound call goes through `notifyN8n` / `n8nWebhookUrl` / `n8nWebhookHeaders` (`lib/events/notifyN8n.ts`), never a hand-built `fetch`. Each request carries `X-Lepefy-Webhook-Secret`: the daily digest uses its dedicated `N8N_DAILY_DIGEST_WEBHOOK_SECRET` (fails closed), every other notification uses `N8N_NOTIFICATION_WEBHOOK_SECRET`. While the shared secret is not configured the header is omitted and a warning is logged (rollout only). Each n8n webhook must attach the matching Header Auth credential, and should answer only after the SMTP result (`responseMode: lastNode` or a Respond node), otherwise the application's `accepted`/`sent` booleans do not reflect delivery.
 

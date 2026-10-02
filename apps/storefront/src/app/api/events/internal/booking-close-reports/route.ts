@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const recipients = await getNotificationRecipients(supabase, event.tenant_id, 'notify_event_booking_closed_reports');
+    const recipients = await getNotificationRecipients(supabase, event.tenant_id, 'event_booking_closed_reports');
     if (recipients.length === 0) {
       await setError(supabase, eventId, dispatchToken, 'no_notification_recipients');
       return NextResponse.json({ error: 'Aucun destinataire configuré pour les rapports de clôture.' }, { status: 422 });

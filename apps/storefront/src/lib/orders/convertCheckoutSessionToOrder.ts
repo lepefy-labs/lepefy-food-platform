@@ -247,7 +247,7 @@ export async function convertCheckoutSessionToOrder(
     await assistedEvent('stock_conflict', { reason: result.stock_error ?? null, refund_succeeded: refundSucceeded });
 
     const recipients = await (deps.getNotificationRecipients ?? getNotificationRecipients)(
-      supabase, input.tenantId, 'notify_order_stock_conflict');
+      supabase, input.tenantId, 'order_stock_conflict');
     if (!tenantContext || !recipients.length) {
       console.error('[convertCheckoutSessionToOrder] stock conflict alert not sent — tenant context or recipients missing — order:', order.id);
     } else {

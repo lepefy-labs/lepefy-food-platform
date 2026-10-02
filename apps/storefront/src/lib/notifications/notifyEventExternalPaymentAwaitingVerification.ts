@@ -37,7 +37,7 @@ export async function notifyEventExternalPaymentAwaitingVerification({
   createdAt: string;
 }): Promise<boolean> {
   try {
-    const recipients = await getNotificationRecipients(supabase, tenantId, 'notify_external_payment_pending');
+    const recipients = await getNotificationRecipients(supabase, tenantId, 'external_payment_pending');
     if (recipients.length === 0) return false;
 
     const tenantContext = await getTenantNotificationContext(tenantId);

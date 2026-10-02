@@ -1,31 +1,26 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { NotificationTypeKey } from '@/lib/notifications/notificationTypes';
 
-export type NotificationFlag =
-  | 'notify_card_payment'
-  | 'notify_external_payment_pending'
-  | 'notify_order_stock_conflict'
-  | 'notify_event_booking_closed_reports'
-  | 'notify_daily_digest'
-  | 'notify_service_inquiries'
-  | 'notify_rental_reservations';
+export type { NotificationTypeKey } from '@/lib/notifications/notificationTypes';
 
 // Best-effort : une erreur ici ne doit jamais bloquer le flux appelant.
+// Lookup unique (RPC notification_recipient_emails, migration 143) : destinataire
+// actif, abonné au type, et membre de l'équipe lié encore actif le cas échéant.
 export async function getNotificationRecipients(
   supabase: SupabaseClient,
   tenantId: string,
-  flag: NotificationFlag,
+  type: NotificationTypeKey,
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('tenant_notification_recipients')
-    .select('email')
-    .eq('tenant_id', tenantId)
-    .eq('active', true)
-    .eq(flag, true);
+  const { data, error } = await supabase.rpc('notification_recipient_emails', {
+    p_tenant_id: tenantId,
+    p_type_key: type,
+    p_channel: 'email',
+  });
 
   if (error) {
-    console.error('[getNotificationRecipients] supabase error:', error, '— tenant:', tenantId, '— flag:', flag);
+    console.error('[getNotificationRecipients] supabase error:', error, '— tenant:', tenantId, '— type:', type);
     return [];
   }
 
-  return (data ?? []).map((row) => row.email as string);
+  return ((data ?? []) as Array<{ email: string }>).map((row) => row.email);
 }

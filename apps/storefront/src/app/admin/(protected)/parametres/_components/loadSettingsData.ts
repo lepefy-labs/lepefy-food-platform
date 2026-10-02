@@ -1,6 +1,7 @@
 import 'server-only';
-import type { Tenant, TenantNotificationRecipient, TenantSocialLink } from '@lepefy/types';
+import type { NotificationTeamMember, Tenant, TenantNotificationRecipient, TenantSocialLink } from '@lepefy/types';
 import { createServiceClient } from '@/lib/supabase/server';
+import { loadNotificationRecipients as loadRecipientsWithSubscriptions, loadNotificationTeamMembers } from '@/lib/notifications/notificationSubscriptions';
 import { dailyDigestModule, DAILY_DIGEST_FEATURE_KEY } from '@/lib/notifications/dailyDigestConfig';
 import type { DailyDigestSettingsInitial } from '../DailyDigestSettingsSection';
 import { isModuleRegistered, readModuleConfig } from '@/lib/tenantConfig/moduleConfig';
@@ -26,9 +27,23 @@ export async function loadSocialLinks(db: Db, tenantId: string): Promise<TenantS
   return (data ?? []) as TenantSocialLink[];
 }
 
+// Read errors degrade to an empty list, like the other settings loaders.
 export async function loadNotificationRecipients(db: Db, tenantId: string): Promise<TenantNotificationRecipient[]> {
-  const { data } = await db.from('tenant_notification_recipients').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: true });
-  return (data ?? []) as TenantNotificationRecipient[];
+  try {
+    return await loadRecipientsWithSubscriptions(db, tenantId);
+  } catch (error) {
+    console.error('[parametres] notification recipients unavailable', error);
+    return [];
+  }
+}
+
+export async function loadNotificationTeam(db: Db, tenantId: string): Promise<NotificationTeamMember[]> {
+  try {
+    return await loadNotificationTeamMembers(db, tenantId);
+  } catch (error) {
+    console.error('[parametres] notification team unavailable', error);
+    return [];
+  }
 }
 
 const plural = (count: number, singular: string, pluralForm: string) => `${count} ${count > 1 ? pluralForm : singular}`;

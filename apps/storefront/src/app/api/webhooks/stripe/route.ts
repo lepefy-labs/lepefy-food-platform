@@ -498,7 +498,7 @@ export async function POST(req: NextRequest) {
       }
 
       const conflictContext = await getTenantNotificationContext(resolvedTenantId);
-      const conflictRecipients = await getNotificationRecipients(supabase, resolvedTenantId, 'notify_order_stock_conflict');
+      const conflictRecipients = await getNotificationRecipients(supabase, resolvedTenantId, 'order_stock_conflict');
       if (!conflictContext || !conflictRecipients.length) {
         console.error('[webhook] stock conflict alert not sent — tenant context or recipients missing — order:', order.id);
       } else {
@@ -617,10 +617,10 @@ async function handleCardQuickPaymentSucceeded(intent: Stripe.PaymentIntent): Pr
     return NextResponse.json({ received: true });
   }
 
-  const recipients = await getNotificationRecipients(supabase, payment.tenant_id, 'notify_card_payment');
+  const recipients = await getNotificationRecipients(supabase, payment.tenant_id, 'card_payment');
 
   if (recipients.length === 0) {
-    console.warn('[webhook] Nessun destinatario notify_card_payment configurato per tenant:', payment.tenant_id, '— email non verrà inviata');
+    console.warn('[webhook] Nessun destinatario card_payment configurato per tenant:', payment.tenant_id, '— email non verrà inviata');
   }
 
   // Best-effort, after the paid update: never throws, never changes the
