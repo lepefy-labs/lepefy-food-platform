@@ -51,7 +51,7 @@ begin
 
   -- Constraints: tenant-consistent FK, key format, channel, PK, cascade.
   begin
-    insert into public.tenant_notification_subscriptions (tenant_id, recipient_id, type_key) values (t2, owner, 'card_payment');
+    insert into public.tenant_notification_subscriptions (tenant_id, recipient_id, type_key) values (t2, owner, 'rental_reservations');
     raise exception 'constraint_missing';
   exception when foreign_key_violation then null; end;
   begin
