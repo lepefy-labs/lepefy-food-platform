@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 ottobre 2026 — **v6.99 Current-State Snapshot** (cockpit ordini; base `main` @ `7b09db7d4b10e67e1968f30e226a0d4948175a7f`)
+> **Aggiornato:** 2 ottobre 2026 — **v7.00 Current-State Snapshot** (cockpit ordini: work queue per priorità operativa; base `main` @ `7431681d273bb9bfe0c8bc422a3def8a72fb4f07`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -10,7 +10,26 @@
 
 ## Admin → Commandes: cockpit operativo
 
-`/admin` combina i conteggi storici della vista `admin_order_dashboard_stats` con `count(head)` tenant-scoped per `À traiter`, `À expédier`, `En transit` e `Incidents`; la lista resta paginata server-side a 50 ordini, con ricerca per nome/email/UUID o prefisso UUID e ordinamento server-side. La vista iniziale `Tous` mantiene accessibile lo storico; sei card e filtri rapidi rendono prioritario il lavoro attivo, mentre delivered/cancelled sono secondari. La riga distingue `orders.status`, `fulfillment_type` e snapshot provider senza inventare aggiornamenti live. Il dettaglio espanso carica il carton suggestion solo quando richiesto tramite `/api/admin/orders/[id]/operation-detail` (`orders.view`, tenant-scoped); le CTA rimandano al dettaglio canonico per le mutazioni `orders.manage`. L'urgenza usa le soglie del daily digest se valide, altrimenti i default dello stesso modulo. Non viene aggiunta migration né cambia la state machine; Admin → Livraison continua a gestire configurazione, tariffe, packaging e strumenti tecnici.
+`/admin` è la work queue di fulfillment. Un classificatore puro unico, `classifyOrderOperation` (`lib/orders/adminOrderOperations.ts`), assegna a ogni ordine: gruppo di priorità, flag KPI, anomalia affidabile, urgenza e prossima azione. Le soglie sono `prepare_hours`, `pickup_hours` e `tracking_stale_hours` del daily digest, con i default del modulo come ripiego. KPI, viste, ordinamento e righe usano tutti lo stesso classificatore.
+
+L'ordinamento predefinito è `sort=priority` («Priorité opérationnelle»), nell'ordine: Action requise → Préparation en retard → Retrait en retard → En préparation → À expédier → Expéditions en cours → Retraits prêts → Terminées. Gli ordini attivi vanno dal più vecchio, i terminati dal più recente. Restano disponibili `newest`, `oldest`, `amount_desc`, `amount_asc`, e le vecchie chiavi `date_*`/`total_*` sono alias.
+
+`lib/orders/loadOrderWorkQueue.ts` legge una sola volta, in forma leggera, gli ordini attivi del tenant (senza items). Gli eventi tracking si leggono solo per le spedizioni in movimento. Da qui escono i KPI tenant-wide e l'ordinamento, che avviene **prima** della paginazione da 50; i terminati seguono dal DB e le righe complete si leggono solo per la pagina. Oltre 5 000 ordini attivi la lista ripiega sull'ordine per data, con un avviso.
+
+Semantica dei KPI e delle viste:
+- `À traiter`: esclude ritiri in attesa normale e transiti regolari.
+- `Incidents`: solo stati provider `exception`/`returned`/`cancelled` o `shipping_sync_error`.
+- `Urgents`: i primi tre gruppi.
+
+Filtri: un solo sistema, cioè i filtri rapidi più i select Statut/date/Paiement; lo stato è in query string.
+
+Ogni riga separa: stato ordine, modalità, pill `Transport : …` (stato provider persistito), anomalia e CTA.
+- Durate in ore sotto 48 h, poi in giorni.
+- Reference e tracking copiabili.
+- UI in «préparation»/«emballage».
+- Le CTA aprono il dettaglio canonico (mutazioni sotto `orders.manage` e transition service); «Voir le suivi» apre invece l'URL transporteur validato.
+
+La riga espansa carica la carton suggestion solo all'apertura, via `/api/admin/orders/[id]/operation-detail` (`orders.view`, tenant-scoped). Nessuna migration, nessuna nuova transizione, nessuna chiamata provider dalla lista. Admin → Livraison continua a gestire configurazione, tariffe, packaging e strumenti tecnici. Dettagli: `docs/SHIPPING_INTELLIGENCE.md` §3.0.
 
 ---
 

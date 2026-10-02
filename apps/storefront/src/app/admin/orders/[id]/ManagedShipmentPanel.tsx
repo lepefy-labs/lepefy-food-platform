@@ -58,7 +58,7 @@ export default function ManagedShipmentPanel({ order, provider, ready }: {
                 className="min-h-11 w-full rounded-lg border border-[var(--admin-border)] bg-transparent px-3 text-sm focus:ring-2 focus:ring-[var(--admin-primary)]" />
               <button disabled={busy || !reference.trim()} className={`${button} bg-[var(--admin-primary)] text-white`}>{busy ? 'Vérification…' : 'Vérifier et associer'}</button>
             </form>
-          ) : <p className="text-sm text-gray-500">Terminez le picking, les contrôles froid et le packing avant d’associer une expédition.</p>}
+          ) : <p className="text-sm text-gray-500">Terminez la préparation, les contrôles froid et l’emballage avant d’associer une expédition.</p>}
           <p className="text-xs text-gray-500">Le transporteur, le tracking et les statuts seront récupérés automatiquement.</p>
         </>
       )}

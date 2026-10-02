@@ -10,6 +10,8 @@ interface AdminFiltersProps {
   currentPayment: string
   statusCounts?: Record<string, number>
   hideStatus?: boolean
+  /** Fulfillment is driven by the quick filters (Livraison / Retrait) on /admin. */
+  hideFulfillment?: boolean
 }
 
 const filters = [
@@ -24,6 +26,7 @@ const filters = [
       { key: 'shipped', label: 'Expédié' },
       { key: 'delivered', label: 'Livré' },
       { key: 'cancelled', label: 'Annulé' },
+      { key: 'stock_conflict', label: 'Conflit de stock' },
     ],
   },
   {
@@ -43,6 +46,8 @@ const filters = [
       { key: 'stripe', label: 'Carte bancaire' },
       { key: 'satispay', label: 'Satispay' },
       { key: 'in_store', label: 'En magasin' },
+      { key: 'external_link', label: 'Lien de paiement' },
+      { key: 'cash', label: 'Espèces' },
     ],
   },
 ]
@@ -70,6 +75,7 @@ export default function AdminFilters({
   currentPayment,
   statusCounts,
   hideStatus = false,
+  hideFulfillment = false,
 }: AdminFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -119,7 +125,7 @@ export default function AdminFilters({
   }
 
   const statusFilter = filters.find(filter => filter.paramKey === 'status')!
-  const otherFilters = filters.filter(filter => filter.paramKey !== 'status')
+  const otherFilters = filters.filter(filter => filter.paramKey !== 'status' && !(hideFulfillment && filter.paramKey === 'fulfillment'))
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">

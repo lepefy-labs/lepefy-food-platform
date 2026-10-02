@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@7b09db7d4b10e67e1968f30e226a0d4948175a7f`
+> **Base codice verificata:** `main@7431681d273bb9bfe0c8bc422a3def8a72fb4f07`
 > **Ultima verifica:** 2 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
@@ -86,13 +86,67 @@ Comprende:
 
 ### 3.0 Confine con il cockpit ordini
 
-Gli eventi tracking JSON sono caricati in un solo batch per le spedizioni associate della pagina corrente, evitando di serializzarli per ogni ordine nella query principale.
+`Admin → Commandes` (`/admin`) è la **work queue di fulfillment**, non una lista cronologica. Ogni riga tiene separati cinque assi:
 
-`Admin → Commandes` (`/admin`) è la work queue di fulfillment: presenta separatamente stato interno dell'ordine, modalità delivery/pickup e snapshot logistico persistito. Sei card tenant-scoped (`À traiter`, `En préparation`, `À expédier`, `En transit`, `Incidents`, `Retraits prêts`) filtrano una lista server-side da 50 ordini/pagina; i conteggi supplementari sono query `count(head)` sulle sole `orders` del tenant, mentre i conteggi storici riusano `admin_order_dashboard_stats`. La ricerca server include nome, email, UUID e prefisso UUID di otto caratteri. Nessuna riga della lista interroga Packlink/BRT live.
+- stato interno dell'ordine (`StatusBadge`, `orders.status`);
+- modalità (`Livraison` / `Retrait magasin`);
+- stato logistico del provider (pill `Transport : …` da `shipping_normalized_status` / `shipping_sync_error`, via `shipmentStatusLabel`);
+- prossima azione;
+- anomalia o urgenza.
 
-`À expédier` richiede ordine delivery in `preparing` con `picking_completed_at` e `packing_completed_at`; `En transit` richiede delivery `shipped` più stato provider `in_transit`/`out_for_delivery`. `Incidents` comprende solo `exception`/`returned`/`cancelled` normalizzati e `shipping_sync_error` persistito su ordini delivery attivi. `À traiter` include `new`, `preparing`, `ready_for_pickup`, `stock_conflict` e spedizioni attive con incidente: non equivale a tutti gli ordini non terminati. Le categorie possono sovrapporsi. `Tous` rimane la vista iniziale, con ordini terminati visivamente secondari e filtro `Terminés` dedicato.
+Stato ordine e stato provider non vengono mai fusi. La sincronizzazione provider resta l'unico punto che può far avanzare `orders.status` (`syncOrderShipment` → `orderTransitionService`).
 
-La riga espansa mostra preparazione, spedizione/ritiro e azioni. La sola suggestion carton viene caricata all'espansione tramite `GET /api/admin/orders/[id]/operation-detail` (`orders.view`, tenant-scoped), usando `loadCartonSuggestion`; le eventuali letture di profili/prodotti avvengono quindi soltanto per la riga aperta. Le CTA della lista navigano al dettaglio canonico, dove le mutazioni restano protette da `orders.manage` e dal transition service. La stampa usa la picking list esistente. Il badge di urgenza usa soglie `daily_order_digest` quando la config è valida, altrimenti i default dello stesso modulo; `picking_started_at` indica l'inizio della preparazione e `updated_at` è solo l'ultima attività disponibile per il ritiro, non un timestamp certo di «prêt depuis». La stasi tracking usa l'ultimo evento persistito e non una chiamata live. Il filtro globale `Urgents` copre le condizioni esprimibili su colonne ordine; la stasi da eventi JSON resta un badge contestuale sulla pagina caricata.
+**Classificatore unico.** `classifyOrderOperation(order, thresholds, now)` (`lib/orders/adminOrderOperations.ts`, puro e client-safe) restituisce gruppo di priorità, flag della coda, anomalia affidabile, urgenza, nota contestuale e prossima azione. KPI, viste, ordinamento, righe e card mobile lo usano tutti: nessuna regola della coda vive nel JSX o in un SQL separato. Le soglie sono quelle tenant-scoped del modulo `daily_order_digest` (`prepare_hours`, `pickup_hours`, `tracking_stale_hours`); se la config non è valida valgono i default dello stesso modulo.
+
+| Gruppo (ordine "Priorité opérationnelle") | Regola | Ordine interno |
+|---|---|---|
+| Action requise | `stock_conflict`; incidente provider (`exception`/`returned`/`cancelled`) o `shipping_sync_error` su delivery attiva; pagamento non `paid`; delivery `shipped` senza tracking né reference; suivi senza movimento oltre `tracking_stale_hours`; ETA superata in transito | `created_at` crescente |
+| Préparation en retard | `new`/`preparing` non ancora imballato, oltre `prepare_hours` da `picking_started_at` (o `created_at`) | più vecchio prima |
+| Retrait en retard | `ready_for_pickup` oltre `pickup_hours` da `updated_at` | più vecchio prima |
+| En préparation | `new`/`preparing` | più vecchio prima |
+| À expédier | delivery `preparing` con `picking_completed_at` e `packing_completed_at` | `packing_completed_at` crescente |
+| Expéditions en cours | `shipped` senza anomalie | `shipped_at` crescente |
+| Retraits prêts | `ready_for_pickup` non in ritardo | più vecchio prima |
+| Terminées | `delivered`/`cancelled` | `updated_at` decrescente |
+
+A parità di valori decidono `created_at` e poi `id`, quindi l'ordinamento è stabile.
+
+**KPI**
+
+- `À traiter`: tutti i gruppi tranne `Expéditions en cours`, `Retraits prêts` e `Terminées`. Un ritiro in attesa normale o un transito regolare non sono azioni.
+- `Urgents`: i primi tre gruppi.
+- `Incidents`: solo anomalie confermate dal provider (stato normalizzato o errore di synchro), mai stime euristiche.
+- `En préparation`, `À expédier`, `En transit` (`in_transit`/`out_for_delivery`) e `Retraits prêts`: flag diretti.
+
+Le categorie possono sovrapporsi. Per i ritiri, `updated_at` è solo l'ultima attività (il testo dice «Inactive depuis…»): non esiste un timestamp certo di «prête depuis».
+
+**Caricamento server-side (`lib/orders/loadOrderWorkQueue.ts`, nessuna migration)**
+
+1. Una lettura leggera degli ordini **attivi** del tenant: colonne di stato, timestamp e snapshot, senza `order_items`. Se ci sono filtri, si aggiunge la stessa lettura filtrata.
+2. Gli eventi tracking JSON si leggono solo per le spedizioni in movimento con reference, a batch di 200 id.
+3. La classificazione produce i KPI tenant-wide.
+4. Con `sort=priority` gli attivi sono ordinati **prima** della paginazione. La finestra di pagina (`planPriorityPage`) prende gli id attivi del set ordinato, poi prosegue con i terminati letti dal DB (`updated_at` desc, `range`).
+5. Le righe complete (con items) si leggono solo per i ≤ 50 id della pagina.
+
+Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo stesso set classificato, quindi coincidono con i KPI. Restano invece paginati dal DB `Terminés`, gli ordinamenti per data/importo e le viste di controllo legacy (`payment_pending`, `aged`, `picking_incomplete`, `packing_pending`, `tracking_missing`).
+
+**Compromesso documentato:** la coda attiva è tenuta in memoria lato server. Oltre `ACTIVE_ORDER_LIMIT` (5 000 ordini attivi) la lista ripiega sull'ordine per data con un avviso, e i KPI diventano parziali. Nessuna riga interroga Packlink/BRT live; il poller della pagina rilegge solo il DB.
+
+**Query string.** Parametri: `view`, `status`, `fulfillment`, `payment`, `dateFrom`, `dateTo`, `q`, `sort`, `page`. `sort` accetta `priority` (default, omesso dall'URL), `newest`, `oldest`, `amount_desc`, `amount_asc`; i vecchi `date_desc`/`date_asc`/`total_desc`/`total_asc` restano alias. Esiste un solo sistema di filtri: i filtri rapidi (`Tous`, `Livraison`, `Retrait`, `Urgents`, `Incidents`, `Terminés`) più i select `Statut` / date / `Paiement`. Ogni filtro conserva gli altri parametri.
+
+**Riga e azioni**
+
+- **Durate:** `formatOperationalDuration` (ore sotto 48 h, poi giorni).
+- **Reference e tracking:** su righe separate (`Réf.` / `Suivi`), in monospace, copiabili.
+- **Avvisi:** solo per anomalie reali o per la nota `Expédition à associer` (delivery imballata, modalità managed, senza reference).
+- **CTA:** solo flussi esistenti. Tutte aprono il dettaglio canonico, dove le mutazioni restano sotto `orders.manage` e passano dal transition service. Fanno eccezione `Voir le suivi` / `Vérifier le suivi`, che aprono l'URL transporteur validato da `safeShipmentTrackingUrl` (fallback al dettaglio).
+- **Terminologia tenant:** «préparation» ed «emballage», non «picking»/«packing».
+- **Ordini terminati:** testo attenuato e CTA terziaria `Voir`.
+- **Riga espansa**, tre sezioni:
+  - preparazione: articoli, ubicazione, peso, colli, carton suggestion caricata solo all'apertura via `GET /api/admin/orders/[id]/operation-detail` (`orders.view`), righe senza peso;
+  - spedizione: destinazione, transporteur e servizio, provider, reference e tracking copiabili, stato provider con ultima synchro, ultimo movimento, ETA; per i ritiri: urgenza e contatto;
+  - azioni esplicite: `Imprimer la liste de préparation`, `Voir la commande`, `Voir le suivi transporteur`.
+- **Mobile:** card operative con CTA a tutta larghezza (44 px), pulsante di dettaglio e le stesse intestazioni di gruppo.
 
 Questo cockpit non sostituisce `Admin → Livraison`: quella sezione conserva tariffe, packaging, intelligence e strumenti tecnici. Il dettaglio ordine conserva la gestione completa della spedizione, comprese associazione reference e sincronizzazione. La sincronizzazione provider può già avanzare `orders.status` tramite `syncOrderShipment`/`orderTransitionService`; il cockpit non introduce nuove transizioni o side effects.
 
@@ -1162,10 +1216,12 @@ apps/storefront/src/lib/shipping/calculateShipping.ts
 apps/storefront/src/lib/shipping/resolveCountryRule.ts
 apps/storefront/src/lib/shipping/packlinkShipmentList.ts   (elenco Packlink read-only: fetch limitato, riepilogo, redazione, esiti)
 apps/storefront/src/lib/shipping/syncOrderShipment.ts      (snapshot provider → orders.shipping_*; incl. shipping_estimated_delivery_at)
-apps/storefront/src/lib/orders/adminOrderOperations.ts      (classificazione e prossima azione del cockpit, pura)
+apps/storefront/src/lib/orders/adminOrderOperations.ts      (classificatore unico del cockpit: gruppi di priorità, flag KPI, anomalie, durate, prossima azione, sort; puro)
+apps/storefront/src/lib/orders/loadOrderWorkQueue.ts        (work queue server-side: set attivo leggero, KPI, sort prima della paginazione, righe di pagina)
 apps/storefront/src/lib/orders/loadOrderOperationDetail.ts  (letture tenant-scoped dell'espansione)
-apps/storefront/src/app/admin/(protected)/page.tsx          (conteggi e filtri tenant-scoped, lista paginata)
-apps/storefront/src/app/admin/(protected)/OrdersTable.tsx   (righe desktop e card mobile, stati separati)
+apps/storefront/src/app/admin/(protected)/page.tsx          (KPI, filtri unificati e query string del cockpit)
+apps/storefront/src/app/admin/(protected)/OrdersSortSelect.tsx  (select di ordinamento, default priority)
+apps/storefront/src/app/admin/(protected)/OrdersTable.tsx   (righe desktop e card mobile, gruppi di priorità, stato ordine e Transport separati)
 apps/storefront/src/app/api/admin/orders/[id]/operation-detail/route.ts  (carton suggestion lazy)
 apps/storefront/src/lib/orders/orderTransitionService.ts   (CAS + side effects; passa la stima salvata all'e-mail shipped)
 apps/storefront/src/lib/notifications/customerEmails.ts    (orderShippedEmail, formatEstimatedDeliveryDate)
@@ -1203,6 +1259,14 @@ Se n8n si ferma o non esegue i job, impostare `SHIPPING_CAMPAIGN_N8N_ACTIVE=fals
 ---
 
 ## 24. Troubleshooting
+
+### Cockpit ordini: un ordine non appare dove atteso
+
+- **Soglie di ritardo:** vengono da `Paramètres → Automatisations` (rapporto quotidiano). Con config invalida valgono i default del modulo.
+- **Incidents:** mostra solo anomalie confermate dal provider. Un suivi fermo o un'ETA superata stanno in `Urgents` / `Action requise`, non in `Incidents`.
+- **Ritiro "in ritardo":** si basa su `updated_at` (ultima attività), quindi qualunque modifica dell'ordine riavvia il conteggio.
+- **Avviso «Plus de 5 000 commandes actives»:** la coda attiva supera `ACTIVE_ORDER_LIMIT` e la lista è ordinata per data. Chiudere gli ordini consegnati o ritirati, oppure rivedere il limite in `loadOrderWorkQueue.ts`.
+
 
 ### Campagna resta queued
 
