@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { IconArrowDown, IconCheck, IconPackage, IconPrinter, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { orderDetailTransition } from '@/lib/orders/adminOrderOperations';
+import { carrierDisplayName } from '@/lib/shipping/shipmentPresentation';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 import PackingPanel from './PackingPanel';
@@ -54,15 +55,8 @@ interface Props {
   nextStep?: NextStepGuide | null;
 }
 
-const CARRIER_MAP: Record<string, string> = {
-  brt: 'BRT', bartolini: 'BRT', dhl: 'DHL', fedex: 'FedEx', tnt: 'TNT',
-  gls: 'GLS', ups: 'UPS', sda: 'SDA', poste: 'Poste Italiane',
-  'poste italiane': 'Poste Italiane', dpd: 'DPD', nexive: 'Nexive',
-};
-
 function formatCarrierName(raw: string | undefined): string {
-  if (!raw) return '—';
-  return CARRIER_MAP[raw.toLowerCase().trim()] ?? raw.trim();
+  return carrierDisplayName(raw) ?? '—';
 }
 
 function Field({ label, value, bold }: { label: string; value: string; bold?: boolean }) {

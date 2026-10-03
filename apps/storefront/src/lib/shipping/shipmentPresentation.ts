@@ -33,3 +33,15 @@ export function shipmentEventsNewestFirst(value: unknown): ShipmentTrackingEvent
     && typeof event.description === 'string' && typeof event.status === 'string')
     .slice(-100).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 }
+
+const CARRIER_NAMES: Record<string, string> = {
+  brt: 'BRT', bartolini: 'BRT', dhl: 'DHL', fedex: 'FedEx', tnt: 'TNT',
+  gls: 'GLS', ups: 'UPS', sda: 'SDA', poste: 'Poste Italiane',
+  'poste italiane': 'Poste Italiane', poste_italiane: 'Poste Italiane', dpd: 'DPD', nexive: 'Nexive',
+};
+/** Carrier name as staff expect to read it ("brt" → "BRT"); unknown names are kept as typed. */
+export function carrierDisplayName(raw: string | null | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  return CARRIER_NAMES[value.toLowerCase()] ?? value;
+}

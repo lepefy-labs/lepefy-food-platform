@@ -28,7 +28,7 @@ import { buildTrackingShareMessage, preorderReference } from '@/lib/orders/assis
 import { shopBaseUrl } from '@/lib/orders/assisted/assistedOrderServer'
 import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
 import { loadCartonSuggestion } from '@/lib/shipping/loadCartonSuggestion'
-import { shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation'
+import { carrierDisplayName, shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
 import { dailyDigestModule, DAILY_DIGEST_DEFAULTS } from '@/lib/notifications/dailyDigestConfig'
 import { readModuleConfig } from '@/lib/tenantConfig/moduleConfig'
@@ -230,7 +230,8 @@ export default async function AdminOrderPage({ params }: PageProps) {
   }
   const ctaHref = terminal ? null : sectionHref[operation.action.section]
   const showCta = Boolean(ctaHref) && (canManage || operation.action.intent === 'tracking')
-  const nextStep: NextStepGuide | null = !terminal && !transition && ctaHref && SECTION_HINTS[operation.action.section]
+  // Guidance only for a step the team must take; a plain consultation (normal transit) needs none.
+  const nextStep: NextStepGuide | null = !terminal && !transition && operation.action.primary && ctaHref && SECTION_HINTS[operation.action.section]
     ? { label: operation.action.label, hint: SECTION_HINTS[operation.action.section]!, href: ctaHref }
     : null
 
@@ -356,7 +357,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
           {showTracking && (
             <ShipmentTrackingCard
               order={order}
-              carrier={order.tracking_carrier ?? shippingDetails?.carrierName ?? null}
+              carrier={carrierDisplayName(order.tracking_carrier ?? shippingDetails?.carrierName)}
               service={shippingDetails?.serviceName ?? null}
               parcels={order.packing_parcel_count ?? shippingDetails?.numParcels ?? null}
               weight={shippingDetails?.totalWeightG ? `${(shippingDetails.totalWeightG / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kg` : null}

@@ -154,7 +154,8 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 - **Alert:** un solo alert per anomalia, urgenza oltre soglia o `Expédition à associer`. Spariscono il vecchio «+24 h» fisso e «Ouverte depuis» sugli ordini terminati.
 - **CTA dell'header:** stesso testo della lista. Porta alla sezione indicata da `NextOrderAction.section`: checklist, `#order-packing`, `#order-shipment`, `#order-tracking`, `#order-payment`/`#order-origin` o il pannello transizioni.
 - **Transizioni di stato:** vengono da `orderDetailTransition(order, managed)` (helper puro unico) e passano da `PATCH /api/admin/orders/[id]` → `orderTransitionService`. Con spedizione managed, «expédiée» e «livrée» arrivano solo dalla sync.
-- **Prossima azione senza transizione:** il pannello mostra solo una guida verso la sezione competente, senza duplicare mutazioni.
+- **Prossima azione senza transizione:** se l'azione è primaria (un intervento dell'équipe), il pannello mostra solo una guida verso la sezione competente, senza duplicare mutazioni. Una semplice consultazione, come il transito regolare, non genera guida.
+- **Nomi dei transporteur:** normalizzati per la lettura con `carrierDisplayName` (`shipmentPresentation.ts`), sia nella lista sia nel dettaglio.
 - **`ShipmentTrackingCard` (sezione «Suivi transporteur»):** mostra stato provider, transporteur, servizio, colli, peso, ETA, reference e tracking copiabili (`CopyableValue`), ultima synchro, link transporteur validato e la timeline degli eventi persistiti (`shipmentEventsNewestFirst` + `shipmentEventLabel`, 4 visibili poi «Afficher tout»). Nessuna chiamata live.
 - **`ManagedShipmentPanel`:** resta il solo punto per associare, sincronizzare o passare al suivi manuel, con un riepilogo compatto.
 - **Senza `orders.manage`:** la pagina è in lettura (banner «Lecture seule», nessun controllo di modifica); l'API resta il controllo autorevole.

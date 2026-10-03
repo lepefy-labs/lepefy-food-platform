@@ -4,7 +4,7 @@ import {
   nextOrderAction, orderDetailTransition, orderQueueFlags, parseOrderSort, transportState, urgencyLabel,
   type OperationalOrder, type PrioritizedOrder,
 } from '../../src/lib/orders/adminOrderOperations';
-import { shipmentEventLabel, shipmentEventsNewestFirst } from '../../src/lib/shipping/shipmentPresentation';
+import { carrierDisplayName, shipmentEventLabel, shipmentEventsNewestFirst } from '../../src/lib/shipping/shipmentPresentation';
 
 const now = new Date('2026-10-02T12:00:00Z');
 const thresholds = { prepareHours: 24, pickupHours: 48, trackingStaleHours: 72 };
@@ -219,5 +219,14 @@ test.describe('order detail alignment', () => {
       { occurredAt: '2026-10-01T08:10:00Z', description: 'IN CONSEGNA', providerStatus: null, status: 'out_for_delivery' },
     ]);
     expect(events.map(shipmentEventLabel)).toEqual(['En livraison', 'Pris en charge']);
+  });
+
+  test('carrier names are normalised for display, unknown ones kept as typed', () => {
+    expect(carrierDisplayName('brt')).toBe('BRT');
+    expect(carrierDisplayName(' Poste Italiane ')).toBe('Poste Italiane');
+    expect(carrierDisplayName('poste_italiane')).toBe('Poste Italiane');
+    expect(carrierDisplayName('Chronopost')).toBe('Chronopost');
+    expect(carrierDisplayName('  ')).toBeNull();
+    expect(carrierDisplayName(null)).toBeNull();
   });
 });

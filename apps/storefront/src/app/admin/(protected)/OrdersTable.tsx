@@ -11,7 +11,7 @@ import {
   classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS, transportState,
   type OperationalThresholds, type OrderOperation, type OrderSortKey,
 } from '@/lib/orders/adminOrderOperations';
-import { safeShipmentTrackingUrl, shipmentDate, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { carrierDisplayName, safeShipmentTrackingUrl, shipmentDate } from '@/lib/shipping/shipmentPresentation';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
 import StatusBadge from '../_components/ui/StatusBadge';
@@ -49,7 +49,7 @@ function weightLabel(order: ListOrder) {
   const weight = order.shipping_details?.totalWeightG;
   return typeof weight === 'number' && Number.isFinite(weight) && weight > 0 ? `${(weight / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kg` : null;
 }
-function carrierOf(order: ListOrder) { return order.tracking_carrier ?? order.shipping_details?.carrierName ?? null; }
+function carrierOf(order: ListOrder) { return carrierDisplayName(order.tracking_carrier ?? order.shipping_details?.carrierName); }
 function coldSummary(order: ListOrder) {
   return order.order_items.reduce((total, item) => {
     if (item.storage_type === 'fresh') total.fresh += item.quantity;
