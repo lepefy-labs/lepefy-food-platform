@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 ottobre 2026 — **v7.04 Current-State Snapshot** (Nouvelle commande: checklist, riordino, guardia di uscita; base `main` @ `8c7a3b394229527856a545a4e8eb9a5d9ff4df51`)
+> **Aggiornato:** 3 ottobre 2026 — **v7.05 Current-State Snapshot** (Clients: KPI cliccabili, ordinamento, scheda operativa; base `main` @ `8c53c495728ae89b0097a79e8cc7659ade273303`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -599,6 +599,16 @@ Il form «Nouvelle commande» / «Modifier» (`AssistedOrderForm`):
 - **Uscita**: chiede conferma prima di uscire con dati non salvati.
 - **Mobile**: usa etichette di azione esplicite.
 - **Invariati**: creazione, conversione e pagamenti.
+
+Admin → Clients.
+- **Lista**: i KPI aprono il segmento corrispondente (Clients, Actifs 90 j, Nouveaux, À risque) e c'è un chip «Actifs». L'ordinamento è in query string (`sort`: dernière activité, dépensé, commandes, nom, création; `parseCustomerSort`). Le fonti sono tradotte e il «Dernier achat» è relativo.
+- **Scheda**:
+  - «Nouvelle commande» (`orders.manage`) apre `/admin/orders/new?customer=<id>`.
+  - «WhatsApp» (`wa.me`, solo numeri internazionali) ed «E-mail» compaiono solo se il contatto esiste.
+  - Modifier, Note e Tag solo con `customers.manage`.
+  - Cronologia, commande, punti, consensi e campagne usano etichette francesi (`lib/admin/crmLabels.ts`, `StatusBadge`); i valori sconosciuti restano grezzi.
+- **Modali**: etichette ed Esc.
+- **Invariati**: segmenti, campagne, RFM e consensi.
 
 Link pubblico: token opaco = HMAC(`TRACKING_SECRET`, sessione + nonce), ricercato per SHA-256 tenant-scoped, revocato cambiando nonce; valido 72 h con prezzi garantiti; ogni emissione riapplica prezzi catalogo, disponibilità e spedizione; una modifica revoca il link, annulla il PaymentIntent (rifiutata se il pagamento è in corso) e riporta in `draft`. `/pay/[token]` (fuori dal layout shop, noindex) mostra solo dati di pagamento e propone Stripe (`StripePaymentStep`, `metadata.type = assisted_preorder`) e i `tenant_payment_methods` attivi del modulo shop (bonifico con riferimento `P-XXXXXXXX`); la scelta di un metodo esterno porta a `awaiting_verification`, mai a una conferma. Il successo è mostrato solo quando il server riporta `completed`.
 

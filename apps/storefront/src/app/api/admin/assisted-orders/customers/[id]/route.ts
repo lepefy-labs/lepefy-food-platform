@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!/^[0-9a-f-]{36}$/i.test(params.id)) return NextResponse.json({ error: 'Client invalide.' }, { status: 400 });
 
   const supabase = createServiceClient();
-  const { data: customer } = await supabase.from('customers').select('id')
+  const { data: customer } = await supabase.from('customers').select('id, full_name, email, phone')
     .eq('id', params.id).eq('tenant_id', tenant.id).maybeSingle();
   if (!customer) return NextResponse.json({ error: 'Client introuvable.' }, { status: 404 });
 
@@ -48,6 +48,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (lastOrderResult.error) console.error('[admin/assisted-orders/customers/:id] last order failed:', lastOrderResult.error);
   const last = lastOrderResult.data as { id: string; created_at: string; total: number; order_items: Array<{ product_id: string | null; name: string; quantity: number }> | null } | null;
   return NextResponse.json({
+    customer,
     addresses: data ?? [],
     lastOrder: last && (last.order_items ?? []).length > 0
       ? {

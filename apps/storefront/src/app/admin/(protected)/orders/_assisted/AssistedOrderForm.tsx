@@ -79,10 +79,13 @@ export default function AssistedOrderForm({
   currency,
   defaultCountry,
   initial,
+  prefillCustomerId = null,
 }: {
   currency: string;
   defaultCountry: string;
   initial?: AssistedFormInitial;
+  /** Customer to preselect (new order opened from a CRM customer page). */
+  prefillCustomerId?: string | null;
 }) {
   const router = useRouter();
   const isEdit = Boolean(initial);
@@ -111,6 +114,7 @@ export default function AssistedOrderForm({
   const [productSearching, setProductSearching] = useState(false);
   const [groups, setGroups] = useState<QuantityGroupOption[] | null>(null);
   const [initialLoading, setInitialLoading] = useState(Boolean(initial?.items.length));
+  const [prefillPending, setPrefillPending] = useState(Boolean(prefillCustomerId && !initial));
 
   // ── Remise / livraison ────────────────────────────────────────────────────
   const [fulfillment, setFulfillment] = useState<'delivery' | 'pickup'>(initial?.fulfillmentType ?? 'delivery');
@@ -260,6 +264,20 @@ export default function AssistedOrderForm({
     setNewCustomer(false);
     setAddress((current) => (current.full_name ? current : { ...current, full_name: customer.full_name ?? '' }));
   }, []);
+
+  // Preselect the customer passed from the CRM page (tenant-scoped read).
+  useEffect(() => {
+    if (!prefillCustomerId || initial) return;
+    let cancelled = false;
+    fetch(`/api/admin/assisted-orders/customers/${prefillCustomerId}`, { cache: 'no-store' })
+      .then(async (res) => {
+        const body = await res.json().catch(() => null) as { customer?: CustomerOption | null } | null;
+        if (!cancelled && res.ok && body?.customer) selectCustomer(body.customer);
+      })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setPrefillPending(false); });
+    return () => { cancelled = true; };
+  }, [prefillCustomerId, initial, selectCustomer]);
 
   const clearCustomer = useCallback(() => {
     setCustomerId(null);
@@ -417,8 +435,8 @@ export default function AssistedOrderForm({
   ]);
   const baseline = useRef<string | null>(null);
   useEffect(() => {
-    if (baseline.current === null && !initialLoading) baseline.current = snapshot;
-  }, [initialLoading, snapshot]);
+    if (baseline.current === null && !initialLoading && !prefillPending) baseline.current = snapshot;
+  }, [initialLoading, prefillPending, snapshot]);
   const dirty = !submitted.current && baseline.current !== null && snapshot !== baseline.current;
   useEffect(() => {
     if (!dirty) return;

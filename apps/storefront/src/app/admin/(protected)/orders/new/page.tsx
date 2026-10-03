@@ -6,7 +6,9 @@ import AssistedOrderForm from '../_assisted/AssistedOrderForm'
 
 export const dynamic = 'force-dynamic'
 
-export default async function NewAssistedOrderPage() {
+export default async function NewAssistedOrderPage({ searchParams = {} }: { searchParams?: { customer?: string } }) {
+  // `?customer=<id>` (from a CRM customer page) preselects that customer; the form re-reads it tenant-scoped.
+  const prefillCustomerId = typeof searchParams.customer === 'string' && /^[0-9a-f-]{36}$/i.test(searchParams.customer) ? searchParams.customer : null
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -18,7 +20,7 @@ export default async function NewAssistedOrderPage() {
         description="Enregistrez un achat reçu par WhatsApp, téléphone, Instagram ou en magasin. Aucune commande n’est créée avant la confirmation du paiement."
         compact
       />
-      <AssistedOrderForm currency={tenant.currency ?? 'EUR'} defaultCountry={(tenant.country ?? 'IT').toUpperCase()} />
+      <AssistedOrderForm currency={tenant.currency ?? 'EUR'} defaultCountry={(tenant.country ?? 'IT').toUpperCase()} prefillCustomerId={prefillCustomerId} />
     </div>
   )
 }
