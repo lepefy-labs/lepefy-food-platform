@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 ottobre 2026 — **v7.03 Current-State Snapshot** (paiements carte: stato URL e consegne e-mail; base `main` @ `9fcb6bd80775f6079b89f0cd14e6e2d9839bad55`)
+> **Aggiornato:** 3 ottobre 2026 — **v7.04 Current-State Snapshot** (Nouvelle commande: checklist, riordino, guardia di uscita; base `main` @ `8c7a3b394229527856a545a4e8eb9a5d9ff4df51`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -592,6 +592,13 @@ La lista Précommandes è una work queue.
 - **Stato della lista**: in query string (`view`, `q`, `page`).
 - **Scheda**: pannello «Prochaine action» con una sola azione primaria; sola lettura senza `orders.manage`.
 - **Banner «Paiements à vérifier» di `/admin`**: mostra solo i checkout storefront; i preordini assistiti dichiarati si confermano dalla loro scheda, raggiunta tramite il link dedicato. Dettagli: `docs/ASSISTED_ORDERS.md` §11.
+
+Il form «Nouvelle commande» / «Modifier» (`AssistedOrderForm`):
+- **Checklist**: mostra una checklist viva dei passaggi (`assistedFormProgress.ts`) ed elenca tutti i punti mancanti all'invio.
+- **Riordino**: propone «Reprendre ces articles» dall'ultima commande del cliente (`lastOrder` in `GET /api/admin/assisted-orders/customers/[id]`), con prezzi, stock e regole attuali.
+- **Uscita**: chiede conferma prima di uscire con dati non salvati.
+- **Mobile**: usa etichette di azione esplicite.
+- **Invariati**: creazione, conversione e pagamenti.
 
 Link pubblico: token opaco = HMAC(`TRACKING_SECRET`, sessione + nonce), ricercato per SHA-256 tenant-scoped, revocato cambiando nonce; valido 72 h con prezzi garantiti; ogni emissione riapplica prezzi catalogo, disponibilità e spedizione; una modifica revoca il link, annulla il PaymentIntent (rifiutata se il pagamento è in corso) e riporta in `draft`. `/pay/[token]` (fuori dal layout shop, noindex) mostra solo dati di pagamento e propone Stripe (`StripePaymentStep`, `metadata.type = assisted_preorder`) e i `tenant_payment_methods` attivi del modulo shop (bonifico con riferimento `P-XXXXXXXX`); la scelta di un metodo esterno porta a `awaiting_verification`, mai a una conferma. Il successo è mostrato solo quando il server riporta `completed`.
 

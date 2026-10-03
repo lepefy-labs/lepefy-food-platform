@@ -156,7 +156,13 @@ Nessuna dipendenza Packlink nel dominio assistito. Le spese usano lo stesso prev
 
 Admin (`Admin → Commandes`):
 - CTA **Nouvelle commande** (`/admin/orders/new`) e link **Précommandes** (`/admin/orders/precommandes`) con badge dei preordini attivi.
-- Form a sezioni (origine, cliente, prodotti con controlli ± conformi a min/step/stock e gruppi, remise con indirizzi salvati e calcolo spese, percorso, nota interna), riepilogo laterale desktop e barra fissa mobile; `requestKey` per evitare doppi invii.
+- **Form a sezioni**: origine, cliente, prodotti con controlli ± conformi a min/step/stock e gruppi, remise con indirizzi salvati e calcolo spese, percorso, nota interna. Ha un riepilogo laterale su desktop e una barra fissa su mobile; `requestKey` evita i doppi invii.
+  - **Avanzamento**: viene da `lib/orders/assisted/assistedFormProgress.ts` (puro). Ogni sezione mostra ✓ e un breve riepilogo quando è completa. Il riepilogo elenca in permanenza «À compléter (n)», con link alle sezioni.
+  - **Invio incompleto**: elenca tutti i punti mancanti (non più solo il primo) e porta alla prima sezione. Una bozza resta salvabile senza preventivo né data di incasso.
+  - **Frais**: «Calculer les frais» è disponibile anche nel riepilogo. Resta un'azione esplicita, senza ricalcolo automatico che moltiplicherebbe le chiamate al provider.
+  - **Dati non salvati**: uscendo dal form con modifiche non salvate, `beforeunload` e un clic su un link interno chiedono conferma. Il confronto avviene con lo stato caricato, quindi una précommande aperta in modifica non risulta modificata finché non cambia qualcosa.
+  - **Etichette del pulsante principale** esplicite anche su mobile («Créer et envoyer le lien», «Enregistrer à vérifier», «Créer la commande payée»).
+  - **Cliente esistente: «Reprendre ces articles»**. `GET …/customers/[id]` restituisce `lastOrder`: l'ultima commande non annullata del cliente, filtrata per `tenant_id` e `customer_id`, con le sue righe. Gli articoli sono riletti con prezzi, stock e regole attuali (`products?ids=`). `reorderLines` salta i prodotti inattivi o non vendibili e adegua le quantità a minimo, pas e stock, segnalando gli adeguamenti. Il server riconvalida tutto alla creazione.
 - **Lista `/admin/orders/precommandes`: work queue**, non elenco cronologico.
   - **Classificatore**: `lib/orders/assisted/preorderQueue.ts` (puro, condiviso con la scheda).
   - **Gruppi e ordine**: À vérifier (`awaiting_verification`, dichiarazione più vecchia prima) → Liens expirés → Brouillons → Attente client (`open`, scadenza più vicina prima) → Terminées (più recenti prima).
@@ -177,7 +183,7 @@ API: `GET/POST /api/admin/assisted-orders`, `POST …/paid`, `GET/PATCH …/[id]
 
 ## 12. Test
 
-- `apps/storefront/tests/unit/assistedOrders.spec.ts` (25 test) e `preorderQueue.spec.ts` (classificatore, ordinamento prima della paginazione, KPI, isolamento tenant): lifecycle/azioni, scadenza, arrotondamenti = SQL/PaymentIntent, token opaco/revoca/riemissione, lookup pubblico tenant-scoped, metodi pubblici, conversione Stripe/bonifico verificato/contanti/Postepay, cliente solo telefono, webhook duplicato, due conferme simultanee (una sola notifica), stock esaurito (rimborso + alert), storefront invariato (CRM/Nala), rifiuti mappati, regole min/gruppi server-side, spedizione nazionale/internazionale da token firmato, stock esaurito prima del pagamento, CRM senza duplicati e cross-tenant, mappa permessi, workflow logistico senza e-mail.
+- `apps/storefront/tests/unit/assistedOrders.spec.ts` (25 test), `assistedFormProgress.spec.ts` (sezioni, punti mancanti, bozza, etichette, riordino) e `preorderQueue.spec.ts` (classificatore, ordinamento prima della paginazione, KPI, isolamento tenant): lifecycle/azioni, scadenza, arrotondamenti = SQL/PaymentIntent, token opaco/revoca/riemissione, lookup pubblico tenant-scoped, metodi pubblici, conversione Stripe/bonifico verificato/contanti/Postepay, cliente solo telefono, webhook duplicato, due conferme simultanee (una sola notifica), stock esaurito (rimborso + alert), storefront invariato (CRM/Nala), rifiuti mappati, regole min/gruppi server-side, spedizione nazionale/internazionale da token firmato, stock esaurito prima del pagamento, CRM senza duplicati e cross-tenant, mappa permessi, workflow logistico senza e-mail.
 - `supabase/verification/128_assisted_orders_verification.sql`: garanzie transazionali sul database reale (da eseguire dopo l'applicazione).
 - Non eseguiti: e2e browser (la suite e2e punta alla produzione e crea ordini reali Stripe) e verifica visiva su dati reali, possibile solo dopo la migration.
 

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   IconAlertTriangle, IconBrandInstagram, IconBrandWhatsapp, IconBuildingStore, IconCash, IconCheck, IconClock,
-  IconDots, IconLink, IconLoader2, IconMinus, IconPhone, IconPlus, IconSearch, IconTrash, IconTruck, IconUserPlus, IconX,
+  IconDots, IconLink, IconLoader2, IconMinus, IconPhone, IconPlus, IconRepeat, IconSearch, IconTrash, IconTruck, IconUserPlus, IconX,
 } from '@tabler/icons-react';
 import type { ManualPaymentMethod, SalesChannel } from '@lepefy/types';
 import { MANUAL_PAYMENT_METHOD_LABELS, SALES_CHANNEL_LABELS } from '@lepefy/types';
@@ -15,6 +15,9 @@ import {
   validatePurchaseQuantityRules,
 } from '@/lib/purchaseQuantityRules';
 import { MANUAL_PAYMENT_METHODS, SALES_CHANNELS } from '@/lib/orders/assisted/assistedOrderPolicy';
+import {
+  assistedFormIssues, assistedFormSteps, assistedPrimaryLabel, reorderLines, type AssistedIssue, type AssistedStepKey,
+} from '@/lib/orders/assisted/assistedFormProgress';
 import type {
   AssistedFormInitial, CustomerOption, ProductOption, QuantityGroupOption, SavedAddress,
 } from './types';
@@ -54,12 +57,18 @@ function emptyAddress(country: string, fullName = ''): AddressForm {
   return { full_name: fullName, line1: '', line2: '', postal_code: '', city: '', country };
 }
 
-function SectionTitle({ step, title, helper }: { step: number; title: string; helper?: string }) {
+interface LastOrder { id: string; createdAt: string; total: number; items: Array<{ productId: string | null; name: string; quantity: number }> }
+
+const stepAnchor = (key: AssistedStepKey) => `assisted-step-${key}`;
+
+function SectionTitle({ step, title, helper, done = false, summary = null }: { step: number; title: string; helper?: string; done?: boolean; summary?: string | null }) {
   return (
     <div className="mb-3 flex items-start gap-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--admin-primary-soft)] text-xs font-bold text-[var(--admin-primary-fg)]">{step}</span>
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]'}`}>
+        {done ? <IconCheck size={14} aria-label="Étape complète" /> : step}
+      </span>
       <div>
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}{done && summary && <span className="font-normal text-gray-500 dark:text-gray-400"> · {summary}</span>}</h2>
         {helper && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{helper}</p>}
       </div>
     </div>
@@ -91,6 +100,9 @@ export default function AssistedOrderForm({
   const [customerSearching, setCustomerSearching] = useState(false);
   const [newCustomer, setNewCustomer] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [lastOrder, setLastOrder] = useState<LastOrder | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [reorderInfo, setReorderInfo] = useState<string | null>(null);
 
   // ── Produits ──────────────────────────────────────────────────────────────
   const [lines, setLines] = useState<Line[]>([]);
@@ -123,6 +135,8 @@ export default function AssistedOrderForm({
 
   const [submitting, setSubmitting] = useState<null | 'main' | 'draft'>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitIssues, setSubmitIssues] = useState<AssistedIssue[] | null>(null);
+  const submitted = useRef(false);
 
   // Groupes combinables (lecture publique existante, fail-closed pour la validation).
   useEffect(() => {
@@ -189,18 +203,52 @@ export default function AssistedOrderForm({
     return () => window.clearTimeout(timer);
   }, [productQuery]);
 
-  // Adresses enregistrées du client sélectionné.
+  // Adresses enregistrées et dernière commande du client sélectionné.
   useEffect(() => {
-    if (!customerId) { setSavedAddresses([]); return; }
+    setReorderInfo(null);
+    if (!customerId) { setSavedAddresses([]); setLastOrder(null); return; }
     let cancelled = false;
     fetch(`/api/admin/assisted-orders/customers/${customerId}`, { cache: 'no-store' })
       .then(async (res) => {
-        const body = await res.json().catch(() => null) as { addresses?: SavedAddress[] } | null;
-        if (!cancelled) setSavedAddresses(body?.addresses ?? []);
+        const body = await res.json().catch(() => null) as { addresses?: SavedAddress[]; lastOrder?: LastOrder | null } | null;
+        if (cancelled) return;
+        setSavedAddresses(body?.addresses ?? []);
+        setLastOrder(body?.lastOrder ?? null);
       })
-      .catch(() => { if (!cancelled) setSavedAddresses([]); });
+      .catch(() => { if (!cancelled) { setSavedAddresses([]); setLastOrder(null); } });
     return () => { cancelled = true; };
   }, [customerId]);
+
+  // « Reprendre ces articles » : produits actuels (prix, stock, règles), jamais ceux de l'ancienne commande.
+  async function reorderLastOrder() {
+    if (!lastOrder || reordering) return;
+    setReordering(true);
+    setReorderInfo(null);
+    try {
+      const ids = Array.from(new Set(lastOrder.items.flatMap((item) => (item.productId ? [item.productId] : []))));
+      const res = await fetch(`/api/admin/assisted-orders/products?ids=${encodeURIComponent(ids.join(','))}`, { cache: 'no-store' });
+      const body = await res.json().catch(() => null) as { products?: ProductOption[] } | null;
+      if (!res.ok) throw new Error();
+      const result = reorderLines(lastOrder.items, body?.products ?? []);
+      setLines((current) => {
+        const next = [...current];
+        for (const line of result.lines) {
+          const index = next.findIndex((entry) => entry.product.id === line.product.id);
+          if (index === -1) next.push(line);
+          else next[index] = { product: line.product, quantity: Math.max(next[index]!.quantity, line.quantity) };
+        }
+        return next;
+      });
+      const parts = [`${result.lines.length} article${result.lines.length > 1 ? 's' : ''} ajouté${result.lines.length > 1 ? 's' : ''}`];
+      if (result.adjusted.length) parts.push(`quantité ajustée : ${result.adjusted.join(', ')}`);
+      if (result.skipped.length) parts.push(`indisponible : ${result.skipped.join(', ')}`);
+      setReorderInfo(`${parts.join(' · ')}.`);
+    } catch {
+      setReorderInfo('Impossible de reprendre les articles. Réessayez.');
+    } finally {
+      setReordering(false);
+    }
+  }
 
   const selectCustomer = useCallback((customer: CustomerOption) => {
     setCustomerId(customer.id);
@@ -334,18 +382,58 @@ export default function AssistedOrderForm({
   const addressComplete = fulfillment === 'pickup'
     || Boolean(address.full_name.trim() && address.line1.trim() && address.city.trim() && address.postal_code.trim() && /^[A-Za-z]{2}$/.test(address.country.trim()));
 
-  const blockers: string[] = [];
-  if (!salesChannel) blockers.push('Choisissez l’origine de la commande.');
-  if (!fullName.trim() && !customerId) blockers.push('Renseignez le nom du client.');
-  if (!hasContact) blockers.push('Renseignez au moins un téléphone ou un e-mail.');
-  if (lines.length === 0) blockers.push('Ajoutez au moins un produit.');
-  if (groups === null && lines.length > 0) blockers.push('Règles de quantité indisponibles : réessayez dans un instant.');
-  if (violations.length > 0) blockers.push(formatQuantityViolationMessage(violations[0]!));
-  if (stockIssues.length > 0) blockers.push(`Stock insuffisant : ${stockIssues.join(', ')}.`);
-  if (!addressComplete) blockers.push('Complétez l’adresse de livraison.');
-  const draftBlockers = [...blockers];
-  if (fulfillment === 'delivery' && !validQuote) blockers.push('Calculez les frais de livraison.');
-  if (mode === 'paid' && !paidAt) blockers.push('Indiquez la date d’encaissement.');
+  const unitCount = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const steps = assistedFormSteps({
+    isEdit,
+    salesChannelLabel: salesChannel ? SALES_CHANNEL_LABELS[salesChannel] : null,
+    customerSelected: Boolean(customerId),
+    fullName,
+    hasContact,
+    unitCount,
+    groupsUnavailable: groups === null,
+    quantityViolation: violations.length > 0 ? formatQuantityViolationMessage(violations[0]!) : null,
+    stockIssues,
+    fulfillment,
+    addressComplete,
+    quoteValid: Boolean(validQuote),
+    mode,
+    modeLabel: MODE_OPTIONS.find((option) => option.key === mode)!.title,
+    paidAtMissing: !paidAt,
+  });
+  const stepOf = (key: AssistedStepKey) => steps.find((step) => step.key === key);
+  const mainIssues = assistedFormIssues(steps, 'main');
+
+  function goToStep(key: AssistedStepKey) {
+    const section = document.getElementById(stepAnchor(key));
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    section?.focus({ preventScroll: true });
+  }
+
+  // Unsaved work: compared with the state once loaded (a preorder opened for
+  // editing is not "dirty" until something changes), then confirm before leaving.
+  const snapshot = JSON.stringify([
+    salesChannel, customerId, fullName, email, phone, lines.map((line) => [line.product.id, line.quantity]),
+    fulfillment, address, adminNote, mode, declaredReference, paidReference, paidNote,
+  ]);
+  const baseline = useRef<string | null>(null);
+  useEffect(() => {
+    if (baseline.current === null && !initialLoading) baseline.current = snapshot;
+  }, [initialLoading, snapshot]);
+  const dirty = !submitted.current && baseline.current !== null && snapshot !== baseline.current;
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement | null)?.closest('a');
+      if (!anchor || anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+      if (!window.confirm('Quitter sans enregistrer ? Vos saisies seront perdues.')) { event.preventDefault(); event.stopPropagation(); }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', onClick, true);
+    return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', onClick, true); };
+  }, [dirty]);
 
   function contentPayload() {
     return {
@@ -366,8 +454,9 @@ export default function AssistedOrderForm({
   async function submit(kind: 'main' | 'draft') {
     if (submitting) return;
     setError(null);
-    const active = kind === 'draft' ? draftBlockers : blockers;
-    if (active.length > 0) { setError(active[0]!); return; }
+    const active = assistedFormIssues(steps, kind);
+    if (active.length > 0) { setSubmitIssues(active); goToStep(active[0]!.step); return; }
+    setSubmitIssues(null);
     setSubmitting(kind);
     try {
       let url = '/api/admin/assisted-orders';
@@ -402,6 +491,7 @@ export default function AssistedOrderForm({
         setError(typeof body?.error === 'string' ? body.error : 'Enregistrement impossible. Réessayez.');
         return;
       }
+      submitted.current = true;
       if (isEdit && initial) {
         router.push(`/admin/orders/precommandes/${initial.preorderId}?updated=1`);
       } else if (mode === 'paid' && kind === 'main' && typeof body?.orderId === 'string') {
@@ -417,11 +507,16 @@ export default function AssistedOrderForm({
     }
   }
 
-  const primaryLabel = isEdit
-    ? 'Enregistrer les modifications'
-    : mode === 'to_pay' ? 'Créer la précommande et le lien'
-      : mode === 'to_verify' ? 'Enregistrer le paiement à vérifier'
-        : 'Créer la commande payée';
+  const primaryLabel = assistedPrimaryLabel(mode, isEdit);
+  const remaining = mainIssues.length;
+  const issuesList = submitIssues && submitIssues.length > 0 && (
+    <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300" role="alert">
+      <p className="font-semibold">{submitIssues.length > 1 ? `${submitIssues.length} points à compléter :` : 'À compléter :'}</p>
+      <ul className="mt-1 space-y-0.5">
+        {submitIssues.map((issue) => <li key={`${issue.step}-${issue.message}`}><button type="button" onClick={() => goToStep(issue.step)} className="text-left underline">{issue.message}</button></li>)}
+      </ul>
+    </div>
+  );
 
   const summary = (
     <div className="space-y-3">
@@ -435,6 +530,24 @@ export default function AssistedOrderForm({
           <dt>Total</dt><dd>{estimatedTotal === null ? '—' : formatPrice(estimatedTotal, currency)}</dd>
         </div>
       </dl>
+      {fulfillment === 'delivery' && !validQuote && lines.length > 0 && addressComplete && (
+        <button type="button" onClick={requestQuote} disabled={quoteLoading} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] px-3 text-sm font-semibold text-[var(--admin-primary-fg)] hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:border-gray-700">
+          {quoteLoading ? <IconLoader2 size={16} className="animate-spin" aria-hidden="true" /> : <IconTruck size={16} aria-hidden="true" />} {quote ? 'Recalculer les frais' : 'Calculer les frais'}
+        </button>
+      )}
+      <div className="border-t border-[var(--admin-border)] pt-2 dark:border-gray-800">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{remaining === 0 ? 'Prêt à enregistrer' : `À compléter (${remaining})`}</p>
+        <ul className="mt-1 space-y-0.5 text-xs">
+          {steps.map((step) => (
+            <li key={step.key}>
+              <button type="button" onClick={() => goToStep(step.key)} className={`flex min-h-7 w-full items-start gap-1.5 text-left ${step.done ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                {step.done ? <IconCheck size={13} aria-hidden="true" className="mt-0.5 shrink-0" /> : <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border border-current" />}
+                <span>{step.label}{!step.done && step.issues[0] ? ` — ${step.issues[0]}` : ''}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
       <p className="text-[11px] leading-4 text-gray-400">Montants recalculés par le serveur (prix catalogue, règles, livraison) à l’enregistrement.</p>
     </div>
   );
@@ -442,6 +555,7 @@ export default function AssistedOrderForm({
   return (
     <div className="grid items-start gap-5 pb-28 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-8">
       <div className="space-y-4">
+        {issuesList && <div className="lg:hidden">{issuesList}</div>}
         {isEdit && initial?.hadActiveLink && (
           <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
             <IconAlertTriangle size={18} className="mt-0.5 shrink-0" />
@@ -450,8 +564,8 @@ export default function AssistedOrderForm({
         )}
 
         {/* 1. Origine */}
-        <section className={sectionClass} aria-labelledby="assisted-origin">
-          <SectionTitle step={1} title="Origine de la commande" />
+        <section id={stepAnchor('origin')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`} aria-labelledby="assisted-origin">
+          <SectionTitle step={1} title="Origine de la commande" done={stepOf('origin')?.done} summary={stepOf('origin')?.summary} />
           <div id="assisted-origin" className="grid grid-cols-2 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Origine">
             {SALES_CHANNELS.map((channel) => {
               const active = salesChannel === channel;
@@ -468,8 +582,8 @@ export default function AssistedOrderForm({
         </section>
 
         {/* 2. Client */}
-        <section className={sectionClass}>
-          <SectionTitle step={2} title="Client" helper="Aucun compte requis. Un téléphone suffit pour partager le lien par WhatsApp." />
+        <section id={stepAnchor('customer')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
+          <SectionTitle step={2} title="Client" helper="Aucun compte requis. Un téléphone suffit pour partager le lien par WhatsApp." done={stepOf('customer')?.done} summary={stepOf('customer')?.summary} />
           {customerId ? (
             <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-3 dark:border-gray-700 dark:bg-gray-950/40">
               <div className="flex items-start justify-between gap-3">
@@ -483,6 +597,19 @@ export default function AssistedOrderForm({
                 <label className="text-xs text-gray-500">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="off" className={`${inputClass} mt-1`} /></label>
                 <label className="text-xs text-gray-500">E-mail<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" className={`${inputClass} mt-1`} /></label>
               </div>
+              {!isEdit && lastOrder && (
+                <div className="mt-3 rounded-xl border border-[#D9D3FF] bg-[var(--admin-primary-soft)] p-3">
+                  <p className="text-sm font-semibold text-[var(--admin-primary-fg)]">
+                    Dernière commande · {new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(lastOrder.createdAt))} · {lastOrder.items.reduce((sum, item) => sum + item.quantity, 0)} articles · {formatPrice(lastOrder.total, currency)}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-gray-600 dark:text-gray-300">{lastOrder.items.map((item) => `×${item.quantity} ${item.name}`).join(' · ')}</p>
+                  <button type="button" onClick={() => void reorderLastOrder()} disabled={reordering} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                    {reordering ? <IconLoader2 size={16} className="animate-spin" aria-hidden="true" /> : <IconRepeat size={16} aria-hidden="true" />} Reprendre ces articles
+                  </button>
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Prix, stock et règles actuels ; les articles indisponibles sont ignorés.</p>
+                  {reorderInfo && <p role="status" className="mt-1 text-xs font-medium text-gray-700 dark:text-gray-200">{reorderInfo}</p>}
+                </div>
+              )}
             </div>
           ) : newCustomer ? (
             <div className="space-y-3">
@@ -537,8 +664,8 @@ export default function AssistedOrderForm({
         </section>
 
         {/* 3. Produits */}
-        <section className={sectionClass}>
-          <SectionTitle step={3} title="Produits" helper="Catalogue réel du tenant — minimums, pas et groupes appliqués automatiquement." />
+        <section id={stepAnchor('products')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
+          <SectionTitle step={3} title="Produits" helper="Catalogue réel du tenant — minimums, pas et groupes appliqués automatiquement." done={stepOf('products')?.done} summary={stepOf('products')?.summary} />
           <div className="relative">
             <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -628,8 +755,8 @@ export default function AssistedOrderForm({
         </section>
 
         {/* 4. Remise */}
-        <section className={sectionClass}>
-          <SectionTitle step={4} title="Remise de la commande" />
+        <section id={stepAnchor('fulfillment')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
+          <SectionTitle step={4} title="Remise de la commande" done={stepOf('fulfillment')?.done} summary={stepOf('fulfillment')?.summary} />
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode de remise">
             {([['delivery', 'Livraison à domicile', <IconTruck key="t" size={18} />], ['pickup', 'Retrait en magasin', <IconBuildingStore key="s" size={18} />]] as const).map(([key, label, icon]) => (
               <button
@@ -679,8 +806,8 @@ export default function AssistedOrderForm({
 
         {/* 5. Parcours */}
         {!isEdit && (
-          <section className={sectionClass}>
-            <SectionTitle step={5} title="Paiement" />
+          <section id={stepAnchor('payment')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
+            <SectionTitle step={5} title="Paiement" done={stepOf('payment')?.done} summary={stepOf('payment')?.summary} />
             <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Parcours de paiement">
               {MODE_OPTIONS.map((option) => (
                 <button
@@ -739,6 +866,7 @@ export default function AssistedOrderForm({
           <h2 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Récapitulatif</h2>
           {summary}
           {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300" role="alert">{error}</p>}
+          {issuesList && <div className="mt-3">{issuesList}</div>}
           <button type="button" onClick={() => submit('main')} disabled={Boolean(submitting)} className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
             {submitting === 'main' ? <IconLoader2 size={16} className="animate-spin" /> : <IconCheck size={16} />} {primaryLabel}
           </button>
@@ -756,8 +884,10 @@ export default function AssistedOrderForm({
         {error && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300" role="alert">{error}</p>}
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-wide text-gray-500">Total estimé</p>
             <p className="text-lg font-bold">{estimatedTotal === null ? formatPrice(subtotal, currency) + ' + livr.' : formatPrice(estimatedTotal, currency)}</p>
+            {remaining > 0
+              ? <button type="button" onClick={() => goToStep(mainIssues[0]!.step)} className="text-left text-xs font-semibold text-amber-800 underline dark:text-amber-300">{remaining} étape{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}</button>
+              : <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Prêt à enregistrer</p>}
           </div>
           {!isEdit && (
             <button type="button" onClick={() => submit('draft')} disabled={Boolean(submitting)} aria-label="Enregistrer comme brouillon" className="min-h-12 rounded-xl border border-[var(--admin-border)] px-3 text-sm font-semibold text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
@@ -766,7 +896,7 @@ export default function AssistedOrderForm({
           )}
           <button type="button" onClick={() => submit('main')} disabled={Boolean(submitting)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50">
             {submitting === 'main' ? <IconLoader2 size={16} className="animate-spin" /> : <IconCheck size={16} />}
-            {isEdit ? 'Enregistrer' : mode === 'paid' ? 'Créer la commande' : 'Valider'}
+            {assistedPrimaryLabel(mode, isEdit, true)}
           </button>
         </div>
       </div>
