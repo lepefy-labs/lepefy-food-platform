@@ -7,6 +7,7 @@ import { assignBarcodeToProduct } from '@/lib/barcode';
 
 import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
+import { applyCatalogueStatus, CATALOGUE_STATUS_OPTIONS, parseCatalogueState } from '@/lib/catalog/catalogueFilters';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(100, Math.max(10, Number.parseInt(params.get('limit') ?? '25', 10) || 25));
   const q = (params.get('q') ?? '').trim();
   const categorySlug = (params.get('category') ?? '').trim();
-  const status = params.get('status') ?? 'all';
+  const status = parseCatalogueState(params).status;
   const requestedSort = params.get('sort') ?? 'position_asc';
   const sort = SORT_MAP[requestedSort] ?? { column: 'position', ascending: true };
   const supabase = createServiceClient();
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('products')
     .select(`
-      id, name, slug, price, stock, active,
+      id, name, slug, price, stock, active, weight_grams, category_id,
       image_url, storage_type, warehouse_location, description_source,
       barcode_value, categories(name, slug)
     `, { count: 'exact' })
@@ -78,16 +79,18 @@ export async function GET(req: NextRequest) {
     query = query.or(`name.ilike.%${safe}%,slug.ilike.%${safe}%,barcode_value.ilike.%${safe}%`);
   }
 
-  if (status === 'active') query = query.eq('active', true);
-  if (status === 'inactive') query = query.eq('active', false);
-  if (status === 'out') query = query.eq('stock', 0);
-  if (status === 'ai') query = query.eq('description_source', 'ai');
+  query = applyCatalogueStatus(query, status);
 
   const from = (page - 1) * limit;
   const to = from + limit - 1;
-  const { data, count, error } = await query
-    .order(sort.column, { ascending: sort.ascending })
-    .range(from, to);
+  // Counters cover the whole tenant catalogue (not the current page), one
+  // count(head) per status; search and category do not narrow them.
+  const countFor = (key: (typeof CATALOGUE_STATUS_OPTIONS)[number]['key']) =>
+    applyCatalogueStatus(supabase.from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id), key);
+  const [{ data, count, error }, ...countResults] = await Promise.all([
+    query.order(sort.column, { ascending: sort.ascending }).order('id', { ascending: true }).range(from, to),
+    ...CATALOGUE_STATUS_OPTIONS.map((option) => countFor(option.key)),
+  ]);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -98,6 +101,7 @@ export async function GET(req: NextRequest) {
     total: count ?? 0,
     page,
     limit,
+    counts: Object.fromEntries(CATALOGUE_STATUS_OPTIONS.map((option, index) => [option.key, countResults[index]?.error ? null : countResults[index]?.count ?? 0])),
   });
 }
 

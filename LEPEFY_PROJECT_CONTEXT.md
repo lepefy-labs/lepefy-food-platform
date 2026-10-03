@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 ottobre 2026 — **v7.05 Current-State Snapshot** (Clients: KPI cliccabili, ordinamento, scheda operativa; base `main` @ `8c53c495728ae89b0097a79e8cc7659ade273303`)
+> **Aggiornato:** 3 ottobre 2026 — **v7.06 Current-State Snapshot** (Catalogue: conteggi, filtri qualità, stato URL; base `main` @ `769a5c5365b6c16da9618409eeff7ea7cbfe10ec`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -250,6 +250,14 @@ Il branding PWA usa `tenants.app_icon_url` come artwork quadrato dedicato per ma
 Le categorie possiedono `catalog_scope: 'shop' | 'gadgets'` (migration additiva e reversibile `103_category_catalog_scope.sql`, default `shop` per tutte le categorie esistenti). Catalogue `/`, paginazione `/api/products` e ricerca semantica pubblica includono soltanto prodotti delle categorie `shop` del tenant; `/gadgets` filtra server-side categorie e prodotti `gadgets`, con filtro `?category=` e paginazione `?page=`. Prodotti senza categoria non appartengono a nessuno scope. Il prodotto phare viene scelto tramite `featured`, poi `position`/`id`; in assenza di prodotti attivi la boutique mostra uno stato vuoto senza dati artificiali.
 
 Goodies riusa `products`, immagini/prezzi/stock, `ProductCard`, l’azione condivisa `useQuickAdd`, cart store/sync/drawer, checkout e ordini. I carrelli misti rimangono supportati. Le card Goodies usano `/products/[slug]?from=gadgets` per la navigazione attiva; breadcrumb e ritorno derivano dallo scope reale della categoria. La canonical resta `/products/[slug]`; le raccomandazioni per merchandise rimangono nella stessa categoria. Admin `/admin/catalogue/categories` e `/api/admin/catalogue/categories` gestiscono nome, slug e destinazione Catalogue/Goodies con le permission esistenti `catalog.view/manage`. Le selezioni categoria nella creazione/modifica prodotto mostrano la destinazione. La migration deve essere applicata prima della promozione del codice che legge la colonna; non viene eseguita dal build Vercel. La migration correttiva `112_category_service_writes.sql` ripristina soltanto INSERT/UPDATE di `categories` per il ruolo server `service_role`, senza cambiare grant customer, RLS o dati; richiede applicazione manuale approvata in produzione. I fallimenti di save registrano soltanto operation/code/message DB nei log server, mai payload o credenziali.
+
+Lista admin `/admin/catalogue` (`CatalogueTable`, helper puri in `lib/catalog/catalogueFilters.ts`).
+- **Filtri e stato**: in query string (`q`, `status`, `category`, `sort`, `page`). `GET /api/admin/catalogue` restituisce `counts`, calcolati sull'intero catalogo del tenant con un `count(head)` per stato, quindi indipendenti dalla pagina.
+- **Stati**: tutti, attivi, inattivi, rupture (stock ≤ 0), stock basso (1–9, `LOW_STOCK_MAX`, stessa soglia del colore ambra), IA da rivedere.
+- **«À compléter»**: senza peso (`weight_grams` nullo o 0, necessario per spedizione e carton), senza foto, senza categoria. I badge compaiono nella riga solo per queste mancanze.
+- **Stock**: si salva solo se cambia (Invio o uscita dal campo); Esc ripristina.
+- **Senza `catalog.manage`**: stock e stato in sola lettura, nessuna azione di gruppo né «Nouveau produit».
+- **Debito noto**: la modifica dello stock dalla lista sovrascrive `products.stock` senza un movimento in `inventory_movements` (modulo Gestion). È un comportamento preesistente, da decidere a parte.
 
 La Product Detail normalizza `image_url` e il JSONB `images` in una galleria ordinata (massimo 8 immagini): la prima immagine resta la copertina retrocompatibile usata dalle card. Il click apre un lightbox accessibile con chiusura Escape, navigazione tastiera, controlli precedente/successivo e swipe mobile. L’editor admin consente upload multiplo, riordino, scelta della copertina ed eliminazione; per rispettare il limite body di produzione, una selezione multipla viene prima ridimensionata nel browser fino a 1600 px e convertita in WebP ad alta qualità, quindi inviata in richieste sequenziali con progresso visibile e limite di 4 MiB per singola immagine. I nuovi asset usano path Storage univoci tenant/product-scoped e le API verificano sempre `tenant_id`. Non è richiesta una nuova migration perché `products.images` esiste dallo schema iniziale.
 
