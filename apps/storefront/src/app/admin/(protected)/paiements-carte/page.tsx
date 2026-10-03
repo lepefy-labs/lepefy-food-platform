@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
@@ -7,7 +8,8 @@ export const dynamic = 'force-dynamic';
 
 // Access (orders.view) is enforced by the protected layout (adminRoutePermissions)
 // and by the API; orders.manage only unlocks "Renvoyer la confirmation".
-export default async function CardPaymentsPage({ searchParams }: { searchParams: { q?: string } }) {
+// Filters (period, dates, status, search, page) live in the query string.
+export default async function CardPaymentsPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
   const access = await getCurrentAdminAccessContext(tenant.id);
@@ -19,7 +21,9 @@ export default async function CardPaymentsPage({ searchParams }: { searchParams:
         title="Paiements carte"
         description="Paiements à montant libre effectués depuis la carte digitale (/card). La référence CP-… est celle affichée au client et dans son email."
       />
-      <CardPaymentsClient initialQuery={typeof searchParams.q === 'string' ? searchParams.q.slice(0, 60) : ''} canResend={canResend} />
+      <Suspense fallback={<p className="p-6 text-sm text-gray-500">Chargement…</p>}>
+        <CardPaymentsClient canResend={canResend} />
+      </Suspense>
     </div>
   );
 }

@@ -114,3 +114,79 @@ export function parsePage(value: string | null | undefined) {
   const page = Number.parseInt(value ?? '1', 10);
   return Number.isFinite(page) && page > 0 ? Math.min(page, 1000) : 1;
 }
+
+// ─── Notification delivery state (notification_deliveries ledger) ──────────
+
+/** Ledger keys of the automatic emails sent when a /card payment succeeds (notifyCardQuickPayment). */
+export function cardPaymentDeliveryKeys(paymentIntentId: string) {
+  return { customer: `card-quick-payment-customer:${paymentIntentId}`, team: `card-quick-payment:${paymentIntentId}` };
+}
+
+export type CardNotificationState = 'sent' | 'sending' | 'retrying' | 'dead' | 'untracked' | 'no_email' | 'not_applicable';
+
+export const CARD_NOTIFICATION_LABELS: Record<CardNotificationState, string> = {
+  sent: 'Envoyée',
+  sending: 'En cours d’envoi',
+  retrying: 'Échec, nouvel essai prévu',
+  dead: 'Échec définitif',
+  untracked: 'Aucune trace d’envoi',
+  no_email: 'Pas d’e-mail client',
+  not_applicable: '—',
+};
+
+/** Only real failures are worth a warning in the list; the rest stays in the detail. */
+export function isNotificationProblem(state: CardNotificationState) {
+  return state === 'retrying' || state === 'dead';
+}
+
+/**
+ * Display state of one automatic email. A paid payment without a ledger row is
+ * "untracked" (e.g. paid before the ledger existed), never reported as a failure.
+ */
+export function cardNotificationState(
+  delivery: { status: string } | null | undefined,
+  context: { paid: boolean; hasRecipient: boolean },
+): CardNotificationState {
+  if (!context.paid) return 'not_applicable';
+  if (!context.hasRecipient) return 'no_email';
+  if (!delivery) return 'untracked';
+  if (delivery.status === 'accepted') return 'sent';
+  if (delivery.status === 'failed') return 'retrying';
+  if (delivery.status === 'dead') return 'dead';
+  return 'sending';
+}
+
+// ─── List state in the query string ───────────────────────────────────────
+
+export interface CardPaymentsListState {
+  period: CardPaymentPeriod;
+  from: string;
+  to: string;
+  status: CardPaymentStatusFilter;
+  q: string;
+  page: number;
+}
+
+export function parseCardPaymentsState(params: { get(name: string): string | null }): CardPaymentsListState {
+  const period = parsePeriod(params.get('period'));
+  return {
+    period,
+    from: period === 'custom' ? parseDay(params.get('from')) ?? '' : '',
+    to: period === 'custom' ? parseDay(params.get('to')) ?? '' : '',
+    status: parseStatusFilter(params.get('status')),
+    q: (params.get('q') ?? '').slice(0, 60),
+    page: parsePage(params.get('page')),
+  };
+}
+
+/** Defaults (7d, all statuses, page 1, no search) are omitted to keep URLs short. */
+export function cardPaymentsQueryString(state: CardPaymentsListState): string {
+  const params = new URLSearchParams();
+  if (state.period !== '7d') params.set('period', state.period);
+  if (state.period === 'custom' && state.from) params.set('from', state.from);
+  if (state.period === 'custom' && state.to) params.set('to', state.to);
+  if (state.status !== 'all') params.set('status', state.status);
+  if (state.q.trim()) params.set('q', state.q.trim());
+  if (state.page > 1) params.set('page', String(state.page));
+  return params.toString();
+}

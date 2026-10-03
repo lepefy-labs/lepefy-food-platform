@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
 import {
-  CARD_PAYMENTS_PAGE_SIZE, displayStatus, parseDay, parsePage, parsePeriod, parseStatusFilter, periodBounds, referenceRange, sanitizeSearch, stripeDashboardUrl,
+  CARD_PAYMENTS_PAGE_SIZE, cardNotificationState, cardPaymentDeliveryKeys, displayStatus, parseDay, parsePage, parsePeriod, parseStatusFilter,
+  periodBounds, referenceRange, sanitizeSearch, stripeDashboardUrl,
 } from '@/lib/card/cardPaymentsAdmin';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
   if (statusFilter === 'unfinished') list = list.eq('status', 'pending');
 
   const from = (page - 1) * CARD_PAYMENTS_PAGE_SIZE;
-  let totalsQuery = supabase.from('tenant_card_payments').select('amount, status, created_at').eq('tenant_id', tenant.id).limit(TOTALS_CAP);
+  let totalsQuery = supabase.from('tenant_card_payments').select('amount, status, created_at').eq('tenant_id', tenant.id).limit(TOTALS_CAP + 1);
   if (since) totalsQuery = totalsQuery.gte('created_at', since);
   if (until) totalsQuery = totalsQuery.lt('created_at', until);
 
@@ -77,7 +78,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Impossible de charger les paiements.' }, { status: 500 });
   }
 
-  const periodRows = (totals.data ?? []) as Array<Pick<CardPaymentRow, 'amount' | 'status' | 'created_at'>>;
+  const allPeriodRows = (totals.data ?? []) as Array<Pick<CardPaymentRow, 'amount' | 'status' | 'created_at'>>;
+  const periodRows = allPeriodRows.slice(0, TOTALS_CAP);
+  const rows = (data ?? []) as CardPaymentRow[];
+
+  // Automatic confirmation / team alert status, one batch for the page (ledger only, no provider call).
+  const keys = rows.flatMap((row) => row.stripe_payment_intent_id ? Object.values(cardPaymentDeliveryKeys(row.stripe_payment_intent_id)) : []);
+  const deliveries = new Map<string, { status: string; accepted_at: string | null }>();
+  if (keys.length > 0) {
+    const { data: deliveryRows, error: deliveryError } = await supabase.from('notification_deliveries')
+      .select('idempotency_key, status, accepted_at').eq('tenant_id', tenant.id).in('idempotency_key', keys);
+    if (deliveryError) console.error('[admin/card-payments] deliveries unavailable:', deliveryError);
+    for (const delivery of (deliveryRows ?? []) as Array<{ idempotency_key: string; status: string; accepted_at: string | null }>) {
+      deliveries.set(delivery.idempotency_key, delivery);
+    }
+  }
+  const notificationsFor = (row: CardPaymentRow) => {
+    const keysFor = row.stripe_payment_intent_id ? cardPaymentDeliveryKeys(row.stripe_payment_intent_id) : null;
+    const customer = keysFor ? deliveries.get(keysFor.customer) : undefined;
+    const team = keysFor ? deliveries.get(keysFor.team) : undefined;
+    const paid = row.status === 'paid' && Boolean(keysFor);
+    return {
+      customer: { state: cardNotificationState(customer, { paid, hasRecipient: Boolean(row.customer_email) }), acceptedAt: customer?.accepted_at ?? null },
+      team: { state: cardNotificationState(team, { paid, hasRecipient: true }), acceptedAt: team?.accepted_at ?? null },
+    };
+  };
   const paidRows = periodRows.filter((row) => row.status === 'paid');
 
   return NextResponse.json({
@@ -93,8 +118,10 @@ export async function GET(req: NextRequest) {
       paidAmount: Math.round(paidRows.reduce((sum, row) => sum + Number(row.amount), 0) * 100) / 100,
       paidCount: paidRows.length,
       abandonedCount: periodRows.filter((row) => displayStatus(row, now) === 'abandoned').length,
+      /** More than TOTALS_CAP payments in the period: totals cover the first TOTALS_CAP only. */
+      truncated: allPeriodRows.length > TOTALS_CAP,
     },
-    payments: ((data ?? []) as CardPaymentRow[]).map((row) => ({
+    payments: rows.map((row) => ({
       id: row.id,
       reference: cardPaymentReference(row.id),
       amount: Number(row.amount),
@@ -106,6 +133,7 @@ export async function GET(req: NextRequest) {
       paidAt: row.paid_at,
       stripePaymentIntentId: row.stripe_payment_intent_id,
       stripeUrl: stripeDashboardUrl(row.stripe_payment_intent_id),
+      notifications: notificationsFor(row),
     })),
   });
 }
