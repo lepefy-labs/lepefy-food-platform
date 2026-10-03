@@ -80,25 +80,9 @@ export interface PreorderDetail {
 export interface PreorderDetailResponse {
   preorder: PreorderDetail;
   actions: PreorderAction[];
+  /** Caller holds orders.manage (UI hint; the API stays authoritative). */
+  canManage: boolean;
   events: AssistedOrderEvent[];
   tenantName: string;
   currency: string;
-}
-
-export interface PreorderListItem {
-  id: string;
-  reference: string;
-  status: CheckoutSessionStatus;
-  fullName: string | null;
-  email: string | null;
-  phone: string | null;
-  salesChannel: SalesChannel | null;
-  fulfillmentType: 'delivery' | 'pickup';
-  itemCount: number;
-  total: number;
-  createdAt: string;
-  expiresAt: string;
-  orderId: string | null;
-  hasActiveLink: boolean;
-  declaredPayment: string | null;
 }

@@ -94,7 +94,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const requestedPage = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
   const now = new Date()
 
-  const [{ data: stats, error: statsError }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: activePreordersCount }, queue] = await Promise.all([
+  const [{ data: stats, error: statsError }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: activePreordersCount }, { count: preordersToVerifyCount }, queue] = await Promise.all([
     supabase.from('admin_order_dashboard_stats').select('*').eq('tenant_id', tenant.id).maybeSingle(),
     supabase.from('carriers').select('name').eq('tenant_id', tenant.id).eq('active', true).order('position', { ascending: true }),
     supabase
@@ -102,6 +102,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       .select('id, email, full_name, items, shipping_total, ambassador_discount_amount, external_payment_type, external_payment_label, created_at')
       .eq('tenant_id', tenant.id)
       .eq('payment_method', 'external_link')
+      // Storefront checkouts only: assisted preorders are verified in Précommandes (own flow and notifications).
+      .eq('origin', 'storefront')
       .in('status', ['open', 'expired', 'awaiting_verification'])
       .is('order_id', null)
       .order('created_at', { ascending: true }),
@@ -111,6 +113,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       .eq('tenant_id', tenant.id)
       .eq('origin', 'assisted')
       .in('status', ['draft', 'open', 'awaiting_verification']),
+    supabase
+      .from('checkout_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('origin', 'assisted')
+      .eq('status', 'awaiting_verification'),
     loadOrderWorkQueue(supabase, tenant.id, { filters, sort: sortKey, page: requestedPage, pageSize: PAGE_SIZE, thresholds, now, managedProviderAvailable })
       .catch((error: unknown): WorkQueueResult | null => { console.error('[admin/orders] work queue unavailable', error); return null }),
   ])
@@ -209,6 +217,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       </section>
 
       {pendingPayments.length > 0 && <div className="mb-4"><PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} /></div>}
+      {(preordersToVerifyCount ?? 0) > 0 && (
+        <Link href="/admin/orders/precommandes" className="mb-4 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <span>{preordersToVerifyCount} précommande{(preordersToVerifyCount ?? 0) > 1 ? 's' : ''} avec un paiement à vérifier</span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
 
       <section aria-label="Filtres des commandes" className="mb-3 rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="flex flex-col gap-2 border-b border-[var(--admin-border)] p-2 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">

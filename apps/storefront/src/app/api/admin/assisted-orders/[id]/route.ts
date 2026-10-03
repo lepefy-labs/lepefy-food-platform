@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
-import { getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import type { AssistedOrderEvent } from '@lepefy/types';
@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!loaded) return NextResponse.json({ error: 'Précommande introuvable.' }, { status: 404 });
   const session = await expireIfDue(supabase, loaded);
 
-  const [{ data: events }, orderResult, creatorResult] = await Promise.all([
+  const [{ data: events }, orderResult, creatorResult, access] = await Promise.all([
     supabase.from('assisted_order_events')
       .select('id, event_type, actor_type, actor_admin_id, order_id, detail, created_at')
       .eq('tenant_id', tenant.id).eq('checkout_session_id', session.id)
@@ -42,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     session.created_by_admin_id
       ? supabase.from('admin_users').select('email').eq('id', session.created_by_admin_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    getCurrentAdminAccessContext(tenant.id),
   ]);
 
   const order = orderResult.data as { id: string; email: string | null; status: string; payment_status: string } | null;
@@ -91,6 +92,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         : null,
     },
     actions: allowedPreorderActions(session.status, Boolean(payUrl)),
+    // UI hint only: every mutation route re-checks orders.manage.
+    canManage: Boolean(access && canAdmin(access, 'orders.manage')),
     events: (events ?? []) as AssistedOrderEvent[],
     tenantName: tenant.name,
     currency: tenant.currency ?? 'EUR',

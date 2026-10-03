@@ -12,76 +12,42 @@ import {
 import { issuePayLinkFields, payUrlFor, type AssistedSessionRow } from '@/lib/orders/assisted/assistedOrderServer';
 import { parseAssistedContent, parseRequestKey, sessionContentColumns } from '@/lib/orders/assisted/assistedOrderRequest';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
+import { loadPreorderQueue } from '@/lib/orders/assisted/loadPreorderQueue';
+import { parsePreorderView } from '@/lib/orders/assisted/preorderQueue';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const LIST_STATUSES: CheckoutSessionStatus[] = ['draft', 'open', 'awaiting_verification', 'completed', 'expired', 'cancelled'];
-const ACTIVE_STATUSES: CheckoutSessionStatus[] = ['draft', 'open', 'awaiting_verification', 'expired'];
+const PAGE_SIZE = 30;
 
-type ListRow = Pick<AssistedSessionRow,
-  'id' | 'status' | 'full_name' | 'email' | 'phone' | 'sales_channel' | 'items' | 'shipping_total'
-  | 'ambassador_discount_amount' | 'fulfillment_type' | 'created_at' | 'expires_at' | 'order_id'
-  | 'external_payment_type' | 'external_payment_label' | 'pay_token_hash'>;
-
-/** Liste des précommandes (checkout_sessions assistées uniquement). */
+/**
+ * Work queue des précommandes (checkout_sessions assistées uniquement) :
+ * `view` (to_treat par défaut, waiting, completed, cancelled, all), `q`, `page`.
+ * Classement, compteurs et pagination : lib/orders/assisted/loadPreorderQueue.ts.
+ */
 export async function GET(req: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
   const supabase = createServiceClient();
-  const nowIso = new Date().toISOString();
-  const statusParam = req.nextUrl.searchParams.get('status') ?? 'active';
-  const q = (req.nextUrl.searchParams.get('q') ?? '').trim().replace(/[^a-zA-Z0-9À-ÿ@._+\- ]/g, '').slice(0, 60);
+  const now = new Date();
+  const params = req.nextUrl.searchParams;
+  const view = parsePreorderView(params.get('view') ?? params.get('status'));
+  const q = (params.get('q') ?? '').trim().replace(/[^a-zA-Z0-9À-ÿ@._+\- ]/g, '').slice(0, 60);
+  const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1);
 
   // Expiration paresseuse des liens échus avant lecture (aucun cron requis).
-  await supabase.from('checkout_sessions').update({ status: 'expired', updated_at: nowIso })
-    .eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'open').lte('expires_at', nowIso);
+  await supabase.from('checkout_sessions').update({ status: 'expired', updated_at: now.toISOString() })
+    .eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'open').lte('expires_at', now.toISOString());
 
-  let query = supabase
-    .from('checkout_sessions')
-    .select('id, status, full_name, email, phone, sales_channel, items, shipping_total, ambassador_discount_amount, fulfillment_type, created_at, expires_at, order_id, external_payment_type, external_payment_label, pay_token_hash')
-    .eq('tenant_id', tenant.id)
-    .eq('origin', 'assisted');
-
-  if (statusParam === 'active') query = query.in('status', ACTIVE_STATUSES);
-  else if ((LIST_STATUSES as string[]).includes(statusParam)) query = query.eq('status', statusParam);
-  if (q) query = query.or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`);
-
-  const countQuery = (status: CheckoutSessionStatus) => supabase.from('checkout_sessions')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', status);
-
-  const [{ data, error }, ...counts] = await Promise.all([
-    query.order('created_at', { ascending: false }).limit(100),
-    ...LIST_STATUSES.map(countQuery),
-  ]);
-  if (error) {
+  try {
+    const result = await loadPreorderQueue(supabase, tenant.id, { view, q, page, pageSize: PAGE_SIZE, now });
+    return NextResponse.json({ ...result, view, q });
+  } catch (error) {
     console.error('[admin/assisted-orders] list failed:', error);
     return NextResponse.json({ error: 'Impossible de charger les précommandes.' }, { status: 500 });
   }
-
-  const preorders = ((data ?? []) as ListRow[]).map((row) => ({
-    id: row.id,
-    reference: preorderReference(row.id),
-    status: row.status,
-    fullName: row.full_name,
-    email: row.email,
-    phone: row.phone,
-    salesChannel: row.sales_channel,
-    fulfillmentType: row.fulfillment_type,
-    itemCount: (row.items ?? []).reduce((sum, item) => sum + item.quantity, 0),
-    total: computePreorderTotals(row.items ?? [], row.shipping_total, row.ambassador_discount_amount).total,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
-    orderId: row.order_id,
-    hasActiveLink: Boolean(row.pay_token_hash) && row.status === 'open',
-    declaredPayment: row.status === 'awaiting_verification' ? row.external_payment_label ?? row.external_payment_type : null,
-  }));
-  const statusCounts = Object.fromEntries(LIST_STATUSES.map((status, index) => [status, counts[index]?.count ?? 0]));
-
-  return NextResponse.json({ preorders, statusCounts });
 }
 
 /**

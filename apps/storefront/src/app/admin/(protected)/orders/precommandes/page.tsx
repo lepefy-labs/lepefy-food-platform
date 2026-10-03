@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { IconArrowLeft, IconPlus } from '@tabler/icons-react'
 import { getTenant } from '@/lib/tenant/getTenant'
 import AdminPageHeader from '../../../_components/ui/AdminPageHeader'
@@ -15,7 +16,7 @@ export default async function PreordersPage() {
       </Link>
       <AdminPageHeader
         title="Précommandes"
-        description="Achats saisis par l’équipe en attente de paiement. Ils ne comptent pas dans le chiffre d’affaires tant qu’ils ne sont pas payés."
+        description="Achats saisis par l’équipe, jusqu’au paiement. Traitez d’abord les paiements à vérifier ; ils ne comptent dans le chiffre d’affaires qu’une fois payés."
         compact
         actions={(
           <Link href="/admin/orders/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white hover:opacity-90">
@@ -23,7 +24,9 @@ export default async function PreordersPage() {
           </Link>
         )}
       />
-      <PreordersListClient currency={tenant.currency ?? 'EUR'} />
+      <Suspense fallback={<p className="py-12 text-center text-sm text-gray-500">Chargement…</p>}>
+        <PreordersListClient currency={tenant.currency ?? 'EUR'} />
+      </Suspense>
     </div>
   )
 }

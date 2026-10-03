@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 ottobre 2026 — **v7.01 Current-State Snapshot** (dettaglio ordine allineato al cockpit; base `main` @ `c24ba53823132f0357d0d372988b783b2fe5947f`)
+> **Aggiornato:** 3 ottobre 2026 — **v7.02 Current-State Snapshot** (précommandes come work queue; base `main` @ `4eee75759d687ccf3fef5b4188f5686e3c0ade08`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -584,6 +584,14 @@ Conversione centrale: `lib/orders/convertCheckoutSessionToOrder.ts` → RPC tran
 *Review del codice: 25/09/2026, base `main@7fd6054ae8ac49e6d383653a296a1a65261ff3e9`.* Documentazione completa, policy e runbook: `docs/ASSISTED_ORDERS.md`.
 
 `Admin → Commandes` espone **Nouvelle commande** (`/admin/orders/new`) e **Précommandes** (`/admin/orders/precommandes`, scheda `/[id]`, modifica `/[id]/modifier`). Un acquisto WhatsApp/telefono/Instagram/negozio è una checkout_session `origin='assisted'` con `sales_channel`: `draft` (Brouillon), `open` (En attente de paiement, link `/pay/<token>`), `awaiting_verification` (Paiement à vérifier), `completed`, `expired`, `cancelled`. «Déjà payé» crea la sessione e la converte subito (`admin_recorded`). Contenuto sempre validato server-side con `validateCheckoutItems` + `verifyCheckoutShipping` (preventivo firmato `/api/shipping/quote`) + sconto ambassador; nessun prezzo/tenant/stato dal browser; `request_key` rende idempotente la saisie.
+
+La lista Précommandes è una work queue.
+- **Classificatore unico**: `preorderQueue.ts`, con gruppi À vérifier → Liens expirés → Brouillons → Attente client → Terminées.
+- **«À traiter»**: esclude l'attesa del cliente.
+- **Ordinamento e conteggi**: server-side, prima della paginazione (`loadPreorderQueue.ts`).
+- **Stato della lista**: in query string (`view`, `q`, `page`).
+- **Scheda**: pannello «Prochaine action» con una sola azione primaria; sola lettura senza `orders.manage`.
+- **Banner «Paiements à vérifier» di `/admin`**: mostra solo i checkout storefront; i preordini assistiti dichiarati si confermano dalla loro scheda, raggiunta tramite il link dedicato. Dettagli: `docs/ASSISTED_ORDERS.md` §11.
 
 Link pubblico: token opaco = HMAC(`TRACKING_SECRET`, sessione + nonce), ricercato per SHA-256 tenant-scoped, revocato cambiando nonce; valido 72 h con prezzi garantiti; ogni emissione riapplica prezzi catalogo, disponibilità e spedizione; una modifica revoca il link, annulla il PaymentIntent (rifiutata se il pagamento è in corso) e riporta in `draft`. `/pay/[token]` (fuori dal layout shop, noindex) mostra solo dati di pagamento e propone Stripe (`StripePaymentStep`, `metadata.type = assisted_preorder`) e i `tenant_payment_methods` attivi del modulo shop (bonifico con riferimento `P-XXXXXXXX`); la scelta di un metodo esterno porta a `awaiting_verification`, mai a una conferma. Il successo è mostrato solo quando il server riporta `completed`.
 

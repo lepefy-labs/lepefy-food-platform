@@ -157,7 +157,19 @@ Nessuna dipendenza Packlink nel dominio assistito. Le spese usano lo stesso prev
 Admin (`Admin → Commandes`):
 - CTA **Nouvelle commande** (`/admin/orders/new`) e link **Précommandes** (`/admin/orders/precommandes`) con badge dei preordini attivi.
 - Form a sezioni (origine, cliente, prodotti con controlli ± conformi a min/step/stock e gruppi, remise con indirizzi salvati e calcolo spese, percorso, nota interna), riepilogo laterale desktop e barra fissa mobile; `requestKey` per evitare doppi invii.
-- Scheda preordine `/admin/orders/precommandes/[id]` (azioni per stato, link copiabile/WhatsApp, conferma incasso, remise en attente, annullamento con conferma, storico) e modifica `/modifier`.
+- **Lista `/admin/orders/precommandes`: work queue**, non elenco cronologico.
+  - **Classificatore**: `lib/orders/assisted/preorderQueue.ts` (puro, condiviso con la scheda).
+  - **Gruppi e ordine**: À vérifier (`awaiting_verification`, dichiarazione più vecchia prima) → Liens expirés → Brouillons → Attente client (`open`, scadenza più vicina prima) → Terminées (più recenti prima).
+  - **«À traiter»**: comprende solo i primi tre gruppi. L'attesa del cliente non è un'azione: diventa «Relancer» solo se il link scade entro 24 h o non è stato consultato dopo 24 h.
+  - **Righe**: ogni riga ha la prossima azione, il contesto (dichiarazione, invio, consultazione del link, scadenza) e un avviso solo per condizioni reali (dichiarazione oltre 24 h, scadenza entro 24 h, spese di spedizione da calcolare).
+  - **Loader** (`lib/orders/assisted/loadPreorderQueue.ts`): legge una volta i preordini attivi del tenant (tetto 1 000), li classifica e li ordina prima della paginazione (30 per pagina). Payées e Annulées sono paginate dal DB. Gli eventi `link_opened` sono letti in un solo batch per le righe della pagina.
+  - **Query string**: `?view=to_treat|waiting|completed|cancelled|all&q=&page=`, ricerca anche per riferimento `P-XXXXXXXX`; il vecchio `status=active` è un alias.
+- Scheda preordine `/admin/orders/precommandes/[id]`.
+  - **Pannello «Prochaine action»**: titolo dal classificatore e un solo pulsante primario (confermare, nuovo link o completare). Restano disponibili link copiabile/WhatsApp, conferma incasso e remise en attente; l'annullamento è separato in fondo.
+  - **Storico**: tempi relativi.
+  - **Sola lettura senza `orders.manage`**: `GET …/[id]` restituisce `canManage` come indicazione per l'interfaccia; le route di mutazione restano il controllo.
+  - **Modifica**: `/modifier`.
+- Banner «Paiements à vérifier» di `/admin`: solo checkout storefront (`origin = 'storefront'`). I preordini assistiti con pagamento dichiarato compaiono come link «N précommande(s) avec un paiement à vérifier →» verso la loro coda, così da essere confermati sempre con il loro flusso (notifica cliente opzionale, eventi).
 - Dettaglio ordine: card «Origine & encaissement» (canale, fonte di conferma, data, riferimento, admin, nota, link tracking condivisibile).
 - `/admin/paiements-en-attente/[id]` reindirizza i preordini assistiti alla loro scheda.
 
@@ -165,7 +177,7 @@ API: `GET/POST /api/admin/assisted-orders`, `POST …/paid`, `GET/PATCH …/[id]
 
 ## 12. Test
 
-- `apps/storefront/tests/unit/assistedOrders.spec.ts` (25 test): lifecycle/azioni, scadenza, arrotondamenti = SQL/PaymentIntent, token opaco/revoca/riemissione, lookup pubblico tenant-scoped, metodi pubblici, conversione Stripe/bonifico verificato/contanti/Postepay, cliente solo telefono, webhook duplicato, due conferme simultanee (una sola notifica), stock esaurito (rimborso + alert), storefront invariato (CRM/Nala), rifiuti mappati, regole min/gruppi server-side, spedizione nazionale/internazionale da token firmato, stock esaurito prima del pagamento, CRM senza duplicati e cross-tenant, mappa permessi, workflow logistico senza e-mail.
+- `apps/storefront/tests/unit/assistedOrders.spec.ts` (25 test) e `preorderQueue.spec.ts` (classificatore, ordinamento prima della paginazione, KPI, isolamento tenant): lifecycle/azioni, scadenza, arrotondamenti = SQL/PaymentIntent, token opaco/revoca/riemissione, lookup pubblico tenant-scoped, metodi pubblici, conversione Stripe/bonifico verificato/contanti/Postepay, cliente solo telefono, webhook duplicato, due conferme simultanee (una sola notifica), stock esaurito (rimborso + alert), storefront invariato (CRM/Nala), rifiuti mappati, regole min/gruppi server-side, spedizione nazionale/internazionale da token firmato, stock esaurito prima del pagamento, CRM senza duplicati e cross-tenant, mappa permessi, workflow logistico senza e-mail.
 - `supabase/verification/128_assisted_orders_verification.sql`: garanzie transazionali sul database reale (da eseguire dopo l'applicazione).
 - Non eseguiti: e2e browser (la suite e2e punta alla produzione e crea ordini reali Stripe) e verifica visiva su dati reali, possibile solo dopo la migration.
 

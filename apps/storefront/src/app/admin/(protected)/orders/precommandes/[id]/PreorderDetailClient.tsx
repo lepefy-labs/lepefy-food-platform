@@ -15,6 +15,8 @@ import {
 import ShareLinkActions from '../../../../_components/ui/ShareLinkActions';
 import ConfirmActionModal from '../../../../_components/ui/ConfirmActionModal';
 import PreorderStatusBadge from '../../_assisted/PreorderStatusBadge';
+import { classifyPreorder } from '@/lib/orders/assisted/preorderQueue';
+import { formatOperationalDuration, formatSince } from '@/lib/orders/adminOrderOperations';
 import type { PreorderDetailResponse } from '../../_assisted/types';
 
 const EVENT_LABELS: Record<AssistedOrderEventType, string> = {
@@ -133,8 +135,24 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
     return <p className="flex items-center gap-2 py-12 text-sm text-gray-500"><IconLoader2 size={16} className="animate-spin" /> Chargement…</p>;
   }
 
-  const { preorder, actions, events, tenantName, currency } = data;
-  const can = (action: string) => actions.includes(action as never);
+  const { preorder, actions, events, tenantName, currency, canManage } = data;
+  // Mutations are offered only with orders.manage; every route re-checks it.
+  const can = (action: string) => canManage && actions.includes(action as never);
+  const now = new Date();
+  const lastOpenedAt = [...events].reverse().find((event) => event.event_type === 'link_opened')?.created_at ?? null;
+  const operation = classifyPreorder({
+    id: preorder.id, status: preorder.status, createdAt: preorder.createdAt, updatedAt: preorder.updatedAt, expiresAt: preorder.expiresAt,
+    declaredAt: preorder.declaredPayment?.declaredAt ?? null, declaredLabel: preorder.declaredPayment?.label ?? preorder.declaredPayment?.method ?? null,
+    linkIssuedAt: preorder.payLinkIssuedAt, lastOpenedAt, shippingPending: preorder.shippingPending,
+  }, now);
+  // The one primary control of the payment panel, from the shared queue rules.
+  const primary: 'confirm' | 'issue_link' | 'edit' | null = preorder.status === 'awaiting_verification' ? 'confirm'
+    : preorder.status === 'expired' ? 'issue_link'
+      : preorder.status === 'draft' ? (preorder.shippingPending ? 'edit' : 'issue_link') : null;
+  const buttonTone = (key: 'confirm' | 'issue_link' | 'edit') => key === primary
+    ? 'bg-[var(--admin-primary)] text-white hover:opacity-90'
+    : 'border border-[var(--admin-border)] text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-200';
+  const hoursLeft = preorder.status === 'open' ? (Date.parse(preorder.expiresAt) - now.getTime()) / 3_600_000 : null;
   const verifying = preorder.status === 'awaiting_verification';
   const payMessage = preorder.payUrl
     ? buildPayLinkMessage({
@@ -188,9 +206,9 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
             <PreorderStatusBadge status={preorder.status} />
           </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {preorder.salesChannel ? SALES_CHANNEL_LABELS[preorder.salesChannel] : '—'} · créée le {dateTime(preorder.createdAt)}{preorder.createdBy ? ` par ${preorder.createdBy}` : ''}
+            {preorder.salesChannel ? SALES_CHANNEL_LABELS[preorder.salesChannel] : '—'} · créée {formatSince(preorder.createdAt, now)}{preorder.createdBy ? ` par ${preorder.createdBy}` : ''}
           </p>
-          {preorder.status === 'open' && <p className="mt-1 text-xs text-gray-500">Lien valable jusqu’au {dateTime(preorder.expiresAt)} · prix garantis jusqu’à cette date</p>}
+          {preorder.status === 'open' && <p className="mt-1 text-xs text-gray-500">Lien valable jusqu’au {dateTime(preorder.expiresAt)}{hoursLeft !== null && hoursLeft > 0 ? ` (dans ${formatOperationalDuration(hoursLeft)})` : ''} · prix garantis jusqu’à cette date</p>}
         </div>
         <div className="text-left sm:text-right">
           <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
@@ -220,7 +238,11 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
             <section className={cardClass}><p className="text-sm text-gray-600">Précommande annulée. Aucun paiement n’est possible.</p></section>
           ) : (
             <section className={cardClass}>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Paiement</h2>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Prochaine action</p>
+              <h2 className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">{operation.group === 'waiting' ? 'Attendre le paiement du client' : operation.action.label}</h2>
+              {operation.warning && <p className="mt-1 flex items-start gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.warning}</p>}
+              {operation.context && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{operation.context}</p>}
+              {!canManage && <p role="status" className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-950/40 dark:text-gray-300"><strong>Lecture seule.</strong> La gestion des précommandes nécessite le droit « commandes : gérer ».</p>}
 
               {verifying && preorder.declaredPayment && (
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
@@ -233,7 +255,7 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
                 <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">Frais de livraison non calculés : modifiez la précommande avant d’envoyer un lien.</p>
               )}
 
-              {preorder.payUrl && can('share_link') && (
+              {preorder.payUrl && actions.includes('share_link') && (
                 <div className="mt-3">
                   <p className="mb-2 text-xs text-gray-500">Lien de paiement (version {preorder.payLinkVersion}) — à envoyer au client :</p>
                   <ShareLinkActions url={preorder.payUrl} phone={preorder.phone} message={payMessage} />
@@ -246,13 +268,13 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
 
               <div className="mt-4 flex flex-wrap gap-2">
                 {can('issue_link') && !preorder.shippingPending && (
-                  <button type="button" onClick={issueLink} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50">
+                  <button type="button" onClick={issueLink} disabled={Boolean(busy)} className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-50 ${buttonTone('issue_link')}`}>
                     {busy === 'link' ? <IconLoader2 size={16} className="animate-spin" /> : preorder.payUrl ? <IconRefresh size={16} /> : <IconLink size={16} />}
                     {preorder.payUrl ? 'Régénérer le lien' : preorder.status === 'expired' ? 'Générer un nouveau lien' : 'Générer le lien de paiement'}
                   </button>
                 )}
                 {(can('confirm_payment') || can('record_payment')) && !paymentForm && (
-                  <button type="button" onClick={() => setPaymentForm(true)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-emerald-600 px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300">
+                  <button type="button" onClick={() => setPaymentForm(true)} className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold ${buttonTone('confirm')}`}>
                     <IconCash size={16} /> {verifying ? 'Confirmer la réception' : 'Encaissement reçu'}
                   </button>
                 )}
@@ -262,14 +284,9 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
                   </button>
                 )}
                 {can('edit') && (
-                  <Link href={`/admin/orders/precommandes/${preorderId}/modifier`} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] px-4 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                  <Link href={`/admin/orders/precommandes/${preorderId}/modifier`} className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold ${buttonTone('edit')}`}>
                     <IconEdit size={16} /> Modifier
                   </Link>
-                )}
-                {can('cancel') && (
-                  <button type="button" onClick={() => setCancelOpen(true)} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
-                    <IconX size={16} /> Annuler
-                  </button>
                 )}
               </div>
 
@@ -301,6 +318,14 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
                     <button type="button" onClick={() => setPaymentForm(false)} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-gray-600">Fermer</button>
                   </div>
                   <p className="text-xs text-gray-500">Action tracée avec votre identité. Une seule commande peut être créée pour cette précommande.</p>
+                </div>
+              )}
+
+              {can('cancel') && (
+                <div className="mt-4 border-t border-[var(--admin-border)] pt-3 dark:border-gray-800">
+                  <button type="button" onClick={() => setCancelOpen(true)} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/30">
+                    <IconX size={16} aria-hidden="true" /> Annuler la précommande
+                  </button>
                 </div>
               )}
             </section>
@@ -352,7 +377,7 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
                     <li key={event.id} className="border-l-2 border-[var(--admin-primary-soft)] pl-3">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{EVENT_LABELS[event.event_type] ?? event.event_type}</p>
                       {detail && <p className="text-xs text-gray-600 dark:text-gray-300">{detail}</p>}
-                      <p className="text-[11px] text-gray-400">{dateTime(event.created_at)} · {event.actor_type === 'customer' ? 'client' : event.actor_type === 'system' ? 'automatique' : 'équipe'}</p>
+                      <p className="text-[11px] text-gray-400"><time dateTime={event.created_at} title={dateTime(event.created_at)}>{formatSince(event.created_at, now)}</time> · {event.actor_type === 'customer' ? 'client' : event.actor_type === 'system' ? 'automatique' : 'équipe'}</p>
                     </li>
                   );
                 })}
