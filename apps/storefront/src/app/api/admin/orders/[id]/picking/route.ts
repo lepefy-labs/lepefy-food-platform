@@ -45,7 +45,7 @@ export async function PATCH(
 
   const body = await req.json().catch(() => null) as PatchBody | null;
   if (!body?.itemId || (body.picked === undefined && body.coldChainChecked === undefined)) {
-    return NextResponse.json({ error: 'Modification de picking invalide.' }, { status: 400 });
+    return NextResponse.json({ error: 'Modification de préparation invalide.' }, { status: 400 });
   }
 
   const supabase = createServiceClient();
@@ -62,7 +62,7 @@ export async function PATCH(
 
   if (order.status !== 'preparing') {
     return NextResponse.json(
-      { error: 'Le picking est modifiable uniquement pendant la préparation.' },
+      { error: 'La checklist est modifiable uniquement pendant la préparation.' },
       { status: 409 },
     );
   }

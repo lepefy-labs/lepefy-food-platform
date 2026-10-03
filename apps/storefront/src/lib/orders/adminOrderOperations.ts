@@ -1,5 +1,5 @@
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
-import { shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation';
+import { shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 
 // Single operational classifier of the Admin → Commandes work queue. KPIs,
 // views, the "Priorité opérationnelle" sort and every row read it: no queue
@@ -143,31 +143,34 @@ export function orderAnomaly(order: OperationalOrder, thresholds: OperationalThr
   return null;
 }
 
-export interface NextOrderAction { label: string; primary: boolean; intent: 'detail' | 'tracking' | 'incident' }
+/** Panel of the order detail page where the next action is carried out. */
+export type OrderActionSection = 'actions' | 'preparation' | 'packing' | 'shipment' | 'tracking' | 'payment' | 'none';
 
-const action = (label: string, intent: NextOrderAction['intent'] = 'detail', primary = true): NextOrderAction => ({ label, intent, primary });
+export interface NextOrderAction { label: string; primary: boolean; intent: 'detail' | 'tracking' | 'incident'; section: OrderActionSection }
+
+const action = (label: string, intent: NextOrderAction['intent'] = 'detail', primary = true, section: OrderActionSection = 'actions'): NextOrderAction => ({ label, intent, primary, section });
 
 /** Next useful step, mapped onto existing backend flows only (order detail, carrier tracking). */
 export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly | null = null): NextOrderAction {
-  if (isTerminalOrder(order)) return action('Voir', 'detail', false);
+  if (isTerminalOrder(order)) return action('Voir', 'detail', false, 'none');
   if (order.status === 'stock_conflict') return action('Vérifier le conflit');
-  if (hasLogisticsIncident(order)) return action('Résoudre l’incident', 'incident');
-  if (order.payment_status !== 'paid') return action('Vérifier le paiement');
+  if (hasLogisticsIncident(order)) return action('Résoudre l’incident', 'incident', true, 'tracking');
+  if (order.payment_status !== 'paid') return action('Vérifier le paiement', 'detail', true, 'payment');
   if (order.status === 'new') return action('Préparer');
   if (order.status === 'preparing') {
-    if (!order.picking_completed_at) return action('Poursuivre la préparation');
+    if (!order.picking_completed_at) return action('Poursuivre la préparation', 'detail', true, 'preparation');
     if (order.fulfillment_type === 'pickup') return action('Marquer prête au retrait');
-    if (!order.packing_completed_at) return action('Terminer l’emballage');
-    if (usesManagedShipment(order)) return action(order.shipping_provider_reference ? 'Gérer l’expédition' : 'Associer l’expédition');
+    if (!order.packing_completed_at) return action('Terminer l’emballage', 'detail', true, 'packing');
+    if (usesManagedShipment(order)) return action(order.shipping_provider_reference ? 'Gérer l’expédition' : 'Associer l’expédition', 'detail', true, 'shipment');
     return action('Expédier');
   }
   if (order.status === 'ready_for_pickup') return action('Marquer retirée');
   if (order.status === 'shipped') {
     if (!order.tracking_code && !order.shipping_provider_reference) return action('Vérifier l’expédition');
-    if (anomaly?.code === 'tracking_stale' || anomaly?.code === 'eta_overdue') return action('Vérifier le suivi', 'tracking');
-    return action('Voir le suivi', 'tracking', false);
+    if (anomaly?.code === 'tracking_stale' || anomaly?.code === 'eta_overdue') return action('Vérifier le suivi', 'tracking', true, 'tracking');
+    return action('Voir le suivi', 'tracking', false, 'tracking');
   }
-  return action('Voir', 'detail', false);
+  return action('Voir', 'detail', false, 'none');
 }
 
 export interface OrderOperation {
@@ -284,4 +287,35 @@ export function compareOrders(sort: OrderSortKey, a: PrioritizedOrder, b: Priori
   if (sort === 'amount_desc') return Number(b.order.total ?? 0) - Number(a.order.total ?? 0) || tie();
   if (sort === 'amount_asc') return Number(a.order.total ?? 0) - Number(b.order.total ?? 0) || tie();
   return tie();
+}
+
+/** Carrier-side state shown apart from the internal order status (null for pickup). */
+export function transportState(order: Pick<OperationalOrder, 'fulfillment_type' | 'shipping_sync_error' | 'shipping_provider_reference' | 'shipping_normalized_status' | 'shipping_tracking_mode' | 'tracking_code'>):
+  { label: string; tone: 'danger' | 'success' | 'neutral' } | null {
+  if (order.fulfillment_type === 'pickup') return null;
+  if (order.shipping_sync_error) return { label: 'Synchro en erreur', tone: 'danger' };
+  if (order.shipping_provider_reference) {
+    const status = order.shipping_normalized_status;
+    return { label: shipmentStatusLabel(status), tone: status && INCIDENT_STATUSES.has(status) ? 'danger' : status === 'delivered' ? 'success' : 'neutral' };
+  }
+  if (order.shipping_tracking_mode === 'manual' || order.tracking_code) return { label: 'Suivi manuel', tone: 'neutral' };
+  return { label: 'Non associée', tone: 'neutral' };
+}
+
+export interface OrderTransition { status: OrderStatus; label: string }
+
+/**
+ * Status transition offered by the order detail page (executed server-side by
+ * PATCH /api/admin/orders/[id] → orderTransitionService). With a managed
+ * shipment, shipping and delivery come from the provider sync, not a button.
+ */
+export function orderDetailTransition(order: Pick<OperationalOrder, 'status' | 'fulfillment_type'>, managed: boolean): OrderTransition | null {
+  const pickup = order.fulfillment_type === 'pickup';
+  let transition: OrderTransition | null = null;
+  if (order.status === 'new') transition = { status: 'preparing', label: 'Démarrer la préparation' };
+  else if (order.status === 'preparing') transition = pickup ? { status: 'ready_for_pickup', label: 'Marquer prête au retrait' } : { status: 'shipped', label: 'Expédier la commande' };
+  else if (order.status === 'ready_for_pickup' && pickup) transition = { status: 'delivered', label: 'Marquer comme retirée' };
+  else if (order.status === 'shipped' && !pickup) transition = { status: 'delivered', label: 'Marquer comme livrée' };
+  if (transition && managed && !pickup && (transition.status === 'shipped' || transition.status === 'delivered')) return null;
+  return transition;
 }

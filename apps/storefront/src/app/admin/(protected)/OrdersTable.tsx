@@ -4,17 +4,18 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconAlertTriangle, IconBuildingStore, IconCheck, IconChevronDown, IconChevronRight, IconCopy, IconExternalLink,
+  IconAlertTriangle, IconBuildingStore, IconCheck, IconChevronDown, IconChevronRight, IconExternalLink,
   IconPrinter, IconSnowflake, IconTemperature, IconTruck, IconX,
 } from '@tabler/icons-react';
 import {
-  classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS,
+  classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS, transportState,
   type OperationalThresholds, type OrderOperation, type OrderSortKey,
 } from '@/lib/orders/adminOrderOperations';
 import { safeShipmentTrackingUrl, shipmentDate, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
 import StatusBadge from '../_components/ui/StatusBadge';
+import CopyableValue from '../_components/ui/CopyableValue';
 import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/BulkTrackingModal';
 import AdminOrdersPoller from './AdminOrdersPoller';
 
@@ -55,17 +56,6 @@ function coldSummary(order: ListOrder) {
     if (item.storage_type === 'frozen') total.frozen += item.quantity;
     return total;
   }, { fresh: 0, frozen: 0 });
-}
-/** Carrier-side state, always shown apart from the internal order status. */
-function transportState(order: ListOrder): { label: string; tone: 'danger' | 'success' | 'neutral' } | null {
-  if (order.fulfillment_type === 'pickup') return null;
-  if (order.shipping_sync_error) return { label: 'Synchro en erreur', tone: 'danger' };
-  if (order.shipping_provider_reference) {
-    const status = order.shipping_normalized_status;
-    return { label: shipmentStatusLabel(status), tone: status && ['exception', 'returned', 'cancelled'].includes(status) ? 'danger' : status === 'delivered' ? 'success' : 'neutral' };
-  }
-  if (order.shipping_tracking_mode === 'manual' || order.tracking_code) return { label: 'Suivi manuel', tone: 'neutral' };
-  return { label: 'Non associée', tone: 'neutral' };
 }
 const TRANSPORT_TONES = {
   danger: 'bg-red-50 text-red-800 ring-red-200 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-900',
@@ -111,10 +101,6 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     if (opening && order.fulfillment_type === 'delivery' && order.status !== 'cancelled' && !detail[order.id] && !loading.has(order.id)) void loadDetail(order.id);
   }
   function toggleSelect(id: string) { setSelected(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
-  async function copy(value: string, label: string) {
-    try { await navigator.clipboard.writeText(value); setToast({ msg: `${label} copié`, type: 'success' }); }
-    catch { setToast({ msg: 'Copie impossible', type: 'error' }); }
-  }
   function exportCsv() {
     const rows = orders.filter(order => selected.has(order.id));
     const cell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -145,14 +131,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
   const operationOf = (order: ListOrder) => operations.get(order.id)!;
   const done = (order: ListOrder) => operationOf(order).group === 'finished';
 
-  function copyable(label: string, value: string, className = '') {
-    return <span className={`flex min-w-0 items-center gap-1 ${className}`}>
-      <span className="shrink-0 text-gray-400">{label}</span>
-      <span className="truncate font-mono text-[11px] text-gray-700 dark:text-gray-300" title={value}>{value}</span>
-      <button type="button" onClick={() => void copy(value, label)} aria-label={`Copier ${label.toLowerCase()} ${value}`}
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:hover:bg-gray-800"><IconCopy size={13} aria-hidden="true" /></button>
-    </span>;
-  }
+  const copyable = (label: string, value: string) => <CopyableValue label={label} value={value} />;
 
   function fulfillmentCell(order: ListOrder) {
     if (order.fulfillment_type === 'pickup') return <p className="inline-flex items-center gap-1.5 text-xs font-semibold"><IconBuildingStore size={15} aria-hidden="true" /> Retrait magasin</p>;

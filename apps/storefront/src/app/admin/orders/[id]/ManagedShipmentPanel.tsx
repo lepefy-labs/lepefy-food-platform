@@ -2,11 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { IconCircleCheck } from '@tabler/icons-react';
 import type { Order } from '@lepefy/types';
 import { shipmentDate, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import CopyableValue from '../../_components/ui/CopyableValue';
 
-export default function ManagedShipmentPanel({ order, provider, ready }: {
-  order: Order; provider: { key: string; displayName: string }; ready: boolean;
+// Provider association panel: attach, sync, switch to manual tracking. The
+// carrier details and the event history live in ShipmentTrackingCard.
+export default function ManagedShipmentPanel({ order, provider, ready, canManage = true }: {
+  order: Order; provider: { key: string; displayName: string }; ready: boolean; canManage?: boolean;
 }) {
   const router = useRouter();
   const [reference, setReference] = useState('');
@@ -15,6 +19,7 @@ export default function ManagedShipmentPanel({ order, provider, ready }: {
   const [manualConfirm, setManualConfirm] = useState(false);
   const associated = Boolean(order.shipping_provider_reference);
   const active = order.status === 'preparing' || order.status === 'shipped';
+  const autoSync = active && !['returned', 'cancelled', 'delivered'].includes(order.shipping_normalized_status ?? '');
   async function request(action: 'attach' | 'sync' | 'manual') {
     setBusy(true); setMessage(null);
     try {
@@ -29,41 +34,39 @@ export default function ManagedShipmentPanel({ order, provider, ready }: {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Opération indisponible.'); }
     finally { setBusy(false); }
   }
-  const button = 'min-h-11 w-full rounded-xl border border-[var(--admin-border)] px-4 py-2.5 text-sm font-semibold disabled:opacity-50';
+  const button = 'min-h-11 w-full rounded-xl border border-[var(--admin-border)] px-4 py-2.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] disabled:opacity-50';
   return (
-    <section className="space-y-4 rounded-2xl border border-[#D9D3FF] bg-white p-4 dark:bg-gray-900">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Expédition {provider.displayName}</h2>
+    <section id="order-shipment" aria-labelledby="order-shipment-title" className="scroll-mt-24 space-y-3 rounded-2xl border border-[#D9D3FF] bg-white p-4 dark:bg-gray-900">
+      <h2 id="order-shipment-title" className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Expédition {provider.displayName}</h2>
       {associated ? (
         <>
-          <p className="text-sm font-semibold text-emerald-700">✓ Expédition trouvée</p>
-          <dl className="space-y-2 text-sm">
-            {[
-              ['Prestataire', provider.displayName], ['Référence', order.shipping_provider_reference],
-              ['Transporteur', order.tracking_carrier], ['Tracking', order.tracking_code],
-              ['Statut', shipmentStatusLabel(order.shipping_normalized_status)],
-              ['Livraison estimée', order.shipping_estimated_delivery_at ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Rome' }).format(new Date(order.shipping_estimated_delivery_at)) : '—'],
-              ['Dernière synchro', shipmentDate(order.shipping_provider_synced_at)],
-            ].map(([label, value]) => <div key={label} className="flex justify-between gap-3"><dt className="text-gray-500">{label}</dt><dd className="min-w-0 break-all text-right">{value ?? '—'}</dd></div>)}
-          </dl>
-          {order.shipping_sync_error && <p role="status" className="text-xs text-amber-700">La dernière synchronisation a échoué. Les dernières données connues sont conservées.</p>}
-          <p className="text-xs text-gray-500">{active && !['returned', 'cancelled', 'delivered'].includes(order.shipping_normalized_status ?? '') ? 'Synchronisation automatique active' : 'Suivi terminé'}</p>
-          {active && <button disabled={busy} onClick={() => void request('sync')} className={button}>{busy ? 'Synchronisation…' : 'Synchroniser maintenant'}</button>}
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300"><IconCircleCheck size={16} aria-hidden="true" /> Expédition associée</p>
+          <div className="space-y-1 text-xs">
+            <CopyableValue label="Réf." value={order.shipping_provider_reference!} />
+            <p className="text-gray-500 dark:text-gray-400">Statut transporteur : <span className="font-medium text-gray-800 dark:text-gray-100">{shipmentStatusLabel(order.shipping_normalized_status)}</span></p>
+            <p className="text-gray-500 dark:text-gray-400">Dernière synchro : {shipmentDate(order.shipping_provider_synced_at)}</p>
+          </div>
+          {order.shipping_sync_error && <p role="status" className="text-xs text-amber-800 dark:text-amber-300">La dernière synchronisation a échoué. Les dernières données connues sont conservées.</p>}
+          <p className="text-xs text-gray-500">{autoSync ? 'Synchronisation automatique active' : 'Suivi terminé'}</p>
+          {active && canManage && <button disabled={busy} onClick={() => void request('sync')} className={button}>{busy ? 'Synchronisation…' : 'Synchroniser maintenant'}</button>}
         </>
       ) : (
         <>
-          {ready && active ? (
-            <form onSubmit={event => { event.preventDefault(); if (!busy) void request('attach'); }} className="space-y-3">
-              <label htmlFor="provider-reference" className="block text-sm">Référence {provider.displayName}</label>
-              <input id="provider-reference" value={reference} onChange={event => setReference(event.target.value)} maxLength={100} required autoComplete="off"
-                className="min-h-11 w-full rounded-lg border border-[var(--admin-border)] bg-transparent px-3 text-sm focus:ring-2 focus:ring-[var(--admin-primary)]" />
-              <button disabled={busy || !reference.trim()} className={`${button} bg-[var(--admin-primary)] text-white`}>{busy ? 'Vérification…' : 'Vérifier et associer'}</button>
-            </form>
-          ) : <p className="text-sm text-gray-500">Terminez la préparation, les contrôles froid et l’emballage avant d’associer une expédition.</p>}
+          {!canManage
+            ? <p className="text-sm text-gray-500">Aucune expédition associée.</p>
+            : ready && active ? (
+              <form onSubmit={event => { event.preventDefault(); if (!busy) void request('attach'); }} className="space-y-3">
+                <label htmlFor="provider-reference" className="block text-sm">Référence {provider.displayName}</label>
+                <input id="provider-reference" value={reference} onChange={event => setReference(event.target.value)} maxLength={100} required autoComplete="off"
+                  className="min-h-11 w-full rounded-lg border border-[var(--admin-border)] bg-transparent px-3 text-sm focus:ring-2 focus:ring-[var(--admin-primary)]" />
+                <button disabled={busy || !reference.trim()} className={`${button} bg-[var(--admin-primary)] text-white`}>{busy ? 'Vérification…' : 'Vérifier et associer'}</button>
+              </form>
+            ) : <p className="text-sm text-gray-500">Terminez la préparation, les contrôles froid et l’emballage avant d’associer une expédition.</p>}
           <p className="text-xs text-gray-500">Le transporteur, le tracking et les statuts seront récupérés automatiquement.</p>
         </>
       )}
       {message && <p role="status" className="text-sm">{message}</p>}
-      {active && (manualConfirm ? (
+      {active && canManage && (manualConfirm ? (
         <div className="space-y-2 rounded-xl border border-amber-200 p-3">
           <p className="text-xs text-amber-800">Le suivi automatique sera désactivé pour cette commande. Vous devrez mettre à jour son tracking et son statut manuellement.</p>
           <button disabled={busy} onClick={() => void request('manual')} className={button}>Confirmer le suivi manuel</button>

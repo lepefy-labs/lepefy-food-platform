@@ -42,7 +42,7 @@ export async function assertPreparationComplete(service: OrderService, order: Or
   if (message) throw new OrderWorkflowError(message);
   if (packing && (!order.packing_completed_at || !order.packing_parcel_count || order.packing_parcel_count < 1
     || (items.some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen') && !order.cold_chain_packing_checked_at))) {
-    throw new OrderWorkflowError('Packing incomplet : validez les colis et les contrôles froid avant l’expédition.');
+    throw new OrderWorkflowError('Emballage incomplet : validez les colis et les contrôles froid avant l’expédition.');
   }
 }
 

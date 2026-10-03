@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@7431681d273bb9bfe0c8bc422a3def8a72fb4f07`
-> **Ultima verifica:** 2 ottobre 2026
+> **Base codice verificata:** `main@c24ba53823132f0357d0d372988b783b2fe5947f`
+> **Ultima verifica:** 3 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -147,6 +147,19 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
   - spedizione: destinazione, transporteur e servizio, provider, reference e tracking copiabili, stato provider con ultima synchro, ultimo movimento, ETA; per i ritiri: urgenza e contatto;
   - azioni esplicite: `Imprimer la liste de préparation`, `Voir la commande`, `Voir le suivi transporteur`.
 - **Mobile:** card operative con CTA a tutta larghezza (44 px), pulsante di dettaglio e le stesse intestazioni di gruppo.
+
+**Dettaglio ordine (`/admin/orders/[id]`).** Usa lo stesso classificatore della lista, con le stesse soglie tenant.
+
+- **Header:** `StatusBadge` più il pill separato `Transport : …` (`transportState`) e la modalità.
+- **Alert:** un solo alert per anomalia, urgenza oltre soglia o `Expédition à associer`. Spariscono il vecchio «+24 h» fisso e «Ouverte depuis» sugli ordini terminati.
+- **CTA dell'header:** stesso testo della lista. Porta alla sezione indicata da `NextOrderAction.section`: checklist, `#order-packing`, `#order-shipment`, `#order-tracking`, `#order-payment`/`#order-origin` o il pannello transizioni.
+- **Transizioni di stato:** vengono da `orderDetailTransition(order, managed)` (helper puro unico) e passano da `PATCH /api/admin/orders/[id]` → `orderTransitionService`. Con spedizione managed, «expédiée» e «livrée» arrivano solo dalla sync.
+- **Prossima azione senza transizione:** il pannello mostra solo una guida verso la sezione competente, senza duplicare mutazioni.
+- **`ShipmentTrackingCard` (sezione «Suivi transporteur»):** mostra stato provider, transporteur, servizio, colli, peso, ETA, reference e tracking copiabili (`CopyableValue`), ultima synchro, link transporteur validato e la timeline degli eventi persistiti (`shipmentEventsNewestFirst` + `shipmentEventLabel`, 4 visibili poi «Afficher tout»). Nessuna chiamata live.
+- **`ManagedShipmentPanel`:** resta il solo punto per associare, sincronizzare o passare al suivi manuel, con un riepilogo compatto.
+- **Senza `orders.manage`:** la pagina è in lettura (banner «Lecture seule», nessun controllo di modifica); l'API resta il controllo autorevole.
+- **Righe articolo:** lette con `order_id` e `tenant_id`, anche nella stampa.
+- **Stampa:** usa solo la rotta dedicata `/admin/orders/[id]/picking-list`.
 
 Questo cockpit non sostituisce `Admin → Livraison`: quella sezione conserva tariffe, packaging, intelligence e strumenti tecnici. Il dettaglio ordine conserva la gestione completa della spedizione, comprese associazione reference e sincronizzazione. La sincronizzazione provider può già avanzare `orders.status` tramite `syncOrderShipment`/`orderTransitionService`; il cockpit non introduce nuove transizioni o side effects.
 
@@ -1223,6 +1236,11 @@ apps/storefront/src/app/admin/(protected)/page.tsx          (KPI, filtri unifica
 apps/storefront/src/app/admin/(protected)/OrdersSortSelect.tsx  (select di ordinamento, default priority)
 apps/storefront/src/app/admin/(protected)/OrdersTable.tsx   (righe desktop e card mobile, gruppi di priorità, stato ordine e Transport separati)
 apps/storefront/src/app/api/admin/orders/[id]/operation-detail/route.ts  (carton suggestion lazy)
+apps/storefront/src/app/admin/(protected)/orders/[id]/page.tsx  (dettaglio ordine: header/alert dal classificatore, ordine dei pannelli, RBAC in lettura)
+apps/storefront/src/app/admin/orders/[id]/ShipmentTrackingCard.tsx  (suivi transporteur: snapshot provider + timeline eventi persistiti)
+apps/storefront/src/app/admin/orders/[id]/ManagedShipmentPanel.tsx  (associazione, sync manuale, passaggio a suivi manuel)
+apps/storefront/src/app/admin/orders/[id]/OrderDetail.tsx  (transizioni via orderDetailTransition, emballage, note, documenti)
+apps/storefront/src/app/admin/_components/ui/CopyableValue.tsx  (reference/tracking copiabili, condiviso lista e dettaglio)
 apps/storefront/src/lib/orders/orderTransitionService.ts   (CAS + side effects; passa la stima salvata all'e-mail shipped)
 apps/storefront/src/lib/notifications/customerEmails.ts    (orderShippedEmail, formatEstimatedDeliveryDate)
 apps/storefront/src/app/api/shipping/quote/route.ts

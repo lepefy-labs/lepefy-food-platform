@@ -153,7 +153,7 @@ test('initial delivered catch-up emits completion only; still requires preparati
   expect(spy.messages.map(message => message.payload.notificationType)).toEqual(['order_completed']);
   expect(spy.hooks).toHaveLength(1);
   const blocked = fakeService(initialOrder({ packing_completed_at: null }));
-  await expect(applyShipmentSnapshot(blocked.service, blocked.order(), snapshot('DELIVERED'), spy.run)).rejects.toThrow('Packing incomplet');
+  await expect(applyShipmentSnapshot(blocked.service, blocked.order(), snapshot('DELIVERED'), spy.run)).rejects.toThrow('Emballage incomplet');
   expect(blocked.order().status).toBe('preparing');
 });
 test('concurrent CAS losers cannot duplicate notification', async () => {

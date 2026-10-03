@@ -33,7 +33,8 @@ export default async function PickingListPage({ params }: PageProps) {
     from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>;
   }).from('order_items')
     .select('*')
-    .eq('order_id', order.id) as { data: OrderItem[] | null };
+    .eq('order_id', order.id)
+    .eq('tenant_id', tenant.id) as { data: OrderItem[] | null };
 
   // Sort by warehouse_location (nulls last) — safe whether column exists or not.
   const items = (rawItems ?? []).sort((a, b) => {

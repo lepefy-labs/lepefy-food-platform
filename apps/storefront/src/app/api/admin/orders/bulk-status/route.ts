@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     if (incomplete.length > 0) {
       return NextResponse.json(
         {
-          error: `Préparation incomplète pour ${incomplete.length} commande${incomplete.length > 1 ? 's' : ''}. Terminez le picking et les contrôles froid avant de traiter la sélection.`,
+          error: `Préparation incomplète pour ${incomplete.length} commande${incomplete.length > 1 ? 's' : ''}. Terminez la préparation et les contrôles froid avant de traiter la sélection.`,
           orderIds: incomplete,
         },
         { status: 409 },

@@ -46,10 +46,10 @@ export async function POST(
 
   const order = orderRaw as unknown as OrderRow;
   if (order.fulfillment_type !== 'delivery') {
-    return NextResponse.json({ error: 'Le packing est réservé aux commandes en livraison.' }, { status: 409 });
+    return NextResponse.json({ error: 'L’emballage est réservé aux commandes en livraison.' }, { status: 409 });
   }
   if (order.status !== 'preparing') {
-    return NextResponse.json({ error: 'Le packing peut être modifié uniquement pendant la préparation.' }, { status: 409 });
+    return NextResponse.json({ error: 'L’emballage peut être modifié uniquement pendant la préparation.' }, { status: 409 });
   }
 
   const { data: itemsRaw, error: itemsError } = await supabase
@@ -59,7 +59,7 @@ export async function POST(
     .eq('tenant_id', tenant.id);
 
   if (itemsError) {
-    return NextResponse.json({ error: 'Impossible de vérifier le picking.' }, { status: 500 });
+    return NextResponse.json({ error: 'Impossible de vérifier la préparation.' }, { status: 500 });
   }
 
   const items = (itemsRaw ?? []) as ItemRow[];
@@ -71,7 +71,7 @@ export async function POST(
     return true;
   });
   if (!pickingComplete) {
-    return NextResponse.json({ error: 'Terminez le picking et les contrôles froid avant le packing.' }, { status: 409 });
+    return NextResponse.json({ error: 'Terminez la préparation et les contrôles froid avant l’emballage.' }, { status: 409 });
   }
 
   const hasColdChain = items.some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen');
@@ -100,7 +100,7 @@ export async function POST(
 
   if (updateError) {
     console.error('[admin/orders packing] update failed:', updateError, '— order_id:', order.id);
-    return NextResponse.json({ error: 'Impossible d’enregistrer le packing.' }, { status: 500 });
+    return NextResponse.json({ error: 'Impossible d’enregistrer l’emballage.' }, { status: 500 });
   }
 
   return NextResponse.json({

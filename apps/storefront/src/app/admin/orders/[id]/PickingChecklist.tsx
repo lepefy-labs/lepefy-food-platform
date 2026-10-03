@@ -15,6 +15,8 @@ interface Props {
   orderId: string;
   orderStatus: OrderStatus;
   items: OrderItem[];
+  /** Without orders.manage the checklist is read-only. */
+  canManage?: boolean;
 }
 
 function storageLabel(storageType: OrderItem['storage_type']) {
@@ -23,7 +25,7 @@ function storageLabel(storageType: OrderItem['storage_type']) {
   return 'Sec';
 }
 
-export default function PickingChecklist({ orderId, orderStatus, items }: Props) {
+export default function PickingChecklist({ orderId, orderStatus, items, canManage = true }: Props) {
   const router = useRouter();
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function PickingChecklist({ orderId, orderStatus, items }: Props)
     };
   }, [items]);
 
-  const editable = orderStatus === 'preparing';
+  const editable = orderStatus === 'preparing' && canManage;
   const percent = progress.total === 0 ? 0 : Math.round((progress.picked / progress.total) * 100);
 
   async function updateItem(itemId: string, body: { picked?: boolean; coldChainChecked?: boolean }) {
@@ -57,7 +59,7 @@ export default function PickingChecklist({ orderId, orderStatus, items }: Props)
       if (!res.ok) throw new Error(payload?.error ?? `HTTP ${res.status}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de mettre à jour le picking.');
+      setError(err instanceof Error ? err.message : 'Impossible de mettre à jour la préparation.');
     } finally {
       setBusyItemId(null);
     }
@@ -89,7 +91,7 @@ export default function PickingChecklist({ orderId, orderStatus, items }: Props)
             style={{ width: `${percent}%` }}
           />
         </div>
-        {!editable && !progress.complete && (
+        {orderStatus !== 'preparing' && canManage && !progress.complete && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             Démarrez la préparation de la commande pour utiliser la checklist.
           </p>

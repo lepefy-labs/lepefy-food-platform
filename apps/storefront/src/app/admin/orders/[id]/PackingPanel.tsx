@@ -13,6 +13,8 @@ interface Props {
   initialParcelCount: number | null;
   initialColdChecked: boolean;
   initialComplete: boolean;
+  /** Without orders.manage the panel only shows the current state. */
+  readOnly?: boolean;
 }
 
 export default function PackingPanel({
@@ -24,6 +26,7 @@ export default function PackingPanel({
   initialParcelCount,
   initialColdChecked,
   initialComplete,
+  readOnly = false,
 }: Props) {
   const router = useRouter();
   const [parcelCount, setParcelCount] = useState(String(initialParcelCount ?? estimatedParcels ?? 1));
@@ -56,25 +59,25 @@ export default function PackingPanel({
       setComplete(Boolean(payload?.packing?.complete));
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer le packing.');
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer l’emballage.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <section className={`overflow-hidden rounded-2xl border shadow-sm ${complete
+    <section id="order-packing" aria-labelledby="order-packing-title" className={`scroll-mt-24 overflow-hidden rounded-2xl border shadow-sm ${complete
       ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/20'
       : 'border-violet-200 bg-violet-50/50 dark:border-violet-900 dark:bg-violet-950/20'
     }`}>
       <div className="flex items-start justify-between gap-3 border-b border-inherit px-4 py-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">Packing & expédition</p>
-          <h2 className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">Préparer les colis</h2>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">Emballage</p>
+          <h2 id="order-packing-title" className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">Préparer les colis</h2>
         </div>
         {complete && (
           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-            <IconCheck size={12} /> Packing terminé
+            <IconCheck size={12} aria-hidden="true" /> Emballage terminé
           </span>
         )}
       </div>
@@ -82,7 +85,7 @@ export default function PackingPanel({
       <div className="space-y-4 bg-white p-4 dark:bg-gray-900">
         {!pickingComplete && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-            Terminez d’abord la checklist de préparation. Le packing ne peut pas être validé tant que le picking est incomplet.
+            Terminez d’abord la checklist de préparation : l’emballage ne peut pas être validé avant.
           </div>
         )}
 
@@ -102,7 +105,7 @@ export default function PackingPanel({
                 setParcelCount(event.target.value);
                 setComplete(false);
               }}
-              disabled={!pickingComplete || saving}
+              disabled={!pickingComplete || saving || readOnly}
               className="h-11 w-full rounded-xl border border-[var(--admin-border)] bg-white px-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] disabled:opacity-50 dark:bg-gray-950 dark:text-gray-100"
             />
           </div>
@@ -123,7 +126,7 @@ export default function PackingPanel({
                 setColdChecked(event.target.checked);
                 setComplete(false);
               }}
-              disabled={!pickingComplete || saving}
+              disabled={!pickingComplete || saving || readOnly}
               className="mt-0.5 h-5 w-5 rounded border-gray-300"
             />
             <span className="min-w-0">
@@ -137,19 +140,19 @@ export default function PackingPanel({
           </label>
         )}
 
-        <button
+        {!readOnly && <button
           type="button"
           onClick={() => void savePacking()}
           disabled={!canComplete || saving}
           className="min-h-11 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? 'Enregistrement…' : complete ? 'Mettre à jour le packing' : 'Valider le packing'}
-        </button>
+          {saving ? 'Enregistrement…' : complete ? 'Mettre à jour l’emballage' : 'Valider l’emballage'}
+        </button>}
 
         {error && <p className="text-xs font-medium text-red-600" role="alert">{error}</p>}
         {complete && (
           <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-            <IconCheck size={14} /> Colis prêts. Renseignez le tracking puis expédiez la commande.
+            <IconCheck size={14} aria-hidden="true" /> Colis prêts pour l’expédition.
           </p>
         )}
       </div>

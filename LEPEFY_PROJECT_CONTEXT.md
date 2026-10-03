@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 2 ottobre 2026 — **v7.00 Current-State Snapshot** (cockpit ordini: work queue per priorità operativa; base `main` @ `7431681d273bb9bfe0c8bc422a3def8a72fb4f07`)
+> **Aggiornato:** 3 ottobre 2026 — **v7.01 Current-State Snapshot** (dettaglio ordine allineato al cockpit; base `main` @ `c24ba53823132f0357d0d372988b783b2fe5947f`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -30,6 +30,14 @@ Ogni riga separa: stato ordine, modalità, pill `Transport : …` (stato provide
 - Le CTA aprono il dettaglio canonico (mutazioni sotto `orders.manage` e transition service); «Voir le suivi» apre invece l'URL transporteur validato.
 
 La riga espansa carica la carton suggestion solo all'apertura, via `/api/admin/orders/[id]/operation-detail` (`orders.view`, tenant-scoped). Nessuna migration, nessuna nuova transizione, nessuna chiamata provider dalla lista. Admin → Livraison continua a gestire configurazione, tariffe, packaging e strumenti tecnici. Dettagli: `docs/SHIPPING_INTELLIGENCE.md` §3.0.
+
+Il dettaglio ordine (`/admin/orders/[id]`) usa lo stesso classificatore.
+- **Header:** stato ordine, pill `Transport : …`, un solo alert contestuale e una CTA con lo stesso testo della lista, che porta alla sezione dove l'azione si compie.
+- **Transizioni:** vengono da `orderDetailTransition`; con spedizione managed, spedito e consegnato arrivano dalla sync.
+- **«Suivi transporteur»:** mostra snapshot e timeline degli eventi persistiti.
+- **Senza `orders.manage`:** pagina in sola lettura.
+- **UI tenant:** «préparation»/«emballage», anche nei messaggi API; stampa solo tramite `/picking-list`.
+- **Righe articolo:** lette anche per `tenant_id`.
 
 ---
 

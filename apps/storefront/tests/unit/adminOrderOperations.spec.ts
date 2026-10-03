@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import {
   classifyOrderOperation, compareOrders, formatOperationalDuration, formatSince, hasLogisticsIncident, isTrackingStale,
-  nextOrderAction, orderQueueFlags, parseOrderSort, urgencyLabel,
+  nextOrderAction, orderDetailTransition, orderQueueFlags, parseOrderSort, transportState, urgencyLabel,
   type OperationalOrder, type PrioritizedOrder,
 } from '../../src/lib/orders/adminOrderOperations';
+import { shipmentEventLabel, shipmentEventsNewestFirst } from '../../src/lib/shipping/shipmentPresentation';
 
 const now = new Date('2026-10-02T12:00:00Z');
 const thresholds = { prepareHours: 24, pickupHours: 48, trackingStaleHours: 72 };
@@ -41,14 +42,14 @@ test.describe('next action', () => {
   });
 
   test('shipped: tracking is a secondary consultation, missing tracking is corrective', () => {
-    expect(nextOrderAction(make({ status: 'shipped', tracking_code: 'TRK1' }))).toEqual({ label: 'Voir le suivi', intent: 'tracking', primary: false });
+    expect(nextOrderAction(make({ status: 'shipped', tracking_code: 'TRK1' }))).toEqual({ label: 'Voir le suivi', intent: 'tracking', primary: false, section: 'tracking' });
     expect(nextOrderAction(make({ status: 'shipped', shipping_provider_reference: 'PK1' })).label).toBe('Voir le suivi');
-    expect(nextOrderAction(make({ status: 'shipped' }))).toEqual({ label: 'Vérifier l’expédition', intent: 'detail', primary: true });
-    expect(classify(make(moving(100))).action).toEqual({ label: 'Vérifier le suivi', intent: 'tracking', primary: true });
+    expect(nextOrderAction(make({ status: 'shipped' }))).toEqual({ label: 'Vérifier l’expédition', intent: 'detail', primary: true, section: 'actions' });
+    expect(classify(make(moving(100))).action).toEqual({ label: 'Vérifier le suivi', intent: 'tracking', primary: true, section: 'tracking' });
   });
 
   test('terminal orders get a neutral consultation, incidents a corrective action', () => {
-    for (const status of ['delivered', 'cancelled'] as const) expect(nextOrderAction(make({ status }))).toEqual({ label: 'Voir', intent: 'detail', primary: false });
+    for (const status of ['delivered', 'cancelled'] as const) expect(nextOrderAction(make({ status }))).toEqual({ label: 'Voir', intent: 'detail', primary: false, section: 'none' });
     for (const patch of [{ shipping_normalized_status: 'exception' as const }, { shipping_normalized_status: 'returned' as const }, { shipping_sync_error: 'provider_error' }]) {
       const order = make({ status: 'shipped', tracking_code: 'TRK1', ...patch });
       expect(hasLogisticsIncident(order)).toBe(true);
@@ -175,5 +176,48 @@ test.describe('operational priority', () => {
     expect(parseOrderSort('total_desc')).toBe('amount_desc');
     expect(parseOrderSort('amount_asc')).toBe('amount_asc');
     expect(parseOrderSort('drop table')).toBe('priority');
+  });
+});
+
+test.describe('order detail alignment', () => {
+  test('each next action points to the panel where it is carried out', () => {
+    const section = (patch: Partial<OperationalOrder>, extra: Partial<OperationalOrder> = {}) => nextOrderAction(make({ ...patch, ...extra })).section;
+    expect(section({ status: 'preparing' })).toBe('preparation');
+    expect(section({ status: 'preparing', picking_completed_at: hoursAgo(1) })).toBe('packing');
+    expect(section({ status: 'preparing', picking_completed_at: hoursAgo(1), packing_completed_at: hoursAgo(1), shipping_tracking_mode: 'managed' })).toBe('shipment');
+    expect(section({ status: 'shipped', shipping_provider_reference: 'PK1', shipping_normalized_status: 'exception' })).toBe('tracking');
+    expect(section({ payment_status: 'pending' })).toBe('payment');
+    for (const patch of [{}, { status: 'ready_for_pickup' as const, fulfillment_type: 'pickup' as const }, { status: 'preparing' as const, fulfillment_type: 'pickup' as const, picking_completed_at: hoursAgo(1) }]) {
+      expect(section(patch)).toBe('actions');
+    }
+  });
+
+  test('detail transitions follow the state machine; managed shipments ship and deliver through sync', () => {
+    expect(orderDetailTransition(make(), false)).toEqual({ status: 'preparing', label: 'Démarrer la préparation' });
+    expect(orderDetailTransition(make({ status: 'preparing' }), false)).toEqual({ status: 'shipped', label: 'Expédier la commande' });
+    expect(orderDetailTransition(make({ status: 'preparing' }), true)).toBeNull();
+    expect(orderDetailTransition(make({ status: 'shipped' }), false)).toEqual({ status: 'delivered', label: 'Marquer comme livrée' });
+    expect(orderDetailTransition(make({ status: 'shipped' }), true)).toBeNull();
+    expect(orderDetailTransition(make({ status: 'preparing', fulfillment_type: 'pickup' }), false)).toEqual({ status: 'ready_for_pickup', label: 'Marquer prête au retrait' });
+    expect(orderDetailTransition(make({ status: 'ready_for_pickup', fulfillment_type: 'pickup' }), false)).toEqual({ status: 'delivered', label: 'Marquer comme retirée' });
+    for (const status of ['delivered', 'cancelled', 'stock_conflict'] as const) expect(orderDetailTransition(make({ status }), false)).toBeNull();
+  });
+
+  test('transport state stays separate from the order status', () => {
+    expect(transportState(make({ fulfillment_type: 'pickup' }))).toBeNull();
+    expect(transportState(make())).toEqual({ label: 'Suivi manuel', tone: 'neutral' });
+    expect(transportState(make({ shipping_tracking_mode: 'managed' }))).toEqual({ label: 'Non associée', tone: 'neutral' });
+    expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_normalized_status: 'exception' }))).toEqual({ label: 'Incident', tone: 'danger' });
+    expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_normalized_status: 'delivered' }))).toEqual({ label: 'Livré', tone: 'success' });
+    expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_sync_error: 'timeout' }))).toEqual({ label: 'Synchro en erreur', tone: 'danger' });
+  });
+
+  test('tracking timeline is newest first, drops malformed events and keeps carrier wording readable', () => {
+    const events = shipmentEventsNewestFirst([
+      { occurredAt: '2026-09-30T11:25:00Z', description: 'RITIRATA', providerStatus: null, status: 'in_transit' },
+      { occurredAt: 'not a date', description: 'x', providerStatus: null, status: 'unknown' },
+      { occurredAt: '2026-10-01T08:10:00Z', description: 'IN CONSEGNA', providerStatus: null, status: 'out_for_delivery' },
+    ]);
+    expect(events.map(shipmentEventLabel)).toEqual(['En livraison', 'Pris en charge']);
   });
 });
