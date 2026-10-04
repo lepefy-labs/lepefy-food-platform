@@ -218,7 +218,7 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
         <p aria-live="polite" className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
           {preview ? (
             <>
-              → Le client paie <strong className="font-semibold text-gray-900 dark:text-gray-100">{formatPrice(preview.finalCost, currency)}</strong>
+              → {body.active ? 'Le client paie' : 'Une fois active, le client paierait'} <strong className="font-semibold text-gray-900 dark:text-gray-100">{formatPrice(preview.finalCost, currency)}</strong>
               {preview.freeShippingApplied
                 ? ' (livraison offerte)'
                 : preview.discountApplied > 0
@@ -226,6 +226,9 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
                   : ''}
               {body.flat_rate_override != null && ' · forfait fixe, sans appel Packlink'}
               {body.free_shipping_above != null && !preview.freeShippingApplied && ` · offerte dès ${formatPrice(body.free_shipping_above, currency)}`}
+              {!body.active && (
+                <span className="block text-amber-700">Règle inactive : elle n&apos;est pas appliquée aux devis tant qu&apos;elle n&apos;est pas activée.</span>
+              )}
             </>
           ) : 'Complétez la règle pour voir le résultat.'}
         </p>
