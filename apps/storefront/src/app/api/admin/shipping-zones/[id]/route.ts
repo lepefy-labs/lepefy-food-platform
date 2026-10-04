@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { duplicatePrefixes, type ZoneLike } from '@/lib/shipping/shippingRuleConflicts';
 
 export const runtime = 'nodejs';
 
@@ -39,6 +40,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ('position' in body) updatePayload.position = parseInt(String(body.position), 10) || 0;
 
   const supabase = createServiceClient();
+
+  // No prefix shared with another active zone of the same country (see POST).
+  if ('country' in updatePayload || 'postal_prefixes' in updatePayload || updatePayload.active === true) {
+    const { data: existing, error: existingError } = await supabase
+      .from('shipping_zones')
+      .select('id, code, country, postal_prefixes, active')
+      .eq('tenant_id', tenant.id);
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    const rows = (existing ?? []) as ZoneLike[];
+    const current = rows.find((row) => row.id === params.id);
+    if (!current) return NextResponse.json({ error: 'Zone introuvable.' }, { status: 404 });
+    const duplicates = duplicatePrefixes({
+      id: current.id,
+      country: (updatePayload.country as string | undefined) ?? current.country,
+      postal_prefixes: (updatePayload.postal_prefixes as string[] | undefined) ?? current.postal_prefixes,
+      active: (updatePayload.active as boolean | undefined) ?? current.active,
+    }, rows);
+    if (duplicates.length > 0) {
+      return NextResponse.json({ error: `Préfixe(s) déjà utilisé(s) par une autre zone active de ce pays : ${duplicates.join(', ')}.`, code: 'PREFIX_OVERLAP', prefixes: duplicates }, { status: 409 });
+    }
+  }
+
   const { error } = await supabase
     .from('shipping_zones')
     .update(updatePayload)

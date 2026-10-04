@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { overlapMessage, overlappingCountries, type RuleLike } from '@/lib/shipping/shippingRuleConflicts';
 import type { ShippingDiscountType } from '@lepefy/types';
 
 export const runtime = 'nodejs';
@@ -93,6 +94,27 @@ export async function PATCH(
   if ('note'     in body) updatePayload.note     = body.note ? String(body.note).trim() : null;
 
   const supabase = createServiceClient();
+
+  // Editing countries or re-activating must not create a second active rule
+  // for a country (see POST).
+  if ('countries' in updatePayload || updatePayload.active === true) {
+    const { data: existing, error: existingError } = await supabase
+      .from('shipping_country_rules')
+      .select('id, countries, active')
+      .eq('tenant_id', tenant.id);
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+    const rows = (existing ?? []) as RuleLike[];
+    const current = rows.find((row) => row.id === params.id);
+    if (!current) return NextResponse.json({ error: 'Règle introuvable.' }, { status: 404 });
+    const overlap = overlappingCountries({
+      id: current.id,
+      countries: (updatePayload.countries as string[] | undefined) ?? current.countries,
+      active: (updatePayload.active as boolean | undefined) ?? current.active,
+    }, rows);
+    if (overlap.length > 0) {
+      return NextResponse.json({ error: overlapMessage(overlap), code: 'COUNTRY_OVERLAP', countries: overlap }, { status: 409 });
+    }
+  }
 
   const { error } = await supabase
     .from('shipping_country_rules')

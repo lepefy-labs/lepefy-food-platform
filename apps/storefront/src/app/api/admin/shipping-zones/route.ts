@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { duplicatePrefixes, type ZoneLike } from '@/lib/shipping/shippingRuleConflicts';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -49,6 +50,20 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient();
+  const active = body.active === undefined ? true : Boolean(body.active);
+
+  // The same prefix in two active zones of one country cannot be resolved by
+  // the longest-prefix rule: the zone (and in tariff mode the price) would be
+  // ambiguous.
+  const { data: existing, error: existingError } = await supabase
+    .from('shipping_zones')
+    .select('id, code, country, postal_prefixes, active')
+    .eq('tenant_id', tenant.id);
+  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+  const duplicates = duplicatePrefixes({ country, postal_prefixes: postalPrefixes, active }, (existing ?? []) as ZoneLike[]);
+  if (duplicates.length > 0) {
+    return NextResponse.json({ error: `Préfixe(s) déjà utilisé(s) par une autre zone active de ce pays : ${duplicates.join(', ')}.`, code: 'PREFIX_OVERLAP', prefixes: duplicates }, { status: 409 });
+  }
 
   const { data: lastZone } = await supabase
     .from('shipping_zones')
@@ -66,7 +81,7 @@ export async function POST(req: NextRequest) {
       code,
       country,
       postal_prefixes: postalPrefixes,
-      active: body.active === undefined ? true : Boolean(body.active),
+      active,
       position: nextPosition,
     })
     .select('*')

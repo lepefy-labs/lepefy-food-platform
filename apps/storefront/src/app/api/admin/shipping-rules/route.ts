@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { overlapMessage, overlappingCountries, type RuleLike } from '@/lib/shipping/shippingRuleConflicts';
 import type { ShippingDiscountType } from '@lepefy/types';
 
 // Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
@@ -96,6 +97,19 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient();
+  const active = body.active === undefined ? true : Boolean(body.active);
+
+  // One active rule per explicit country: the quote resolves an unordered set,
+  // so two active rules for one country would make the price undetermined.
+  const { data: existing, error: existingError } = await supabase
+    .from('shipping_country_rules')
+    .select('id, countries, active')
+    .eq('tenant_id', tenant.id);
+  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+  const overlap = overlappingCountries({ countries, active }, (existing ?? []) as RuleLike[]);
+  if (overlap.length > 0) {
+    return NextResponse.json({ error: overlapMessage(overlap), code: 'COUNTRY_OVERLAP', countries: overlap }, { status: 409 });
+  }
 
   // Position par défaut = dernière position du tenant + 1 (même pattern que
   // tenant_hero_slides).
@@ -117,7 +131,7 @@ export async function POST(req: NextRequest) {
       flat_rate_override:   flatRateOverride,
       discount_type:        discount.type,
       discount_value:       discount.value,
-      active:               body.active === undefined ? true : Boolean(body.active),
+      active,
       position:             nextPosition,
       note:                 body.note ? String(body.note).trim() : null,
     })

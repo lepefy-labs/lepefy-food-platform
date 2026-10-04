@@ -1,10 +1,16 @@
 'use client';
 
 import { useState, Fragment } from 'react';
-import { IconTrash, IconPlus } from '@tabler/icons-react';
+import { IconTrash, IconPlus, IconAlertTriangle } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import type { ShippingCountryRuleRow, ShippingDiscountType } from '@lepefy/types';
 import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import {
+  findCountryRuleConflicts,
+  overlapMessage,
+  overlappingCountries,
+  previewCountryRule,
+} from '@/lib/shipping/shippingRuleConflicts';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -76,8 +82,15 @@ function countryLabel(code: string): string {
   return COUNTRIES.find((c) => c.value === code)?.label ?? code;
 }
 
+function parseExample(raw: string): number {
+  const value = Number(raw.replace(',', '.'));
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
 interface RuleFormProps {
   initial?: ShippingCountryRuleRow;
+  /** All rules, to warn before saving a second active rule for a country (the API rejects it too). */
+  allRules: ShippingCountryRuleRow[];
   currency: string;
   submitLabel: string;
   isSaving: boolean;
@@ -85,9 +98,18 @@ interface RuleFormProps {
   onCancel?: () => void;
 }
 
-function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel }: RuleFormProps) {
+function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit, onCancel }: RuleFormProps) {
   const [form, setForm] = useState<FormState>(toFormState(initial));
   const [error, setError] = useState<string | null>(null);
+  const [exampleBase, setExampleBase] = useState('12.90');
+  const [exampleCart, setExampleCart] = useState('45');
+
+  const body = formToBody(form);
+  const overlap = overlappingCountries({ id: initial?.id, countries: body.countries, active: body.active }, allRules);
+  const validationIssue = validate(form);
+  // Same function as /api/shipping/quote and the tariff quote: what the customer would pay.
+  const preview = validationIssue ? null : previewCountryRule(parseExample(exampleBase), parseExample(exampleCart), body);
+  const idSuffix = initial?.id ?? 'new';
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -103,9 +125,12 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
   }
 
   function handleSubmit() {
-    const validationError = validate(form);
-    if (validationError) {
-      setError(validationError);
+    if (validationIssue) {
+      setError(validationIssue);
+      return;
+    }
+    if (overlap.length > 0) {
+      setError(overlapMessage(overlap));
       return;
     }
     setError(null);
@@ -114,7 +139,7 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
 
   return (
     <div className="space-y-3">
-      {error && <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
+      {error && <div role="alert" className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
 
       <div>
         <label className={LABEL_CLS}>Pays</label>
@@ -169,8 +194,42 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
       </div>
 
       <div className="flex items-center gap-2">
-        <input type="checkbox" id={`active-${initial?.id ?? 'new'}`} checked={form.active} onChange={(e) => set('active', e.target.checked)} className="w-5 h-5" />
-        <label htmlFor={`active-${initial?.id ?? 'new'}`} className="text-sm text-gray-600">Actif</label>
+        <input type="checkbox" id={`active-${idSuffix}`} checked={form.active} onChange={(e) => set('active', e.target.checked)} className="w-5 h-5" />
+        <label htmlFor={`active-${idSuffix}`} className="text-sm text-gray-600">Actif</label>
+      </div>
+
+      {overlap.length > 0 && (
+        <div role="alert" className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <IconAlertTriangle size={14} stroke={1.8} className="mt-0.5 shrink-0" />
+          {overlapMessage(overlap)}
+        </div>
+      )}
+
+      <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
+        <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">Aperçu</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <label htmlFor={`example-base-${idSuffix}`}>Prix de base</label>
+          <input id={`example-base-${idSuffix}`} type="text" inputMode="decimal" value={exampleBase} onChange={(e) => setExampleBase(e.target.value)} className="w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900" />
+          <span>{currency} ·</span>
+          <label htmlFor={`example-cart-${idSuffix}`}>panier</label>
+          <input id={`example-cart-${idSuffix}`} type="text" inputMode="decimal" value={exampleCart} onChange={(e) => setExampleCart(e.target.value)} className="w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900" />
+          <span>{currency}</span>
+        </div>
+        <p aria-live="polite" className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
+          {preview ? (
+            <>
+              → Le client paie <strong className="font-semibold text-gray-900 dark:text-gray-100">{formatPrice(preview.finalCost, currency)}</strong>
+              {preview.freeShippingApplied
+                ? ' (livraison offerte)'
+                : preview.discountApplied > 0
+                  ? ` (remise -${formatPrice(preview.discountApplied, currency)})`
+                  : ''}
+              {body.flat_rate_override != null && ' · forfait fixe, sans appel Packlink'}
+              {body.free_shipping_above != null && !preview.freeShippingApplied && ` · offerte dès ${formatPrice(body.free_shipping_above, currency)}`}
+            </>
+          ) : 'Complétez la règle pour voir le résultat.'}
+        </p>
+        <p className="mt-1 text-2xs text-gray-400">Le prix de base est le tarif de la zone en mode grille tarifaire, sinon le coût du devis Packlink.</p>
       </div>
 
       <div className="flex items-center gap-2 pt-1">
@@ -186,15 +245,21 @@ function RuleForm({ initial, currency, submitLabel, isSaving, onSubmit, onCancel
 interface ShippingCountryRulesSectionProps {
   initialRules: ShippingCountryRuleRow[];
   currency: string;
+  /** UI hint only: the API re-checks shipping.manage. */
+  canManage: boolean;
 }
 
-export function ShippingCountryRulesSection({ initialRules, currency }: ShippingCountryRulesSectionProps) {
+export function ShippingCountryRulesSection({ initialRules, currency, canManage }: ShippingCountryRulesSectionProps) {
   const [rules, setRules] = useState<ShippingCountryRuleRow[]>([...initialRules].sort((a, b) => a.position - b.position));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingToggle, setPendingToggle] = useState<ShippingCountryRuleRow | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  const conflicts = findCountryRuleConflicts(rules);
+  const conflictedIds = new Set(conflicts.flatMap((conflict) => conflict.ruleIds));
 
   function showToast(msg: string, type: 'success' | 'error') {
     setToast({ msg, type });
@@ -244,7 +309,11 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
   async function handleToggleActive(rule: ShippingCountryRuleRow) {
     setSavingId(rule.id);
     const ok = await patchRule(rule.id, { active: !rule.active });
-    if (ok) setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, active: !r.active } : r)));
+    if (ok) {
+      setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, active: !r.active } : r)));
+      showToast(rule.active ? 'Règle désactivée' : 'Règle activée', 'success');
+    }
+    setPendingToggle(null);
     setSavingId(null);
   }
 
@@ -265,7 +334,16 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
 
   return (
     <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      {toast && <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.msg}</div>}
+      {toast && <div role={toast.type === 'error' ? 'alert' : 'status'} className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.msg}</div>}
+
+      {conflicts.length > 0 && (
+        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <IconAlertTriangle size={14} stroke={1.8} className="mt-0.5 shrink-0" />
+          <span>
+            Conflit : {conflicts.map((conflict) => `${countryLabel(conflict.country)} (${conflict.ruleIds.length} règles)`).join(', ')} — plusieurs règles actives pour un même pays, la règle appliquée n&apos;est pas déterminée. Désactivez ou modifiez l&apos;une d&apos;elles.
+          </span>
+        </div>
+      )}
 
       {rules.length === 0 && !creating && <p className="text-sm text-gray-400 mb-4">Aucune règle configurée — le calcul de livraison standard s&apos;applique sans modification.</p>}
 
@@ -274,25 +352,39 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
-                <th className="py-2 pr-3">Pays</th><th className="py-2 pr-3">Gratuité dès</th><th className="py-2 pr-3">Forfait</th><th className="py-2 pr-3">Remise</th><th className="py-2 pr-3">Actif</th><th className="py-2 pr-3 text-right">Actions</th>
+                <th className="py-2 pr-3">Pays</th><th className="py-2 pr-3">Gratuité dès</th><th className="py-2 pr-3">Forfait</th><th className="py-2 pr-3">Remise</th><th className="py-2 pr-3">Actif</th>{canManage && <th className="py-2 pr-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {rules.map((rule) => (
                 <Fragment key={rule.id}>
                   <tr className="border-b border-gray-50 dark:border-gray-800/60">
-                    <td className="py-2.5 pr-3"><div className="flex flex-wrap gap-1">{rule.countries.includes(ALL_COUNTRIES) ? <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">Tous les pays</span> : rule.countries.map((c) => <span key={c} className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">{countryLabel(c)}</span>)}</div></td>
+                    <td className="py-2.5 pr-3">
+                      <div className="flex flex-wrap gap-1">
+                        {rule.countries.includes(ALL_COUNTRIES)
+                          ? <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">Tous les pays</span>
+                          : rule.countries.map((c) => <span key={c} className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">{countryLabel(c)}</span>)}
+                        {rule.active && conflictedIds.has(rule.id) && <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Conflit</span>}
+                      </div>
+                      {rule.note && <p className="mt-1 text-xs text-gray-400">{rule.note}</p>}
+                    </td>
                     <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.free_shipping_above != null ? formatPrice(rule.free_shipping_above, currency) : '—'}</td>
                     <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.flat_rate_override != null ? formatPrice(rule.flat_rate_override, currency) : '—'}</td>
                     <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.discount_type ? rule.discount_type === 'percentage' ? `-${rule.discount_value}%` : `-${formatPrice(rule.discount_value ?? 0, currency)}` : '—'}</td>
-                    <td className="py-2.5 pr-3"><input type="checkbox" checked={rule.active} onChange={() => handleToggleActive(rule)} disabled={savingId === rule.id} className="w-5 h-5" /></td>
-                    <td className="py-2.5 pr-3"><div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => setEditingId(editingId === rule.id ? null : rule.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === rule.id ? 'Fermer' : 'Modifier'}</button>
-                      <button onClick={() => setPendingDeleteId(rule.id)} disabled={savingId === rule.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
-                    </div></td>
+                    <td className="py-2.5 pr-3">
+                      {canManage
+                        ? <input type="checkbox" aria-label={rule.active ? 'Désactiver la règle' : 'Activer la règle'} checked={rule.active} onChange={() => setPendingToggle(rule)} disabled={savingId === rule.id} className="w-5 h-5" />
+                        : <span className={`text-xs font-medium ${rule.active ? 'text-green-700' : 'text-gray-400'}`}>{rule.active ? 'Active' : 'Inactive'}</span>}
+                    </td>
+                    {canManage && (
+                      <td className="py-2.5 pr-3"><div className="flex items-center gap-2 justify-end">
+                        <button onClick={() => setEditingId(editingId === rule.id ? null : rule.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === rule.id ? 'Fermer' : 'Modifier'}</button>
+                        <button onClick={() => setPendingDeleteId(rule.id)} disabled={savingId === rule.id} aria-label="Supprimer la règle" className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
+                      </div></td>
+                    )}
                   </tr>
-                  {editingId === rule.id && (
-                    <tr><td colSpan={6} className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4"><RuleForm initial={rule} currency={currency} submitLabel="Enregistrer" isSaving={savingId === rule.id} onSubmit={(form) => handleUpdate(rule.id, form)} onCancel={() => setEditingId(null)} /></td></tr>
+                  {canManage && editingId === rule.id && (
+                    <tr><td colSpan={6} className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4"><RuleForm initial={rule} allRules={rules} currency={currency} submitLabel="Enregistrer" isSaving={savingId === rule.id} onSubmit={(form) => handleUpdate(rule.id, form)} onCancel={() => setEditingId(null)} /></td></tr>
                   )}
                 </Fragment>
               ))}
@@ -301,11 +393,22 @@ export function ShippingCountryRulesSection({ initialRules, currency }: Shipping
         </div>
       )}
 
-      {creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4"><p className="text-xs font-medium text-gray-500 mb-3">Nouvelle règle</p><RuleForm currency={currency} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
+      {!canManage ? null : creating ? (
+        <div className="border border-dashed border-gray-200 rounded-lg p-4"><p className="text-xs font-medium text-gray-500 mb-3">Nouvelle règle</p><RuleForm allRules={rules} currency={currency} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
       ) : (
         <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter une règle</button>
       )}
+
+      <ConfirmActionModal
+        open={pendingToggle !== null}
+        title={pendingToggle?.active ? 'Désactiver cette règle de livraison ?' : 'Activer cette règle de livraison ?'}
+        description="Les prochains devis de livraison des clients changeront immédiatement. Les commandes déjà payées ne sont pas modifiées."
+        confirmLabel={pendingToggle?.active ? 'Désactiver' : 'Activer'}
+        cancelLabel="Annuler"
+        loading={pendingToggle !== null && savingId === pendingToggle.id}
+        onCancel={() => setPendingToggle(null)}
+        onConfirm={() => { if (pendingToggle) void handleToggleActive(pendingToggle); }}
+      />
 
       <ConfirmActionModal
         open={pendingDeleteId !== null}

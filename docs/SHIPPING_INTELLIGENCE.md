@@ -178,6 +178,16 @@ Questo cockpit non sostituisce `Admin → Livraison`: quella sezione conserva ta
 Source:
 `apps/storefront/src/app/admin/(protected)/livraison/LivraisonTabs.tsx`.
 
+#### Tarification (`/admin/livraison`)
+
+- **Contesto**: un badge mostra la modalità effettiva (`effectivePricingMode` su `loadPricingMode`: coût Packlink / grille en observation / grille tarifaire) e l'ordine reale di applicazione: prezzo base → forfait fisso → remise → gratuità, con la regola del paese prioritaria su « Tous les pays ».
+- **Una sola regola attiva per paese**: `resolveCountryRule` prende il primo match di un insieme non ordinato, quindi due regole attive sullo stesso paese esplicito renderebbero il prezzo indeterminato. `POST`/`PATCH /api/admin/shipping-rules` rispondono `409 COUNTRY_OVERLAP` quando una regola creata, modificata o riattivata condivide un paese con un'altra regola attiva; la UI segnala i conflitti già presenti. Il calcolo (`/api/shipping/quote`, `tariffQuote`) non cambia.
+- **Anteprima**: il form calcola « le client paie » con la stessa `applyCountryRule` delle quote, su un prezzo base e un carrello d'esempio, senza chiamate di rete.
+- **Attivazione**: la casella « Actif » chiede conferma (effetto immediato sui prossimi devis).
+- **Zone**: raggruppate per paese; « Quelle zone pour … » applica la stessa regola di `resolveZoneCodeFromRows` (prefisso più lungo) e mostra il prefisso vincente. Lo stesso prefisso in due zone attive dello stesso paese è ambiguo: segnalato in UI e rifiutato da `POST`/`PATCH /api/admin/shipping-zones` (`409 PREFIX_OVERLAP`). In modalità grille tarifaire la zona determina il prezzo e un CAP fuori zona va in fallback: testo e conferma d'eliminazione lo dicono.
+- **Permessi**: senza `shipping.manage` la pagina è in « Lecture seule » (nessuna azione), le API restano il controllo.
+- Helper puri: `lib/shipping/shippingRuleConflicts.ts` (test `tests/unit/shippingRuleConflicts.spec.ts`).
+
 Gli strumenti tecnici sono nella console piattaforma, gruppo **Platform → Livraison technique** (`platformNavConfig.ts`, id `shipping`), riservati al `platform_owner` (layout `platform/layout.tsx` + `requirePlatformOwner()` in ogni pagina e in ogni API):
 
 | Pagina | Route | Responsabilità |

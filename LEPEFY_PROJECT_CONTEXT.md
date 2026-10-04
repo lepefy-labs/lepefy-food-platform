@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 ottobre 2026 — **v7.08 Current-State Snapshot** (scan fidélité: anteprima punti, protezione doppio accredito, carta dimenticata; base `main` @ `92661c4b41dee27f66a16af857302ed1c1030274`)
+> **Aggiornato:** 4 ottobre 2026 — **v7.09 Current-State Snapshot** (Livraison › Tarification: una regola attiva per paese, anteprima, zone per paese e ricerca CAP; base `main` @ `3810d11335cbf9a4f55adaa359fad19b1d284ea1`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -113,6 +113,14 @@ Pagina fuori dal gruppo `(protected)` (accessibile a `tenant_cashier`), protetta
 - **Carta dimenticata**: `GET scan/search?q=` cerca per nome o telefono (≥ 3 caratteri) solo tra i clienti con carta, massimo 5 risultati, con e-mail mascherata e ultime 4 cifre della carta; la scelta carica il cliente con `scan/lookup?customerId=`. Allarga ciò che vede una cassiera, quindi il payload resta minimo.
 - **Ritmo di cassa**: dopo il successo il focus va su «Nouveau scan (Entrée)»; «Cette session» elenca gli ultimi 10 accrediti, solo in memoria nella pagina.
 - **Accessibilità**: etichette visibili, errori `role="alert"`, anteprima e successo `aria-live`.
+
+### Livraison › Tarification (`/admin/livraison`)
+
+- Badge della modalità di prezzo effettiva e ordine di applicazione (prezzo base → forfait fisso → remise → gratuità; il paese prima di « Tous les pays »).
+- **Una regola attiva per paese**: le API `shipping-rules` rifiutano con `409 COUNTRY_OVERLAP` una sovrapposizione (prima il prezzo diventava indeterminato: la quote prende il primo match non ordinato); i conflitti esistenti sono segnalati. Calcolo, checkout e tariffe invariati.
+- **Anteprima** nel form con la stessa `applyCountryRule` delle quote; « Actif » chiede conferma.
+- **Zone** raggruppate per paese, ricerca « paese + CAP → zona » con la stessa regola del calcolo (prefisso più lungo); prefissi identici tra zone attive dello stesso paese segnalati e rifiutati (`409 PREFIX_OVERLAP`). Il testo dice ora che in modalità grille tarifaire la zona determina il prezzo.
+- Senza `shipping.manage`: « Lecture seule ». Dettagli: `docs/SHIPPING_INTELLIGENCE.md` §3.
 
 ### Configurazione parrainage (migration 132)
 
