@@ -8,6 +8,7 @@ import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { revalidateSessionShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import type { ShippingAddress } from '@lepefy/types';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -44,6 +45,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const body: { accessToken?: string } = await req.json().catch(() => ({}));
     const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(tenantSlug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'shop');
+    if (unavailable) return unavailable;
     const supabase = createServiceClient();
     const sessionCustomer = await getSessionCustomer(tenant.id);
     const now = new Date();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 const stripe = getStripeClient('card');
 
@@ -40,6 +41,9 @@ export async function POST(req: NextRequest) {
 
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'digital_card');
+    if (unavailable) return unavailable;
 
     const roundedAmount = Math.round(amount * 100) / 100;
     const supabase      = createServiceClient();

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { EventCheckoutItemInput, EventPaymentIntentMetadata } from '@lepefy/types';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 // Agente e2e Fase 0 — voir api/checkout/route.ts : getStripeClient() ne peut
 // plus être instancié au scope module, la résolution de clé dépend désormais
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const stripe = getStripeClient('event');
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'events');
+    if (unavailable) return unavailable;
 
     if (!tenant.events_enabled) {
       return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 404 });

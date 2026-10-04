@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { isTenantFeatureEnabled } from '@/lib/entitlements/tenantFeatureSettings';
+import { getTenantServiceState, moduleForFeature } from '@/lib/billing/tenantServiceState';
 
 export const PLATFORM_FEATURE_KEYS = {
   shop: 'shop',
@@ -28,6 +29,12 @@ function isOverrideApplicable(override: TenantFeatureOverride, now: Date): boole
 }
 
 export async function hasTenantFeature(tenantId: string, featureKey: string): Promise<boolean> {
+  // A suspended tenant, or a platform-suspended module, has no feature at all
+  // (overrides included): see lib/billing/tenantServiceState.ts.
+  const serviceState = await getTenantServiceState(tenantId);
+  const suspendedModule = moduleForFeature(featureKey);
+  if (serviceState.suspended || (suspendedModule && serviceState.suspendedModules.includes(suspendedModule))) return false;
+
   const service = createServiceClient();
   const [subscriptionResult, overrideResult] = await Promise.all([
     service.from('tenant_subscriptions').select('plan_id, status').eq('tenant_id', tenantId).maybeSingle(),

@@ -13,6 +13,8 @@ import { AddToCartConfirmation } from '@/components/cart/AddToCartConfirmation';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getShopShellData } from '@/lib/tenant/getShopShellData';
+import { getTenantServiceState, isModuleAvailable } from '@/lib/billing/tenantServiceState';
+import { ServiceSuspendedPage } from '@/components/billing/ServiceSuspendedPage';
 
 // Ce layout ne lit ni cookies ni session : tout ce qui dépend du client
 // connecté (bandeau d'achat à reprendre, compte, panier) est résolu côté
@@ -20,6 +22,10 @@ import { getShopShellData } from '@/lib/tenant/getShopShellData';
 // produit / de /accueil ne sert plus jamais depuis le CDN.
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  // Tenant-level read only (cached, no cookies): keeps the shop ISR.
+  if (!isModuleAvailable(await getTenantServiceState(tenant.id), 'shop')) {
+    return <ServiceSuspendedPage tenantName={tenant.name} logoUrl={tenant.logo_url} />;
+  }
   const { socialLinks, nalaEnabled, reviewsAvailable } = await getShopShellData(tenant.id);
   const storyEnabled = Boolean(tenant.story_heading && tenant.story_text);
 

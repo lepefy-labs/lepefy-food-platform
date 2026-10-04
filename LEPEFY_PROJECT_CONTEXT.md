@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 ottobre 2026 — **v7.09 Current-State Snapshot** (Livraison › Tarification: una regola attiva per paese, anteprima, zone per paese e ricerca CAP; base `main` @ `3810d11335cbf9a4f55adaa359fad19b1d284ea1`)
+> **Aggiornato:** 4 ottobre 2026 — **v7.10 Current-State Snapshot** (abbonamento: regola di rinnovo a fine mese, sospensione reale globale o per modulo, console Platform → Abonnements; migration 144 da applicare; base `main` @ `a790f875ad0ed2009a2b39f5ca0752651d363899`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -121,6 +121,13 @@ Pagina fuori dal gruppo `(protected)` (accessibile a `tenant_cashier`), protetta
 - **Anteprima** nel form con la stessa `applyCountryRule` delle quote; « Actif » chiede conferma.
 - **Zone** raggruppate per paese, ricerca « paese + CAP → zona » con la stessa regola del calcolo (prefisso più lungo); prefissi identici tra zone attive dello stesso paese segnalati e rifiutati (`409 PREFIX_OVERLAP`). Il testo dice ora che in modalità grille tarifaire la zona determina il prezzo.
 - Senza `shipping.manage`: « Lecture seule ». Dettagli: `docs/SHIPPING_INTELLIGENCE.md` §3.
+
+### Abbonamento e sospensione (migration 144 — da applicare)
+
+- **Rinnovo**: un pagamento (carta via webhook `saas_subscription`, o bonifico registrato dalla piattaforma) prolunga fino alla fine del mese successivo al mese pagato; dopo una sospensione con arretrati copre il mese del pagamento (mesi senza servizio non addebitati). Registro `tenant_subscription_payments` idempotente sulla sessione Stripe; senza 144 il webhook mantiene il +30 giorni legacy.
+- **Sospensione reale**: manuale o automatica dopo N giorni (`suspension_mode`, default **manuale** per tutti), più la sospensione di un singolo modulo. Motore unico `lib/billing/tenantServiceState.ts` (cache 60 s, fail-open): siti pubblici «Service temporairement indisponible», API di checkout/pagamento/prenotazione 503, Nala e avis spenti, admin del tenant limitato ad Abonnement e ordini in lettura (API 423). Webhook mai bloccati; `platform_owner` mai limitato.
+- **Platform → Abonnements** (`/admin/platform/abonnements`): virement, sospensione/riattivazione, politica automatica, correzione scadenza, link Stripe, moduli, storico e journal (audit con motivo obbligatorio).
+- **`/admin/billing`**: stato veritiero (sospeso, in ritardo, da rinnovare, attivo), mese coperto, riferimento bonifico `LEPEFY <SLUG> <AAAA-MM>` copiabile, ultimi pagamenti. Runbook: `docs/SUBSCRIPTION_LIFECYCLE.md`.
 
 ### Configurazione parrainage (migration 132)
 

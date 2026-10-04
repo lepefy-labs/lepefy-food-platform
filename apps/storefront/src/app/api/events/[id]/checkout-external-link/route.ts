@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { notifyEventExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyEventExternalPaymentAwaitingVerification';
 import type { EventCheckoutItemInput, TenantPaymentMethod } from '@lepefy/types';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 const MAX_QUANTITY_PER_TICKET = 999;
 
@@ -24,6 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'events');
+    if (unavailable) return unavailable;
 
     if (!tenant.events_enabled) {
       return NextResponse.json({ error: 'Module événementiel non activé.' }, { status: 404 });

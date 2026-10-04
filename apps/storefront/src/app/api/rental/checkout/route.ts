@@ -4,6 +4,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { isCountryAllowedForDelivery, matchDeliveryZone } from '@/lib/rental/matchDeliveryZone';
 import type { RentalCheckoutItemInput, RentalDeliveryZone, RentalPaymentIntentMetadata } from '@lepefy/types';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 const stripe = getStripeClient('rental');
 
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
   try {
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'events');
+    if (unavailable) return unavailable;
 
     if (!tenant.services_enabled) {
       return NextResponse.json({ error: 'Module services non activé.' }, { status: 404 });

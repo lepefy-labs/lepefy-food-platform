@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { sendTenantEmail } from '@/lib/notifications/sendEmail';
 import { serviceInquiryEmail } from '@/lib/notifications/operationalEmails';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 interface InquiryBody {
   customer_name:   string;
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   try {
     const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'events');
+    if (unavailable) return unavailable;
 
     if (!tenant.services_enabled) {
       return NextResponse.json({ error: 'Module services non activé.' }, { status: 404 });

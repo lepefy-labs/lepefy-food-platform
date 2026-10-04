@@ -102,6 +102,12 @@ The shipping logic is the most complex part of the codebase:
 - Senders call `getNotificationRecipients(db, tenantId, '<type_key>')` (or `sendTenantEmail({ recipientFlag })`) → RPC `notification_recipient_emails`, which also drops recipients linked (`admin_user_id`) to an inactive admin/membership.
 - All subscription edits go through `POST /api/admin/notification-recipients/subscriptions` (batch of `{ recipientId, typeKey, subscribed }`); types of disabled modules (`events_enabled`) are hidden in the UI but their subscriptions are preserved.
 
+### Subscription lifecycle and suspension — `docs/SUBSCRIPTION_LIFECYCLE.md`
+
+- One engine: `lib/billing/tenantServiceState.ts` (`getTenantServiceState`, `isModuleAvailable`, `guardModule`). Suspended = manual (`tenant_subscriptions.status = 'suspended'`) or automatic past `paid_until + grace_days`, computed at read time; per-module suspension in `tenant_module_suspensions`. Fail-open without migration 144.
+- A new public write API (checkout, payment, reservation, inquiry) must call `guardModule(tenant.id, '<module>')` before creating anything; webhooks never do. Public layouts render `ServiceSuspendedPage`; the shop layout stays cookie-free.
+- Subscription writes only through the 144 RPCs (`record_tenant_subscription_payment`, `admin_update_tenant_subscription`); the renewal rule lives in SQL, mirrored in `lib/billing/subscriptionRules.ts`.
+
 ### Gestion du commerce (suppliers, purchases, stock ledger, treasury) — `docs/BUSINESS_MANAGEMENT.md`
 
 - Admin domain under `/admin/gestion/**` + `/api/admin/gestion/**`, behind the release flag `business_management` (`tenant_feature_flags`). Every page calls `requireBusinessManagementPage()` and every handler `requireBusinessManagementApi()` (`lib/gestion/featureGate.ts`); flag off/unreadable = 404. Hiding the sidebar entry is not the security control.

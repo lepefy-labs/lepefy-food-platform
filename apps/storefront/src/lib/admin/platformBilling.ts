@@ -63,7 +63,8 @@ export async function getTenantBillingSnapshot(tenant: LegacyTenantBilling): Pro
         planName: plan.name,
         monthlyPriceCents: Number(plan.monthly_price_cents) || 0,
         currency: plan.currency || 'EUR',
-        status: subscription.status === 'expired' ? 'expired' : 'active',
+        // 144: 'suspended' (legacy 'expired') — the real state is lib/billing/tenantServiceState.ts.
+        status: subscription.status === 'active' ? 'active' : 'expired',
         paidUntil: subscription.paid_until,
         stripePaymentLink: subscription.stripe_payment_link,
         features: (features ?? []).map((feature: { feature_key: string; label: string; position: number | null }) => ({

@@ -14,6 +14,7 @@ import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import type { TenantPaymentMethod } from '@lepefy/types';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 interface CartItemPayload {
   productId: string;
@@ -61,6 +62,9 @@ export async function POST(req: NextRequest) {
 
     const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(tenantSlug);
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'shop');
+    if (unavailable) return unavailable;
     const supabase = createServiceClient();
 
     const { data: methodRow } = await supabase

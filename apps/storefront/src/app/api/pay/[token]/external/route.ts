@@ -7,6 +7,7 @@ import { revalidateAssistedSession } from '@/lib/orders/assisted/assistedOrderSe
 import { externalPaymentLink, loadSessionByPayToken, publicExternalMethods } from '@/lib/orders/assisted/payLinkPublic';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 import {
   PAYMENT_IN_PROGRESS_MESSAGE, PAYMENT_UNVERIFIABLE_MESSAGE, releasePendingPaymentIntent,
 } from '@/lib/orders/pendingPaymentIntent';
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     if (typeof body.methodId !== 'string') return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
 
     const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'shop');
+    if (unavailable) return unavailable;
     const supabase = createServiceClient();
     const session = await loadSessionByPayToken(supabase, tenant.id, params.token);
     if (!session) return NextResponse.json({ error: 'Ce lien de paiement n\'est pas ou plus valide.' }, { status: 404 });

@@ -162,9 +162,9 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 
 ### 3.12 Configurazione commerciale e billing SaaS
 - **Colonne:** `subscription_status`, `subscription_paid_until`, `stripe_payment_link`, `bank_iban`, `bank_beneficiary`, `bank_bic`, `stripe_account_id`.
-- **Tabelle:** `tenant_subscriptions`, `platform_plans`, `platform_plan_features`, `platform_billing_settings` (084), `tenant_feature_overrides` (094).
-- **Letture:** `/admin/billing`, `lib/admin/platformBilling.ts`, webhook Stripe.
-- **Scritture:** manuali o dal webhook.
+- **Tabelle:** `tenant_subscriptions`, `platform_plans`, `platform_plan_features`, `platform_billing_settings` (084), `tenant_feature_overrides` (094); ciclo di vita (144): `tenant_module_suspensions`, `tenant_subscription_payments`, `tenant_subscription_audit`.
+- **Letture:** `/admin/billing`, `lib/admin/platformBilling.ts`, `lib/billing/tenantServiceState.ts` (sospensione), Platform → Abonnements.
+- **Scritture:** solo RPC 144 (`record_tenant_subscription_payment` dal webhook Stripe o dalla piattaforma, `admin_update_tenant_subscription`), che allineano anche le colonne legacy. Dettagli: `docs/SUBSCRIPTION_LIFECYCLE.md`.
 - **Esposizione:** S (fino alla Fase 0 inviata al browser tramite il root layout).
 - **Destinazione:** solo il dominio billing (084). Le colonne su `tenants` sono legacy.
 - **Rischio:** medio (riguarda il fatturato della piattaforma, non i pagamenti dei clienti).

@@ -5,6 +5,7 @@ import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { computePreorderTotals, preorderReference, toCents } from '@/lib/orders/assisted/assistedOrderPolicy';
 import { revalidateAssistedSession } from '@/lib/orders/assisted/assistedOrderServer';
 import { loadSessionByPayToken } from '@/lib/orders/assisted/payLinkPublic';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -20,6 +21,9 @@ export const fetchCache = 'force-no-store';
 export async function POST(_req: NextRequest, { params }: { params: { token: string } }) {
   try {
     const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'shop');
+    if (unavailable) return unavailable;
     const supabase = createServiceClient();
     const session = await loadSessionByPayToken(supabase, tenant.id, params.token);
     if (!session) return NextResponse.json({ error: 'Ce lien de paiement n\'est pas ou plus valide.' }, { status: 404 });

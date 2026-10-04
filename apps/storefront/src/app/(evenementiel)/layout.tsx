@@ -2,6 +2,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { getTenantSocialLinks } from '@/lib/tenant/getTenantSocialLinks';
 import { createPublicClient } from '@/lib/supabase/public';
+import { getTenantServiceState, isModuleAvailable } from '@/lib/billing/tenantServiceState';
+import { ServiceSuspendedPage } from '@/components/billing/ServiceSuspendedPage';
 import { EventsHeader } from './_components/EventsHeader';
 import { EventsFooter } from './_components/EventsFooter';
 
@@ -13,6 +15,9 @@ type ServiceCapabilityRow = {
 export default async function EvenementielLayout({ children }: { children: React.ReactNode }) {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
+  if (!isModuleAvailable(await getTenantServiceState(tenant.id), 'events')) {
+    return <ServiceSuspendedPage tenantName={tenant.name} logoUrl={tenant.logo_url} />;
+  }
   const supabase = createPublicClient();
 
   const [socialLinks, featuredEventRes, servicesRes, galleryRes] = await Promise.all([

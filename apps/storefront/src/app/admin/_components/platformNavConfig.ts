@@ -1,4 +1,4 @@
-import { IconBell, IconBriefcase, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
+import { IconBell, IconBriefcase, IconReceipt, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
  * Platform-owner navigation, single source of truth for the sidebar groups and
@@ -23,6 +23,7 @@ export interface PlatformNavGroup {
 
 export const PLATFORM_NAV: PlatformNavGroup[] = [
   { id: 'console', label: 'Console Lepefy', icon: IconSettings, href: '/admin/platform', match: 'exact' },
+  { id: 'subscriptions', label: 'Abonnements', icon: IconReceipt, href: '/admin/platform/abonnements' },
   {
     id: 'access', label: 'Accès', icon: IconShieldLock, children: [
       { label: 'Utilisateurs', href: '/admin/team' },

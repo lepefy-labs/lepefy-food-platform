@@ -1,7 +1,9 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
+import { isAdminApiAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
 
 export interface AdminAccessContext {
   userId: string;
@@ -104,6 +106,17 @@ export async function requirePermission(tenantId: string | null, permission: str
   if (!context) return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
   if (!canAdmin(context, permission)) return NextResponse.json({ error: 'Permission insuffisante.' }, { status: 403 });
   if (!context.isPlatformOwner && context.tenantId !== tenantId) return NextResponse.json({ error: 'Accès refusé pour ce tenant.' }, { status: 403 });
+  // Suspended tenant: its team keeps read-only orders and billing; the
+  // platform owner is never limited.
+  if (!context.isPlatformOwner && tenantId && (await getTenantServiceState(tenantId)).suspended) {
+    const method = headers().get('x-lepefy-admin-method') ?? 'GET';
+    if (!isAdminApiAllowedWhenSuspended(permission, method)) {
+      return NextResponse.json(
+        { error: 'Abonnement suspendu : cette action est indisponible. Réglez l’abonnement pour rétablir le service.', code: 'TENANT_SUSPENDED' },
+        { status: 423 },
+      );
+    }
+  }
   return null;
 }
 

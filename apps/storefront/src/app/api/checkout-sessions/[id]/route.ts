@@ -11,6 +11,7 @@ import { revalidateSessionShipping, verifyCheckoutShipping } from '@/lib/shippin
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
+import { guardModule } from '@/lib/billing/tenantServiceState';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -194,6 +195,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const body: PatchBody = await req.json();
     const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+    // Suspended tenant or module: refuse before any row or PaymentIntent.
+    const unavailable = await guardModule(tenant.id, 'shop');
+    if (unavailable) return unavailable;
     const supabase = createServiceClient();
     const sessionCustomer = await getSessionCustomer(tenant.id);
 

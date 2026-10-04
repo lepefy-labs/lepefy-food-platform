@@ -4,6 +4,8 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { buildPublicPreorderView, loadSessionByPayToken } from '@/lib/orders/assisted/payLinkPublic';
 import PayPreorderClient from './PayPreorderClient';
+import { getTenantServiceState, isModuleAvailable } from '@/lib/billing/tenantServiceState';
+import { ServiceSuspendedPage } from '@/components/billing/ServiceSuspendedPage';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -22,6 +24,9 @@ export default async function PayPreorderPage({
   searchParams: { paid?: string; redirect_status?: string };
 }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
+  if (!isModuleAvailable(await getTenantServiceState(tenant.id), 'shop')) {
+    return <ServiceSuspendedPage tenantName={tenant.name} logoUrl={tenant.logo_url} />;
+  }
   const supabase = createServiceClient();
   const session = await loadSessionByPayToken(supabase, tenant.id, params.token).catch(() => null);
   const view = session

@@ -13,6 +13,9 @@ import { GESTION_VIEW_PERMISSIONS } from '@/lib/gestion/domain';
 import AdminSidebar from '../_components/AdminSidebar';
 import AdminHeader from '../_components/AdminHeader';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
+import SubscriptionBanner from '../_components/SubscriptionBanner';
+import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
+import { SUSPENDED_ADMIN_PERMISSIONS, isAdminPathAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = cookies();
@@ -60,6 +63,15 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     redirect(destination);
   }
 
+  // Suspended tenant: its team keeps billing and read-only orders (the APIs
+  // enforce the same rule in requirePermission). The platform owner is never limited.
+  const serviceState = await getTenantServiceState(tenant.id);
+  const limitedBySuspension = serviceState.suspended && !access.isPlatformOwner;
+  if (limitedBySuspension && !isAdminPathAllowedWhenSuspended(requestedPath)) redirect('/admin/billing');
+  const navPermissions = limitedBySuspension
+    ? access.permissions.filter((permission) => (SUSPENDED_ADMIN_PERMISSIONS as readonly string[]).includes(permission))
+    : access.permissions;
+
   const adminClient = createServiceClient();
   const [{ data: categories }, pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
     adminClient.from('categories').select('id, name, slug').eq('tenant_id', tenant.id).order('position'),
@@ -80,10 +92,10 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
-      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={access.permissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} />
+      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={navPermissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} />
       <div className="flex min-h-[calc(100vh-57px)] bg-[var(--admin-page-bg)] dark:bg-gray-950">
-        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={access.permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} /></Suspense></aside>
-        <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8">{children}</main>
+        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={navPermissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} /></Suspense></aside>
+        <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8"><SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />{children}</main>
       </div>
     </AdminThemeProvider>
   );

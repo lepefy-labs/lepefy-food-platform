@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { revalidateTenantCache } from '@/lib/cache/storefrontCache';
+import { recordSaasSubscriptionPayment } from '@/lib/billing/recordSubscriptionPayment';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { generateTrackingToken } from '@/lib/tracking/generateTrackingToken';
@@ -186,30 +187,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // Calcola il nuovo periodo: +30 giorni dalla data di pagamento
-    const paidAt = new Date(session.created * 1000);
-    const paidUntil = new Date(paidAt);
-    paidUntil.setDate(paidUntil.getDate() + 30);
+    // Rinnovo: regola della migration 144 (ledger idempotente sulla sessione),
+    // altrimenti comportamento precedente (+30 giorni sulle colonne legacy).
+    const outcome = await recordSaasSubscriptionPayment(createServiceClient(), {
+      tenantSlug,
+      stripeSessionId: session.id,
+      amountCents: session.amount_total ?? 0,
+      currency: session.currency ?? 'eur',
+      paidAt: new Date(session.created * 1000),
+    });
 
-    const supabase = createServiceClient();
-
-    const { error } = await supabase
-      .from('tenants')
-      .update({
-        subscription_status:     'active',
-        subscription_paid_until: paidUntil.toISOString(),
-        updated_at:              new Date().toISOString(),
-      })
-      .eq('slug', tenantSlug);
-
-    if (error) {
-      console.error('[webhook/billing] errore aggiornamento tenant:', error);
-      return NextResponse.json({ error: 'DB update failed' }, { status: 500 });
+    if (!outcome.ok) {
+      console.error('[webhook/billing] rinnovo non registrato:', outcome.reason, '— tenant:', tenantSlug);
+      // tenant_not_found non si risolve ritentando; un errore DB sì.
+      return outcome.reason === 'tenant_not_found'
+        ? NextResponse.json({ received: true })
+        : NextResponse.json({ error: 'DB update failed' }, { status: 500 });
     }
 
     revalidateTenantCache();
 
-    console.info(`[webhook/billing] abbonamento rinnovato per tenant: ${tenantSlug} fino al ${paidUntil.toISOString()}`);
+    console.info('[webhook/billing] abbonamento rinnovato (' + outcome.mode + ') per tenant:', tenantSlug, 'fino al', outcome.paidUntil);
 
     return NextResponse.json({ received: true });
   }
