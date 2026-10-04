@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getLoyaltySettings } from '@/lib/loyalty/loyaltyConfig';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import LogoutButton from '../../LogoutButton';
 import { ScanClient } from './ScanClient';
 
@@ -39,20 +40,12 @@ export default async function LoyaltyScanPage() {
   const tenant       = await getTenant(slug);
   const adminClient  = createServiceClient();
 
-  const { data: admin } = await adminClient
-    .from('admin_users')
-    .select('id, role, tenant_id, active')
-    .eq('id', user.id)
-    .eq('active', true)
-    .single();
-
-  if (!admin) redirect('/admin/login?error=unauthorized');
-  if (admin.role !== 'platform_owner' && admin.tenant_id !== tenant.id) {
-    redirect('/admin/login?error=unauthorized');
-  }
-  if (!['platform_owner', 'tenant_admin', 'tenant_cashier'].includes(admin.role)) {
-    redirect('/admin/login?error=unauthorized');
-  }
+  // Same permission as the scan APIs (loyalty.scan via RBAC membership or
+  // legacy role), so a membership-based admin is not refused here while the
+  // APIs would accept them.
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  if (!access || !canAdmin(access, 'loyalty.scan')) redirect('/admin/login?error=unauthorized');
+  if (!access.isPlatformOwner && access.tenantId !== tenant.id) redirect('/admin/login?error=unauthorized');
 
   const loyalty = await getLoyaltySettings(adminClient, tenant.id);
 

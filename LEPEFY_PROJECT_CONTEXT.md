@@ -106,7 +106,7 @@ Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('l
 
 ### Scan fidélité in cassa (`/admin/loyalty/scan`)
 
-Pagina fuori dal gruppo `(protected)` (accessibile a `tenant_cashier`); le route `/api/admin/loyalty/scan/*` richiedono `loyalty.scan` (ruoli `tenant_admin`, `tenant_cashier`). Helper puri condivisi: `src/lib/loyalty/loyaltyScan.ts`.
+Pagina fuori dal gruppo `(protected)` (accessibile a `tenant_cashier`), protetta dalla stessa permission RBAC delle sue API (`getCurrentAdminAccessContext` + `canAdmin(..., 'loyalty.scan')` + tenant), non più dal solo `admin_users.role`; le route `/api/admin/loyalty/scan/*` richiedono `loyalty.scan` (ruoli `tenant_admin`, `tenant_cashier`). Helper puri condivisi: `src/lib/loyalty/loyaltyScan.ts`.
 - **Anteprima**: «≈ +25 pts → nouveau solde 145» con lo stesso arrotondamento della RPC (`round(importo × purchase_points_rate)`, tasso passato dalla pagina); il pulsante dice «Créditer N pts». I punti reali restano calcolati da `process_manual_purchase_points_atomic`.
 - **Importo anomalo**: sopra `UNUSUAL_AMOUNT_EUR` (300 €) serve una seconda conferma.
 - **Doppio accredito**: `POST scan/confirm` rifiuta con `409 DUPLICATE_RECENT` un acquisto identico (stesso cliente e importo) registrato da meno di 120 s, salvo `confirmDuplicate: true` («Créditer quand même»; il default è «Ne pas recréditer»). Il client invia una sola richiesta alla volta. **Limite**: due richieste strettamente simultanee possono ancora passare; chiuderlo richiede una chiave d'idempotenza nella RPC (migration, non fatta).
