@@ -1,9 +1,9 @@
 {
-  "name": "Lepefy · Subscription reminders (daily)",
+  "name": "Lepefy · Subscription reminders and suspension cache (hourly)",
   "nodes": [
     {
       "id": "5f2a8c41-9d3e-4b7a-8c16-0e4f2a9b7d01",
-      "name": "Every day at 09:00",
+      "name": "Every hour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -14,9 +14,8 @@
         "rule": {
           "interval": [
             {
-              "field": "days",
-              "daysInterval": 1,
-              "triggerAtHour": 9
+              "field": "hours",
+              "hoursInterval": 1
             }
           ]
         }
@@ -79,7 +78,7 @@
     }
   ],
   "connections": {
-    "Every day at 09:00": {
+    "Every hour": {
       "main": [
         [
           {

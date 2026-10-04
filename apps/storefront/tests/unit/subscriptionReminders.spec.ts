@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { dueSubscriptionReminder, runSubscriptionReminders } from '../../src/lib/billing/subscriptionReminders';
+import { dueSubscriptionReminder, runSubscriptionReminders, suspensionJustStarted } from '../../src/lib/billing/subscriptionReminders';
 import type { SubscriptionRow } from '../../src/lib/billing/subscriptionRules';
 import { subscriptionReminderEmail } from '../../src/lib/notifications/customerEmails';
 
@@ -54,7 +54,7 @@ test('runner counts outcomes and isolates failures', async () => {
       return true;
     },
   }, d('2026-10-12T08:00:00Z'));
-  expect(outcomes).toEqual({ sent: 1, not_due: 1, no_recipients: 1, failed: 1 });
+  expect(outcomes).toEqual({ sent: 1, not_due: 1, no_recipients: 1, failed: 1, cache_invalidated: 0 });
   expect(sent).toEqual(['a:d7']);
 });
 
@@ -65,4 +65,19 @@ test('emails say when and link to billing', () => {
   expect(warning.html).toContain('https://shop.test/admin/billing');
   const suspended = subscriptionReminderEmail({ tenantName: 'Chloe', kind: 'suspended', daysLeft: 0, suspendOn: '', paidUntil: '', billingUrl: null });
   expect(suspended.subject).toContain('suspendu');
+});
+
+test('cache is dropped once, right after an automatic suspension starts', async () => {
+  expect(suspensionJustStarted(auto(), d('2026-10-16T01:00:00Z'))).toBe(true);
+  expect(suspensionJustStarted(auto(), d('2026-10-16T04:00:00Z'))).toBe(false);
+  expect(suspensionJustStarted(auto(), d('2026-10-15T20:00:00Z'))).toBe(false);
+  const invalidated: string[] = [];
+  const outcomes = await runSubscriptionReminders({
+    listTenants: async () => [{ tenantId: 'a', row: auto() }, { tenantId: 'b', row: auto({ suspension_mode: 'manual' }) }],
+    recipients: async () => ['owner@x.test'],
+    send: async () => true,
+    invalidate: (tenantId) => invalidated.push(tenantId),
+  }, d('2026-10-16T01:00:00Z'));
+  expect(invalidated).toEqual(['a']);
+  expect(outcomes.cache_invalidated).toBe(1);
 });

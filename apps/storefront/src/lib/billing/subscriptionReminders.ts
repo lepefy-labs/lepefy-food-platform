@@ -38,6 +38,22 @@ export function dueSubscriptionReminder(tenantId: string, row: SubscriptionRow, 
   return { kind, idempotencyKey: `subscription-reminder:${tenantId}:${auto.toISOString()}:${kind}`, daysLeft: Math.max(0, daysLeft), suspendOn: auto };
 }
 
+/** Window in which a suspension counts as just started (scheduler runs hourly). */
+export const CACHE_INVALIDATION_WINDOW_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * An automatic suspension starts by the clock alone, with no write that could
+ * invalidate the storefront cache: the scheduler does it when it sees a
+ * suspension that started within the window. Manual suspensions and payments
+ * already invalidate in their own request.
+ */
+export function suspensionJustStarted(row: SubscriptionRow, now: Date = new Date()): boolean {
+  const verdict = isSuspendedAt(row, now);
+  if (!verdict.suspended) return false;
+  const since = verdict.by === 'manual' ? (row.suspended_at ? new Date(row.suspended_at) : null) : autoSuspendAt(row);
+  return Boolean(since) && now.getTime() - since!.getTime() <= CACHE_INVALIDATION_WINDOW_MS;
+}
+
 export interface ReminderTenant {
   tenantId: string;
   row: SubscriptionRow;
@@ -49,13 +65,19 @@ export interface ReminderDeps {
   recipients: (tenantId: string) => Promise<string[]>;
   /** Sends one email; true when accepted by the transport (the ledger dedups). */
   send: (tenantId: string, decision: ReminderDecision, recipients: string[], row: SubscriptionRow) => Promise<boolean>;
+  /** Drops the tenant's cached storefront pages (service state + ISR). */
+  invalidate?: (tenantId: string) => void;
 }
 
-export type ReminderOutcome = 'sent' | 'not_due' | 'no_recipients' | 'failed';
+export type ReminderOutcome = 'sent' | 'not_due' | 'no_recipients' | 'failed' | 'cache_invalidated';
 
 export async function runSubscriptionReminders(deps: ReminderDeps, now: Date = new Date()): Promise<Record<ReminderOutcome, number>> {
-  const outcomes: Record<ReminderOutcome, number> = { sent: 0, not_due: 0, no_recipients: 0, failed: 0 };
+  const outcomes: Record<ReminderOutcome, number> = { sent: 0, not_due: 0, no_recipients: 0, failed: 0, cache_invalidated: 0 };
   for (const tenant of await deps.listTenants()) {
+    if (deps.invalidate && suspensionJustStarted(tenant.row, now)) {
+      deps.invalidate(tenant.tenantId);
+      outcomes.cache_invalidated += 1;
+    }
     const decision = dueSubscriptionReminder(tenant.tenantId, tenant.row, now);
     if (!decision) { outcomes.not_due += 1; continue; }
     try {

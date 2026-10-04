@@ -7,16 +7,18 @@ import { deliverEmail } from '@/lib/notifications/sendEmail';
 import { PLATFORM_EMAIL_CONTEXT, subscriptionReminderEmail } from '@/lib/notifications/customerEmails';
 import { reminderDates, runSubscriptionReminders, type ReminderTenant } from '@/lib/billing/subscriptionReminders';
 import { isMissingLifecycleSchema, type SubscriptionRow } from '@/lib/billing/subscriptionRules';
+import { revalidateServiceState } from '@/lib/billing/tenantServiceState';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Daily scheduler entry point (n8n, ops/n8n/subscription-reminders.json):
+ * Hourly scheduler entry point (n8n, ops/n8n/subscription-reminders.json):
  * warnings before an automatic suspension and suspension notices
  * (lib/billing/subscriptionReminders.ts). Idempotent through the delivery
- * ledger, so running it twice a day sends nothing twice.
+ * ledger, so running it every hour sends nothing twice. Also drops the
+ * storefront cache of a tenant whose automatic suspension just started.
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.SUBSCRIPTION_REMINDERS_CRON_SECRET ?? '';
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const outcomes = await runSubscriptionReminders({ listTenants, recipients, send });
+    const outcomes = await runSubscriptionReminders({ listTenants, recipients, send, invalidate: revalidateServiceState });
     return NextResponse.json({ outcomes }, { status: outcomes.failed > 0 ? 503 : 200 });
   } catch (error) {
     const missing = isMissingLifecycleSchema(error as { code?: string; message?: string });
