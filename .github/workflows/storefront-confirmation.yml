@@ -45,7 +45,10 @@ jobs:
               const { data } = await github.rest.repos.getCombinedStatusForRef({
                 ...context.repo, ref: context.sha,
               });
-              const deployment = data.statuses.find(status => status.context === 'Vercel');
+              // One Vercel status per project since September 2026: the smoke
+              // targets the production shop (chloefood); 'Vercel' is the old name.
+              const deployment = data.statuses.find(status => status.context === 'Vercel – chloefood')
+                ?? data.statuses.find(status => status.context === 'Vercel');
               if (deployment?.state === 'success') {
                 const { data: branch } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
                 if (branch.commit.sha !== context.sha) throw new Error('Production moved to another commit');
