@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 ottobre 2026 — **v7.07 Current-State Snapshot** (editor prodotto: salvataggio dei soli campi modificati; base `main` @ `a80724d3299a34e11cf140fd71c5870bb1d132a0`)
+> **Aggiornato:** 4 ottobre 2026 — **v7.08 Current-State Snapshot** (scan fidélité: anteprima punti, protezione doppio accredito, carta dimenticata; base `main` @ `92661c4b41dee27f66a16af857302ed1c1030274`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,16 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Scan fidélité in cassa (`/admin/loyalty/scan`)
+
+Pagina fuori dal gruppo `(protected)` (accessibile a `tenant_cashier`); le route `/api/admin/loyalty/scan/*` richiedono `loyalty.scan` (ruoli `tenant_admin`, `tenant_cashier`). Helper puri condivisi: `src/lib/loyalty/loyaltyScan.ts`.
+- **Anteprima**: «≈ +25 pts → nouveau solde 145» con lo stesso arrotondamento della RPC (`round(importo × purchase_points_rate)`, tasso passato dalla pagina); il pulsante dice «Créditer N pts». I punti reali restano calcolati da `process_manual_purchase_points_atomic`.
+- **Importo anomalo**: sopra `UNUSUAL_AMOUNT_EUR` (300 €) serve una seconda conferma.
+- **Doppio accredito**: `POST scan/confirm` rifiuta con `409 DUPLICATE_RECENT` un acquisto identico (stesso cliente e importo) registrato da meno di 120 s, salvo `confirmDuplicate: true` («Créditer quand même»; il default è «Ne pas recréditer»). Il client invia una sola richiesta alla volta. **Limite**: due richieste strettamente simultanee possono ancora passare; chiuderlo richiede una chiave d'idempotenza nella RPC (migration, non fatta).
+- **Carta dimenticata**: `GET scan/search?q=` cerca per nome o telefono (≥ 3 caratteri) solo tra i clienti con carta, massimo 5 risultati, con e-mail mascherata e ultime 4 cifre della carta; la scelta carica il cliente con `scan/lookup?customerId=`. Allarga ciò che vede una cassiera, quindi il payload resta minimo.
+- **Ritmo di cassa**: dopo il successo il focus va su «Nouveau scan (Entrée)»; «Cette session» elenca gli ultimi 10 accrediti, solo in memoria nella pagina.
+- **Accessibilità**: etichette visibili, errori `role="alert"`, anteprima e successo `aria-live`.
 
 ### Configurazione parrainage (migration 132)
 

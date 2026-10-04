@@ -75,7 +75,7 @@ export default async function LoyaltyScanPage() {
       </header>
 
       <main className="px-4 py-6 max-w-md mx-auto">
-        <ScanClient tenantId={tenant.id} loyaltyEnabled={loyalty.enabled} />
+        <ScanClient loyaltyEnabled={loyalty.enabled} purchasePointsRate={loyalty.purchasePointsRate} />
       </main>
     </div>
   );

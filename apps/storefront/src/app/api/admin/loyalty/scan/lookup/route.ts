@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { cardLastDigits } from '@/lib/loyalty/loyaltyScan';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Route admin — dati mutabili, mai cacheable (bug noto Next.js 14.2.x sulla
 // Data Cache non disattivata da force-dynamic da solo, confermato in
@@ -20,21 +23,26 @@ export async function GET(req: NextRequest) {
   const denied = await requireAdmin(tenant.id, ['tenant_admin', 'tenant_cashier']);
   if (denied) return denied;
 
+  // Either a scanned card number, or a customerId picked from the
+  // forgotten-card search (scan/search) — only customers holding a card.
+  const customerId = req.nextUrl.searchParams.get('customerId');
   const raw = req.nextUrl.searchParams.get('cardNumber') ?? '';
   const cardNumber = raw.trim().replace(/[^0-9]/g, '').slice(0, 13);
 
-  if (cardNumber.length < 8) {
-    return NextResponse.json({ error: 'Numéro de carte invalide.' }, { status: 400 });
+  if (customerId ? !UUID_RE.test(customerId) : cardNumber.length < 8) {
+    return NextResponse.json({ error: customerId ? 'Client invalide.' : 'Numéro de carte invalide.' }, { status: 400 });
   }
 
   const supabase = createServiceClient();
 
-  const { data: customer, error } = await supabase
+  let query = supabase
     .from('customers')
-    .select('id, full_name, email')
-    .eq('tenant_id', tenant.id)
-    .eq('loyalty_card_number', cardNumber)
-    .maybeSingle();
+    .select('id, full_name, email, loyalty_card_number')
+    .eq('tenant_id', tenant.id);
+  query = customerId
+    ? query.eq('id', customerId).not('loyalty_card_number', 'is', null)
+    : query.eq('loyalty_card_number', cardNumber);
+  const { data: customer, error } = await query.maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,6 +63,7 @@ export async function GET(req: NextRequest) {
       id: customer.id,
       fullName: customer.full_name,
       email: customer.email,
+      cardLast4: cardLastDigits(customer.loyalty_card_number),
       confirmedBalance: balance?.confirmed_balance ?? 0,
     },
   });
