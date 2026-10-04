@@ -63,3 +63,16 @@ Un modulo sospeso singolarmente applica le stesse regole solo alle sue superfici
 5. Rollback funzionale: `set_suspension_policy` → manuale e `reactivate`; il codice resta fail-open se le tabelle mancano.
 
 Test: `supabase/tests/144_*.sql` (CI), `tests/unit/subscriptionLifecycle.spec.ts`.
+
+## 7. Avvisi e-mail (tipo `subscription_billing`)
+
+- **Quando**: `lib/billing/subscriptionReminders.ts` (`dueSubscriptionReminder`): in modalità automatica, `d7` quando la sospensione cade entro 7 giorni, `d1` l'ultimo giorno; `suspended` all'inizio di una sospensione (manuale o automatica, solo se recente: ≤ 7 giorni). In modalità manuale senza sospensione non parte nulla.
+- **Idempotenza**: chiavi `subscription-reminder:<tenant>:<data sospensione>:<d7|d1>` e `subscription-suspended:<tenant>:<inizio>` nel ledger `notification_deliveries`: lo scheduler può girare più volte senza doppioni.
+- **Destinatari**: abbonati al tipo `subscription_billing` (gruppo «Compte», attivo di default per i nuovi destinatari, preset Gérant e Comptabilité); se nessuno è abbonato, gli `admin_users` `tenant_admin` attivi del tenant. E-mail con mittente Lepefy (`PLATFORM_EMAIL_CONTEXT`), CTA verso `/admin/billing`; anteprime in Plateforme → Notifications → Modèles.
+- **Scheduler**: `POST /api/internal/subscription-reminders` (Bearer `SUBSCRIPTION_REMINDERS_CRON_SECRET`, confronto timing-safe; `503` se un invio fallisce o se 144 manca). Template n8n `ops/n8n/subscription-reminders.json` (ogni giorno alle 09:00 Europe/Rome, credential Header Auth `Authorization: Bearer <secret>`), importato **inattivo**.
+
+### Attivazione
+
+1. Applicare la migration 144 (§6).
+2. Vercel (progetti `chloefood` e `lepefy-food-test`): variabile `SUBSCRIPTION_REMINDERS_CRON_SECRET` (valore casuale lungo), redeploy.
+3. n8n: importare il template, creare la credential Header Auth con lo stesso secret, «Manual test» → `outcomes` senza `failed`, poi attivare il workflow.

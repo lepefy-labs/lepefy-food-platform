@@ -28,19 +28,21 @@ test.describe('notification type registry', () => {
   test('legacy notify_* flags all map to a type (backfill of migration 143)', () => {
     const legacy = ['notify_card_payment', 'notify_external_payment_pending', 'notify_order_stock_conflict',
       'notify_event_booking_closed_reports', 'notify_daily_digest', 'notify_service_inquiries', 'notify_rental_reservations'];
-    expect(legacy.map((flag) => flag.slice('notify_'.length)).sort()).toEqual(NOTIFICATION_TYPES.map((t) => t.key).sort());
+    // Types added after 143 have no legacy column.
+    const later = new Set(['subscription_billing']);
+    expect(legacy.map((flag) => flag.slice('notify_'.length)).sort()).toEqual(NOTIFICATION_TYPES.map((t) => t.key).filter((key) => !later.has(key)).sort());
   });
 
   test('event types are hidden when the events module is off; empty groups dropped', () => {
     expect(withEvents).toHaveLength(NOTIFICATION_TYPES.length);
-    expect(shopOnly.map((t) => t.key)).toEqual(['card_payment', 'external_payment_pending', 'order_stock_conflict', 'daily_digest']);
-    expect(groupNotificationTypes(shopOnly).map((g) => g.key)).toEqual(['orders', 'reports']);
-    expect(groupNotificationTypes(withEvents).map((g) => g.key)).toEqual(['orders', 'events', 'reports']);
+    expect(shopOnly.map((t) => t.key)).toEqual(['card_payment', 'external_payment_pending', 'order_stock_conflict', 'daily_digest', 'subscription_billing']);
+    expect(groupNotificationTypes(shopOnly).map((g) => g.key)).toEqual(['orders', 'reports', 'account']);
+    expect(groupNotificationTypes(withEvents).map((g) => g.key)).toEqual(['orders', 'events', 'reports', 'account']);
   });
 
   test('defaults keep the historical behaviour of the add form', () => {
-    expect(defaultNotificationTypeKeys(withEvents)).toEqual(['card_payment', 'external_payment_pending', 'event_booking_closed_reports']);
-    expect(defaultNotificationTypeKeys(shopOnly)).toEqual(['card_payment', 'external_payment_pending']);
+    expect(defaultNotificationTypeKeys(withEvents)).toEqual(['card_payment', 'external_payment_pending', 'event_booking_closed_reports', 'subscription_billing']);
+    expect(defaultNotificationTypeKeys(shopOnly)).toEqual(['card_payment', 'external_payment_pending', 'subscription_billing']);
   });
 
   test('presets resolve on available types and are recognised back', () => {
@@ -50,7 +52,7 @@ test.describe('notification type registry', () => {
     expect(presetTypeKeys(operations, shopOnly)).toEqual(['order_stock_conflict', 'daily_digest']);
     expect(matchingPreset(presetTypeKeys(operations, withEvents), withEvents)?.key).toBe('operations');
     // Hidden subscriptions don't prevent matching on the visible ones.
-    expect(matchingPreset(['card_payment', 'external_payment_pending', 'daily_digest', 'rental_reservations'], shopOnly)?.key).toBe('accounting');
+    expect(matchingPreset(['card_payment', 'external_payment_pending', 'daily_digest', 'subscription_billing', 'rental_reservations'], shopOnly)?.key).toBe('accounting');
     expect(matchingPreset(['card_payment'], withEvents)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import type { TenantNotificationContext } from '@/lib/notifications/getTenantNot
 import {
   adminInvitedEmail, cardQuickPaymentCustomerEmail, cardQuickPaymentEmail, eventBookingClosedReportsEmail, eventExternalPaymentAwaitingVerificationEmail,
   eventReservationConfirmedEmail, externalPaymentAwaitingVerificationEmail, orderCancelledEmail, orderCompletedEmail,
-  orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, reviewInviteEmail,
+  orderConfirmedEmail, orderReadyForPickupEmail, orderShippedEmail, paymentReminderEmail, reviewInviteEmail, subscriptionReminderEmail,
 } from '@/lib/notifications/customerEmails';
 import {
   eventCapacityConflictEmail, marketingCampaignEmail, rentalDeliveryQuotePendingEmail, rentalReservationAdminEmail,
@@ -136,6 +136,10 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
   add('admin-invited', 'Avis & invitations', 'Invitation administrateur', 'Plateforme', adminInvitedEmail({
     tenantName: context.tenantName, role: 'tenant_admin', invitedByEmail: 'support@lepefy.com', loginUrl: `${base}/admin/login`,
   }));
+
+  const subscription = { tenantName: context.tenantName, daysLeft: 7, suspendOn: '15 octobre 2026', paidUntil: '30 septembre 2026', billingUrl: `${base}/admin/billing` };
+  add('subscription-reminder', 'Avis & invitations', 'Abonnement : rappel avant suspension', 'Plateforme', subscriptionReminderEmail({ ...subscription, kind: 'd7' }));
+  add('subscription-suspended', 'Avis & invitations', 'Abonnement : suspension', 'Plateforme', subscriptionReminderEmail({ ...subscription, kind: 'suspended' }));
 
   // Opérations & marketing
   add('daily-digest', 'Opérations & marketing', 'Rapport quotidien (08h)', 'Équipe du tenant', {

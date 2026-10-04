@@ -705,3 +705,45 @@ ${infoBox([
     }),
   };
 }
+
+/**
+ * Platform email to a tenant's staff about its Lepefy subscription: warning
+ * before the automatic suspension (kind d7 / d1) or suspension notice.
+ */
+export function subscriptionReminderEmail(input: {
+  tenantName: string;
+  kind: 'd7' | 'd1' | 'suspended';
+  daysLeft: number;
+  suspendOn: string;
+  paidUntil: string;
+  billingUrl: string | null;
+}): RenderedEmail {
+  const tenant = esc(input.tenantName);
+  const offline = 'boutique, événementiel, carte digitale et paiements en ligne';
+  if (input.kind === 'suspended') {
+    return {
+      subject: `Abonnement Lepefy suspendu — ${input.tenantName}`,
+      html: page(PLATFORM_EMAIL_CONTEXT, {
+        title: 'Abonnement suspendu',
+        footerLink: { url: null, label: '' },
+        body: `<p>Bonjour,</p>
+<p>L’abonnement Lepefy de <strong>${tenant}</strong> est suspendu : ${offline} sont hors ligne et l’administration est limitée à l’abonnement et à la consultation des commandes.</p>
+<p>Un paiement par carte rétablit le service immédiatement ; un virement, dès sa réception.</p>
+${cta(input.billingUrl, 'Régler l’abonnement')}`,
+      }),
+    };
+  }
+  const when = input.daysLeft <= 0 ? 'aujourd’hui' : input.daysLeft === 1 ? 'demain' : `dans ${input.daysLeft} jours`;
+  return {
+    subject: `Abonnement Lepefy : suspension ${when} (${input.suspendOn}) — ${input.tenantName}`,
+    html: page(PLATFORM_EMAIL_CONTEXT, {
+      title: 'Votre abonnement arrive à suspension',
+      footerLink: { url: null, label: '' },
+      body: `<p>Bonjour,</p>
+<p>L’abonnement Lepefy de <strong>${tenant}</strong> était payé jusqu’au <strong>${esc(input.paidUntil)}</strong>.</p>
+<p>Sans paiement, le service sera suspendu <strong>${esc(when)}, le ${esc(input.suspendOn)}</strong> : ${offline} seront hors ligne.</p>
+${cta(input.billingUrl, 'Régler l’abonnement')}
+<p class="note">Paiement déjà effectué par virement ? Il sera pris en compte dès sa réception, aucune action supplémentaire n’est nécessaire.</p>`,
+    }),
+  };
+}

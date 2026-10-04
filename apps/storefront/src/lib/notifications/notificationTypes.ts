@@ -5,7 +5,7 @@
 //
 // Client-safe: no server imports.
 
-export type NotificationGroupKey = 'orders' | 'events' | 'reports';
+export type NotificationGroupKey = 'orders' | 'events' | 'reports' | 'account';
 
 /** Tenant module a type depends on; types of a disabled module are hidden. */
 export type NotificationModule = 'events';
@@ -26,6 +26,7 @@ export const NOTIFICATION_GROUPS: ReadonlyArray<{ key: NotificationGroupKey; lab
   { key: 'orders', label: 'Commandes & paiements' },
   { key: 'events', label: 'Événementiel' },
   { key: 'reports', label: 'Rapports' },
+  { key: 'account', label: 'Compte' },
 ];
 
 export const NOTIFICATION_TYPES = [
@@ -36,6 +37,7 @@ export const NOTIFICATION_TYPES = [
   { key: 'service_inquiries', group: 'events', label: 'Demandes de devis', short: 'Devis', description: 'Nouvelle demande de devis traiteur ou service.', defaultOn: false, module: 'events' },
   { key: 'rental_reservations', group: 'events', label: 'Réservations matériel', short: 'Location', description: 'Réservation de matériel confirmée ou devis de livraison à établir.', defaultOn: false, module: 'events' },
   { key: 'daily_digest', group: 'reports', label: 'Rapport quotidien (08h)', short: 'Digest', description: 'Résumé quotidien des commandes à traiter.', defaultOn: false },
+  { key: 'subscription_billing', group: 'account', label: 'Abonnement Lepefy', short: 'Abonnement', description: 'Rappels avant la suspension automatique et avis de suspension de l’abonnement.', defaultOn: true },
 ] as const satisfies ReadonlyArray<NotificationTypeDefinition>;
 
 export type NotificationTypeKey = typeof NOTIFICATION_TYPES[number]['key'];
@@ -86,7 +88,7 @@ export interface NotificationPreset {
 
 export const NOTIFICATION_PRESETS: ReadonlyArray<NotificationPreset> = [
   { key: 'manager', label: 'Gérant', description: 'Toutes les notifications', types: 'all' },
-  { key: 'accounting', label: 'Comptabilité', description: 'Paiements et rapport quotidien', types: ['card_payment', 'external_payment_pending', 'daily_digest'] },
+  { key: 'accounting', label: 'Comptabilité', description: 'Paiements, rapport quotidien et abonnement', types: ['card_payment', 'external_payment_pending', 'daily_digest', 'subscription_billing'] },
   { key: 'operations', label: 'Préparation', description: 'Stock, locations et clôtures', types: ['order_stock_conflict', 'rental_reservations', 'event_booking_closed_reports', 'daily_digest'] },
 ];
 

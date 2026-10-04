@@ -1,0 +1,126 @@
+{
+  "name": "Lepefy · Subscription reminders (daily)",
+  "nodes": [
+    {
+      "id": "5f2a8c41-9d3e-4b7a-8c16-0e4f2a9b7d01",
+      "name": "Every day at 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8a3d6e12-4c7b-4f59-a2e8-1b9c5d7f3e02",
+      "name": "Manual test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        180,
+        440
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c4e7b9a2-6d18-4e3f-9b05-7a2c8e4d1f03",
+      "name": "Send subscription reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://shop.chloefood.com/api/internal/subscription-reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 30000
+    },
+    {
+      "id": "e9b1f5c3-2a47-4d8e-b6c0-3f8d1a5e7b04",
+      "name": "Check reminders outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        770,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const outcomes = $input.first()?.json?.outcomes;\nif (!outcomes || Number(outcomes.failed ?? 0) > 0) {\n  // Throw without echoing upstream responses, HTTP headers, or credentials.\n  throw new Error(\"subscription_reminders_failed\");\n}\nreturn [{ json: { ok: true, sent: Number(outcomes.sent ?? 0), notDue: Number(outcomes.not_due ?? 0), noRecipients: Number(outcomes.no_recipients ?? 0) } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Every day at 09:00": {
+      "main": [
+        [
+          {
+            "node": "Send subscription reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual test": {
+      "main": [
+        [
+          {
+            "node": "Send subscription reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send subscription reminders": {
+      "main": [
+        [
+          {
+            "node": "Check reminders outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
