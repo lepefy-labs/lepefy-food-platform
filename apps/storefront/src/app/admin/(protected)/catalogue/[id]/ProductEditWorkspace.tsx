@@ -11,6 +11,8 @@ interface ProductEditWorkspaceProps {
   active: boolean;
   stock: number;
   hasImage: boolean;
+  /** Missing or zero weight: shipping quote and carton suggestion cannot use it. */
+  missingWeight?: boolean;
   descriptionSource: 'ai' | 'human' | null;
 }
 
@@ -32,6 +34,7 @@ export default function ProductEditWorkspace({
   active,
   stock,
   hasImage,
+  missingWeight = false,
   descriptionSource,
 }: ProductEditWorkspaceProps) {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,11 @@ export default function ProductEditWorkspace({
             <span className={`rounded-full px-2.5 py-1 font-medium ${hasImage ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>
               {hasImage ? 'Image prête' : 'Image à compléter'}
             </span>
+            {!isNew && missingWeight && (
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
+                Poids à compléter
+              </span>
+            )}
             {descriptionSource === 'ai' && (
               <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
                 Description IA à revoir

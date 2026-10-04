@@ -230,6 +230,9 @@ export default function CatalogueTable({ tenantCurrency, categories, canManage }
   }
 
   const filtersActive = Boolean(category || status !== 'all' || sort !== 'position_asc' || urlQuery);
+  // The editor's back link returns to this exact list view.
+  const listQuery = catalogueQueryString(state);
+  const editorHref = (id: string) => listQuery ? `/admin/catalogue/${id}?from=${encodeURIComponent(listQuery)}` : `/admin/catalogue/${id}`;
   const chipClass = (active: boolean) => `inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] ${active ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`;
 
   function countBadge(key: CatalogueStatus) {
@@ -394,7 +397,7 @@ export default function CatalogueTable({ tenantCurrency, categories, canManage }
                 <td className="px-4 py-3">{statusControl(product)}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-1">
-                    <Link href={`/admin/catalogue/${product.id}`} className="inline-flex min-h-10 items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">{canManage ? 'Modifier' : 'Voir'}</Link>
+                    <Link href={editorHref(product.id)} className="inline-flex min-h-10 items-center rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">{canManage ? 'Modifier' : 'Voir'}</Link>
                     <ActionMenu product={product} />
                   </div>
                 </td>
@@ -433,7 +436,7 @@ export default function CatalogueTable({ tenantCurrency, categories, canManage }
               </div>
               <div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-2 border-t border-gray-100 pt-3">
                 {stockControl(product, true)}
-                <Link href={`/admin/catalogue/${product.id}`} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">{canManage ? 'Modifier' : 'Voir'}</Link>
+                <Link href={editorHref(product.id)} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">{canManage ? 'Modifier' : 'Voir'}</Link>
                 <ActionMenu product={product} />
               </div>
             </li>

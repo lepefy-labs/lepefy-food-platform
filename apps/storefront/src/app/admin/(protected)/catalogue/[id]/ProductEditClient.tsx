@@ -1,8 +1,10 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
+  IconAlertTriangle,
   IconPhoto,
   IconUpload,
   IconSparkles,
@@ -18,6 +20,7 @@ import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
 import ProductRelationshipsEditor from './ProductRelationshipsEditor';
 import ProductMediaManager from './ProductMediaManager';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { changedFieldLabels, changedProductKeys, productPatchPayload, type ProductBody } from '@/lib/catalog/productFormDiff';
 
 interface ProductEditProps {
   product: {
@@ -74,6 +77,8 @@ interface ProductEditProps {
   aiDescriptionsEnabled: boolean;
   isNew?: boolean;
   fromCategory?: string;
+  /** catalog.manage; without it the editor is read-only (the API re-checks it). */
+  canManage?: boolean;
 }
 
 interface FormState {
@@ -142,6 +147,51 @@ function cleanNutrition(raw: NutritionInfo): NutritionInfo {
   return Object.fromEntries(entries) as NutritionInfo;
 }
 
+/** PATCH/POST body of the editor (same mapping as before, now shared with the diff). */
+function buildBody(formData: FormState): ProductBody {
+  return {
+    name:               formData.name,
+    name_alt:           formData.name_alt,
+    description:        formData.description,
+    descriptions:       formData.descriptions,
+    description_source: formData.descriptionSource,
+    price:              formData.price,
+    compare_at_price:   formData.compare_at_price,
+    position:           formData.position,
+    weight_grams:       formData.weight_grams,
+    stock:              formData.stock,
+    min_order_quantity: formData.min_order_quantity,
+    order_quantity_step: formData.order_quantity_step,
+    active:             formData.active,
+    featured:           formData.featured,
+    storage_type:       formData.storage_type,
+    category_id:        formData.category_id,
+    warehouse_location: formData.warehouse_location,
+    image_url:          formData.image_url,
+    images:             formData.images,
+    producer_id:                 formData.producer_id || null,
+    importer_id:                 formData.importer_id || null,
+    ingredients_text:            formData.ingredients_text,
+    allergens_text:              formData.allergens_text,
+    gluten_free_certified:       formData.gluten_free_certified,
+    usage_instructions:          formData.usage_instructions,
+    conservation_instructions:   formData.conservation_instructions,
+    conservation_after_opening:  formData.conservation_after_opening,
+    country_of_origin:           formData.country_of_origin,
+    durability_type:             formData.durability_type || null,
+    quid_ingredient:             formData.quid_ingredient,
+    quid_percentage:             formData.quid_percentage,
+    alcohol_pct:                 formData.alcohol_pct,
+    net_quantity_display:        formData.net_quantity_display,
+    packaging_material:          formData.packaging_material,
+    recycling_note:              formData.recycling_note,
+    nutrition_basis:             formData.nutrition_basis,
+    nutrition:                   cleanNutrition(formData.nutrition),
+    label_background_image_url:  formData.label_background_image_url,
+    label_background_color:      formData.label_background_color || null,
+  };
+}
+
 function initFormState(product: ProductEditProps['product'], tenantLocales: string[]): FormState {
   const descriptions = { ...(product.descriptions ?? {}) };
   if (Object.keys(descriptions).length === 0 && product.description && tenantLocales[0]) {
@@ -206,9 +256,18 @@ export default function ProductEditClient({
   isNew = false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fromCategory,
+  canManage = true,
 }: ProductEditProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta' | 'associations'>('generale');
   const [formData, setFormData]         = useState<FormState>(() => initFormState(product, tenantLocales));
+  // Snapshot of what was loaded (or last saved): only the differences are sent.
+  const [baseline, setBaseline]         = useState<FormState>(() => initFormState(product, tenantLocales));
+  const currentBody  = useMemo(() => buildBody(formData), [formData]);
+  const baselineBody = useMemo(() => buildBody(baseline), [baseline]);
+  const changedKeys  = useMemo(() => isNew ? [] : changedProductKeys(baselineBody, currentBody), [isNew, baselineBody, currentBody]);
+  const dirty = canManage && (isNew ? false : changedKeys.length > 0);
+  const missingWeight = !(Number(formData.weight_grams) > 0);
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
@@ -234,6 +293,22 @@ export default function ProductEditClient({
     setToast({ msg, type });
   }
 
+  // Unsaved changes: confirm before leaving (browser navigation and in-app links).
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement | null)?.closest('a');
+      if (!anchor || anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:')) return;
+      if (!window.confirm('Quitter sans enregistrer ? Vos modifications seront perdues.')) { event.preventDefault(); event.stopPropagation(); }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', onClick, true);
+    return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', onClick, true); };
+  }, [dirty]);
+
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormData((prev) => ({ ...prev, [key]: value }));
   }
@@ -258,50 +333,12 @@ export default function ProductEditClient({
       showToast('Le minimum et l’incrément doivent être des entiers positifs.', 'error');
       return;
     }
+    // Creation sends everything; an edit sends only the changed fields so a
+    // stock or price changed elsewhere since opening is never overwritten.
+    const body = isNew ? currentBody : productPatchPayload(baselineBody, currentBody);
+    if (!isNew && Object.keys(body).length === 0) { showToast('Aucune modification à enregistrer', 'success'); return; }
     setIsSaving(true);
     try {
-      const body = {
-        name:               formData.name,
-        name_alt:           formData.name_alt,
-        description:        formData.description,
-        descriptions:       formData.descriptions,
-        description_source: formData.descriptionSource,
-        price:              formData.price,
-        compare_at_price:   formData.compare_at_price,
-        position:           formData.position,
-        weight_grams:       formData.weight_grams,
-        stock:              formData.stock,
-        min_order_quantity: formData.min_order_quantity,
-        order_quantity_step: formData.order_quantity_step,
-        active:             formData.active,
-        featured:           formData.featured,
-        storage_type:       formData.storage_type,
-        category_id:        formData.category_id,
-        warehouse_location: formData.warehouse_location,
-        image_url:          formData.image_url,
-        images:             formData.images,
-
-        producer_id:                 formData.producer_id || null,
-        importer_id:                 formData.importer_id || null,
-        ingredients_text:            formData.ingredients_text,
-        allergens_text:              formData.allergens_text,
-        gluten_free_certified:       formData.gluten_free_certified,
-        usage_instructions:          formData.usage_instructions,
-        conservation_instructions:   formData.conservation_instructions,
-        conservation_after_opening:  formData.conservation_after_opening,
-        country_of_origin:           formData.country_of_origin,
-        durability_type:             formData.durability_type || null,
-        quid_ingredient:              formData.quid_ingredient,
-        quid_percentage:              formData.quid_percentage,
-        alcohol_pct:                  formData.alcohol_pct,
-        net_quantity_display:         formData.net_quantity_display,
-        packaging_material:           formData.packaging_material,
-        recycling_note:               formData.recycling_note,
-        nutrition_basis:              formData.nutrition_basis,
-        nutrition:                    cleanNutrition(formData.nutrition),
-        label_background_image_url:   formData.label_background_image_url,
-        label_background_color:       formData.label_background_color || null,
-      };
 
       const method   = isNew ? 'POST' : 'PATCH';
       const endpoint = isNew
@@ -325,7 +362,9 @@ export default function ProductEditClient({
         const { id } = await res.json() as { id: string };
         window.location.href = `/admin/catalogue/${id}`;
       } else {
+        setBaseline(formData);
         showToast('Produit enregistré', 'success');
+        router.refresh();
       }
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erreur lors de l\'enregistrement', 'error');
@@ -419,6 +458,8 @@ export default function ProductEditClient({
       if (!res.ok) throw new Error(data.error ?? 'Échec du téléversement');
 
       setField('label_background_image_url', data.assetUrl ?? null);
+      // upload-label-asset already stored it on the product.
+      setBaseline((previous) => ({ ...previous, label_background_image_url: data.assetUrl ?? null }));
       showToast('Fond étiquette mis à jour', 'success');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur lors de l\'upload', 'error');
@@ -443,6 +484,8 @@ export default function ProductEditClient({
         body: JSON.stringify({ label_background_image_url: null }),
       });
       if (!res.ok) throw new Error('Erreur');
+      // Already persisted: keep it out of the unsaved changes.
+      setBaseline((previous) => ({ ...previous, label_background_image_url: null }));
       showToast('Fond étiquette supprimé', 'success');
     } catch {
       showToast('Erreur lors de la suppression', 'error');
@@ -451,32 +494,24 @@ export default function ProductEditClient({
 
   return (
     <>
-      <div>
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">
-              {isNew ? 'Nouveau produit' : product.name}
-            </h1>
-            <p className="text-sm text-gray-400 mt-0.5">
-              slug: <span className="font-mono">{product.slug}</span>
-            </p>
+      <div className={canManage ? 'pb-24' : ''}>
+        {!canManage && (
+          <p role="status" className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            <strong>Lecture seule.</strong> La modification du catalogue nécessite le droit « catalogue : gérer ».
+          </p>
+        )}
+        {!isNew && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-gray-400">slug : <span className="font-mono">{product.slug}</span></p>
+            <Link
+              href={`/admin/products/${product.id}/etichetta`}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <IconTag size={16} aria-hidden="true" />
+              Étiquette
+            </Link>
           </div>
-          <div className="flex items-center gap-2">
-            {!isNew && (
-              <Link
-                href={`/admin/products/${product.id}/etichetta`}
-                className="border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-              >
-                <IconTag size={16} />
-                Étiquette
-              </Link>
-            )}
-            <Button onClick={handleSave} loading={isSaving}>
-              {!isSaving && <IconCheck size={16} />}
-              {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-            </Button>
-          </div>
-        </div>
+        )}
 
         <div className="flex items-center gap-1 border-b border-gray-200 mb-5">
           <button
@@ -513,6 +548,8 @@ export default function ProductEditClient({
           )}
         </div>
 
+        {/* Read-only without catalog.manage: tabs stay usable, every field below is disabled. */}
+        <fieldset disabled={!canManage} className="min-w-0">
         <div
           className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5"
           style={{ display: activeTab === 'generale' ? 'grid' : 'none' }}
@@ -522,8 +559,9 @@ export default function ProductEditClient({
               <h2 className={SECTION_TITLE_CLS}>Informations</h2>
               <div className="space-y-4">
                 <div>
-                  <label className={LABEL_CLS}>Nom du produit</label>
+                  <label htmlFor="product-name" className={LABEL_CLS}>Nom du produit</label>
                   <input
+                    id="product-name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => setField('name', e.target.value)}
@@ -531,8 +569,9 @@ export default function ProductEditClient({
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLS}>Catégorie</label>
+                  <label htmlFor="product-category" className={LABEL_CLS}>Catégorie</label>
                   <select
+                    id="product-category"
                     value={formData.category_id}
                     onChange={(e) => setField('category_id', e.target.value)}
                     className={INPUT_CLS}
@@ -543,8 +582,9 @@ export default function ProductEditClient({
                   </select>
                 </div>
                 <div>
-                  <label className={LABEL_CLS}>Type de stockage</label>
+                  <label htmlFor="product-storage" className={LABEL_CLS}>Type de stockage</label>
                   <select
+                    id="product-storage"
                     value={formData.storage_type}
                     onChange={(e) => setField('storage_type', e.target.value)}
                     className={INPUT_CLS}
@@ -561,16 +601,26 @@ export default function ProductEditClient({
               <div className="flex items-center justify-between mb-4">
                 <h2 className={SECTION_TITLE_CLS.replace('mb-4', '')}>Descriptions</h2>
                 {formData.descriptionSource === 'ai' && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                    IA — à revoir
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                      IA — à revoir
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setField('descriptionSource', 'human')}
+                      className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-gray-200 px-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      <IconCheck size={14} aria-hidden="true" /> Marquer comme relue
+                    </button>
                   </span>
                 )}
               </div>
               <div className="space-y-4">
                 {tenantLocales.map((locale) => (
                   <div key={locale}>
-                    <label className={LABEL_CLS}>Description ({locale.toUpperCase()})</label>
+                    <label htmlFor={`product-description-${locale}`} className={LABEL_CLS}>Description ({locale.toUpperCase()})</label>
                     <textarea
+                      id={`product-description-${locale}`}
                       value={formData.descriptions[locale] ?? ''}
                       onChange={(e) => setDescriptionLocale(locale, e.target.value)}
                       rows={4}
@@ -607,8 +657,9 @@ export default function ProductEditClient({
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className={LABEL_CLS}>Prix (€)</label>
+                  <label htmlFor="product-price" className={LABEL_CLS}>Prix (€)</label>
                   <input
+                    id="product-price"
                     type="number"
                     step="0.01"
                     min="0"
@@ -618,14 +669,22 @@ export default function ProductEditClient({
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLS}>Poids (grammes)</label>
+                  <label htmlFor="product-weight" className={LABEL_CLS}>Poids (grammes)</label>
                   <input
+                    id="product-weight"
                     type="number"
                     min="0"
                     value={formData.weight_grams}
                     onChange={(e) => setField('weight_grams', e.target.value)}
-                    className={INPUT_CLS}
+                    aria-describedby={missingWeight ? 'product-weight-hint' : undefined}
+                    className={`${INPUT_CLS} ${missingWeight ? 'border-amber-300 bg-amber-50' : ''}`}
                   />
+                  {missingWeight && (
+                    <p id="product-weight-hint" className="mt-1 flex items-start gap-1 text-xs font-medium text-amber-800">
+                      <IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />
+                      Requis pour les frais de livraison et le carton suggéré.
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
@@ -685,11 +744,9 @@ export default function ProductEditClient({
               aiEnabled={aiEnabled}
               isNew={isNew}
               onChange={(imageUrl, images) => {
-                setFormData((previous) => ({
-                  ...previous,
-                  image_url: imageUrl,
-                  images,
-                }));
+                // Gallery changes are persisted by the media routes themselves.
+                setFormData((previous) => ({ ...previous, image_url: imageUrl, images }));
+                setBaseline((previous) => ({ ...previous, image_url: imageUrl, images }));
               }}
               onToast={showToast}
             />
@@ -702,11 +759,14 @@ export default function ProductEditClient({
                   <p className="text-xs text-gray-400">Visible en boutique</p>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.active}
                   onClick={() => setField('active', !formData.active)}
                   className={`relative w-10 h-6 rounded-full transition-colors ${
                     formData.active ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
                   }`}
-                  aria-label="Activer le produit"
+                  aria-label="Produit actif (visible en boutique)"
                 >
                   <span
                     className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
@@ -721,11 +781,14 @@ export default function ProductEditClient({
                   <p className="text-xs text-gray-400">Affiché en homepage</p>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.featured}
                   onClick={() => setField('featured', !formData.featured)}
                   className={`relative w-10 h-6 rounded-full transition-colors ${
                     formData.featured ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
                   }`}
-                  aria-label="Mettre en vedette"
+                  aria-label="Produit en vedette (homepage)"
                 >
                   <span
                     className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
@@ -739,14 +802,16 @@ export default function ProductEditClient({
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className={SECTION_TITLE_CLS}>Stock</h2>
               <div>
-                <label className={LABEL_CLS}>Quantité disponible</label>
+                <label htmlFor="product-stock" className={LABEL_CLS}>Quantité disponible</label>
                 <input
+                  id="product-stock"
                   type="number"
                   min={0}
                   value={formData.stock}
                   onChange={(e) => setField('stock', e.target.value)}
                   className={INPUT_CLS}
                 />
+                {!isNew && <p className="mt-1 text-xs text-gray-400">Enregistré seulement si vous le modifiez : les ventes en cours ne sont pas écrasées.</p>}
               </div>
             </section>
 
@@ -754,8 +819,9 @@ export default function ProductEditClient({
               <h2 className={SECTION_TITLE_CLS}>Règles de vente</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={LABEL_CLS}>Quantité minimale</label>
+                  <label htmlFor="product-min-qty" className={LABEL_CLS}>Quantité minimale</label>
                   <input
+                    id="product-min-qty"
                     type="number"
                     min={1}
                     value={formData.min_order_quantity}
@@ -764,8 +830,9 @@ export default function ProductEditClient({
                   />
                 </div>
                 <div>
-                  <label className={LABEL_CLS}>Incrément après le minimum</label>
+                  <label htmlFor="product-step" className={LABEL_CLS}>Incrément après le minimum</label>
                   <input
+                    id="product-step"
                     type="number"
                     min={1}
                     value={formData.order_quantity_step}
@@ -1184,9 +1251,12 @@ export default function ProductEditClient({
           </div>
         </div>
 
+        </fieldset>
+
         {toast && (
           <div
-            className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
+            role="status"
+            className={`fixed bottom-24 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
               toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
             }`}
           >
@@ -1195,6 +1265,32 @@ export default function ProductEditClient({
           </div>
         )}
       </div>
+
+      {canManage && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0 text-sm text-gray-600" aria-live="polite">
+              {isNew
+                ? 'Nouveau produit : complétez l’essentiel puis créez-le.'
+                : dirty
+                  ? <><span className="text-amber-600" aria-hidden="true">● </span>{changedKeys.length} modification{changedKeys.length > 1 ? 's' : ''} non enregistrée{changedKeys.length > 1 ? 's' : ''} · <span className="text-gray-500">{changedFieldLabels(changedKeys).join(', ')}</span></>
+                  : 'Aucune modification'}
+            </p>
+            <div className="flex gap-2">
+              {!isNew && dirty && (
+                <button type="button" onClick={() => setFormData(baseline)} disabled={isSaving}
+                  className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                  Annuler les modifications
+                </button>
+              )}
+              <Button onClick={handleSave} loading={isSaving} disabled={!isNew && !dirty} className="min-h-11">
+                {!isSaving && <IconCheck size={16} aria-hidden="true" />}
+                {isSaving ? 'Enregistrement...' : isNew ? 'Créer le produit' : 'Enregistrer'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmActionModal
         open={barcodeConfirmOpen}

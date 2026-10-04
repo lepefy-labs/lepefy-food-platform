@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 3 ottobre 2026 — **v7.06 Current-State Snapshot** (Catalogue: conteggi, filtri qualità, stato URL; base `main` @ `769a5c5365b6c16da9618409eeff7ea7cbfe10ec`)
+> **Aggiornato:** 4 ottobre 2026 — **v7.07 Current-State Snapshot** (editor prodotto: salvataggio dei soli campi modificati; base `main` @ `a80724d3299a34e11cf140fd71c5870bb1d132a0`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -258,6 +258,15 @@ Lista admin `/admin/catalogue` (`CatalogueTable`, helper puri in `lib/catalog/ca
 - **Stock**: si salva solo se cambia (Invio o uscita dal campo); Esc ripristina.
 - **Senza `catalog.manage`**: stock e stato in sola lettura, nessuna azione di gruppo né «Nouveau produit».
 - **Debito noto**: la modifica dello stock dalla lista sovrascrive `products.stock` senza un movimento in `inventory_movements` (modulo Gestion). È un comportamento preesistente, da decidere a parte.
+
+Editor prodotto `/admin/catalogue/[id]` (`ProductEditClient`).
+- **Salvataggio**: in modifica invia solo i campi cambiati rispetto allo stato caricato o all'ultimo salvataggio (`lib/catalog/productFormDiff.ts`), con la PATCH che già aggiorna una colonna solo se è presente nel corpo. Così uno stock decrementato dagli ordini, o un prezzo o stato cambiati dalla lista mentre l'editor era aperto, non vengono più sovrascritti. L'embedding IA si rigenera solo se cambiano nome, categoria o descrizioni. La creazione invia ancora il corpo completo.
+- **Campi già persistiti**: galleria e fondo d'etichetta, salvati subito dalle loro route, non contano come modifiche.
+- **Barra fissa**: elenca le modifiche non salvate, con «Annuler les modifications» ed «Enregistrer»; uscire con modifiche chiede conferma.
+- **Descrizioni IA**: «Marquer comme relue» imposta `description_source = 'human'` senza riscrivere il testo.
+- **Peso**: se manca è evidenziato (necessario per spedizione e carton) e compare il badge «Poids à compléter».
+- **Senza `catalog.manage`**: «Lecture seule», con i campi disattivati via `fieldset` (le schede restano navigabili).
+- **Ritorno**: «← Catalogue» torna alla vista della lista (`?from=`, riletto con `parseCatalogueState`).
 
 La Product Detail normalizza `image_url` e il JSONB `images` in una galleria ordinata (massimo 8 immagini): la prima immagine resta la copertina retrocompatibile usata dalle card. Il click apre un lightbox accessibile con chiusura Escape, navigazione tastiera, controlli precedente/successivo e swipe mobile. L’editor admin consente upload multiplo, riordino, scelta della copertina ed eliminazione; per rispettare il limite body di produzione, una selezione multipla viene prima ridimensionata nel browser fino a 1600 px e convertita in WebP ad alta qualità, quindi inviata in richieste sequenziali con progresso visibile e limite di 4 MiB per singola immagine. I nuovi asset usano path Storage univoci tenant/product-scoped e le API verificano sempre `tenant_id`. Non è richiesta una nuova migration perché `products.images` esiste dallo schema iniziale.
 

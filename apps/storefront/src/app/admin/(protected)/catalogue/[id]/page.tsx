@@ -6,6 +6,9 @@ import { getAiCapabilities } from '@/lib/ai/aiSettings';
 import ProductEditClient from './ProductEditClient';
 import ProductEditWorkspace from './ProductEditWorkspace';
 import { ProductCostPanel } from '../../gestion/_components/ProductCostPanel';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
+import { catalogueQueryString, parseCatalogueState } from '@/lib/catalog/catalogueFilters';
+import { readFromParam } from '@/lib/catalog/productFormDiff';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -15,12 +18,14 @@ export default async function AdminProductEditPage({
   searchParams,
 }: {
   params:       { id: string };
-  searchParams: { from_category?: string };
+  searchParams: { from_category?: string; from?: string };
 }) {
   const slug     = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant   = await getTenant(slug);
   const supabase = createServiceClient();
-  const ai = await getAiCapabilities(supabase, tenant.id, tenant);
+  const [ai, access] = await Promise.all([getAiCapabilities(supabase, tenant.id, tenant), getCurrentAdminAccessContext(tenant.id)]);
+  // UI hint only: PATCH /api/admin/catalogue/[id] re-checks catalog.manage.
+  const canManage = Boolean(access && canAdmin(access, 'catalog.manage'));
 
   const { data: product } = await supabase
     .from('products')
@@ -63,9 +68,11 @@ export default async function AdminProductEditPage({
     .eq('active', true)
     .order('name');
 
-  const backHref = searchParams.from_category
-    ? `/admin/catalogue?category=${searchParams.from_category}`
-    : '/admin/catalogue';
+  // Back to the list view the admin came from (re-parsed: only known list params survive).
+  const fromState = parseCatalogueState(readFromParam(searchParams.from));
+  if (searchParams.from_category && !fromState.category) fromState.category = searchParams.from_category;
+  const backQuery = catalogueQueryString(fromState);
+  const backHref = backQuery ? `/admin/catalogue?${backQuery}` : '/admin/catalogue';
   const categoryName = categories?.find((category) => category.id === product.category_id)?.name ?? null;
 
   return (
@@ -83,6 +90,7 @@ export default async function AdminProductEditPage({
         active={product.active}
         stock={product.stock}
         hasImage={Boolean(product.image_url)}
+        missingWeight={!(Number(product.weight_grams) > 0)}
         descriptionSource={product.description_source}
       >
         <ProductEditClient
@@ -96,6 +104,7 @@ export default async function AdminProductEditPage({
           tenantLocales={tenant.locales ?? ['fr']}
           aiDescriptionsEnabled={ai.descriptionGeneration}
           fromCategory={searchParams.from_category}
+          canManage={canManage}
         />
       </ProductEditWorkspace>
       {/* Gestion (flag business_management) : coût d'achat en lecture seule, rendu serveur uniquement. */}
