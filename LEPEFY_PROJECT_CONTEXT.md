@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 ottobre 2026 — **v7.10 Current-State Snapshot** (abbonamento: regola di rinnovo a fine mese, sospensione reale globale o per modulo, console Platform → Abonnements; migration 144 da applicare; base `main` @ `a790f875ad0ed2009a2b39f5ca0752651d363899`)
+> **Aggiornato:** 4 ottobre 2026 — **v7.11 Current-State Snapshot** (Fidélité & parrainage: salvataggio per sezione, commissioni in %, azioni che dicono la verità; base `main` @ `8acf3d69253a5a53e7c1fef73e09696de3f67f31`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Admin Fidélité & parrainage (`/admin/loyalty`)
+
+- **Configurazione** in due sezioni (programma; parrainage + anti-frode), con esempio dei punti e frase che descrive l'anti-frode. Salva solo le sezioni modificate (`changedLoyaltySections`, `lib/loyalty/loyaltyAdmin.ts`) e dice esattamente cosa è stato salvato; barra delle modifiche non salvate, conferma prima di disattivare il programma. Senza `tenant_settings.manage` la configurazione è in sola lettura (le API lo richiedono già).
+- **Commissioni per livello** inserite in % (salvate in decimali, invariato); `referralTierIssues` segnala livelli senza commissione, commissioni oltre la profondità e totale > 50 %. `POST /api/admin/loyalty/tiers` inserisce la nuova versione prima di disattivare le precedenti (prima un insert fallito lasciava il livello a 0 %) e limita il livello a 1–5.
+- **Accessi, revisioni, bonus**: le azioni cambiano lo stato a schermo solo se il server conferma e mostrano l'errore; `grantReferralAccess`/`revokeReferralAccess` restituiscono un esito (404 cliente non trovato, 500 errore DB) invece di riuscire in silenzio. Revoca con conferma, motivi e tipi in francese, righe in revisione con beneficiario, filleul e ordine (una sola query clienti, tenant-scoped).
 
 ### Scan fidélité in cassa (`/admin/loyalty/scan`)
 

@@ -9,18 +9,26 @@ import type { StuckSignupBonus } from '@/lib/loyalty/getStuckSignupBonuses';
 export function StuckSignupBonusSection({ initialItems }: { initialItems: StuckSignupBonus[] }) {
   const [items, setItems] = useState(initialItems);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
 
   async function handleConfirm(customerId: string) {
     setPendingId(customerId);
+    setMessage(null);
     try {
       const res = await fetch('/api/admin/loyalty/confirm-signup-bonus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customerId }),
       });
-      if (res.ok) {
-        setItems((prev) => prev.filter((i) => i.customerId !== customerId));
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        setMessage({ text: body?.error ?? 'Confirmation impossible.', tone: 'error' });
+        return;
       }
+      setItems((prev) => prev.filter((i) => i.customerId !== customerId));
+      setMessage({ text: 'Bonus confirmé.', tone: 'ok' });
+    } catch {
+      setMessage({ text: 'Erreur réseau — réessayez.', tone: 'error' });
     } finally {
       setPendingId(null);
     }
@@ -32,10 +40,14 @@ export function StuckSignupBonusSection({ initialItems }: { initialItems: StuckS
         Bonus de bienvenue en attente
       </h2>
       <p className="text-xs text-gray-400 mb-4">
-        Bonus de parrainage (SIGNUP_BONUS) restés PENDING plus de 7 jours. Une ligne en rouge signifie
+        Bonus d’inscription par parrainage restés en attente plus de 7 jours. Une ligne en rouge signifie
         que le client a déjà une commande livrée — le bonus aurait dû se confirmer automatiquement et
         ne l&apos;a pas fait ; à confirmer manuellement après vérification.
       </p>
+
+      {message && (
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+      )}
 
       {items.length === 0 ? (
         <p className="text-sm text-gray-400">Aucun bonus bloqué.</p>

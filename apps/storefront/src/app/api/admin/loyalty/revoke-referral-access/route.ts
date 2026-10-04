@@ -15,7 +15,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'customerId requis.' }, { status: 400 });
   }
 
-  await revokeReferralAccess({ tenantId: tenant.id, customerId: body.customerId });
+  const result = await revokeReferralAccess({ tenantId: tenant.id, customerId: body.customerId });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.reason === 'not_found' ? 'Client introuvable.' : 'Mise à jour impossible. Réessayez.' },
+      { status: result.reason === 'not_found' ? 404 : 500 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

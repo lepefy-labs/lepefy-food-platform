@@ -18,12 +18,18 @@ export async function POST(req: NextRequest) {
 
   const adminId = await getAdminId();
 
-  await grantReferralAccess({
+  const result = await grantReferralAccess({
     tenantId: tenant.id,
     customerId: body.customerId,
     reason: 'ADMIN_GRANTED',
     grantedByAdminId: adminId ?? undefined,
   });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.reason === 'not_found' ? 'Client introuvable.' : 'Mise à jour impossible. Réessayez.' },
+      { status: result.reason === 'not_found' ? 404 : 500 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

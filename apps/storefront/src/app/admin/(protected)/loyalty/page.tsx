@@ -10,6 +10,7 @@ import { ReferralAccessSection } from './ReferralAccessSection';
 import { PendingReviewSection } from './PendingReviewSection';
 import { StuckSignupBonusSection } from './StuckSignupBonusSection';
 import type { PointsLedgerEntry, TenantReferralTier } from '@lepefy/types';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -19,10 +20,13 @@ export default async function AdminLoyaltyPage() {
   const tenant = await getTenant(slug);
 
   const supabase = createServiceClient();
-  const [loyalty, referralSettings] = await Promise.all([
+  const [loyalty, referralSettings, access] = await Promise.all([
     getLoyaltySettings(supabase, tenant.id),
     getReferralSettings(supabase, tenant.id),
+    getCurrentAdminAccessContext(tenant.id),
   ]);
+  // UI hint only: PATCH loyalty/settings and loyalty/referral re-check tenant_settings.manage.
+  const canEditSettings = Boolean(access && canAdmin(access, 'tenant_settings.manage'));
   const referral = referralSettings ?? REFERRAL_UNAVAILABLE_VIEW;
 
   const [{ data: tiers }, { data: pendingEntries }, stuckSignupBonuses] = await Promise.all([
@@ -41,6 +45,14 @@ export default async function AdminLoyaltyPage() {
       .order('created_at', { ascending: false }),
     getStuckSignupBonuses(tenant.id),
   ]);
+
+  // Names for the review rows: one tenant-scoped query for every customer involved.
+  const entries = (pendingEntries ?? []) as PointsLedgerEntry[];
+  const customerIds = [...new Set(entries.flatMap((entry) => [entry.customer_id, entry.reference_customer_id]).filter((id): id is string => Boolean(id)))];
+  const { data: reviewCustomers } = customerIds.length > 0
+    ? await supabase.from('customers').select('id, full_name, email').eq('tenant_id', tenant.id).in('id', customerIds)
+    : { data: [] as Array<{ id: string; full_name: string | null; email: string | null }> };
+  const customerNames = Object.fromEntries((reviewCustomers ?? []).map((customer) => [customer.id, customer.full_name || customer.email || 'Client']));
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
@@ -62,6 +74,7 @@ export default async function AdminLoyaltyPage() {
             referral_fraud_period_days={referral.referral_fraud_period_days}
             referral_fraud_action={referral.referral_fraud_action}
             initialTiers={(tiers ?? []) as TenantReferralTier[]}
+            canEditSettings={canEditSettings}
           />
         </AdminBlockAccent>
 
@@ -69,8 +82,8 @@ export default async function AdminLoyaltyPage() {
           <ReferralAccessSection />
         </AdminBlockAccent>
 
-        <AdminBlockAccent tone={(pendingEntries ?? []).length > 0 ? 'warning' : 'neutral'}>
-          <PendingReviewSection initialEntries={(pendingEntries ?? []) as PointsLedgerEntry[]} />
+        <AdminBlockAccent tone={entries.length > 0 ? 'warning' : 'neutral'}>
+          <PendingReviewSection initialEntries={entries} customerNames={customerNames} />
         </AdminBlockAccent>
 
         <AdminBlockAccent tone={stuckSignupBonuses.length > 0 ? 'warning' : 'neutral'}>

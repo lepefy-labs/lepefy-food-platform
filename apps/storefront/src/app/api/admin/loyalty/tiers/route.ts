@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const body = await req.json() as { level?: number; pct?: number };
-  if (typeof body.level !== 'number' || body.level < 1) {
+  const body = await req.json().catch(() => ({})) as { level?: number; pct?: number };
+  if (typeof body.level !== 'number' || !Number.isInteger(body.level) || body.level < 1 || body.level > 5) {
     return NextResponse.json({ error: 'Niveau invalide.' }, { status: 400 });
   }
   if (typeof body.pct !== 'number' || body.pct < 0 || body.pct > 1) {
@@ -55,17 +55,9 @@ export async function POST(req: NextRequest) {
   const adminId   = await getAdminId();
   const supabase  = createServiceClient();
 
-  const { error: deactivateError } = await supabase
-    .from('tenant_referral_tiers')
-    .update({ is_active: false })
-    .eq('tenant_id', tenant.id)
-    .eq('level', body.level)
-    .eq('is_active', true);
-
-  if (deactivateError) {
-    return NextResponse.json({ error: deactivateError.message }, { status: 500 });
-  }
-
+  // New version first, previous ones deactivated afterwards: a failure at
+  // any step leaves the level with an active tier (before, a failed insert
+  // after the deactivation left the level at 0 % silently).
   const { data, error } = await supabase
     .from('tenant_referral_tiers')
     .insert({
@@ -78,8 +70,24 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !data) {
+    console.error('[loyalty/tiers] insert failed:', error);
+    return NextResponse.json({ error: 'Enregistrement du pourcentage impossible.' }, { status: 500 });
+  }
+
+  const { error: deactivateError } = await supabase
+    .from('tenant_referral_tiers')
+    .update({ is_active: false })
+    .eq('tenant_id', tenant.id)
+    .eq('level', body.level)
+    .eq('is_active', true)
+    .neq('id', data.id);
+
+  if (deactivateError) {
+    // Two active versions for this level until a retry: the newest one is
+    // the one shown first; report it instead of hiding it.
+    console.error('[loyalty/tiers] deactivate previous failed:', deactivateError);
+    return NextResponse.json({ error: 'Nouvelle version enregistrée, mais l’ancienne n’a pas pu être désactivée. Réessayez.' }, { status: 500 });
   }
 
   return NextResponse.json(data);
