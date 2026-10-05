@@ -249,7 +249,7 @@ export default async function NalaAnalyticsPage({ searchParams }: PageProps) {
             const title = `${dashboard.bucketSize === 'week' ? `Semaine du ${item.label}` : item.label} : ${item.interactions} message${item.interactions > 1 ? 's' : ''}${item.assistedRevenue > 0 ? ` · ${formatCurrency(item.assistedRevenue, dashboard.currency)}` : ''}`;
             return (
               <div key={item.key} title={title} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-                <div className="w-full rounded-t-md bg-[var(--admin-primary)]/80" style={{ height: `${height}%` }} />
+                <div className="w-full rounded-t-md bg-[var(--admin-primary)] opacity-80" style={{ height: `${height}%` }} />
               </div>
             );
           })}
