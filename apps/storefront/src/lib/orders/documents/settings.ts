@@ -10,7 +10,7 @@ import { ORDER_DOCUMENT_FORMAT_IDS, DEFAULT_ORDER_DOCUMENT_FORMAT } from './form
  * Préférences des documents de commande, une ligne
  * tenant_feature_settings (tenant_id, 'order_documents') — migration 145.
  * Config plate (la fusion de moduleConfig est superficielle) ; clés et types
- * miroirs de public.is_valid_order_documents_config(). `enabled` de la ligne
+ * miroirs de public.is_valid_order_documents_config() (145, étendue par 146). `enabled` de la ligne
  * n'a pas de sens ici (les documents sont toujours disponibles) : seule la
  * config compte, et une ligne absente ou invalide vaut les défauts sûrs.
  */
@@ -21,6 +21,7 @@ const formatSchema = z.enum(ORDER_DOCUMENT_FORMAT_IDS);
 export const orderDocumentsConfigSchema = z.object({
   version: z.literal(1),
   picking_list_format: formatSchema,
+  picking_list_show_delivery_address: z.boolean(),
   packing_slip_enabled: z.boolean(),
   packing_slip_format: formatSchema,
   packing_slip_show_logo: z.boolean(),
@@ -36,6 +37,8 @@ export type OrderDocumentsConfig = z.infer<typeof orderDocumentsConfigSchema>;
 export const ORDER_DOCUMENTS_DEFAULTS: OrderDocumentsConfig = {
   version: 1,
   picking_list_format: DEFAULT_ORDER_DOCUMENT_FORMAT,
+  // Adresse complète sur la liste interne : opt-in (minimisation des données).
+  picking_list_show_delivery_address: false,
   packing_slip_enabled: true,
   packing_slip_format: DEFAULT_ORDER_DOCUMENT_FORMAT,
   packing_slip_show_logo: true,

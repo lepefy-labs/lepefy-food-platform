@@ -43,6 +43,10 @@ export async function PATCH(req: NextRequest) {
     if (error instanceof ModuleConfigValidationError) {
       return NextResponse.json({ error: 'Préférences invalides.', issues: error.issues }, { status: 400 });
     }
+    // CHECK SQL plus ancien que le code (146 non appliquée) : message explicite, pas un 500 opaque.
+    if (error instanceof Error && /check constraint|23514/i.test(error.message)) {
+      return NextResponse.json({ error: 'La migration 146 doit être appliquée avant d’enregistrer ces préférences.' }, { status: 409 });
+    }
     console.error('[order-documents settings] update failed', tenantId, error instanceof Error ? error.message : error);
     return NextResponse.json({ error: 'Enregistrement impossible.' }, { status: 500 });
   }

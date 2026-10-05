@@ -12,7 +12,7 @@ Order
                                                                             → htmlToPdf (Gotenberg) → PDF
 ```
 
-- **Liste de préparation** (interna): emplacements, chaîne du froid, riepilogo unità/peso/colli, emballage suggéré (solo consegna), firme.
+- **Liste de préparation** (interna): emplacements, chaîne du froid, riepilogo unità/peso/colli, emballage suggéré (solo consegna), firme. Di default solo nome + CAP/città; indirizzo completo (via, complemento, «CAP città, paese», «Destinataire : …» se diverso dal cliente) solo con `picking_list_show_delivery_address`.
 - **Bon de colis** (cliente, nel pacco; titolo stampato «RÉCAPITULATIF DE COMMANDE»): marca, «Merci <prénom> !», réf. courte e data, articoli, QR del portale, ringraziamento, contatti. Il view-model cliente è costruito campo per campo: non riceve mai la riga `orders` né item grezzi. Il loader non legge `notes`, `email`, telefono o pagamento.
 - File: `apps/storefront/src/lib/orders/documents/*`.
 
@@ -29,6 +29,7 @@ Aggiungere un formato (letter, a6, thermal_80): voce del registro, layout nei du
 | Chiave | Default |
 |---|---|
 | `picking_list_format` | `a5` |
+| `picking_list_show_delivery_address` | `false` (solo consegne; chiave aggiunta dalla 146) |
 | `packing_slip_enabled` | `true` |
 | `packing_slip_format` | `a5` |
 | `packing_slip_show_logo` / `_show_qr` / `_show_thank_you` / `_show_contact` | `true` |
@@ -50,7 +51,7 @@ Aggiungere un formato (letter, a6, thermal_80): voce del registro, layout nei du
 - Risposta: `application/pdf`, `inline` (o `attachment` con `download=1`), `Cache-Control: private, no-store`, `X-Robots-Tag: noindex`. Nomi: `commande-CC4314FE-preparation-a5.pdf`, `commande-CC4314FE-bon-de-colis-a5.pdf`, `preparation-2026-10-05-a5.pdf`, `bons-de-colis-2026-10-05-a5.pdf`.
 - Errori (francese; pagina HTML se aperta in navigazione): formato sconosciuto 400, ordine assente/altro tenant 404, annullato 409, bon de colis disattivato 409, lotto > 50 413, Gotenberg assente/irraggiungibile/timeout 503, errore di conversione 502. Nel lotto gli ordini assenti, di altro tenant o annullati sono esclusi (`X-Documents-Skipped`).
 - Gotenberg: client unico `lib/labels/gotenberg.ts`, `htmlToPdf(html, options)` con carta e margini dal registro, `footer.html`, timeout 25 s. Senza opzioni gli altri consumer (etichette, affiche, biglietti, liste Événementiel) restano invariati. Env: `GOTENBERG_URL`, `GOTENBERG_AUTH`.
-- UI: sezione «Documents» del dettaglio ordine (`OrderDocumentsCard`), azione di riga «Imprimer la liste de préparation», azione di gruppo «Documents…» (`BulkDocumentsDialog`). Navigazione HTTP diretta al PDF (funziona anche in PWA); nessun `window.print`.
+- UI: sezione «Documents» del dettaglio ordine (`OrderDocumentsCard`, scelta A5/A4 puntuale), azioni rapide nella riga espansa della lista al formato di default (`Liste de préparation · A5`, e per le consegne `Bon de colis · A5` se attivo), azione di gruppo «Documents…» (`BulkDocumentsDialog`). Navigazione HTTP diretta al PDF (funziona anche in PWA); nessun `window.print`.
 
 ## 5. QR e token
 
@@ -92,6 +93,10 @@ supabase db push
 **Stato:** applicata in produzione il 05/10/2026 e verificata (feature registrata non fatturabile, tabella token presente e negata ad `anon`, nessuna riga di preferenze). Test CI: `supabase/tests/145_order_documents.{fixture,test}.sql`.
 
 In un ambiente senza la 145: preferenze = default (non salvabili, avviso in Paramètres), bon de colis generato senza QR (avviso nel dettaglio ordine), portale 404. Rollback: vedi l'intestazione della migration.
+
+### Migration 146 (opzione indirizzo sulla liste de préparation)
+
+`supabase/migrations/146_order_documents_picking_address.sql` ridefinisce solo `is_valid_order_documents_config` per accettare `picking_list_show_delivery_address` (booleana). Nessuna tabella o dato toccati; compatibile all'indietro, applicabile prima o dopo il deploy. Senza la 146 il codice non può salvare le preferenze: la PATCH risponde 409 «La migration 146 doit être appliquée…»; la stampa continua senza indirizzo. Test CI: `supabase/tests/146_order_documents_picking_address.test.sql`.
 
 ## 8. Test
 

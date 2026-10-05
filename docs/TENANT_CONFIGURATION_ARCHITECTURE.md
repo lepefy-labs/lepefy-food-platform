@@ -124,7 +124,7 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Dettagli:** `docs/DAILY_ORDER_DIGEST.md`.
 
 ### 3.8b Documenti delle commande — **nuovo modulo (145)**
-- **Struttura:** `tenant_feature_settings('order_documents')`, config piatta v1 (formati liste de préparation / bon de colis, attivazione e contenuto del bon); CHECK `is_valid_order_documents_config`. `enabled` non usato. Nessuna colonna `tenants`.
+- **Struttura:** `tenant_feature_settings('order_documents')`, config piatta v1 (formati liste de préparation / bon de colis, indirizzo completo sulla liste (146), attivazione e contenuto del bon); CHECK `is_valid_order_documents_config`. `enabled` non usato. Nessuna colonna `tenants`.
 - **Letture:** `readOrderDocumentSettings()` (`lib/orders/documents/settings.ts`): route PDF, dettaglio e lista ordini, Paramètres. Riga assente, invalida o illeggibile ⇒ default sicuri.
 - **Scritture:** `PATCH /api/admin/order-documents/settings` (`tenant_settings.manage`).
 - **Esposizione:** S.

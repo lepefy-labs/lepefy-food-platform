@@ -42,6 +42,7 @@ table.pl-items { width: 100%; border-collapse: collapse; }
 .pl-sign span { flex: 1; border-bottom: 0.3mm solid #111; padding-bottom: 6mm; }
 .pl-notes { height: 24mm; background: repeating-linear-gradient(transparent 0 7.7mm, #999 7.7mm 8mm); }
 .pl-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+.pl-address { margin-top: 1mm; line-height: 1.35; }
 
 /* A5 : compact, une colonne d'information par ligne */
 .format-a5 { font-size: 10.5pt; }
@@ -130,6 +131,10 @@ function summaryParts(vm: InternalOrderDocumentViewModel): string[] {
   ].filter((part): part is string => Boolean(part));
 }
 
+function addressBlock(vm: InternalOrderDocumentViewModel): string {
+  return vm.deliveryAddress ? `<div class="pl-address">${vm.deliveryAddress.map(escapeHtml).join('<br>')}</div>` : '';
+}
+
 function customerLine(vm: InternalOrderDocumentViewModel): string {
   return `<b>${escapeHtml(vm.customerName)}</b> · ${vm.destination ? escapeHtml(vm.destination) : vm.fulfillment === 'pickup' ? 'Retrait en boutique' : 'Destination non renseignée'}`;
 }
@@ -138,7 +143,7 @@ export function pickingListSectionHtml(vm: InternalOrderDocumentViewModel, forma
   if (format === 'a4') {
     return `<section class="doc">
 ${header(vm)}
-<div class="pl-grid2 pl-meta"><div><b>Client</b><br>${customerLine(vm)}</div><div><b>Résumé</b><br>${escapeHtml(summaryParts(vm).join(' · '))}</div></div>
+<div class="pl-grid2 pl-meta"><div><b>Client</b><br>${vm.deliveryAddress ? `<b>${escapeHtml(vm.customerName)}</b>${addressBlock(vm)}` : customerLine(vm)}</div><div><b>Résumé</b><br>${escapeHtml(summaryParts(vm).join(' · '))}</div></div>
 <div class="pl-section keep-next">ARTICLES</div>
 ${itemsTableA4(vm)}
 <div class="pl-grid2 avoid" style="margin-top:4mm">
@@ -150,7 +155,7 @@ ${itemsTableA4(vm)}
   }
   return `<section class="doc">
 ${header(vm)}
-<div class="pl-meta">${customerLine(vm)}</div>
+<div class="pl-meta">${vm.deliveryAddress ? `<b>${escapeHtml(vm.customerName)}</b>${addressBlock(vm)}` : customerLine(vm)}</div>
 <div class="pl-section keep-next">${escapeHtml(summaryParts(vm).join(' · ').toUpperCase())}</div>
 ${itemsTableA5(vm)}
 ${cartonBlock(vm, format)}

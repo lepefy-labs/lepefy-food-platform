@@ -125,6 +125,30 @@ test('picking view-model keeps operational data: locations sorted, cold chain, c
   expect(pickup.fulfillmentLabel).toBe('RETRAIT');
 });
 
+test('picking list: full delivery address only when the tenant enables it, never for pickup', () => {
+  const hidden = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null });
+  expect(hidden.deliveryAddress).toBeNull();
+  expect(pickingListHtml([hidden], 'a5')).not.toContain('Oberkampf');
+  const shown = buildPickingListViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true });
+  expect(shown.deliveryAddress).toEqual(['12 rue Oberkampf', '75011 Paris, FR']);
+  const gift = buildPickingListViewModel({ order: order(ORDER_A, { shipping_address: { full_name: 'Moussa Traoré', line1: '3 rue Lepic', postal_code: '75018', city: 'Paris', country: 'FR' } }), items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true });
+  expect(gift.deliveryAddress).toEqual(['Destinataire : Moussa Traoré', '3 rue Lepic', '75018 Paris, FR']);
+  for (const format of ['a5', 'a4'] as const) expect(pickingListHtml([shown], format)).toContain('12 rue Oberkampf');
+  const pickup = buildPickingListViewModel({ order: order(ORDER_A, { fulfillment_type: 'pickup' }), items: ITEMS, tenant: { name: 'T' }, carton: null, showDeliveryAddress: true });
+  expect(pickup.deliveryAddress).toBeNull();
+  expect(ORDER_DOCUMENTS_DEFAULTS.picking_list_show_delivery_address).toBe(false);
+});
+
+test('render: picking address setting flows from tenant settings to the PDF HTML', async () => {
+  await withGotenberg(async (calls) => {
+    const base = { db: documentsDb() as never, tenant: TENANT, kind: 'picking_list' as const, format: 'a5' as const, bulk: false, orderIds: [ORDER_A] };
+    await renderOrderDocuments({ ...base, settings: ORDER_DOCUMENTS_DEFAULTS });
+    await renderOrderDocuments({ ...base, settings: { ...ORDER_DOCUMENTS_DEFAULTS, picking_list_show_delivery_address: true } });
+    expect(await htmlOf(calls[0]!)).not.toContain('Oberkampf');
+    expect(await htmlOf(calls[1]!)).toContain('12 rue Oberkampf');
+  });
+});
+
 test('packing slip view-model is customer-safe by construction and hides prices by default', () => {
   const raw = order(ORDER_A);
   const vm = buildPackingSlipViewModel({ order: raw, items: ITEMS, tenant: DOC_TENANT, settings: ORDER_DOCUMENTS_DEFAULTS, qr: null });

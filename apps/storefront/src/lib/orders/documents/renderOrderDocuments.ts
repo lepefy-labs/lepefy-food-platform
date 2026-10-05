@@ -149,7 +149,7 @@ export async function renderOrderDocuments(input: {
   let html: string;
   let footerLabel: string;
   if (kind === 'picking_list') {
-    const vms = printable.map(({ order, items, carton }) => buildPickingListViewModel({ order, items, tenant: { name: tenant.name }, carton }));
+    const vms = printable.map(({ order, items, carton }) => buildPickingListViewModel({ order, items, tenant: { name: tenant.name }, carton, showDeliveryAddress: settings.picking_list_show_delivery_address }));
     html = pickingListHtml(vms, format);
     footerLabel = vms.length === 1 ? `#${vms[0]!.ref} · Liste de préparation` : `Listes de préparation · ${vms.length} commandes`;
   } else {

@@ -2,7 +2,7 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@80b3971e8443c63357d65c56dc587adfddfe09b9`
+> **Base codice verificata:** `main@96d94e9d793aa6eabf8c4c9b5213f84eee8e9f5b`
 > **Ultima verifica:** 5 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
@@ -145,7 +145,7 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 - **Riga espansa**, tre sezioni:
   - preparazione: articoli, ubicazione, peso, colli, carton suggestion caricata solo all'apertura via `GET /api/admin/orders/[id]/operation-detail` (`orders.view`), righe senza peso;
   - spedizione: destinazione, transporteur e servizio, provider, reference e tracking copiabili, stato provider con ultima synchro, ultimo movimento, ETA; per i ritiri: urgenza e contatto;
-  - azioni esplicite: `Imprimer la liste de préparation` (PDF server al formato di default del tenant), `Voir la commande`, `Voir le suivi transporteur`.
+  - azioni esplicite: `Liste de préparation · A5` (PDF al formato di default del tenant, indicato nell'etichetta), per le consegne `Bon de colis · A5` se attivo, `Voir la commande`, `Voir le suivi transporteur`.
 - **Azione di gruppo `Documents…`:** dialog con documento (listes de préparation / bons de colis) e formato A5/A4 → un solo PDF (§3.1).
 - **Mobile:** card operative con CTA a tutta larghezza (44 px), pulsante di dettaglio e le stesse intestazioni di gruppo.
 
@@ -171,7 +171,7 @@ Due documenti distinti costruiti da un loader condiviso, mai lo stesso markup:
 
 | Documento | Destinatario | Contenuto | Mai |
 |---|---|---|---|
-| **Liste de préparation** (`pickingListHtml.ts`) | équipe | réf. courte, data, LIVRAISON/RETRAIT, nome + CAP/città, articoli ordinati per `warehouse_location` con casella 6/7 mm, quantità 16–17 pt, FRAIS/SURGELÉ in testo, riepilogo unità/ref./peso/colli, **emballage suggéré** (solo consegna non annullata, `cartonSuggestion.ts`), firme | UUID completo, e-mail, indirizzo completo |
+| **Liste de préparation** (`pickingListHtml.ts`) | équipe | réf. courte, data, LIVRAISON/RETRAIT, nome + CAP/città, articoli ordinati per `warehouse_location` con casella 6/7 mm, quantità 16–17 pt, FRAIS/SURGELÉ in testo, riepilogo unità/ref./peso/colli, **emballage suggéré** (solo consegna non annullata, `cartonSuggestion.ts`), firme; indirizzo completo di consegna solo con l'opzione tenant `picking_list_show_delivery_address` (destinatario ripetuto solo se diverso dal cliente) | UUID completo, e-mail |
 | **Bon de colis** (`packingSlipHtml.ts`, titolo stampato «RÉCAPITULATIF DE COMMANDE») | cliente, nel pacco | logo/nome tenant, «Merci <prénom> !», réf. courte e data, articoli, totale articoli, QR portale (§3.2), ringraziamento, contatti; prezzi storici `order_items` e indirizzo solo se attivati | emplacements, caselle, carton, peso, e-mail, telefono, note, pagamento, errori provider, UUID |
 
 - **Formati:** registro unico `lib/orders/documents/formats.ts` (`ORDER_DOCUMENT_FORMATS`: `a5` 148×210 default/raccomandato, `a4` 210×297; portrait). A5 e A4 hanno layout propri (A4: colonne Conservation/Emplacement, dettaglio per collo, zona note). Un formato nuovo = una voce del registro + layout + CHECK della migration.

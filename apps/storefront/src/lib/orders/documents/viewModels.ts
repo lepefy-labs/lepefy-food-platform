@@ -78,6 +78,8 @@ export interface InternalOrderDocumentViewModel {
   tenantName: string;
   customerName: string;
   destination: string | null;
+  /** Adresse complète (livraison uniquement), seulement si le tenant l'a activée. */
+  deliveryAddress: string[] | null;
   items: PickingItemVM[];
   totalUnits: number;
   referenceCount: number;
@@ -102,6 +104,30 @@ function address(order: DocumentOrderRow): Record<string, string | undefined> {
   return (order.shipping_address ?? {}) as Record<string, string | undefined>;
 }
 
+/** Lignes d'adresse de livraison (nom, rue, complément, CP ville, pays), vides écartées. */
+function addressLines(order: DocumentOrderRow): string[] | null {
+  const a = address(order);
+  const lines = [a.full_name ?? order.full_name ?? '', a.line1 ?? '', a.line2 ?? '', [a.postal_code, a.city].filter(Boolean).join(' '), a.country ?? '']
+    .map((line) => String(line).trim()).filter(Boolean);
+  return lines.length > 0 ? lines : null;
+}
+
+/**
+ * Liste interne : le nom du client est déjà imprimé au-dessus, on ne répète le
+ * destinataire que s'il diffère (cadeau). CP, ville et pays sur une ligne (A5).
+ */
+function pickingAddressLines(order: DocumentOrderRow): string[] | null {
+  const a = address(order);
+  const recipient = a.full_name?.trim();
+  const customer = order.full_name?.trim();
+  const lines = [
+    recipient && recipient.toLowerCase() !== customer?.toLowerCase() ? `Destinataire : ${recipient}` : '',
+    a.line1 ?? '', a.line2 ?? '',
+    [[a.postal_code, a.city].filter(Boolean).join(' '), a.country].filter(Boolean).join(', '),
+  ].map((line) => String(line).trim()).filter(Boolean);
+  return lines.length > 0 ? lines : null;
+}
+
 function dims(carton: { box_length_cm: number; box_width_cm: number; box_height_cm: number } | null): string | null {
   return carton ? `${carton.box_length_cm} × ${carton.box_width_cm} × ${carton.box_height_cm} cm` : null;
 }
@@ -111,6 +137,7 @@ export function buildPickingListViewModel(input: {
   items: DocumentItemRow[];
   tenant: Pick<DocumentTenant, 'name'>;
   carton: { suggestion: CartonSuggestion | null; missingWeightLines: number; maxParcelG?: number } | null;
+  showDeliveryAddress?: boolean;
 }): InternalOrderDocumentViewModel {
   const { order, tenant, carton } = input;
   const isPickup = order.fulfillment_type === 'pickup';
@@ -155,6 +182,7 @@ export function buildPickingListViewModel(input: {
     tenantName: tenant.name,
     customerName: order.full_name?.trim() || 'Client',
     destination,
+    deliveryAddress: input.showDeliveryAddress && !isPickup ? pickingAddressLines(order) : null,
     items,
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
     referenceCount: items.length,
@@ -245,11 +273,7 @@ export function buildPackingSlipViewModel(input: {
     prices = { lines, total: formatPrice(total, currency) };
   }
 
-  const a = address(order);
-  const deliveryAddress = settings.packing_slip_show_delivery_address && order.fulfillment_type === 'delivery'
-    ? [a.full_name ?? order.full_name ?? '', a.line1 ?? '', a.line2 ?? '', [a.postal_code, a.city].filter(Boolean).join(' '), a.country ?? '']
-      .map((line) => String(line).trim()).filter(Boolean)
-    : null;
+  const deliveryAddress = settings.packing_slip_show_delivery_address && order.fulfillment_type === 'delivery' ? addressLines(order) : null;
 
   const name = firstName(order.full_name);
   const contact = settings.packing_slip_show_contact
@@ -270,7 +294,7 @@ export function buildPackingSlipViewModel(input: {
     items,
     totalUnits: items.reduce((sum, item) => sum + item.quantity, 0),
     prices,
-    deliveryAddress: deliveryAddress && deliveryAddress.length > 0 ? deliveryAddress : null,
+    deliveryAddress,
     qr: settings.packing_slip_show_qr ? input.qr : null,
     qrUnavailable: settings.packing_slip_show_qr && !input.qr && Boolean(input.qrUnavailable),
     thankYou: settings.packing_slip_show_thank_you

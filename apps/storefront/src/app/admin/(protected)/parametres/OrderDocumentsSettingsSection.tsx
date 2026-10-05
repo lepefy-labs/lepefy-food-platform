@@ -78,6 +78,10 @@ export function OrderDocumentsSettingsSection({ initial, available, invalid, can
           <label htmlFor="doc-picking-format" className={SETTINGS_LABEL_CLS}>Format par défaut</label>
           <FormatSelect id="doc-picking-format" value={form.picking_list_format} onChange={(v) => set('picking_list_format', v)} disabled={disabled} />
           <p className={SETTINGS_HINT_CLS}>{ORDER_DOCUMENT_FORMATS[form.picking_list_format].description} Modifiable à chaque impression.</p>
+          <label className="mt-4 flex min-h-11 items-start gap-2.5 py-1 text-sm text-gray-800 dark:text-gray-200">
+            <input type="checkbox" disabled={disabled} checked={form.picking_list_show_delivery_address} onChange={(e) => set('picking_list_show_delivery_address', e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--admin-primary)]" />
+            <span>Adresse de livraison complète<span className="block text-xs text-gray-500 dark:text-gray-400">Par défaut, seuls le code postal et la ville sont imprimés. Livraisons uniquement.</span></span>
+          </label>
         </div>
       </article>
 

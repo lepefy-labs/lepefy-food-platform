@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   IconAlertTriangle, IconBuildingStore, IconCheck, IconChevronDown, IconChevronRight, IconExternalLink,
-  IconPrinter, IconSnowflake, IconTemperature, IconTruck, IconX,
+  IconFileTypePdf, IconPrinter, IconSnowflake, IconTemperature, IconTruck, IconX,
 } from '@tabler/icons-react';
+import { ORDER_DOCUMENT_FORMATS } from '@/lib/orders/documents/formats';
 import {
   classifyOrderOperation, formatSince, lastTrackingEventAt, PRIORITY_GROUP_LABELS, transportState,
   type OperationalThresholds, type OrderOperation, type OrderSortKey,
@@ -207,7 +208,9 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           </div>}
       </section>
       <section aria-label="Actions"><h3 className="mb-2 text-[10px] font-bold uppercase tracking-wide text-gray-500">Actions</h3><div className="flex flex-col items-stretch gap-2 sm:items-start">
-        {order.status !== 'cancelled' && <a href={`/api/admin/orders/${order.id}/documents/picking-list`} target="_blank" rel="noopener noreferrer" className={detailButton}><IconPrinter size={15} aria-hidden="true" /> Imprimer la liste de préparation<span className="sr-only"> (PDF, nouvel onglet)</span></a>}
+        {/* Action rapide au format par défaut du tenant ; le choix ponctuel A5/A4 reste dans le détail et « Documents… ». */}
+        {order.status !== 'cancelled' && <a href={`/api/admin/orders/${order.id}/documents/picking-list`} target="_blank" rel="noopener noreferrer" className={detailButton}><IconPrinter size={15} aria-hidden="true" /> Liste de préparation · {ORDER_DOCUMENT_FORMATS[documentDefaults.pickingFormat].label}<span className="sr-only"> (PDF, nouvel onglet)</span></a>}
+        {order.status !== 'cancelled' && order.fulfillment_type === 'delivery' && documentDefaults.packingSlipEnabled && <a href={`/api/admin/orders/${order.id}/documents/packing-slip`} target="_blank" rel="noopener noreferrer" className={detailButton}><IconFileTypePdf size={15} aria-hidden="true" /> Bon de colis · {ORDER_DOCUMENT_FORMATS[documentDefaults.packingSlipFormat].label}<span className="sr-only"> (PDF, nouvel onglet)</span></a>}
         <Link href={`/admin/orders/${order.id}`} className={detailButton}>Voir la commande</Link>
         {trackingUrl && <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={detailButton}>Voir le suivi transporteur <IconExternalLink size={13} aria-hidden="true" /></a>}
       </div></section>
