@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 5 ottobre 2026 — **v7.15 Current-State Snapshot** (Slides d'accueil, Funnel checkout, Base IA, Avis clients; base `main` @ `3b7f1948`)
+> **Aggiornato:** 5 ottobre 2026 — **v7.15 Current-State Snapshot** (Avis clients, Base IA, Funnel checkout, Slides d'accueil; base `main` @ `c2ecf025`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Admin Avis clients (`/admin/avis`)
+
+- Moderazione da finestra di conferma per ogni azione (Publier / Rejeter / Masquer / Republier): motivo obbligatorio per rifiuto e mascheramento, precisazione obbligatoria per « Autre » (`moderationIssues`, `lib/reviews/reviewAdmin.ts`, applicato anche dall'API). Un avis segnalato si pubblica solo con « Publier malgré le signalement ».
+- Stati, motivi e segnali in francese (`possible_personal_data`, `contains_url`, termini della lista di vigilanza); filtri con conteggi per stato; numero d'ordine collegato all'ordine; errori dentro la finestra.
+- Configurazione con barra « modifications non enregistrées », conferma di salvataggio e frase su cosa vede il pubblico (« La note moyenne s'affichera à partir de N avis publiés : encore X avis »), stessa regola di `summarizePublicReviewStats`.
 
 ### Admin IA — Base de connaissance (`/admin/ai-lab`)
 

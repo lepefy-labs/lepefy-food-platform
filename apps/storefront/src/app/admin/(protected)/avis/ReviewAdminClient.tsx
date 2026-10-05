@@ -1,8 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconAlertTriangle, IconCheck, IconEyeOff, IconRosetteDiscountCheck, IconStar, IconX } from '@tabler/icons-react';
+import { REVIEW_REASON_CODES } from '@/lib/reviews/reviewModeration';
+import {
+  ACTION_LABELS,
+  actionsFor,
+  flagLabel,
+  moderationIssues,
+  needsReason,
+  publicRatingState,
+  REASON_LABELS,
+  REVIEW_STATUS_LABELS,
+  type ModerationAction,
+} from '@/lib/reviews/reviewAdmin';
 
 export interface AdminReviewRow {
   id: string;
@@ -20,14 +33,99 @@ export interface AdminReviewRow {
   orderTotal: number | null;
 }
 
-const reasonOptions = [
-  ['spam','Spam'], ['personal_data','Données personnelles'], ['abuse','Abus / insultes'],
-  ['threats','Menaces'], ['hate','Haine'], ['illegal','Contenu illicite'],
-  ['irrelevant','Hors sujet'], ['duplicate','Doublon'], ['other','Autre'],
-] as const;
+const STATUS_TONE: Record<AdminReviewRow['status'], string> = {
+  pending_moderation: 'bg-amber-50 text-amber-800',
+  published: 'bg-emerald-50 text-emerald-800',
+  rejected: 'bg-red-50 text-red-700',
+  hidden: 'bg-gray-100 text-gray-600',
+};
+
+const ACTION_ICONS: Record<ModerationAction, typeof IconCheck> = { publish: IconCheck, restore: IconCheck, reject: IconX, hide: IconEyeOff };
+
+function ModerationModal({ review, action, onClose, onDone }: {
+  review: AdminReviewRow;
+  action: ModerationAction;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const titleId = useId();
+  const [reasonCode, setReasonCode] = useState('');
+  const [reasonText, setReasonText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const issues = moderationIssues(action, reasonCode || null, reasonText);
+  const flagged = review.moderation_flags.length > 0;
+  const publishing = action === 'publish' || action === 'restore';
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/reviews/${review.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reasonCode: needsReason(action) ? reasonCode : null, reasonText: reasonText.trim() || null }),
+      });
+      const body = await res.json().catch(() => null) as { error?: string } | null;
+      if (!res.ok) { setError(body?.error ?? 'Action impossible.'); return; }
+      onDone();
+    } catch {
+      setError('Erreur réseau — réessayez.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}
+      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) onClose(); }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div className="w-full max-w-md space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+        <h2 id={titleId} className="text-base font-semibold text-gray-950 dark:text-white">
+          {action === 'publish' ? 'Publier cet avis ?' : action === 'restore' ? 'Republier cet avis ?' : action === 'reject' ? 'Rejeter cet avis ?' : 'Masquer cet avis ?'}
+        </h2>
+        <p className="text-sm text-gray-500">
+          {publishing ? 'Il sera visible sur la boutique et compté dans la note moyenne. Le texte du client n’est jamais modifié.'
+            : action === 'reject' ? 'Il ne sera jamais publié. Le client n’est pas prévenu.'
+              : 'Il disparaît de la boutique et de la note moyenne ; vous pourrez le republier.'}
+        </p>
+        {publishing && flagged && (
+          <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <IconAlertTriangle size={16} className="mt-0.5 shrink-0" />
+            Signalé : {review.moderation_flags.map(flagLabel).join(', ')}. Vérifiez qu’il ne contient pas de données personnelles avant de publier.
+          </p>
+        )}
+        {needsReason(action) && <>
+          <label className="block text-sm">Motif (obligatoire)
+            <select value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950">
+              <option value="">Choisir…</option>
+              {REVIEW_REASON_CODES.map((code) => <option key={code} value={code}>{REASON_LABELS[code]}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">Précision {reasonCode === 'other' ? '(obligatoire)' : '(facultative)'}
+            <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
+          </label>
+        </>}
+        {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={busy} className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">Annuler</button>
+          <button type="button" onClick={() => void confirm()} disabled={busy || issues.length > 0}
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-50 ${publishing ? 'bg-emerald-600' : 'bg-red-600'}`}>
+            {busy ? '…' : publishing && flagged ? `${ACTION_LABELS[action]} malgré le signalement` : ACTION_LABELS[action]}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ReviewAdminClient({
-  initialReviews, enabled, publicDisplay, minPublicCount, blacklistTerms, canModerate, canManage,
+  initialReviews, enabled, publicDisplay, minPublicCount, blacklistTerms, canModerate, canManage, publishedCount,
 }: {
   initialReviews: AdminReviewRow[];
   enabled: boolean;
@@ -36,74 +134,100 @@ export default function ReviewAdminClient({
   blacklistTerms: string[];
   canModerate: boolean;
   canManage: boolean;
+  publishedCount: number;
 }) {
   const router = useRouter();
+  const baseline = { enabled, publicDisplay, minPublicCount, terms: blacklistTerms.join('\n') };
+  const [settings, setSettings] = useState(baseline);
   const [saving, setSaving] = useState(false);
-  const [localEnabled, setLocalEnabled] = useState(enabled);
-  const [localPublic, setLocalPublic] = useState(publicDisplay);
-  const [localMin, setLocalMin] = useState(minPublicCount);
-  const [terms, setTerms] = useState(blacklistTerms.join('\n'));
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [reasonById, setReasonById] = useState<Record<string,string>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [settingsMessage, setSettingsMessage] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
+  const [pending, setPending] = useState<{ review: AdminReviewRow; action: ModerationAction } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const dirty = JSON.stringify(settings) !== JSON.stringify(baseline);
+  const rating = publicRatingState(publishedCount, settings.minPublicCount, settings.publicDisplay);
 
   async function saveSettings() {
-    setSaving(true); setError(null);
-    const blacklist = terms.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
-    const response = await fetch('/api/admin/reviews/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: localEnabled, publicDisplay: localPublic, minPublicCount: localMin, blacklistTerms: blacklist }) });
-    const payload = await response.json().catch(() => ({}));
-    setSaving(false);
-    if (!response.ok) { setError(payload.error ?? 'Enregistrement impossible.'); return; }
-    router.refresh();
-  }
-
-  async function moderate(review: AdminReviewRow, action: 'publish'|'reject'|'hide'|'restore') {
-    setBusyId(review.id); setError(null);
-    const reasonCode = (action === 'reject' || action === 'hide') ? (reasonById[review.id] || null) : null;
-    if ((action === 'reject' || action === 'hide') && !reasonCode) { setError('Choisissez un motif de modération.'); setBusyId(null); return; }
-    const response = await fetch(`/api/admin/reviews/${review.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reasonCode, reasonText: null }) });
-    const payload = await response.json().catch(() => ({}));
-    setBusyId(null);
-    if (!response.ok) { setError(payload.error ?? 'Action impossible.'); return; }
-    router.refresh();
+    setSaving(true);
+    setSettingsMessage(null);
+    try {
+      const blacklist = settings.terms.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
+      const response = await fetch('/api/admin/reviews/settings', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: settings.enabled, publicDisplay: settings.publicDisplay, minPublicCount: settings.minPublicCount, blacklistTerms: blacklist }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) { setSettingsMessage({ text: payload.error ?? 'Enregistrement impossible.', tone: 'error' }); return; }
+      setSettingsMessage({ text: 'Configuration enregistrée. La boutique est mise à jour.', tone: 'ok' });
+      router.refresh();
+    } catch {
+      setSettingsMessage({ text: 'Erreur réseau — réessayez.', tone: 'error' });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return <div className="space-y-6">
     {canManage && <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-xl"><h2 className="font-semibold text-gray-950 dark:text-white">Configuration</h2><p className="mt-1 text-sm leading-6 text-gray-500">Collecte après commande payée et terminée. Premier envoi à +24 h, rappel à +7 jours, lien valable 30 jours. L’IA de modération reste désactivée en V1.</p></div>
-        <button onClick={saveSettings} disabled={saving} className="min-h-11 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+      <h2 className="font-semibold text-gray-950 dark:text-white">Configuration</h2>
+      <p className="mt-1 text-sm leading-6 text-gray-500">Après une commande payée et terminée, le client reçoit une invitation à +24 h, un rappel à +7 jours ; le lien reste valable 30 jours.</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <label className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800"><input type="checkbox" checked={settings.enabled} onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Envoyer les invitations</span></label>
+        <label className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800"><input type="checkbox" checked={settings.publicDisplay} onChange={(e) => setSettings({ ...settings, publicDisplay: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Afficher les avis sur la boutique</span></label>
+        <label className="rounded-xl bg-gray-50 p-4 text-sm dark:bg-gray-800"><span className="font-medium">Avis minimum avant d’afficher la note</span><input type="number" min={1} max={50} value={settings.minPublicCount} onChange={(e) => setSettings({ ...settings, minPublicCount: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })} className="mt-2 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900" /></label>
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        <label className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800"><input type="checkbox" checked={localEnabled} onChange={(e) => setLocalEnabled(e.target.checked)} className="h-5 w-5" /><span className="text-sm font-medium">Collecte active</span></label>
-        <label className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800"><input type="checkbox" checked={localPublic} onChange={(e) => setLocalPublic(e.target.checked)} className="h-5 w-5" /><span className="text-sm font-medium">Affichage public</span></label>
-        <label className="rounded-xl bg-gray-50 p-4 text-sm dark:bg-gray-800"><span className="font-medium">Seuil note publique</span><input type="number" min={1} max={50} value={localMin} onChange={(e) => setLocalMin(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} className="mt-2 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900" /></label>
-      </div>
-      <label className="mt-4 block text-sm"><span className="font-medium text-gray-900 dark:text-gray-100">Liste de vigilance</span><span className="ml-2 text-xs text-gray-400">un terme par ligne, signalement uniquement</span><textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={4} className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-950" placeholder="numéro de téléphone\nnom sensible\nterme à vérifier" /></label>
+      <p className={`mt-3 rounded-xl px-3 py-2 text-xs ${rating.visible ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}>{rating.text}</p>
+      <label className="mt-4 block text-sm"><span className="font-medium text-gray-900 dark:text-gray-100">Liste de vigilance</span><span className="ml-2 text-xs text-gray-400">un terme par ligne : l’avis est signalé pour vérification, jamais rejeté automatiquement</span>
+        <textarea value={settings.terms} onChange={(e) => setSettings({ ...settings, terms: e.target.value })} rows={4} className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-950" placeholder={'numéro de téléphone\nnom d’un employé'} /></label>
+      {settingsMessage && <p role={settingsMessage.tone === 'error' ? 'alert' : 'status'} className={`mt-3 rounded-xl px-3 py-2 text-sm ${settingsMessage.tone === 'ok' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{settingsMessage.text}</p>}
+      {dirty && <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button onClick={() => void saveSettings()} disabled={saving} className="min-h-11 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+        <button onClick={() => { setSettings(baseline); setSettingsMessage(null); }} disabled={saving} className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">Annuler</button>
+        <span className="text-xs text-gray-500">Modifications non enregistrées</span>
+      </div>}
     </section>}
 
-    {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
+    {notice && <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{notice}</p>}
 
     <section className="space-y-3">
-      {initialReviews.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 p-10 text-center text-sm text-gray-500">Aucun avis à modérer ou publier.</div> : initialReviews.map((review) => {
+      {initialReviews.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 p-10 text-center text-sm text-gray-500">Aucun avis dans ce filtre.</div> : initialReviews.map((review) => {
         const flagged = review.moderation_flags.length > 0;
         return <article key={review.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><div className="flex items-center gap-2"><strong className="text-gray-950 dark:text-white">{review.reviewer_display_name || 'Client vérifié'}</strong><span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><IconRosetteDiscountCheck size={14}/> vérifié</span></div><p className="mt-1 text-xs text-gray-400">{review.orderNumber}{review.orderDate ? ` · ${new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium'}).format(new Date(review.orderDate))}` : ''}</p></div>
-            <div className="text-right"><span className="inline-flex">{[1,2,3,4,5].map((value) => <IconStar key={value} size={17} fill={value <= review.rating ? 'currentColor':'none'} className={value <= review.rating ? 'text-amber-500':'text-gray-300'} />)}</span><p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{review.status.replace('_',' ')}</p></div>
+            <div>
+              <div className="flex items-center gap-2"><strong className="text-gray-950 dark:text-white">{review.reviewer_display_name || 'Client vérifié'}</strong><span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><IconRosetteDiscountCheck size={14}/> achat vérifié</span></div>
+              <p className="mt-1 text-xs text-gray-400">
+                <Link href={`/admin/orders/${review.order_id}`} className="hover:underline">Commande {review.orderNumber}</Link>
+                {review.orderDate ? ` · ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(review.orderDate))}` : ''}
+                {' · avis du '}{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(review.submitted_at))}
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="inline-flex" aria-label={`${review.rating} sur 5`}>{[1,2,3,4,5].map((value) => <IconStar key={value} size={17} fill={value <= review.rating ? 'currentColor':'none'} className={value <= review.rating ? 'text-amber-500':'text-gray-300'} />)}</span>
+              <p className="mt-1"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[review.status]}`}>{REVIEW_STATUS_LABELS[review.status]}</span></p>
+              {review.moderation_reason_code && review.status !== 'published' && <p className="mt-1 text-xs text-gray-400">Motif : {REASON_LABELS[review.moderation_reason_code as keyof typeof REASON_LABELS] ?? review.moderation_reason_code}</p>}
+            </div>
           </div>
           {review.body ? <p className="mt-4 whitespace-pre-line text-sm leading-6 text-gray-700 dark:text-gray-300">{review.body}</p> : <p className="mt-4 text-sm italic text-gray-400">Note sans commentaire</p>}
-          {flagged && <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"><IconAlertTriangle size={16} className="mt-0.5 shrink-0"/><span>À vérifier : {review.moderation_flags.map((flag) => flag.startsWith('blocked_term:') ? `terme interdit « ${flag.slice('blocked_term:'.length)} »` : flag.replaceAll('_', ' ')).join(', ')}. Aucun signalement automatique ne rejette l’avis.</span></div>}
-          {canModerate && <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
-            {(review.status === 'pending_moderation' || review.status === 'published') && <select aria-label="Motif de modération" value={reasonById[review.id] ?? ''} onChange={(e) => setReasonById((current) => ({...current,[review.id]:e.target.value}))} className="min-h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950"><option value="">Motif si rejet / masquage…</option>{reasonOptions.map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>}
-            <div className="flex flex-1 flex-wrap justify-end gap-2">
-              {review.status === 'pending_moderation' && <><button disabled={busyId===review.id} onClick={() => moderate(review,'reject')} className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-red-200 px-3 text-sm font-semibold text-red-700"><IconX size={16}/> Rejeter</button><button disabled={busyId===review.id} onClick={() => moderate(review,'publish')} className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white"><IconCheck size={16}/> Publier</button></>}
-              {review.status === 'published' && <button disabled={busyId===review.id} onClick={() => moderate(review,'hide')} className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-gray-200 px-3 text-sm font-semibold text-gray-700"><IconEyeOff size={16}/> Masquer</button>}
-              {(review.status === 'hidden' || review.status === 'rejected') && <button disabled={busyId===review.id} onClick={() => moderate(review,'restore')} className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white"><IconCheck size={16}/> Restaurer</button>}
-            </div>
+          {flagged && <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"><IconAlertTriangle size={16} className="mt-0.5 shrink-0"/><span>À vérifier : {review.moderation_flags.map(flagLabel).join(', ')}. Un signalement ne rejette jamais l’avis automatiquement.</span></div>}
+          {canModerate && <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            {actionsFor(review.status).map((action) => {
+              const Icon = ACTION_ICONS[action];
+              const positive = action === 'publish' || action === 'restore';
+              return <button key={action} onClick={() => { setNotice(null); setPending({ review, action }); }}
+                className={`inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-semibold ${positive ? 'bg-emerald-600 text-white' : action === 'reject' ? 'border border-red-200 text-red-700' : 'border border-gray-200 text-gray-700'}`}>
+                <Icon size={16}/> {ACTION_LABELS[action]}{needsReason(action) ? '…' : ''}
+              </button>;
+            })}
           </div>}
         </article>;
       })}
     </section>
+
+    {pending && <ModerationModal review={pending.review} action={pending.action} onClose={() => setPending(null)} onDone={() => {
+      const label = { publish: 'publié', restore: 'republié', reject: 'rejeté', hide: 'masqué' }[pending.action];
+      setPending(null);
+      setNotice(`Avis ${label}.`);
+      router.refresh();
+    }} />}
   </div>;
 }

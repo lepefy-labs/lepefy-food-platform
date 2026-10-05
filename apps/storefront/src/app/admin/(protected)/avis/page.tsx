@@ -39,14 +39,17 @@ export default async function AdminReviewsPage({ searchParams }: { searchParams:
   if (rating) reviewsQuery = reviewsQuery.eq('rating', rating);
   reviewsQuery = reviewsQuery.order('submitted_at', { ascending: false }).range(from, to);
 
-  const [featureSetting, settings, reviewsResult, statsResult, pendingResult, sentInvitesResult, completedInvitesResult] = await Promise.all([
+  const statusCount = (value: string) => db.from('reviews').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', value);
+  const [featureSetting, settings, reviewsResult, statsResult, pendingResult, sentInvitesResult, completedInvitesResult, rejectedResult, hiddenResult] = await Promise.all([
     getTenantFeatureSetting(tenant.id, 'reviews'),
     getReviewSettings(tenant.id),
     reviewsQuery,
     db.from('tenant_review_stats').select('*').eq('tenant_id', tenant.id).maybeSingle(),
-    db.from('reviews').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending_moderation'),
+    statusCount('pending_moderation'),
     db.from('review_invites').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).not('sent_at', 'is', null),
     db.from('review_invites').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).not('completed_at', 'is', null),
+    statusCount('rejected'),
+    statusCount('hidden'),
   ]);
 
   const rawReviews = reviewsResult.data ?? [];
@@ -63,6 +66,11 @@ export default async function AdminReviewsPage({ searchParams }: { searchParams:
   const stats = statsResult.data;
   const sentCount = sentInvitesResult.count ?? 0;
   const completedCount = completedInvitesResult.count ?? 0;
+  const publishedCount = Number(stats?.published_count ?? 0);
+  const statusCounts: Record<string, number | null> = {
+    '': null, pending_moderation: pendingResult.count ?? 0, published: publishedCount,
+    rejected: rejectedResult.count ?? 0, hidden: hiddenResult.count ?? 0,
+  };
   const filterHref = (next: { status?: string; rating?: number; page?: number }) => {
     const params = new URLSearchParams();
     const s = next.status ?? status;
@@ -86,12 +94,12 @@ export default async function AdminReviewsPage({ searchParams }: { searchParams:
 
     <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Statut</span>
-      {[['','Tous'],['pending_moderation','À modérer'],['published','Publiés'],['rejected','Rejetés'],['hidden','Masqués']].map(([value,label]) => <Link key={value} href={filterHref({ status: value, page: 1 })} className={`rounded-lg px-3 py-2 text-sm font-medium ${status === value ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}>{label}</Link>)}
+      {[['','Tous'],['pending_moderation','À modérer'],['published','Publiés'],['rejected','Rejetés'],['hidden','Masqués']].map(([value,label]) => <Link key={value} href={filterHref({ status: value, page: 1 })} aria-current={status === value ? 'page' : undefined} className={`rounded-lg px-3 py-2 text-sm font-medium ${status === value ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}>{label}{statusCounts[value ?? ''] != null && <span className={`ml-1.5 rounded-full px-1.5 text-xs ${value === 'pending_moderation' && (statusCounts[value] ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>{statusCounts[value ?? '']}</span>}</Link>)}
       <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Note</span>
       {[0,1,2,3,4,5].map((value) => <Link key={value} href={filterHref({ rating: value, page: 1 })} className={`rounded-lg px-2.5 py-2 text-sm font-medium ${rating === value ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}>{value ? `${value}★` : 'Toutes'}</Link>)}
     </div>
 
-    <ReviewAdminClient initialReviews={reviews} enabled={featureSetting?.enabled ?? false} publicDisplay={settings.publicDisplay} minPublicCount={settings.minPublicCount} blacklistTerms={settings.blacklistTerms} canModerate={canModerate} canManage={canManage} />
+    <ReviewAdminClient publishedCount={publishedCount} initialReviews={reviews} enabled={featureSetting?.enabled ?? false} publicDisplay={settings.publicDisplay} minPublicCount={settings.minPublicCount} blacklistTerms={settings.blacklistTerms} canModerate={canModerate} canManage={canManage} />
 
     {totalPages > 1 && <nav className="mt-6 flex items-center justify-between text-sm" aria-label="Pagination avis">
       <span className="text-gray-500">Page {page} sur {totalPages} · {total} avis</span>

@@ -5,6 +5,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { REVIEW_REASON_CODES } from '@/lib/reviews/reviewModeration';
+import { moderationIssues } from '@/lib/reviews/reviewAdmin';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
 
 const schema = z.object({
@@ -19,9 +20,8 @@ async function handlePATCH(req: NextRequest, { params }: { params: { id: string 
   if (denied) return denied;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Action invalide.' }, { status: 400 });
-  if (['reject','hide'].includes(parsed.data.action) && !parsed.data.reasonCode) {
-    return NextResponse.json({ error: 'Un motif est obligatoire.' }, { status: 400 });
-  }
+  const issues = moderationIssues(parsed.data.action, parsed.data.reasonCode, parsed.data.reasonText);
+  if (issues.length) return NextResponse.json({ error: issues[0] }, { status: 400 });
   const access = await getCurrentAdminAccessContext(tenant.id);
   if (!access) return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,7 +36,7 @@ async function handlePATCH(req: NextRequest, { params }: { params: { id: string 
   });
   if (error) {
     console.error('[reviews] moderation failed', { code: error.code, message: error.message });
-    return NextResponse.json({ error: 'Impossible de modérer cet avis.' }, { status: 409 });
+    return NextResponse.json({ error: 'Impossible de modérer cet avis : il a peut-être déjà été traité. Rechargez la page.' }, { status: 409 });
   }
   if (parsed.data.action === 'publish' || parsed.data.action === 'restore') {
     const row = Array.isArray(review) ? review[0] : review;
