@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/utils/format';
+import { ambassadorDisplayName } from '@/lib/ambassador/ambassadorAdmin';
 import Button from '../../_components/ui/Button';
+import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 
 export interface AmbassadorListRow {
   id: string;
@@ -18,96 +21,99 @@ export interface AmbassadorListRow {
   paidTotal: number;
 }
 
-interface AmbassadorsListSectionProps {
-  ambassadors: AmbassadorListRow[];
-  payoutThreshold: number;
-  currency: string;
-}
-
-export function AmbassadorsListSection({ ambassadors, payoutThreshold, currency }: AmbassadorsListSectionProps) {
+export function AmbassadorsListSection({ ambassadors, currency }: { ambassadors: AmbassadorListRow[]; currency: string }) {
   const router = useRouter();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [target, setTarget] = useState<AmbassadorListRow | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
 
-  async function handleDemote(customerId: string) {
-    setPendingId(customerId);
+  async function demote(row: AmbassadorListRow) {
+    setIsSaving(true);
+    setMessage(null);
     try {
       const res = await fetch('/api/admin/ambassador/demote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId }),
+        body: JSON.stringify({ customerId: row.id }),
       });
-      if (res.ok) router.refresh();
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        setMessage({ text: body?.error ?? 'Retrait du statut impossible.', tone: 'error' });
+        return;
+      }
+      setMessage({ text: `${ambassadorDisplayName(row)} n’est plus ambassadeur.`, tone: 'ok' });
+      router.refresh();
+    } catch {
+      setMessage({ text: 'Erreur réseau — réessayez.', tone: 'error' });
     } finally {
-      setPendingId(null);
+      setIsSaving(false);
+      setTarget(null);
     }
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Ambassadeurs actifs</h2>
-      <p className="text-xs text-gray-400 mb-4">
-        Les profils incomplets accumulent quand même des commissions CONFIRMED — seul le paiement est bloqué tant
-        que nom, prénom et un moyen de paiement ne sont pas renseignés.
+    <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <h2 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-200">Ambassadeurs</h2>
+      <p className="mb-4 text-xs text-gray-400">
+        Le lien d&apos;invitation de l&apos;ambassadeur fonctionne dès sa nomination. Un profil incomplet accumule ses commissions,
+        mais ne peut pas être payé tant que nom, prénom et IBAN ou PayPal ne sont pas renseignés dans son compte.
       </p>
 
+      {message && (
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+      )}
+
       {ambassadors.length === 0 ? (
-        <p className="text-sm text-gray-400">Aucun ambassadeur pour l&apos;instant.</p>
+        <p className="text-sm text-gray-400">Aucun ambassadeur pour l&apos;instant. Nommez-en un ci-dessous.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400 uppercase tracking-wide">
+              <tr className="text-left text-gray-400">
                 <th className="py-1.5 font-medium">Ambassadeur</th>
-                <th className="py-1.5 font-medium">Profil</th>
-                <th className="py-1.5 font-medium">Solde confirmé</th>
-                <th className="py-1.5 font-medium">Payé (total)</th>
-                <th className="py-1.5 font-medium">Action</th>
+                <th className="py-1.5 font-medium">Profil de paiement</th>
+                <th className="py-1.5 font-medium">À verser</th>
+                <th className="py-1.5 font-medium">Déjà versé</th>
+                <th className="py-1.5 font-medium"><span className="sr-only">Action</span></th>
               </tr>
             </thead>
             <tbody>
-              {ambassadors.map((a) => {
-                const displayName = a.ambassador_first_name && a.ambassador_last_name
-                  ? `${a.ambassador_first_name} ${a.ambassador_last_name}`
-                  : a.full_name ?? '—';
-                const readyForPayout = a.confirmedBalance >= payoutThreshold;
-                return (
-                  <tr key={a.id} className="border-t border-gray-100 dark:border-gray-800">
-                    <td className="py-2">
-                      <div className="font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
-                      <div className="text-gray-400">{a.email}</div>
-                    </td>
-                    <td className="py-2">
-                      {a.ambassador_profile_completed_at ? (
-                        <span className="text-green-600">
-                          Complet ({a.ambassador_payment_method === 'IBAN' ? 'IBAN' : 'PayPal'})
-                        </span>
-                      ) : (
-                        <span className="text-amber-600">Profil incomplet</span>
-                      )}
-                    </td>
-                    <td className="py-2">
-                      <span className={readyForPayout ? 'font-bold text-green-700' : 'font-medium'}>
-                        {formatPrice(a.confirmedBalance, currency)}
-                      </span>
-                      {readyForPayout && (
-                        <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
-                          À payer
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2 text-gray-500">{formatPrice(a.paidTotal, currency)}</td>
-                    <td className="py-2">
-                      <Button variant="outline" size="sm" onClick={() => handleDemote(a.id)} loading={pendingId === a.id}>
-                        Retirer le statut
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {ambassadors.map((a) => (
+                <tr key={a.id} className="border-t border-gray-100 dark:border-gray-800">
+                  <td className="py-2">
+                    <Link href={`/admin/clients/${a.id}`} className="font-medium text-gray-800 hover:underline dark:text-gray-100">{ambassadorDisplayName(a)}</Link>
+                    <div className="text-gray-400">{a.email}</div>
+                    {a.promoted_to_ambassador_at && (
+                      <div className="text-gray-400">depuis le {new Date(a.promoted_to_ambassador_at).toLocaleDateString('fr-FR')}</div>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    {a.ambassador_profile_completed_at
+                      ? <span className="text-green-700">Complet · {a.ambassador_payment_method === 'IBAN' ? 'IBAN' : 'PayPal'}</span>
+                      : <span className="text-amber-700">Incomplet</span>}
+                  </td>
+                  <td className="py-2 font-medium">{formatPrice(a.confirmedBalance, currency)}</td>
+                  <td className="py-2 text-gray-500">{formatPrice(a.paidTotal, currency)}</td>
+                  <td className="py-2 text-right">
+                    <Button variant="outline" size="sm" onClick={() => setTarget(a)}>Retirer le statut…</Button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <ConfirmActionModal
+        open={target !== null}
+        title="Retirer le statut d’ambassadeur ?"
+        description={`${target ? ambassadorDisplayName(target) : 'Ce client'} ne générera plus de commission pour les prochaines commandes livrées de ses invités. Les commissions déjà créées${target && target.confirmedBalance > 0 ? ` (${formatPrice(target.confirmedBalance, currency)} à verser)` : ''} restent dues et visibles.`}
+        confirmLabel="Retirer le statut"
+        destructive
+        loading={isSaving}
+        onCancel={() => setTarget(null)}
+        onConfirm={() => { if (target) void demote(target); }}
+      />
     </section>
   );
 }

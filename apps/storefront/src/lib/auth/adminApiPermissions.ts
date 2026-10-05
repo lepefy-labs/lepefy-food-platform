@@ -55,7 +55,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/loyalty/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/loyalty/referral') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/loyalty')) return 'loyalty.manage';
-  if (/^\/api\/admin\/ambassador\/commissions\/[^/]+\/pay$/.test(path)) return 'growth.payouts.manage';
+  if (path === '/api/admin/ambassador/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  if (path === '/api/admin/ambassador/payouts' || /^\/api\/admin\/ambassador\/commissions\/[^/]+\/cancel$/.test(path)) return 'growth.payouts.manage';
   if (path.startsWith('/api/admin/ambassador')) return 'growth.manage';
   // Technical shipping tools (Laboratoire, Diagnostic Packlink: shipping-simulator,
   // shipping-simulation-campaigns/**, shipping-postal-code-import, packlink-inspector,

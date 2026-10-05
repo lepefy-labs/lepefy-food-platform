@@ -108,6 +108,12 @@ The shipping logic is the most complex part of the codebase:
 - A new public write API (checkout, payment, reservation, inquiry) must call `guardModule(tenant.id, '<module>')` before creating anything; webhooks never do. Public layouts render `ServiceSuspendedPage`; the shop layout stays cookie-free.
 - Subscription writes only through the 144 RPCs (`record_tenant_subscription_payment`, `admin_update_tenant_subscription`); the renewal rule lives in SQL, mirrored in `lib/billing/subscriptionRules.ts`.
 
+### Ambassador program — `docs/AMBASSADOR_PROGRAM.md`
+
+- Real-money commission on the first **delivered** order of each customer invited by an ambassador (`customers.is_ambassador`, admin-only); computed in SQL by `process_ambassador_commission_atomic` (046/051), parameters historised per row, one commission per referred customer (unique).
+- Settings are written only by `PATCH /api/admin/ambassador/settings`, validated by `ambassadorSettingsIssues` (`lib/ambassador/ambassadorAdmin.ts`); never re-add the `ambassador_*` fields to `/api/admin/tenant`.
+- Payouts are manual and recorded per ambassador (`POST /api/admin/ambassador/payouts`, `growth.payouts.manage`, refused for incomplete profiles); bank details are loaded only for that permission. Commissions move only `CONFIRMED → PAID | CANCELLED`, never deleted.
+
 ### Gestion du commerce (suppliers, purchases, stock ledger, treasury) — `docs/BUSINESS_MANAGEMENT.md`
 
 - Admin domain under `/admin/gestion/**` + `/api/admin/gestion/**`, behind the release flag `business_management` (`tenant_feature_flags`). Every page calls `requireBusinessManagementPage()` and every handler `requireBusinessManagementApi()` (`lib/gestion/featureGate.ts`); flag off/unreadable = 404. Hiding the sidebar entry is not the security control.

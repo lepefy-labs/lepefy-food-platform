@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 4 ottobre 2026 — **v7.11 Current-State Snapshot** (Fidélité & parrainage: salvataggio per sezione, commissioni in %, azioni che dicono la verità; base `main` @ `8acf3d69253a5a53e7c1fef73e09696de3f67f31`)
+> **Aggiornato:** 5 ottobre 2026 — **v7.12 Current-State Snapshot** (Programme Ambassadeur: configurazione validata, versamenti per ambassadeur, annullamento commissioni; base `main` @ `ac14022c`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Admin Programme Ambassadeur (`/admin/ambassadeurs`) — `docs/AMBASSADOR_PROGRAM.md`
+
+- **Regole** salvate solo da `PATCH /api/admin/ambassador/settings` (`tenant_settings.manage`, zod + `ambassadorSettingsIssues`): achat minimum > 0 (prima uno 0 faceva dividere per zero `process_ambassador_commission_atomic` alla consegna), pool > 0, riduzioni ≤ 100 % / ≤ achat minimum, plafond ≥ commission au seuil. I campi ambassadeur non sono più in `/api/admin/tenant`. « Commission minimum » rinominata « Commission au seuil » (definisce il tasso, non è un minimo).
+- **À verser** (solo `growth.payouts.manage`, unico ruolo che riceve IBAN/PayPal): un versamento per ambassadeur (`POST /api/admin/ambassador/payouts`, un solo update filtrato tenant + ambassadeur + `CONFIRMED` sugli id mostrati, mai doppio), rifiutato se il profilo è incompleto. Sostituisce il vecchio « Marquer comme payé » per riga (`commissions/[id]/pay`, rimosso).
+- **Annullare** una commissione `CONFIRMED` con motivo (`commissions/[id]/cancel`) per ordini rimborsati; definitivo (vincolo unico per invitato). Nomination idempotente, rimozione con conferma, ricerca clienti sotto `/api/admin/ambassador/customers-search` (permesso `growth.manage`, prima richiedeva `loyalty.manage`), errori sempre mostrati.
 
 ### Admin Fidélité & parrainage (`/admin/loyalty`)
 

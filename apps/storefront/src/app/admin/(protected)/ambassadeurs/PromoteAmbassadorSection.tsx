@@ -14,115 +14,99 @@ interface CustomerRow {
 export function PromoteAmbassadorSection() {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<CustomerRow[]>([]);
+  const [results, setResults] = useState<CustomerRow[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (query.trim().length < 2) return;
+    if (query.trim().length < 2) {
+      setMessage({ text: 'Saisissez au moins 2 caractères.', tone: 'error' });
+      return;
+    }
     setIsSearching(true);
+    setMessage(null);
     try {
-      const res = await fetch(`/api/admin/loyalty/customers-search?q=${encodeURIComponent(query.trim())}`);
-      const data = await res.json();
+      const res = await fetch(`/api/admin/ambassador/customers-search?q=${encodeURIComponent(query.trim())}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        setMessage({ text: body?.error ?? 'Recherche indisponible.', tone: 'error' });
+        return;
+      }
+      const data = await res.json() as { customers?: CustomerRow[] };
       setResults(data.customers ?? []);
+    } catch {
+      setMessage({ text: 'Erreur réseau — réessayez.', tone: 'error' });
     } finally {
       setIsSearching(false);
     }
   }
 
-  async function handlePromote(customerId: string) {
-    setPendingId(customerId);
+  async function handlePromote(customer: CustomerRow) {
+    setPendingId(customer.id);
+    setMessage(null);
     try {
       const res = await fetch('/api/admin/ambassador/promote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId }),
+        body: JSON.stringify({ customerId: customer.id }),
       });
-      if (res.ok) {
-        setResults((prev) => prev.map((c) => (c.id === customerId ? { ...c, is_ambassador: true } : c)));
-        router.refresh();
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        setMessage({ text: body?.error ?? 'Nomination impossible.', tone: 'error' });
+        return;
       }
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function handleDemote(customerId: string) {
-    setPendingId(customerId);
-    try {
-      const res = await fetch('/api/admin/ambassador/demote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId }),
-      });
-      if (res.ok) {
-        setResults((prev) => prev.map((c) => (c.id === customerId ? { ...c, is_ambassador: false } : c)));
-        router.refresh();
-      }
+      setResults((prev) => (prev ?? []).map((c) => (c.id === customer.id ? { ...c, is_ambassador: true } : c)));
+      setMessage({ text: `${customer.full_name || customer.email} est maintenant ambassadeur. Son lien d’invitation est actif.`, tone: 'ok' });
+      router.refresh();
+    } catch {
+      setMessage({ text: 'Erreur réseau — réessayez.', tone: 'error' });
     } finally {
       setPendingId(null);
     }
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Promouvoir un client</h2>
-      <p className="text-xs text-gray-400 mb-4">
-        Recherche par nom ou email — aucune auto-promotion possible, uniquement via cette action admin.
+    <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <h2 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-200">Nommer un ambassadeur</h2>
+      <p className="mb-4 text-xs text-gray-400">
+        Seul un administrateur peut nommer un ambassadeur. Le client doit déjà avoir un compte sur la boutique.
       </p>
 
-      <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+        <label htmlFor="ambassador-search" className="sr-only">Nom ou e-mail du client</label>
         <input
-          type="text"
+          id="ambassador-search"
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Nom ou email…"
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          placeholder="Nom ou e-mail…"
+          className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
-        <Button type="submit" loading={isSearching}>
-          Rechercher
-        </Button>
+        <Button type="submit" loading={isSearching}>Rechercher</Button>
       </form>
 
-      {results.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-gray-400 uppercase tracking-wide">
-                <th className="py-1.5 font-medium">Client</th>
-                <th className="py-1.5 font-medium">Statut</th>
-                <th className="py-1.5 font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((c) => (
-                <tr key={c.id} className="border-t border-gray-100 dark:border-gray-800">
-                  <td className="py-2">
-                    <div className="font-medium text-gray-800 dark:text-gray-100">{c.full_name ?? '—'}</div>
-                    <div className="text-gray-400">{c.email}</div>
-                  </td>
-                  <td className="py-2">
-                    {c.is_ambassador
-                      ? <span className="text-green-600">Ambassadeur</span>
-                      : <span className="text-gray-400">Client standard</span>}
-                  </td>
-                  <td className="py-2">
-                    {c.is_ambassador ? (
-                      <Button variant="outline" size="sm" onClick={() => handleDemote(c.id)} loading={pendingId === c.id}>
-                        Retirer le statut
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={() => handlePromote(c.id)} loading={pendingId === c.id}>
-                        Promouvoir ambassadeur
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {message && (
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+      )}
+
+      {results && results.length === 0 && <p className="text-sm text-gray-400">Aucun client trouvé.</p>}
+
+      {results && results.length > 0 && (
+        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {results.map((c) => (
+            <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="font-medium text-gray-800 dark:text-gray-100">{c.full_name ?? '—'}</div>
+                <div className="truncate text-gray-400">{c.email}</div>
+              </div>
+              {c.is_ambassador
+                ? <span className="shrink-0 text-green-700">Déjà ambassadeur</span>
+                : <Button size="sm" onClick={() => void handlePromote(c)} loading={pendingId === c.id}>Nommer ambassadeur</Button>}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

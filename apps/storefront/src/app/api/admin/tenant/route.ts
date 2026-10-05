@@ -22,33 +22,16 @@ const EDITABLE_TENANT_FIELDS = [
   'story_text',
   'countries_served',
   // Loyalty: /api/admin/loyalty/settings (130). Referral: /api/admin/loyalty/referral (132).
-  'ambassador_min_purchase_amount',
-  'ambassador_min_commission_amount',
-  'ambassador_max_commission_amount',
-  'ambassador_loyalty_from_second_order',
-  'ambassador_first_order_discount_type',
-  'ambassador_first_order_discount_value',
-  'ambassador_payout_threshold_amount',
-  'ambassador_commission_mode',
-  'ambassador_split_pool_amount',
-  'ambassador_split_pool_ambassador_percent',
+  // Ambassador program: /api/admin/ambassador/settings (validated invariants).
 ] as const;
 
 const NUMERIC_FIELDS = new Set<string>([
   'countries_served',
 ]);
 
-const BOOLEAN_FIELDS = new Set<string>(['ambassador_loyalty_from_second_order']);
+const BOOLEAN_FIELDS = new Set<string>([]);
 
-const DECIMAL_FIELDS = new Set<string>([
-  'ambassador_min_purchase_amount',
-  'ambassador_min_commission_amount',
-  'ambassador_max_commission_amount',
-  'ambassador_first_order_discount_value',
-  'ambassador_payout_threshold_amount',
-  'ambassador_split_pool_amount',
-  'ambassador_split_pool_ambassador_percent',
-]);
+const DECIMAL_FIELDS = new Set<string>([]);
 
 const GOOGLE_MAPS_HOSTS = new Set([
   'maps.app.goo.gl',

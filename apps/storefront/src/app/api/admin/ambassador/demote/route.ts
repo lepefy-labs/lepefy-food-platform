@@ -4,9 +4,9 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 
 // "Retirer le statut" — les commissions déjà générées (ambassador_commissions)
-// ne sont jamais touchées ici : is_ambassador ne redevenir false ne fait que
-// bloquer les FUTURES attributions de commission (process_ambassador_commission_atomic
-// vérifie is_ambassador au moment de la livraison, pas au moment du signup).
+// ne sont jamais touchées ici : is_ambassador = false ne fait que bloquer les
+// FUTURES commissions (process_ambassador_commission_atomic vérifie
+// is_ambassador au moment de la livraison, pas au moment de l'inscription).
 export async function POST(req: NextRequest) {
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant     = await getTenant(tenantSlug);
@@ -14,24 +14,24 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const body = await req.json() as { customerId?: string };
-  if (!body.customerId) {
+  const body = await req.json().catch(() => null) as { customerId?: string } | null;
+  if (!body?.customerId) {
     return NextResponse.json({ error: 'customerId requis.' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await createServiceClient()
     .from('customers')
     .update({ is_ambassador: false })
     .eq('id', body.customerId)
     .eq('tenant_id', tenant.id)
     .select('id, is_ambassador')
-    .single();
+    .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[ambassador demote] update failed', tenant.id, error);
+    return NextResponse.json({ error: 'Retrait du statut impossible pour le moment.' }, { status: 500 });
   }
+  if (!data) return NextResponse.json({ error: 'Client introuvable.' }, { status: 404 });
 
   return NextResponse.json(data);
 }
