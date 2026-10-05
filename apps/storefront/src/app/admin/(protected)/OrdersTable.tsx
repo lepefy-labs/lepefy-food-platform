@@ -18,6 +18,8 @@ import StatusBadge from '../_components/ui/StatusBadge';
 import CopyableValue from '../_components/ui/CopyableValue';
 import BulkTrackingModal, { type PendingTrackingOrder } from '../_components/ui/BulkTrackingModal';
 import AdminOrdersPoller from './AdminOrdersPoller';
+import BulkDocumentsDialog from './BulkDocumentsDialog';
+import type { OrderDocumentsDefaults } from '../orders/[id]/OrderDocumentsCard';
 
 interface ShippingAddress { city?: string; postal_code?: string; country?: string; line1?: string }
 interface ShippingDetails { carrierName?: string; serviceName?: string; numParcels?: number; totalWeightG?: number }
@@ -37,6 +39,7 @@ interface DetailData { suggestion: CartonSuggestion | null; missingWeightLines: 
 interface Props {
   orders: ListOrder[]; tenantCurrency: string; carriers: string[]; thresholds: OperationalThresholds;
   canManage: boolean; managedProviderAvailable: boolean; nowIso: string; sort: OrderSortKey;
+  documentDefaults: OrderDocumentsDefaults;
 }
 
 const shortId = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
@@ -66,13 +69,14 @@ function formatEta(value: string | null) {
   return value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Rome' }).format(new Date(value)) : null;
 }
 
-export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, sort }: Props) {
+export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, sort, documentDefaults }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Record<string, DetailData>>({});
   const [detailError, setDetailError] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [documentsOpen, setDocumentsOpen] = useState(false);
   const [pendingTracking, setPendingTracking] = useState<PendingTrackingOrder[] | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const now = useMemo(() => new Date(nowIso), [nowIso]);
@@ -203,7 +207,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           </div>}
       </section>
       <section aria-label="Actions"><h3 className="mb-2 text-[10px] font-bold uppercase tracking-wide text-gray-500">Actions</h3><div className="flex flex-col items-stretch gap-2 sm:items-start">
-        {order.status !== 'cancelled' && <Link href={`/admin/orders/${order.id}/picking-list`} target="_blank" rel="noopener noreferrer" className={detailButton}><IconPrinter size={15} aria-hidden="true" /> Imprimer la liste de préparation</Link>}
+        {order.status !== 'cancelled' && <a href={`/api/admin/orders/${order.id}/documents/picking-list`} target="_blank" rel="noopener noreferrer" className={detailButton}><IconPrinter size={15} aria-hidden="true" /> Imprimer la liste de préparation<span className="sr-only"> (PDF, nouvel onglet)</span></a>}
         <Link href={`/admin/orders/${order.id}`} className={detailButton}>Voir la commande</Link>
         {trackingUrl && <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={detailButton}>Voir le suivi transporteur <IconExternalLink size={13} aria-hidden="true" /></a>}
       </div></section>
@@ -290,7 +294,8 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         </li>;
       })}</ul>
     </div>
-    {selected.size > 0 && <div role="toolbar" aria-label="Actions groupées" className="sticky bottom-4 z-20 mx-auto mt-4 flex max-w-fit flex-wrap items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-white shadow-lg"><span className="text-xs font-bold">{selected.size} sélectionnée(s)</span><button type="button" onClick={exportCsv} className="min-h-9 text-xs underline">Exporter CSV</button><button type="button" onClick={() => window.open(`/admin/orders/picking-list?ids=${Array.from(selected).join(',')}`, '_blank', 'noopener,noreferrer')} className="min-h-9 text-xs underline">Imprimer les listes de préparation</button>{canManage && <button type="button" onClick={() => void handleBulk()} className="min-h-9 text-xs underline">Traiter la sélection</button>}<button type="button" onClick={() => setSelected(new Set())} aria-label="Annuler la sélection" className="min-h-9 min-w-9"><IconX size={16} aria-hidden="true" /></button></div>}
+    {selected.size > 0 && <div role="toolbar" aria-label="Actions groupées" className="sticky bottom-4 z-20 mx-auto mt-4 flex max-w-fit flex-wrap items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-white shadow-lg"><span className="text-xs font-bold">{selected.size} sélectionnée(s)</span><button type="button" onClick={exportCsv} className="min-h-9 text-xs underline">Exporter CSV</button><button type="button" onClick={() => setDocumentsOpen(true)} className="min-h-9 text-xs underline">Documents…</button>{canManage && <button type="button" onClick={() => void handleBulk()} className="min-h-9 text-xs underline">Traiter la sélection</button>}<button type="button" onClick={() => setSelected(new Set())} aria-label="Annuler la sélection" className="min-h-9 min-w-9"><IconX size={16} aria-hidden="true" /></button></div>}
+    {documentsOpen && <BulkDocumentsDialog orderIds={orders.filter((order) => selected.has(order.id)).map((order) => order.id)} defaults={documentDefaults} onClose={() => setDocumentsOpen(false)} />}
     {pendingTracking && <BulkTrackingModal orders={pendingTracking} carrierOptions={carriers} onCancel={() => setPendingTracking(null)} onConfirm={tracking => { void handleBulk(tracking); }} />}
     {toast && <div role="status" className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-white shadow-lg ${toast.type === 'success' ? 'bg-emerald-700' : 'bg-red-700'}`}>{toast.type === 'success' ? <IconCheck size={16} aria-hidden="true" /> : <IconX size={16} aria-hidden="true" />}{toast.msg}</div>}
   </div>;

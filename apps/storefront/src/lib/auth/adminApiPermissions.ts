@@ -77,6 +77,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/shipping-shadow-report') return read ? 'shipping.view' : null;
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  if (path === '/api/admin/order-documents/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/feature-flags') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   // Gestion du commerce: mappa dedicata, fail-closed (null = nessuna capability).
   if (path.startsWith('/api/admin/gestion/')) return gestionApiPermission(path, method) as AdminApiPermission | null;

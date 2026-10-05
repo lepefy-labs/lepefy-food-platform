@@ -123,6 +123,13 @@ Legenda esposizione: **P** = colonna nel grant pubblico 076 (anon/authenticated)
 - **Esposizione:** S.
 - **Dettagli:** `docs/DAILY_ORDER_DIGEST.md`.
 
+### 3.8b Documenti delle commande — **nuovo modulo (145)**
+- **Struttura:** `tenant_feature_settings('order_documents')`, config piatta v1 (formati liste de préparation / bon de colis, attivazione e contenuto del bon); CHECK `is_valid_order_documents_config`. `enabled` non usato. Nessuna colonna `tenants`.
+- **Letture:** `readOrderDocumentSettings()` (`lib/orders/documents/settings.ts`): route PDF, dettaglio e lista ordini, Paramètres. Riga assente, invalida o illeggibile ⇒ default sicuri.
+- **Scritture:** `PATCH /api/admin/order-documents/settings` (`tenant_settings.manage`).
+- **Esposizione:** S.
+- **Dettagli:** `docs/ORDER_DOCUMENTS.md`.
+
 ### 3.9 AI e Nala — **migrata (134 applicata; fase 5 aperta)**
 - **Struttura:**
   - `tenant_feature_settings('ai')`: `enabled = true` (riservato: oggi non esiste un interruttore AI globale) e config `{version: 1, image_generation, description_generation, semantic_search, rate_limit_public_per_minute, rate_limit_public_per_day, rate_limit_admin_per_day}`. Flag booleani, limiti interi 0–1 000 000; CHECK `is_valid_ai_config`. La voce di catalogo `ai` (094, fatturabile, inclusa nel piano) mantiene la sua semantica commerciale.

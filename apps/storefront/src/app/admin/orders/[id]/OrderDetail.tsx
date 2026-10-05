@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconArrowDown, IconCheck, IconPackage, IconPrinter, IconSnowflake, IconTemperature } from '@tabler/icons-react';
+import { IconArrowDown, IconCheck, IconPackage, IconSnowflake, IconTemperature } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import { orderDetailTransition } from '@/lib/orders/adminOrderOperations';
 import { carrierDisplayName } from '@/lib/shipping/shipmentPresentation';
@@ -12,6 +12,7 @@ import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
 import PackingPanel from './PackingPanel';
 import ManagedShipmentPanel from './ManagedShipmentPanel';
 import CartonSuggestionCard from './CartonSuggestionCard';
+import OrderDocumentsCard, { type OrderDocumentsDefaults } from './OrderDocumentsCard';
 import type { CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import type { Order } from '@lepefy/types';
 
@@ -53,6 +54,7 @@ interface Props {
   missingWeightLines?: number;
   canManage: boolean;
   nextStep?: NextStepGuide | null;
+  documents: OrderDocumentsDefaults;
 }
 
 function formatCarrierName(raw: string | undefined): string {
@@ -83,6 +85,7 @@ export default function OrderDetail({
   missingWeightLines = 0,
   canManage,
   nextStep = null,
+  documents,
 }: Props) {
   const router = useRouter();
   const isPickup = order.fulfillment_type === 'pickup';
@@ -357,12 +360,8 @@ export default function OrderDetail({
 
       <section aria-labelledby="order-documents-title" className="rounded-xl border border-[var(--admin-border)] bg-white p-4 dark:bg-gray-900">
         <h2 id="order-documents-title" className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">Documents</h2>
-        <div className="space-y-2">
-          {order.status !== 'cancelled' && (
-            <Link href={`/admin/orders/${order.id}/picking-list`} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
-              <IconPrinter size={16} aria-hidden="true" /> Imprimer la liste de préparation<span className="sr-only"> (nouvel onglet)</span>
-            </Link>
-          )}
+        <div className="space-y-3">
+          <OrderDocumentsCard orderId={order.id} cancelled={order.status === 'cancelled'} defaults={documents} />
           {canManage && !['cancelled', 'delivered', 'shipped'].includes(order.status) && (
             <button type="button" onClick={() => setCancelOpen(true)} disabled={saving}
               className="min-h-11 w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/30">

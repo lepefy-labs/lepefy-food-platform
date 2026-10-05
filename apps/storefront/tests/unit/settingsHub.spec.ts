@@ -29,7 +29,7 @@ test('every Settings Hub destination has a page and stays under tenant_settings.
 test('the hub covers the approved groups in order', () => {
   expect(SETTINGS_GROUPS.map((group) => group.label)).toEqual(['Boutique', 'Communication', 'Commerce', 'Organisation']);
   expect(SETTINGS_SECTIONS.map((section) => section.key)).toEqual([
-    'boutique', 'retrait', 'apparence', 'presence', 'notifications', 'automatisations', 'paiements', 'integrations', 'legal', 'fonctionnalites',
+    'boutique', 'retrait', 'apparence', 'presence', 'notifications', 'automatisations', 'paiements', 'documents', 'integrations', 'legal', 'fonctionnalites',
   ]);
 });
 

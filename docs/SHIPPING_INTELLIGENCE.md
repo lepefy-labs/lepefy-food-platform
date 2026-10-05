@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@c24ba53823132f0357d0d372988b783b2fe5947f`
-> **Ultima verifica:** 3 ottobre 2026
+> **Base codice verificata:** `main@80b3971e8443c63357d65c56dc587adfddfe09b9`
+> **Ultima verifica:** 5 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -145,7 +145,8 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 - **Riga espansa**, tre sezioni:
   - preparazione: articoli, ubicazione, peso, colli, carton suggestion caricata solo all'apertura via `GET /api/admin/orders/[id]/operation-detail` (`orders.view`), righe senza peso;
   - spedizione: destinazione, transporteur e servizio, provider, reference e tracking copiabili, stato provider con ultima synchro, ultimo movimento, ETA; per i ritiri: urgenza e contatto;
-  - azioni esplicite: `Imprimer la liste de préparation`, `Voir la commande`, `Voir le suivi transporteur`.
+  - azioni esplicite: `Imprimer la liste de préparation` (PDF server al formato di default del tenant), `Voir la commande`, `Voir le suivi transporteur`.
+- **Azione di gruppo `Documents…`:** dialog con documento (listes de préparation / bons de colis) e formato A5/A4 → un solo PDF (§3.1).
 - **Mobile:** card operative con CTA a tutta larghezza (44 px), pulsante di dettaglio e le stesse intestazioni di gruppo.
 
 **Dettaglio ordine (`/admin/orders/[id]`).** Usa lo stesso classificatore della lista, con le stesse soglie tenant.
@@ -159,10 +160,34 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 - **`ShipmentTrackingCard` (sezione «Suivi transporteur»):** mostra stato provider, transporteur, servizio, colli, peso, ETA, reference e tracking copiabili (`CopyableValue`), ultima synchro, link transporteur validato e la timeline degli eventi persistiti (`shipmentEventsNewestFirst` + `shipmentEventLabel`, 4 visibili poi «Afficher tout»). Nessuna chiamata live.
 - **`ManagedShipmentPanel`:** resta il solo punto per associare, sincronizzare o passare al suivi manuel, con un riepilogo compatto.
 - **Senza `orders.manage`:** la pagina è in lettura (banner «Lecture seule», nessun controllo di modifica); l'API resta il controllo autorevole.
-- **Righe articolo:** lette con `order_id` e `tenant_id`, anche nella stampa.
-- **Stampa:** usa solo la rotta dedicata `/admin/orders/[id]/picking-list`.
+- **Righe articolo:** lette con `order_id` e `tenant_id`, anche nei documenti PDF.
+- **Documenti:** sezione «Documents» (`OrderDocumentsCard`) con Liste de préparation e Bon de colis, scelta A5/A4 per la singola stampa (preselezione = default tenant), «Ouvrir le PDF» / «Télécharger». Dettagli §3.1.
 
 Questo cockpit non sostituisce `Admin → Livraison`: quella sezione conserva tariffe, packaging, intelligence e strumenti tecnici. Il dettaglio ordine conserva la gestione completa della spedizione, comprese associazione reference e sincronizzazione. La sincronizzazione provider può già avanzare `orders.status` tramite `syncOrderShipment`/`orderTransitionService`; il cockpit non introduce nuove transizioni o side effects.
+
+### 3.1 Documents des commandes (PDF Gotenberg)
+
+Due documenti distinti costruiti da un loader condiviso, mai lo stesso markup:
+
+| Documento | Destinatario | Contenuto | Mai |
+|---|---|---|---|
+| **Liste de préparation** (`pickingListHtml.ts`) | équipe | réf. courte, data, LIVRAISON/RETRAIT, nome + CAP/città, articoli ordinati per `warehouse_location` con casella 6/7 mm, quantità 16–17 pt, FRAIS/SURGELÉ in testo, riepilogo unità/ref./peso/colli, **emballage suggéré** (solo consegna non annullata, `cartonSuggestion.ts`), firme | UUID completo, e-mail, indirizzo completo |
+| **Bon de colis** (`packingSlipHtml.ts`, titolo stampato «RÉCAPITULATIF DE COMMANDE») | cliente, nel pacco | logo/nome tenant, «Merci <prénom> !», réf. courte e data, articoli, totale articoli, QR portale (§3.2), ringraziamento, contatti; prezzi storici `order_items` e indirizzo solo se attivati | emplacements, caselle, carton, peso, e-mail, telefono, note, pagamento, errori provider, UUID |
+
+- **Formati:** registro unico `lib/orders/documents/formats.ts` (`ORDER_DOCUMENT_FORMATS`: `a5` 148×210 default/raccomandato, `a4` 210×297; portrait). A5 e A4 hanno layout propri (A4: colonne Conservation/Emplacement, dettaglio per collo, zona note). Un formato nuovo = una voce del registro + layout + CHECK della migration.
+- **Preferenze tenant:** `tenant_feature_settings('order_documents')` (migration 145, config piatta v1 validata da zod `lib/orders/documents/settings.ts` e dal CHECK `is_valid_order_documents_config`). Riga assente o invalida ⇒ default sicuri (A5, bon de colis attivo, prezzi e indirizzo nascosti). UI `/admin/parametres/documents`, API `GET/PATCH /api/admin/order-documents/settings` (`tenant_settings.view/manage`).
+- **Route PDF (`orders.view`, non mutanti sull'ordine):** `GET /api/admin/orders/[id]/documents/{picking-list|packing-slip}?format=&download=1` e `GET /api/admin/orders/documents/{kind}?ids=a,b&format=` (lotto). `format` assente ⇒ default tenant; presente ma sconosciuto ⇒ 400. Risposta `application/pdf`, `inline` (o `attachment`), `Cache-Control: private, no-store`, nome `commande-CC4314FE-preparation-a5.pdf` / `preparation-2026-10-05-a5.pdf`.
+- **Lotto:** un solo PDF, una `<section class="doc">` per ordine con salto pagina, ordine = ordine degli `ids` (quello della lista), ordini di altro tenant/assenti/annullati esclusi (`X-Documents-Skipped`). Massimo `MAX_BULK_ORDER_DOCUMENTS = 50` (= una pagina della lista; budget Vercel 30 s) ⇒ 413. Dati in lotto: 1 query `orders`, 1 `order_items` (anche per `tenant_id`), 1 contesto carton (`loadCartonContext` + `computeCartonSuggestion` puro) per tutto il lotto.
+- **Multipagina:** righe `break-inside: avoid`, titoli `break-after: avoid`, `thead` ripetuto con «#REF» come intestazione ridotta, piè di pagina Gotenberg «#REF · Page X/Y» (in lotto la numerazione è quella dell'intero PDF). Nessun font informativo sotto 10 pt.
+- **Gotenberg:** `htmlToPdf(html, options?)` di `lib/labels/gotenberg.ts`; senza opzioni la richiesta resta identica (etichette, affiche, biglietti). Con opzioni: `paperWidth/Height` e margini in pollici dal registro, `printBackground`, `footer.html`, timeout 25 s. Errori: Gotenberg assente/irraggiungibile/503 ⇒ 503 «Le service PDF est indisponible», altra risposta d'errore ⇒ 502; navigazione diretta ⇒ pagina HTML francese (mai JSON grezzo). Nessuna chiamata provider live nei documenti.
+- **Errori ordine:** ordine assente o di altro tenant 404, annullato 409, bon de colis disattivato 409.
+- Le vecchie pagine `/admin/orders/[id]/picking-list` e `/admin/orders/picking-list` redirigono al PDF; `window.print`/`AutoPrint` e il CSS `.pl-*` non esistono più.
+
+### 3.2 Portale QR `/o/[token]`
+
+Il QR del bon de colis punta a `<storefront_url del tenant>/o/<token>` (base da `getAdminWorkspaceUrls`, mai dall'header Host). Token = base64url(HMAC-SHA256(`TRACKING_SECRET`, `order-portal:<rowId>:<nonce>`)) troncato a 128 bit (22 car.), tabella `order_public_access_tokens` (migration 145: nonce + SHA-256 del token, unique `(tenant_id, token_hash)`, un solo token attivo per ordine, `revoked_at`, RLS senza policy, solo service role). Creazione pigra al primo bon de colis (`getOrCreateOrderPublicTokens`, in lotto); ristampa = stesso token.
+
+La pagina mostra solo: marca, réf. courte, data, stage cliente (`getCustomerOrderPresentation`), modalità, articoli (nome + quantità); per la consegna transporteur / stato normalizzato / ETA `shipping_estimated_delivery_at` / ultimo aggiornamento dallo **snapshot persistito**, link transporteur solo se `safeShipmentTrackingUrl(shipping_tracking_url)` è valido; per il ritiro l'indirizzo pubblico del punto di ritiro. Nessun nome, e-mail, telefono, indirizzo di consegna, prezzo o pagamento. CTA: prima della consegna suivi (se URL valido) + aiuto; dopo la consegna «Commander à nouveau» → «Donner mon avis» (solo con invito d'avis utilizzabile) → aiuto. Dettagli: `docs/ORDER_DOCUMENTS.md`.
 
 `Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sei superfici di business:
 
@@ -242,7 +267,7 @@ Campi principali:
 
 Al momento **non sostituisce** `packaging_surcharges` nel checkout.
 
-**Carton suggerito in preparazione.** Un profilo attivo con `suggest_max_weight_g` valorizzato è un cartone "di magazzino": il dettaglio ordine admin (stati `new`/`preparing`, solo consegna) mostra la card «Carton à utiliser»; la picking list stampabile (dettaglio ordine e `/admin/orders/:id/picking-list`) riporta lo stesso suggerimento nel riquadro «IMBALLO SUGGERITO» (caricamento condiviso `lib/shipping/loadCartonSuggestion.ts`). Il peso dell'ordine è `shipping_details.totalWeightG` del checkout, altrimenti ricalcolato da `order_items` × `products.weight_grams` (le righe senza peso sono segnalate). Il peso è diviso in colli pieni di `packaging_surcharges.max_pack_kg` (default 15 kg) più il resto (20 kg → 15 + 5, non 10 + 10 come lo split del checkout). Per ogni collo: carton = primo profilo per `position` con `min < peso ≤ max`; gli altri profili che coprono lo stesso peso sono proposti «si volumineux». Motore puro `lib/shipping/cartonSuggestion.ts` (test `tests/unit/cartonSuggestion.spec.ts`); editor in Admin → Livraison → Emballages. Solo aiuto alla preparazione: nessun effetto sul prezzo o sul checkout. Senza migration applicata le colonne mancano e la card resta nascosta.
+**Carton suggerito in preparazione.** Un profilo attivo con `suggest_max_weight_g` valorizzato è un cartone "di magazzino": il dettaglio ordine admin (stati `new`/`preparing`, solo consegna) mostra la card «Carton à utiliser»; la liste de préparation PDF (singola e in lotto, §3.1) riporta lo stesso suggerimento nel riquadro «EMBALLAGE SUGGÉRÉ» (caricamento condiviso `lib/shipping/loadCartonSuggestion.ts`: `loadCartonContext` una volta per lotto + `computeCartonSuggestion` puro). Il bon de colis cliente non lo mostra mai. Il peso dell'ordine è `shipping_details.totalWeightG` del checkout, altrimenti ricalcolato da `order_items` × `products.weight_grams` (le righe senza peso sono segnalate). Il peso è diviso in colli pieni di `packaging_surcharges.max_pack_kg` (default 15 kg) più il resto (20 kg → 15 + 5, non 10 + 10 come lo split del checkout). Per ogni collo: carton = primo profilo per `position` con `min < peso ≤ max`; gli altri profili che coprono lo stesso peso sono proposti «si volumineux». Motore puro `lib/shipping/cartonSuggestion.ts` (test `tests/unit/cartonSuggestion.spec.ts`); editor in Admin → Livraison → Emballages. Solo aiuto alla preparazione: nessun effetto sul prezzo o sul checkout. Senza migration applicata le colonne mancano e la card resta nascosta.
 
 Configurazione ChloeFood prevista: Carton S commerce 35×25×22 (0–5 kg), Standard 40×30×30 (5–15 kg), Carton L commerce 45×35×40 (12,5–15 kg, alternativa per colli voluminosi).
 
@@ -1021,7 +1046,8 @@ Regole obbligatorie:
 - Laboratoire, campagne, test rapido, import CAP e diagnostica Packlink sono riservati al `platform_owner` (`requirePlatformOwner()`), non figurano nella mappa `adminApiPermissions.ts` e sono verificati da `tests/unit/shippingPlatformTools.spec.ts`;
 - il worker interno usa service-role bearer;
 - non loggare secret, URL sensibili o payload provider raw;
-- non indebolire RLS/grant esistenti.
+- non indebolire RLS/grant esistenti;
+- documenti di commande: route PDF sotto `orders.view` e tenant-scoped; il bon de colis riceve solo il view-model cliente; `order_public_access_tokens` è service-role only e il token del portale non viene mai salvato in chiaro né loggato (§3.2).
 
 Tabelle con costi/simulazioni non hanno policy pubbliche e sono pensate per accesso service-role/admin server-side.
 
@@ -1088,6 +1114,9 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 25. La tariffazione commerciale (`tariff`/`active`) si attiva solo con l'azione esplicita «Activer cette tarification pour les clients» (conferma + checklist); nessuna attivazione automatica.
 26. In modalità `tariff` un ordine non arriva mai al pagamento con un importo di spedizione diverso da quello ricalcolato dal server e confermato dal cliente (token V2 + ricalcolo in ogni percorso; differenza → nuovo preventivo).
 27. La disponibilità logistica non è mai dedotta dalla sola formula: preventivo identico recente, chiamata provider limitata nel tempo, o evidenza recente dello stesso CAP (mai oltre il limite logistico verificato). I territori extra-doganali restano non consegnabili anche con `flat_rate_override`.
+28. La liste de préparation (interna) e il bon de colis (cliente) restano renderer distinti; il bon de colis non riceve mai la riga `orders` né item grezzi e non può mostrare emplacements, carton, note, e-mail, telefono o UUID.
+29. Il PDF Gotenberg è la fonte di verità dei documenti di commande (mai `window.print`); il lotto produce un solo PDF, al massimo 50 ordini, nell'ordine della selezione.
+30. Il QR del bon de colis non contiene mai UUID, PII o URL provider: solo `<storefront_url>/o/<token opaco>`; il portale legge solo lo snapshot persistito, nessuna chiamata provider live.
 
 ---
 
@@ -1201,6 +1230,8 @@ apps/storefront/src/lib/shipping/tariff/          (V1F)
 ### Test
 
 ```text
+apps/storefront/tests/unit/orderDocuments.spec.ts   (formati, settings, view-model, HTML, lotto, Gotenberg mock, permessi)
+apps/storefront/tests/unit/orderPortal.spec.ts      (token, portale, supporto, riordino)
 apps/storefront/tests/unit/shippingIntelligenceDataQuality.spec.ts
 apps/storefront/tests/unit/helpers/fakeShippingSupabase.ts   (client in memoria con tetto 1000 righe + log tenant scope)
 apps/storefront/tests/unit/shippingSchedulerAuth.spec.ts
@@ -1247,6 +1278,15 @@ apps/storefront/src/app/admin/(protected)/page.tsx          (KPI, filtri unifica
 apps/storefront/src/app/admin/(protected)/OrdersSortSelect.tsx  (select di ordinamento, default priority)
 apps/storefront/src/app/admin/(protected)/OrdersTable.tsx   (righe desktop e card mobile, gruppi di priorità, stato ordine e Transport separati)
 apps/storefront/src/app/api/admin/orders/[id]/operation-detail/route.ts  (carton suggestion lazy)
+apps/storefront/src/lib/shipping/loadCartonSuggestion.ts   (loadCartonContext per lotto + computeCartonSuggestion puro; dettaglio, espansione e PDF)
+apps/storefront/src/lib/orders/documents/                  (formats, settings, loadOrderDocumentData, viewModels, pickingListHtml, packingSlipHtml, documentHtml, documentQr, renderOrderDocuments)
+apps/storefront/src/lib/orders/portal/                     (orderPublicToken, portalViewModel, loadOrderPortal, reorderProposal, supportChannels)
+apps/storefront/src/app/api/admin/orders/[id]/documents/[kind]/route.ts  (PDF singolo)
+apps/storefront/src/app/api/admin/orders/documents/[kind]/route.ts       (PDF di lotto)
+apps/storefront/src/app/admin/orders/[id]/OrderDocumentsCard.tsx         (sezione Documents del dettaglio)
+apps/storefront/src/app/admin/(protected)/BulkDocumentsDialog.tsx        (azione di gruppo Documents…)
+apps/storefront/src/app/(shop)/o/[token]/page.tsx                        (portale QR)
+apps/storefront/src/lib/labels/gotenberg.ts                (client Gotenberg unico, opzioni papier/marges/footer retro-compatibili)
 apps/storefront/src/app/admin/(protected)/orders/[id]/page.tsx  (dettaglio ordine: header/alert dal classificatore, ordine dei pannelli, RBAC in lettura)
 apps/storefront/src/app/admin/orders/[id]/ShipmentTrackingCard.tsx  (suivi transporteur: snapshot provider + timeline eventi persistiti)
 apps/storefront/src/app/admin/orders/[id]/ManagedShipmentPanel.tsx  (associazione, sync manuale, passaggio a suivi manuel)
@@ -1296,6 +1336,15 @@ Se n8n si ferma o non esegue i job, impostare `SHIPPING_CAMPAIGN_N8N_ACTIVE=fals
 - **Ritiro "in ritardo":** si basa su `updated_at` (ultima attività), quindi qualunque modifica dell'ordine riavvia il conteggio.
 - **Avviso «Plus de 5 000 commandes actives»:** la coda attiva supera `ACTIVE_ORDER_LIMIT` e la lista è ordinata per data. Chiudere gli ordini consegnati o ritirati, oppure rivedere il limite in `loadOrderWorkQueue.ts`.
 
+
+### Documenti di commande
+
+- **503 «Le service PDF est indisponible»:** `GOTENBERG_URL`/`GOTENBERG_AUTH` mancanti su Vercel, Gotenberg spento o oltre 25 s. Verificare anche etichette e biglietti (stesso client).
+- **502:** Gotenberg ha rifiutato l'HTML; in lotto ridurre la selezione.
+- **413:** più di 50 ordini selezionati.
+- **Bon de colis senza QR:** migration 145 non applicata, `TRACKING_SECRET` assente o nessun URL boutique (`tenants.storefront_url`/`NEXT_PUBLIC_APP_URL`); il dettaglio ordine mostra l'avviso quando la migration manca.
+- **QR «Lien indisponible»:** token revocato, `TRACKING_SECRET` ruotato (invalida i QR già stampati) o QR di un altro tenant.
+- **Preferenze non salvabili:** migration 145 assente (409) o permesso `tenant_settings.manage` mancante.
 
 ### Campagna resta queued
 

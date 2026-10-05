@@ -13,7 +13,8 @@ interface ChatWidgetGateProps {
 
 export function ChatWidgetGate(props: ChatWidgetGateProps) {
   const pathname = usePathname();
-  const hidden = pathname === '/avis/donner' || pathname === '/cart' || pathname.startsWith('/checkout') || pathname.startsWith('/order-confirmation');
+  // /o/[token] : le jeton du portail ne doit jamais partir dans les analytics Nala (sourcePath).
+  const hidden = pathname.startsWith('/o/') || pathname === '/avis/donner' || pathname === '/cart' || pathname.startsWith('/checkout') || pathname.startsWith('/order-confirmation');
 
   const raiseForProductPurchaseBar = pathname.startsWith('/products/');
 

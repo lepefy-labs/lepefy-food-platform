@@ -28,6 +28,7 @@ import { buildTrackingShareMessage, preorderReference } from '@/lib/orders/assis
 import { shopBaseUrl } from '@/lib/orders/assisted/assistedOrderServer'
 import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
 import { loadCartonSuggestion } from '@/lib/shipping/loadCartonSuggestion'
+import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
 import { carrierDisplayName, shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
 import { dailyDigestModule, DAILY_DIGEST_DEFAULTS } from '@/lib/notifications/dailyDigestConfig'
@@ -133,7 +134,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
 
   if (!order) notFound()
 
-  const [{ data: rawItems }, { data: carriersRaw }, access, digest] = await Promise.all([
+  const [{ data: rawItems }, { data: carriersRaw }, access, digest, documentSettings] = await Promise.all([
     (supabase as unknown as {
       from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>
     }).from('order_items')
@@ -148,6 +149,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
       .order('position', { ascending: true }),
     getCurrentAdminAccessContext(tenant.id),
     readModuleConfig(supabase, dailyDigestModule, tenant.id).catch(() => null),
+    readOrderDocumentSettings(supabase, tenant.id),
   ])
 
   const items = (rawItems ?? []).sort((a, b) => {
@@ -499,6 +501,12 @@ export default async function AdminOrderPage({ params }: PageProps) {
             missingWeightLines={missingWeightLines}
             canManage={canManage}
             nextStep={nextStep}
+            documents={{
+              pickingFormat: documentSettings.config.picking_list_format,
+              packingSlipEnabled: documentSettings.config.packing_slip_enabled,
+              packingSlipFormat: documentSettings.config.packing_slip_format,
+              packingSlipQrUnavailable: !documentSettings.available && documentSettings.config.packing_slip_show_qr,
+            }}
           />
         </aside>
       </div>

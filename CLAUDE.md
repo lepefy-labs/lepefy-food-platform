@@ -96,6 +96,12 @@ The shipping logic is the most complex part of the codebase:
 - Every conversion (assisted Stripe webhook `metadata.type = assisted_preorder`, manual confirmation, "Déjà payé") goes through `src/lib/orders/convertCheckoutSessionToOrder.ts` → RPC `convert_checkout_session_to_order` (migration 128): row lock + order/items/stock in one transaction, unique `orders.checkout_session_id`; side effects run only when `created = true`.
 - `orders.email` can be null for assisted orders: never assume an email; tracking tokens are `HMAC(orderId + (email ?? ''))`.
 
+### Order documents & QR portal — `docs/ORDER_DOCUMENTS.md`
+
+- Two separate renderers on one batch loader (`src/lib/orders/documents/`): internal **liste de préparation** and customer **bon de colis**. The slip only ever receives `CustomerOrderDocumentViewModel` (built field by field — never the `orders` row, never warehouse locations, notes, e-mail, phone, payment or UUID).
+- Server PDF via Gotenberg (`htmlToPdf(html, options)` in `src/lib/labels/gotenberg.ts`, options are additive) is the only print path: `GET /api/admin/orders/[id]/documents/{picking-list|packing-slip}` and bulk `GET /api/admin/orders/documents/{kind}?ids=` (`orders.view`, one PDF, max 50). Formats come from `ORDER_DOCUMENT_FORMATS` (A5 default, A4) — never hard-code `'a5'`/`'a4'` elsewhere. Tenant defaults live in `tenant_feature_settings('order_documents')` (migration 145).
+- The QR targets `<storefront_url>/o/<token>`: opaque 128-bit HMAC token, only nonce + SHA-256 stored in `order_public_access_tokens` (service role only), created lazily, same token on reprint, revocable. The `/o/[token]` portal shows a minimal view-model (no PII, persisted tracking snapshot only); reorder is a read-only proposal added through the normal cart.
+
 ### Internal notification recipients — `docs/NOTIFICATION_SUBSCRIPTIONS.md`
 
 - Notification types are a code catalogue (`src/lib/notifications/notificationTypes.ts`: `NOTIFICATION_TYPES`, groups, presets); the DB stores only `tenant_notification_subscriptions (tenant_id, recipient_id, type_key, channel)` (migration 143). Adding a type = one registry entry, never a new `notify_*` column (those are legacy, backfilled by 143).

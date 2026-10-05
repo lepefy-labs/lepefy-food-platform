@@ -22,6 +22,7 @@ import OrdersSortSelect from './OrdersSortSelect'
 import PendingPaymentsBanner from './PendingPaymentsBanner'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
 import type { ListOrder } from './OrdersTable'
+import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
 
 export const dynamic = 'force-dynamic'
@@ -66,10 +67,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood'
   const tenant = await getTenant(tenantSlug)
   const supabase = createServiceClient()
-  const [access, digest] = await Promise.all([
+  const [access, digest, documentSettings] = await Promise.all([
     getCurrentAdminAccessContext(tenant.id),
     readModuleConfig(supabase, dailyDigestModule, tenant.id).catch(() => null),
+    readOrderDocumentSettings(supabase, tenant.id),
   ])
+  const documentDefaults = {
+    pickingFormat: documentSettings.config.picking_list_format,
+    packingSlipEnabled: documentSettings.config.packing_slip_enabled,
+    packingSlipFormat: documentSettings.config.packing_slip_format,
+    packingSlipQrUnavailable: !documentSettings.available && documentSettings.config.packing_slip_show_qr,
+  }
   const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
   // Same tenant-scoped thresholds as the daily digest; module defaults otherwise.
   const digestConfig = digest?.status === 'ok' ? digest.config : DAILY_DIGEST_DEFAULTS
@@ -262,7 +270,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
       {!queue
         ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">Impossible de charger les commandes. <Link href={pageHref(1)} className="font-bold underline">Réessayer</Link></div>
-        : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={thresholds} canManage={canManage} managedProviderAvailable={managedProviderAvailable} nowIso={now.toISOString()} sort={queue.appliedSort} />}
+        : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={thresholds} canManage={canManage} managedProviderAvailable={managedProviderAvailable} nowIso={now.toISOString()} sort={queue.appliedSort} documentDefaults={documentDefaults} />}
 
       <div className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs text-gray-500 dark:text-gray-400">{pageStart}–{pageEnd} sur {filteredCount} commande{filteredCount !== 1 ? 's' : ''}</span>

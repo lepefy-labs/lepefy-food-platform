@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 5 ottobre 2026 — **v7.15 Current-State Snapshot** (Avis clients, Base IA, Funnel checkout, Slides d'accueil; base `main` @ `c2ecf025`)
+> **Aggiornato:** 5 ottobre 2026 — **v7.16 Current-State Snapshot** (Documenti delle commande, bon de colis e portale QR; base `main` @ `80b3971e`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -36,8 +36,17 @@ Il dettaglio ordine (`/admin/orders/[id]`) usa lo stesso classificatore.
 - **Transizioni:** vengono da `orderDetailTransition`; con spedizione managed, spedito e consegnato arrivano dalla sync.
 - **«Suivi transporteur»:** mostra snapshot e timeline degli eventi persistiti.
 - **Senza `orders.manage`:** pagina in sola lettura.
-- **UI tenant:** «préparation»/«emballage», anche nei messaggi API; stampa solo tramite `/picking-list`.
+- **UI tenant:** «préparation»/«emballage», anche nei messaggi API; documenti solo come PDF server (sezione «Documents», vedi sotto).
 - **Righe articolo:** lette anche per `tenant_id`.
+
+### Documenti delle commande e portale QR (migration 145 — da applicare) — `docs/ORDER_DOCUMENTS.md`
+
+- **Due documenti distinti** da un loader condiviso (`lib/orders/documents/`): **Liste de préparation** interna (emplacements, FRAIS/SURGELÉ, riepilogo, emballage suggéré dalla carton suggestion, firme) e **Bon de colis** cliente da mettere nel pacco (titolo «RÉCAPITULATIF DE COMMANDE», marca, «Merci <prénom> !», articoli, QR, contatti). Il bon riceve solo un view-model cliente costruito campo per campo: mai emplacements, carton, note, e-mail, telefono, pagamento o UUID; prezzi storici `order_items` e indirizzo solo se attivati.
+- **PDF Gotenberg = fonte di verità**: `GET /api/admin/orders/[id]/documents/{picking-list|packing-slip}` e lotto `GET /api/admin/orders/documents/{kind}?ids=` (`orders.view`, un solo PDF, una commande per pagina nell'ordine della lista, max 50, annullate escluse). Formati da registro (`ORDER_DOCUMENT_FORMATS`: A5 default, A4), scelti per singola stampa con preselezione del default tenant. `htmlToPdf(html, options?)` estesa in modo retro-compatibile (carta, margini, piè di pagina numerato, timeout). `window.print`/`AutoPrint` e le vecchie pagine HTML (ora redirect al PDF) sono rimossi.
+- **Preferenze tenant**: `tenant_feature_settings('order_documents')` (config piatta v1, zod + CHECK), `/admin/parametres/documents`, `GET/PATCH /api/admin/order-documents/settings` (`tenant_settings.view/manage`). Default: A5, bon de colis attivo, QR/logo/ringraziamento/contatti sì, prezzi e indirizzo no; riga assente o invalida ⇒ default.
+- **Accesso pubblico**: tabella `order_public_access_tokens` (nonce + SHA-256 del token, mai in chiaro; token = HMAC `TRACKING_SECRET` troncato a 128 bit; un token attivo per ordine, revocabile con `revoked_at`; RLS senza policy, solo service role). Creato pigramente al primo bon de colis, stesso QR alle ristampe. QR = `<storefront_url>/o/<token>`.
+- **Portale `/o/[token]`** (storefront, senza login, noindex, no-referrer, no-store): réf. courte, stage cliente, articoli, snapshot di suivi persistito (transporteur, stato, ETA, link solo se `safeShipmentTrackingUrl`), punto di ritiro; nessuna PII né prezzo. CTA per ciclo di vita: suivi/itinéraire → aiuto prima della consegna; dopo «Commander à nouveau» (proposta in sola lettura `GET /api/order-portal/[token]/reorder` con prezzi/minimi/stock attuali, poi `cartStore.addItem` e checkout che rivalida tutto), «Donner mon avis» solo con invito d'avis utilizzabile (`POST /o/[token]/avis` emette un token d'avis `qr_portal`), «Besoin d'aide ?» dai canali tenant (WhatsApp, e-mail, boutique). Il widget Nala è nascosto su `/o/*` (il token non va negli analytics).
+- **Senza la 145**: preferenze = default non salvabili, bon de colis senza QR (avviso nel dettaglio ordine), portale 404.
 
 ---
 
@@ -984,6 +993,8 @@ Ordini senza e-mail (assistiti, cliente solo telefono): `order-confirmed` e tutt
 
 La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
+`145` è additiva e rieseguibile, senza backfill: registra `order_documents` in `platform_features` (non fatturabile) con il CHECK `is_valid_order_documents_config`, crea `order_public_access_tokens` (RLS forzata senza policy, grant solo `service_role`, unique `(tenant_id, token_hash)`, indice unico parziale «un token attivo per ordine») ed estende `review_invite_tokens.purpose` a `qr_portal`. Da applicare manualmente (`supabase db push`); senza, i documenti funzionano con i default e senza QR. Rollback nell'intestazione del file. Vedi `docs/ORDER_DOCUMENTS.md`.
+
 ```text
 074_checkout_recovery_lifecycle.sql
 075_external_payment_verification.sql
@@ -1204,7 +1215,8 @@ supabase/migrations/*
 - in `provider_cost` un `flat_rate_override` IT salterebbe Packlink anche per Livigno/Campione (il blocco extra-doganale è garantito solo in `tariff`);
 - costo reale degli imballaggi non registrato: nessun margine completo sugli ordini al forfait;
 - Shipping Intelligence : il mapping città→CAP dipende dall'indice GeoNames importato (`shipping_postal_code_index`) con repli Nominatim/Zippopotam.us/GeoNames e fallback manuale; l'esaustività dei CAP non è verificabile e le città GeoNames suddivise per arrondissement (es. `Lyon 01`…`Lyon 09`) non sono raggruppate automaticamente; il mapping CAP→zona commerciale resta tenant-owned (`shipping_zones.postal_prefixes`) e non costituisce un mapping regionale ufficiale della piattaforma; `shipping_quote_observations.source = 'real_shipment'` non è mai popolato perché il costo finale reale di una spedizione non è catturato separatamente dal preventivo; gli item storici con riuso incompatibile restano in produzione (esclusi solo dalla copertura) finché non viene lanciata una remesure esplicita; il range di costo mostrato per un item storico `succeeded` usa l'osservazione collegata all'epoca (scelta sul solo prezzo base prima della V1E), mentre Historique/Assistant/rétrotest ricalcolano l'osservazione operativa; la tariffazione commerciale forfait è implementata (V1G) ma nessun tenant è attivato finché un admin non lo fa esplicitamente;
-- AI credits predisposti semanticamente ma non monetizzati/applicati.
+- AI credits predisposti semanticamente ma non monetizzati/applicati;
+- documenti delle commande: nel PDF di lotto la numerazione «Page X/Y» è quella dell'intero file (Chromium non riparte da 1 per commande); nessuna UI di revoca del token del portale (solo `revokeOrderPublicTokens`); una rotazione di `TRACKING_SECRET` invalida i QR già stampati, come i link di suivi e `/pay`.
 
 ---
 
