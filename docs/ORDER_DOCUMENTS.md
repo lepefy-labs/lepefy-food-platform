@@ -1,4 +1,4 @@
-# Documenti delle commande e portale QR (migration 145)
+# Documenti delle commande e portale QR (migration 145, applicata in produzione)
 
 Documento di riferimento per la liste de préparation, il bon de colis, il portale cliente `/o/[token]` e le preferenze tenant. Il codice resta la source of truth. Lato Shipping Intelligence (carton suggestion, file map, invarianti): `docs/SHIPPING_INTELLIGENCE.md` §3.1–3.2.
 
@@ -89,7 +89,9 @@ Pagina storefront (shell `(shop)`), senza login, `force-dynamic` (no-store), `ro
 supabase db push
 ```
 
-Prima dell'applicazione: preferenze = default (non salvabili, avviso in Paramètres), bon de colis generato senza QR (avviso nel dettaglio ordine), portale 404. Rollback: vedi l'intestazione della migration.
+**Stato:** applicata in produzione il 05/10/2026 e verificata (feature registrata non fatturabile, tabella token presente e negata ad `anon`, nessuna riga di preferenze). Test CI: `supabase/tests/145_order_documents.{fixture,test}.sql`.
+
+In un ambiente senza la 145: preferenze = default (non salvabili, avviso in Paramètres), bon de colis generato senza QR (avviso nel dettaglio ordine), portale 404. Rollback: vedi l'intestazione della migration.
 
 ## 8. Test
 

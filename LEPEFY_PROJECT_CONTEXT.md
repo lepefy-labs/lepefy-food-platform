@@ -39,14 +39,14 @@ Il dettaglio ordine (`/admin/orders/[id]`) usa lo stesso classificatore.
 - **UI tenant:** «préparation»/«emballage», anche nei messaggi API; documenti solo come PDF server (sezione «Documents», vedi sotto).
 - **Righe articolo:** lette anche per `tenant_id`.
 
-### Documenti delle commande e portale QR (migration 145 — da applicare) — `docs/ORDER_DOCUMENTS.md`
+### Documenti delle commande e portale QR (migration 145 — applicata in produzione) — `docs/ORDER_DOCUMENTS.md`
 
 - **Due documenti distinti** da un loader condiviso (`lib/orders/documents/`): **Liste de préparation** interna (emplacements, FRAIS/SURGELÉ, riepilogo, emballage suggéré dalla carton suggestion, firme) e **Bon de colis** cliente da mettere nel pacco (titolo «RÉCAPITULATIF DE COMMANDE», marca, «Merci <prénom> !», articoli, QR, contatti). Il bon riceve solo un view-model cliente costruito campo per campo: mai emplacements, carton, note, e-mail, telefono, pagamento o UUID; prezzi storici `order_items` e indirizzo solo se attivati.
 - **PDF Gotenberg = fonte di verità**: `GET /api/admin/orders/[id]/documents/{picking-list|packing-slip}` e lotto `GET /api/admin/orders/documents/{kind}?ids=` (`orders.view`, un solo PDF, una commande per pagina nell'ordine della lista, max 50, annullate escluse). Formati da registro (`ORDER_DOCUMENT_FORMATS`: A5 default, A4), scelti per singola stampa con preselezione del default tenant. `htmlToPdf(html, options?)` estesa in modo retro-compatibile (carta, margini, piè di pagina numerato, timeout). `window.print`/`AutoPrint` e le vecchie pagine HTML (ora redirect al PDF) sono rimossi.
 - **Preferenze tenant**: `tenant_feature_settings('order_documents')` (config piatta v1, zod + CHECK), `/admin/parametres/documents`, `GET/PATCH /api/admin/order-documents/settings` (`tenant_settings.view/manage`). Default: A5, bon de colis attivo, QR/logo/ringraziamento/contatti sì, prezzi e indirizzo no; riga assente o invalida ⇒ default.
 - **Accesso pubblico**: tabella `order_public_access_tokens` (nonce + SHA-256 del token, mai in chiaro; token = HMAC `TRACKING_SECRET` troncato a 128 bit; un token attivo per ordine, revocabile con `revoked_at`; RLS senza policy, solo service role). Creato pigramente al primo bon de colis, stesso QR alle ristampe. QR = `<storefront_url>/o/<token>`.
 - **Portale `/o/[token]`** (storefront, senza login, noindex, no-referrer, no-store): réf. courte, stage cliente, articoli, snapshot di suivi persistito (transporteur, stato, ETA, link solo se `safeShipmentTrackingUrl`), punto di ritiro; nessuna PII né prezzo. CTA per ciclo di vita: suivi/itinéraire → aiuto prima della consegna; dopo «Commander à nouveau» (proposta in sola lettura `GET /api/order-portal/[token]/reorder` con prezzi/minimi/stock attuali, poi `cartStore.addItem` e checkout che rivalida tutto), «Donner mon avis» solo con invito d'avis utilizzabile (`POST /o/[token]/avis` emette un token d'avis `qr_portal`), «Besoin d'aide ?» dai canali tenant (WhatsApp, e-mail, boutique). Il widget Nala è nascosto su `/o/*` (il token non va negli analytics).
-- **Senza la 145**: preferenze = default non salvabili, bon de colis senza QR (avviso nel dettaglio ordine), portale 404.
+- **Stato**: 145 **applicata in produzione il 05/10/2026** (verificato: `order_documents` registrata non fatturabile, tabella dei token presente, `anon` riceve `permission denied`, nessuna riga di preferenze ⇒ tutti i tenant usano i default). Senza la 145 un ambiente avrebbe preferenze default non salvabili, bon de colis senza QR e portale 404. Test SQL in CI: `supabase/tests/145_order_documents.*`.
 
 ---
 
@@ -993,7 +993,7 @@ Ordini senza e-mail (assistiti, cliente solo telefono): `order-confirmed` e tutt
 
 La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
-`145` è additiva e rieseguibile, senza backfill: registra `order_documents` in `platform_features` (non fatturabile) con il CHECK `is_valid_order_documents_config`, crea `order_public_access_tokens` (RLS forzata senza policy, grant solo `service_role`, unique `(tenant_id, token_hash)`, indice unico parziale «un token attivo per ordine») ed estende `review_invite_tokens.purpose` a `qr_portal`. Da applicare manualmente (`supabase db push`); senza, i documenti funzionano con i default e senza QR. Rollback nell'intestazione del file. Vedi `docs/ORDER_DOCUMENTS.md`.
+`145` è additiva e rieseguibile, senza backfill: registra `order_documents` in `platform_features` (non fatturabile) con il CHECK `is_valid_order_documents_config`, crea `order_public_access_tokens` (RLS forzata senza policy, grant solo `service_role`, unique `(tenant_id, token_hash)`, indice unico parziale «un token attivo per ordine») ed estende `review_invite_tokens.purpose` a `qr_portal`. **Applicata in produzione il 05/10/2026** (verificata); senza, i documenti funzionano con i default e senza QR. Test CI: `supabase/tests/145_order_documents.{fixture,test}.sql` (doppia applicazione, CHECK, grant/RLS, un token attivo per ordine). Rollback nell'intestazione del file. Vedi `docs/ORDER_DOCUMENTS.md`.
 
 ```text
 074_checkout_recovery_lifecycle.sql

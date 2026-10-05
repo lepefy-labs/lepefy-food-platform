@@ -62,9 +62,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
   }
 }
 
-export function fakeDb(tables: Record<string, Row[]> = {}): FakeDb {
+// `object[]` (pas `Row[]`) : les tests passent des lignes typées par interface.
+export function fakeDb(tables: Record<string, object[]> = {}): FakeDb {
   const db: FakeDb = {
-    tables,
+    tables: tables as Record<string, Row[]>,
     failures: {},
     from(table: string) { return new FakeQuery(db, table); },
   };
