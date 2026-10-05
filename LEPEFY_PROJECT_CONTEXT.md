@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 5 ottobre 2026 — **v7.14 Current-State Snapshot** (Prospects: vista « À relancer », pipeline, note datate, motivi obbligatori; base `main` @ `d0861eaf`)
+> **Aggiornato:** 5 ottobre 2026 — **v7.15 Current-State Snapshot** (Slides d'accueil, Funnel checkout, Base IA, Avis clients; base `main` @ `3b7f1948`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,13 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Admin Slides d'accueil (`/admin/accueil-slides`)
+
+- **Sicurezza**: i link dei pulsanti erano salvati senza controllo (un `javascript:` finiva come href sulla home). Ora `safeSlideHref` (`lib/home/heroSlideRules.ts`) accetta solo percorsi interni `/…` o `https://` senza credenziali: validato nel form, nelle API (POST/PATCH sul risultato unito) e di nuovo in `HeroCarousel` per i dati già esistenti. Libellé e link vanno insieme anche per il pulsante principale.
+- **Cache**: le API delle slide non invalidavano nulla e `/accueil` è ISR 300 s; ora POST/PATCH/DELETE/riordino passano da `withStorefrontInvalidation(['catalog'])`.
+- **Riordino** con un solo `PUT /api/admin/hero-slides/order` (lista completa, posizioni riscritte 0..n-1, 409 se la lista è cambiata) al posto di due PATCH paralleli. Upload immagini da `/api/admin/hero-slides/upload-image` (permesso `catalog.manage`, solo kind `hero-slide`; prima serviva `event_content.manage`).
+- Editor con anteprima reale (stessi gradienti della home), varianti in francese, conferma prima di nascondere l'ultima slide attiva, errori del server leggibili.
 
 ### Platform Prospects — suivi commercial (`/admin/platform/prospects`) — `docs/PLATFORM_PROSPECTS.md`
 
