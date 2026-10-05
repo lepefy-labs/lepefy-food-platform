@@ -108,6 +108,12 @@ The shipping logic is the most complex part of the codebase:
 - A new public write API (checkout, payment, reservation, inquiry) must call `guardModule(tenant.id, '<module>')` before creating anything; webhooks never do. Public layouts render `ServiceSuspendedPage`; the shop layout stays cookie-free.
 - Subscription writes only through the 144 RPCs (`record_tenant_subscription_payment`, `admin_update_tenant_subscription`); the renewal rule lives in SQL, mirrored in `lib/billing/subscriptionRules.ts`.
 
+### Nala Analytics — `docs/NALA_ANALYTICS.md`
+
+- `/admin/nala-analytics` (entitlement `nala_analytics`, `ai_usage.view`) reads `nala_sessions` / `nala_interactions` / `nala_conversion_events` through `lib/admin/nalaAnalyticsDashboard.ts`; pure rules in `lib/admin/nalaAnalyticsRules.ts`.
+- Customer message excerpts shown to admins always go through `redactMessage` (truncated, e-mails/phones masked, never the customer identity). Assisted revenue counts only paid, non-cancelled, non-test orders.
+- 90-day retention is enforced by `POST /api/internal/nala-analytics-purge` (`NALA_ANALYTICS_PURGE_CRON_SECRET`, n8n `ops/n8n/nala-analytics-purge.json`).
+
 ### Ambassador program — `docs/AMBASSADOR_PROGRAM.md`
 
 - Real-money commission on the first **delivered** order of each customer invited by an ambassador (`customers.is_ambassador`, admin-only); computed in SQL by `process_ambassador_commission_atomic` (046/051), parameters historised per row, one commission per referred customer (unique).

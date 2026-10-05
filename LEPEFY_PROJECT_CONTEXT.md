@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 5 ottobre 2026 — **v7.12 Current-State Snapshot** (Programme Ambassadeur: configurazione validata, versamenti per ambassadeur, annullamento commissioni; base `main` @ `ac14022c`)
+> **Aggiornato:** 5 ottobre 2026 — **v7.13 Current-State Snapshot** (Nala Analytics: funnel, liste azionabili, fatturato senza ordini test/annullati/rimborsati, ritenzione 90 giorni schedulabile; base `main` @ `1347d658`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Admin Nala Analytics (`/admin/nala-analytics`) — `docs/NALA_ANALYTICS.md`
+
+- **Parcours** conversazioni → panier → paiement → commande (conversazioni distinte, tasso sulle conversazioni del periodo). **Ventes assistées** senza ordini `is_test`, annullati o non `paid` (una query `orders` ogni 200 id; prima erano tutti contati).
+- **Liste azionabili** con estratti di messaggio (≤ 120 caratteri, e-mail e telefoni mascherati da `redactMessage`, nessuna identità): domande senza risposta → AI Lab, prodotti introvabili → `/admin/catalogue?q=`, risposte prodotto deboli. Attività su tutto il periodo (giorni 7/30, settimane 90) in Europe/Rome; avviso se l'arricchimento copre < 90 % dei messaggi; « Module IA suspendu » distinto da « non inclus ».
+- **Ritenzione**: `purge_expired_nala_analytics()` (095) non era mai chiamata. Ora `POST /api/internal/nala-analytics-purge` (Bearer `NALA_ANALYTICS_PURGE_CRON_SECRET`) + `ops/n8n/nala-analytics-purge.json` (giornaliero 03:30, importato inattivo).
 
 ### Admin Programme Ambassadeur (`/admin/ambassadeurs`) — `docs/AMBASSADOR_PROGRAM.md`
 
