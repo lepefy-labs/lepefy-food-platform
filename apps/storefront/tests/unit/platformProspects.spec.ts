@@ -180,6 +180,7 @@ for (const status of [401,403]) {
       '@/lib/platform/prospects/scoring':{},
       '@/lib/platform/prospects/googlePlaces':{},
       '@/lib/platform/prospects/assessment':{},
+      '@/lib/platform/prospects/salesPipeline':{},
     };
     type Collection = typeof import('../../src/app/api/admin/platform/prospects/route');
     type Detail = typeof import('../../src/app/api/admin/platform/prospects/[id]/route');

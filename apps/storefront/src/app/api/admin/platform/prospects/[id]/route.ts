@@ -7,6 +7,7 @@ import { scoreProspect } from '@/lib/platform/prospects/scoring';
 import { salesSchema } from '@/lib/platform/prospects/validation';
 import { normalizeUrl } from '@/lib/platform/prospects/websiteFetcher';
 import { normalizedDomain } from '@/lib/platform/prospects/deduplication';
+import { appendNote, applySalesTransition, salesIssues } from '@/lib/platform/prospects/salesPipeline';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export async function GET(_req:NextRequest,{params}:{params:{id:string}}) {
@@ -22,8 +23,11 @@ export async function PATCH(req:NextRequest,{params}:{params:{id:string}}) {
   if (req.headers.get('origin') && req.headers.get('origin') !== req.nextUrl.origin) return NextResponse.json({error:'Origine refusée.'},{status:403});
   const parsed = salesSchema.safeParse(await req.json().catch(() => null));
   if (!z.string().uuid().safeParse(params.id).success || !parsed.success) return NextResponse.json({error:'Champs invalides.'},{status:400});
+  const {append_note:appendedNote,...fields}=parsed.data;
+  const issues=salesIssues(fields);
+  if (issues.length) return NextResponse.json({error:issues[0],issues},{status:400});
   let website:string | null;
-  try { website = parsed.data.website_url ? normalizeUrl(parsed.data.website_url).href : null; }
+  try { website = fields.website_url ? normalizeUrl(fields.website_url).href : null; }
   catch { return NextResponse.json({error:'URL HTTP(S) publique requise.'},{status:400}); }
   try {
     const current = await getProspect(params.id); if (!current) return NextResponse.json({error:'Prospect introuvable.'},{status:404});
@@ -36,8 +40,11 @@ export async function PATCH(req:NextRequest,{params}:{params:{id:string}}) {
         {signal:'website_source',source:'manual',value:website ?? 'Site retiré manuellement'}],
       technologies:[],crawl_status:'pending' as const,crawl_http_status:null,crawl_error:null,last_enriched_at:null} : {};
     // Sales form and enrichment share optimistic concurrency; never write stale derived signals.
+    // Contact date stamped on a contact status, next action closed on won/lost/ignored, dated note prepended.
+    const sales=applySalesTransition(current,fields);
+    const notes=appendedNote ? appendNote(sales.notes,appendedNote) : sales.notes;
     const {db}=await import('@/lib/platform/prospects/repository');
-    const saved=await db().from('platform_prospects').update({...parsed.data,website_url:website,domain:normalizedDomain(website),...reset,
+    const saved=await db().from('platform_prospects').update({...fields,...sales,notes,website_url:website,domain:normalizedDomain(website),...reset,
       ...scoreProspect({...current,...reset,website_url:website})}).eq('id',params.id).eq('updated_at',current.updated_at).select('id');
     if(saved.error)throw new Error('save_failed');
     if(!saved.data?.length)return NextResponse.json({error:'La fiche a changé. Rechargez-la avant de réessayer.'},{status:409});

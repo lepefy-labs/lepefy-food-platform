@@ -1,4 +1,5 @@
 import { assessProspect, completenessLabel, QUALITY_LABELS } from '@/lib/platform/prospects/assessment';
+import { daysOverdue, followUpState, SALES_TIME_ZONE } from '@/lib/platform/prospects/salesPipeline';
 import type { Prospect } from '@/lib/platform/prospects/types';
 import { Badge } from './ui';
 export function Fit({p}:{p:Prospect}) {
@@ -17,4 +18,11 @@ export function Qualification({p}:{p:Prospect}) {
 }
 export function CollectionStatus({p}:{p:Prospect}) {
   return <span>{QUALITY_LABELS[assessProspect(p).enrichment_status]}</span>;
+}
+export function FollowUp({p}:{p:Prospect}) {
+  if (!p.next_action_at) return <span className="text-xs text-gray-400">—</span>;
+  const state=followUpState(p.next_action_at), day=new Date(p.next_action_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',timeZone:SALES_TIME_ZONE});
+  if (state==='overdue') { const late=daysOverdue(p.next_action_at); return <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-800">En retard · {late} j</span>; }
+  if (state==='today') return <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">Aujourd’hui</span>;
+  return <span className="text-xs text-gray-600 dark:text-gray-300">{day}</span>;
 }

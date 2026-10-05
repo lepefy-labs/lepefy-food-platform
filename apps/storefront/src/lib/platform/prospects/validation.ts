@@ -15,6 +15,8 @@ export const salesSchema = z.object({
   notes: z.string().max(10000).nullable(), lost_reason: z.string().max(1000).nullable(),
   do_not_contact: z.boolean(), suppression_reason: z.string().max(1000).nullable(),
   website_url: z.string().max(2048).nullable(),
+  // Dated entry prepended to notes server-side (salesPipeline.appendNote).
+  append_note: z.string().trim().min(1).max(2000).optional(),
 }).strict();
 export const actionSchema = z.discriminatedUnion('action', [
   z.object({ action:z.literal('discover'), filters:discoverySchema }),

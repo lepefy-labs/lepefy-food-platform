@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { CONFIG } from './config';
 import { identityKey, normalizedDomain, sameIdentity } from './deduplication';
 import { scoreProspect } from './scoring';
+import { CLOSED_STATUSES, endOfLocalDay, PIPELINE_STAGES } from './salesPipeline';
 import type { Identity, Prospect, Run } from './types';
 export const db = () => createServiceClient();
 export const hash = (value:unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -87,6 +88,9 @@ export async function listProspects(params:URLSearchParams) {
   if (params.get('has_whatsapp') === 'true') query = query.not('whatsapp_url','is',null);
   if (params.get('has_whatsapp') === 'false') query = query.is('whatsapp_url',null);
   if (params.get('outbound') === 'true') query = query.eq('do_not_contact',false).in('status',['discovered','enriched','qualified']);
+  // « À relancer » : next action due today or earlier, open and contactable prospects only.
+  if (params.get('follow_up') === 'due') query = query.lte('next_action_at',endOfLocalDay()).eq('do_not_contact',false)
+    .not('status','in','('+CLOSED_STATUSES.join(',')+')');
   const score = Number(params.get('score') ?? 0);
   query = query.gte('fit_score',Number.isFinite(score) ? Math.min(100,Math.max(0,score)) : 0);
   const cutoff=new Date(Date.now()-CONFIG.websiteDays*86400000).toISOString();
@@ -94,6 +98,7 @@ export async function listProspects(params:URLSearchParams) {
   if(params.get('collection')==='enriched' || params.get('qualification_level'))
     query=query.eq('crawl_status','completed').gte('website_checked_at',cutoff);
   if(params.get('sort')==='fit')query=query.order('fit_score',{ascending:false});
+  else if(params.get('sort')==='next_action' || params.get('follow_up')==='due')query=query.order('next_action_at',{ascending:true,nullsFirst:false});
   else query=query.order('last_enriched_at',{ascending:true,nullsFirst:true})
     .order('has_catering',{ascending:false,nullsFirst:false}).order('has_multiple_locations',{ascending:false,nullsFirst:false})
     .order('latitude',{ascending:true,nullsFirst:false});
@@ -101,6 +106,7 @@ export async function listProspects(params:URLSearchParams) {
   if (result.error) throw new StoreError();
   return { prospects:result.data as Prospect[], total:result.count ?? 0, page, pageSize:CONFIG.pageSize };
 }
+const head = () => db().from('platform_prospects').select('id',{count:'exact',head:true});
 export async function dashboard() {
   const cutoff=new Date(Date.now()-CONFIG.websiteDays*86400000).toISOString();
   const counts = await Promise.all([
@@ -113,7 +119,18 @@ export async function dashboard() {
     ...['demo','won'].map(status => db().from('platform_prospects').select('id',{count:'exact',head:true}).eq('status',status)),
   ]);
   if (counts.some(r => r.error)) throw new StoreError();
+  // Overdue = due before today (local); start of today = end of yesterday.
+  const startOfToday=endOfLocalDay(new Date(Date.now()-86_400_000));
+  const open=(q:ReturnType<typeof head>)=>q.eq('do_not_contact',false).not('status','in','('+CLOSED_STATUSES.join(',')+')');
+  const [pipeline,dueToday,overdue] = await Promise.all([
+    Promise.all(PIPELINE_STAGES.map(status => head().eq('status',status))),
+    open(head()).lte('next_action_at',endOfLocalDay()),
+    open(head()).lt('next_action_at',startOfToday),
+  ]);
+  if (pipeline.some(r => r.error) || dueToday.error || overdue.error) throw new StoreError();
   const runs = await db().from('platform_prospect_runs').select('*').order('created_at',{ascending:false}).limit(5);
   if (runs.error) throw new StoreError();
-  return { counts:counts.map(r => r.count ?? 0), runs:runs.data as Run[] };
+  return { counts:counts.map(r => r.count ?? 0), runs:runs.data as Run[],
+    pipeline:Object.fromEntries(PIPELINE_STAGES.map((status,i) => [status,pipeline[i]?.count ?? 0])) as Record<string,number>,
+    followUp:{due:dueToday.count ?? 0,overdue:overdue.count ?? 0} };
 }

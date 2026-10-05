@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 5 ottobre 2026 — **v7.13 Current-State Snapshot** (Nala Analytics: funnel, liste azionabili, fatturato senza ordini test/annullati/rimborsati, ritenzione 90 giorni schedulabile; base `main` @ `1347d658`)
+> **Aggiornato:** 5 ottobre 2026 — **v7.14 Current-State Snapshot** (Prospects: vista « À relancer », pipeline, note datate, motivi obbligatori; base `main` @ `d0861eaf`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -103,6 +103,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 ### Configurazione programma fedeltà (migration 130/131)
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
+
+### Platform Prospects — suivi commercial (`/admin/platform/prospects`) — `docs/PLATFORM_PROSPECTS.md`
+
+- Vista di default **À relancer** (`follow_up=due`: prossima azione entro oggi, Europe/Paris, esclusi chiusi e opposizioni) con conteggio dei ritardi; **Pipeline** con chip per stato e conteggi; filtri nell'URL.
+- `salesPipeline.ts` applicato dal PATCH: motivo obbligatorio per « Perdu » e « Ne pas contacter », data di contatto automatica sugli stati di contatto, prossima azione chiusa per gagné/perdu/ignoré, `append_note` datata in cima allo storico.
+- Fiche: suivi commercial in alto, link di contatto rapidi (nascosti in caso di opposizione), diagnostica tecnica chiusa. Nessuna migrazione.
 
 ### Admin Nala Analytics (`/admin/nala-analytics`) — `docs/NALA_ANALYTICS.md`
 

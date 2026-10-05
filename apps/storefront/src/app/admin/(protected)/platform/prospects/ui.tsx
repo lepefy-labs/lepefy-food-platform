@@ -14,8 +14,12 @@ export function ExternalLink({href,children}:{href?:string | null;children:React
   return <a className="break-all text-violet-700 underline dark:text-violet-300" href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
 }
 export async function api<T>(path:string,init?:RequestInit):Promise<T> {
-  const response = await fetch(path,{cache:'no-store',...init});
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error ?? 'Opération indisponible.');
+  let response:Response;
+  try { response = await fetch(path,{cache:'no-store',...init}); }
+  catch { throw new Error('Connexion impossible. Vérifiez le réseau et réessayez.'); }
+  // A platform timeout (504) or proxy page is not JSON: report the status instead of crashing.
+  const body = await response.json().catch(() => null) as ({error?:string} & T) | null;
+  if (!response.ok) throw new Error(body?.error ?? (response.status === 504 ? 'Le serveur a mis trop de temps à répondre. Réessayez.' : 'Opération indisponible (HTTP '+response.status+').'));
+  if (body === null) throw new Error('Réponse illisible du serveur. Réessayez.');
   return body as T;
 }

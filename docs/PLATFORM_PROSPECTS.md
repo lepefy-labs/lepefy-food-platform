@@ -197,6 +197,32 @@ Run cursors retain OSM matches/ambiguities, sites discovered/crawled/blocked, Go
 complete/partial/failed counts. The run panel and detail source diagnostics expose these without
 logging HTML, credentials or business contact data.
 
+## Commercial follow-up
+
+The list opens on **À relancer**: open, contactable prospects whose `next_action_at` is due today or earlier
+(Europe/Paris day; `follow_up=due`, sorted by next action). Other views: **Pipeline** (status chips with counts:
+qualified → contacted → replied → demo → pilot → won), **À enrichir** (`collection=unverified`) and **Tous**.
+Filters, view and page live in the URL, so they survive reloads and can be shared. Discovery, enrichment
+counters and recent runs sit in the collapsible « Découverte et enrichissement » panel.
+`dashboard()` adds per-stage counts and the due/overdue follow-up counts (head-only counts in parallel).
+Overdue means due before today, consistently with the « En retard · n j » badge.
+
+Pure rules live in `salesPipeline.ts` and are applied by the detail PATCH route:
+
+- **Required reasons**: status « Perdu » needs `lost_reason`; « Ne pas contacter » needs `suppression_reason`
+  (proof of the objection). Reasons are cleared when the prospect leaves that state; notes keep the history.
+- **Contact date**: moving to contacted/replied/demo/pilot stamps `last_contact_at` when it was left empty.
+- **Closed** (won/lost/ignored): `next_action_at` is cleared; closed or opposed prospects never appear in « À relancer ».
+- **Dated notes**: `append_note` (≤ 2,000 characters) is prepended as « [dd/mm/yyyy hh:mm] … » (Paris time),
+  the whole field stays ≤ 10,000 characters. The full history remains editable for corrections.
+  A structured activity table would need a migration and is intentionally not part of this module.
+
+The detail page shows the commercial follow-up first, with quick contact links (tel:, mailto:, HTTPS
+WhatsApp/Instagram/Facebook/site only, hidden when the prospect objected) and next-action presets
+(tomorrow, +3 days, +1 week at 09:00). Observations and recommended modules follow; sources, OSM, Google,
+HTTP and completeness diagnostics are in the collapsed « Diagnostic technique » section.
+The client `api()` helper reports non-JSON responses (e.g. a 504 timeout) with their status instead of crashing.
+
 ## Validation
 
 Unit tests use HTML fixtures and mocked provider/HTTP responses, including address pinning,
