@@ -104,6 +104,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
 
+### Admin Funnel checkout (`/admin/checkout-funnel`)
+
+- Calcolo in `lib/admin/checkoutFunnel.ts` da `checkout_sessions` storefront del periodo (7/30/90 giorni, letture paginate; la view `checkout_funnel_30d` resta per gli altri lettori). Le sessioni il cui ordine è `is_test` sono escluse.
+- Conversione = commandes / paiements terminés (completati + scaduti + annullati): prima i checkout ancora aperti contavano come persi (2/5 = 40 % invece di 2/3). Valori in euro convertiti, in attesa e persi (articoli + spedizione − riduzione parrainage).
+- Liste azionabili: pagamenti esterni da verificare e carrelli da rilanciare (aperti/scaduti negli ultimi 7 giorni, con contatto, dal più alto) con link a `/admin/paiements-en-attente/[id]`.
+
 ### Admin Slides d'accueil (`/admin/accueil-slides`)
 
 - **Sicurezza**: i link dei pulsanti erano salvati senza controllo (un `javascript:` finiva come href sulla home). Ora `safeSlideHref` (`lib/home/heroSlideRules.ts`) accetta solo percorsi interni `/…` o `https://` senza credenziali: validato nel form, nelle API (POST/PATCH sul risultato unito) e di nuovo in `HeroCarousel` per i dati già esistenti. Libellé e link vanno insieme anche per il pulsante principale.
