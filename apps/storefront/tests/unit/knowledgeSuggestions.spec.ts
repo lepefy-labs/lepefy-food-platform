@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 import {
   buildKnowledgeBaseSuggestions,
+  isDismissedMarker,
+  knowledgeDismissedSource,
   knowledgeSuggestionSource,
+  KNOWLEDGE_INTENTS,
   type KnowledgeSuggestionInteractionRow,
 } from '../../src/lib/admin/knowledgeSuggestions';
 
@@ -94,4 +97,21 @@ test('rows without a real knowledge/retrieval gap are ignored', () => {
   });
 
   expect(suggestions).toEqual([]);
+});
+
+test('an ignored suggestion is never proposed again and its marker stays out of the knowledge list', () => {
+  const rows = [row()];
+  const [suggestion] = buildKnowledgeBaseSuggestions({ rows });
+  expect(suggestion).toBeTruthy();
+  const marker = knowledgeDismissedSource(suggestion!.key);
+  expect(buildKnowledgeBaseSuggestions({ rows, existingSources: [marker] })).toEqual([]);
+  expect(isDismissedMarker(marker)).toBe(true);
+  expect(isDismissedMarker(knowledgeSuggestionSource(suggestion!.key))).toBe(false);
+  expect(isDismissedMarker(null)).toBe(false);
+});
+
+test('product searches are not knowledge gaps (shared with Nala Analytics)', () => {
+  expect(KNOWLEDGE_INTENTS.has('delivery')).toBe(true);
+  expect(KNOWLEDGE_INTENTS.has('product_search')).toBe(false);
+  expect(buildKnowledgeBaseSuggestions({ rows: [row({ intent: 'product_search', message_text: 'Je veux la Bouillie' })] })).toEqual([]);
 });

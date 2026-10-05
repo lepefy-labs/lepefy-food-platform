@@ -7,7 +7,9 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { embedText } from '@/lib/ai/embeddings';
 import { logAiUsage } from '@/lib/ai/usageTracking';
 import {
+  KNOWLEDGE_DISMISSED_SOURCE_PREFIX,
   KNOWLEDGE_SUGGESTION_SOURCE_PREFIX,
+  knowledgeDismissedSource,
   knowledgeSuggestionSource,
 } from '@/lib/admin/knowledgeSuggestions';
 import type { KnowledgeBaseCategory } from '@lepefy/types';
@@ -66,7 +68,7 @@ export async function GET() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Chargement impossible.' }, { status: 500 });
   }
 
   return NextResponse.json({ entries: data ?? [] });
@@ -80,18 +82,36 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
 
   const body = await req.json().catch(() => null);
+
+  // « Ignorer » : inactive marker without embedding, so the suggestion is never proposed again.
+  const dismissKey = typeof body?.dismissSuggestionKey === 'string' ? body.dismissSuggestionKey.trim() : '';
+  if (dismissKey) {
+    if (!SUGGESTION_KEY_PATTERN.test(dismissKey)) return NextResponse.json({ error: 'Suggestion inconnue.' }, { status: 400 });
+    const db = createServiceClient();
+    const source = knowledgeDismissedSource(dismissKey);
+    const { data: existing } = await db.from('tenant_knowledge_base').select('id').eq('tenant_id', tenant.id).eq('source', source).maybeSingle();
+    if (!existing) {
+      const { error } = await db.from('tenant_knowledge_base').insert({
+        tenant_id: tenant.id, category: 'faq', content: 'Suggestion ignorée', embedding: null, source,
+        active: false, reviewed_by: await getAdminEmail(), reviewed_at: new Date().toISOString(),
+      });
+      if (error) return NextResponse.json({ error: 'Impossible d’ignorer cette suggestion.' }, { status: 500 });
+    }
+    return NextResponse.json({ dismissed: true });
+  }
+
   const category = typeof body?.category === 'string' ? body.category : '';
   const content = typeof body?.content === 'string' ? body.content.trim() : '';
   const rawSuggestionKey = typeof body?.suggestionKey === 'string' ? body.suggestionKey.trim() : '';
 
   if (!VALID_CATEGORIES.includes(category)) {
-    return NextResponse.json({ error: 'invalid_category' }, { status: 400 });
+    return NextResponse.json({ error: 'Catégorie invalide.' }, { status: 400 });
   }
   if (!content || content.length > MAX_CONTENT_LENGTH) {
-    return NextResponse.json({ error: 'invalid_content' }, { status: 400 });
+    return NextResponse.json({ error: `Le contenu est obligatoire (${MAX_CONTENT_LENGTH} caractères au plus).` }, { status: 400 });
   }
   if (rawSuggestionKey && !SUGGESTION_KEY_PATTERN.test(rawSuggestionKey)) {
-    return NextResponse.json({ error: 'invalid_suggestion_key' }, { status: 400 });
+    return NextResponse.json({ error: 'Suggestion inconnue.' }, { status: 400 });
   }
 
   const manualSource = typeof body?.source === 'string' && body.source.trim()
@@ -99,7 +119,7 @@ export async function POST(req: NextRequest) {
     : 'manual';
   const source = rawSuggestionKey
     ? knowledgeSuggestionSource(rawSuggestionKey)
-    : manualSource.startsWith(KNOWLEDGE_SUGGESTION_SOURCE_PREFIX) ? 'manual' : manualSource;
+    : manualSource.startsWith(KNOWLEDGE_SUGGESTION_SOURCE_PREFIX) || manualSource.startsWith(KNOWLEDGE_DISMISSED_SOURCE_PREFIX) ? 'manual' : manualSource.slice(0, 120);
 
   const adminEmail = await getAdminEmail();
   const supabase = createServiceClient();
@@ -158,6 +178,6 @@ export async function POST(req: NextRequest) {
       model: 'gemini-embedding-001',
       status: 'error',
     });
-    return NextResponse.json({ error: 'insert_failed' }, { status: 502 });
+    return NextResponse.json({ error: 'Ajout impossible : le service d’indexation IA n’a pas répondu. Réessayez.' }, { status: 502 });
   }
 }

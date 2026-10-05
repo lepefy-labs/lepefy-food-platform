@@ -104,6 +104,12 @@ L’etichetta parrainage usa `referral_access_granted` e `referral_suspended`, c
 
 Attivazione e tassi del programma vivono **solo** in `tenant_feature_settings('loyalty')` (feature `billable = false`, senza piani): `enabled` + config `{version, purchase_points_rate, points_to_currency_rate}` validata da zod (`src/lib/loyalty/loyaltyConfig.ts`) e dal CHECK `is_valid_loyalty_config`. Il codice legge tramite `getLoyaltySettings(db, tenantId)`: riga valida → valori salvati; riga assente, invalida o illeggibile → programma disattivato (fail closed). Scrittura admin: `PATCH /api/admin/loyalty/settings` (`tenant_settings.manage`, come prima). Le impostazioni referral hanno un proprio modulo (paragrafo seguente). **130 e 131 sono applicate in produzione** (26/09/2026, verificate): le colonne `tenants.loyalty_enabled/purchase_points_rate/points_to_currency_rate` e i trigger di mirror non esistono più, `process_manual_purchase_points_atomic` legge il tasso dalla riga settings. Un nuovo tenant non riceve alcuna riga loyalty: il programma resta disattivato finché un admin non salva la configurazione.
 
+### Admin IA — Base de connaissance (`/admin/ai-lab`)
+
+- Voci **modificabili** (`PATCH /api/admin/knowledge-base/[id]`: testo e categoria, nuovo embedding se il testo cambia, uso IA registrato), **in pausa** (`active = false`, già ignorato da `match_knowledge_base`) e cancellazione solo con conferma. Ricerca, filtro Attive / In pausa, testo espandibile.
+- **Ignorare un suggerimento**: riga marcatore inattiva senza embedding con `source = nala_dismissed:<chiave>`; il loader la usa solo come esclusione e la pagina non la mostra. Errori dell'API in francese.
+- `KNOWLEDGE_INTENTS` (`lib/admin/knowledgeSuggestions.ts`) è condiviso con Nala Analytics: « Questions sans réponse » conta ora solo domande a cui una voce di conoscenza può rispondere (boutique, livraison, recette, événement, info produit). Prima includeva le ricerche di prodotto (« Je veux la Bouillie ») e rimandava qui una lista vuota.
+
 ### Admin Funnel checkout (`/admin/checkout-funnel`)
 
 - Calcolo in `lib/admin/checkoutFunnel.ts` da `checkout_sessions` storefront del periodo (7/30/90 giorni, letture paginate; la view `checkout_funnel_30d` resta per gli altri lettori). Le sessioni il cui ordine è `is_test` sono escluse.

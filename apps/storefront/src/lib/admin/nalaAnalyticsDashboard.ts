@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { KNOWLEDGE_INTENTS } from './knowledgeSuggestions';
 import {
   activityBuckets,
   bucketIndexFor,
@@ -242,7 +243,8 @@ export async function loadNalaAnalyticsDashboard(params: {
   const sessionCount = sessionsResult.count ?? 0;
 
   const unmetRows = interactions.filter((row) => row.demand_status === 'unmet');
-  const knowledgeGapRows = interactions.filter((row) => row.knowledge_status === 'missing');
+  // Same scope as the AI-lab suggestions: questions a knowledge entry can answer (product searches → unmet demand).
+  const knowledgeGapRows = interactions.filter((row) => row.knowledge_status === 'missing' && KNOWLEDGE_INTENTS.has(row.intent ?? ''));
   const retrievalIssueRows = interactions.filter((row) => row.retrieval_quality === 'weak' || row.retrieval_quality === 'empty');
   const enrichedRows = interactions.filter((row) => row.semantic_enrichment_status === 'completed');
 

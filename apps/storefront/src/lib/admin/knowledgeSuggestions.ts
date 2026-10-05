@@ -7,6 +7,8 @@ import type {
 } from '@lepefy/types';
 
 export const KNOWLEDGE_SUGGESTION_SOURCE_PREFIX = 'nala_suggestion:';
+/** Inactive marker row (no embedding, never retrieved) recording a suggestion the admin chose to ignore. */
+export const KNOWLEDGE_DISMISSED_SOURCE_PREFIX = 'nala_dismissed:';
 
 const LOOKBACK_DAYS = 90;
 const MAX_INTERACTIONS = 500;
@@ -14,7 +16,8 @@ const MAX_SUGGESTIONS = 10;
 const MAX_QUESTION_PREVIEW = 160;
 const MAX_PROPOSED_CONTENT = 1200;
 
-const ELIGIBLE_INTENTS = new Set([
+/** Intents a knowledge entry can answer; product searches belong to the catalogue. Shared with Nala Analytics. */
+export const KNOWLEDGE_INTENTS: ReadonlySet<string> = new Set([
   'product_information',
   'recipe',
   'delivery',
@@ -94,6 +97,14 @@ export function knowledgeSuggestionSource(key: string): string {
   return `${KNOWLEDGE_SUGGESTION_SOURCE_PREFIX}${key}`;
 }
 
+export function knowledgeDismissedSource(key: string): string {
+  return `${KNOWLEDGE_DISMISSED_SOURCE_PREFIX}${key}`;
+}
+
+export function isDismissedMarker(source: string | null | undefined): boolean {
+  return Boolean(source?.startsWith(KNOWLEDGE_DISMISSED_SOURCE_PREFIX));
+}
+
 /**
  * Builds review-only knowledge drafts from bounded Nala analytics rows.
  * Nothing returned here is authoritative until a tenant admin explicitly approves it.
@@ -111,7 +122,7 @@ export function buildKnowledgeBaseSuggestions(params: {
     if (row.outcome !== 'answered' && row.outcome !== 'retrieval_empty') continue;
 
     const intent = row.intent ?? '';
-    if (!ELIGIBLE_INTENTS.has(intent)) continue;
+    if (!KNOWLEDGE_INTENTS.has(intent)) continue;
 
     const signals = suggestionSignals(row);
     if (signals.length === 0) continue;
@@ -127,7 +138,7 @@ export function buildKnowledgeBaseSuggestions(params: {
     const seed = clusterSeed(row, intent);
     if (!seed || seed.endsWith('|question|')) continue;
     const key = fingerprint(seed);
-    if (existingSources.has(knowledgeSuggestionSource(key))) continue;
+    if (existingSources.has(knowledgeSuggestionSource(key)) || existingSources.has(knowledgeDismissedSource(key))) continue;
 
     const current = groups.get(key);
     if (current) {

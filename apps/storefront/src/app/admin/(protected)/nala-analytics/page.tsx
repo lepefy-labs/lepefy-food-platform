@@ -263,7 +263,7 @@ export default async function NalaAnalyticsPage({ searchParams }: PageProps) {
       <div className="grid gap-5 lg:grid-cols-2">
         <SectionCard
           title={`Questions sans réponse (${dashboard.knowledgeGaps})`}
-          subtitle="Nala n’avait pas l’information. Ajoutez-la à sa base de connaissance pour qu’elle réponde la prochaine fois."
+          subtitle="Questions sur la boutique, la livraison, une recette ou un événement auxquelles Nala n’avait pas l’information. Ajoutez-la à sa base de connaissance."
           action={<ActionLink href="/admin/ai-lab">Compléter la base IA</ActionLink>}
         >
           {dashboard.knowledgeGapExamples.length === 0

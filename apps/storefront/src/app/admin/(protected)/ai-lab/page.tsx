@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
-import { loadKnowledgeBaseSuggestions } from '@/lib/admin/knowledgeSuggestions';
+import { isDismissedMarker, loadKnowledgeBaseSuggestions } from '@/lib/admin/knowledgeSuggestions';
 import AdminBlockAccent from '../../_components/ui/AdminBlockAccent';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { KnowledgeBaseClient } from './KnowledgeBaseClient';
@@ -20,19 +20,21 @@ export default async function AiLabPage() {
     .eq('tenant_id', tenant.id)
     .order('created_at', { ascending: false });
 
-  const entries = (data ?? []) as KnowledgeBaseEntry[];
+  const rows = (data ?? []) as KnowledgeBaseEntry[];
+  // Ignored suggestions are inactive marker rows: they only feed the exclusion list.
+  const entries = rows.filter((entry) => !isDismissedMarker(entry.source));
   const suggestions = await loadKnowledgeBaseSuggestions({
     supabase,
     tenantId: tenant.id,
-    existingSources: entries.map((entry) => entry.source),
+    existingSources: rows.map((entry) => entry.source),
   });
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
       <AdminPageHeader
         title="Base de connaissance IA"
-        description="Validez les suggestions issues des signaux Nala ou ajoutez vos propres connaissances. Rien n'est promu automatiquement dans la base."
-        meta={`${entries.length} validée${entries.length !== 1 ? 's' : ''} · ${suggestions.length} suggestion${suggestions.length !== 1 ? 's' : ''}`}
+        description="Ce que Nala sait de votre boutique au-delà du catalogue : livraison, horaires, recettes, expressions. Validez les suggestions issues des questions clients ou ajoutez vos propres connaissances ; rien n'est ajouté automatiquement."
+        meta={`${entries.filter((entry) => entry.active).length} active${entries.filter((entry) => entry.active).length !== 1 ? 's' : ''} · ${suggestions.length} suggestion${suggestions.length !== 1 ? 's' : ''}`}
       />
 
       <AdminBlockAccent tone="primary">
