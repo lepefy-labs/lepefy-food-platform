@@ -164,8 +164,8 @@ begin
   -- 11. RBAC catalogue.
   if (select count(*) from public.admin_permissions where key like 'whatsapp.%') <> 3
     then raise exception 'whatsapp capabilities missing'; end if;
-  if exists (select 1 from public.admin_role_permissions rp join public.admin_roles r on r.id = rp.role_id
-             where rp.permission_key like 'whatsapp.%' and r.code not in ('platform_owner', 'tenant_admin'))
+  if exists (select 1 from public.admin_role_permissions rp join public.admin_roles ro on ro.id = rp.role_id
+             where rp.permission_key like 'whatsapp.%' and ro.code not in ('platform_owner', 'tenant_admin'))
     then raise exception 'whatsapp capabilities must not be granted to other roles'; end if;
 end $$;
 rollback;
