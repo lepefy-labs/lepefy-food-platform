@@ -30,6 +30,7 @@ const LEGACY_TENANT_ADMIN_PERMISSIONS = [
   'tenant_settings.view','tenant_settings.manage','billing.view','ai_usage.view',
   'suppliers.view','suppliers.manage','purchases.view','purchases.manage','inventory.view','inventory.manage',
   'treasury.view','treasury.manage','supplier_payments.verify',
+  'whatsapp.view','whatsapp.reply','whatsapp.manage',
 ];
 const LEGACY_CASHIER_PERMISSIONS = ['loyalty.scan','scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own'];
 

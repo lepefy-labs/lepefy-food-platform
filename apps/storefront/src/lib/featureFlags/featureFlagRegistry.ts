@@ -32,6 +32,12 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     label: 'Gestion du commerce',
     description: 'Active l\'espace de gestion des fournisseurs, achats, dettes et trésorerie.',
   },
+  {
+    // Canal WhatsApp Business multi-tenant (migration 147, docs/WHATSAPP_BUSINESS_PLATFORM.md).
+    key: 'whatsapp_business',
+    label: 'WhatsApp Business',
+    description: 'Active le canal WhatsApp (réception des messages, réponses automatiques, Nala, boîte de réception de l\'équipe).',
+  },
 ];
 
 export function featureFlagDefinition(key: string): FeatureFlagDefinition | undefined {

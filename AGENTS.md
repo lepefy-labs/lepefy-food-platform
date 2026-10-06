@@ -46,6 +46,22 @@ The documentation is a **mandatory co-change** for this module:
 
 Do not treat a small Shipping Intelligence change as exempt from this documentation contract. At minimum, re-verify the document and update the affected section plus its reviewed-base SHA/date. The only exception is a repository operation that does not modify module files or behavior at all.
 
+### WhatsApp Business channel documentation contract
+
+For **any task that touches the WhatsApp channel** (`apps/storefront/src/lib/whatsapp/**`, `lib/ai/nalaChannelTurn.ts`, `app/api/integrations/whatsapp/**`, `app/api/internal/whatsapp/**`, `app/api/admin/whatsapp/**`, `app/admin/(protected)/canaux/whatsapp/**`, migration `147_whatsapp_business_platform.sql` or later WhatsApp migrations, `ops/n8n/whatsapp-*.json`), read and follow:
+
+```text
+docs/WHATSAPP_BUSINESS_PLATFORM.md
+```
+
+Non-negotiable invariants:
+
+1. the tenant is resolved only server-side from the recipient `phone_number_id`; never from the customer number, a client-supplied tenant id or the deployment env;
+2. no Meta token, app secret or verify token in the database or repository (env var references only);
+3. never connect, migrate or activate a real tenant number (e.g. Chloe Food) without explicit requester approval — follow the onboarding checklist of the document;
+4. deterministic data (prices, stock, shipping, order status, tracking, payments) never comes from AI;
+5. the document is a mandatory co-change: update its state, file map, invariants and troubleshooting in the same delivery unit.
+
 ## Core workflow
 
 Follow this sequence:

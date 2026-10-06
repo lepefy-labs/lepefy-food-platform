@@ -1,0 +1,174 @@
+{
+  "name": "Lepefy · WhatsApp maintenance (sweep every minute, retention nightly)",
+  "nodes": [
+    {
+      "id": "1e2f3a4b-5c6d-4e7f-8a9b-0c1d2e3f4a01",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2f3a4b5c-6d7e-4f80-9b0c-1d2e3f4a5b02",
+      "name": "Sweep pending messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_LEPEFY_APP_URL/api/internal/whatsapp/maintenance",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\":\"sweep\"}",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "3a4b5c6d-7e8f-4091-a0c1-2e3f4a5b6c03",
+      "name": "Every night 03:45",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        180,
+        420
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 45
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "4b5c6d7e-8f90-41a2-b1d2-3f4a5b6c7d04",
+      "name": "Retention purge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        420
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_LEPEFY_APP_URL/api/internal/whatsapp/maintenance",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\":\"purge\"}",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 30000
+    },
+    {
+      "id": "5c6d7e8f-9001-42b3-82e3-4a5b6c7d8e05",
+      "name": "Check outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        310
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $input.first()?.json;\nif (!body || body.ok !== true) {\n  throw new Error('whatsapp_maintenance_failed');\n}\nreturn [{ json: { ok: true } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "Sweep pending messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every night 03:45": {
+      "main": [
+        [
+          {
+            "node": "Retention purge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sweep pending messages": {
+      "main": [
+        [
+          {
+            "node": "Check outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retention purge": {
+      "main": [
+        [
+          {
+            "node": "Check outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

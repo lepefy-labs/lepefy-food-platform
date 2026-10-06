@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode, IconBuildingWarehouse, IconTruckLoading, IconCash, IconLayoutDashboard, IconPackages } from '@tabler/icons-react';
+import { IconShoppingBag, IconChartBar, IconPackage, IconUsers, IconTag, IconSettings, IconCreditCard, IconSparkles, IconGift, IconPhoto, IconStar, IconScan, IconTruck, IconTruckDelivery, IconCalendarEvent, IconFileInvoice, IconToolsKitchen2, IconBriefcase, IconMessageCircle, IconFileText, IconQrcode, IconBuildingWarehouse, IconTruckLoading, IconCash, IconLayoutDashboard, IconPackages, IconBrandWhatsapp } from '@tabler/icons-react';
 import type { AdminWorkspace } from '@/lib/admin/workspace';
 import PlatformNav from './PlatformNav';
 
@@ -17,9 +17,11 @@ interface AdminSidebarProps {
   isPlatformOwner?: boolean;
   /** Flag business_management attivo per il tenant (risolto lato server). */
   gestionEnabled?: boolean;
+  /** Flag whatsapp_business attivo per il tenant (risolto lato server). */
+  whatsappEnabled?: boolean;
 }
 
-export default function AdminSidebar({ workspace = 'shop', permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, isPlatformOwner = false, gestionEnabled = false }: AdminSidebarProps) {
+export default function AdminSidebar({ workspace = 'shop', permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, isPlatformOwner = false, gestionEnabled = false, whatsappEnabled = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
   function navClass(active: boolean) { return active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] font-semibold ring-1 ring-[#D9D3FF] shadow-[inset_3px_0_0_var(--admin-primary)] dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-500/30' : 'text-gray-600 dark:text-gray-300 hover:bg-white hover:text-gray-950 dark:hover:bg-white/5 dark:hover:text-white'; }
@@ -49,6 +51,10 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
       {has('reviews.view') && <Link href="/admin/avis" className={linkClass(pathname.startsWith('/admin/avis'))}><IconMessageCircle size={20}/>Avis clients</Link>}
       {has('ai_usage.view') && <Link href="/admin/nala-analytics" className={linkClass(pathname.startsWith('/admin/nala-analytics'))}><IconSparkles size={20}/>Nala Analytics</Link>}
       {has('ai_knowledge.manage') && <Link href="/admin/ai-lab" className={linkClass(pathname === '/admin/ai-lab')}><IconSparkles size={20}/>IA — Base de connaissance</Link>}
+      {whatsappEnabled && has('whatsapp.view') && <>
+        <p className={groupLabel}>Canaux</p>
+        <Link href="/admin/canaux/whatsapp" className={linkClass(pathname.startsWith('/admin/canaux/whatsapp'))}><IconBrandWhatsapp size={20}/>WhatsApp</Link>
+      </>}
       {gestionVisible && <>
         <p className={groupLabel}>Gestion</p>
         <Link href="/admin/gestion" className={linkClass(pathname === '/admin/gestion')}><IconLayoutDashboard size={20}/>Vue d&apos;ensemble</Link>

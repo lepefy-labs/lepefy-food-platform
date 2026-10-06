@@ -10,6 +10,7 @@ import { canAdmin, getAdminAccessContext } from '@/lib/auth/adminRbac';
 import { defaultAdminDestination, isPersonalAdminPath, permissionsForAdminPath } from '@/lib/auth/adminRoutePermissions';
 import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 import { GESTION_VIEW_PERMISSIONS } from '@/lib/gestion/domain';
+import { isWhatsAppEnabled } from '@/lib/whatsapp/server/featureGate';
 import AdminSidebar from '../_components/AdminSidebar';
 import AdminHeader from '../_components/AdminHeader';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
@@ -84,6 +85,8 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   const gestionEnabled = workspace === 'shop' && GESTION_VIEW_PERMISSIONS.some((permission) => canAdmin(access, permission))
     ? await isBusinessManagementEnabled(tenant.id)
     : false;
+  // WhatsApp (flag whatsapp_business): letto solo se l'admin potrebbe vedere la sezione.
+  const whatsappEnabled = workspace === 'shop' && canAdmin(access, 'whatsapp.view') ? await isWhatsAppEnabled(tenant.id) : false;
   const pendingPaymentsCount = pendingPaymentsResult.count ?? 0;
   const pendingEventRequestsCount = pendingEventRequestsResult.count ?? 0;
   const pendingRentalRequestsCount = pendingRentalRequestsResult.count ?? 0;
@@ -92,9 +95,9 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
-      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={navPermissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} />
+      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={navPermissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} />
       <div className="flex min-h-[calc(100vh-57px)] bg-[var(--admin-page-bg)] dark:bg-gray-950">
-        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={navPermissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} /></Suspense></aside>
+        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-56 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={navPermissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} /></Suspense></aside>
         <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8"><SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />{children}</main>
       </div>
     </AdminThemeProvider>

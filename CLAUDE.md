@@ -102,6 +102,14 @@ The shipping logic is the most complex part of the codebase:
 - Server PDF via Gotenberg (`htmlToPdf(html, options)` in `src/lib/labels/gotenberg.ts`, options are additive) is the only print path: `GET /api/admin/orders/[id]/documents/{picking-list|packing-slip}` and bulk `GET /api/admin/orders/documents/{kind}?ids=` (`orders.view`, one PDF, max 50). Formats come from `ORDER_DOCUMENT_FORMATS` (A5 default, A4) — never hard-code `'a5'`/`'a4'` elsewhere. Tenant defaults live in `tenant_feature_settings('order_documents')` (migration 145).
 - The QR targets `<storefront_url>/o/<token>`: opaque 128-bit HMAC token, only nonce + SHA-256 stored in `order_public_access_tokens` (service role only), created lazily, same token on reprint, revocable. The `/o/[token]` portal shows a minimal view-model (no PII, persisted tracking snapshot only); reorder is a read-only proposal added through the normal cart.
 
+### WhatsApp Business channel (multi-tenant) — `docs/WHATSAPP_BUSINESS_PLATFORM.md`
+
+- One public webhook for all tenants: `/api/integrations/whatsapp/webhook` (GET verify token, POST `X-Hub-Signature-256`, fail closed). The tenant is resolved **only** from `metadata.phone_number_id` → `tenant_whatsapp_channels` (migration 147), never from the customer number, a client-sent id or `NEXT_PUBLIC_TENANT_SLUG`. Processing code reads the tenant row by id and builds links from `tenants.storefront_url` only (never `NEXT_PUBLIC_APP_URL`).
+- Graph API is called only from `src/lib/whatsapp/provider/metaCloudProvider.ts`; every outbound message goes through `responseService.ts` (24 h window, test-tenant allow-list `WHATSAPP_TEST_RECIPIENTS`). Tokens never in DB: `access_token_env` stores an env var NAME, default `META_WHATSAPP_SYSTEM_USER_TOKEN`.
+- Inbound messages are persisted idempotently (RPC `ingest_whatsapp_inbound_message`) then processed via atomic claim (`claim_whatsapp_inbound_messages`), inline or through n8n (`WHATSAPP_PROCESSING_MODE`); n8n only carries UUIDs.
+- Deterministic rules (`lib/whatsapp/automation/`) win over AI; payments, orders, shipping costs, stock and tracking never come from Nala. Nala runs as a channel via `lib/ai/nalaChannelTurn.ts` — do not create a second assistant. A conversation in `waiting_human`/`human` has `automation_status = paused`: automation must never reply.
+- Behind release flag `whatsapp_business`; pages call `requireWhatsAppPage()`, APIs `requireWhatsAppApi()` (`lib/whatsapp/server/featureGate.ts`). Capabilities `whatsapp.view|reply|manage`; mapping a `phone_number_id` to a tenant is platform-owner only.
+
 ### Internal notification recipients — `docs/NOTIFICATION_SUBSCRIPTIONS.md`
 
 - Notification types are a code catalogue (`src/lib/notifications/notificationTypes.ts`: `NOTIFICATION_TYPES`, groups, presets); the DB stores only `tenant_notification_subscriptions (tenant_id, recipient_id, type_key, channel)` (migration 143). Adding a type = one registry entry, never a new `notify_*` column (those are legacy, backfilled by 143).
@@ -194,6 +202,15 @@ SUPABASE_SERVICE_ROLE_KEY=
 STRIPE_SECRET_KEY=
 PACKLINK_API_KEY=
 ADMIN_EMAILS=email1@example.com,email2@example.com  # comma-separated, no spaces
+
+# WhatsApp Business channel (docs/WHATSAPP_BUSINESS_PLATFORM.md §9)
+META_WHATSAPP_VERIFY_TOKEN=          # webhook GET verification (random, chosen by us)
+META_APP_SECRET=                     # Meta App Secret (X-Hub-Signature-256), comma-separated for rotation
+META_WHATSAPP_API_VERSION=           # Graph API version, default v23.0
+META_WHATSAPP_SYSTEM_USER_TOKEN=     # permanent System User token (never the temporary token in prod)
+WHATSAPP_PROCESSING_MODE=inline      # inline | n8n
+WHATSAPP_INTERNAL_SECRET=            # bearer for /api/internal/whatsapp/* (n8n)
+WHATSAPP_TEST_RECIPIENTS=            # test tenants only: allowed recipients, digits, comma-separated
 ```
 
 ## Conventions

@@ -1,0 +1,127 @@
+{
+  "name": "Lepefy · WhatsApp inbound dispatch",
+  "nodes": [
+    {
+      "id": "5a1d2c3e-6f70-4b81-9c92-a3b4c5d6e701",
+      "name": "Lepefy webhook (message IDs)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        180,
+        300
+      ],
+      "webhookId": "whatsapp-inbound",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-inbound",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "responseCode": 202,
+        "options": {}
+      }
+    },
+    {
+      "id": "6b2e3d4f-7081-4c92-8da3-b4c5d6e7f802",
+      "name": "Keep only message IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ids = $input.first()?.json?.body?.messageIds;\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!Array.isArray(ids) || ids.length === 0 || ids.length > 50 || !ids.every((id) => typeof id === 'string' && uuid.test(id))) {\n  throw new Error('whatsapp_dispatch_invalid_payload');\n}\n// Only internal UUIDs transit through n8n: no message body, no phone number.\nreturn [{ json: { messageIds: ids } }];"
+      }
+    },
+    {
+      "id": "7c3f4e50-8192-4da3-9eb4-c5d6e7f80903",
+      "name": "Process in Lepefy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_LEPEFY_APP_URL/api/internal/whatsapp/process",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messageIds: $json.messageIds }) }}",
+        "options": {
+          "timeout": 55000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "8d405f61-92a3-4eb4-afc5-d6e7f8091a04",
+      "name": "Check outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $input.first()?.json;\nif (!body || body.ok !== true) {\n  // Never echo upstream responses or credentials. Pending messages are picked up by the maintenance sweep.\n  throw new Error('whatsapp_process_failed');\n}\nreturn [{ json: { ok: true, claimed: Number(body.claimed ?? 0), done: Number(body.done ?? 0), errors: Number(body.errors ?? 0) } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Lepefy webhook (message IDs)": {
+      "main": [
+        [
+          {
+            "node": "Keep only message IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only message IDs": {
+      "main": [
+        [
+          {
+            "node": "Process in Lepefy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process in Lepefy": {
+      "main": [
+        [
+          {
+            "node": "Check outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "active": false,
+  "tags": [],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

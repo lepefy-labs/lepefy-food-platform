@@ -13,7 +13,8 @@ export type AdminApiPermission =
   | 'event_payments.view' | 'event_payments.confirm' | 'event_payments.cancel' | 'event_payments.refund'
   | 'event_content.manage' | 'tenant_settings.view' | 'tenant_settings.manage'
   | 'suppliers.view' | 'suppliers.manage' | 'purchases.view' | 'purchases.manage'
-  | 'inventory.view' | 'inventory.manage' | 'treasury.view' | 'treasury.manage' | 'supplier_payments.verify';
+  | 'inventory.view' | 'inventory.manage' | 'treasury.view' | 'treasury.manage' | 'supplier_payments.verify'
+  | 'whatsapp.view' | 'whatsapp.reply' | 'whatsapp.manage';
 
 function isRead(method: string): boolean {
   const normalized = method.toUpperCase();
@@ -81,6 +82,12 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/feature-flags') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   // Gestion du commerce: mappa dedicata, fail-closed (null = nessuna capability).
   if (path.startsWith('/api/admin/gestion/')) return gestionApiPermission(path, method) as AdminApiPermission | null;
+  // Canal WhatsApp (migration 147). Identité du numéro et envoi de test : platform owner en plus (requireWhatsAppApi).
+  if (/^\/api\/admin\/whatsapp\/conversations\/[^/]+\/(messages|actions)$/.test(path)) return method.toUpperCase() === 'POST' ? 'whatsapp.reply' : null;
+  if (/^\/api\/admin\/whatsapp\/conversations\/[^/]+$/.test(path)) return read ? 'whatsapp.view' : method.toUpperCase() === 'DELETE' ? 'whatsapp.manage' : null;
+  if (path === '/api/admin/whatsapp/conversations') return read ? 'whatsapp.view' : null;
+  if (path === '/api/admin/whatsapp/channel' || path === '/api/admin/whatsapp/rules') return read ? 'whatsapp.view' : 'whatsapp.manage';
+  if (path === '/api/admin/whatsapp/channel/settings' || path === '/api/admin/whatsapp/channel/test') return read ? null : 'whatsapp.manage';
   if (path.startsWith('/api/admin/payment-methods') || path.startsWith('/api/admin/notification-recipients')) return read ? 'tenant_settings.view' : 'tenant_settings.manage';
 
   if (/^\/api\/admin\/evenementiel\/reservation-requests\/[^/]+\/confirm-payment$/.test(path)) return 'event_payments.confirm';

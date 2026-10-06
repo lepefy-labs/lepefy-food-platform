@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 5 ottobre 2026 — **v7.17 Current-State Snapshot** (Documenti delle commande, bon de colis e portale QR, opzione indirizzo; base `main` @ `96d94e9d`)
+> **Aggiornato:** 6 ottobre 2026 — **v7.18 Current-State Snapshot** (Canale WhatsApp Business multi-tenant, migration 147 da applicare; base `main` @ `2ef761bc`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -48,6 +48,17 @@ Il dettaglio ordine (`/admin/orders/[id]`) usa lo stesso classificatore.
 - **Accesso pubblico**: tabella `order_public_access_tokens` (nonce + SHA-256 del token, mai in chiaro; token = HMAC `TRACKING_SECRET` troncato a 128 bit; un token attivo per ordine, revocabile con `revoked_at`; RLS senza policy, solo service role). Creato pigramente al primo bon de colis, stesso QR alle ristampe. QR = `<storefront_url>/o/<token>`.
 - **Portale `/o/[token]`** (storefront, senza login, noindex, no-referrer, no-store): réf. courte, stage cliente, articoli, snapshot di suivi persistito (transporteur, stato, ETA, link solo se `safeShipmentTrackingUrl`), punto di ritiro; nessuna PII né prezzo. CTA per ciclo di vita: suivi/itinéraire → aiuto prima della consegna; dopo «Commander à nouveau» (proposta in sola lettura `GET /api/order-portal/[token]/reorder` con prezzi/minimi/stock attuali, poi `cartStore.addItem` e checkout che rivalida tutto), «Donner mon avis» solo con invito d'avis utilizzabile (`POST /o/[token]/avis` emette un token d'avis `qr_portal`), «Besoin d'aide ?» dai canali tenant (WhatsApp, e-mail, boutique). Il widget Nala è nascosto su `/o/*` (il token non va negli analytics).
 - **Stato**: 145 **applicata in produzione il 05/10/2026** (verificato: `order_documents` registrata non fatturabile, tabella dei token presente, `anon` riceve `permission denied`, nessuna riga di preferenze ⇒ tutti i tenant usano i default). Senza la 145 un ambiente avrebbe preferenze default non salvabili, bon de colis senza QR e portale 404. Test SQL in CI: `supabase/tests/145_order_documents.*`.
+
+### Canale WhatsApp Business multi-tenant (migration 147 — da applicare, flag `whatsapp_business` spento) — `docs/WHATSAPP_BUSINESS_PLATFORM.md`
+
+- **Webhook unico** `/api/integrations/whatsapp/webhook` (GET verifica `META_WHATSAPP_VERIFY_TOKEN`, POST firmato `X-Hub-Signature-256` con `META_APP_SECRET`, fail closed). Tenant risolto **solo** da `metadata.phone_number_id` → `tenant_whatsapp_channels` (unique `(provider, phone_number_id)`), mai dal numero cliente né da `NEXT_PUBLIC_TENANT_SLUG`: il webhook è il primo punto di ingresso realmente multi-tenant su un solo deployment. Canale `disabled`, flag spento o numero sconosciuto ⇒ 200 senza persistenza.
+- **Persistenza idempotente** (RPC `ingest_whatsapp_inbound_message`, unique `(channel_id, provider_message_id)`), poi elaborazione asincrona: `WHATSAPP_PROCESSING_MODE=inline` (default) o `n8n` (`ops/n8n/whatsapp-inbound-dispatch.json` → `POST /api/internal/whatsapp/process`, solo UUID). Sweep ogni minuto + purge notturna `POST /api/internal/whatsapp/maintenance` (`ops/n8n/whatsapp-maintenance.json`, bearer `WHATSAPP_INTERNAL_SECRET`). Claim atomico `claim_whatsapp_inbound_messages` (max 3 tentativi).
+- **Motore** (`lib/whatsapp/automation/`): intent sensibili (operatore, reclamo, pagamento, non ricevuto, media) → handoff; regole deterministiche per priorità tenant (`whatsapp_automation_rules`, riga assente = default) con dati Lepefy (orari/indirizzo via `resolveNalaFastStoreInformation`, spedizione da `tenants.shipping_provider`, stock via `resolveNalaFastProductAvailability`, ordini/tracking via `buildOrderPortalViewModel` solo se `wa_id` = `customers.normalized_phone` univoco del tenant e ordine pagato); poi Nala; poi operatore/fallback. Nessun URL di deployment nei messaggi: solo `tenants.storefront_url`.
+- **Nala come canale**: `lib/ai/nalaChannelTurn.ts` riusa prompt, contratto, routing AI Core (`nala`/`structured_chat`), Response Memory e retrieval del widget; storico AI Core separato (`nala_whatsapp`); guardrail: pagamento/ordine/consegna mai dall'IA, confidenza < 0,55 o intent `unknown` ⇒ handoff. Il widget `/api/chat` non è stato migrato.
+- **Handoff**: `whatsapp_handoffs` (uno aperto per conversazione); `waiting_human`/`human` ⇒ `automation_status = paused` e nessuna risposta automatica; presa in carico, ripresa manuale o automatica (`auto_resume_minutes`), chiusura, tutto auditato (`whatsapp_audit_events`). Risposte umane dallo stesso numero, solo entro 24 h dall'ultimo messaggio cliente (template non implementati).
+- **Segreti**: nessun token in DB; `access_token_env` = nome di variabile `META_WHATSAPP_<X>_TOKEN`, default `META_WHATSAPP_SYSTEM_USER_TOKEN`. Tenant `is_test`: invii solo verso `WHATSAPP_TEST_RECIPIENTS`.
+- **Admin** `/admin/canaux/whatsapp` (Vue d'ensemble, Conversations, Automatisations), voce sidebar «Canaux › WhatsApp» solo con flag + `whatsapp.view`; `requireWhatsAppPage/Api` (`lib/whatsapp/server/featureGate.ts`, 404 a flag spento). Capability `whatsapp.view` / `whatsapp.reply` / `whatsapp.manage`; identità Meta del numero e invio `hello_world` riservati al platform owner.
+- **Stato**: codice e test pronti (unit `tests/unit/whatsapp.spec.ts`, SQL `supabase/tests/147_*` in CI). Migration non applicata, nessun canale, nessun numero reale collegato (Chloe Food: procedura documentata, non eseguita).
 
 ---
 
@@ -253,7 +264,7 @@ La navigazione admin e la ricerca globale sono permission-aware. Lo switch works
 - Tutti gli altri webhook n8n: saltati.
 - Packlink (`lib/shipping/packlinkApiKey.ts`, usato da preventivo, tracking, simulatore, inspector, campagne): per un tenant di test solo la chiave propria del tenant, mai `PACKLINK_API_KEY` di piattaforma.
 - Ogni salto è loggato come `[test-tenant] skipped: <canale>` e restituisce `ok` (`skipped: true`), così il ledger non riprova all'infinito.
-- WhatsApp Cloud API non esiste nel codice (solo link `wa.me`), quindi non c'è nulla da proteggere.
+- WhatsApp Cloud API (migration 147): per un tenant di test il response service non invia nulla (né conferme di lettura) verso numeri fuori `WHATSAPP_TEST_RECIPIENTS`; variabile assente = nessun invio (messaggio registrato `failed`/`test_blocked`). I link `wa.me` restano invariati.
 - Eccezione nota: la console di test notifiche platform (`/api/admin/platform/notifications/test`) chiama n8n direttamente. È uno strumento esplicito del platform_owner.
 
 **Ordini e prenotazioni.** Il trigger `mark_test_tenant_rows` (BEFORE INSERT su `orders` ed `event_reservations`) forza `is_test = true` per ogni riga di un tenant di test. Copre checkout, webhook Stripe, RPC di conversione e qualsiasi percorso futuro, senza toccare la logica di checkout. Attenzione: `tests/e2e/scripts/cleanup-test-data.ts` cancella gli ordini `is_test` delle ultime 24 h **di tutti i tenant**. Il seed crea quindi ordini retrodatati di più di 48 h.
@@ -479,6 +490,7 @@ purchases.view / purchases.manage
 inventory.view / inventory.manage
 treasury.view / treasury.manage
 supplier_payments.verify
+whatsapp.view / whatsapp.reply / whatsapp.manage
 platform.*
 ```
 
@@ -994,6 +1006,8 @@ Ordini senza e-mail (assistiti, cliente solo telefono): `order-confirmed` e tutt
 
 La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
+`147` (WhatsApp Business Platform) è additiva e rieseguibile, senza backfill: 6 tabelle nuove (`tenant_whatsapp_channels`, `whatsapp_conversations`, `whatsapp_messages`, `whatsapp_automation_rules`, `whatsapp_handoffs`, `whatsapp_audit_events`) con RLS forzata senza policy e GRANT espliciti al solo `service_role` (canali senza DELETE, audit append-only), FK composite `(tenant_id, …)`, trigger di coerenza tenant cliente↔conversazione, 4 RPC service-role (ingest idempotente, claim, stato monotono, purge 180/365 giorni) e 3 capability RBAC (`platform_owner`/`tenant_admin`). Nessuna tabella esistente modificata (`tenants.whatsapp_number` intatto). **Non applicata**. Test CI: `supabase/tests/147_whatsapp_business_platform.{fixture,test}.sql`. Rollback nell'intestazione. Vedi `docs/WHATSAPP_BUSINESS_PLATFORM.md`.
+
 `146` ridefinisce solo `is_valid_order_documents_config` per accettare `picking_list_show_delivery_address`; nessuna tabella o dato toccati, compatibile all'indietro, rieseguibile. **Applicata in produzione il 05/10/2026** (verificata: nuova chiave booleana accettata, valore non booleano rifiutato, config 145 ancora valide, `anon` 401); senza, il salvataggio delle preferenze documenti risponderebbe 409. Test CI: `supabase/tests/146_order_documents_picking_address.test.sql`.
 
 `145` è additiva e rieseguibile, senza backfill: registra `order_documents` in `platform_features` (non fatturabile) con il CHECK `is_valid_order_documents_config`, crea `order_public_access_tokens` (RLS forzata senza policy, grant solo `service_role`, unique `(tenant_id, token_hash)`, indice unico parziale «un token attivo per ordine») ed estende `review_invite_tokens.purpose` a `qr_portal`. **Applicata in produzione il 05/10/2026** (verificata); senza, i documenti funzionano con i default e senza QR. Test CI: `supabase/tests/145_order_documents.{fixture,test}.sql` (doppia applicazione, CHECK, grant/RLS, un token attivo per ordine). Rollback nell'intestazione del file. Vedi `docs/ORDER_DOCUMENTS.md`.
@@ -1182,6 +1196,8 @@ apps/storefront/src/lib/admin/platformBilling.ts
 apps/storefront/src/lib/admin/nalaAnalyticsDashboard.ts
 apps/storefront/src/lib/admin/knowledgeSuggestions.ts
 apps/storefront/src/lib/ai/*
+apps/storefront/src/lib/whatsapp/*
+apps/storefront/src/app/api/integrations/whatsapp/*
 apps/storefront/src/lib/notifications/*
 apps/storefront/src/app/api/admin/*
 apps/storefront/src/app/admin/*
@@ -1219,6 +1235,7 @@ supabase/migrations/*
 - costo reale degli imballaggi non registrato: nessun margine completo sugli ordini al forfait;
 - Shipping Intelligence : il mapping città→CAP dipende dall'indice GeoNames importato (`shipping_postal_code_index`) con repli Nominatim/Zippopotam.us/GeoNames e fallback manuale; l'esaustività dei CAP non è verificabile e le città GeoNames suddivise per arrondissement (es. `Lyon 01`…`Lyon 09`) non sono raggruppate automaticamente; il mapping CAP→zona commerciale resta tenant-owned (`shipping_zones.postal_prefixes`) e non costituisce un mapping regionale ufficiale della piattaforma; `shipping_quote_observations.source = 'real_shipment'` non è mai popolato perché il costo finale reale di una spedizione non è catturato separatamente dal preventivo; gli item storici con riuso incompatibile restano in produzione (esclusi solo dalla copertura) finché non viene lanciata una remesure esplicita; il range di costo mostrato per un item storico `succeeded` usa l'osservazione collegata all'epoca (scelta sul solo prezzo base prima della V1E), mentre Historique/Assistant/rétrotest ricalcolano l'osservazione operativa; la tariffazione commerciale forfait è implementata (V1G) ma nessun tenant è attivato finché un admin non lo fa esplicitamente;
 - AI credits predisposti semanticamente ma non monetizzati/applicati;
+- WhatsApp (147, non attivata): nessun template message (risposte solo entro 24 h), nessuna notifica all'équipe sugli handoff (solo badge inbox, polling 10 s), media in arrivo non scaricati, interazioni WhatsApp non incluse in Nala Analytics, widget `/api/chat` non ancora migrato su `runNalaChannelTurn` (cascata Nala in due punti); uno status Meta che arriva prima dell'aggiornamento `provider_message_id` dell'outbound viene ignorato (`status_unmatched`);
 - documenti delle commande: nel PDF di lotto la numerazione «Page X/Y» è quella dell'intero file (Chromium non riparte da 1 per commande); nessuna UI di revoca del token del portale (solo `revokeOrderPublicTokens`); una rotazione di `TRACKING_SECRET` invalida i QR già stampati, come i link di suivi e `/pay`.
 
 ---

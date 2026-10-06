@@ -45,6 +45,8 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/loyalty', permission: 'loyalty.manage' },
   { prefix: '/admin/ambassadeurs', permission: 'growth.manage' },
   { prefix: '/admin/nala-analytics', permission: 'ai_usage.view' },
+  // Canal WhatsApp (visibile solo con il flag whatsapp_business, controllato dalle pagine).
+  { prefix: '/admin/canaux/whatsapp', permission: 'whatsapp.view' },
   { prefix: '/admin/ai-lab', permission: 'ai_knowledge.manage' },
   { prefix: '/admin/parametres', permission: 'tenant_settings.view' },
   // Moved out of Paramètres with the same access (story, QR/poster: tenant_settings.*).

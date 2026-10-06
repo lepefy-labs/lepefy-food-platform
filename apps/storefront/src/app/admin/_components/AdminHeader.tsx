@@ -20,6 +20,7 @@ interface AdminHeaderProps {
   isPlatformOwner?: boolean;
   permissions?: string[];
   gestionEnabled?: boolean;
+  whatsappEnabled?: boolean;
   adminEmail: string;
   adminDisplayName?: string;
   pendingPaymentsCount?: number;
@@ -37,7 +38,7 @@ function tenantInitials(name: string) {
     .join('') || 'T';
 }
 
-export default function AdminHeader({ platformName, platformLogoUrl, tenantName, tenantLogoUrl, categories, workspace, shopAdminUrl, eventsAdminUrl, isPlatformOwner = false, permissions = [], adminEmail, adminDisplayName, pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, gestionEnabled = false }: AdminHeaderProps) {
+export default function AdminHeader({ platformName, platformLogoUrl, tenantName, tenantLogoUrl, categories, workspace, shopAdminUrl, eventsAdminUrl, isPlatformOwner = false, permissions = [], adminEmail, adminDisplayName, pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, gestionEnabled = false, whatsappEnabled = false }: AdminHeaderProps) {
   const workspaceLabel = workspace === 'events' ? 'Événementiel' : 'Boutique';
   const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
   const canShop = has('orders.view') || has('catalog.view') || has('customers.view') || has('shipping.view') || has('loyalty.scan');
@@ -45,7 +46,7 @@ export default function AdminHeader({ platformName, platformLogoUrl, tenantName,
 
   return (
     <header className="sticky top-0 z-30 flex min-h-[57px] items-center gap-2 border-b border-[var(--admin-border)] bg-white/95 px-3 py-2.5 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 md:gap-3 md:px-6">
-      <Suspense fallback={<div className="h-9 w-9 md:hidden" />}><AdminMobileNav categories={categories} workspace={workspace} isPlatformOwner={isPlatformOwner} permissions={permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} /></Suspense>
+      <Suspense fallback={<div className="h-9 w-9 md:hidden" />}><AdminMobileNav categories={categories} workspace={workspace} isPlatformOwner={isPlatformOwner} permissions={permissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} /></Suspense>
       <div className="hidden items-center gap-2 md:flex">{platformLogoUrl ? <Image src={platformLogoUrl} alt={platformName} width={112} height={30} className="h-7 w-auto object-contain" priority /> : <div className="flex items-center gap-2 text-[var(--admin-primary-fg)]"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--admin-primary)] text-sm font-bold text-white">L</span><span className="text-base font-semibold">{platformName}</span></div>}</div>
       <div className="hidden h-7 w-px bg-[var(--admin-border)] md:block" />
       <details className="group relative min-w-0">
