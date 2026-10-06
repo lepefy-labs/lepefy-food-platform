@@ -2,6 +2,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { groupSuggestedCartons, type CartonSuggestion } from '@/lib/shipping/cartonSuggestion';
 import { formatDocumentDate, formatKg, orderShortRef, readableBrandColor, safeColor, safeImageUrl } from './documentHtml';
 import { androidAppStatus } from '@/lib/mobileApp/androidApp';
+import { formatWhatsappDisplay } from '@/lib/orders/portal/supportChannels';
 import type { OrderDocumentsConfig } from './settings';
 
 /**
@@ -277,7 +278,7 @@ export function buildPackingSlipViewModel(input: {
 
   const name = firstName(order.full_name);
   const contact = settings.packing_slip_show_contact
-    ? { website: websiteLabel(tenant.storefront_url), whatsapp: tenant.whatsapp_number?.trim() || null, email: tenant.legal_email?.trim() || null }
+    ? { website: websiteLabel(tenant.storefront_url), whatsapp: formatWhatsappDisplay(tenant.whatsapp_number), email: tenant.legal_email?.trim() || null }
     : null;
 
   return {

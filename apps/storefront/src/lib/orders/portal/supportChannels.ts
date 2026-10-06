@@ -25,11 +25,23 @@ export function whatsappDigits(raw: string | null | undefined): string | null {
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
 }
 
+/**
+ * Numéro WhatsApp lisible : préfixe « + » ajouté à un numéro international saisi
+ * sans lui (« 393296958822 » → « +393296958822 »). Un numéro national (« 06… »)
+ * ou déjà préfixé reste tel quel ; aucun regroupement de chiffres inventé.
+ */
+export function formatWhatsappDisplay(raw: string | null | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  if (value.startsWith('+') || value.startsWith('0')) return value;
+  return /^[\d\s.-]+$/.test(value) && whatsappDigits(value) ? `+${value}` : value;
+}
+
 export function buildSupportChannels(tenant: SupportTenant, orderRef: string, shopBaseUrl: string | null): SupportChannel[] {
   const channels: SupportChannel[] = [];
   const message = `Bonjour, j’ai une question sur ma commande #${orderRef}.`;
   const wa = whatsappDigits(tenant.whatsapp_number);
-  if (wa) channels.push({ kind: 'whatsapp', label: 'WhatsApp', href: `https://wa.me/${wa}?text=${encodeURIComponent(message)}`, detail: tenant.whatsapp_number?.trim() ?? null });
+  if (wa) channels.push({ kind: 'whatsapp', label: 'WhatsApp', href: `https://wa.me/${wa}?text=${encodeURIComponent(message)}`, detail: formatWhatsappDisplay(tenant.whatsapp_number) });
   const email = tenant.legal_email?.trim();
   if (email && EMAIL.test(email)) {
     channels.push({ kind: 'email', label: 'E-mail', href: `mailto:${email}?subject=${encodeURIComponent(`Commande #${orderRef}`)}`, detail: email });

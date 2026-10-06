@@ -55,7 +55,7 @@ Aggiungere un formato (letter, a6, thermal_80): voce del registro, layout nei du
 
 ## 5. QR e token
 
-- URL: `<storefront_url del tenant>/o/<token>` (`getAdminWorkspaceUrls`, fallback `NEXT_PUBLIC_APP_URL`; mai l'header Host). Stampato anche in chiaro sotto il QR (SVG locale, libreria `qrcode`, correzione M, 32 mm in A5 / 38 mm in A4).
+- URL: `<storefront_url del tenant>/o/<token>` (`getAdminWorkspaceUrls`, fallback `NEXT_PUBLIC_APP_URL`; mai l'header Host). Stampato anche in chiaro sotto il QR, con eventuale ritorno a capo solo dopo `/o/` e mai dentro il token (SVG locale, libreria `qrcode`, correzione M, 32 mm in A5 / 38 mm in A4).
 - Token: `base64url(HMAC-SHA256(TRACKING_SECRET, "order-portal:<rowId>:<nonce>"))` troncato a 128 bit (22 caratteri). Nessun UUID, PII, payment intent o URL provider.
 - Tabella `order_public_access_tokens`: `tenant_id`, `order_id`, `purpose = 'order_portal'`, `token_nonce`, `token_hash` (SHA-256), `created_at`, `revoked_at`; unique `(tenant_id, token_hash)`; indice unico parziale «un token attivo per ordine». RLS forzata senza policy, nessun grant `anon`/`authenticated`.
 - Ciclo di vita: creazione pigra al primo bon de colis (in lotto per i lotti); ristampa = stesso token; nessuna scadenza breve (il foglio può essere usato mesi dopo); revoca = `revoked_at` (`revokeOrderPublicTokens`, senza UI per ora), il bon successivo riceve un nuovo token. Un token emesso con un `TRACKING_SECRET` precedente viene revocato e riemesso alla stampa successiva.
@@ -95,6 +95,8 @@ supabase db push
 In un ambiente senza la 145: preferenze = default (non salvabili, avviso in Paramètres), bon de colis generato senza QR (avviso nel dettaglio ordine), portale 404. Rollback: vedi l'intestazione della migration.
 
 ### Migration 146 (opzione indirizzo sulla liste de préparation)
+
+**Stato:** applicata in produzione il 05/10/2026 e verificata.
 
 `supabase/migrations/146_order_documents_picking_address.sql` ridefinisce solo `is_valid_order_documents_config` per accettare `picking_list_show_delivery_address` (booleana). Nessuna tabella o dato toccati; compatibile all'indietro, applicabile prima o dopo il deploy. Senza la 146 il codice non può salvare le preferenze: la PATCH risponde 409 «La migration 146 doit être appliquée…»; la stampa continua senza indirizzo. Test CI: `supabase/tests/146_order_documents_picking_address.test.sql`.
 

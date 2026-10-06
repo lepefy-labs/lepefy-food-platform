@@ -33,7 +33,8 @@ table.ps-items { width: 100%; border-collapse: collapse; }
 .ps-qr-code { flex: none; background: #fff; }
 .ps-qr-code svg { width: 100%; height: 100%; display: block; }
 .ps-qr-text b { display: block; }
-.ps-url { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; word-break: break-all; margin-top: 1.5mm; color: #222; }
+.ps-url { font-family: 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace; overflow-wrap: anywhere; margin-top: 1.5mm; color: #222; }
+.ps-url-token { white-space: nowrap; }
 .ps-address { line-height: 1.4; }
 .ps-thanks { margin-top: 5mm; color: #222; line-height: 1.45; }
 .ps-contact { margin-top: 5mm; border-top: 0.2mm solid #999; padding-top: 2mm; display: flex; flex-wrap: wrap; gap: 1mm 6mm; color: #333; }
@@ -80,12 +81,24 @@ function totals(vm: CustomerOrderDocumentViewModel): string {
 <table class="ps-totals avoid"><tbody>${lines}<tr class="ps-total"><td>Total</td><td>${escapeHtml(vm.prices.total)}</td></tr></tbody></table>`;
 }
 
+/**
+ * URL imprimée sous le QR : le retour à la ligne éventuel se fait après « /o/ »,
+ * jamais à l'intérieur du jeton (recopie manuelle sans erreur).
+ */
+export function displayUrlHtml(displayUrl: string): string {
+  const cut = displayUrl.lastIndexOf('/o/');
+  if (cut < 0) return escapeHtml(displayUrl);
+  const prefix = displayUrl.slice(0, cut + 3);
+  const token = displayUrl.slice(cut + 3);
+  return `${escapeHtml(prefix)}<wbr><span class="ps-url-token">${escapeHtml(token)}</span>`;
+}
+
 function qrBlock(vm: CustomerOrderDocumentViewModel): string {
   if (!vm.qr) return '';
   return `<div class="ps-qr avoid">
 <div class="ps-qr-code" role="img" aria-label="QR code de suivi de commande">${vm.qr.svg}</div>
 <div class="ps-qr-text"><b>Scannez pour suivre votre commande, obtenir de l’aide ou commander à nouveau.</b>
-<div class="ps-url">${escapeHtml(vm.qr.displayUrl)}</div></div>
+<div class="ps-url">${displayUrlHtml(vm.qr.displayUrl)}</div></div>
 </div>`;
 }
 

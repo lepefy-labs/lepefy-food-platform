@@ -12,7 +12,8 @@ import {
   type DocumentItemRow, type DocumentOrderRow, type DocumentTenant,
 } from '../../src/lib/orders/documents/viewModels';
 import { pickingListHtml } from '../../src/lib/orders/documents/pickingListHtml';
-import { packingSlipHtml } from '../../src/lib/orders/documents/packingSlipHtml';
+import { displayUrlHtml, packingSlipHtml } from '../../src/lib/orders/documents/packingSlipHtml';
+import { formatWhatsappDisplay } from '../../src/lib/orders/portal/supportChannels';
 import {
   orderDocumentFilename, parseOrderIdList, renderOrderDocuments, OrderDocumentError,
 } from '../../src/lib/orders/documents/renderOrderDocuments';
@@ -211,9 +212,20 @@ test('packing slip HTML: QR block with readable URL; never internal data', () =>
   expect(html).toContain('@page { size: A5 portrait; }');
   expect(html).toContain('RÉCAPITULATIF DE COMMANDE');
   expect(html).toContain('Scannez pour suivre votre commande');
-  expect(html).toContain('shop.example.com/o/AbCdEfGhIjKlMnOpQrStUv');
+  expect(html).toContain('shop.example.com/o/<wbr><span class="ps-url-token">AbCdEfGhIjKlMnOpQrStUv</span>');
   for (const forbidden of ['B-04', 'FRIGO-1', 'awa.d@example.fr', 'EMBALLAGE', 'pl-box', ORDER_A]) expect(html).not.toContain(forbidden);
   expect(escapeHtml(`<a href="x">'`)).toBe('&lt;a href=&quot;x&quot;&gt;&#39;');
+});
+
+test('packing slip: URL breaks only after /o/, WhatsApp shown with international prefix', () => {
+  expect(displayUrlHtml('shop.chloefood.com/o/BIzJBssl2zmwFUKCTor6KQ')).toBe('shop.chloefood.com/o/<wbr><span class="ps-url-token">BIzJBssl2zmwFUKCTor6KQ</span>');
+  expect(displayUrlHtml('<x>')).toBe('&lt;x&gt;');
+  expect(formatWhatsappDisplay('393296958822')).toBe('+393296958822');
+  expect(formatWhatsappDisplay('+33 6 12 34 56 78')).toBe('+33 6 12 34 56 78');
+  expect(formatWhatsappDisplay('06 12 34 56 78')).toBe('06 12 34 56 78');
+  expect(formatWhatsappDisplay('  ')).toBeNull();
+  const vm = buildPackingSlipViewModel({ order: order(ORDER_A), items: ITEMS, tenant: { ...DOC_TENANT, whatsapp_number: '393296958822' }, settings: ORDER_DOCUMENTS_DEFAULTS, qr: null });
+  expect(vm.contact?.whatsapp).toBe('+393296958822');
 });
 
 // ─── Bulk helpers ───────────────────────────────────────────────────────────
@@ -321,9 +333,9 @@ test('render: packing slip reuses the same QR token across reprints, QR points t
     await renderOrderDocuments(base);
     const first = await htmlOf(calls[0]!);
     const second = await htmlOf(calls[1]!);
-    const url = first.match(/shop\.example\.com\/o\/([A-Za-z0-9_-]{22})/)?.[1];
+    const url = first.match(/shop\.example\.com\/o\/<wbr><span class="ps-url-token">([A-Za-z0-9_-]{22})</)?.[1];
     expect(url).toBeTruthy();
-    expect(second).toContain(`shop.example.com/o/${url}`);
+    expect(second).toContain(`<span class="ps-url-token">${url}</span>`);
     expect(first).not.toContain(ORDER_A);
     expect(db.tables.order_public_access_tokens).toHaveLength(1);
     expect(JSON.stringify(db.tables.order_public_access_tokens)).not.toContain(url!);

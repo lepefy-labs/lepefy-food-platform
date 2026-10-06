@@ -994,7 +994,7 @@ Ordini senza e-mail (assistiti, cliente solo telefono): `order-confirmed` e tutt
 
 La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
-`146` ridefinisce solo `is_valid_order_documents_config` per accettare `picking_list_show_delivery_address`; nessuna tabella o dato toccati, compatibile all'indietro, rieseguibile. **Da applicare manualmente**: senza, il salvataggio delle preferenze documenti risponde 409 (la stampa resta invariata). Test CI: `supabase/tests/146_order_documents_picking_address.test.sql`.
+`146` ridefinisce solo `is_valid_order_documents_config` per accettare `picking_list_show_delivery_address`; nessuna tabella o dato toccati, compatibile all'indietro, rieseguibile. **Applicata in produzione il 05/10/2026** (verificata: nuova chiave booleana accettata, valore non booleano rifiutato, config 145 ancora valide, `anon` 401); senza, il salvataggio delle preferenze documenti risponderebbe 409. Test CI: `supabase/tests/146_order_documents_picking_address.test.sql`.
 
 `145` è additiva e rieseguibile, senza backfill: registra `order_documents` in `platform_features` (non fatturabile) con il CHECK `is_valid_order_documents_config`, crea `order_public_access_tokens` (RLS forzata senza policy, grant solo `service_role`, unique `(tenant_id, token_hash)`, indice unico parziale «un token attivo per ordine») ed estende `review_invite_tokens.purpose` a `qr_portal`. **Applicata in produzione il 05/10/2026** (verificata); senza, i documenti funzionano con i default e senza QR. Test CI: `supabase/tests/145_order_documents.{fixture,test}.sql` (doppia applicazione, CHECK, grant/RLS, un token attivo per ordine). Rollback nell'intestazione del file. Vedi `docs/ORDER_DOCUMENTS.md`.
 
