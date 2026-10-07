@@ -191,7 +191,7 @@ API (`/api/admin/whatsapp/…`, mappa fail-closed in `adminApiPermissions.ts`):
 | `WHATSAPP_TEST_RECIPIENTS` | deployment di test | numeri autorizzati (internazionali senza `+`, separati da virgola) per i tenant `is_test`; assente = nessun invio per un tenant di test |
 | `N8N_WEBHOOK_URL` | esistente | base n8n (modalità `n8n`) |
 
-**Development/test**: numero di test Meta + token temporaneo (24 h) consentito solo per il collaudo iniziale (usato il 7/10/2026 su `test.lepefy.com`, da sostituire con un token System User per qualsiasi uso continuativo). Il token deve essere generato **dopo** il consenso dell'app sulla WABA di test: un token precedente produce `131005 Access denied`. **Production**: mai token temporaneo; System User dedicato, token conservato solo in Vercel (Sensitive). Nessun file `.env.example` nel repository: le variabili sono documentate qui e in `CLAUDE.md`.
+**Development/test**: numero di test Meta. Il token temporaneo (24 h) della console è servito solo per il primo collaudo; dal 7/10/2026 `test.lepefy.com` usa il **token permanente** del System User *Lepefy Messaging Bot* (§11.1). Il token deve essere generato **dopo** il consenso dell'app sulla WABA di test: un token precedente produce `131005 Access denied`. **Production**: mai token temporaneo; System User dedicato, token conservato solo in Vercel (Sensitive). Nessun file `.env.example` nel repository: le variabili sono documentate qui e in `CLAUDE.md`.
 
 Deployment: Meta accetta **un** URL di callback per app. Il webhook è multi-tenant (risolve il tenant dal `phone_number_id` sul DB condiviso), quindi può puntare a un unico deployment "hub" (es. `test.lepefy.com` durante la fase di test, poi il dominio piattaforma). Le risposte in uscita dall'admin partono dal deployment del tenant: ogni deployment che invia deve avere `META_WHATSAPP_SYSTEM_USER_TOKEN` (o il token del canale). Gli URL inviati ai clienti usano sempre `tenants.storefront_url`, mai l'URL del deployment.
 
@@ -211,11 +211,11 @@ Procedura effettivamente seguita il 7 ottobre 2026 (UI Meta in italiano; i nomi 
 3. **App Meta**: *Crea app* → caso d'uso **"Connettiti con i clienti tramite WhatsApp"** → portfolio **Lepefy** (non verificato: sufficiente per il numero di test) → *Crea app* (richiede di reinserire la password). Meta **rifiuta "WhatsApp" nel nome dell'app** (marchio): nome usato *Lepefy Messaging Platform*.
 4. **Numero di test**: *Casi d'uso › Personalizza › Passaggio 1. Prova* → *Continua* (accetta Condizioni WhatsApp Business + hosting Cloud API). Meta crea la WABA di test e il numero di test e mostra Phone Number ID e WABA ID.
 5. **Destinatari**: stesso pannello › *Destinatario › Gestisci elenco di numeri di telefono* → aggiungere fino a 5 numeri; Meta invia un codice a 5 cifre **su WhatsApp** al numero, inserito dal titolare.
-6. **Token**: *Genera token* apre un popup di consenso su account/WABA; solo dopo il consenso il token può inviare. Per un uso continuativo: System User del portfolio con `whatsapp_business_messaging` + `whatsapp_business_management` (vedi §9).
+6. **Token**: per il primo test, *Genera token* (console) apre un popup di consenso su account/WABA; solo dopo il consenso il token può inviare (scade in 24 h). Token permanente (fatto il 7/10): *business.facebook.com › Impostazioni › Utenti › Utenti di sistema* → *Aggiungi* (nome **senza trattini multipli né "whatsapp"**, es. `Lepefy Messaging Bot`; ruolo Admin) → *Assegna risorse*: app *Lepefy Messaging Platform* (*Gestisci l'app*, controllo completo) + WABA di test (*Tutto*, controllo completo) → *Genera token*: app, scadenza **Mai**, permessi `whatsapp_business_messaging` + `whatsapp_business_management` → copiarlo subito in Vercel e redeploy.
 7. **Vercel `lepefy-food-test`** (Production): segreti `META_WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET` (*Impostazioni app › Di base › Chiave segreta*), `META_WHATSAPP_SYSTEM_USER_TOKEN`, `WHATSAPP_INTERNAL_SECRET`; config `META_WHATSAPP_API_VERSION`, `WHATSAPP_TEST_RECIPIENTS`, `WHATSAPP_PROCESSING_MODE=inline`. **Redeploy**. Controllo senza segreti: GET del webhook con un token sbagliato → **403** (era 503 senza configurazione); POST senza firma → **401**.
 8. **Webhook**: §12 (verifica, campo `messages`, `subscribed_apps`, app pubblicata).
 9. **Flag**: `/admin/parametres/fonctionnalites` su `lepefy-test` → *WhatsApp Business* attivato (cache 30 s).
-10. **Canale**: `/admin/canaux/whatsapp` › Connexion Meta (solo platform owner): environnement *Test*, statut *En test*, WABA ID, Phone Number ID, numero visualizzato, nome; variabile token vuota. Il 7/10 l'account admin connesso non era platform owner: la riga è stata creata via service role con evento `whatsapp_audit_events` (`channel_created`).
+10. **Canale**: `/admin/canaux/whatsapp` (voce di menu *Canaux › WhatsApp*) › Connexion Meta (solo platform owner): environnement *Test*, statut *En test*, WABA ID, Phone Number ID, numero visualizzato, nome; variabile token vuota. Il 7/10 la riga di test è stata creata via service role (account admin connesso non platform owner) con evento `whatsapp_audit_events` (`channel_created`); con il platform owner connesso il pannello mostra correttamente il canale e d'ora in poi la configurazione passa dall'admin.
 11. **Prima conversazione**: il numero di test **non è ricercabile** su WhatsApp. Inviare prima un template (*Passaggio 1. Prova › Invia messaggio*, template "Ciao mondo"/`hello_world`) al destinatario, poi rispondere in quella chat.
 12. **Inbound in test**: con statut *En test* il messaggio è salvato con `processing_result = channel_not_active` (nessuna risposta).
 13. **Automazione**: statut *Actif* + Réponses automatiques ON (Nala OFF per il primo collaudo). Provare: "Ciao"/"Bonjour", "Vous livrez à domicile ?", poi "Quels sont vos horaires ?", "Avez-vous du manioc ?", "Où en est ma commande ?", "Je veux parler à un conseiller".
@@ -234,6 +234,7 @@ Identificativi (non segreti):
 | Destinatari autorizzati | 2 numeri interni (in Meta e in `WHATSAPP_TEST_RECIPIENTS`) |
 | Webhook | `https://test.lepefy.com/api/integrations/whatsapp/webhook`, verificato; campo `messages` (v26.0); app iscritta alla WABA |
 | Canale Lepefy | `lepefy-test`, canale `e08aaece-c08e-4172-a223-3067827612c5`, *Test*, *Actif*, automazione ON, Nala OFF, handoff ON |
+| Token | permanente, System User *Lepefy Messaging Bot* (ID `61595400380744`, Admin) con app + WABA di test in controllo completo; in `META_WHATSAPP_SYSTEM_USER_TOKEN` su `lepefy-food-test` |
 
 | Test | Esito |
 |---|---|
@@ -242,10 +243,12 @@ Identificativi (non segreti):
 | Risoluzione tenant | PASS (`phone_number_id` reale → `lepefy-test`; ID di esempio `123456123` → `unknown_phone_number_id`) |
 | Inbound + persistenza | PASS (conversazione unica, `wamid` salvato, un messaggio per evento) |
 | Outbound | PASS (template dalla console; risposte Lepefy `sent → delivered → read` tramite webhook di stato) |
-| Risposta automatica | PASS (`rule:greeting`, `rule:shipping`, ~4 s) |
+| Risposta automatica | PASS (`rule:greeting`, `rule:shipping`, `rule:opening_hours`, ~3–4 s) |
+| Token permanente System User | PASS (risposte `sent → delivered → read` dopo la sostituzione del token temporaneo) |
+| Handoff automatico | PASS (`handoff:unsupported_intent`: handoff aperto, conversazione `waiting_human`, automazione in pausa, messaggio di presa in carico inviato) |
 | Errore provider | PASS (token senza accesso → messaggio `failed` `131005`, nessun crash) |
 | Idempotenza | non provocata in reale; coperta da indice unico + test SQL CI |
-| Handoff, Nala, stato ordine | non ancora collaudati sul numero di test |
+| Inbox operatore + ripresa automazione, Nala, stato ordine | non ancora collaudati sul numero di test |
 
 ## 12. Configurare il webhook Meta
 
@@ -293,14 +296,14 @@ Nessuna azione automatica. Il WhatsApp Business attualmente usato dal tenant non
 Checklist produzione prima del punto 12:
 
 - [x] migration 147 applicata (7/10/2026; resta da eseguire la verifica completa di grant/RLS lato produzione);
-- [ ] token **permanente** System User al posto del token temporaneo;
+- [x] token **permanente** System User (fatto su `test.lepefy.com`; da ripetere sui deployment di produzione che inviano);
 - [ ] gestione dei clienti con username WhatsApp (messaggi senza numero di telefono, vedi §16);
-- [ ] account platform owner per la configurazione dei canali dall'admin (non via service role);
+- [x] account platform owner per la configurazione dei canali dall'admin (verificato su `test.lepefy.com`);
 - [ ] `META_APP_SECRET`, `META_WHATSAPP_VERIFY_TOKEN`, `META_WHATSAPP_SYSTEM_USER_TOKEN` (permanente), `WHATSAPP_INTERNAL_SECRET` su Vercel produzione;
 - [ ] `WHATSAPP_PROCESSING_MODE=n8n` + workflow n8n importati, credenziali, Error Workflow, attivati;
 - [ ] sweep di manutenzione attivo (prima di qualsiasi traffico reale);
 - [x] numero di test verificato end-to-end su `lepefy-test` (inbound, persistenza, regole, outbound, stati — §11.1);
-- [ ] handoff, Nala e stato ordine collaudati sul numero di test;
+- [ ] inbox operatore, ripresa automazione, Nala e stato ordine collaudati sul numero di test (handoff automatico già PASS);
 - [ ] `tenants.storefront_url` del tenant corretto (link catalogo/portale);
 - [ ] orari e indirizzo di ritiro compilati (Paramètres › Retrait), modalità di spedizione corretta;
 - [ ] clienti con telefono E.164 (`customers.normalized_phone`) per lo stato ordine;
@@ -318,7 +321,7 @@ Checklist produzione prima del punto 12:
 
 ## 16. Non ancora attivato / evoluzioni
 
-- Stato: migration 147 applicata; flag attivo solo su `lepefy-test`; un solo canale (numero di test Meta); token temporaneo; modalità `inline`; workflow n8n non importati (nessuno sweep di manutenzione attivo).
+- Stato: migration 147 applicata; flag attivo solo su `lepefy-test`; un solo canale (numero di test Meta); token permanente System User; modalità `inline`; workflow n8n non importati (nessuno sweep di manutenzione attivo).
 - **Username WhatsApp (BSUID)**: Meta introduce gli username; per un cliente che li ha attivati i webhook possono arrivare **senza numero di telefono** (identificativo utente al posto di `from`/`wa_id`; la console di test mostra lo "Scenario nome utente"). `webhookPayload.ts` oggi scarta un messaggio senza `from` numerico e lo schema richiede `wa_id`/`customer_phone`: da gestire (identificativo cliente generico + invio tramite l'ID utente) prima della produzione.
 - Template message (fuori finestra 24 h), media in uscita nell'inbox, notifiche push/email all'équipe su handoff, Meta Embedded Signup, analytics Nala per il canale, migrazione del widget storefront su `runNalaChannelTurn`, inbox omnicanale (Instagram DM, Messenger, web chat, email).
 
