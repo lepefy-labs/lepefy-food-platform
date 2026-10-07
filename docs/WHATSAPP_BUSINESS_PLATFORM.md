@@ -1,8 +1,8 @@
 # WhatsApp Business Platform — canale multi-tenant
 
-> Stato: **implementato, non attivato**. Migration `147_whatsapp_business_platform.sql` **da applicare** (non applicata in remoto da questo ciclo). Flag di rilascio `whatsapp_business` spento per tutti i tenant. Nessun numero reale collegato.
+> Stato al **7 ottobre 2026**: **attivo in test end-to-end sul numero di test Meta** (tenant `lepefy-test`, deployment `test.lepefy.com`). Migration `147_whatsapp_business_platform.sql` **applicata** sul progetto Supabase condiviso. Flag `whatsapp_business` attivo **solo** su `lepefy-test`. Nessun numero reale collegato; Chloe Food non configurato (vedi §14).
 >
-> Base analizzata: `main` @ `2ef761bc` (6 ottobre 2026).
+> Base del codice: `main` @ `560ccbb8`. Esito dei test reali: §11.1.
 
 ## 1. Obiettivo e principi
 
@@ -183,7 +183,7 @@ API (`/api/admin/whatsapp/…`, mappa fail-closed in `adminApiPermissions.ts`):
 |---|---|---|
 | `META_WHATSAPP_VERIFY_TOKEN` | deployment che riceve il webhook | token della verifica GET (stringa casuale ≥ 32 caratteri, scelta da noi) |
 | `META_APP_SECRET` | idem | App Secret dell'app Meta (firma `X-Hub-Signature-256`). Più valori separati da virgola per la rotazione. Assente = webhook POST 503 (fail closed) |
-| `META_WHATSAPP_API_VERSION` | tutti | versione Graph API (default `v23.0`; aggiornarla alle deprecazioni Meta) |
+| `META_WHATSAPP_API_VERSION` | tutti | versione Graph API. Impostarla sempre esplicitamente (`v25.0` su `test.lepefy.com` al 7/10/2026, versione mostrata dalla console Meta); il default del codice `v23.0` è più vecchio e serve solo da ultima rete |
 | `META_WHATSAPP_SYSTEM_USER_TOKEN` | tutti i deployment che inviano | token **permanente** di un System User Meta (permessi `whatsapp_business_messaging`, `whatsapp_business_management`) |
 | `META_WHATSAPP_<X>_TOKEN` | opzionale | token dedicato a un canale, referenziato da `access_token_env` |
 | `WHATSAPP_PROCESSING_MODE` | deployment webhook | `inline` (default) o `n8n` |
@@ -191,7 +191,7 @@ API (`/api/admin/whatsapp/…`, mappa fail-closed in `adminApiPermissions.ts`):
 | `WHATSAPP_TEST_RECIPIENTS` | deployment di test | numeri autorizzati (internazionali senza `+`, separati da virgola) per i tenant `is_test`; assente = nessun invio per un tenant di test |
 | `N8N_WEBHOOK_URL` | esistente | base n8n (modalità `n8n`) |
 
-**Development/test**: numero di test Meta + token temporaneo (24 h) consentito solo in locale per esplorare; sul deployment `test.lepefy.com` usare comunque un token System User. **Production**: mai token temporaneo; System User dedicato, token conservato solo in Vercel (Sensitive). Nessun file `.env.example` nel repository: le variabili sono documentate qui e in `CLAUDE.md`.
+**Development/test**: numero di test Meta + token temporaneo (24 h) consentito solo per il collaudo iniziale (usato il 7/10/2026 su `test.lepefy.com`, da sostituire con un token System User per qualsiasi uso continuativo). Il token deve essere generato **dopo** il consenso dell'app sulla WABA di test: un token precedente produce `131005 Access denied`. **Production**: mai token temporaneo; System User dedicato, token conservato solo in Vercel (Sensitive). Nessun file `.env.example` nel repository: le variabili sono documentate qui e in `CLAUDE.md`.
 
 Deployment: Meta accetta **un** URL di callback per app. Il webhook è multi-tenant (risolve il tenant dal `phone_number_id` sul DB condiviso), quindi può puntare a un unico deployment "hub" (es. `test.lepefy.com` durante la fase di test, poi il dominio piattaforma). Le risposte in uscita dall'admin partono dal deployment del tenant: ogni deployment che invia deve avere `META_WHATSAPP_SYSTEM_USER_TOKEN` (o il token del canale). Gli URL inviati ai clienti usano sempre `tenants.storefront_url`, mai l'URL del deployment.
 
@@ -204,16 +204,48 @@ Sostituire `REPLACE_WITH_LEPEFY_APP_URL`, collegare l'Error Workflow esistente, 
 
 ## 11. Collegare il numero di test Meta (tenant `lepefy-test`)
 
-1. **Migration**: applicare `147_whatsapp_business_platform.sql` (dopo revisione; vedi checklist §14).
-2. **App Meta** (developers.facebook.com, app di tipo Business, prodotto WhatsApp aggiunto). In *WhatsApp › API Setup* annotare **Phone number ID** e **WhatsApp Business Account ID** del numero di test; aggiungere fino a 5 numeri destinatari e verificarli via codice.
-3. **Token**: Business Settings › Utenti di sistema › creare un System User, assegnargli l'app e la WABA di test, generare un token con `whatsapp_business_messaging` + `whatsapp_business_management`. Vercel (`lepefy-food-test`): `META_WHATSAPP_SYSTEM_USER_TOKEN`.
-4. Vercel `lepefy-food-test`: `META_APP_SECRET` (App Settings › Basic), `META_WHATSAPP_VERIFY_TOKEN` (generato), `META_WHATSAPP_API_VERSION`, `WHATSAPP_INTERNAL_SECRET`, `WHATSAPP_TEST_RECIPIENTS` (gli stessi numeri autorizzati in Meta), `WHATSAPP_PROCESSING_MODE=inline`. Redeploy.
-5. **Flag**: `/admin/parametres/fonctionnalites` su `lepefy-test` → attivare *WhatsApp Business*.
-6. **Canale** (platform owner): `/admin/canaux/whatsapp` › Connexion Meta: environnement *Test*, statut *En test*, WABA ID, Phone number ID, numero visualizzato, nome; variabile token vuota (= token piattaforma).
-7. **Uscita**: "Envoyer le modèle de test hello_world" verso un numero autorizzato → il messaggio arriva.
-8. **Webhook**: vedi §12, poi scrivere al numero di test dal telefono autorizzato → la conversazione appare in *Conversations* (statut *En test*: nessuna risposta automatica).
-9. **Automazione**: statut *Actif*, poi in *Vue d'ensemble* attivare Réponses automatiques (e opzionalmente Nala). Provare: "Bonjour", "Quels sont vos horaires ?", "Vous livrez ?", "Avez-vous du manioc ?", "Où en est ma commande ?", "Je veux parler à un conseiller".
-10. **Handoff**: dall'inbox rispondere come operatore, verificare la pausa, poi "Rendre à l'automatisation".
+Procedura effettivamente seguita il 7 ottobre 2026 (UI Meta in italiano; i nomi dei menu cambiano spesso, cercare la sezione per significato).
+
+1. **Migration** `147_whatsapp_business_platform.sql` applicata (verifica indiretta: `/admin/canaux/whatsapp` carica e le scritture sul canale riescono).
+2. **Account sviluppatore**: se `developers.facebook.com/apps/` rimanda alla home con "Get Started", registrare l'account come sviluppatore (accettazione termini + verifica telefono/e-mail, a cura del titolare dell'account).
+3. **App Meta**: *Crea app* → caso d'uso **"Connettiti con i clienti tramite WhatsApp"** → portfolio **Lepefy** (non verificato: sufficiente per il numero di test) → *Crea app* (richiede di reinserire la password). Meta **rifiuta "WhatsApp" nel nome dell'app** (marchio): nome usato *Lepefy Messaging Platform*.
+4. **Numero di test**: *Casi d'uso › Personalizza › Passaggio 1. Prova* → *Continua* (accetta Condizioni WhatsApp Business + hosting Cloud API). Meta crea la WABA di test e il numero di test e mostra Phone Number ID e WABA ID.
+5. **Destinatari**: stesso pannello › *Destinatario › Gestisci elenco di numeri di telefono* → aggiungere fino a 5 numeri; Meta invia un codice a 5 cifre **su WhatsApp** al numero, inserito dal titolare.
+6. **Token**: *Genera token* apre un popup di consenso su account/WABA; solo dopo il consenso il token può inviare. Per un uso continuativo: System User del portfolio con `whatsapp_business_messaging` + `whatsapp_business_management` (vedi §9).
+7. **Vercel `lepefy-food-test`** (Production): segreti `META_WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET` (*Impostazioni app › Di base › Chiave segreta*), `META_WHATSAPP_SYSTEM_USER_TOKEN`, `WHATSAPP_INTERNAL_SECRET`; config `META_WHATSAPP_API_VERSION`, `WHATSAPP_TEST_RECIPIENTS`, `WHATSAPP_PROCESSING_MODE=inline`. **Redeploy**. Controllo senza segreti: GET del webhook con un token sbagliato → **403** (era 503 senza configurazione); POST senza firma → **401**.
+8. **Webhook**: §12 (verifica, campo `messages`, `subscribed_apps`, app pubblicata).
+9. **Flag**: `/admin/parametres/fonctionnalites` su `lepefy-test` → *WhatsApp Business* attivato (cache 30 s).
+10. **Canale**: `/admin/canaux/whatsapp` › Connexion Meta (solo platform owner): environnement *Test*, statut *En test*, WABA ID, Phone Number ID, numero visualizzato, nome; variabile token vuota. Il 7/10 l'account admin connesso non era platform owner: la riga è stata creata via service role con evento `whatsapp_audit_events` (`channel_created`).
+11. **Prima conversazione**: il numero di test **non è ricercabile** su WhatsApp. Inviare prima un template (*Passaggio 1. Prova › Invia messaggio*, template "Ciao mondo"/`hello_world`) al destinatario, poi rispondere in quella chat.
+12. **Inbound in test**: con statut *En test* il messaggio è salvato con `processing_result = channel_not_active` (nessuna risposta).
+13. **Automazione**: statut *Actif* + Réponses automatiques ON (Nala OFF per il primo collaudo). Provare: "Ciao"/"Bonjour", "Vous livrez à domicile ?", poi "Quels sont vos horaires ?", "Avez-vous du manioc ?", "Où en est ma commande ?", "Je veux parler à un conseiller".
+14. **Handoff**: dall'inbox rispondere come operatore, verificare la pausa, poi "Rendre à l'automatisation" (non ancora collaudato, vedi §11.1).
+
+### 11.1 Ambiente di test attuale ed esiti (7 ottobre 2026)
+
+Identificativi (non segreti):
+
+| Elemento | Valore |
+|---|---|
+| Business Portfolio | Lepefy — `4931233883595900` (non verificato) |
+| App Meta | Lepefy Messaging Platform — App ID `1806050800594885`, **pubblicata** (Live), unico caso d'uso WhatsApp |
+| WABA di test | `2200021060719675` |
+| Numero di test | +1 555 639 2192 — Phone Number ID `1367677619765571` |
+| Destinatari autorizzati | 2 numeri interni (in Meta e in `WHATSAPP_TEST_RECIPIENTS`) |
+| Webhook | `https://test.lepefy.com/api/integrations/whatsapp/webhook`, verificato; campo `messages` (v26.0); app iscritta alla WABA |
+| Canale Lepefy | `lepefy-test`, canale `e08aaece-c08e-4172-a223-3067827612c5`, *Test*, *Actif*, automazione ON, Nala OFF, handoff ON |
+
+| Test | Esito |
+|---|---|
+| Verifica webhook (GET) | PASS |
+| Firma `X-Hub-Signature-256` | PASS (evento di prova Meta → 200; senza firma → 401) |
+| Risoluzione tenant | PASS (`phone_number_id` reale → `lepefy-test`; ID di esempio `123456123` → `unknown_phone_number_id`) |
+| Inbound + persistenza | PASS (conversazione unica, `wamid` salvato, un messaggio per evento) |
+| Outbound | PASS (template dalla console; risposte Lepefy `sent → delivered → read` tramite webhook di stato) |
+| Risposta automatica | PASS (`rule:greeting`, `rule:shipping`, ~4 s) |
+| Errore provider | PASS (token senza accesso → messaggio `failed` `131005`, nessun crash) |
+| Idempotenza | non provocata in reale; coperta da indice unico + test SQL CI |
+| Handoff, Nala, stato ordine | non ancora collaudati sul numero di test |
 
 ## 12. Configurare il webhook Meta
 
@@ -221,9 +253,15 @@ Sostituire `REPLACE_WITH_LEPEFY_APP_URL`, collegare l'Error Workflow esistente, 
    - Callback URL: `https://<deployment-hub>/api/integrations/whatsapp/webhook` (mostrato nel pannello Connexion Meta);
    - Verify token: il valore di `META_WHATSAPP_VERIFY_TOKEN`.
    Meta invia `GET ?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`; la route risponde con il challenge (403 se token errato, 503 se non configurato).
-2. *Webhook fields*: sottoscrivere **`messages`** (messaggi in arrivo + stati sent/delivered/read/failed).
-3. Verificare che l'app sia sottoscritta alla WABA (`POST /{WABA_ID}/subscribed_apps` con il token System User, o dal pannello).
-4. Controllo: un messaggio di prova produce nei log Vercel `[whatsapp] webhook_received` → `tenant_resolved` → `message_ingested`.
+   Nella UI attuale il blocco si trova in *Casi d'uso › Personalizza › Passaggio 2. Configurazione di produzione › Configura webhook*.
+2. *Campi del webhook*: sottoscrivere **solo `messages`** (messaggi in arrivo + stati sent/delivered/read/failed). Il pulsante *Test* della riga invia un evento di esempio con `phone_number_id` fittizio: atteso **200** e log `unknown_phone_number_id` (prova connettività + firma).
+3. **Iscrivere l'app alla WABA** — obbligatorio: senza, il webhook è verificato ma **nessun evento reale arriva** (né messaggi né stati). Con un token valido:
+   ```text
+   POST https://graph.facebook.com/<versione>/<WABA_ID>/subscribed_apps   (Authorization: Bearer <token>)
+   GET  https://graph.facebook.com/<versione>/<WABA_ID>/subscribed_apps   → l'app deve comparire
+   ```
+4. **App pubblicata (Live)**: un'app non pubblicata riceve solo i webhook di prova della dashboard. Requisiti soddisfatti il 7/10: URL privacy policy (`/politique-confidentialite`), istruzioni di cancellazione dati (`/supprimer-compte`), categoria *Messaggistica*. Nessuna verifica aziendale richiesta per i permessi standard.
+5. Controllo: un messaggio reale produce nei log Vercel `[whatsapp] webhook_received` → `tenant_resolved` → `message_ingested`.
 
 ## 13. Onboarding di un nuovo tenant
 
@@ -254,11 +292,15 @@ Nessuna azione automatica. Il WhatsApp Business attualmente usato dal tenant non
 
 Checklist produzione prima del punto 12:
 
-- [ ] migration 147 applicata e verificata (grant, RLS, `select count(*)` = 0 righe inattese);
+- [x] migration 147 applicata (7/10/2026; resta da eseguire la verifica completa di grant/RLS lato produzione);
+- [ ] token **permanente** System User al posto del token temporaneo;
+- [ ] gestione dei clienti con username WhatsApp (messaggi senza numero di telefono, vedi §16);
+- [ ] account platform owner per la configurazione dei canali dall'admin (non via service role);
 - [ ] `META_APP_SECRET`, `META_WHATSAPP_VERIFY_TOKEN`, `META_WHATSAPP_SYSTEM_USER_TOKEN` (permanente), `WHATSAPP_INTERNAL_SECRET` su Vercel produzione;
 - [ ] `WHATSAPP_PROCESSING_MODE=n8n` + workflow n8n importati, credenziali, Error Workflow, attivati;
 - [ ] sweep di manutenzione attivo (prima di qualsiasi traffico reale);
-- [ ] numero di test verificato end-to-end su `lepefy-test`;
+- [x] numero di test verificato end-to-end su `lepefy-test` (inbound, persistenza, regole, outbound, stati — §11.1);
+- [ ] handoff, Nala e stato ordine collaudati sul numero di test;
 - [ ] `tenants.storefront_url` del tenant corretto (link catalogo/portale);
 - [ ] orari e indirizzo di ritiro compilati (Paramètres › Retrait), modalità di spedizione corretta;
 - [ ] clienti con telefono E.164 (`customers.normalized_phone`) per lo stato ordine;
@@ -276,7 +318,8 @@ Checklist produzione prima del punto 12:
 
 ## 16. Non ancora attivato / evoluzioni
 
-- Migration 147 non applicata; flag spento ovunque; nessun canale; workflow n8n non importati.
+- Stato: migration 147 applicata; flag attivo solo su `lepefy-test`; un solo canale (numero di test Meta); token temporaneo; modalità `inline`; workflow n8n non importati (nessuno sweep di manutenzione attivo).
+- **Username WhatsApp (BSUID)**: Meta introduce gli username; per un cliente che li ha attivati i webhook possono arrivare **senza numero di telefono** (identificativo utente al posto di `from`/`wa_id`; la console di test mostra lo "Scenario nome utente"). `webhookPayload.ts` oggi scarta un messaggio senza `from` numerico e lo schema richiede `wa_id`/`customer_phone`: da gestire (identificativo cliente generico + invio tramite l'ID utente) prima della produzione.
 - Template message (fuori finestra 24 h), media in uscita nell'inbox, notifiche push/email all'équipe su handoff, Meta Embedded Signup, analytics Nala per il canale, migrazione del widget storefront su `runNalaChannelTurn`, inbox omnicanale (Instagram DM, Messenger, web chat, email).
 
 ## 17. Troubleshooting
@@ -284,7 +327,11 @@ Checklist produzione prima del punto 12:
 | Sintomo | Causa probabile | Verifica |
 |---|---|---|
 | Meta: "The callback URL or verify token couldn't be validated" | `META_WHATSAPP_VERIFY_TOKEN` diverso o assente (503) | log `webhook_rejected` `method: GET` |
-| Nessun evento in Lepefy | campo `messages` non sottoscritto, app non iscritta alla WABA, firma errata | log `webhook_rejected reason: invalid_signature` → `META_APP_SECRET` |
+| Nessun evento in Lepefy (il *Test* della dashboard invece arriva) | app **non iscritta alla WABA** o app **non pubblicata** | `GET /{WABA_ID}/subscribed_apps`; *Pubblicazione* = Pubblicata (§12) |
+| Nessun evento, nemmeno il *Test* | campo `messages` non sottoscritto, firma errata | log `webhook_rejected reason: invalid_signature` → `META_APP_SECRET` |
+| Numero di test "non registrato su WhatsApp" | il numero di test non è ricercabile | inviare prima un template dalla console, poi rispondere (§11 punto 11) |
+| Invio fallito `131005 Access denied` | token senza accesso alla WABA (generato prima del consenso, o di un'altra app) | rigenerare il token dopo il consenso / token System User con la WABA assegnata, poi redeploy |
+| GET webhook 503 / POST 503 | segreti assenti sul deployment | variabili Vercel + redeploy (atteso poi 403 / 401 senza credenziali valide) |
 | `unknown_phone_number_id` | canale non creato o `phone_number_id` errato | pannello Connexion Meta |
 | Messaggi salvati, nessuna risposta | canale `En test`, automazione OFF, flag OFF, conversazione in pausa, tenant sospeso | `processing_result` del messaggio (`channel_not_active`, `automation_disabled`, `automation_paused`, `tenant_suspended`) |
 | Messaggi bloccati `pending` | dispatch n8n fallito e sweep non attivo | workflow manutenzione |
