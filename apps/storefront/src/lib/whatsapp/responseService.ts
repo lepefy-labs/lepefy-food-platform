@@ -45,7 +45,7 @@ export type SendOutcome =
 export async function sendConversationText(
   params: {
     channel: WhatsAppChannel;
-    conversation: Pick<WhatsAppConversation, 'id' | 'tenant_id' | 'channel_id' | 'wa_id' | 'last_inbound_at'>;
+    conversation: Pick<WhatsAppConversation, 'id' | 'tenant_id' | 'channel_id' | 'wa_id' | 'last_inbound_at'> & { wa_user_id?: string | null };
     body: string;
     authorType: OutboundInsert['authorType'];
     authorAdminId?: string | null;
@@ -81,8 +81,9 @@ export async function sendConversationText(
     metadata: params.metadata ?? {},
   };
 
-  // Tenant de test : jamais de message vers un numéro réel hors liste autorisée.
-  if (params.isTestTenant && !deps.testAllowList.includes(conversation.wa_id)) {
+  // Tenant de test : jamais de message vers un numéro réel hors liste autorisée
+  // (un client identifié seulement par BSUID ne peut pas être vérifié : bloqué).
+  if (params.isTestTenant && (!conversation.wa_id || !deps.testAllowList.includes(conversation.wa_id))) {
     const messageId = await deps.store.insertOutbound({ ...base, status: 'failed', errorCode: 'test_blocked', errorTitle: 'Destinataire hors WHATSAPP_TEST_RECIPIENTS (tenant de test).' });
     deps.log('test_recipient_blocked', logFields);
     return { ok: false, messageId, reason: 'test_recipient_blocked' };
@@ -91,7 +92,7 @@ export async function sendConversationText(
   const messageId = await deps.store.insertOutbound({ ...base, status: 'pending' });
   try {
     const provider = deps.providerFactory(channel);
-    const result = await provider.sendText(conversation.wa_id, body, { replyTo: params.replyTo ?? undefined });
+    const result = await provider.sendText({ phone: conversation.wa_id, userId: conversation.wa_user_id ?? null }, body, { replyTo: params.replyTo ?? undefined });
     await deps.store.markSent(channel.tenant_id, messageId, result.providerMessageId);
     await deps.store.touchConversation(channel.tenant_id, conversation.id);
     deps.log('message_sent', { ...logFields, messageId });

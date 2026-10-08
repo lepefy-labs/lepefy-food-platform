@@ -84,6 +84,14 @@ Capability RBAC: `whatsapp.view` (standard), `whatsapp.reply` (sensitive), `what
 
 Test SQL: `supabase/tests/147_whatsapp_business_platform.{fixture,test}.sql` (CI, job dedicato): grant, RLS, unicità cross-tenant, idempotenza dell'ingest, FK composite, stati monotoni, claim, retention.
 
+### Migration 148 — username (BSUID) e messaggi dall'app Business (in locale, da applicare)
+
+- **BSUID**: da aprile 2026 Meta aggiunge a ogni webhook il *business-scoped user ID* (`messages[].from_user_id`, `contacts[].user_id`, formato `IT.1349…`, `ENT` per i parent BSUID). Un cliente con **username** può arrivare **senza numero** (`from`/`wa_id` omessi). `whatsapp_conversations.wa_user_id` (unico per canale) affianca `wa_id`; `wa_id`/`customer_phone` diventano facoltativi (CHECK: almeno uno dei due). `whatsapp_resolve_conversation` risolve per BSUID poi per telefono e completa l'identificativo mancante.
+- **Invio**: il provider usa `to` quando il numero è noto, altrimenti `recipient` = BSUID (`recipientFields`). Stato ordine (match telefono) e tenant di test (allow-list per numero) restano bloccati per un cliente senza numero.
+- **Eco dall'app** (`smb_message_echoes`, coexistence): `ingest_whatsapp_business_echo` registra il messaggio scritto dal telefono come messaggio *équipe* in uscita (`metadata.source = business_app`, idempotente sul wamid), mette la conversazione in `human` con automazione **in pausa**, apre/accetta un handoff `agent_takeover`, audit `business_app_reply`. Ripresa automatica dopo `auto_resume_minutes` del canale, **60 min di default** (l'équipe al telefono non clicca "Rendre à l'automatisation"). Modifiche/cancellazioni dall'app (`edit`/`revoke`) non riflesse.
+- **Ordine di rilascio**: applicare **148 prima** di deployare il codice che la usa (le select includono `wa_user_id`). 148 è compatibile con il codice già in produzione (firma 147 dell'ingest mantenuta); il nuovo codice ricade sulla firma 147 se la 148 manca, ma solo per l'ingest.
+- Test: `supabase/tests/148_whatsapp_bsuid_echoes.test.sql` (CI), `tests/unit/whatsapp.spec.ts` (*usernames (BSUID) and business app echoes*).
+
 ### Decisione omnicanale
 
 Tabelle **specifiche WhatsApp** (non un modello generico "channel/inbox"), per non generalizzare prematuramente. L'estendibilità è garantita a livello di codice:
@@ -160,7 +168,7 @@ Debito noto: la cascata storefront in `app/api/chat/route.ts` non è stata migra
 | Pagina | Contenuto |
 |---|---|
 | Vue d'ensemble | stato, numero, nome verificato, Automatisations/Nala/Handoff ON-OFF, lingua, reprise automatique; pannello **Connexion Meta** solo platform owner (identità, URL webhook, invio template `hello_world`) |
-| Conversations | inbox: filtri, lista, filo, stati (Nala, Automatisation, Opérateur demandé, Opérateur, Fermée, Nouvelle), prendere la mano / restituire / chiudere, composer (Ctrl+Invio), polling 10 s; mobile lista ↔ filo |
+| Conversations | inbox: filtri, lista, filo, stati (Nala, Automatisation, Opérateur demandé, Opérateur, Fermée, Nouvelle), prendere la mano / restituire / chiudere, composer (Ctrl+Invio), polling 10 s; mobile lista ↔ filo. Quando l'automazione è in pausa, un avviso sopra il composer ripete «Rendre à l'automatisation» (il pulsante dell'intestazione non era notato dopo una risposta) |
 | Automatisations | attivazione, priorità e testi opzionali per regola |
 
 API (`/api/admin/whatsapp/…`, mappa fail-closed in `adminApiPermissions.ts`):
@@ -248,7 +256,10 @@ Identificativi (non segreti):
 | Handoff automatico | PASS (`handoff:unsupported_intent`: handoff aperto, conversazione `waiting_human`, automazione in pausa, messaggio di presa in carico inviato) |
 | Errore provider | PASS (token senza accesso → messaggio `failed` `131005`, nessun crash) |
 | Idempotenza | non provocata in reale; coperta da indice unico + test SQL CI |
-| Inbox operatore + ripresa automazione, Nala, stato ordine | non ancora collaudati sul numero di test |
+| Inbox operatore | PASS (risposta dall'inbox inviata dal numero di test → `sent/delivered/read`; presa in carico automatica `agent_takeover`) |
+| Ripresa automazione | PASS (handoff `resolved = resumed`, conversazione `open` + automazione attiva, audit `automation_resumed`) |
+| Stati fuori ordine | PASS (`delivered` ricevuto prima di `sent`: stato non retrocede) |
+| Nala, stato ordine | non ancora collaudati sul numero di test |
 
 ## 12. Configurare il webhook Meta
 
@@ -278,6 +289,8 @@ Identificativi (non segreti):
 
 ## 14. Onboarding Chloe Food (futuro — NON eseguito)
 
+**Vincolo verificato (documentazione Meta, ottobre 2026)**: l'onboarding **Coexistence** (stesso numero nell'app WhatsApp Business e in Cloud API) avviene solo via Embedded Signup e richiede di essere **Solution Partner o Tech Provider**. Lepefy non è ancora una struttura giuridica, quindi non può completare la verifica aziendale richiesta per diventare Tech Provider. Strada a regime: Lepefy Tech Provider. Alternative fino ad allora: (a) un BSP/Solution Partner che offre coexistence, con un adattatore provider dedicato; (b) Chloe Food come sviluppatore diretto con il numero **spostato** sulla sola Cloud API (l'équipe risponde dall'inbox Lepefy, non più dall'app); (c) attendere Lepefy Tech Provider. Requisiti coexistence noti: app Business ≥ 2.24.17; i dispositivi collegati vengono scollegati (Windows e WearOS non supportati); gruppi non sincronizzati; messaggi effimeri, view-once, posizione live e liste broadcast disattivati; chiamate, cataloghi, risposte rapide, etichette non disponibili via Cloud API; 20 msg/s; sincronizzazione contatti/storico entro 24 h; offboarding solo dall'app (non via Deregister API). Campi webhook da sottoscrivere in quel momento: `smb_message_echoes` (gestito dalla 148), `history` e `smb_app_state_sync` (non ancora gestiti). I messaggi inviati dall'app restano gratuiti e non aprono la finestra di 24 h della Cloud API.
+
 Nessuna azione automatica. Il WhatsApp Business attualmente usato dal tenant non deve essere messo a rischio.
 
 1. **Requisiti Meta**: Business Manager verificato, nome visualizzato, numero idoneo, accettazione termini WhatsApp Business.
@@ -297,13 +310,14 @@ Checklist produzione prima del punto 12:
 
 - [x] migration 147 applicata (7/10/2026; resta da eseguire la verifica completa di grant/RLS lato produzione);
 - [x] token **permanente** System User (fatto su `test.lepefy.com`; da ripetere sui deployment di produzione che inviano);
-- [ ] gestione dei clienti con username WhatsApp (messaggi senza numero di telefono, vedi §16);
+- [ ] migration 148 applicata (username/BSUID + eco dall'app) e codice relativo deployato;
 - [x] account platform owner per la configurazione dei canali dall'admin (verificato su `test.lepefy.com`);
 - [ ] `META_APP_SECRET`, `META_WHATSAPP_VERIFY_TOKEN`, `META_WHATSAPP_SYSTEM_USER_TOKEN` (permanente), `WHATSAPP_INTERNAL_SECRET` su Vercel produzione;
 - [ ] `WHATSAPP_PROCESSING_MODE=n8n` + workflow n8n importati, credenziali, Error Workflow, attivati;
 - [ ] sweep di manutenzione attivo (prima di qualsiasi traffico reale);
 - [x] numero di test verificato end-to-end su `lepefy-test` (inbound, persistenza, regole, outbound, stati — §11.1);
-- [ ] inbox operatore, ripresa automazione, Nala e stato ordine collaudati sul numero di test (handoff automatico già PASS);
+- [x] handoff automatico, inbox operatore e ripresa automazione collaudati sul numero di test;
+- [ ] Nala e stato ordine collaudati sul numero di test;
 - [ ] `tenants.storefront_url` del tenant corretto (link catalogo/portale);
 - [ ] orari e indirizzo di ritiro compilati (Paramètres › Retrait), modalità di spedizione corretta;
 - [ ] clienti con telefono E.164 (`customers.normalized_phone`) per lo stato ordine;
@@ -322,7 +336,7 @@ Checklist produzione prima del punto 12:
 ## 16. Non ancora attivato / evoluzioni
 
 - Stato: migration 147 applicata; flag attivo solo su `lepefy-test`; un solo canale (numero di test Meta); token permanente System User; modalità `inline`; workflow n8n non importati (nessuno sweep di manutenzione attivo).
-- **Username WhatsApp (BSUID)**: Meta introduce gli username; per un cliente che li ha attivati i webhook possono arrivare **senza numero di telefono** (identificativo utente al posto di `from`/`wa_id`; la console di test mostra lo "Scenario nome utente"). `webhookPayload.ts` oggi scarta un messaggio senza `from` numerico e lo schema richiede `wa_id`/`customer_phone`: da gestire (identificativo cliente generico + invio tramite l'ID utente) prima della produzione.
+- **Username WhatsApp (BSUID)** ed **eco dall'app Business**: gestiti in locale (migration 148 + codice, §3), non ancora applicati né deployati. Non gestiti: webhook `history` e `smb_app_state_sync` della coexistence, modifiche/cancellazioni dall'app.
 - Template message (fuori finestra 24 h), media in uscita nell'inbox, notifiche push/email all'équipe su handoff, Meta Embedded Signup, analytics Nala per il canale, migrazione del widget storefront su `runNalaChannelTurn`, inbox omnicanale (Instagram DM, Messenger, web chat, email).
 
 ## 17. Troubleshooting

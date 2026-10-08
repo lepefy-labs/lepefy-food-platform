@@ -1,5 +1,5 @@
 import type { WhatsAppLogger } from './log';
-import type { InboundMessageEvent, StatusEvent, WhatsAppWebhookEvent } from './webhookPayload';
+import type { BusinessEchoEvent, InboundMessageEvent, StatusEvent, WhatsAppWebhookEvent } from './webhookPayload';
 import type { WhatsAppChannelStatus } from './types';
 
 /**
@@ -13,7 +13,15 @@ export interface ResolvedChannel {
   id: string;
   tenantId: string;
   status: WhatsAppChannelStatus;
+  autoResumeMinutes: number | null;
 }
+
+/**
+ * Pause de l'automatisation après une réponse écrite depuis l'app WhatsApp
+ * Business (coexistence). L'équipe au téléphone ne passe pas par l'admin pour
+ * « Rendre à l'automatisation » : sans réglage du canal, reprise après 60 min.
+ */
+export const BUSINESS_APP_PAUSE_DEFAULT_MINUTES = 60;
 
 export interface IngestResult {
   messageId: string;
@@ -27,6 +35,7 @@ export interface IngestionStore {
   isFeatureEnabled(tenantId: string): Promise<boolean>;
   ingestInbound(channelId: string, event: InboundMessageEvent): Promise<IngestResult>;
   applyStatus(channelId: string, event: StatusEvent): Promise<{ found: boolean; applied: boolean; tenantId: string | null }>;
+  ingestBusinessEcho(channelId: string, event: BusinessEchoEvent, resumeMinutes: number | null): Promise<IngestResult>;
 }
 
 export interface IngestionSummary {
@@ -35,6 +44,7 @@ export interface IngestionSummary {
   ingested: number;
   duplicates: number;
   statuses: number;
+  echoes: number;
   skipped: number;
 }
 
@@ -45,7 +55,7 @@ export async function ingestWebhookEvents(
   store: IngestionStore,
   log: WhatsAppLogger,
 ): Promise<IngestionSummary> {
-  const summary: IngestionSummary = { toProcess: [], ingested: 0, duplicates: 0, statuses: 0, skipped: 0 };
+  const summary: IngestionSummary = { toProcess: [], ingested: 0, duplicates: 0, statuses: 0, echoes: 0, skipped: 0 };
   const decisions = new Map<string, ChannelDecision>();
 
   async function decide(phoneNumberId: string): Promise<ChannelDecision> {
@@ -88,6 +98,12 @@ export async function ingestWebhookEvents(
         summary.duplicates += 1;
         log('duplicate_event', { tenantId: result.tenantId, messageId: result.messageId });
       }
+    } else if (event.kind === 'echo') {
+      // Réponse humaine depuis le téléphone : enregistrée et automatisation en pause (jamais traitée par le moteur).
+      const result = await store.ingestBusinessEcho(channel.id, event, channel.autoResumeMinutes ?? BUSINESS_APP_PAUSE_DEFAULT_MINUTES);
+      if (result.tenantId !== channel.tenantId) throw new Error('whatsapp_tenant_mismatch');
+      summary.echoes += 1;
+      log(result.created ? 'business_echo_ingested' : 'duplicate_event', { tenantId: result.tenantId, messageId: result.messageId, conversationId: result.conversationId });
     } else {
       const result = await store.applyStatus(channel.id, event);
       summary.statuses += 1;

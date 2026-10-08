@@ -13,6 +13,7 @@ export type WhatsAppLogEvent =
   | 'feature_disabled'
   | 'duplicate_event'
   | 'message_ingested'
+  | 'business_echo_ingested'
   | 'status_applied'
   | 'status_unmatched'
   | 'processing_dispatched'

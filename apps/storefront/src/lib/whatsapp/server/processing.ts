@@ -112,6 +112,8 @@ export function createProcessingDeps(db: Db): ProcessDeps {
     },
 
     async linkCustomer(ctx) {
+      // Client à username sans numéro : aucune correspondance fiable possible.
+      if (!ctx.conversation.customer_phone) return null;
       // wa_id est le numéro vérifié par WhatsApp : correspondance exacte, unique par tenant (index 109).
       const { data, error } = await db.from('customers').select('id')
         .eq('tenant_id', ctx.tenant.id).eq('normalized_phone', ctx.conversation.customer_phone).limit(2);
@@ -198,7 +200,7 @@ export function createProcessingDeps(db: Db): ProcessDeps {
     },
 
     async markRead(ctx: InboundContext) {
-      if (ctx.isTestTenant && !testRecipientAllowList().includes(ctx.conversation.wa_id)) return;
+      if (ctx.isTestTenant && (!ctx.conversation.wa_id || !testRecipientAllowList().includes(ctx.conversation.wa_id))) return;
       try {
         await createChannelProvider(ctx.channel).markAsRead(ctx.message.provider_message_id);
       } catch {

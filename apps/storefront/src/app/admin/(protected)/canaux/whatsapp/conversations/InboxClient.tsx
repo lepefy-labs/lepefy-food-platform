@@ -163,7 +163,7 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
               <button type="button" onClick={() => setSelectedId(item.id)}
                 className={`w-full border-b border-gray-100 px-4 py-3 text-left transition-colors dark:border-gray-800 ${selectedId === item.id ? 'bg-[var(--admin-primary-soft)]/60' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{item.customerName ?? item.customerPhone}</span>
+                  <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{item.customerName ?? item.customerPhone ?? 'Client WhatsApp'}</span>
                   <span className="shrink-0 text-[11px] text-gray-400">{relative(item.lastMessageAt)}</span>
                 </div>
                 <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
@@ -189,11 +189,11 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
               <button type="button" className="md:hidden" aria-label="Retour à la liste" onClick={() => setSelectedId(null)}><IconArrowLeft size={18} /></button>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 className="truncate text-sm font-semibold text-gray-950 dark:text-white">{conversation.customer_name ?? conversation.customer_phone}</h2>
+                  <h2 className="truncate text-sm font-semibold text-gray-950 dark:text-white">{conversation.customer_name ?? conversation.customer_phone ?? 'Client WhatsApp'}</h2>
                   <StateBadge state={detail.state} />
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {conversation.customer_phone}
+                  {conversation.customer_phone ?? 'Numéro masqué (username WhatsApp)'}
                   {detail.customer ? <> · <a className="underline" href={`/admin/clients/${detail.customer.id}`}>fiche client</a></> : ' · client non reconnu'}
                   {detail.openHandoff ? ` · opérateur demandé (${detail.openHandoff.reason})` : ''}
                 </p>
@@ -238,6 +238,17 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
             {canReply && (
               <footer className="border-t border-[var(--admin-border)] p-3 dark:border-gray-800">
                 {actionError && <p className="mb-2 text-xs text-red-600 dark:text-red-300" role="alert">{actionError}</p>}
+                {/* Rappel au point d'action : après une réponse, l'automatisation reste en pause jusqu'à la reprise. */}
+                {paused && (
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      Automatisation en pause : les réponses automatiques et Nala ne répondent plus à ce client.
+                    </p>
+                    <Button variant="outline" size="md" onClick={() => void runAction('resume')} loading={busy === 'resume'}>
+                      <IconPlayerPlay size={16} /> Rendre à l’automatisation
+                    </Button>
+                  </div>
+                )}
                 {channelDisabled ? (
                   <p className="text-xs text-gray-500">Canal désactivé : envoi impossible.</p>
                 ) : !detail.withinServiceWindow ? (

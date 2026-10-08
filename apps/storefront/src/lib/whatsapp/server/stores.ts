@@ -19,18 +19,27 @@ function fail(scope: string, error: { code?: string; message?: string } | null):
   throw new Error(`whatsapp_${scope}_failed${error?.code ? `:${error.code}` : ''}`);
 }
 
+function isMissingFunction(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST202' || error.code === '42883' || /could not find the function/i.test(error.message ?? '');
+}
+
 export function createIngestionStore(db: Db): IngestionStore {
   return {
     async findChannelByPhoneNumberId(phoneNumberId) {
       const { data, error } = await db.from('tenant_whatsapp_channels')
-        .select('id, tenant_id, status')
+        .select('id, tenant_id, status, auto_resume_minutes')
         .eq('provider', 'meta_cloud').eq('phone_number_id', phoneNumberId).maybeSingle();
       if (error) fail('channel_lookup', error);
-      return data ? { id: data.id as string, tenantId: data.tenant_id as string, status: data.status as 'pending' | 'active' | 'disabled' } : null;
+      return data ? {
+        id: data.id as string,
+        tenantId: data.tenant_id as string,
+        status: data.status as 'pending' | 'active' | 'disabled',
+        autoResumeMinutes: (data.auto_resume_minutes as number | null) ?? null,
+      } : null;
     },
     isFeatureEnabled: (tenantId) => isFeatureEnabled(tenantId, WHATSAPP_FEATURE_FLAG),
     async ingestInbound(channelId, event) {
-      const { data, error } = await db.rpc('ingest_whatsapp_inbound_message', {
+      let { data, error } = await db.rpc('ingest_whatsapp_inbound_message', {
         p_channel_id: channelId,
         p_wa_id: event.waId,
         p_customer_name: event.profileName,
@@ -39,9 +48,40 @@ export function createIngestionStore(db: Db): IngestionStore {
         p_body: event.body,
         p_metadata: event.metadata,
         p_provider_timestamp: event.timestamp?.toISOString() ?? null,
+        // Migration 148 : identité BSUID (client avec username, éventuellement sans numéro).
+        p_user_id: event.userId,
       });
+      // Migration 148 pas encore appliquée : signature 147 (numéro obligatoire).
+      if (error && isMissingFunction(error) && event.waId) {
+        ({ data, error } = await db.rpc('ingest_whatsapp_inbound_message', {
+          p_channel_id: channelId,
+          p_wa_id: event.waId,
+          p_customer_name: event.profileName,
+          p_provider_message_id: event.providerMessageId,
+          p_message_type: event.messageType,
+          p_body: event.body,
+          p_metadata: event.metadata,
+          p_provider_timestamp: event.timestamp?.toISOString() ?? null,
+        }));
+      }
       const row = (Array.isArray(data) ? data[0] : data) as { out_message_id: string; out_conversation_id: string; out_tenant_id: string; out_created: boolean } | null;
       if (error || !row) fail('ingest', error);
+      return { messageId: row.out_message_id, conversationId: row.out_conversation_id, tenantId: row.out_tenant_id, created: row.out_created };
+    },
+    async ingestBusinessEcho(channelId, event, resumeMinutes) {
+      const { data, error } = await db.rpc('ingest_whatsapp_business_echo', {
+        p_channel_id: channelId,
+        p_wa_id: event.waId,
+        p_user_id: event.userId,
+        p_provider_message_id: event.providerMessageId,
+        p_message_type: event.messageType,
+        p_body: event.body,
+        p_metadata: event.metadata,
+        p_provider_timestamp: event.timestamp?.toISOString() ?? null,
+        p_resume_minutes: resumeMinutes,
+      });
+      const row = (Array.isArray(data) ? data[0] : data) as { out_message_id: string; out_conversation_id: string; out_tenant_id: string; out_created: boolean } | null;
+      if (error || !row) fail('echo_ingest', error);
       return { messageId: row.out_message_id, conversationId: row.out_conversation_id, tenantId: row.out_tenant_id, created: row.out_created };
     },
     async applyStatus(channelId, event) {

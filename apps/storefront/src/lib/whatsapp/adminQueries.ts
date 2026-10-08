@@ -35,7 +35,8 @@ export function inboxState(conversation: Pick<WhatsAppConversation, 'status'>, l
 export interface InboxItem {
   id: string;
   customerName: string | null;
-  customerPhone: string;
+  /** null pour un client à username sans numéro disponible. */
+  customerPhone: string | null;
   customerLinked: boolean;
   state: InboxState;
   automationPaused: boolean;

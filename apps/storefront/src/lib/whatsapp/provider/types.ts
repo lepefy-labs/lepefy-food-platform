@@ -21,13 +21,19 @@ export interface WhatsAppTemplateComponent {
   parameters: Array<Record<string, unknown>>;
 }
 
+/**
+ * Destinataire : numéro (chiffres E.164 sans « + ») ou business-scoped user ID
+ * (BSUID, champ `recipient` de Graph API). Le numéro prime quand il existe.
+ */
+export type WhatsAppRecipient = string | { phone?: string | null; userId?: string | null };
+
 export interface WhatsAppProvider {
   readonly kind: 'meta_cloud';
-  sendText(to: string, body: string, options?: { previewUrl?: boolean; replyTo?: string }): Promise<WhatsAppSendResult>;
-  sendTemplate(to: string, name: string, languageCode: string, components?: WhatsAppTemplateComponent[]): Promise<WhatsAppSendResult>;
-  sendInteractive(to: string, interactive: Record<string, unknown>): Promise<WhatsAppSendResult>;
-  sendImage(to: string, image: WhatsAppMediaRef & { caption?: string }): Promise<WhatsAppSendResult>;
-  sendDocument(to: string, document: WhatsAppMediaRef & { filename?: string; caption?: string }): Promise<WhatsAppSendResult>;
+  sendText(to: WhatsAppRecipient, body: string, options?: { previewUrl?: boolean; replyTo?: string }): Promise<WhatsAppSendResult>;
+  sendTemplate(to: WhatsAppRecipient, name: string, languageCode: string, components?: WhatsAppTemplateComponent[]): Promise<WhatsAppSendResult>;
+  sendInteractive(to: WhatsAppRecipient, interactive: Record<string, unknown>): Promise<WhatsAppSendResult>;
+  sendImage(to: WhatsAppRecipient, image: WhatsAppMediaRef & { caption?: string }): Promise<WhatsAppSendResult>;
+  sendDocument(to: WhatsAppRecipient, document: WhatsAppMediaRef & { filename?: string; caption?: string }): Promise<WhatsAppSendResult>;
   markAsRead(providerMessageId: string): Promise<void>;
 }
 

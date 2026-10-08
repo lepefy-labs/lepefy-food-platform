@@ -3,9 +3,25 @@ import {
   type WhatsAppMediaRef,
   type WhatsAppProvider,
   type WhatsAppProviderErrorKind,
+  type WhatsAppRecipient,
   type WhatsAppSendResult,
   type WhatsAppTemplateComponent,
 } from './types';
+
+const BSUID = /^[A-Z]{2}(\.ENT)?\.[A-Za-z0-9]{1,128}$/;
+
+/**
+ * Champ destinataire Graph API : `to` (numéro) quand il est connu, sinon
+ * `recipient` (business-scoped user ID d'un client à username sans numéro).
+ */
+export function recipientFields(to: WhatsAppRecipient): { to: string } | { recipient: string } {
+  const phone = typeof to === 'string' ? to : to.phone ?? null;
+  const digits = phone?.replace(/[^0-9]/g, '') ?? '';
+  if (digits.length >= 6) return { to: digits };
+  const userId = typeof to === 'string' ? null : to.userId?.trim() ?? null;
+  if (userId && BSUID.test(userId)) return { recipient: userId };
+  throw new WhatsAppProviderError({ kind: 'recipient', message: 'invalid_recipient' });
+}
 
 /**
  * Adaptateur WhatsApp Cloud API (Graph API). Seul module qui parle à
@@ -107,13 +123,11 @@ export function createMetaCloudProvider(options: MetaCloudProviderOptions): What
     }
   }
 
-  async function send(to: string, type: string, payload: Record<string, unknown>, context?: string): Promise<WhatsAppSendResult> {
-    const recipient = to.replace(/[^0-9]/g, '');
-    if (recipient.length < 6) throw new WhatsAppProviderError({ kind: 'recipient', message: 'invalid_recipient' });
+  async function send(to: WhatsAppRecipient, type: string, payload: Record<string, unknown>, context?: string): Promise<WhatsAppSendResult> {
     const json = await post({
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to: recipient,
+      ...recipientFields(to),
       type,
       ...(context ? { context: { message_id: context } } : {}),
       [type]: payload,

@@ -9,10 +9,19 @@
 
 export type WhatsAppDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed';
 
-export interface InboundMessageEvent {
+/**
+ * Identité client : numéro (wa_id, absent si le client utilise un username et
+ * que le numéro n'est pas disponible) et/ou business-scoped user ID Meta
+ * (BSUID, `user_id`, toujours présent dans les webhooks récents). Au moins un.
+ */
+export interface CustomerIdentity {
+  waId: string | null;
+  userId: string | null;
+}
+
+export interface InboundMessageEvent extends CustomerIdentity {
   kind: 'message';
   phoneNumberId: string;
-  waId: string;
   profileName: string | null;
   providerMessageId: string;
   timestamp: Date | null;
@@ -31,7 +40,18 @@ export interface StatusEvent {
   errorTitle: string | null;
 }
 
-export type WhatsAppWebhookEvent = InboundMessageEvent | StatusEvent;
+/** Message écrit par l'équipe dans l'app WhatsApp Business (coexistence, champ smb_message_echoes). */
+export interface BusinessEchoEvent extends CustomerIdentity {
+  kind: 'echo';
+  phoneNumberId: string;
+  providerMessageId: string;
+  timestamp: Date | null;
+  messageType: string;
+  body: string | null;
+  metadata: Record<string, string | number | boolean>;
+}
+
+export type WhatsAppWebhookEvent = InboundMessageEvent | StatusEvent | BusinessEchoEvent;
 
 export interface ParsedWebhook {
   /** false si le payload n'est pas une notification WhatsApp Business (ignoré, 200). */
@@ -64,6 +84,14 @@ function str(value: unknown, max = 500): string | null {
 function digits(value: unknown, min: number, max: number): string | null {
   const raw = str(value, 40);
   return raw && new RegExp(`^[0-9]{${min},${max}}$`).test(raw) ? raw : null;
+}
+
+/** BSUID : code pays ISO, point, éventuellement "ENT.", puis jusqu'à 128 caractères alphanumériques. */
+export const BSUID_PATTERN = /^[A-Z]{2}(.ENT)?.[A-Za-z0-9]{1,128}$/;
+
+function bsuid(value: unknown): string | null {
+  const raw = str(value, 140);
+  return raw && BSUID_PATTERN.test(raw) ? raw : null;
 }
 
 function epochSeconds(value: unknown): Date | null {
@@ -148,30 +176,51 @@ export function parseWhatsAppWebhook(payload: unknown): ParsedWebhook {
     for (const change of arr(obj(entry)?.changes)) {
       const changeObj = obj(change);
       const value = obj(changeObj?.value);
-      if (changeObj?.field !== 'messages' || !value) { ignored += 1; continue; }
+      const field = changeObj?.field;
+      if ((field !== 'messages' && field !== 'smb_message_echoes') || !value) { ignored += 1; continue; }
       const phoneNumberId = digits(obj(value.metadata)?.phone_number_id, 5, 32);
       if (!phoneNumberId) { ignored += 1; continue; }
+
+      if (field === 'smb_message_echoes') {
+        for (const echo of arr(value.message_echoes)) {
+          const echoObj = obj(echo);
+          const id = providerId(echoObj?.id);
+          const waId = digits(echoObj?.to, 6, 20);
+          const userId = bsuid(echoObj?.to_user_id ?? echoObj?.recipient_user_id);
+          const type = messageType(echoObj?.type);
+          // Modifications / suppressions depuis l'app : non reflétées dans cette version.
+          if (!echoObj || !id || (!waId && !userId) || type === 'edit' || type === 'revoke') { ignored += 1; continue; }
+          const { body, metadata } = extractContent(echoObj, type);
+          events.push({ kind: 'echo', phoneNumberId, waId, userId, providerMessageId: id, timestamp: epochSeconds(echoObj.timestamp), messageType: type, body, metadata });
+        }
+        continue;
+      }
 
       const names = new Map<string, string>();
       for (const contact of arr(value.contacts)) {
         const contactObj = obj(contact);
-        const waId = digits(contactObj?.wa_id, 6, 20);
         const name = str(obj(contactObj?.profile)?.name, 120);
-        if (waId && name) names.set(waId, name);
+        if (!name) continue;
+        const waId = digits(contactObj?.wa_id, 6, 20);
+        const userId = bsuid(contactObj?.user_id);
+        if (waId) names.set(waId, name);
+        if (userId) names.set(userId, name);
       }
 
       for (const message of arr(value.messages)) {
         const messageObj = obj(message);
         const waId = digits(messageObj?.from, 6, 20);
+        const userId = bsuid(messageObj?.from_user_id);
         const id = providerId(messageObj?.id);
-        if (!messageObj || !waId || !id) { ignored += 1; continue; }
+        if (!messageObj || (!waId && !userId) || !id) { ignored += 1; continue; }
         const type = messageType(messageObj.type);
         const { body, metadata } = extractContent(messageObj, type);
         events.push({
           kind: 'message',
           phoneNumberId,
           waId,
-          profileName: names.get(waId) ?? null,
+          userId,
+          profileName: (userId && names.get(userId)) || (waId && names.get(waId)) || null,
           providerMessageId: id,
           timestamp: epochSeconds(messageObj.timestamp),
           messageType: type,

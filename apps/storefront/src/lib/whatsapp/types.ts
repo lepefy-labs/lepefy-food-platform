@@ -40,8 +40,11 @@ export interface WhatsAppConversation {
   tenant_id: string;
   channel_id: string;
   customer_id: string | null;
-  wa_id: string;
-  customer_phone: string;
+  /** Numéro WhatsApp (chiffres) — absent pour un client à username sans numéro disponible (migration 148). */
+  wa_id: string | null;
+  /** Business-scoped user ID Meta (BSUID) — migration 148. */
+  wa_user_id: string | null;
+  customer_phone: string | null;
   customer_name: string | null;
   status: WhatsAppConversationStatus;
   automation_status: WhatsAppAutomationStatus;
@@ -56,7 +59,7 @@ export interface WhatsAppConversation {
   created_at: string;
 }
 
-export const CONVERSATION_COLUMNS = 'id, tenant_id, channel_id, customer_id, wa_id, customer_phone, customer_name, status, automation_status, assigned_to, detected_language, nala_conversation_id, unread_count, last_message_at, last_inbound_at, human_handoff_at, automation_resume_at, created_at';
+export const CONVERSATION_COLUMNS = 'id, tenant_id, channel_id, customer_id, wa_id, wa_user_id, customer_phone, customer_name, status, automation_status, assigned_to, detected_language, nala_conversation_id, unread_count, last_message_at, last_inbound_at, human_handoff_at, automation_resume_at, created_at';
 
 export interface WhatsAppMessage {
   id: string;

@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
 import type { Tenant } from '@lepefy/types';
 import { computeMetaSignature, verifyMetaSignature, verifySubscriptionRequest } from '../../src/lib/whatsapp/signature';
-import { parseWhatsAppWebhook, type InboundMessageEvent, type StatusEvent } from '../../src/lib/whatsapp/webhookPayload';
-import { ingestWebhookEvents, type IngestionStore, type ResolvedChannel } from '../../src/lib/whatsapp/ingestion';
+import { parseWhatsAppWebhook, type BusinessEchoEvent, type InboundMessageEvent, type StatusEvent } from '../../src/lib/whatsapp/webhookPayload';
+import { BUSINESS_APP_PAUSE_DEFAULT_MINUTES, ingestWebhookEvents, type IngestionStore, type ResolvedChannel } from '../../src/lib/whatsapp/ingestion';
 import { decideAutomation, evaluateNalaGuardrails, type EngineInput } from '../../src/lib/whatsapp/automation/engine';
 import { detectIntents, detectLanguage, extractOrderRef } from '../../src/lib/whatsapp/automation/intents';
 import { resolveRules, parseRuleConfig } from '../../src/lib/whatsapp/automation/rules';
 import { shippingReply, toWhatsAppText } from '../../src/lib/whatsapp/automation/replies';
 import { processInboundMessage, tenantStorefrontBase, type InboundContext, type ProcessDeps } from '../../src/lib/whatsapp/automation/processInbound';
-import { classifyMetaError, createMetaCloudProvider, sanitizeProviderMessage } from '../../src/lib/whatsapp/provider/metaCloudProvider';
+import { classifyMetaError, createMetaCloudProvider, recipientFields, sanitizeProviderMessage } from '../../src/lib/whatsapp/provider/metaCloudProvider';
 import { resolveChannelAccessToken } from '../../src/lib/whatsapp/provider/credentials';
 import { WhatsAppProviderError, type WhatsAppProvider } from '../../src/lib/whatsapp/provider/types';
 import { sendConversationText, type OutboundInsert, type OutboundStore } from '../../src/lib/whatsapp/responseService';
@@ -48,26 +48,47 @@ function textMessage(id: string, from = '393331112222', body = 'Bonjour') {
 }
 
 /** Store en mémoire reproduisant les garanties SQL de la migration 147 (unicité, résolution par canal). */
-function memoryIngestionStore(channels: Array<ResolvedChannel & { phoneNumberId: string }>, enabledTenants = new Set([TENANT_A, TENANT_B])) {
-  const conversations: Array<{ id: string; tenantId: string; channelId: string; waId: string }> = [];
+type TestChannel = Omit<ResolvedChannel, 'autoResumeMinutes'> & { phoneNumberId: string; autoResumeMinutes?: number | null };
+
+/** Store en mémoire reproduisant les garanties SQL des migrations 147/148 (unicité, résolution par canal, BSUID). */
+function memoryIngestionStore(channels: TestChannel[], enabledTenants = new Set([TENANT_A, TENANT_B])) {
+  const conversations: Array<{ id: string; tenantId: string; channelId: string; waId: string | null; userId: string | null; paused: boolean; resumeMinutes?: number | null }> = [];
   const messages: Array<{ id: string; tenantId: string; channelId: string; conversationId: string; providerId: string; direction: 'inbound' | 'outbound'; status: string }> = [];
   let seq = 0;
+  function resolve(channelId: string, tenantId: string, waId: string | null, userId: string | null) {
+    let conversation = (userId && conversations.find((row) => row.channelId === channelId && row.userId === userId))
+      || (waId && conversations.find((row) => row.channelId === channelId && row.waId === waId)) || undefined;
+    if (!conversation) {
+      conversation = { id: `conv-${++seq}`, tenantId, channelId, waId, userId, paused: false };
+      conversations.push(conversation);
+    }
+    conversation.waId ??= waId;
+    conversation.userId ??= userId;
+    return conversation;
+  }
   const store: IngestionStore = {
     async findChannelByPhoneNumberId(phoneNumberId) {
       const channel = channels.find((candidate) => candidate.phoneNumberId === phoneNumberId);
-      return channel ? { id: channel.id, tenantId: channel.tenantId, status: channel.status } : null;
+      return channel ? { id: channel.id, tenantId: channel.tenantId, status: channel.status, autoResumeMinutes: channel.autoResumeMinutes ?? null } : null;
     },
     async isFeatureEnabled(tenantId) { return enabledTenants.has(tenantId); },
     async ingestInbound(channelId, event) {
       const channel = channels.find((candidate) => candidate.id === channelId)!;
       const existing = messages.find((message) => message.channelId === channelId && message.providerId === event.providerMessageId);
       if (existing) return { messageId: existing.id, conversationId: existing.conversationId, tenantId: existing.tenantId, created: false };
-      let conversation = conversations.find((row) => row.channelId === channelId && row.waId === event.waId);
-      if (!conversation) {
-        conversation = { id: `conv-${++seq}`, tenantId: channel.tenantId, channelId, waId: event.waId };
-        conversations.push(conversation);
-      }
+      const conversation = resolve(channelId, channel.tenantId, event.waId, event.userId);
       const message = { id: `msg-${++seq}`, tenantId: channel.tenantId, channelId, conversationId: conversation.id, providerId: event.providerMessageId, direction: 'inbound' as const, status: 'received' };
+      messages.push(message);
+      return { messageId: message.id, conversationId: conversation.id, tenantId: channel.tenantId, created: true };
+    },
+    async ingestBusinessEcho(channelId, event, resumeMinutes) {
+      const channel = channels.find((candidate) => candidate.id === channelId)!;
+      const existing = messages.find((message) => message.channelId === channelId && message.providerId === event.providerMessageId);
+      if (existing) return { messageId: existing.id, conversationId: existing.conversationId, tenantId: existing.tenantId, created: false };
+      const conversation = resolve(channelId, channel.tenantId, event.waId, event.userId);
+      conversation.paused = true;
+      conversation.resumeMinutes = resumeMinutes;
+      const message = { id: `msg-${++seq}`, tenantId: channel.tenantId, channelId, conversationId: conversation.id, providerId: event.providerMessageId, direction: 'outbound' as const, status: 'sent' };
       messages.push(message);
       return { messageId: message.id, conversationId: conversation.id, tenantId: channel.tenantId, created: true };
     },
@@ -98,7 +119,7 @@ function channelRow(patch: Partial<WhatsAppChannel> = {}): WhatsAppChannel {
 
 function conversationRow(patch: Partial<WhatsAppConversation> = {}): WhatsAppConversation {
   return {
-    id: 'conv-1', tenant_id: TENANT_A, channel_id: 'channel-a', customer_id: null, wa_id: '393331112222',
+    id: 'conv-1', tenant_id: TENANT_A, channel_id: 'channel-a', customer_id: null, wa_id: '393331112222', wa_user_id: null,
     customer_phone: '+393331112222', customer_name: 'Marie', status: 'open', automation_status: 'active', assigned_to: null,
     detected_language: null, nala_conversation_id: null, unread_count: 1, last_message_at: new Date().toISOString(),
     last_inbound_at: new Date().toISOString(), human_handoff_at: null, automation_resume_at: null, created_at: '2026-10-01T00:00:00Z',
@@ -622,5 +643,95 @@ test.describe('intents and replies', () => {
     expect(tenantStorefrontBase({ storefront_url: 'https://shop.example.test/' })).toBe('https://shop.example.test');
     expect(tenantStorefrontBase({ storefront_url: null })).toBeNull();
     expect(toWhatsAppText('**Ndolé** [voir](https://shop.example.test/p)')).toBe('*Ndolé* voir : https://shop.example.test/p');
+  });
+});
+
+// ─── Username WhatsApp (BSUID) et messages de l'app Business (coexistence) ──
+
+function echoPayload(phoneNumberId: string, echoes: unknown[]) {
+  return {
+    object: 'whatsapp_business_account',
+    entry: [{ id: 'waba', changes: [{ field: 'smb_message_echoes', value: {
+      messaging_product: 'whatsapp',
+      metadata: { display_phone_number: '15550000000', phone_number_id: phoneNumberId },
+      message_echoes: echoes,
+    } }] }],
+  };
+}
+
+test.describe('usernames (BSUID) and business app echoes', () => {
+  test('a customer with a username and no phone number is kept, identified by BSUID', async () => {
+    const parsed = parseWhatsAppWebhook(webhookPayload(PHONE_ID_A, {
+      contacts: [{ profile: { name: 'Jean', username: 'jeanfood' }, user_id: 'FR.13491208655302741918' }],
+      messages: [{ from_user_id: 'FR.13491208655302741918', id: 'wamid.USR-0001', timestamp: '1760000000', type: 'text', text: { body: 'Bonjour' } }],
+    }));
+    const [event] = parsed.events as InboundMessageEvent[];
+    expect(event).toMatchObject({ waId: null, userId: 'FR.13491208655302741918', profileName: 'Jean', body: 'Bonjour' });
+
+    const memory = memoryIngestionStore(CHANNELS);
+    await ingestWebhookEvents(parsed.events, memory.store, () => undefined);
+    // Le même client écrit plus tard avec son numéro visible : même conversation.
+    await ingestWebhookEvents(parseWhatsAppWebhook(webhookPayload(PHONE_ID_A, {
+      messages: [{ from: '33612345678', from_user_id: 'FR.13491208655302741918', id: 'wamid.USR-0002', timestamp: '1760000100', type: 'text', text: { body: 'Re' } }],
+    })).events, memory.store, () => undefined);
+    expect(memory.conversations).toHaveLength(1);
+    expect(memory.conversations[0]).toMatchObject({ waId: '33612345678', userId: 'FR.13491208655302741918' });
+  });
+
+  test('messages without any identity or with a malformed BSUID are ignored', () => {
+    const parsed = parseWhatsAppWebhook(webhookPayload(PHONE_ID_A, {
+      messages: [
+        { id: 'wamid.NOID-0001', type: 'text', text: { body: 'x' } },
+        { from_user_id: 'not-a-bsuid', id: 'wamid.NOID-0002', type: 'text', text: { body: 'x' } },
+      ],
+    }));
+    expect(parsed.events).toHaveLength(0);
+    expect(parsed.ignored).toBe(2);
+  });
+
+  test('replies go to "to" when the phone is known, otherwise to the BSUID "recipient"', () => {
+    expect(recipientFields({ phone: '393331112222', userId: 'IT.111' })).toEqual({ to: '393331112222' });
+    expect(recipientFields({ phone: null, userId: 'IT.ENT.11815799212886844830' })).toEqual({ recipient: 'IT.ENT.11815799212886844830' });
+    expect(() => recipientFields({ phone: null, userId: 'bad id' })).toThrow(WhatsAppProviderError);
+  });
+
+  test('a reply written in the WhatsApp Business app is recorded and pauses automation (never processed by the engine)', async () => {
+    const parsed = parseWhatsAppWebhook(echoPayload(PHONE_ID_A, [
+      { from: '15550000000', to: '393331112222', id: 'wamid.ECHO-0001', timestamp: '1760000200', type: 'text', text: { body: 'Je vous réponds tout de suite' } },
+      { from: '15550000000', to: '393331112222', id: 'wamid.ECHO-EDIT', timestamp: '1760000300', type: 'edit', edit: {} },
+    ]));
+    expect(parsed.ignored).toBe(1);
+    const [echo] = parsed.events as BusinessEchoEvent[];
+    expect(echo).toMatchObject({ kind: 'echo', waId: '393331112222', body: 'Je vous réponds tout de suite' });
+
+    const memory = memoryIngestionStore(CHANNELS);
+    const logs = recorder();
+    const summary = await ingestWebhookEvents(parsed.events, memory.store, logs.log);
+    expect(summary).toMatchObject({ echoes: 1, toProcess: [] });
+    expect(memory.conversations[0]).toMatchObject({ paused: true, resumeMinutes: BUSINESS_APP_PAUSE_DEFAULT_MINUTES });
+    expect(memory.messages[0]).toMatchObject({ direction: 'outbound' });
+    // Retry Meta : pas de doublon.
+    await ingestWebhookEvents(parsed.events, memory.store, logs.log);
+    expect(memory.messages).toHaveLength(1);
+    expect(logs.events.map((entry) => entry.event)).toEqual(expect.arrayContaining(['business_echo_ingested', 'duplicate_event']));
+  });
+
+  test('the channel auto-resume setting overrides the default pause after an app reply', async () => {
+    const memory = memoryIngestionStore([{ ...CHANNELS[0]!, autoResumeMinutes: 240 }]);
+    await ingestWebhookEvents(parseWhatsAppWebhook(echoPayload(PHONE_ID_A, [
+      { from: '15550000000', to: '393331112222', id: 'wamid.ECHO-0002', timestamp: '1760000200', type: 'text', text: { body: 'ok' } },
+    ])).events, memory.store, () => undefined);
+    expect(memory.conversations[0]?.resumeMinutes).toBe(240);
+  });
+
+  test('a test tenant never sends to a customer known only by BSUID', async () => {
+    let calls = 0;
+    const store: OutboundStore = { insertOutbound: async () => 'out-1', markSent: async () => undefined, markFailed: async () => undefined, touchConversation: async () => undefined };
+    const outcome = await sendConversationText(
+      { channel: channelRow(), conversation: { ...conversationRow({ wa_id: null, customer_phone: null }), wa_user_id: 'IT.111' }, body: 'x', authorType: 'automation', isTestTenant: true },
+      { store, providerFactory: () => { calls += 1; return {} as WhatsAppProvider; }, log: () => undefined, testAllowList: ['393331112222'] },
+    );
+    expect(outcome).toMatchObject({ ok: false, reason: 'test_recipient_blocked' });
+    expect(calls).toBe(0);
   });
 });
