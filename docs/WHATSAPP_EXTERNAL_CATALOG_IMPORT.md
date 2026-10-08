@@ -47,7 +47,7 @@ Lettura precedente (stesso giorno) senza credenziali: `AUTH_MISSING`, flusso int
 Campi prodotto usati: `id`, `name`, `description`, `price`, `sale_price` (oggetto `{ price, … }`), `currency`, `retailer_id`, `is_hidden`, `availability` (fallback `product_availability` della doc), `url`, `media.images[].{id, original_image_url, request_image_url}`.
 
 Limiti documentati che condizionano il connettore:
-- **Paginazione**: la risposta espone `paging.after` ma la doc **non indica alcun parametro di richiesta** per il cursore. Il connettore non lo inventa: chiede `productLimit = --limit` (max 500) e, se `after` non è vuoto, marca il risultato `truncated` con diagnostica `LIMIT_REACHED` o `PAGINATION_CURSOR_UNDOCUMENTED`.
+- **Paginazione non disponibile** (verificato l'8/10/2026 sul catalogo reale): `getProducts` restituisce **al massimo 10 prodotti** per richiesta anche con `productLimit: 100`/`500`, e una richiesta con il cursore `after` (unico nome suggerito dalla doc) risponde HTTP 400 *"Validation failed. Details: 'after' is not allowed"*. Nessuno degli SDK ufficiali GREEN-API (Python, JS, Go, PHP, MCP gateway) implementa `getProducts`. Il connettore chiede comunque `productLimit` al massimo (500) e, se `after` non è vuoto, marca il risultato `truncated` con diagnostica `LIMIT_REACHED` o `PAGINATION_UNSUPPORTED`. Da chiedere al supporto GREEN-API.
 - **Rate limiting**: WhatsApp può limitare temporaneamente l'API cataloghi su chiamate frequenti. Nessun parallelismo; backoff su 429/499/502/503 con `Retry-After` (max 30 s, 3 tentativi).
 - **Errori comuni**: 401/403 → `AUTH_INVALID`; 466 → `QUOTA_EXCEEDED` (limite del piano); 400 "not authorized" → `INSTANCE_NOT_AUTHORIZED`; altri 400 → `CATALOG_UNAVAILABLE`.
 - **`getContactInfo`** espone anch'esso `products` (con `imageUrls.original/requested`) ma senza valuta: non usato.
@@ -187,7 +187,7 @@ Requisiti: Node ≥ 22.18 / 23.6 (type stripping; verificato con Node 24.20).
 
 1. **Client non ufficiale**: GREEN-API opera tramite una sessione WhatsApp (Web) di un account Lepefy. Le condizioni d'uso WhatsApp vietano accessi automatizzati non autorizzati: rischio di blocco del numero, nessuna garanzia contrattuale né SLA Meta. La via ufficiale (Commerce/Catalog API Meta) richiede che sia il venditore a concedere l'accesso al proprio catalogo.
 2. **Diritti sui contenuti**: testi e foto appartengono al venditore; serve un consenso scritto prima di pubblicarli o copiarli nello storage di un tenant.
-3. **Paginazione** non documentata (§2): cataloghi grandi recuperati solo parzialmente.
+3. **Solo i primi 10 prodotti** di ogni catalogo sono leggibili: GREEN-API non supporta la paginazione di `getProducts` (§2).
 4. **Formato del provider non conforme alla sua documentazione** (scala del prezzo, nomi di campo, §1): va ricontrollato a ogni aggiornamento GREEN-API.
 5. **Rate limit** WhatsApp e quote del piano GREEN-API (466; *Developer* = 3 chat/mese, ogni venditore è una chat): niente sincronizzazioni frequenti.
 6. **URL immagine firmati** che scadono.
@@ -200,7 +200,7 @@ Dati non recuperabili dal catalogo: modello di prezzo, stock reale (solo `availa
 
 ## 10. Cicli futuri (non implementati)
 
-Sincronizzazione programmata (oggi solo «Actualiser» manuale), paginazione oltre 500 prodotti (cursore GREEN-API non documentato), lettura delle collezioni → categorie, notifica al tenant dei prezzi cambiati, provider ufficiale Meta (Commerce/Catalog API con accesso concesso dal venditore). Sorgenti per tenant, provenienza, deduplica, rilevamento modifiche, approvazione, audit e consenso sono nella console platform (§12).
+Sincronizzazione programmata (oggi solo «Actualiser» manuale), paginazione oltre i primi 10 prodotti (non supportata da GREEN-API, §2), lettura delle collezioni → categorie, notifica al tenant dei prezzi cambiati, provider ufficiale Meta (Commerce/Catalog API con accesso concesso dal venditore). Sorgenti per tenant, provenienza, deduplica, rilevamento modifiche, approvazione, audit e consenso sono nella console platform (§12).
 
 ## 11. Test
 

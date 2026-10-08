@@ -85,7 +85,7 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
     const d = res.data;
     setNotice({
       tone: 'ok',
-      text: `${d.received} produit(s) lus : ${d.new} nouveau(x), ${d.changed} modifié(s), ${d.unavailable} retiré(s).${d.truncated ? ' Le catalogue contient d’autres pages non lues (500 produits max par lecture).' : ''}`,
+      text: `${d.received} produit(s) lus : ${d.new} nouveau(x), ${d.changed} modifié(s), ${d.unavailable} retiré(s).${d.truncated ? ' Le catalogue contient d’autres produits : GREEN-API n’en renvoie que 10 par lecture et ne permet pas encore de lire la suite.' : ''}`,
     });
     void load();
   }
@@ -209,7 +209,7 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
         </div>
       )}
       {source.last_fetch_truncated && (
-        <p className="text-xs text-gray-500">La dernière lecture était partielle : les produits au-delà de 500 ne sont pas lus, et aucun produit n’est marqué « retiré » tant que la lecture est partielle.</p>
+        <p className="text-xs text-gray-500">Lecture partielle : GREEN-API ne renvoie que les 10 premiers produits du catalogue et ne permet pas de lire la suite. Aucun produit n’est marqué « retiré » tant que la lecture est partielle.</p>
       )}
     </div>
   );

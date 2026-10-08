@@ -23,9 +23,10 @@ import { ExternalCatalogError } from '../types';
  *     invio (sendMessage, sendProduct, sendOrder…).
  *   - Il token compare solo nel path dell'URL: mai nei log, negli errori o negli
  *     artefatti (`redact`).
- *   - La doc non documenta un parametro di richiesta per il cursore
- *     `paging.after`: non viene inventato. Se il provider segnala altre pagine,
- *     il risultato è marcato `truncated` con una diagnostica esplicita.
+ *   - Paginazione NON disponibile: GREEN-API restituisce al massimo 10
+ *     prodotti per richiesta (productLimit più alto ignorato) e rifiuta il
+ *     cursore `after` ("'after' is not allowed", verificato l'8/10/2026). Se il
+ *     provider segnala altre pagine, il risultato è marcato `truncated`.
  *   - WhatsApp può limitare temporaneamente l'API cataloghi su chiamate
  *     frequenti: niente parallelismo, backoff su 429/499/502.
  */
@@ -305,8 +306,8 @@ export function extractGreenApiProducts(bodies: unknown[], limit: number): {
   if (truncated) {
     diagnostics.push(products.length >= limit
       ? { code: 'LIMIT_REACHED', message: `Limite di ${limit} prodotti raggiunto: il catalogo contiene altre pagine.` }
-      : { code: 'PAGINATION_CURSOR_UNDOCUMENTED',
-          message: 'Il provider segnala altre pagine (paging.after) ma la documentazione GREEN-API non indica come passare il cursore nella richiesta: pagine successive non recuperate.' });
+      : { code: 'PAGINATION_UNSUPPORTED',
+          message: `GREEN-API restituisce al massimo ${products.length} prodotti per richiesta e rifiuta il cursore della pagina successiva ("'after' is not allowed", verificato l'8/10/2026): gli altri prodotti del catalogo non sono leggibili.` });
   }
   if (products.length === 0) {
     diagnostics.push({ code: 'EMPTY_CATALOG', message: 'Il provider ha risposto senza prodotti (catalogo vuoto, nascosto o non consultabile da questa sessione).' });

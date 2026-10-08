@@ -142,7 +142,7 @@ test.describe('recupero catalogo', () => {
     const { p, calls } = provider([AUTHORIZED, { status: 200, body: { paging: { after: 'QVFI' }, products: [product('a')] } }]);
     const r = await p.fetchProducts(source, { limit: 10 });
     expect(r.truncated).toBe(true);
-    expect(r.diagnostics.map((d) => d.code)).toContain('PAGINATION_CURSOR_UNDOCUMENTED');
+    expect(r.diagnostics.map((d) => d.code)).toContain('PAGINATION_UNSUPPORTED');
     expect(calls).toHaveLength(2);
   });
 
