@@ -2,47 +2,72 @@ import type {
   ExternalCatalogDiagnostic,
   ExternalCatalogPage,
   ExternalCatalogProvider,
+  ExternalCatalogReadStats,
   ExternalCatalogResult,
   ExternalCatalogSource,
   FetchOptions,
   RawExternalImage,
   RawExternalProduct,
+  ReadCompleteness,
 } from '../types';
 import { ExternalCatalogError } from '../types';
 
 /**
  * Connettore sperimentale GREEN-API (sessione WhatsApp controllata da Lepefy).
  *
- * Metodi usati, verificati sulla documentazione ufficiale (green-api.com/en/docs):
- *   GET  {apiUrl}/waInstance{id}/getStateInstance/{token}  → { stateInstance }
- *   POST {apiUrl}/waInstance{id}/getProducts/{token}       { chatId, productLimit? }
- *        → { paging: { after }, products: [...] }
+ * Metodi usati, verificati sulla documentazione ufficiale (green-api.com/en/docs)
+ * e su un catalogo reale (8/10/2026):
+ *   GET  …/getStateInstance/{token}   → { stateInstance }
+ *   POST …/getProducts/{token}        { chatId, productLimit? }
+ *        → { paging: { after }, products }  max 10 prodotti, nessuna pagina
+ *          successiva ("'after' is not allowed")
+ *   POST …/getCollections/{token}     { chatId, collectionLimit?, productLimit?, afterCollectionId? }
+ *        → { paging: { after }, collections: [{ id, name, products }] }
+ *   POST …/getCollection/{token}      { chatId, collectionId, productLimit?, afterProduct? }
+ *        → { paging: { after }, collection: { id, name, products } }
+ *
+ * Strategia: prima pagina di getProducts e, se il catalogo ha altre pagine,
+ * tutte le collezioni con i loro cursori documentati. Il catalogo può contenere
+ * prodotti fuori dalle collezioni (verificato: 5 dei primi 10), quindi una
+ * lettura così è al massimo `partial`, mai `complete` (`ReadCompleteness`).
  *
  * Vincoli:
- *   - SOLO lettura: la lista `ALLOWED_METHODS` impedisce qualsiasi metodo di
- *     invio (sendMessage, sendProduct, sendOrder…).
+ *   - SOLO lettura: `ALLOWED_METHODS` impedisce qualsiasi metodo d'invio
+ *     (sendMessage, sendProduct, sendOrder…).
  *   - Il token compare solo nel path dell'URL: mai nei log, negli errori o negli
  *     artefatti (`redact`).
- *   - Paginazione NON disponibile: GREEN-API restituisce al massimo 10
- *     prodotti per richiesta (productLimit più alto ignorato) e rifiuta il
- *     cursore `after` ("'after' is not allowed", verificato l'8/10/2026). Se il
- *     provider segnala altre pagine, il risultato è marcato `truncated`.
- *   - WhatsApp può limitare temporaneamente l'API cataloghi su chiamate
- *     frequenti: niente parallelismo, backoff su 429/499/502.
+ *   - WhatsApp può limitare l'API cataloghi su chiamate frequenti: richieste in
+ *     sequenza con pausa, budget di richieste e di tempo, backoff solo su
+ *     429/499/502/503. collectionLimit 50 ha prodotto un HTTP 500 del provider:
+ *     si usa 10, il valore della documentazione.
  */
 
-const ALLOWED_METHODS = new Set(['getStateInstance', 'getProducts']);
+const ALLOWED_METHODS = new Set(['getStateInstance', 'getProducts', 'getCollections', 'getCollection']);
+const COLLECTION_PAGE_SIZE = 10;       // collectionLimit verificato (50 → HTTP 500 del provider)
+const COLLECTION_PREVIEW_PRODUCTS = 3; // productLimit di getCollections (default documentato)
+const COLLECTION_PRODUCTS_PAGE = 10;   // productLimit di getCollection verificato
+const MAX_COLLECTION_LIST_PAGES = 30;
+const MAX_PAGES_PER_COLLECTION = 60;
+const DEFAULT_PAGE_DELAY_MS = 1000;
+const DEFAULT_MAX_REQUESTS = 80;
 const ALLOWED_API_HOST_SUFFIXES = ['.green-api.com', '.greenapi.com'];
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_RETRIES = 3;
 const MAX_RETRY_AFTER_MS = 30_000;
 /**
- * Tetto di `productLimit` per richiesta. La doc GREEN-API indica solo il default
- * (10), non un massimo: usiamo il massimo che la pipeline accetta (500, come
- * `too_many_items` della RPC 149). La console legge sempre al massimo; se
- * GREEN-API rifiutasse un valore così alto, la lettura fallisce con diagnosi.
+ * Tetto di prodotti unici per lettura: il massimo che la pipeline accetta (500,
+ * come `too_many_items` della RPC 149). getProducts ne restituisce comunque al
+ * massimo 10: gli altri arrivano dalle collezioni.
  */
 export const GREEN_API_MAX_PRODUCT_LIMIT = 500;
+
+/** Cursore GREEN-API (paging.after): stringa opaca base64/base64url di lunghezza limitata. */
+export function validCursor(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  if (v.length === 0 || v.length > 4096) return null;
+  return /^[A-Za-z0-9+/=_-]+$/.test(v) ? v : null;
+}
 
 export interface GreenApiConfig {
   apiUrl: string;
@@ -257,62 +282,263 @@ export function createGreenApiCatalogProvider(config: GreenApiConfig, deps: Gree
       }
 
       const fetchedAt = now().toISOString();
-      const body = await request('getProducts', { body: { chatId: source.chatId, productLimit: limit } }, options);
-      const pages: ExternalCatalogPage[] = [{ body, receivedAt: now().toISOString() }];
-      const extracted = extractGreenApiProducts(pages.map((pg) => pg.body), limit);
-      diagnostics.push(...extracted.diagnostics);
-      const { products, truncated } = extracted;
+      const startedAt = Date.now();
+      const pageDelay = Math.max(0, options.pageDelayMs ?? DEFAULT_PAGE_DELAY_MS);
+      const maxRequests = Math.max(1, options.maxRequests ?? DEFAULT_MAX_REQUESTS);
+      const deadline = options.deadlineMs ? startedAt + options.deadlineMs : Number.POSITIVE_INFINITY;
+      const pages: ExternalCatalogPage[] = [];
+      let requests = 0;
+      let stopReason: string | null = null;
 
-      return { provider: 'green_api', source, fetchedAt, products, pages, truncated, diagnostics };
+      async function catalogCall(
+        method: 'getProducts' | 'getCollections' | 'getCollection',
+        body: Record<string, unknown>,
+        collectionId: string | null,
+        cursor: boolean,
+      ): Promise<Record<string, unknown> | null> {
+        if (requests > 0 && pageDelay > 0) await sleep(pageDelay);
+        requests++;
+        const response = await request(method, { body }, options);
+        pages.push({ body: response, receivedAt: now().toISOString(), method, collectionId, cursor });
+        return asRecord(response);
+      }
+      function budgetExhausted(): string | null {
+        if (requests >= maxRequests) return `budget di ${maxRequests} richieste esaurito`;
+        if (Date.now() + pageDelay >= deadline) return 'tempo massimo della lettura raggiunto';
+        return null;
+      }
+
+      // 1. Prima pagina di getProducts: l'unica che vede anche i prodotti fuori dalle collezioni.
+      const first = await catalogCall('getProducts', { chatId: source.chatId, productLimit: limit }, null, false);
+      if (!first || !Array.isArray(first.products)) {
+        throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getProducts: campo "products" assente o non è una lista.');
+      }
+      const getProductsHasMore = (asString(asRecord(first.paging)?.after) ?? '').length > 0;
+      let collectionsListed = 0;
+      let collectionsRead = false;
+
+      // 2. Collezioni, solo se il catalogo va oltre la prima pagina.
+      if (getProductsHasMore && options.collections !== false) {
+        try {
+          const collectionIds: string[] = [];
+          let listCursor: string | null = null;
+          let listDone = false;
+          const seenListCursors = new Set<string>();
+          for (let page = 0; page < MAX_COLLECTION_LIST_PAGES && !stopReason; page++) {
+            stopReason = budgetExhausted();
+            if (stopReason) break;
+            const body: Record<string, unknown> = { chatId: source.chatId, collectionLimit: COLLECTION_PAGE_SIZE, productLimit: COLLECTION_PREVIEW_PRODUCTS };
+            if (listCursor) body.afterCollectionId = listCursor;
+            const res = await catalogCall('getCollections', body, null, Boolean(listCursor));
+            collectionsListed++;
+            if (!res || !Array.isArray(res.collections)) {
+              throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getCollections: campo "collections" assente.');
+            }
+            for (const c of res.collections) {
+              const rec = asRecord(c);
+              const id = typeof rec?.id === 'string' || typeof rec?.id === 'number' ? String(rec.id) : null;
+              if (id && !collectionIds.includes(id)) collectionIds.push(id);
+            }
+            const next = nextCursor(res, seenListCursors, 'getCollections', diagnostics);
+            if (next.done) { listDone = true; break; }
+            if (next.error) { stopReason = next.error; break; }
+            listCursor = next.cursor ?? null;
+          }
+          if (!listDone && !stopReason) stopReason = 'troppe pagine di collezioni';
+
+          // 3. Prodotti di ogni collezione, con afterProduct.
+          let allCollectionsDone = listDone;
+          for (const collectionId of collectionIds) {
+            if (stopReason) { allCollectionsDone = false; break; }
+            let productCursor: string | null = null;
+            let finished = false;
+            const seen = new Set<string>();
+            for (let page = 0; page < MAX_PAGES_PER_COLLECTION; page++) {
+              stopReason = budgetExhausted();
+              if (stopReason) break;
+              const body: Record<string, unknown> = { chatId: source.chatId, collectionId, productLimit: COLLECTION_PRODUCTS_PAGE };
+              if (productCursor) body.afterProduct = productCursor;
+              const res = await catalogCall('getCollection', body, collectionId, Boolean(productCursor));
+              if (!res || !asRecord(res.collection)) {
+                throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getCollection: campo "collection" assente.');
+              }
+              const next = nextCursor(res, seen, `getCollection ${collectionId}`, diagnostics);
+              if (next.done) { finished = true; break; }
+              if (next.error) { stopReason = next.error; break; }
+              productCursor = next.cursor ?? null;
+              if (uniqueProductCount(pages) >= limit) { stopReason = `limite di ${limit} prodotti raggiunto`; break; }
+            }
+            if (!finished) {
+              allCollectionsDone = false;
+              if (!stopReason) stopReason = `troppe pagine nella collezione ${collectionId}`;
+            }
+          }
+          collectionsRead = allCollectionsDone && !stopReason;
+        } catch (err) {
+          const e = err instanceof ExternalCatalogError ? err : new ExternalCatalogError('PROVIDER_ERROR', String((err as Error)?.message ?? err));
+          stopReason = `errore del provider sulle collezioni (${e.code})`;
+          diagnostics.push({ code: 'COLLECTIONS_FAILED', message: `Lettura delle collezioni interrotta: ${e.message}` });
+        }
+      }
+
+      const collected = collectGreenApiProducts(pages, limit);
+      diagnostics.push(...collected.diagnostics);
+      if (collected.limitReached && !stopReason) stopReason = `limite di ${limit} prodotti raggiunto`;
+      const completeness: ReadCompleteness = !getProductsHasMore && !collected.limitReached
+        ? 'complete'
+        : collectionsRead && !collected.limitReached ? 'partial' : 'truncated';
+      const stats: ExternalCatalogReadStats = {
+        ...collected.stats, getProductsHasMore, collectionsPagesListed: collectionsListed, requests, stopReason,
+      };
+      diagnostics.push(completenessDiagnostic(completeness, stats, options.collections === false));
+      if (collected.products.length === 0) {
+        diagnostics.push({ code: 'EMPTY_CATALOG', message: 'Il provider ha risposto senza prodotti (catalogo vuoto, nascosto o non consultabile da questa sessione).' });
+      }
+
+      return {
+        provider: 'green_api', source, fetchedAt, products: collected.products, pages,
+        truncated: completeness !== 'complete', completeness, stats, diagnostics,
+      };
     },
   };
 }
 
+/** Cursore successivo di una risposta: fine, cursore valido o errore (non valido / ripetuto). */
+function nextCursor(
+  res: Record<string, unknown>,
+  seen: Set<string>,
+  label: string,
+  diagnostics: ExternalCatalogDiagnostic[],
+): { done: true; cursor?: undefined; error?: undefined } | { done: false; cursor: string; error?: undefined } | { done: false; cursor?: undefined; error: string } {
+  const raw = asString(asRecord(res.paging)?.after) ?? '';
+  if (!raw) return { done: true };
+  const cursor = validCursor(raw);
+  if (!cursor) {
+    diagnostics.push({ code: 'CURSOR_INVALID', message: `${label}: cursore paging.after non valido, lettura interrotta.` });
+    return { done: false, error: `cursore non valido (${label})` };
+  }
+  if (seen.has(cursor)) {
+    diagnostics.push({ code: 'CURSOR_REPEATED', message: `${label}: cursore ripetuto, lettura interrotta per evitare un ciclo.` });
+    return { done: false, error: `cursore ripetuto (${label})` };
+  }
+  seen.add(cursor);
+  return { done: false, cursor };
+}
+
+function completenessDiagnostic(completeness: ReadCompleteness, stats: ExternalCatalogReadStats, collectionsDisabled: boolean): ExternalCatalogDiagnostic {
+  if (completeness === 'complete') {
+    return { code: 'READ_COMPLETE', message: `Catalogo letto per intero (${stats.uniqueProducts} prodotti in una sola pagina di getProducts).` };
+  }
+  if (completeness === 'partial') {
+    return {
+      code: 'READ_PARTIAL',
+      message: stats.outsideCollections > 0
+        ? `Tutte le ${stats.collectionsFound} collezioni lette, ma ${stats.outsideCollections} dei primi ${stats.getProductsProducts} prodotti non appartengono a nessuna collezione: oltre la prima pagina di getProducts possono esistere altri prodotti fuori dalle collezioni, che GREEN-API non permette di leggere.`
+        : `Tutte le ${stats.collectionsFound} collezioni lette; GREEN-API non permette però di verificare che non esistano prodotti fuori dalle collezioni oltre la prima pagina di getProducts.`,
+    };
+  }
+  if (collectionsDisabled && stats.getProductsHasMore) {
+    return { code: 'PAGINATION_UNSUPPORTED', message: 'getProducts restituisce al massimo 10 prodotti e rifiuta il cursore ("\'after\' is not allowed"); collezioni non lette.' };
+  }
+  return { code: 'READ_TRUNCATED', message: `Lettura interrotta: ${stats.stopReason ?? 'motivo sconosciuto'}. I prodotti mancanti non vengono segnati come ritirati.` };
+}
+
+function pageItems(page: ExternalCatalogPage): { items: unknown[]; collection: { id: string; name: string | null } | null } {
+  const body = asRecord(page.body);
+  if (!body) return { items: [], collection: null };
+  const method = page.method ?? 'getProducts';
+  if (method === 'getCollection') {
+    const c = asRecord(body.collection);
+    const id = typeof c?.id === 'string' || typeof c?.id === 'number' ? String(c.id) : null;
+    return { items: Array.isArray(c?.products) ? c.products : [], collection: id ? { id, name: asString(c?.name) } : null };
+  }
+  // getCollections: anteprime (3 prodotti), lette per intero con getCollection.
+  if (method === 'getCollections') return { items: [], collection: null };
+  return { items: Array.isArray(body.products) ? body.products : [], collection: null };
+}
+
+function uniqueProductCount(pages: ExternalCatalogPage[]): number {
+  const ids = new Set<string>();
+  for (const page of pages) {
+    for (const item of pageItems(page).items) {
+      const id = asRecord(item)?.id;
+      if (typeof id === 'string' || typeof id === 'number') ids.add(String(id));
+    }
+  }
+  return ids.size;
+}
+
 /**
- * Estrae i prodotti dalle risposte `getProducts` (anche rilette da raw/catalog.json):
- * deduplica per id, rispetta il limite, segnala pagine non recuperate.
+ * Prodotti unici da tutte le pagine lette (getProducts + getCollection), in
+ * ordine di lettura: deduplica per id (vince la prima occorrenza), conserva la
+ * provenienza (`rawRef.page` = indice della pagina, che porta metodo e
+ * collezione) e l'appartenenza alle collezioni. Usata anche da `--from-raw`
+ * (pagine senza `method` = getProducts dei raw precedenti).
  */
-export function extractGreenApiProducts(bodies: unknown[], limit: number): {
+export function collectGreenApiProducts(pages: ExternalCatalogPage[], limit: number): {
   products: RawExternalProduct[];
-  truncated: boolean;
   diagnostics: ExternalCatalogDiagnostic[];
+  limitReached: boolean;
+  stats: Omit<ExternalCatalogReadStats, 'getProductsHasMore' | 'collectionsPagesListed' | 'requests' | 'stopReason'>;
 } {
   const diagnostics: ExternalCatalogDiagnostic[] = [];
-  const products: RawExternalProduct[] = [];
-  const seen = new Set<string>();
-  let after = '';
-  bodies.forEach((body, page) => {
-    const record = asRecord(body);
-    if (!record || !Array.isArray(record.products)) {
-      throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getProducts: campo "products" assente o non è una lista.');
+  const byId = new Map<string, RawExternalProduct>();
+  const order: string[] = [];
+  const getProductsIds = new Set<string>();
+  const collectionIds = new Set<string>();
+  const inCollections = new Set<string>();
+  let fromCollections = 0;
+  let collectionPages = 0;
+  let duplicates = 0;
+  let skipped = 0;
+  let limitReached = false;
+
+  pages.forEach((page, pageIndex) => {
+    const method = page.method ?? 'getProducts';
+    const { items, collection } = pageItems(page);
+    if (method === 'getCollection') {
+      collectionPages++;
+      if (collection) collectionIds.add(collection.id);
     }
-    record.products.forEach((item, index) => {
-      const mapped = mapGreenApiProduct(item, page, index);
-      if (!mapped) {
-        diagnostics.push({ code: 'PRODUCT_SKIPPED', message: `Elemento ${index} senza id: ignorato (resta nel raw).` });
+    items.forEach((item, index) => {
+      const mapped = mapGreenApiProduct(item, pageIndex, index);
+      if (!mapped) { skipped++; return; }
+      const id = mapped.providerProductId;
+      if (method === 'getProducts') getProductsIds.add(id);
+      else { fromCollections++; inCollections.add(id); }
+      const existing = byId.get(id);
+      if (existing) {
+        duplicates++;
+        if (collection && !existing.collections?.some((c) => c.id === collection.id)) {
+          existing.collections = [...(existing.collections ?? []), collection];
+        }
         return;
       }
-      if (seen.has(mapped.providerProductId)) {
-        diagnostics.push({ code: 'DUPLICATE_PRODUCT', message: `Prodotto ${mapped.providerProductId} duplicato: ignorato.` });
-        return;
-      }
-      seen.add(mapped.providerProductId);
-      if (products.length < limit) products.push(mapped);
+      if (order.length >= limit) { limitReached = true; return; }
+      mapped.collections = collection ? [collection] : [];
+      byId.set(id, mapped);
+      order.push(id);
     });
-    after = asString(asRecord(record.paging)?.after) ?? '';
   });
 
-  const truncated = after.length > 0;
-  if (truncated) {
-    diagnostics.push(products.length >= limit
-      ? { code: 'LIMIT_REACHED', message: `Limite di ${limit} prodotti raggiunto: il catalogo contiene altre pagine.` }
-      : { code: 'PAGINATION_UNSUPPORTED',
-          message: `GREEN-API restituisce al massimo ${products.length} prodotti per richiesta e rifiuta il cursore della pagina successiva ("'after' is not allowed", verificato l'8/10/2026): gli altri prodotti del catalogo non sono leggibili.` });
-  }
-  if (products.length === 0) {
-    diagnostics.push({ code: 'EMPTY_CATALOG', message: 'Il provider ha risposto senza prodotti (catalogo vuoto, nascosto o non consultabile da questa sessione).' });
-  }
-  return { products, truncated, diagnostics };
+  if (skipped > 0) diagnostics.push({ code: 'PRODUCT_SKIPPED', message: `${skipped} elemento/i senza id ignorato/i (restano nel raw).` });
+  if (duplicates > 0) diagnostics.push({ code: 'DUPLICATES_REMOVED', message: `${duplicates} occorrenza/e duplicata/e eliminata/e (stesso prodotto in getProducts e/o in più collezioni).` });
+  if (limitReached) diagnostics.push({ code: 'LIMIT_REACHED', message: `Limite di ${limit} prodotti unici raggiunto.` });
+
+  return {
+    products: order.map((id) => byId.get(id) as RawExternalProduct),
+    diagnostics,
+    limitReached,
+    stats: {
+      getProductsProducts: getProductsIds.size,
+      collectionsFound: collectionIds.size,
+      collectionPages,
+      productsFromCollections: fromCollections,
+      duplicatesRemoved: duplicates,
+      uniqueProducts: order.length,
+      outsideCollections: [...getProductsIds].filter((id) => !inCollections.has(id)).length,
+    },
+  };
 }
 
 function mapHttpError(method: string, status: number, excerpt: string): ExternalCatalogError {

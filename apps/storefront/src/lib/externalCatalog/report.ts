@@ -2,8 +2,10 @@ import { previewValidQuantities, toLepefyQuantityRule } from './normalizeProduct
 import type {
   ExternalCatalogDiagnostic,
   ExternalCatalogProviderId,
+  ExternalCatalogReadStats,
   ExternalProductReviewDecision,
   NormalizedExternalProduct,
+  ReadCompleteness,
   UnitFormat,
 } from './types';
 
@@ -27,7 +29,7 @@ export const UNRECOVERABLE_DATA = [
   'Modello di prezzo (prezzo per lotto o per unità): non dimostrabile dal catalogo, sempre da confermare.',
   'Stock reale del venditore: solo `availability`; `max_available` restituisce 99 per tutti i prodotti (limite fisso, non stock).',
   'Peso di spedizione, ingredienti, allergeni, origine: non presenti nella struttura prodotto del catalogo.',
-  'Categorie Lepefy: le collezioni del catalogo non sono lette in questo ciclo.',
+  'Categorie Lepefy: le collezioni del venditore sono lette e conservate su ogni prodotto, ma non sono mappate automaticamente alle categorie del tenant.',
 ];
 
 export type RunStatus = 'success' | 'empty' | 'failed';
@@ -60,6 +62,19 @@ export interface RunReport {
     description_missing: number;
   };
   truncated: boolean;
+  /** Lettura: completezza verificabile e provenienza (getProducts / collezioni). */
+  read: {
+    completeness: ReadCompleteness | null;
+    get_products_products: number | null;
+    collections_found: number | null;
+    collection_pages: number | null;
+    products_from_collections: number | null;
+    duplicates_removed: number | null;
+    unique_products: number | null;
+    outside_collections: number | null;
+    requests: number | null;
+    stop_reason: string | null;
+  };
   diagnostics: ExternalCatalogDiagnostic[];
   unrecoverable_data: string[];
   production_limitations: string[];
@@ -87,6 +102,8 @@ export function buildRunReport(input: {
   options: RunReport['options'];
   products: NormalizedExternalProduct[];
   truncated: boolean;
+  completeness?: ReadCompleteness | null;
+  readStats?: ExternalCatalogReadStats | null;
   diagnostics: ExternalCatalogDiagnostic[];
 }): RunReport {
   const ps = input.products;
@@ -94,7 +111,11 @@ export function buildRunReport(input: {
   const dynamicUnrecoverable: string[] = [];
   const noCurrency = ps.filter((p) => p.review_reasons.some((r) => r.code === 'CURRENCY_MISSING')).length;
   if (noCurrency > 0) dynamicUnrecoverable.push(`Valuta assente per ${noCurrency} prodotto/i.`);
-  if (input.truncated) dynamicUnrecoverable.push('Prodotti oltre la prima pagina del catalogo.');
+  if (input.completeness === 'partial') {
+    dynamicUnrecoverable.push('Eventuali prodotti fuori dalle collezioni oltre i primi 10 di getProducts (GREEN-API non pagina getProducts).');
+  } else if (input.truncated) {
+    dynamicUnrecoverable.push(`Prodotti non letti: lettura interrotta${input.readStats?.stopReason ? ` (${input.readStats.stopReason})` : ''}.`);
+  }
 
   return {
     generated_at: input.generatedAt,
@@ -123,6 +144,18 @@ export function buildRunReport(input: {
       description_missing: ps.filter((p) => p.original_description === null).length,
     },
     truncated: input.truncated,
+    read: {
+      completeness: input.completeness ?? null,
+      get_products_products: input.readStats?.getProductsProducts ?? null,
+      collections_found: input.readStats?.collectionsFound ?? null,
+      collection_pages: input.readStats?.collectionPages ?? null,
+      products_from_collections: input.readStats?.productsFromCollections ?? null,
+      duplicates_removed: input.readStats?.duplicatesRemoved ?? null,
+      unique_products: input.readStats?.uniqueProducts ?? null,
+      outside_collections: input.readStats?.outsideCollections ?? null,
+      requests: input.readStats?.requests ?? null,
+      stop_reason: input.readStats?.stopReason ?? null,
+    },
     diagnostics: input.diagnostics,
     unrecoverable_data: [...UNRECOVERABLE_DATA, ...dynamicUnrecoverable],
     production_limitations: PRODUCTION_LIMITATIONS,
@@ -168,6 +201,8 @@ function formatPrice(value: number | null, currency: string | null): string {
   if (value === null) return 'Non disponibile';
   return `${value.toFixed(2).replace('.', ',')} ${currency ?? '(valuta ?)'}`;
 }
+
+const COMPLETENESS_LABEL: Record<ReadCompleteness, string> = { complete: 'completa', partial: 'parziale', truncated: 'troncata' };
 
 const CONFIDENCE_LABEL = { high: 'Alta', medium: 'Media', low: 'Bassa', none: 'Nessuna' } as const;
 const MODEL_LABEL = { requires_review: 'Da verificare', single_item: 'Articolo singolo', unknown: 'Sconosciuto' } as const;
@@ -313,7 +348,7 @@ code { font-size:12px; }
 <p class="muted small">Generato ${escapeHtml(report.generated_at)} · provider ${escapeHtml(report.access.provider)} · sorgente ${escapeHtml(report.access.source_url ?? '—')} · ${report.status === 'failed' ? 'nessun dato ricevuto dal provider' : 'origine dati: provider reale'}</p>
 ${banner}
 <section class="stats">
-  <div class="stat"><b>${c.products_retrieved}</b>prodotti recuperati</div>
+  <div class="stat"><b>${c.products_retrieved}</b>prodotti recuperati${report.read.completeness ? ` · lettura ${COMPLETENESS_LABEL[report.read.completeness]}` : ''}</div>
   <div class="stat"><b>${c.images_available}</b>immagini disponibili (${c.images_declared} dichiarate)</div>
   <div class="stat"><b>${c.min_quantity_proposed}</b>minimi proposti</div>
   <div class="stat"><b>${c.step_proposed}</b>step proposti</div>
@@ -322,6 +357,11 @@ ${banner}
 </section>
 ${products.length ? `<div class="toolbar"><button type="button" id="save">Salva revisione</button><span id="saveStatus" class="small muted"></span></div>` : ''}
 ${cards}
+<details open><summary>Lettura del catalogo</summary>${report.read.unique_products === null ? '<p class="small muted">Statistiche non disponibili (lettura precedente).</p>' : `<ul class="reasons">
+  <li>getProducts: ${report.read.get_products_products} prodotti (prima pagina, unica leggibile)</li>
+  <li>Collezioni: ${report.read.collections_found}, pagine getCollection: ${report.read.collection_pages}, prodotti letti dalle collezioni: ${report.read.products_from_collections}</li>
+  <li>Duplicati eliminati: ${report.read.duplicates_removed} · prodotti unici: ${report.read.unique_products} · fuori da ogni collezione (fra i primi 10): ${report.read.outside_collections}</li>
+  <li>Richieste: ${report.read.requests}${report.read.stop_reason ? ` · interruzione: ${escapeHtml(report.read.stop_reason)}` : ''}</li></ul>`}</details>
 <details><summary>Diagnostica del provider</summary><ul class="reasons">${diag || '<li>Nessuna</li>'}</ul></details>
 <details><summary>Dati non recuperabili</summary><ul class="reasons">${list(report.unrecoverable_data)}</ul></details>
 <details><summary>Limitazioni per l'uso in produzione</summary><ul class="reasons">${list(report.production_limitations)}</ul></details>

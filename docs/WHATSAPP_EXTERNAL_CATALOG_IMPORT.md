@@ -2,7 +2,7 @@
 
 Stato (8/10/2026, ramo `feat/whatsapp-external-catalog-import`, base `main@ae81c8a7`):
 - **CLI sperimentale locale**: operativa, testata su un catalogo reale (§1, §7).
-- **Console platform** `/admin/platform/catalogues-whatsapp`: implementata (§12). Migration 149 **applicata** l'8/10/2026; correzione dei privilegi **150 da applicare**; flag `external_catalog_import` acceso solo su `lepefy-test`; codice non ancora deployato.
+- **Console platform** `/admin/platform/catalogues-whatsapp`: implementata (§12). Migration 149 e 150 **applicate** l'8/10/2026; codice in produzione (`chloefood`, `lepefy-food-test`); flag `external_catalog_import` acceso su `lepefy-test` e `chloefood` (scelta del requester). Lettura oltre i primi 10 prodotti tramite collezioni (§1.1): implementata, non ancora deployata.
 
 Obiettivo: leggere il catalogo WhatsApp Business di un'attività **terza** (senza accesso al suo Meta Business), normalizzare i prodotti, proporre quantità minime/step/formati e, dalla console platform, applicarli **prodotto per prodotto e campo per campo** al catalogo di un tenant dopo validazione.
 
@@ -17,14 +17,35 @@ Istanza GREEN-API *Developer* (gratuita, 3 chat/mese) `7107…`, collegata a un 
 | Domanda | Esito |
 |---|---|
 | Accesso al catalogo reale | **Riuscito** (`getProducts` HTTP 200, ~4 s) con `--chat-id 393296958822@c.us` |
-| Prodotti recuperati | **10** (limite `--limit 10`; il provider segnala altre pagine — cursore non documentato, §2) |
+| Prodotti recuperati | **10** con il solo `getProducts` (prima lettura); **98** con le collezioni, §1.1 |
 | Immagini | **12** dichiarate, **12** scaricate in staging (originali, 833–1536 × 1600–2048 px, JPEG da `*.fna.whatsapp.net`), 0 scadute/rifiutate |
 | Quantità minima proposta | **4** prodotti (Arachide 3, Tapioca 2, Isenbeck 4, Malta Guinness 4) — tutte inferite, nessuna esplicita |
 | Da revisionare | **5** (i 4 sopra + Bobolo: "1 carton … de 20 paquets" → 20 è contenuto, nessun minimo) |
 | Articoli singoli senza revisione | 5 ("100g", "500g", "1 paquet 480g", "1 paquet de 250g") |
 | Prezzi | 10/10 validi in EUR; 1 promozione (Bobolo 50 € → 45 €) |
 
-Il prodotto di riferimento "Haricot rouge petite graines" **non è tra i primi 10** del catalogo: non è stato possibile verificarlo sul dato reale perché le pagine successive non sono recuperabili (cursore non documentato). Resta coperto dai test del parser.
+### 1.1 Oltre i primi 10: lettura per collezioni (8/10/2026, sera)
+
+Sonda in sola lettura (sequenziale, 1,5 s fra le chiamate, 22 chiamate su `getCollections`/`getCollection`, stesso venditore), poi rielaborazione con la CLI (`--from-raw`) delle sole risposte reali salvate.
+
+| Voce | Valore reale |
+|---|---|
+| Prodotti da `getProducts` | **10** (unica pagina leggibile) |
+| Collezioni trovate | **17**, in 2 pagine di `getCollections` (`afterCollectionId` funziona: 10 + 7, cursore poi vuoto) |
+| Pagine `getCollection` percorse | **20** (`afterProduct` funziona: «Épices» 10 + 10 + 4, «Ndole / Légumes» 10 + 2, le altre in una pagina) |
+| Prodotti letti dalle collezioni | **94** righe, nessun duplicato fra pagine della stessa collezione |
+| Duplicati eliminati | **6** (5 prodotti di `getProducts` presenti anche in collezioni, 1 prodotto in due collezioni) |
+| Totale prodotti unici | **98** (contro 10) |
+| Prodotti con immagini | **98 / 98** (159 immagini originali in staging, 0 scadute o rifiutate) |
+| Fuori da ogni collezione | **5 dei primi 10** prodotti di `getProducts` |
+| Quantità minima proposta / da revisionare | 35 / 37 (prezzi validi 98/98) |
+| Completezza verificabile | **parziale**: tutte le collezioni lette fino al cursore vuoto, ma il catalogo contiene prodotti fuori dalle collezioni e oltre i primi 10 di `getProducts` non sono raggiungibili |
+
+I prodotti restituiti da `getCollection` hanno tutti i campi di `getProducts` (descrizione, `media.images`, `availability`, `sale_price`, `is_hidden`…): normalizzazione, parser, prezzi e immagini sono invariati.
+
+Il prodotto di riferimento **"Haricot rouge petite graines"** è stato letto (collezione «Haricots / Koki»): descrizione "4 paquets de 500g", prezzo `12000` → **12,00 €**, 4 confezioni da 500 g (2000 g), **minimo 4 inferito** (`MIN_INFERRED_FROM_PACKAGE_COUNT`, `PRICE_MODEL_UNKNOWN`), `requires_review`, nessun prezzo unitario derivato: esattamente il risultato atteso dal brief iniziale.
+
+Il primo tentativo di `getCollections` con `collectionLimit: 50` ha restituito HTTP 500 dal provider (*"write EPROTO … SSL routines … packet length too long"*); con `collectionLimit: 10` (valore della documentazione) la stessa richiesta è riuscita. Il connettore usa 10.
 
 **Scostamenti fra documentazione GREEN-API e risposta reale** (corretti nel connettore, coperti da test):
 1. **Scala del prezzo: millesimi (÷1000), non ÷100.** `"10000"` = 10,00 € per "3 paquets de 500g"; con ÷100 sarebbero 100 €. Coerente con `priceAmount1000` di WhatsApp.
@@ -42,17 +63,50 @@ Lettura precedente (stesso giorno) senza credenziali: `AUTH_MISSING`, flusso int
 | Metodo | Uso | Note dalla doc |
 |---|---|---|
 | `GET {apiUrl}/waInstance{id}/getStateInstance/{token}` | Diagnosi sessione | `stateInstance`: `authorized`, `notAuthorized`, `blocked`, `sleepMode`, `starting`, `yellowCard`, `suspended` |
-| `POST {apiUrl}/waInstance{id}/getProducts/{token}` `{ chatId, productLimit? }` | Lettura catalogo | Non richiede account Business per chi legge; **istanza autorizzata obbligatoria**. Risposta `{ paging: { after }, products: [...] }`. `price`: la doc indica unità minima (÷100), il dato reale è in millesimi (÷1000), §1. |
+| `POST {apiUrl}/waInstance{id}/getProducts/{token}` `{ chatId, productLimit? }` | Prima pagina del catalogo | Non richiede account Business per chi legge; **istanza autorizzata obbligatoria**. Risposta `{ paging: { after }, products: [...] }`. `price`: la doc indica unità minima (÷100), il dato reale è in millesimi (÷1000), §1. **Al massimo 10 prodotti, nessuna pagina successiva.** |
+| `POST {apiUrl}/waInstance{id}/getCollections/{token}` `{ chatId, collectionLimit?, productLimit?, afterCollectionId? }` | Elenco collezioni | Cursore `afterCollectionId` = `paging.after` precedente: **verificato**. `collectionLimit` 10 (50 → HTTP 500 del provider), `productLimit` 3 (anteprima, non usata). |
+| `POST {apiUrl}/waInstance{id}/getCollection/{token}` `{ chatId, collectionId, productLimit?, afterProduct? }` | Prodotti di una collezione | Cursore `afterProduct` = `paging.after` precedente: **verificato**. `productLimit` 10. Prodotti con tutti i campi di `getProducts`. |
 
 Campi prodotto usati: `id`, `name`, `description`, `price`, `sale_price` (oggetto `{ price, … }`), `currency`, `retailer_id`, `is_hidden`, `availability` (fallback `product_availability` della doc), `url`, `media.images[].{id, original_image_url, request_image_url}`.
 
-Limiti documentati che condizionano il connettore:
-- **Paginazione non disponibile** (verificato l'8/10/2026 sul catalogo reale): `getProducts` restituisce **al massimo 10 prodotti** per richiesta anche con `productLimit: 100`/`500`, e una richiesta con il cursore `after` (unico nome suggerito dalla doc) risponde HTTP 400 *"Validation failed. Details: 'after' is not allowed"*. Nessuno degli SDK ufficiali GREEN-API (Python, JS, Go, PHP, MCP gateway) implementa `getProducts`. Il connettore chiede comunque `productLimit` al massimo (500) e, se `after` non è vuoto, marca il risultato `truncated` con diagnostica `LIMIT_REACHED` o `PAGINATION_UNSUPPORTED`. Da chiedere al supporto GREEN-API.
+Strategia di lettura (`fetchProducts`):
+1. `getProducts` (prima pagina: l'unica che vede anche i prodotti fuori dalle collezioni);
+2. se `paging.after` non è vuoto, tutte le pagine di `getCollections` (`afterCollectionId`) e, per ogni collezione, tutte le pagine di `getCollection` (`afterProduct`);
+3. deduplica per ID prodotto (vince la prima occorrenza), appartenenza alle collezioni conservata (`RawExternalProduct.collections`), provenienza di ogni prodotto (`rawRef.page` → pagina con `method`, `collectionId`, `cursor`).
+
+Cursori validati (`validCursor`: stringa base64/base64url, max 4096 caratteri): cursore vuoto = fine; non valido → `CURSOR_INVALID`, ripetuto → `CURSOR_REPEATED`, lettura interrotta. Richieste in sequenza con pausa (CLI 1000 ms, console 800 ms), budget di richieste (CLI 80, console 60) e di tempo (console 45 s, sotto i 60 s della route Vercel), nessun nuovo tentativo salvo 429/499/502/503. Un errore sulle collezioni non perde i prodotti di `getProducts` (`COLLECTIONS_FAILED`).
+
+**Completezza** (`ReadCompleteness`):
+
+| Valore | Quando | Effetto |
+|---|---|---|
+| `complete` | `getProducts` senza pagine successive | i prodotti assenti possono essere marcati «retiré» |
+| `partial` | tutte le collezioni lette fino al cursore vuoto, ma `getProducts` aveva altre pagine | mai «retiré»: possono esistere prodotti fuori dalle collezioni (`READ_PARTIAL`, con il numero di prodotti fuori collezione fra i primi 10) |
+| `truncated` | interruzione: budget, tempo, limite di 500 prodotti, errore, cursore anomalo, collezioni disattivate (`--no-collections`) | mai «retiré» (`READ_TRUNCATED`, `PAGINATION_UNSUPPORTED`) |
+
+Limiti che condizionano il connettore:
+- **`getProducts` non pagina** (verificato l'8/10/2026): al massimo **10 prodotti** anche con `productLimit: 100`/`500`; il cursore `after` è rifiutato con HTTP 400 *"Validation failed. Details: 'after' is not allowed"*. Nessuno degli SDK ufficiali GREEN-API (Python, JS, Go, PHP, MCP gateway) implementa `getProducts`. I prodotti fuori dalle collezioni oltre i primi 10 restano irraggiungibili (richiesta al supporto: §2.1).
 - **Rate limiting**: WhatsApp può limitare temporaneamente l'API cataloghi su chiamate frequenti. Nessun parallelismo; backoff su 429/499/502/503 con `Retry-After` (max 30 s, 3 tentativi).
 - **Errori comuni**: 401/403 → `AUTH_INVALID`; 466 → `QUOTA_EXCEEDED` (limite del piano); 400 "not authorized" → `INSTANCE_NOT_AUTHORIZED`; altri 400 → `CATALOG_UNAVAILABLE`.
 - **`getContactInfo`** espone anch'esso `products` (con `imageUrls.original/requested`) ma senza valuta: non usato.
 
-Il connettore conosce **solo** `getStateInstance` e `getProducts` (allow-list `ALLOWED_METHODS`): nessun metodo d'invio (`sendMessage`, `sendProduct`, `sendOrder`…) è raggiungibile.
+Il connettore conosce **solo** `getStateInstance`, `getProducts`, `getCollections` e `getCollection`, tutti in sola lettura (allow-list `ALLOWED_METHODS`): nessun metodo d'invio (`sendMessage`, `sendProduct`, `sendOrder`…) è raggiungibile.
+
+### 2.1 Richiesta tecnica al supporto GREEN-API (da inviare)
+
+> **Subject:** `getProducts` pagination: `paging.after` cursor cannot be sent back ("'after' is not allowed")
+>
+> Instance: Developer plan, instance ID available on request (not included here). Method: `POST {apiUrl}/waInstance{idInstance}/getProducts/{apiTokenInstance}`, seller `chatId` `<seller>@c.us` (WhatsApp Business account with a public catalog of ~100 products).
+>
+> 1. `{"chatId": "<seller>@c.us", "productLimit": 100}` → HTTP 200, **10 products**, `paging.after` non-empty. `productLimit` above 10 seems to be ignored.
+> 2. `{"chatId": "<seller>@c.us", "productLimit": 100, "after": "<paging.after from 1>"}` → HTTP 400.
+> 3. `{"chatId": "<seller>@c.us", "after": "test"}` → HTTP 400 `{"statusCode":400,"message":"Validation failed. Details: 'after' is not allowed"}`.
+>
+> Your documentation of GetProducts says to "pass this value in the next request" but lists only `chatId` and `productLimit`. `getCollections` (`afterCollectionId`) and `getCollection` (`afterProduct`) paginate correctly, but products that are not in any collection are only reachable through `getProducts`.
+>
+> Questions: (a) what is the request parameter name for the `getProducts` cursor? (b) what is the maximum `productLimit`? (c) is there any other documented method to list products that are not in a collection?
+>
+> Also observed: `getCollections` with `collectionLimit: 50` → HTTP 500 `write EPROTO … packet length too long`, while `collectionLimit: 10` works; and `price` is returned in thousandths (`"10000"` = 10.00 EUR), not hundredths as documented.
 
 ---
 
@@ -73,7 +127,7 @@ Il connettore conosce **solo** `getStateInstance` e `getProducts` (allow-list `A
 | `apps/storefront/scripts/catalog-whatsapp-test.ts` | CLI di recupero |
 | `apps/storefront/scripts/catalog-whatsapp-review.ts` | Server di revisione locale (127.0.0.1) |
 | `apps/storefront/scripts/ts-resolve-hooks.mjs` | Hook Node per eseguire i moduli TS col type stripping nativo (nessuna nuova dipendenza) |
-| `apps/storefront/tests/unit/externalCatalog*.spec.ts` | 89 test unitari |
+| `apps/storefront/tests/unit/externalCatalog*.spec.ts` | 119 test unitari (di cui `externalCatalogCollections.spec.ts`: cursori, deduplica, provenienza, completezza, budget) |
 
 I moduli di `lib/externalCatalog/` (tranne `server/`) non usano alias `@/` né Supabase/Next: girano identici nella CLI, nei test e nella console platform. La CLI non scrive mai in Supabase; tabelle, route e UI della console sono descritte al §12.
 
@@ -136,7 +190,9 @@ Estensione futura: un estrattore AI implementa `QuantityExtractor` e restituisce
 ## 7. Uso
 
 ```bash
-pnpm catalog:whatsapp:test --url https://wa.me/c/191701838729307 --limit 10
+pnpm catalog:whatsapp:test --url https://wa.me/c/191701838729307 --chat-id 393296958822@c.us   # default: --limit 500, collezioni lette
+pnpm catalog:whatsapp:test --url … --no-collections   # solo getProducts (10 prodotti), 1 richiesta
+pnpm catalog:whatsapp:test --url … --page-delay-ms 1500   # pausa fra le richieste di catalogo (min 500)
 pnpm catalog:whatsapp:test --url … --dry-run          # nessuna scrittura su disco
 pnpm catalog:whatsapp:test --url … --no-images        # nessun download immagini
 pnpm catalog:whatsapp:test --url … --chat-id 393296958822@c.us   # numero del venditore (obbligatorio se il link contiene l'ID catalogo)
@@ -187,20 +243,20 @@ Requisiti: Node ≥ 22.18 / 23.6 (type stripping; verificato con Node 24.20).
 
 1. **Client non ufficiale**: GREEN-API opera tramite una sessione WhatsApp (Web) di un account Lepefy. Le condizioni d'uso WhatsApp vietano accessi automatizzati non autorizzati: rischio di blocco del numero, nessuna garanzia contrattuale né SLA Meta. La via ufficiale (Commerce/Catalog API Meta) richiede che sia il venditore a concedere l'accesso al proprio catalogo.
 2. **Diritti sui contenuti**: testi e foto appartengono al venditore; serve un consenso scritto prima di pubblicarli o copiarli nello storage di un tenant.
-3. **Solo i primi 10 prodotti** di ogni catalogo sono leggibili: GREEN-API non supporta la paginazione di `getProducts` (§2).
+3. **Completezza non garantita**: i prodotti in collezione sono tutti leggibili (`getCollection`), ma quelli fuori da ogni collezione solo se compaiono fra i primi 10 di `getProducts`, che non pagina (§2). Una lettura di un catalogo con più di 10 prodotti è al massimo `partial`. Una lettura completa costa 1 + pagine di collezioni + pagine di prodotti richieste (23 per il catalogo di test).
 4. **Formato del provider non conforme alla sua documentazione** (scala del prezzo, nomi di campo, §1): va ricontrollato a ogni aggiornamento GREEN-API.
 5. **Rate limit** WhatsApp e quote del piano GREEN-API (466; *Developer* = 3 chat/mese, ogni venditore è una chat): niente sincronizzazioni frequenti.
 6. **URL immagine firmati** che scadono.
 7. **Numero del venditore** necessario: il link `wa.me/c/` da solo non basta.
 8. Nessuna persistenza di provenienza, deduplica, audit o approvazione: tutto resta locale.
 
-Dati non recuperabili dal catalogo: modello di prezzo, stock reale (solo `availability`; `max_available` = 99 fisso), peso di spedizione, ingredienti/allergeni/origine, categorie Lepefy (le collezioni non sono lette).
+Dati non recuperabili dal catalogo: modello di prezzo, stock reale (solo `availability`; `max_available` = 99 fisso), peso di spedizione, ingredienti/allergeni/origine, categorie Lepefy (le collezioni del venditore sono lette e conservate su ogni prodotto, non mappate alle categorie del tenant), prodotti fuori collezione oltre i primi 10.
 
 ---
 
 ## 10. Cicli futuri (non implementati)
 
-Sincronizzazione programmata (oggi solo «Actualiser» manuale), paginazione oltre i primi 10 prodotti (non supportata da GREEN-API, §2), lettura delle collezioni → categorie, notifica al tenant dei prezzi cambiati, provider ufficiale Meta (Commerce/Catalog API con accesso concesso dal venditore). Sorgenti per tenant, provenienza, deduplica, rilevamento modifiche, approvazione, audit e consenso sono nella console platform (§12).
+Sincronizzazione programmata (oggi solo «Actualiser» manuale), prodotti fuori collezione oltre i primi 10 (dipende dalla risposta del supporto GREEN-API, §2.1), proposta di categoria Lepefy a partire dalle collezioni del venditore, lettura «a riprese» per cataloghi che superano il budget di 45 s di una richiesta, notifica al tenant dei prezzi cambiati, provider ufficiale Meta (Commerce/Catalog API con accesso concesso dal venditore). Sorgenti per tenant, provenienza, deduplica, rilevamento modifiche, approvazione, audit e consenso sono nella console platform (§12).
 
 ## 11. Test
 
@@ -272,7 +328,7 @@ RLS attiva e forzata **senza policy**; nessun privilegio per `anon`/`authenticat
 
 ### 12.5 Messa in servizio (da fare, previa approvazione)
 
-1. Applicare `149_external_catalog_import.sql` (fatto l'8/10/2026, verificato: tabelle presenti, `anon` rifiutato) e `150_external_catalog_import_grants.sql` (solo GRANT, da applicare).
+1. Applicare `149_external_catalog_import.sql` (fatto l'8/10/2026, verificato: tabelle presenti, `anon` rifiutato) e `150_external_catalog_import_grants.sql` (solo GRANT, applicata l'8/10/2026 e verificata: prima lettura registrata e prodotto di prova creato su `lepefy-test`).
 2. Impostare sul progetto Vercel da cui si usa la console platform `GREEN_API_URL`, `GREEN_API_INSTANCE_ID`, `GREEN_API_TOKEN` (e, se serve, `WHATSAPP_CATALOG_IMAGE_HOSTS`). Nessun segreto in DB.
 3. Accendere `external_catalog_import` **solo su `lepefy-test`** (`/admin/parametres/fonctionnalites` di quel tenant).
 4. Creare la sorgente (numero `+39 329 695 8822`), registrare il consenso, «Actualiser», applicare uno o due prodotti, controllare il prodotto inattivo e le foto nell'admin di `lepefy-test`.

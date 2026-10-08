@@ -45,6 +45,23 @@ const FILTERS: Array<{ key: ItemStatus | 'all'; label: string }> = [
   { key: 'dismissed', label: 'Écartés' },
 ];
 
+function refreshSummary(d: {
+  received: number; new: number; changed: number; unavailable: number;
+  completeness: 'complete' | 'partial' | 'truncated';
+  stats: { getProductsProducts: number; collectionsFound: number; duplicatesRemoved: number; outsideCollections: number; stopReason: string | null } | null;
+}): string {
+  const base = `${d.received} produit(s) lus : ${d.new} nouveau(x), ${d.changed} modifié(s), ${d.unavailable} retiré(s).`;
+  const s = d.stats;
+  const origin = s && s.collectionsFound > 0
+    ? ` Sources : ${s.getProductsProducts} via la liste principale + ${s.collectionsFound} collection(s), ${s.duplicatesRemoved} doublon(s) éliminé(s).`
+    : '';
+  if (d.completeness === 'complete') return `${base}${origin} Lecture complète.`;
+  if (d.completeness === 'partial') {
+    return `${base}${origin} Lecture partielle : toutes les collections ont été lues, mais ${s?.outsideCollections ?? 0} des 10 premiers produits ne sont dans aucune collection ; d’autres produits hors collection peuvent exister et ne sont pas lisibles via GREEN-API. Aucun produit n’est marqué « retiré ».`;
+  }
+  return `${base}${origin} Lecture interrompue${s?.stopReason ? ` (${s.stopReason})` : ''} : relancez « Actualiser » plus tard. Aucun produit n’est marqué « retiré ».`;
+}
+
 export default function SourceClient({ sourceId }: { sourceId: string }) {
   const [source, setSource] = useState<Source | null>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -78,14 +95,18 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
   async function refresh() {
     setBusy('refresh');
     setNotice(null);
-    const res = await apiJson<{ received: number; new: number; changed: number; unavailable: number; truncated: boolean }>(
+    const res = await apiJson<{
+      received: number; new: number; changed: number; unavailable: number; truncated: boolean;
+      completeness: 'complete' | 'partial' | 'truncated';
+      stats: { getProductsProducts: number; collectionsFound: number; duplicatesRemoved: number; outsideCollections: number; stopReason: string | null } | null;
+    }>(
       `/api/admin/platform/external-catalogs/${sourceId}/refresh`, { method: 'POST' });
     setBusy(null);
     if (!res.ok) { setNotice({ text: res.error, tone: 'error' }); void load(); return; }
     const d = res.data;
     setNotice({
       tone: 'ok',
-      text: `${d.received} produit(s) lus : ${d.new} nouveau(x), ${d.changed} modifié(s), ${d.unavailable} retiré(s).${d.truncated ? ' Le catalogue contient d’autres produits : GREEN-API n’en renvoie que 10 par lecture et ne permet pas encore de lire la suite.' : ''}`,
+      text: refreshSummary(d),
     });
     void load();
   }
@@ -209,7 +230,7 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
         </div>
       )}
       {source.last_fetch_truncated && (
-        <p className="text-xs text-gray-500">Lecture partielle : GREEN-API ne renvoie que les 10 premiers produits du catalogue et ne permet pas de lire la suite. Aucun produit n’est marqué « retiré » tant que la lecture est partielle.</p>
+        <p className="text-xs text-gray-500">La dernière lecture n’était pas complète (catalogue au-delà des 10 premiers produits lu via les collections, ou lecture interrompue) : aucun produit n’est marqué « retiré » tant que la lecture n’est pas complète.</p>
       )}
     </div>
   );

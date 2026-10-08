@@ -156,7 +156,7 @@ test.describe('report', () => {
     });
     expect(r.data_origin).toBe('live_provider');
     expect(r.counts).toMatchObject({ products_retrieved: 2, products_with_images: 1, min_quantity_proposed: 1, requires_review: 1 });
-    expect(r.unrecoverable_data.join(' ')).toContain('prima pagina');
+    expect(r.unrecoverable_data.join(' ')).toContain('lettura interrotta');
     expect(r.production_limitations.length).toBeGreaterThan(0);
   });
 

@@ -28,12 +28,20 @@ export interface ExternalCatalogSource {
 }
 
 export interface FetchOptions {
-  /** Numero massimo di prodotti da recuperare. */
+  /** Numero massimo di prodotti unici da recuperare. */
   limit?: number;
   /** Timeout per singola richiesta HTTP, in ms. */
   timeoutMs?: number;
   /** Tentativi massimi su 429/502/499/errori di rete. */
   maxRetries?: number;
+  /** Leggere anche le collezioni per superare la prima pagina di getProducts (default true). */
+  collections?: boolean;
+  /** Pausa fra due richieste di catalogo, in ms (limiti WhatsApp). */
+  pageDelayMs?: number;
+  /** Numero massimo di richieste di catalogo per lettura (state esclusa). */
+  maxRequests?: number;
+  /** Tempo massimo complessivo della lettura, in ms: oltre, lettura troncata. */
+  deadlineMs?: number;
 }
 
 /** Immagine così come dichiarata dal provider (nessun download implicito). */
@@ -62,6 +70,8 @@ export interface RawExternalProduct {
   retailerId: string | null;
   url: string | null;
   images: RawExternalImage[];
+  /** Collezioni del catalogo in cui il prodotto compare (vuoto se letto solo da getProducts). */
+  collections?: Array<{ id: string; name: string | null }>;
   /** Posizione nel file raw (pagina, indice) per risalire al dato originale. */
   rawRef: { page: number; index: number };
 }
@@ -70,6 +80,34 @@ export interface ExternalCatalogPage {
   /** Corpo JSON della risposta, conservato integralmente. */
   body: unknown;
   receivedAt: string;
+  /** Provenienza: metodo e collezione della pagina (assenti nei raw precedenti = getProducts). */
+  method?: 'getProducts' | 'getCollections' | 'getCollection';
+  collectionId?: string | null;
+  /** La richiesta portava un cursore (pagina successiva). */
+  cursor?: boolean;
+}
+
+/**
+ * - `complete`: il catalogo sta in una pagina di getProducts (nessun cursore).
+ * - `partial`: getProducts e tutte le collezioni letti, ma possono esistere
+ *   prodotti fuori dalle collezioni oltre la prima pagina di getProducts.
+ * - `truncated`: lettura interrotta (limite, tempo, errore, cursore anomalo).
+ * Solo `complete` autorizza a marcare "retiré" i prodotti assenti.
+ */
+export type ReadCompleteness = 'complete' | 'partial' | 'truncated';
+
+export interface ExternalCatalogReadStats {
+  getProductsProducts: number;
+  getProductsHasMore: boolean;
+  collectionsFound: number;
+  collectionPages: number;
+  collectionsPagesListed: number;
+  productsFromCollections: number;
+  duplicatesRemoved: number;
+  uniqueProducts: number;
+  outsideCollections: number;
+  requests: number;
+  stopReason: string | null;
 }
 
 export interface ExternalCatalogDiagnostic {
@@ -83,8 +121,10 @@ export interface ExternalCatalogResult {
   fetchedAt: string;
   products: RawExternalProduct[];
   pages: ExternalCatalogPage[];
-  /** true se il provider segnala altre pagine non recuperate. */
+  /** true se la lettura non è dimostrabilmente completa (= completeness !== 'complete'). */
   truncated: boolean;
+  completeness?: ReadCompleteness;
+  stats?: ExternalCatalogReadStats;
   diagnostics: ExternalCatalogDiagnostic[];
 }
 

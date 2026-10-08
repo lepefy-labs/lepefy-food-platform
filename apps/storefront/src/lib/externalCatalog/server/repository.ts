@@ -15,7 +15,7 @@ import { GREEN_API_MAX_PRODUCT_LIMIT } from '../providers/greenApi';
 import { sellerChatIdFromPhone } from '../sellerPhone';
 import { parseWhatsAppCatalogUrl } from '../sourceUrl';
 import { ExternalCatalogError } from '../types';
-import type { NormalizedExternalProduct, RawExternalProduct } from '../types';
+import type { ExternalCatalogReadStats, NormalizedExternalProduct, RawExternalProduct, ReadCompleteness } from '../types';
 import { externalCatalogRpcError, PROVIDER_ERROR_MESSAGES } from './errors';
 
 /**
@@ -144,7 +144,22 @@ async function loadSource(id: string) {
 
 // ─── Lettura dal provider ───────────────────────────────────────────────────
 
-export async function refreshSource(id: string, actor: string | null): Promise<ServiceResult<Record<string, number | boolean>>> {
+export interface RefreshOutcome {
+  received: number;
+  new: number;
+  changed: number;
+  unchanged: number;
+  unavailable: number;
+  truncated: boolean;
+  completeness: ReadCompleteness;
+  stats: ExternalCatalogReadStats | null;
+}
+
+/**
+ * Lettura dal provider. Budget pensato per una route Vercel da 60 s: pausa 800 ms
+ * fra le richieste, al massimo 60 richieste e 45 s; oltre, lettura `truncated`.
+ */
+export async function refreshSource(id: string, actor: string | null): Promise<ServiceResult<RefreshOutcome>> {
   const loaded = await loadSource(id);
   if (!loaded.ok) return loaded;
   const source = loaded.data;
@@ -155,12 +170,18 @@ export async function refreshSource(id: string, actor: string | null): Promise<S
   const fetchedAt = new Date().toISOString();
   let products: RawExternalProduct[];
   let truncated: boolean;
+  let completeness: ReadCompleteness;
+  let stats: ExternalCatalogReadStats | null;
   let provider: 'green_api';
   try {
     const parsed = parseWhatsAppCatalogUrl(source.source_url, source.seller_chat_id);
-    const result = await getExternalCatalogProvider(process.env).fetchProducts(parsed, { limit: GREEN_API_MAX_PRODUCT_LIMIT, timeoutMs: 25_000, maxRetries: 1 });
+    const result = await getExternalCatalogProvider(process.env).fetchProducts(parsed, {
+      limit: GREEN_API_MAX_PRODUCT_LIMIT, timeoutMs: 15_000, maxRetries: 1, pageDelayMs: 800, maxRequests: 60, deadlineMs: 45_000,
+    });
     products = result.products;
     truncated = result.truncated;
+    completeness = result.completeness ?? (result.truncated ? 'truncated' : 'complete');
+    stats = result.stats ?? null;
     provider = result.provider;
   } catch (err) {
     const code = err instanceof ExternalCatalogError ? err.code : 'PROVIDER_ERROR';
@@ -191,7 +212,10 @@ export async function refreshSource(id: string, actor: string | null): Promise<S
   const row = (Array.isArray(data) ? data[0] : data) as { out_new: number; out_changed: number; out_unchanged: number; out_unavailable: number };
   return {
     ok: true,
-    data: { received: items.length, new: row.out_new, changed: row.out_changed, unchanged: row.out_unchanged, unavailable: row.out_unavailable, truncated },
+    data: {
+      received: items.length, new: row.out_new, changed: row.out_changed, unchanged: row.out_unchanged, unavailable: row.out_unavailable,
+      truncated, completeness, stats,
+    },
   };
 }
 

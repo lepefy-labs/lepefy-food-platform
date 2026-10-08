@@ -23,18 +23,18 @@ import { createImageStager, DEFAULT_IMAGE_HOST_SUFFIXES } from '../src/lib/exter
 import { loadDecisions, readJsonArtifact, writeArtifact, writeJsonArtifact } from '../src/lib/externalCatalog/localStore';
 import { normalizeExternalProduct } from '../src/lib/externalCatalog/normalizeProduct';
 import { getExternalCatalogProvider } from '../src/lib/externalCatalog/providers';
-import { extractGreenApiProducts, GREEN_API_MAX_PRODUCT_LIMIT, redactSecrets } from '../src/lib/externalCatalog/providers/greenApi';
+import { collectGreenApiProducts, GREEN_API_MAX_PRODUCT_LIMIT, redactSecrets } from '../src/lib/externalCatalog/providers/greenApi';
 import { buildRunReport, renderReportHtml } from '../src/lib/externalCatalog/report';
 import type { RunReport } from '../src/lib/externalCatalog/report';
 import { parseWhatsAppCatalogUrl } from '../src/lib/externalCatalog/sourceUrl';
-import type { ExternalCatalogDiagnostic, ExternalCatalogPage, ExternalCatalogResult, ExternalCatalogSource, NormalizedExternalProduct } from '../src/lib/externalCatalog/types';
+import type { ExternalCatalogDiagnostic, ExternalCatalogPage, ExternalCatalogReadStats, ExternalCatalogResult, ExternalCatalogSource, NormalizedExternalProduct, ReadCompleteness } from '../src/lib/externalCatalog/types';
 import { ExternalCatalogError } from '../src/lib/externalCatalog/types';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '../../..');
 
 function usage(): never {
-  console.error('Uso: pnpm catalog:whatsapp:test --url https://wa.me/c/<id> [--chat-id <numero>@c.us] [--limit 10] [--dry-run] [--no-images] [--from-raw] [--timeout-ms 20000]');
+  console.error('Uso: pnpm catalog:whatsapp:test --url https://wa.me/c/<id> [--chat-id <numero>@c.us] [--limit 500] [--dry-run] [--no-images] [--no-collections] [--page-delay-ms 1000] [--from-raw] [--timeout-ms 20000]');
   process.exit(1);
 }
 
@@ -42,7 +42,9 @@ const { values } = parseArgs({
   args: process.argv.slice(2).filter((a) => a !== '--'),
   options: {
     url: { type: 'string' },
-    limit: { type: 'string', default: '10' },
+    limit: { type: 'string', default: String(GREEN_API_MAX_PRODUCT_LIMIT) },
+    'no-collections': { type: 'boolean', default: false },
+    'page-delay-ms': { type: 'string', default: '1000' },
     'dry-run': { type: 'boolean', default: false },
     'no-images': { type: 'boolean', default: false },
     'from-raw': { type: 'boolean', default: false },
@@ -90,18 +92,32 @@ async function existingImageHashes(): Promise<Map<string, string>> {
  * di dati d'esempio: rifiuta un raw assente, di un altro provider o di un altro chatId.
  */
 async function resultFromRaw(source: ExternalCatalogSource): Promise<ExternalCatalogResult> {
-  const raw = await readJsonArtifact<{ provider?: string; source?: ExternalCatalogSource; fetched_at?: string; pages?: ExternalCatalogPage[] }>(outRoot, ARTIFACT_FILES.raw);
+  const raw = await readJsonArtifact<{
+    provider?: string; source?: ExternalCatalogSource; fetched_at?: string; pages?: ExternalCatalogPage[];
+    completeness?: ReadCompleteness; stats?: ExternalCatalogReadStats;
+  }>(outRoot, ARTIFACT_FILES.raw);
   if (!raw || raw.provider !== 'green_api' || !Array.isArray(raw.pages) || !raw.fetched_at) {
     throw new ExternalCatalogError('UNEXPECTED_RESPONSE', `Nessuna lettura reale riutilizzabile in ${ARTIFACT_FILES.raw}: eseguire prima senza --from-raw.`);
   }
   if (raw.source?.chatId !== source.chatId) {
     throw new ExternalCatalogError('SOURCE_INVALID', `${ARTIFACT_FILES.raw} appartiene a un altro venditore (${raw.source?.chatId ?? '?'}).`);
   }
-  const extracted = extractGreenApiProducts(raw.pages.map((p) => p.body), limit);
+  const collected = collectGreenApiProducts(raw.pages, limit);
+  // Completezza: quella registrata alla lettura; i raw precedenti (solo getProducts,
+  // con altre pagine segnalate) erano letture troncate.
+  const firstAfter = (raw.pages[0]?.body as { paging?: { after?: string } } | undefined)?.paging?.after ?? '';
+  const completeness: ReadCompleteness = raw.completeness ?? (firstAfter ? 'truncated' : 'complete');
   return {
-    provider: 'green_api', source, fetchedAt: raw.fetched_at, products: extracted.products, pages: raw.pages,
-    truncated: extracted.truncated,
-    diagnostics: [{ code: 'FROM_RAW', message: `Rielaborazione della lettura reale del ${raw.fetched_at}.` }, ...extracted.diagnostics],
+    provider: 'green_api', source, fetchedAt: raw.fetched_at, products: collected.products, pages: raw.pages,
+    truncated: completeness !== 'complete', completeness,
+    stats: {
+      ...collected.stats,
+      getProductsHasMore: Boolean(firstAfter),
+      collectionsPagesListed: raw.pages.filter((p) => p.method === 'getCollections').length,
+      requests: raw.stats?.requests ?? raw.pages.length,
+      stopReason: raw.stats?.stopReason ?? null,
+    },
+    diagnostics: [{ code: 'FROM_RAW', message: `Rielaborazione della lettura reale del ${raw.fetched_at}.` }, ...collected.diagnostics],
   };
 }
 
@@ -139,7 +155,9 @@ async function main(): Promise<number> {
     } else {
       const provider = getExternalCatalogProvider(process.env, { log });
       log(`[catalog] provider ${provider.id}, chatId ${source.chatId}, limite ${limit}`);
-      result = await provider.fetchProducts(source, { limit, timeoutMs });
+      result = await provider.fetchProducts(source, {
+        limit, timeoutMs, collections: !values['no-collections'], pageDelayMs: Math.max(500, Number(values['page-delay-ms']) || 1000),
+      });
     }
   } catch (err) {
     const e = err instanceof ExternalCatalogError
@@ -170,6 +188,8 @@ async function main(): Promise<number> {
       source: result.source,
       fetched_at: result.fetchedAt,
       truncated: result.truncated,
+      completeness: result.completeness,
+      stats: result.stats,
       diagnostics: result.diagnostics,
       pages: result.pages,
     }, redact);
@@ -213,13 +233,19 @@ async function main(): Promise<number> {
 
   const report = buildRunReport({
     generatedAt: startedAt, status: products.length > 0 ? 'success' : 'empty', provider: result.provider,
-    sourceUrl: result.source.url, chatId: result.source.chatId, options, products, truncated: result.truncated, diagnostics,
+    sourceUrl: result.source.url, chatId: result.source.chatId, options, products, truncated: result.truncated,
+    completeness: result.completeness ?? null, readStats: result.stats ?? null, diagnostics,
   });
   await writeReport(report, products);
 
   const c = report.counts;
   log(`\n✔ Accesso al catalogo riuscito (${result.provider}).`);
-  log(`  Prodotti recuperati: ${c.products_retrieved}${result.truncated ? ' (altre pagine non recuperate)' : ''}`);
+  const r = report.read;
+  log(`  Prodotti unici: ${c.products_retrieved} · lettura ${r.completeness ?? 'n/d'}`);
+  if (r.unique_products !== null) {
+    log(`  getProducts: ${r.get_products_products} · collezioni: ${r.collections_found} (${r.collection_pages} pagine, ${r.products_from_collections} prodotti) · duplicati eliminati: ${r.duplicates_removed} · fuori collezione fra i primi 10: ${r.outside_collections} · richieste: ${r.requests}`);
+  }
+  if (r.stop_reason) log(`  Interruzione: ${r.stop_reason}`);
   log(`  Immagini: ${c.images_declared} dichiarate, ${c.images_available} disponibili in staging (${c.images_downloaded} nuove, ${c.images_duplicate} già presenti/duplicate), ${c.images_unavailable} non disponibili`);
   log(`  Quantità minima proposta: ${c.min_quantity_proposed} · step proposti: ${c.step_proposed} · da revisionare: ${c.requires_review}`);
   if (!dryRun) log(`  Report: ${path.relative(REPO_ROOT, path.join(outRoot, ARTIFACT_FILES.reportHtml))} — revisione: pnpm catalog:whatsapp:review`);

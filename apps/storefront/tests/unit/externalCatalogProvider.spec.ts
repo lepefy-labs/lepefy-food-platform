@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { getExternalCatalogProvider } from '../../src/lib/externalCatalog/providers';
-import { createGreenApiCatalogProvider, extractGreenApiProducts, readGreenApiConfig, redactSecrets } from '../../src/lib/externalCatalog/providers/greenApi';
+import { collectGreenApiProducts, createGreenApiCatalogProvider, readGreenApiConfig, redactSecrets, validCursor } from '../../src/lib/externalCatalog/providers/greenApi';
 import { parseWhatsAppCatalogUrl } from '../../src/lib/externalCatalog/sourceUrl';
 import { ExternalCatalogError } from '../../src/lib/externalCatalog/types';
 
@@ -138,17 +138,18 @@ test.describe('recupero catalogo', () => {
     expect((await catchError(p.fetchProducts(source))).code).toBe('UNEXPECTED_RESPONSE');
   });
 
-  test('paginazione: cursore presente ma non documentato → truncated, nessun loop', async () => {
+  test('senza collezioni: getProducts non pagina → truncated, nessun loop', async () => {
     const { p, calls } = provider([AUTHORIZED, { status: 200, body: { paging: { after: 'QVFI' }, products: [product('a')] } }]);
-    const r = await p.fetchProducts(source, { limit: 10 });
+    const r = await p.fetchProducts(source, { limit: 10, collections: false });
     expect(r.truncated).toBe(true);
+    expect(r.completeness).toBe('truncated');
     expect(r.diagnostics.map((d) => d.code)).toContain('PAGINATION_UNSUPPORTED');
     expect(calls).toHaveLength(2);
   });
 
   test('paginazione: limite raggiunto e prodotti in eccesso scartati', async () => {
     const { p } = provider([AUTHORIZED, { status: 200, body: { paging: { after: 'QVFI' }, products: [product('a'), product('b'), product('c')] } }]);
-    const r = await p.fetchProducts(source, { limit: 2 });
+    const r = await p.fetchProducts(source, { limit: 2, collections: false });
     expect(r.products.map((x) => x.providerProductId)).toEqual(['a', 'b']);
     expect(r.diagnostics.map((d) => d.code)).toContain('LIMIT_REACHED');
   });
@@ -157,7 +158,7 @@ test.describe('recupero catalogo', () => {
     const { p } = provider([AUTHORIZED, { status: 200, body: { paging: { after: '' }, products: [product('a'), product('a'), { name: 'senza id' }] } }]);
     const r = await p.fetchProducts(source);
     expect(r.products).toHaveLength(1);
-    expect(r.diagnostics.map((d) => d.code)).toEqual(expect.arrayContaining(['DUPLICATE_PRODUCT', 'PRODUCT_SKIPPED']));
+    expect(r.diagnostics.map((d) => d.code)).toEqual(expect.arrayContaining(['DUPLICATES_REMOVED', 'PRODUCT_SKIPPED']));
   });
 });
 
@@ -197,11 +198,11 @@ test.describe('errori, rate limiting e protezione del token', () => {
     expect(lines.join('\n')).not.toContain(TOKEN);
   });
 
-  test('rielaborazione da raw salvato: stessa estrazione, nessuna chiamata', () => {
-    const r = extractGreenApiProducts([{ paging: { after: 'X' }, products: [product('a'), product('b')] }], 1);
-    expect(r.products.map((p) => p.providerProductId)).toEqual(['a']);
-    expect(r.truncated).toBe(true);
-    expect(() => extractGreenApiProducts([{ nope: true }], 1)).toThrow(ExternalCatalogError);
+  test('rielaborazione da raw salvato (pagine senza method = getProducts): stessa raccolta, nessuna chiamata', () => {
+    const r = collectGreenApiProducts([{ body: { paging: { after: 'X' }, products: [product('a'), product('b')] }, receivedAt: 't' }], 1);
+    expect(r.products.map((x) => x.providerProductId)).toEqual(['a']);
+    expect(r.limitReached).toBe(true);
+    expect(collectGreenApiProducts([{ body: { nope: true }, receivedAt: 't' }], 5).products).toEqual([]);
   });
 
   test('redactSecrets', () => {
