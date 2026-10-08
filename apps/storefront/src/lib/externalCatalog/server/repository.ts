@@ -297,7 +297,7 @@ export async function getSourceWithItems(id: string, status: string | null): Pro
   if (!loaded.ok) return loaded;
   let query = db()
     .from('external_catalog_items')
-    .select('id, provider_product_id, normalized, displayed_price, sale_price, currency, previous_price, price_changed_at, status, linked_product_id, applied_at, last_seen_at, products(id, name, price, active)')
+    .select('id, provider_product_id, normalized, collections:raw->collections, displayed_price, sale_price, currency, previous_price, price_changed_at, status, linked_product_id, applied_at, last_seen_at, products(id, name, price, active)')
     .eq('source_id', id)
     .order('first_seen_at', { ascending: true });
   if (status && (ITEM_STATUSES as readonly string[]).includes(status)) query = query.eq('status', status);

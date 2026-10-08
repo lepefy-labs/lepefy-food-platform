@@ -48,3 +48,32 @@ export async function apiJson<T>(url: string, init?: RequestInit): Promise<{ ok:
     return { ok: false, error: 'Erreur réseau — réessayez.' };
   }
 }
+
+/**
+ * Ordre de la liste filtrée de la source, conservé pour « Précédent / Suivant »
+ * sur la fiche produit (sessionStorage : confort par onglet, jamais une donnée).
+ */
+function navKey(sourceId: string): string {
+  return `lepefy:wa-catalog-nav:${sourceId}`;
+}
+
+export interface ItemNavigation {
+  ids: string[];
+  /** Query string de la liste (`?statut=todo&q=…`), pour revenir à la même vue. */
+  search: string;
+}
+
+export function saveItemNavigation(sourceId: string, nav: ItemNavigation): void {
+  try { sessionStorage.setItem(navKey(sourceId), JSON.stringify(nav)); } catch { /* stockage indisponible */ }
+}
+
+export function readItemNavigation(sourceId: string): ItemNavigation {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(navKey(sourceId)) ?? '{}') as Partial<ItemNavigation>;
+    const ids = Array.isArray(parsed.ids) ? parsed.ids.filter((v): v is string => typeof v === 'string') : [];
+    const search = typeof parsed.search === 'string' && /^(\?[\w%.+~=&-]*)?$/.test(parsed.search) ? parsed.search : '';
+    return { ids, search };
+  } catch {
+    return { ids: [], search: '' };
+  }
+}

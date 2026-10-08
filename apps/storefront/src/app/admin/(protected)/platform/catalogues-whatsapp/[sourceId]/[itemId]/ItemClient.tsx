@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { IconArrowLeft, IconExternalLink } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconExternalLink } from '@tabler/icons-react';
 import { computeUnitPrice, lotPriceFor, type PriceRounding } from '@/lib/externalCatalog/pricing';
 import { netQuantityDisplay, unitWeightGrams } from '@/lib/externalCatalog/proposalFormat';
 import type { NormalizedExternalProduct } from '@/lib/externalCatalog/types';
-import { CARD, CONSENT, INPUT, ITEM_STATUS, LABEL, PRIMARY, SECONDARY, apiJson, dateTime, euro, type ItemStatus } from '../../ui';
+import { CARD, CONSENT, INPUT, ITEM_STATUS, LABEL, PRIMARY, SECONDARY, apiJson, dateTime, euro, readItemNavigation, type ItemStatus } from '../../ui';
 
 interface Product {
   id: string;
@@ -92,6 +92,16 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [listSearch, setListSearch] = useState('');
+  const [nav, setNav] = useState<{ prev: string | null; next: string | null; index: number; total: number } | null>(null);
+
+  // Liste filtrée de la page source (sessionStorage) : absente si on arrive par un lien direct.
+  useEffect(() => {
+    const { ids, search } = readItemNavigation(sourceId);
+    const index = ids.indexOf(itemId);
+    setListSearch(search);
+    setNav(index < 0 ? null : { prev: ids[index - 1] ?? null, next: ids[index + 1] ?? null, index, total: ids.length });
+  }, [sourceId, itemId]);
 
   const load = useCallback(async () => {
     const res = await apiJson<Detail>(`/api/admin/platform/external-catalogs/items/${itemId}`);
@@ -217,6 +227,9 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
         ? 'Produit écarté : restaurez-le pour l’appliquer.'
         : null;
   const storefront = source.tenants?.storefront_url?.replace(/\/$/, '');
+  const itemHref = (id: string) => `/admin/platform/catalogues-whatsapp/${sourceId}/${id}`;
+  // Retour à la liste avec les mêmes filtres (référent même onglet uniquement).
+  const backHref = `/admin/platform/catalogues-whatsapp/${sourceId}${listSearch}`;
   const current = mode === 'update' ? target : null;
   const currentValue = (key: FieldKey): string => {
     if (!current) return '—';
@@ -228,9 +241,22 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
 
   return (
     <div className="space-y-5">
-      <Link href={`/admin/platform/catalogues-whatsapp/${sourceId}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
-        <IconArrowLeft size={16} aria-hidden /> {source.label}
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+          <IconArrowLeft size={16} aria-hidden /> {source.label}
+        </Link>
+        {nav && nav.total > 1 && (
+          <nav aria-label="Produits de la liste" className="flex items-center gap-1 text-sm">
+            {nav.prev
+              ? <Link href={itemHref(nav.prev)} className={`${SECONDARY} min-h-8 px-2.5 py-1`}><IconChevronLeft size={16} aria-hidden /> Précédent</Link>
+              : <span className={`${SECONDARY} min-h-8 cursor-not-allowed px-2.5 py-1 opacity-40`} aria-disabled><IconChevronLeft size={16} aria-hidden /> Précédent</span>}
+            <span className="px-2 text-xs tabular-nums text-gray-500">{nav.index + 1} / {nav.total}</span>
+            {nav.next
+              ? <Link href={itemHref(nav.next)} className={`${SECONDARY} min-h-8 px-2.5 py-1`}>Suivant <IconChevronRight size={16} aria-hidden /></Link>
+              : <span className={`${SECONDARY} min-h-8 cursor-not-allowed px-2.5 py-1 opacity-40`} aria-disabled>Suivant <IconChevronRight size={16} aria-hidden /></span>}
+          </nav>
+        )}
+      </div>
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
