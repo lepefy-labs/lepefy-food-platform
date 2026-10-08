@@ -7,6 +7,7 @@ import type {
   ExternalCatalogSource,
   FetchOptions,
   RawExternalImage,
+  CatalogReadResume,
   RawExternalProduct,
   ReadCompleteness,
 } from '../types';
@@ -50,6 +51,11 @@ const MAX_COLLECTION_LIST_PAGES = 30;
 const MAX_PAGES_PER_COLLECTION = 60;
 const DEFAULT_PAGE_DELAY_MS = 1000;
 const DEFAULT_MAX_REQUESTS = 80;
+const MAX_COLLECTIONS = 500;
+/** Blocchi massimi di una lettura a riprese (anti-ciclo). */
+export const MAX_READ_STEPS = 30;
+/** Errori del provider ritentati (letture idempotenti): 5xx transitori come "write EPROTO". */
+const RETRYABLE_STATUSES = new Set([429, 499, 500, 502, 503, 504]);
 const ALLOWED_API_HOST_SUFFIXES = ['.green-api.com', '.greenapi.com'];
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_RETRIES = 3;
@@ -67,6 +73,35 @@ export function validCursor(value: unknown): string | null {
   const v = value.trim();
   if (v.length === 0 || v.length > 4096) return null;
   return /^[A-Za-z0-9+/=_-]+$/.test(v) ? v : null;
+}
+
+/** ID di collezione WhatsApp: numerico (osservato: 15–16 cifre). */
+export function validCollectionId(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{1,30}$/.test(value);
+}
+
+/**
+ * Valida uno stato di ripresa arrivato dal browser: cursori e ID nel formato
+ * atteso, indici coerenti, numero di blocchi limitato. null se non valido.
+ */
+export function parseReadResume(value: unknown): CatalogReadResume | null {
+  const r = asRecord(value);
+  if (!r || r.v !== 1) return null;
+  const ids = r.collectionIds;
+  if (!Array.isArray(ids) || ids.length > MAX_COLLECTIONS || !ids.every(validCollectionId)) return null;
+  if (new Set(ids).size !== ids.length) return null;
+  const index = r.collectionIndex;
+  const steps = r.steps;
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index > ids.length) return null;
+  if (typeof steps !== 'number' || !Number.isInteger(steps) || steps < 1 || steps >= MAX_READ_STEPS) return null;
+  if (typeof r.listDone !== 'boolean') return null;
+  const listCursor = r.listCursor === null ? null : validCursor(r.listCursor);
+  const productCursor = r.productCursor === null ? null : validCursor(r.productCursor);
+  if (r.listCursor !== null && !listCursor) return null;
+  if (r.productCursor !== null && !productCursor) return null;
+  if (r.listDone && listCursor) return null;
+  if (!r.listDone && (index !== 0 || productCursor)) return null;
+  return { v: 1, listCursor, listDone: r.listDone, collectionIds: ids as string[], collectionIndex: index, productCursor, steps };
 }
 
 export interface GreenApiConfig {
@@ -242,13 +277,21 @@ export function createGreenApiCatalogProvider(config: GreenApiConfig, deps: Gree
       }
 
       const excerpt = safe(text);
-      if (res.status === 429 || res.status === 499 || res.status === 502 || res.status === 503) {
+      // Restrizione WhatsApp sulle funzioni catalogo del numero (osservata l'8/10/2026
+      // dopo molte letture ravvicinate): un nuovo tentativo non serve e la prolungherebbe.
+      if (/commerce features (are not available|disabled)/i.test(text)) {
+        throw new ExternalCatalogError('CATALOG_RESTRICTED', `GREEN-API ${method}: WhatsApp ha disattivato temporaneamente le funzioni catalogo per questo numero (HTTP ${res.status}: ${excerpt}).`, {
+          httpStatus: res.status,
+          hint: 'Restrizione temporanea di WhatsApp dopo letture troppo frequenti: attendere qualche ora prima di rileggere, senza nuovi tentativi ravvicinati.',
+        });
+      }
+      if (RETRYABLE_STATUSES.has(res.status)) {
         const retryAfter = Number(res.headers.get('retry-after'));
         lastRetryAfterMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : null;
         lastError = res.status === 429
           ? new ExternalCatalogError('RATE_LIMITED', `GREEN-API ${method}: troppe richieste (429).`, {
               httpStatus: 429, hint: 'WhatsApp può limitare temporaneamente l\'API cataloghi: riprovare più tardi, senza chiamate ravvicinate.' })
-          : new ExternalCatalogError('PROVIDER_ERROR', `GREEN-API ${method}: HTTP ${res.status}.`, { httpStatus: res.status });
+          : new ExternalCatalogError('PROVIDER_ERROR', `GREEN-API ${method}: HTTP ${res.status}${excerpt ? ` (${excerpt})` : ''}.`, { httpStatus: res.status });
         continue;
       }
       throw mapHttpError(method, res.status, excerpt);
@@ -270,15 +313,19 @@ export function createGreenApiCatalogProvider(config: GreenApiConfig, deps: Gree
     async fetchProducts(source: ExternalCatalogSource, options: FetchOptions = {}): Promise<ExternalCatalogResult> {
       const limit = Math.max(1, Math.min(GREEN_API_MAX_PRODUCT_LIMIT, Math.trunc(options.limit ?? 10)));
       const diagnostics: ExternalCatalogDiagnostic[] = [];
+      const resumeIn = options.resume ?? null;
 
-      const state = await getInstanceState(options);
-      diagnostics.push({ code: 'INSTANCE_STATE', message: `stateInstance = ${state}` });
-      if (state === 'notAuthorized') {
-        throw new ExternalCatalogError('INSTANCE_NOT_AUTHORIZED', 'L\'istanza GREEN-API non è collegata a un account WhatsApp.', {
-          hint: 'Scansionare il QR code dalla console GREEN-API con il numero WhatsApp di Lepefy dedicato ai test.' });
-      }
-      if (state !== 'authorized') {
-        throw new ExternalCatalogError('INSTANCE_UNAVAILABLE', `Istanza GREEN-API non utilizzabile (stateInstance = ${state}).`);
+      // Lo stato dell'istanza si verifica una volta, al primo blocco.
+      if (!resumeIn) {
+        const state = await getInstanceState(options);
+        diagnostics.push({ code: 'INSTANCE_STATE', message: `stateInstance = ${state}` });
+        if (state === 'notAuthorized') {
+          throw new ExternalCatalogError('INSTANCE_NOT_AUTHORIZED', 'L\'istanza GREEN-API non è collegata a un account WhatsApp.', {
+            hint: 'Scansionare il QR code dalla console GREEN-API con il numero WhatsApp di Lepefy dedicato ai test.' });
+        }
+        if (state !== 'authorized') {
+          throw new ExternalCatalogError('INSTANCE_UNAVAILABLE', `Istanza GREEN-API non utilizzabile (stateInstance = ${state}).`);
+        }
       }
 
       const fetchedAt = now().toISOString();
@@ -308,25 +355,39 @@ export function createGreenApiCatalogProvider(config: GreenApiConfig, deps: Gree
         return null;
       }
 
-      // 1. Prima pagina di getProducts: l'unica che vede anche i prodotti fuori dalle collezioni.
-      const first = await catalogCall('getProducts', { chatId: source.chatId, productLimit: limit }, null, false);
-      if (!first || !Array.isArray(first.products)) {
-        throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getProducts: campo "products" assente o non è una lista.');
-      }
-      const getProductsHasMore = (asString(asRecord(first.paging)?.after) ?? '').length > 0;
+      // Stato della lettura: nuovo, oppure ripreso dal blocco precedente.
+      let getProductsHasMore = true;
+      let listCursor: string | null = resumeIn?.listCursor ?? null;
+      let listDone = resumeIn?.listDone ?? false;
+      const collectionIds: string[] = [...(resumeIn?.collectionIds ?? [])];
+      let collectionIndex = resumeIn?.collectionIndex ?? 0;
+      let productCursor: string | null = resumeIn?.productCursor ?? null;
       let collectionsListed = 0;
       let collectionsRead = false;
+      let budgetStop = false;
+      let resumeOut: CatalogReadResume | null = null;
+
+      // 1. Prima pagina di getProducts (solo al primo blocco): l'unica che vede
+      //    anche i prodotti fuori dalle collezioni.
+      if (!resumeIn) {
+        const first = await catalogCall('getProducts', { chatId: source.chatId, productLimit: limit }, null, false);
+        if (!first || !Array.isArray(first.products)) {
+          throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getProducts: campo "products" assente o non è una lista.');
+        }
+        getProductsHasMore = (asString(asRecord(first.paging)?.after) ?? '').length > 0;
+      }
 
       // 2. Collezioni, solo se il catalogo va oltre la prima pagina.
       if (getProductsHasMore && options.collections !== false) {
         try {
-          const collectionIds: string[] = [];
-          let listCursor: string | null = null;
-          let listDone = false;
-          const seenListCursors = new Set<string>();
-          for (let page = 0; page < MAX_COLLECTION_LIST_PAGES && !stopReason; page++) {
-            stopReason = budgetExhausted();
-            if (stopReason) break;
+          const seenListCursors = new Set<string>(listCursor ? [listCursor] : []);
+          while (!listDone) {
+            if (collectionsListed >= MAX_COLLECTION_LIST_PAGES || collectionIds.length >= MAX_COLLECTIONS) {
+              stopReason = 'troppe pagine di collezioni';
+              break;
+            }
+            const exhausted = budgetExhausted();
+            if (exhausted) { stopReason = exhausted; budgetStop = true; break; }
             const body: Record<string, unknown> = { chatId: source.chatId, collectionLimit: COLLECTION_PAGE_SIZE, productLimit: COLLECTION_PREVIEW_PRODUCTS };
             if (listCursor) body.afterCollectionId = listCursor;
             const res = await catalogCall('getCollections', body, null, Boolean(listCursor));
@@ -337,67 +398,81 @@ export function createGreenApiCatalogProvider(config: GreenApiConfig, deps: Gree
             for (const c of res.collections) {
               const rec = asRecord(c);
               const id = typeof rec?.id === 'string' || typeof rec?.id === 'number' ? String(rec.id) : null;
-              if (id && !collectionIds.includes(id)) collectionIds.push(id);
+              if (id && validCollectionId(id) && !collectionIds.includes(id)) collectionIds.push(id);
             }
             const next = nextCursor(res, seenListCursors, 'getCollections', diagnostics);
-            if (next.done) { listDone = true; break; }
+            if (next.done) { listDone = true; listCursor = null; break; }
             if (next.error) { stopReason = next.error; break; }
             listCursor = next.cursor ?? null;
           }
-          if (!listDone && !stopReason) stopReason = 'troppe pagine di collezioni';
 
-          // 3. Prodotti di ogni collezione, con afterProduct.
-          let allCollectionsDone = listDone;
-          for (const collectionId of collectionIds) {
-            if (stopReason) { allCollectionsDone = false; break; }
-            let productCursor: string | null = null;
-            let finished = false;
-            const seen = new Set<string>();
-            for (let page = 0; page < MAX_PAGES_PER_COLLECTION; page++) {
-              stopReason = budgetExhausted();
-              if (stopReason) break;
-              const body: Record<string, unknown> = { chatId: source.chatId, collectionId, productLimit: COLLECTION_PRODUCTS_PAGE };
-              if (productCursor) body.afterProduct = productCursor;
-              const res = await catalogCall('getCollection', body, collectionId, Boolean(productCursor));
-              if (!res || !asRecord(res.collection)) {
-                throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getCollection: campo "collection" assente.');
+          // 3. Prodotti di ogni collezione, con afterProduct, dal punto di ripresa.
+          if (listDone && !stopReason) {
+            while (collectionIndex < collectionIds.length) {
+              const collectionId = collectionIds[collectionIndex] as string;
+              const seen = new Set<string>(productCursor ? [productCursor] : []);
+              let finished = false;
+              for (let page = 0; page < MAX_PAGES_PER_COLLECTION; page++) {
+                const exhausted = budgetExhausted();
+                if (exhausted) { stopReason = exhausted; budgetStop = true; break; }
+                const body: Record<string, unknown> = { chatId: source.chatId, collectionId, productLimit: COLLECTION_PRODUCTS_PAGE };
+                if (productCursor) body.afterProduct = productCursor;
+                const res = await catalogCall('getCollection', body, collectionId, Boolean(productCursor));
+                if (!res || !asRecord(res.collection)) {
+                  throw new ExternalCatalogError('UNEXPECTED_RESPONSE', 'getCollection: campo "collection" assente.');
+                }
+                const next = nextCursor(res, seen, `getCollection ${collectionId}`, diagnostics);
+                if (next.done) { finished = true; productCursor = null; break; }
+                if (next.error) { stopReason = next.error; break; }
+                productCursor = next.cursor ?? null;
+                if (uniqueProductCount(pages) >= limit) { stopReason = `limite di ${limit} prodotti raggiunto`; break; }
               }
-              const next = nextCursor(res, seen, `getCollection ${collectionId}`, diagnostics);
-              if (next.done) { finished = true; break; }
-              if (next.error) { stopReason = next.error; break; }
-              productCursor = next.cursor ?? null;
-              if (uniqueProductCount(pages) >= limit) { stopReason = `limite di ${limit} prodotti raggiunto`; break; }
+              if (!finished) {
+                if (!stopReason) stopReason = `troppe pagine nella collezione ${collectionId}`;
+                break;
+              }
+              collectionIndex++;
             }
-            if (!finished) {
-              allCollectionsDone = false;
-              if (!stopReason) stopReason = `troppe pagine nella collezione ${collectionId}`;
-            }
+            collectionsRead = !stopReason && collectionIndex >= collectionIds.length;
           }
-          collectionsRead = allCollectionsDone && !stopReason;
         } catch (err) {
           const e = err instanceof ExternalCatalogError ? err : new ExternalCatalogError('PROVIDER_ERROR', String((err as Error)?.message ?? err));
           stopReason = `errore del provider sulle collezioni (${e.code})`;
-          diagnostics.push({ code: 'COLLECTIONS_FAILED', message: `Lettura delle collezioni interrotta: ${e.message}` });
+          budgetStop = false;
+          diagnostics.push({ code: e.code === 'CATALOG_RESTRICTED' ? 'CATALOG_RESTRICTED' : 'COLLECTIONS_FAILED', message: `Lettura delle collezioni interrotta: ${e.message}` });
+        }
+
+        // Interruzione per budget o tempo del blocco: si riprende dal punto esatto.
+        if (budgetStop) {
+          const steps = (resumeIn?.steps ?? 0) + 1;
+          if (steps < MAX_READ_STEPS) {
+            resumeOut = { v: 1, listCursor, listDone, collectionIds, collectionIndex, productCursor, steps };
+          } else {
+            stopReason = `troppi blocchi di lettura (${MAX_READ_STEPS})`;
+          }
         }
       }
 
       const collected = collectGreenApiProducts(pages, limit);
       diagnostics.push(...collected.diagnostics);
       if (collected.limitReached && !stopReason) stopReason = `limite di ${limit} prodotti raggiunto`;
-      const completeness: ReadCompleteness = !getProductsHasMore && !collected.limitReached
+      if (collected.limitReached) resumeOut = null;
+      const completeness: ReadCompleteness = !resumeIn && !getProductsHasMore && !collected.limitReached
         ? 'complete'
         : collectionsRead && !collected.limitReached ? 'partial' : 'truncated';
       const stats: ExternalCatalogReadStats = {
         ...collected.stats, getProductsHasMore, collectionsPagesListed: collectionsListed, requests, stopReason,
       };
-      diagnostics.push(completenessDiagnostic(completeness, stats, options.collections === false));
-      if (collected.products.length === 0) {
+      diagnostics.push(resumeOut
+        ? { code: 'READ_IN_PROGRESS', message: `Blocco ${resumeOut.steps} letto (collezione ${Math.min(collectionIndex + 1, Math.max(collectionIds.length, 1))}/${collectionIds.length || '?'}): la lettura continua al blocco successivo.` }
+        : completenessDiagnostic(completeness, stats, options.collections === false));
+      if (collected.products.length === 0 && !resumeIn) {
         diagnostics.push({ code: 'EMPTY_CATALOG', message: 'Il provider ha risposto senza prodotti (catalogo vuoto, nascosto o non consultabile da questa sessione).' });
       }
 
       return {
         provider: 'green_api', source, fetchedAt, products: collected.products, pages,
-        truncated: completeness !== 'complete', completeness, stats, diagnostics,
+        truncated: completeness !== 'complete', completeness, stats, resume: resumeOut, diagnostics,
       };
     },
   };

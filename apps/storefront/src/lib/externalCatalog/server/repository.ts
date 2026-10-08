@@ -11,11 +11,11 @@ import { createImageStager, DEFAULT_IMAGE_HOST_SUFFIXES } from '../imageStaging'
 import { normalizeExternalProduct } from '../normalizeProduct';
 import { externalContentHash } from '../contentHash';
 import { getExternalCatalogProvider } from '../providers';
-import { GREEN_API_MAX_PRODUCT_LIMIT } from '../providers/greenApi';
+import { GREEN_API_MAX_PRODUCT_LIMIT, parseReadResume } from '../providers/greenApi';
 import { sellerChatIdFromPhone } from '../sellerPhone';
 import { parseWhatsAppCatalogUrl } from '../sourceUrl';
 import { ExternalCatalogError } from '../types';
-import type { ExternalCatalogReadStats, NormalizedExternalProduct, RawExternalProduct, ReadCompleteness } from '../types';
+import type { CatalogReadResume, ExternalCatalogReadStats, NormalizedExternalProduct, RawExternalProduct, ReadCompleteness } from '../types';
 import { externalCatalogRpcError, PROVIDER_ERROR_MESSAGES } from './errors';
 
 /**
@@ -145,6 +145,12 @@ async function loadSource(id: string) {
 // ─── Lettura dal provider ───────────────────────────────────────────────────
 
 export interface RefreshOutcome {
+  /** false: il browser deve chiamare il blocco successivo con `resume` e `startedAt`. */
+  done: boolean;
+  resume: CatalogReadResume | null;
+  startedAt: string;
+  progress: { collectionIndex: number; collections: number };
+  /** Conteggi di QUESTO blocco (il browser li somma). */
   received: number;
   new: number;
   changed: number;
@@ -153,13 +159,31 @@ export interface RefreshOutcome {
   truncated: boolean;
   completeness: ReadCompleteness;
   stats: ExternalCatalogReadStats | null;
+  /** Solo all'ultimo blocco, dal database: prodotti unici visti in tutta la lettura. */
+  totals: { unique: number; outsideCollections: number } | null;
+  /** Messaggio del provider o della diagnostica quando la lettura non è finita bene. */
+  message: string | null;
+}
+
+/** Inizio della lettura a riprese: ISO valido e recente (≤ 30 min). */
+function validStartedAt(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const t = Date.parse(value);
+  if (!Number.isFinite(t) || t > Date.now() + 60_000 || Date.now() - t > 30 * 60_000) return null;
+  return new Date(t).toISOString();
 }
 
 /**
- * Lettura dal provider. Budget pensato per una route Vercel da 60 s: pausa 800 ms
- * fra le richieste, al massimo 60 richieste e 45 s; oltre, lettura `truncated`.
+ * Lettura dal provider, a riprese: ogni chiamata è un blocco di al massimo 40 s
+ * (route Vercel da 60 s), pausa 800 ms fra le richieste, max 40 richieste. Ogni
+ * blocco registra i prodotti letti; se resta da leggere restituisce `resume`
+ * e il browser chiama il blocco successivo. Un 5xx del provider è ritentato una volta.
  */
-export async function refreshSource(id: string, actor: string | null): Promise<ServiceResult<RefreshOutcome>> {
+export async function refreshSource(
+  id: string,
+  actor: string | null,
+  input: { resume?: unknown; startedAt?: unknown } = {},
+): Promise<ServiceResult<RefreshOutcome>> {
   const loaded = await loadSource(id);
   if (!loaded.ok) return loaded;
   const source = loaded.data;
@@ -167,22 +191,42 @@ export async function refreshSource(id: string, actor: string | null): Promise<S
   if (denied) return denied;
   if (source.status !== 'active') return fail(409, 'Cette source est archivée.');
 
+  let resumeIn: CatalogReadResume | null = null;
+  let startedAt = new Date().toISOString();
+  if (input.resume !== undefined && input.resume !== null) {
+    resumeIn = parseReadResume(input.resume);
+    const started = validStartedAt(input.startedAt);
+    if (!resumeIn || !started) return fail(400, 'Reprise de lecture invalide ou expirée : relancez « Actualiser ».', 'resume_invalid');
+    startedAt = started;
+  }
+
   const fetchedAt = new Date().toISOString();
   let products: RawExternalProduct[];
   let truncated: boolean;
   let completeness: ReadCompleteness;
   let stats: ExternalCatalogReadStats | null;
   let provider: 'green_api';
+  let resumeOut: CatalogReadResume | null;
+  let message: string | null = null;
   try {
     const parsed = parseWhatsAppCatalogUrl(source.source_url, source.seller_chat_id);
-    const result = await getExternalCatalogProvider(process.env).fetchProducts(parsed, {
-      limit: GREEN_API_MAX_PRODUCT_LIMIT, timeoutMs: 15_000, maxRetries: 1, pageDelayMs: 800, maxRequests: 60, deadlineMs: 45_000,
+    const result = await getExternalCatalogProvider(process.env, {
+      log: (line) => console.info(`[external-catalog] ${id} ${line}`),
+    }).fetchProducts(parsed, {
+      limit: GREEN_API_MAX_PRODUCT_LIMIT, timeoutMs: 15_000, maxRetries: 1, pageDelayMs: 800, maxRequests: 40, deadlineMs: 40_000,
+      resume: resumeIn,
     });
     products = result.products;
-    truncated = result.truncated;
+    resumeOut = result.resume ?? null;
     completeness = result.completeness ?? (result.truncated ? 'truncated' : 'complete');
+    truncated = resumeOut !== null || completeness !== 'complete';
     stats = result.stats ?? null;
     provider = result.provider;
+    const problem = result.diagnostics.find((d) => ['CATALOG_RESTRICTED', 'COLLECTIONS_FAILED', 'CURSOR_INVALID', 'CURSOR_REPEATED', 'READ_TRUNCATED'].includes(d.code));
+    if (!resumeOut && problem) {
+      message = problem.code === 'CATALOG_RESTRICTED' ? (PROVIDER_ERROR_MESSAGES.CATALOG_RESTRICTED ?? problem.message) : problem.message;
+    }
+    if (problem) console.warn(`[external-catalog] ${id} ${problem.code}: ${problem.message}`);
   } catch (err) {
     const code = err instanceof ExternalCatalogError ? err.code : 'PROVIDER_ERROR';
     const message = PROVIDER_ERROR_MESSAGES[code] ?? PROVIDER_ERROR_MESSAGES.PROVIDER_ERROR ?? 'Erreur du fournisseur.';
@@ -205,16 +249,43 @@ export async function refreshSource(id: string, actor: string | null): Promise<S
       currency: normalized.currency,
     };
   });
+  // Tutti i blocchi registrano con la data d'inizio della lettura: last_seen_at
+  // identifica i prodotti visti in QUESTA lettura. Un blocco intermedio è sempre
+  // `truncated` (nessun prodotto marcato «retiré»).
   const { data, error } = await db().rpc('external_catalog_record_fetch', {
-    p_tenant_id: source.tenant_id, p_source_id: id, p_items: items, p_fetched_at: fetchedAt, p_truncated: truncated, p_actor: actor,
+    p_tenant_id: source.tenant_id, p_source_id: id, p_items: items, p_fetched_at: startedAt, p_truncated: truncated, p_actor: actor,
   });
   if (error) return fromDbError(error);
   const row = (Array.isArray(data) ? data[0] : data) as { out_new: number; out_changed: number; out_unchanged: number; out_unavailable: number };
+
+  let totals: RefreshOutcome['totals'] = null;
+  if (!resumeOut) {
+    const { data: seen, error: seenError } = await db()
+      .from('external_catalog_items')
+      .select('id, collections:raw->collections')
+      .eq('source_id', id)
+      .gte('last_seen_at', startedAt);
+    if (!seenError && seen) {
+      const rows = seen as Array<{ collections: unknown }>;
+      totals = {
+        unique: rows.length,
+        outsideCollections: rows.filter((r) => Array.isArray(r.collections) && r.collections.length === 0).length,
+      };
+    }
+  }
+
   return {
     ok: true,
     data: {
+      done: resumeOut === null,
+      resume: resumeOut,
+      startedAt,
+      progress: {
+        collectionIndex: resumeOut?.collectionIndex ?? 0,
+        collections: resumeOut?.collectionIds.length ?? 0,
+      },
       received: items.length, new: row.out_new, changed: row.out_changed, unchanged: row.out_unchanged, unavailable: row.out_unavailable,
-      truncated, completeness, stats,
+      truncated, completeness, stats, totals, message,
     },
   };
 }

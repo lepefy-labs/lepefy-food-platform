@@ -45,21 +45,31 @@ const FILTERS: Array<{ key: ItemStatus | 'all'; label: string }> = [
   { key: 'dismissed', label: 'Écartés' },
 ];
 
-function refreshSummary(d: {
-  received: number; new: number; changed: number; unavailable: number;
+interface RefreshStep {
+  done: boolean;
+  resume: unknown;
+  startedAt: string;
+  progress: { collectionIndex: number; collections: number };
+  received: number; new: number; changed: number; unchanged: number; unavailable: number;
   completeness: 'complete' | 'partial' | 'truncated';
-  stats: { getProductsProducts: number; collectionsFound: number; duplicatesRemoved: number; outsideCollections: number; stopReason: string | null } | null;
-}): string {
-  const base = `${d.received} produit(s) lus : ${d.new} nouveau(x), ${d.changed} modifié(s), ${d.unavailable} retiré(s).`;
-  const s = d.stats;
-  const origin = s && s.collectionsFound > 0
-    ? ` Sources : ${s.getProductsProducts} via la liste principale + ${s.collectionsFound} collection(s), ${s.duplicatesRemoved} doublon(s) éliminé(s).`
-    : '';
-  if (d.completeness === 'complete') return `${base}${origin} Lecture complète.`;
-  if (d.completeness === 'partial') {
-    return `${base}${origin} Lecture partielle : toutes les collections ont été lues, mais ${s?.outsideCollections ?? 0} des 10 premiers produits ne sont dans aucune collection ; d’autres produits hors collection peuvent exister et ne sont pas lisibles via GREEN-API. Aucun produit n’est marqué « retiré ».`;
+  stats: { stopReason: string | null } | null;
+  totals: { unique: number; outsideCollections: number } | null;
+  message: string | null;
+}
+
+/** Une lecture = plusieurs blocs d’au plus 40 s ; garde-fou côté navigateur. */
+const MAX_REFRESH_STEPS = 30;
+
+function refreshSummary(acc: { new: number; changed: number; unavailable: number; steps: number }, last: RefreshStep): string {
+  const unique = last.totals?.unique;
+  const base = `${unique ?? '?'} produit(s) uniques lus en ${acc.steps} bloc(s) : ${acc.new} nouveau(x), ${acc.changed} modifié(s), ${acc.unavailable} retiré(s).`;
+  if (last.completeness === 'complete') return `${base} Lecture complète.`;
+  if (last.completeness === 'partial') {
+    const outside = last.totals?.outsideCollections ?? 0;
+    return `${base} Lecture partielle : toutes les collections ont été lues ; ${outside} produit(s) ne sont dans aucune collection et d’autres produits hors collection peuvent exister au-delà des 10 premiers (non lisibles via GREEN-API). Aucun produit n’est marqué « retiré ».`;
   }
-  return `${base}${origin} Lecture interrompue${s?.stopReason ? ` (${s.stopReason})` : ''} : relancez « Actualiser » plus tard. Aucun produit n’est marqué « retiré ».`;
+  const why = last.message ?? last.stats?.stopReason ?? null;
+  return `${base} Lecture interrompue${why ? ` : ${why}` : ''}. Relancez « Actualiser » plus tard. Aucun produit n’est marqué « retiré ».`;
 }
 
 export default function SourceClient({ sourceId }: { sourceId: string }) {
@@ -95,19 +105,37 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
   async function refresh() {
     setBusy('refresh');
     setNotice(null);
-    const res = await apiJson<{
-      received: number; new: number; changed: number; unavailable: number; truncated: boolean;
-      completeness: 'complete' | 'partial' | 'truncated';
-      stats: { getProductsProducts: number; collectionsFound: number; duplicatesRemoved: number; outsideCollections: number; stopReason: string | null } | null;
-    }>(
-      `/api/admin/platform/external-catalogs/${sourceId}/refresh`, { method: 'POST' });
+    const acc = { new: 0, changed: 0, unavailable: 0, steps: 0 };
+    let resume: unknown = null;
+    let startedAt: string | null = null;
+    let last: RefreshStep | null = null;
+    while (acc.steps < MAX_REFRESH_STEPS) {
+      const res: Awaited<ReturnType<typeof apiJson<RefreshStep>>> = await apiJson<RefreshStep>(`/api/admin/platform/external-catalogs/${sourceId}/refresh`, {
+        method: 'POST',
+        body: JSON.stringify(resume ? { resume, startedAt } : {}),
+      });
+      if (!res.ok) {
+        const partial = acc.steps > 0 ? ` (${acc.steps} bloc(s) déjà enregistré(s), ${acc.new} nouveau(x))` : '';
+        setNotice({ text: `${res.error}${partial}`, tone: 'error' });
+        break;
+      }
+      const step: RefreshStep = res.data;
+      last = step;
+      acc.steps++;
+      acc.new += step.new;
+      acc.changed += step.changed;
+      acc.unavailable += step.unavailable;
+      if (step.done) break;
+      resume = step.resume;
+      startedAt = step.startedAt;
+      setNotice({
+        tone: 'ok',
+        text: `Lecture en cours… bloc ${acc.steps} enregistré (${acc.new} nouveau(x) jusqu’ici), collection ${Math.min(step.progress.collectionIndex + 1, step.progress.collections)}/${step.progress.collections || '?'}.`,
+      });
+      void load();
+    }
+    if (last?.done) setNotice({ tone: last.completeness === 'truncated' ? 'error' : 'ok', text: refreshSummary(acc, last) });
     setBusy(null);
-    if (!res.ok) { setNotice({ text: res.error, tone: 'error' }); void load(); return; }
-    const d = res.data;
-    setNotice({
-      tone: 'ok',
-      text: refreshSummary(d),
-    });
     void load();
   }
 

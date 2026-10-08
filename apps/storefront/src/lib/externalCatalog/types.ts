@@ -40,8 +40,28 @@ export interface FetchOptions {
   pageDelayMs?: number;
   /** Numero massimo di richieste di catalogo per lettura (state esclusa). */
   maxRequests?: number;
-  /** Tempo massimo complessivo della lettura, in ms: oltre, lettura troncata. */
+  /** Tempo massimo complessivo della lettura, in ms: oltre, lettura troncata (o da riprendere). */
   deadlineMs?: number;
+  /** Riprende una lettura a riprese dal punto restituito dal blocco precedente (`result.resume`). */
+  resume?: CatalogReadResume | null;
+}
+
+/**
+ * Punto di ripresa di una lettura per collezioni, serializzabile (console: il
+ * browser lo rimanda al blocco successivo). Validato a ogni ripresa.
+ */
+export interface CatalogReadResume {
+  v: 1;
+  /** Cursore della prossima pagina di getCollections (null = elenco da (ri)cominciare o chiuso). */
+  listCursor: string | null;
+  listDone: boolean;
+  collectionIds: string[];
+  /** Indice della collezione in corso in `collectionIds`. */
+  collectionIndex: number;
+  /** Cursore della prossima pagina della collezione in corso. */
+  productCursor: string | null;
+  /** Blocchi già eseguiti (limite anti-ciclo). */
+  steps: number;
 }
 
 /** Immagine così come dichiarata dal provider (nessun download implicito). */
@@ -125,6 +145,8 @@ export interface ExternalCatalogResult {
   truncated: boolean;
   completeness?: ReadCompleteness;
   stats?: ExternalCatalogReadStats;
+  /** Non null: la lettura continua al blocco successivo da questo punto (budget/tempo del blocco esauriti). */
+  resume?: CatalogReadResume | null;
   diagnostics: ExternalCatalogDiagnostic[];
 }
 
@@ -146,6 +168,7 @@ export type ExternalCatalogErrorCode =
   | 'TIMEOUT'
   | 'NETWORK'
   | 'PROVIDER_ERROR'          // 5xx o risposta non conforme
+  | 'CATALOG_RESTRICTED'      // WhatsApp ha disattivato temporaneamente le funzioni catalogo del numero
   | 'UNEXPECTED_RESPONSE';
 
 export class ExternalCatalogError extends Error {

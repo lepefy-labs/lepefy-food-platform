@@ -69,4 +69,5 @@ export const PROVIDER_ERROR_MESSAGES: Record<string, string> = {
   NETWORK: 'Erreur réseau vers GREEN-API.',
   PROVIDER_ERROR: 'Erreur du fournisseur GREEN-API.',
   UNEXPECTED_RESPONSE: 'Réponse inattendue de GREEN-API.',
+  CATALOG_RESTRICTED: 'WhatsApp limite temporairement les fonctions catalogue de ce numéro (lectures trop fréquentes). Réessayez dans quelques heures, sans relancer à répétition.',
 };

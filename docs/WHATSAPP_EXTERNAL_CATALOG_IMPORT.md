@@ -47,6 +47,12 @@ Il prodotto di riferimento **"Haricot rouge petite graines"** è stato letto (co
 
 Il primo tentativo di `getCollections` con `collectionLimit: 50` ha restituito HTTP 500 dal provider (*"write EPROTO … SSL routines … packet length too long"*); con `collectionLimit: 10` (valore della documentazione) la stessa richiesta è riuscita. Il connettore usa 10.
 
+### 1.2 Prima lettura dalla console e restrizione WhatsApp (8/10/2026, notte)
+
+- La prima «Actualiser» in produzione (sorgente su `chloefood`) si è fermata dopo `getProducts` con `PROVIDER_ERROR` sulle collezioni: lettura troncata, nessun prodotto marcato «retiré», messaggio del provider allora non visibile in console.
+- Una chiamata diagnostica isolata a `getCollections` ha poi risposto HTTP 200 ma in **5,7 s**; una lettura reale a riprese (solo provider, nessuna scrittura) ha misurato **latenza media 3,1 s, massima 10,8 s** per chiamata: le ~23 chiamate di questo catalogo non stanno nei 45 s di una sola richiesta Vercel. Da qui la **lettura a riprese** (§2).
+- La stessa lettura ha ricevuto da `getCollections` **HTTP 500 *"Commerce Features Disabled Error: Commerce features are not available."*** (due volte, a un secondo di distanza), mentre `getProducts` funzionava. È una **restrizione temporanea di WhatsApp sulle funzioni catalogo del numero** dopo molte letture ravvicinate nella giornata (sonde, prove, console), come avverte la documentazione GREEN-API. Il connettore la riconosce (`CATALOG_RESTRICTED`), non la ritenta e la mostra in console; letture sospese finché non rientra.
+
 **Scostamenti fra documentazione GREEN-API e risposta reale** (corretti nel connettore, coperti da test):
 1. **Scala del prezzo: millesimi (÷1000), non ÷100.** `"10000"` = 10,00 € per "3 paquets de 500g"; con ÷100 sarebbero 100 €. Coerente con `priceAmount1000` di WhatsApp.
 2. **Disponibilità** nel campo `availability` (doc: `product_availability`), valore `IN_STOCK`.
@@ -74,7 +80,9 @@ Strategia di lettura (`fetchProducts`):
 2. se `paging.after` non è vuoto, tutte le pagine di `getCollections` (`afterCollectionId`) e, per ogni collezione, tutte le pagine di `getCollection` (`afterProduct`);
 3. deduplica per ID prodotto (vince la prima occorrenza), appartenenza alle collezioni conservata (`RawExternalProduct.collections`), provenienza di ogni prodotto (`rawRef.page` → pagina con `method`, `collectionId`, `cursor`).
 
-Cursori validati (`validCursor`: stringa base64/base64url, max 4096 caratteri): cursore vuoto = fine; non valido → `CURSOR_INVALID`, ripetuto → `CURSOR_REPEATED`, lettura interrotta. Richieste in sequenza con pausa (CLI 1000 ms, console 800 ms), budget di richieste (CLI 80, console 60) e di tempo (console 45 s, sotto i 60 s della route Vercel), nessun nuovo tentativo salvo 429/499/502/503. Un errore sulle collezioni non perde i prodotti di `getProducts` (`COLLECTIONS_FAILED`).
+Cursori validati (`validCursor`: stringa base64/base64url, max 4096 caratteri): cursore vuoto = fine; non valido → `CURSOR_INVALID`, ripetuto → `CURSOR_REPEATED`, lettura interrotta. Richieste in sequenza con pausa (CLI 1000 ms, console 800 ms). Un solo nuovo tentativo (console) su 429/499/500/502/503/504, che coprono i 5xx transitori come *"write EPROTO"*; **mai** sulla restrizione *"Commerce Features Disabled"* (`CATALOG_RESTRICTED`). Un errore sulle collezioni non perde i prodotti di `getProducts` (`COLLECTIONS_FAILED` / `CATALOG_RESTRICTED`, con l'estratto redatto della risposta del provider).
+
+**Lettura a riprese (console).** Ogni «Actualiser» è una sequenza di blocchi: ogni blocco dura al massimo 40 s o 40 richieste (route Vercel da 60 s), registra subito i prodotti letti (`external_catalog_record_fetch`, sempre `truncated` finché non è l'ultimo) e, se resta da leggere, restituisce un punto di ripresa (`CatalogReadResume`: cursore dell'elenco, ID delle collezioni, indice e cursore della collezione in corso). Il browser lo rimanda con `startedAt` al blocco successivo e mostra l'avanzamento. Il server rivalida tutto (`parseReadResume`: cursori, ID numerici, indici coerenti, max 30 blocchi, `startedAt` di meno di 30 min). Il primo blocco controlla l'istanza e legge `getProducts`; i successivi riprendono direttamente dalle collezioni. Tutti i blocchi registrano con la stessa data d'inizio: il riepilogo finale (prodotti unici, fuori collezione) è calcolato dal database su `last_seen_at ≥ startedAt`, quindi senza doppi conteggi fra blocchi. Limite noto: se un prodotto compare in collezioni lette in blocchi diversi, il suo `raw.collections` conserva l'ultima.
 
 **Completezza** (`ReadCompleteness`):
 
@@ -344,5 +352,8 @@ RLS attiva e forzata **senza policy**; nessun privilegio per `anon`/`authenticat
 | «Catalogue introuvable pour ce numéro» | chatId errato: usare il numero del venditore, non l'ID del link |
 | «L'instance GREEN-API n'est plus connectée» | rescansionare il QR nella console GREEN-API |
 | «Quota du forfait GREEN-API épuisé» | piano Developer: 3 chat al mese |
+| «WhatsApp limite temporairement les fonctions catalogue de ce numéro» (`CATALOG_RESTRICTED`, HTTP 500 *Commerce Features Disabled*) | troppe letture ravvicinate: attendere qualche ora, una sola «Actualiser» per volta |
+| «Lecture interrompue : … HTTP 500 (write EPROTO …)» | errore transitorio del provider già ritentato una volta: rilanciare più tardi |
+| «Reprise de lecture invalide ou expirée» | blocco successivo arrivato dopo più di 30 min o stato manomesso: rilanciare «Actualiser» |
 | Foto «non récupérées» | URL CDN scaduti: «Actualiser» la sorgente e riapplicare le sole foto |
 | Modifica non visibile sullo storefront | TTL della cache del deployment del tenant (al massimo 300 s) |
