@@ -62,6 +62,22 @@ Non-negotiable invariants:
 4. deterministic data (prices, stock, shipping, order status, tracking, payments) never comes from AI;
 5. the document is a mandatory co-change: update its state, file map, invariants and troubleshooting in the same delivery unit.
 
+### External WhatsApp catalog import (experimental) documentation contract
+
+For **any task that touches external catalog import** (`apps/storefront/src/lib/externalCatalog/**`, `apps/storefront/scripts/catalog-whatsapp-*.ts`, `apps/storefront/scripts/ts-resolve-hooks.mjs`, `app/admin/(protected)/platform/catalogues-whatsapp/**`, `app/api/admin/platform/external-catalogs/**`, migrations `149_external_catalog_import.sql`, `150_external_catalog_import_grants.sql` or later external catalog migrations, `tests/unit/externalCatalog*.spec.ts`), read and follow:
+
+```text
+docs/WHATSAPP_EXTERNAL_CATALOG_IMPORT.md
+```
+
+Non-negotiable invariants:
+
+1. the local CLI never writes to Supabase or tenant storage; tenant products change only from the platform console, platform owner only, for a tenant with the `external_catalog_import` flag, through the 149 RPCs (field-by-field, audited, created products inactive), and only with recorded seller consent;
+2. read-only provider access (allow-listed methods); never send WhatsApp messages; GREEN-API credentials only from env, never logged or written to artifacts;
+3. never simulate a successful read: a provider failure produces a diagnosis and stops; parser tests on sample text are not catalog reads;
+4. inference, source data and confirmed decisions stay separate; the WhatsApp price is the total for the minimum quantity: the unit price is computed only by `computeUnitPrice` (lot ÷ minimum × (1 − discount), shown rounding gap), never applied without explicit confirmation;
+5. CLI outputs stay under `artifacts/whatsapp-catalog/` (git-ignored); never enable the flag on a real tenant (e.g. Chloe Food) without explicit approval; the document is a mandatory co-change.
+
 ## Core workflow
 
 Follow this sequence:

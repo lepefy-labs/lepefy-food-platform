@@ -1,4 +1,4 @@
-import { IconBell, IconBriefcase, IconReceipt, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
+import { IconBell, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
  * Platform-owner navigation, single source of truth for the sidebar groups and
@@ -44,6 +44,7 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
       { label: 'Transport & santé', href: '/admin/platform/notifications/sante' },
     ],
   },
+  { id: 'external-catalogs', label: 'Catalogues WhatsApp', icon: IconBrandWhatsapp, href: '/admin/platform/catalogues-whatsapp' },
   { id: 'mobile-app', label: 'Application mobile', icon: IconDeviceMobile, href: '/admin/platform/application-mobile' },
   {
     id: 'shipping', label: 'Livraison technique', icon: IconTruck, children: [

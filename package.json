@@ -9,6 +9,8 @@
     "dev": "pnpm --filter @lepefy/storefront dev",
     "build": "pnpm --filter @lepefy/storefront build",
     "lint": "pnpm --filter @lepefy/storefront lint",
-    "typecheck": "pnpm --filter @lepefy/storefront typecheck"
+    "typecheck": "pnpm --filter @lepefy/storefront typecheck",
+    "catalog:whatsapp:test": "pnpm --filter @lepefy/storefront catalog:whatsapp:test",
+    "catalog:whatsapp:review": "pnpm --filter @lepefy/storefront catalog:whatsapp:review"
   }
 }

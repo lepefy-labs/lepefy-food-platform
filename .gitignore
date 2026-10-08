@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 # Playwright
 test-results/
 playwright-report/
+
+# Artefatti locali (cataloghi esterni: dati reali, immagini di terzi) — mai versionati
+artifacts/

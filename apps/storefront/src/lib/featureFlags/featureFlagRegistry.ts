@@ -38,6 +38,14 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     label: 'WhatsApp Business',
     description: 'Active le canal WhatsApp (réception des messages, réponses automatiques, Nala, boîte de réception de l\'équipe).',
   },
+  {
+    // Import de catalogues WhatsApp externes depuis la console plateforme
+    // (migration 149, docs/WHATSAPP_EXTERNAL_CATALOG_IMPORT.md). Le flag autorise
+    // le propriétaire de la plateforme à écrire des produits dans CE tenant.
+    key: 'external_catalog_import',
+    label: 'Import de catalogues WhatsApp',
+    description: 'Autorise la console plateforme à créer ou mettre à jour des produits de cette boutique depuis un catalogue WhatsApp externe, après validation produit par produit.',
+  },
 ];
 
 export function featureFlagDefinition(key: string): FeatureFlagDefinition | undefined {
