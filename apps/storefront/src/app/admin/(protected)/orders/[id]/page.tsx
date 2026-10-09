@@ -23,10 +23,11 @@ import AdminBlockAccent from '../../../_components/ui/AdminBlockAccent'
 import ShareLinkActions from '../../../_components/ui/ShareLinkActions'
 import type { Order, OrderItem, PaymentConfirmationSource } from '@lepefy/types'
 import { SALES_CHANNEL_LABELS } from '@lepefy/types'
+import { readShippingAutomationSettings } from '@/lib/shipping/shipmentDraft/settings'
 import { buildOrderTrackingLink } from '@/lib/orders/convertCheckoutSessionToOrder'
 import { buildTrackingShareMessage, preorderReference } from '@/lib/orders/assisted/assistedOrderPolicy'
 import { shopBaseUrl } from '@/lib/orders/assisted/assistedOrderServer'
-import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
+import { getShippingProvider, managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
 import { loadCartonSuggestion } from '@/lib/shipping/loadCartonSuggestion'
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
 import { carrierDisplayName, shipmentEventsNewestFirst } from '@/lib/shipping/shipmentPresentation'
@@ -134,7 +135,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
 
   if (!order) notFound()
 
-  const [{ data: rawItems }, { data: carriersRaw }, access, digest, documentSettings] = await Promise.all([
+  const [{ data: rawItems }, { data: carriersRaw }, access, digest, documentSettings, shipmentAutomation] = await Promise.all([
     (supabase as unknown as {
       from(t: 'order_items'): ReturnType<ReturnType<typeof createServiceClient>['from']>
     }).from('order_items')
@@ -150,6 +151,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
     getCurrentAdminAccessContext(tenant.id),
     readModuleConfig(supabase, dailyDigestModule, tenant.id).catch(() => null),
     readOrderDocumentSettings(supabase, tenant.id),
+    readShippingAutomationSettings(supabase, tenant.id),
   ])
 
   const items = (rawItems ?? []).sort((a, b) => {
@@ -217,7 +219,10 @@ export default async function AdminOrderPage({ params }: PageProps) {
   const transport = transportState(order)
   const trackingEvents = shipmentEventsNewestFirst(order.shipping_tracking_events)
   const showTracking = !isPickup && Boolean(order.shipping_provider_reference || order.tracking_code || trackingEvents.length > 0)
-  const showShipmentPanel = managed && order.status !== 'new' && order.status !== 'cancelled'
+  // Brouillons d'expédition (migration 151) : réglage actif + transporteur du tenant capable de créer.
+  const draftCreation = managed && shipmentAutomation.enabled
+    && Boolean(getShippingProvider(tenant.shipping_provider)?.capabilities.createDraft)
+  const showShipmentPanel = managed && (order.status !== 'new' || draftCreation) && order.status !== 'cancelled'
   const inStorePending = order.payment_method === 'in_store' && order.payment_status === 'pending'
 
   // Where the next action is carried out; null when that panel is not on the page.
@@ -495,6 +500,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
             shippingDetails={shippingDetails}
             shippingProvider={tenant.shipping_provider ?? 'flat_rate'}
             managedProvider={managedProvider}
+            draftCreation={draftCreation}
             coldChain={{ fresh: freshQty, frozen: frozenQty }}
             pickingProgress={pickingProgress}
             cartonSuggestion={cartonSuggestion}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
 
 interface PatchBody {
   itemId?: string;
@@ -113,12 +114,18 @@ export async function PATCH(
   }
 
   if (!order.picking_started_at) {
-    await supabase
+    const { data: started } = await supabase
       .from('orders')
       .update({ picking_started_at: nowIso })
       .eq('id', order.id)
       .eq('tenant_id', tenant.id)
-      .is('picking_started_at', null);
+      .is('picking_started_at', null)
+      .select('id');
+    // Seul le gagnant du compare-and-set signale le début de la préparation
+    // (brouillon d'expédition, trigger « preparing ») : mise en file, jamais bloquante.
+    if ((started ?? []).length > 0) {
+      await requestShipmentDraft(supabase, tenant.id, order.id, 'preparation_started');
+    }
   }
 
   const { data: allItemsRaw, error: allItemsError } = await supabase

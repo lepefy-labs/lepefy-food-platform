@@ -14,6 +14,7 @@ import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { guardModule } from '@/lib/billing/tenantServiceState';
+import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
 
 interface CartItemPayload {
   productId: string;
@@ -188,6 +189,10 @@ export async function POST(req: NextRequest) {
         from(table: 'order_items'): { insert(data: unknown[]): Promise<{ error: unknown }> };
       }).from('order_items').insert(orderItemsPayload);
       if (itemsError) console.error('[checkout] in_store order_items insert error:', itemsError, '— order_id:', order.id);
+      // Brouillon d'expédition (trigger « order_created ») : mise en file, jamais bloquante.
+      if (fulfillmentType === 'delivery' && !itemsError) {
+        await requestShipmentDraft(supabase, tenant.id, order.id, 'order_created');
+      }
 
       if (customerId) {
         await saveCheckoutProfile({

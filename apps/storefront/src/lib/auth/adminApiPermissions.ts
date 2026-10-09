@@ -35,7 +35,7 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/assisted-orders/customers') || path === '/api/admin/assisted-orders/products') return 'orders.manage';
   if (path.startsWith('/api/admin/assisted-orders')) return read ? 'orders.view' : 'orders.manage';
   if (path.startsWith('/api/admin/checkout-sessions')) return read ? 'orders.view' : 'orders.manage';
-  if (/^\/api\/admin\/orders\/[^/]+\/shipment\/(attach|sync|manual)$/.test(path)) return method.toUpperCase() === 'POST' ? 'orders.manage' : null;
+  if (/^\/api\/admin\/orders\/[^/]+\/shipment\/(attach|sync|manual|create)$/.test(path)) return method.toUpperCase() === 'POST' ? 'orders.manage' : null;
   if (path.startsWith('/api/admin/orders')) return read ? 'orders.view' : 'orders.manage';
   // Paiements carte (/card): list is read-only; resending the customer confirmation is a manage action.
   if (path === '/api/admin/card-payments') return read ? 'orders.view' : null;
@@ -75,6 +75,8 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/shipping-tariff-versions/retire') return method.toUpperCase() === 'POST' ? 'shipping.manage' : null;
   if (path === '/api/admin/shipping-tariff-versions') return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-pricing-mode') return read ? 'shipping.view' : 'shipping.manage';
+  // Création des brouillons d'expédition (migration 151) : réglage transport, pas un réglage boutique.
+  if (path === '/api/admin/shipping-automation') return read ? 'shipping.view' : 'shipping.manage';
   if (path === '/api/admin/shipping-shadow-report') return read ? 'shipping.view' : null;
   if (path === '/api/admin/tenant') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';

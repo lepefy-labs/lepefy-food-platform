@@ -12,6 +12,8 @@ import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notificatio
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
+import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
+import type { OrderService } from '@/lib/orders/orderTransitionService';
 
 /**
  * Service central de conversion « checkout_session payée → commande ».
@@ -130,6 +132,8 @@ export interface ConversionSideEffectDependencies {
   recordOrderCustomerEvents: typeof recordOrderCustomerEvents;
   recordNalaPurchaseAttribution: typeof recordNalaPurchaseAttribution;
   refundPaymentIntent: (paymentIntentId: string) => Promise<{ id: string }>;
+  /** Defaults to the shipment-draft queue (trigger « order_created »); never throws. */
+  requestShipmentDraft?: (supabase: SupabaseClient, tenantId: string, orderId: string) => Promise<unknown>;
 }
 
 const defaultDependencies: ConversionSideEffectDependencies = {
@@ -288,6 +292,12 @@ export async function convertCheckoutSessionToOrder(
   // Nala n'est jamais crédité d'une vente saisie par l'équipe.
   if (!isAssisted) {
     await deps.recordNalaPurchaseAttribution({ supabase, checkoutSessionId: input.sessionId, orderId: order.id });
+  }
+  // Brouillon d'expédition : mise en file uniquement, jamais bloquante.
+  if (order.fulfillment_type === 'delivery') {
+    await (deps.requestShipmentDraft
+      ?? ((db, tenantId, orderId) => requestShipmentDraft(db as unknown as OrderService, tenantId, orderId, 'order_created')))(
+      supabase, input.tenantId, order.id);
   }
 
   const wantsNotification = input.notifyCustomer ?? (isAssisted ? session?.notify_customer !== false : true);

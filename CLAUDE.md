@@ -83,6 +83,13 @@ The shipping logic is the most complex part of the codebase:
 - `shippingTotal = packlink_base_price + vat + (surcharge_amount × num_parcels)`
 - Selects the cheapest eligible service; detailed breakdown is hidden from the customer UI
 
+### Shipment drafts (provider-neutral, Packlink first) — `docs/SHIPPING_INTELLIGENCE.md` §2.4
+
+- Lepefy only creates an unpurchased provider **draft** (Packlink `POST /v1/shipments`, no `service_id`); purchase stays in Packlink PRO. Never touches customer shipping price, never sets `shipped`, never emails.
+- Per-tenant setting `tenant_feature_settings('shipping_automation')` (migration 151): no row = disabled. Triggers `order_created` (Stripe webhook, `convertCheckoutSessionToOrder` when `created = true`, in-store checkout) or `preparing` (first write of `picking_started_at`), or `manual`.
+- Order code calls only `requestShipmentDraft` (`lib/shipping/shipmentDraft/shipmentDraftService.ts`): it queues `pending` and never throws or calls the provider. The `/api/internal/shipping-sync` tick (or `POST /api/admin/orders/[id]/shipment/create`) claims with compare-and-set and calls `adapter.createShipmentDraft` (capability `createDraft`).
+- Timeouts / 5xx other than 503 / 2xx without reference → `ambiguous`, never auto-retried (Packlink cannot look up by our `LEPEFY-<8>` reference); only 429/503 retry, max 3.
+
 ### Storefront Caching
 
 - `getTenant()` (60 s), shop categories / category previews / catalogue ranking IDs (`src/lib/catalog/catalogCache.ts`, 60–300 s) and the shop-layout display data (`getShopShellData`, 300 s) live in the Next.js Data Cache, tagged via `src/lib/cache/storefrontCache.ts`. Product rows (price, stock) are always read fresh — the cache only decides the order.

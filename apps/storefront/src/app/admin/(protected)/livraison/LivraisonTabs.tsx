@@ -1,11 +1,12 @@
 import Link from 'next/link';
 
 type LivraisonTab =
-  | 'rules' | 'packaging' | 'assistant' | 'historique' | 'tarif-analyse' | 'forfait-shadow';
+  | 'rules' | 'packaging' | 'expeditions' | 'assistant' | 'historique' | 'tarif-analyse' | 'forfait-shadow';
 
 const TABS: Array<{ key: LivraisonTab; href: string; label: string }> = [
   { key: 'rules', href: '/admin/livraison', label: 'Tarification' },
   { key: 'packaging', href: '/admin/livraison/emballages', label: 'Emballages' },
+  { key: 'expeditions', href: '/admin/livraison/expeditions', label: 'Expéditions' },
   { key: 'assistant', href: '/admin/livraison/assistant', label: 'Assistant expédition' },
   { key: 'historique', href: '/admin/livraison/historique', label: 'Historique des coûts' },
   { key: 'tarif-analyse', href: '/admin/livraison/analyse-tarifaire', label: 'Analyse tarifaire' },

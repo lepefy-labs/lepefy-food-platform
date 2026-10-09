@@ -20,6 +20,7 @@ import { verifyE2EStripeWebhookSignature } from '@/lib/e2e/verifyStripeWebhookSi
 import type { EventCheckoutItemInput, RentalCheckoutItemInput } from '@lepefy/types';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
+import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
 import { convertCheckoutSessionToOrder } from '@/lib/orders/convertCheckoutSessionToOrder';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
 import { computePreorderTotals, toCents } from '@/lib/orders/assisted/assistedOrderPolicy';
@@ -516,6 +517,13 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({ received: true });
+    }
+
+    // ── Brouillon d'expédition (trigger « order_created ») ───────────────────
+    // Met seulement la commande en file (pending) ; jamais d'appel transporteur
+    // ni d'exception ici : la commande payée est déjà créée.
+    if (checkoutSession.fulfillment_type === 'delivery' && !itemsError) {
+      await requestShipmentDraft(supabase, resolvedTenantId, order.id, 'order_created');
     }
 
     // ── Notify n8n ───────────────────────────────────────────────────────────

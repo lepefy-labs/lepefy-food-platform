@@ -18,6 +18,11 @@ export type OrderOrigin = 'storefront' | 'assisted';
 export type FulfillmentType = 'delivery' | 'pickup';
 
 export type NormalizedShipmentStatus = 'pending' | 'ready_for_collection' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned' | 'cancelled' | 'unknown';
+/**
+ * Provisioning of the provider shipment (migration 151), separate from the
+ * logistics status. Null in the database means `not_required`.
+ */
+export type ShipmentCreationStatus = 'not_required' | 'pending' | 'creating' | 'draft_created' | 'failed' | 'ambiguous';
 export interface ShipmentTrackingEvent {
   occurredAt: string;
   description: string;
@@ -60,6 +65,12 @@ export interface Order {
   shipping_tracking_url?: string | null;
   shipping_estimated_delivery_at?: string | null;
   shipping_tracking_events?: ShipmentTrackingEvent[] | null;
+  /** Migration 151 — absents tant que la migration n'est pas appliquée. */
+  shipping_creation_status?: ShipmentCreationStatus | null;
+  shipping_creation_attempts?: number;
+  shipping_creation_error?: string | null;
+  shipping_creation_updated_at?: string | null;
+  shipping_provider_created_at?: string | null;
   /** Timestamp set when operational picking starts. */
   picking_started_at: string | null;
   /** Timestamp set only while every item is picked and all cold-chain checks are validated. */

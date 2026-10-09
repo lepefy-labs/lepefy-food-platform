@@ -48,6 +48,8 @@ interface Props {
   shippingDetails: ShippingDetails | null;
   shippingProvider: string;
   managedProvider?: { key: string; displayName: string } | null;
+  /** Tenant creates provider shipment drafts from Lepefy (migration 151). */
+  draftCreation?: boolean;
   coldChain?: { fresh: number; frozen: number };
   pickingProgress: PickingProgress;
   cartonSuggestion?: CartonSuggestion | null;
@@ -79,6 +81,7 @@ export default function OrderDetail({
   shippingDetails,
   shippingProvider,
   managedProvider,
+  draftCreation = false,
   coldChain = { fresh: 0, frozen: 0 },
   pickingProgress,
   cartonSuggestion = null,
@@ -304,8 +307,8 @@ export default function OrderDetail({
         <CartonSuggestionCard suggestion={cartonSuggestion} missingWeightLines={missingWeightLines} />
       )}
 
-      {managed && managedProvider && order.status !== 'new' && order.status !== 'cancelled' && (
-        <ManagedShipmentPanel order={order} provider={managedProvider} ready={pickingProgress.complete && packingProgress.complete} canManage={canManage} />
+      {managed && managedProvider && (order.status !== 'new' || draftCreation) && order.status !== 'cancelled' && (
+        <ManagedShipmentPanel order={order} provider={managedProvider} ready={pickingProgress.complete && packingProgress.complete} canManage={canManage} draftCreation={draftCreation} />
       )}
 
       {order.payment_method === 'in_store' && !isPaid && (

@@ -1,5 +1,9 @@
 import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
-import { ShippingProviderError, type NormalizedShipmentStatus, type ProviderShipmentSnapshot, type ShippingProviderAdapter } from './types';
+import {
+  ShipmentDraftError, ShippingProviderError,
+  type NormalizedShipmentStatus, type ProviderShipmentDraftInput, type ProviderShipmentSnapshot, type ShippingProviderAdapter,
+  type ShippingProviderContext,
+} from './types';
 
 const BASE = 'https://api.packlink.com/v1';
 const MAX_BYTES = 256_000;
@@ -117,13 +121,137 @@ async function request(apiKey: string, path: string): Promise<unknown> {
   }
 }
 
+function tenantApiKey(context: ShippingProviderContext): string | null {
+  return resolvePacklinkApiKey({ packlink_api_key: text(context.tenant.packlink_api_key, 4096), is_test: context.tenant.is_test === true });
+}
+
+async function readBoundedJson(response: Response): Promise<unknown> {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    size += result.value.length;
+    if (size > MAX_BYTES) { await reader.cancel(); return null; }
+    chunks.push(result.value);
+  }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown; } catch { return null; }
+}
+
+export interface PacklinkAddress {
+  name: string; surname: string | null; company: string | null; street1: string; street2: string | null;
+  zip_code: string; city: string; country: string; phone: string | null; email: string | null;
+}
+
+/**
+ * Sender = the account's default Packlink PRO warehouse (official connector:
+ * GET clients/warehouses, `default_selection`). A single warehouse counts as
+ * default. `postal_code` may be "<code> - <city>" (Warehouse::fromArray).
+ */
+export function selectPacklinkWarehouse(payload: unknown): PacklinkAddress | null {
+  const list = Array.isArray(payload) ? payload : Array.isArray(object(payload).warehouses) ? object(payload).warehouses as unknown[] : [];
+  const warehouses = list.map(object);
+  const chosen = warehouses.find(row => row.default_selection === true) ?? (warehouses.length === 1 ? warehouses[0] : undefined);
+  if (!chosen) return null;
+  let zip = text(chosen.postal_code ?? chosen.zip_code, 40);
+  let city = text(chosen.city, 80);
+  const split = zip ? /^(.+?)\s+-\s+(.+)$/.exec(zip) : null;
+  if (split) { zip = split[1]!.trim(); city = city ?? split[2]!.trim(); }
+  const country = text(chosen.country, 2)?.toUpperCase() ?? null;
+  const street1 = text(chosen.address ?? chosen.street1, 120);
+  const name = text(chosen.name, 80) ?? text(chosen.company, 80);
+  if (!zip || !city || !country || !street1 || !name) return null;
+  return {
+    name, surname: text(chosen.surname, 80), company: text(chosen.company, 80), street1, street2: null,
+    zip_code: zip, city, country, phone: text(chosen.phone, 40), email: text(chosen.email, 160),
+  };
+}
+
+/** Pure payload builder (Draft.php keys); no service_id: the service is chosen and purchased in Packlink PRO. */
+export function buildPacklinkDraftPayload(from: PacklinkAddress, input: ProviderShipmentDraftInput): Record<string, unknown> {
+  const r = input.recipient;
+  const compact = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== ''));
+  return {
+    from: compact({ ...from }),
+    to: compact({
+      name: r.firstName, surname: r.lastName, street1: r.street1, street2: r.street2,
+      zip_code: r.postalCode, city: r.city, country: r.country, phone: r.phone, email: r.email,
+    }),
+    packages: input.parcels.map(parcel => ({
+      weight: Math.round(parcel.weightKg * 100) / 100,
+      width: Math.ceil(parcel.widthCm), height: Math.ceil(parcel.heightCm), length: Math.ceil(parcel.lengthCm),
+    })),
+    content: input.content.slice(0, 60),
+    contentvalue: Math.round(input.contentValue * 100) / 100,
+    contentValue_currency: input.currency,
+    content_second_hand: false,
+    shipment_custom_reference: input.orderReference.slice(0, 50),
+  };
+}
+
+/**
+ * Maps the draft POST HTTP status. Only 429/503 are explicit "not processed"
+ * answers (retryable); other 5xx may follow a created draft (ambiguous, never
+ * retried automatically).
+ */
+export function classifyPacklinkDraftStatus(status: number): ShipmentDraftError['code'] {
+  if (status === 401 || status === 403) return 'missing_configuration';
+  if (status === 429 || status === 503) return 'provider_unavailable';
+  if (status >= 400 && status < 500) return 'provider_rejected';
+  return 'ambiguous_creation';
+}
+
+async function loadDefaultWarehouse(apiKey: string): Promise<PacklinkAddress> {
+  let response: Response;
+  try {
+    response = await fetch(BASE + '/clients/warehouses', {
+      headers: { Authorization: apiKey, Accept: 'application/json' },
+      cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(8_000),
+    });
+  } catch { throw new ShipmentDraftError('provider_unavailable'); }
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new ShipmentDraftError(response.status === 401 || response.status === 403 ? 'missing_configuration' : 'provider_unavailable');
+  }
+  const warehouse = selectPacklinkWarehouse(await readBoundedJson(response));
+  if (!warehouse) throw new ShipmentDraftError('missing_configuration');
+  return warehouse;
+}
+
 export const packlinkAdapter: ShippingProviderAdapter = {
   key: 'packlink', displayName: 'Packlink',
-  capabilities: { providerReference: true, trackingTimeline: true, trackingUrl: true, webhooks: false },
+  capabilities: { providerReference: true, trackingTimeline: true, trackingUrl: true, webhooks: false, createDraft: true },
+  async createShipmentDraft(context, input) {
+    const key = tenantApiKey(context);
+    if (!key) throw new ShipmentDraftError('missing_configuration');
+    // Read-only and before any POST: a failure here can never leave a draft behind.
+    const from = await loadDefaultWarehouse(key);
+    let response: Response;
+    try {
+      response = await fetch(BASE + '/shipments', {
+        method: 'POST',
+        headers: { Authorization: key, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPacklinkDraftPayload(from, input)),
+        cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(12_000),
+      });
+    } catch (error) {
+      const name = error instanceof Error ? error.name : '';
+      throw new ShipmentDraftError(name === 'TimeoutError' || name === 'AbortError' ? 'provider_timeout' : 'ambiguous_creation');
+    }
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new ShipmentDraftError(classifyPacklinkDraftStatus(response.status));
+    }
+    const reference = text(object(await readBoundedJson(response)).reference, 60)?.toUpperCase() ?? null;
+    if (!reference || !/^[A-Z0-9]{6,40}$/.test(reference)) throw new ShipmentDraftError('invalid_provider_response');
+    return { provider: 'packlink', providerReference: reference, providerStatus: null, createdAt: new Date().toISOString() };
+  },
   async resolveShipment(context, rawReference) {
     const reference = rawReference.trim().toUpperCase();
     if (!/^[A-Z0-9]{6,40}$/.test(reference)) throw new ShippingProviderError('shipment_reference_invalid');
-    const key = resolvePacklinkApiKey({ packlink_api_key: text(context.tenant.packlink_api_key, 4096), is_test: context.tenant.is_test === true });
+    const key = tenantApiKey(context);
     if (!key) throw new ShippingProviderError('shipping_provider_not_configured');
     const path = '/shipments/' + encodeURIComponent(reference);
     const [shipment, timeline] = await Promise.all([request(key, path), request(key, path + '/track')]);

@@ -6,11 +6,14 @@ import { IconCircleCheck } from '@tabler/icons-react';
 import type { Order } from '@lepefy/types';
 import { shipmentDate, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 import CopyableValue from '../../_components/ui/CopyableValue';
+import ShipmentDraftBlock from './ShipmentDraftBlock';
 
 // Provider association panel: attach, sync, switch to manual tracking. The
 // carrier details and the event history live in ShipmentTrackingCard.
-export default function ManagedShipmentPanel({ order, provider, ready, canManage = true }: {
+export default function ManagedShipmentPanel({ order, provider, ready, canManage = true, draftCreation = false }: {
   order: Order; provider: { key: string; displayName: string }; ready: boolean; canManage?: boolean;
+  /** Tenant creates provider drafts from Lepefy (shipping_automation, migration 151). */
+  draftCreation?: boolean;
 }) {
   const router = useRouter();
   const [reference, setReference] = useState('');
@@ -19,6 +22,8 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
   const [manualConfirm, setManualConfirm] = useState(false);
   const associated = Boolean(order.shipping_provider_reference);
   const active = order.status === 'preparing' || order.status === 'shipped';
+  const fromDraft = associated && order.shipping_creation_status === 'draft_created';
+  const showDraft = draftCreation && !associated && (order.status === 'new' || order.status === 'preparing');
   const autoSync = active && !['returned', 'cancelled', 'delivered'].includes(order.shipping_normalized_status ?? '');
   async function request(action: 'attach' | 'sync' | 'manual') {
     setBusy(true); setMessage(null);
@@ -40,9 +45,10 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
       <h2 id="order-shipment-title" className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Expédition {provider.displayName}</h2>
       {associated ? (
         <>
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300"><IconCircleCheck size={16} aria-hidden="true" /> Expédition associée</p>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300"><IconCircleCheck size={16} aria-hidden="true" /> {fromDraft ? `Brouillon ${provider.displayName} créé` : 'Expédition associée'}</p>
           <div className="space-y-1 text-xs">
             <CopyableValue label="Réf." value={order.shipping_provider_reference!} />
+            {fromDraft && order.shipping_provider_created_at && <p className="text-gray-500 dark:text-gray-400">Créé depuis Lepefy le {shipmentDate(order.shipping_provider_created_at)}</p>}
             <p className="text-gray-500 dark:text-gray-400">Statut transporteur : <span className="font-medium text-gray-800 dark:text-gray-100">{shipmentStatusLabel(order.shipping_normalized_status)}</span></p>
             <p className="text-gray-500 dark:text-gray-400">Dernière synchro : {shipmentDate(order.shipping_provider_synced_at)}</p>
           </div>
@@ -52,8 +58,9 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
         </>
       ) : (
         <>
+          {showDraft && <ShipmentDraftBlock order={order} providerName={provider.displayName} canManage={canManage} />}
           {!canManage
-            ? <p className="text-sm text-gray-500">Aucune expédition associée.</p>
+            ? (showDraft ? null : <p className="text-sm text-gray-500">Aucune expédition associée.</p>)
             : ready && active ? (
               <form onSubmit={event => { event.preventDefault(); if (!busy) void request('attach'); }} className="space-y-3">
                 <label htmlFor="provider-reference" className="block text-sm">Référence {provider.displayName}</label>
@@ -61,7 +68,7 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
                   className="min-h-11 w-full rounded-lg border border-[var(--admin-border)] bg-transparent px-3 text-sm focus:ring-2 focus:ring-[var(--admin-primary)]" />
                 <button disabled={busy || !reference.trim()} className={`${button} bg-[var(--admin-primary)] text-white`}>{busy ? 'Vérification…' : 'Vérifier et associer'}</button>
               </form>
-            ) : <p className="text-sm text-gray-500">Terminez la préparation, les contrôles froid et l’emballage avant d’associer une expédition.</p>}
+            ) : showDraft ? null : <p className="text-sm text-gray-500">Terminez la préparation, les contrôles froid et l’emballage avant d’associer une expédition.</p>}
           <p className="text-xs text-gray-500">Le transporteur, le tracking et les statuts seront récupérés automatiquement.</p>
         </>
       )}

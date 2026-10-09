@@ -2,9 +2,9 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@96d94e9d793aa6eabf8c4c9b5213f84eee8e9f5b`
-> **Ultima verifica:** 5 ottobre 2026
-> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale)
+> **Base codice verificata:** `main@0e0d04addd2b9de0c1661955b9bf5f68d10b0048`
+> **Ultima verifica:** 9 ottobre 2026
+> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` (brouillons d'expédition, §2.4)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
 >
@@ -46,6 +46,8 @@ packlink
 
 La logica reale di checkout continua a usare il flusso shipping esistente e non è stata sostituita da Shipping Intelligence.
 
+Tracking: `orders.shipping_*` (migration 111) sincronizzati da `syncOrderShipment`. Creazione di una bozza presso il provider a partire da un ordine: §2.4.
+
 #### Data di consegna stimata (suivi automatique)
 
 - La data arriva dal provider (Packlink: `estimated_delivery_date`, `YYYY/MM/DD`) tramite l'adapter (`parsePacklinkShipment` → `snapshot.estimatedDeliveryAt`).
@@ -79,6 +81,62 @@ Comprende:
 - stima per similarità;
 - storico aggregato;
 - laboratorio tariffario.
+
+### 2.4 Creazione dei brouillons d'expédition (migration 151)
+
+Lepefy può creare **solo una bozza** (draft) della spedizione presso il provider a partire da un ordine reale. Acquisto, scelta definitiva del servizio, pagamento ed etichetta restano in Packlink PRO. Prezzo cliente (`shipping_cost`, totale, versione tariffaria, forfait) e costo operativo provider restano separati: la bozza non li legge né li modifica.
+
+**Configurazione tenant.** Modulo `shipping_automation` di `tenant_feature_settings` (nessuna colonna `tenants.*`): `enabled` = «Créer les brouillons d'expédition depuis Lepefy», `config = { version: 1, create_shipment_trigger: 'order_created' | 'preparing' | 'manual' }` (CHECK `is_valid_shipping_automation_config`). Riga assente, invalida o illeggibile = **disattivato** (nessuna creazione, nemmeno manuale): la migration non attiva nessun tenant. UI: `Admin → Livraison → Expéditions` (`/admin/livraison/expeditions`, lettura `shipping.view`, scrittura `shipping.manage` via `GET/PATCH /api/admin/shipping-automation`). Alla prima attivazione la UI preseleziona «Au début de la préparation» (raccomandato). Se il provider del tenant non ha la capability `createDraft` la pagina lo dice e non mostra opzioni. Il cambio di impostazione vale per gli eventi successivi, nessun effetto retroattivo.
+
+**Condizioni (`draftIneligibility`, pura).** Impostazione attiva; adapter del `tenants.shipping_provider` con `capabilities.createDraft` e `createShipmentDraft`; `fulfillment_type = 'delivery'`; `shipping_provider_reference` nullo; ordine `new`/`preparing`; `shipping_tracking_mode` diverso da `manual` (il team ha scelto il suivi manuel). Chiave API e dati mancanti producono un errore classificato, non un salto silenzioso.
+
+**Trigger.** Nessun trigger su `checkout_sessions`: solo veri ordini.
+
+| Trigger | Evento | Punto nel codice |
+|---|---|---|
+| `order_created` | ordine realmente creato | webhook Stripe storefront (dopo inserimento righe, fuori dal ramo stock_conflict); `convertCheckoutSessionToOrder` solo con `created = true` e senza conflitto di stock (Stripe assistito, pagamenti esterni, «Déjà payé»); `/api/checkout` ramo `in_store` |
+| `preparing` | **inizio della preparazione** = prima scrittura di `picking_started_at` | `updateWorkflowOrder` (`new → preparing`, vincitore del CAS) e `PATCH /api/admin/orders/[id]/picking` (prima riga prelevata, CAS `is('picking_started_at', null)` + `select`) |
+| `manual` | nessuno | solo dalla scheda ordine |
+
+Tutti i percorsi di creazione attuali creano l'ordine direttamente in `preparing`: una transizione letterale `new → preparing` non avverrebbe quasi mai, per questo l'evento canonico è la prima scrittura di `picking_started_at`. `preparing → preparing` e i tick successivi del picking non rilanciano nulla (CAS + stato non più `not_required`).
+
+**Provider-neutral.** La state machine ordini chiama solo `requestShipmentDraft` (`lib/shipping/shipmentDraft/shipmentDraftService.ts`), che usa il registry: `ShippingProviderAdapter.capabilities.createDraft` + `createShipmentDraft(context, input) → ProviderShipmentDraftResult { provider, providerReference, providerStatus?, createdAt }`. Input neutro `ProviderShipmentDraftInput` (riferimento ordine, destinatario, colli kg/cm, contenuto, valore merce = `orders.subtotal`). Packlink: `createDraft = true`; nessun altro adapter oggi.
+
+**Packlink.** Verificato sul connettore ufficiale `packlink-dev/ecommerce_module_core` (`Proxy::sendDraft`, `Draft::toArray`, `OrderService::convertOrderToDraftDto`):
+- mittente = magazzino predefinito dell'account (`GET /v1/clients/warehouses`, `default_selection`; un unico magazzino vale come predefinito; `postal_code` può essere `"<cap> - <città>"`). Nessun mittente hardcoded; l'origine `IT/42122` delle quote (§5) non è usata qui;
+- `POST /v1/shipments` JSON con `from`, `to` (`name`, `surname`, `street1`, `street2`, `zip_code`, `city`, `country`, `phone`, `email`), `packages` (`weight` kg a 2 decimali, `width/height/length` cm interi), `content` (≤ 60 car.), `contentvalue`, `contentValue_currency`, `content_second_hand: false`, `shipment_custom_reference`. **Nessun `service_id`**: il connettore ufficiale lo omette quando nessun servizio è scelto; il servizio si sceglie e si paga in Packlink PRO;
+- risposta: `{ reference }` (es. `IT2026PRO0006415025`), validata `^[A-Z0-9]{6,40}$`.
+
+**Riferimenti.** `shipment_custom_reference = LEPEFY-<8 caratteri>` (stesso codice del numero ordine admin `#3F2A91C0`, nessun dato personale) ↔ `orders.shipping_provider_reference = <reference Packlink>`.
+
+**Dati.** `buildShipmentDraftInput` (puro, `buildDraftInput.ts`):
+- destinatario da `orders.shipping_address` (`full_name` o `orders.full_name` → nome/cognome sull'ultimo spazio), e-mail opzionale (ordini assistiti senza e-mail), telefono letto dalla riga `Téléphone: …` di `orders.notes` (unico punto in cui i tre percorsi di creazione lo persistono). Campo mancante → `invalid_recipient:<campi>`, nessuna chiamata;
+- peso: `orders.shipping_details.totalWeightG`, altrimenti Σ `order_items.quantity × products.weight_grams` **solo** se ogni riga ha un peso (nessun `WEIGHT_FALLBACK_G`). Assente → `invalid_parcel:poids`;
+- colli: stessa regola delle quote (`splitIntoParcels(peso, packaging_surcharges.max_pack_kg)` + dimensioni della riga `packaging_surcharges` attiva). Il carton suggestion (§6) e `packing_parcel_count` restano supporto operativo, non verità fisica inviata: la bozza si corregge in Packlink PRO se la preparazione differisce. Dimensioni assenti → `invalid_parcel:dimensions`.
+
+**Stato di provisioning (`orders.shipping_creation_*`, separato da `shipping_normalized_status`).**
+
+```text
+null (= not_required) ──evento──▶ pending ──claim CAS──▶ creating ──▶ draft_created (reference salvata)
+                                     ▲                        ├──▶ failed     (errore sicuro: dati, 4xx, 401/403, 429/503)
+                                     └── retry automatico ────┘    ambiguous  (timeout, rete, 5xx≠503, 2xx senza reference,
+                                         (solo provider_unavailable,           claim interrotto > 10 min)
+                                          max 3 tentativi, ≥ 10 min)
+```
+
+Colonne: `shipping_creation_status`, `shipping_creation_attempts`, `shipping_creation_error` (`<codice>` o `<codice>:<dettaglio>`, ≤ 64, mai payload provider/PII), `shipping_creation_updated_at`, `shipping_provider_created_at`. Codici: `missing_configuration`, `invalid_recipient`, `invalid_parcel`, `provider_timeout`, `provider_unavailable`, `provider_rejected`, `invalid_provider_response`, `ambiguous_creation` (messaggi francesi in `shipmentDraftPresentation.ts`).
+
+**Idempotenza.** (1) Nessuna creazione se `shipping_provider_reference` è valorizzato (eleggibilità + filtro `is(reference, null)` in ogni update). (2) Claim compare-and-set su stato **e** numero di tentativi letti (`pending|failed|null → creating`): doppio clic, due worker, tick + clic → una sola chiamata provider. (3) Il salvataggio finale è CAS su `creating`; se fallisce (stato cambiato nel frattempo) l'ordine passa `ambiguous` e la reference viene solo loggata. (4) `orders_tenant_shipping_reference_idx` (111) impedisce la stessa reference su due ordini. Il frontend non è il controllo.
+
+**Timeout ambiguo.** Packlink non offre lookup per `shipment_custom_reference` (il connettore ufficiale documenta solo `GET shipments/{reference}`; la lista `GET /v1/shipments` non è documentata né filtrabile, §Diagnostic). Quindi nessun retry cieco: timeout, errore di rete, 500/502/504, 2xx senza reference e claim interrotto diventano `ambiguous` e non vengono mai ritentati automaticamente. Riconciliazione manuale nella scheda ordine: «Associer la référence» (verificata con `resolveShipment`) oppure «Aucun brouillon trouvé ? → recréer» con conferma esplicita (`confirmNoExistingDraft`).
+
+**Esecuzione asincrona.** Gli eventi fanno solo un update CAS `→ pending` e non lanciano mai eccezioni (migration assente, lettura fallita: log `queue_unavailable`): errore provider ≠ errore di creazione ordine ≠ errore di preparazione. La creazione avviene nel tick esistente `POST /api/internal/shipping-sync` (n8n ogni 15 min, §23) dopo la sync tracking (`runShipmentDraftBatch`: claim interrotti → `ambiguous`, poi ≤ 3 ordini `pending`/`failed` ritentabili; nessuna nuova creazione dopo 35 s per restare in `maxDuration = 60`). Timeout adapter: magazzini 8 s, bozza 12 s. Nessuna nuova infrastruttura.
+
+**Fallback manuale.** Scheda ordine, pannello «Expédition Packlink» (`ManagedShipmentPanel` → `ShipmentDraftBlock`), visibile per delivery `new`/`preparing` senza reference quando l'impostazione è attiva: «Aucun brouillon créé» → «Créer le brouillon Packlink»; «Création en attente» → «Créer maintenant»; «Échec de création» + messaggio → «Réessayer»; «Création incertaine» → associare/recreare; dopo il successo «✓ Brouillon Packlink créé», reference copiabile, data, stato transporteur. Endpoint `POST /api/admin/orders/[id]/shipment/create` (`orders.manage`, come attach/sync/manual: è un'azione sull'ordine, non un réglage; tenant dal deploy, ordine filtrato per `tenant_id`). Corpo: `{}` | `{ confirmNoExistingDraft: true }` | `{ providerReference }`.
+
+**Dopo la creazione.** Patch: `shipping_tracking_mode = 'managed'`, `shipping_provider_key`, `shipping_provider_reference`, `shipping_normalized_status = 'pending'`, `shipping_provider_synced_at = null`. Lo stato ordine non cambia: una bozza **non** è una spedizione, nessun `shipped`, nessuna e-mail (né alla creazione né all'associazione). Da lì `runShippingSyncBatch`/`syncOrderShipment` gestiscono `pending → ready_for_collection → in_transit → … → delivered/exception/returned/cancelled`; `order_shipped` parte solo dalla vera transizione `shipped`. «Utiliser un suivi manuel» stacca la reference e blocca nuove creazioni (`manual_tracking`).
+
+**Osservabilità.** Log `[shipping/draft] queued|started|created|failed|skipped_existing|ambiguous|linked` con solo tenant id, order id, provider e codice. Mai chiave API, indirizzo, telefono, e-mail o payload Packlink.
 
 ---
 
@@ -158,7 +216,7 @@ Le viste di classificazione (`to_treat`, `urgent`, `incidents`, …) filtrano lo
 - **Prossima azione senza transizione:** se l'azione è primaria (un intervento dell'équipe), il pannello mostra solo una guida verso la sezione competente, senza duplicare mutazioni. Una semplice consultazione, come il transito regolare, non genera guida.
 - **Nomi dei transporteur:** normalizzati per la lettura con `carrierDisplayName` (`shipmentPresentation.ts`), sia nella lista sia nel dettaglio.
 - **`ShipmentTrackingCard` (sezione «Suivi transporteur»):** mostra stato provider, transporteur, servizio, colli, peso, ETA, reference e tracking copiabili (`CopyableValue`), ultima synchro, link transporteur validato e la timeline degli eventi persistiti (`shipmentEventsNewestFirst` + `shipmentEventLabel`, 4 visibili poi «Afficher tout»). Nessuna chiamata live.
-- **`ManagedShipmentPanel`:** resta il solo punto per associare, sincronizzare o passare al suivi manuel, con un riepilogo compatto.
+- **`ManagedShipmentPanel`:** resta il solo punto per creare il brouillon d'expédition (`ShipmentDraftBlock`, §2.4), associare, sincronizzare o passare al suivi manuel, con un riepilogo compatto.
 - **Senza `orders.manage`:** la pagina è in lettura (banner «Lecture seule», nessun controllo di modifica); l'API resta il controllo autorevole.
 - **Righe articolo:** lette con `order_id` e `tenant_id`, anche nei documenti PDF.
 - **Documenti:** sezione «Documents» (`OrderDocumentsCard`) con Liste de préparation e Bon de colis, scelta A5/A4 per la singola stampa (preselezione = default tenant), «Ouvrir le PDF» / «Télécharger». Dettagli §3.1.
@@ -189,12 +247,13 @@ Il QR del bon de colis punta a `<storefront_url del tenant>/o/<token>` (base da 
 
 La pagina mostra solo: marca, réf. courte, data, stage cliente (`getCustomerOrderPresentation`), modalità, articoli (nome + quantità); per la consegna transporteur / stato normalizzato / ETA `shipping_estimated_delivery_at` / ultimo aggiornamento dallo **snapshot persistito**, link transporteur solo se `safeShipmentTrackingUrl(shipping_tracking_url)` è valido; per il ritiro l'indirizzo pubblico del punto di ritiro. Nessun nome, e-mail, telefono, indirizzo di consegna, prezzo o pagamento. CTA: prima della consegna suivi (se URL valido) + aiuto; dopo la consegna «Commander à nouveau» → «Donner mon avis» (solo con invito d'avis utilizzabile) → aiuto. Dettagli: `docs/ORDER_DOCUMENTS.md`.
 
-`Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sei superfici di business:
+`Admin → Livraison` (tenant, `shipping.view` / `shipping.manage`) contiene sette superfici di business:
 
 | Tab | Route | Responsabilità |
 |---|---|---|
 | Tarification | `/admin/livraison` | regole paese esistenti + zone logistiche |
 | Emballages | `/admin/livraison/emballages` | catalogo profili di imballaggio |
+| Expéditions | `/admin/livraison/expeditions` | creazione dei brouillons d'expédition: attivazione e momento (§2.4) |
 | Assistant expédition | `/admin/livraison/assistant` | stima deterministica dallo storico |
 | Historique des coûts | `/admin/livraison/historique` | aggregati delle osservazioni |
 | Analyse tarifaire | `/admin/livraison/analyse-tarifaire` | bozze e retrotest forfait |
@@ -422,6 +481,8 @@ La campagna usa oggi:
 country = IT
 zip_code = 42122
 ```
+
+(I brouillons d'expédition, §2.4, non usano questa origine: il mittente è il magazzino predefinito dell'account Packlink PRO del tenant.)
 
 definita in:
 
@@ -1047,6 +1108,7 @@ Regole obbligatorie:
 - il worker interno usa service-role bearer;
 - non loggare secret, URL sensibili o payload provider raw;
 - non indebolire RLS/grant esistenti;
+- brouillons d'expédition: creazione sotto `orders.manage`, réglage sotto `shipping.view`/`shipping.manage`; chiave Packlink solo server-side (mai al browser, nei log, nelle risposte o in `shipping_creation_error`); ogni operazione filtra l'ordine per `tenant_id` del deploy e il tick usa il `tenant_id` della riga (§2.4);
 - documenti di commande: route PDF sotto `orders.view` e tenant-scoped; il bon de colis riceve solo il view-model cliente; `order_public_access_tokens` è service-role only e il token del portale non viene mai salvato in chiaro né loggato (§3.2).
 
 Tabelle con costi/simulazioni non hanno policy pubbliche e sono pensate per accesso service-role/admin server-side.
@@ -1061,7 +1123,8 @@ Usato per:
 
 - quotazioni live;
 - servizi/carrier;
-- dataset sintetico.
+- dataset sintetico;
+- brouillons d'expédition (`GET /v1/clients/warehouses`, `POST /v1/shipments`, mai acquisto) e verifica di una reference (`GET /v1/shipments/{reference}`), §2.4.
 
 Packlink rimane la fonte autorevole per il prezzo operativo corrente.
 
@@ -1117,6 +1180,11 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 28. La liste de préparation (interna) e il bon de colis (cliente) restano renderer distinti; il bon de colis non riceve mai la riga `orders` né item grezzi e non può mostrare emplacements, carton, note, e-mail, telefono o UUID.
 29. Il PDF Gotenberg è la fonte di verità dei documenti di commande (mai `window.print`); il lotto produce un solo PDF, al massimo 50 ordini, nell'ordine della selezione.
 30. Il QR del bon de colis non contiene mai UUID, PII o URL provider: solo `<storefront_url>/o/<token opaco>`; il portale legge solo lo snapshot persistito, nessuna chiamata provider live.
+31. Lepefy crea al massimo **una** bozza per ordine e mai con una reference già presente; la protezione è server-side (CAS su stato + tentativi), mai solo nel frontend.
+32. Una bozza non acquista, non paga, non sceglie il servizio e non modifica prezzo cliente, `shipping_cost`, versione tariffaria o forfait; non porta l'ordine a `shipped` e non invia e-mail.
+33. Un errore del provider o della coda bozze non fa mai fallire la creazione dell'ordine né l'inizio della preparazione; l'evento mette solo in coda.
+34. Un esito che può seguire una bozza creata (timeout, rete, 5xx ≠ 503, 2xx senza reference, claim interrotto) è `ambiguous` e non viene mai ritentato automaticamente; si riconcilia a mano.
+35. La state machine ordini dipende solo dall'interfaccia provider (`capabilities.createDraft`), mai da Packlink; la migration e l'assenza di riga lasciano la funzione disattivata.
 
 ---
 
@@ -1130,6 +1198,7 @@ apps/storefront/src/app/admin/(protected)/livraison/       (tenant: shipping.vie
   page.tsx
   ZonesSection.tsx
   emballages/
+  expeditions/                (page.tsx + ShipmentCreationSection.tsx: réglage brouillons, §2.4)
   assistant/
   historique/
   analyse-tarifaire/
@@ -1166,6 +1235,8 @@ apps/storefront/src/app/api/admin/
   shipping-simulator/              (platform_owner)
   shipping-packaging-profiles/
   shipping-zones/
+  shipping-automation/route.ts     (GET/PATCH réglage brouillons: shipping.view / shipping.manage)
+  orders/[id]/shipment/create/route.ts  (POST creazione/associazione bozza: orders.manage)
   shipping-simulation-campaigns/   (platform_owner, tutte le route)
     route.ts                    GET lista / POST creazione (samplingMode, contesto città, destinationMode)
     zone-sentinels/route.ts     GET anteprima CAP campione per zona (sola lettura)
@@ -1241,6 +1312,7 @@ apps/storefront/tests/unit/shadowReport.spec.ts
 apps/storefront/tests/unit/tariffCheckout.spec.ts
 apps/storefront/tests/unit/packlinkShipmentList.spec.ts     (elenco Packlink: mock fetch, nessuna chiamata reale)
 apps/storefront/tests/unit/shippingPlatformTools.spec.ts    (API tecniche solo requirePlatformOwner, navigazione, redirect)
+apps/storefront/tests/unit/shipmentDraft.spec.ts           (brouillons: trigger, idempotenza, errori, ambiguous, retry, isolamento; Packlink mock)
 ```
 
 ### Worker
@@ -1259,6 +1331,7 @@ supabase/migrations/119_shipping_intelligence_foundation.sql
 supabase/migrations/120_shipping_postal_code_index.sql
 supabase/migrations/124_shipping_tariff_versions.sql
 supabase/migrations/125_shipping_tariff_activation.sql
+supabase/migrations/151_shipping_shipment_creation.sql   (modulo shipping_automation + orders.shipping_creation_*)
 packages/types/shippingIntelligence.ts   (ShippingScenarioMatrix: samplingMode, weightsByProfileId, part, sourceCampaignId; destinazione con city/adminCode1/adminCode2/adminName)
 ```
 
@@ -1271,6 +1344,11 @@ apps/storefront/src/lib/shipping/calculateShipping.ts
 apps/storefront/src/lib/shipping/resolveCountryRule.ts
 apps/storefront/src/lib/shipping/packlinkShipmentList.ts   (elenco Packlink read-only: fetch limitato, riepilogo, redazione, esiti)
 apps/storefront/src/lib/shipping/syncOrderShipment.ts      (snapshot provider → orders.shipping_*; incl. shipping_estimated_delivery_at)
+apps/storefront/src/lib/shipping/providers/types.ts        (ShippingProviderAdapter: capabilities.createDraft, createShipmentDraft, ShipmentDraftError)
+apps/storefront/src/lib/shipping/providers/packlink.ts     (resolveShipment + createShipmentDraft: magazzino predefinito, payload Draft, classificazione HTTP)
+apps/storefront/src/lib/shipping/shipmentDraft/            (settings, buildDraftInput puro, shipmentDraftService: coda/claim/batch/link, shipmentDraftPresentation client-safe)
+apps/storefront/src/app/admin/orders/[id]/ShipmentDraftBlock.tsx  (stati e CTA della bozza nel pannello spedizione)
+apps/storefront/src/app/api/internal/shipping-sync/route.ts  (tick n8n: sync tracking, poi coda bozze)
 apps/storefront/src/lib/orders/adminOrderOperations.ts      (classificatore unico del cockpit: gruppi di priorità, flag KPI, anomalie, durate, prossima azione, sort; puro)
 apps/storefront/src/lib/orders/loadOrderWorkQueue.ts        (work queue server-side: set attivo leggero, KPI, sort prima della paginazione, righe di pagina)
 apps/storefront/src/lib/orders/loadOrderOperationDetail.ts  (letture tenant-scoped dell'espansione)
@@ -1325,9 +1403,21 @@ Se n8n si ferma o non esegue i job, impostare `SHIPPING_CAMPAIGN_N8N_ACTIVE=fals
 
 **Sicurezza:** usare il token dedicato soltanto nella credenziale Header Auth n8n e nella env Vercel server-side. Non creare una env `NEXT_PUBLIC_*`, non passare il token come query parameter e non esportare le credenziali n8n insieme al workflow. La service-role key resta autorizzata dal vecchio endpoint soltanto per la compatibilità GitHub; valutare la sua rimozione dopo la stabilizzazione definitiva.
 
+**Brouillons d'expédition.** Nessuna nuova configurazione n8n: il workflow «Lepefy · Shipping sync scheduler» esistente (`/api/internal/shipping-sync`, ogni 15 min) elabora anche la coda; la risposta include `drafts: { processed, created, failed, ambiguous }`. Attivazione per tenant solo da `Livraison → Expéditions`. Rollback: disattivare il réglage (le bozze già create restano associate); in emergenza la riga `tenant_feature_settings` `shipping_automation` può essere messa a `enabled = false`.
+
 ---
 
 ## 24. Troubleshooting
+
+### Brouillon d'expédition non creato o «Création incertaine»
+
+- **Resta «Création en attente»:** il tick n8n non gira (vedi Executions) o la risposta ha `drafts: null`/`unavailable` (migration 151 assente). «Créer maintenant» crea subito.
+- **`missing_configuration`:** chiave Packlink assente (un tenant di test non usa mai la chiave di piattaforma) o rifiutata (401/403), oppure nessun magazzino predefinito in Packlink PRO (Paramètres → Entrepôts).
+- **`invalid_recipient:<campi>`:** campi mancanti nell'indirizzo o telefono assente da `orders.notes`; correggere nella commande / in Packlink PRO, poi «Réessayer».
+- **`invalid_parcel:poids` / `:dimensions`:** `shipping_details.totalWeightG` assente e prodotto senza `weight_grams`, oppure nessuna riga `packaging_surcharges` attiva con dimensioni.
+- **`provider_rejected`:** Packlink ha rifiutato il payload (4xx). Il messaggio grezzo non viene salvato: riprodurre la bozza a mano in Packlink PRO per vedere il campo.
+- **`ambiguous`:** cercare `LEPEFY-<8 car.>` (riferimento mostrato nel pannello) in Packlink PRO. Trovata → «Associer la référence». Assente → «Aucun brouillon trouvé ? → recréer». Mai ricreare senza verificare: Packlink non permette la ricerca automatica per riferimento ordine.
+- **Il pannello non appare:** réglage disattivato, provider del tenant senza `createDraft`, ordine in ritiro, già associato, `shipped`/`cancelled`, o suivi manuel attivo.
 
 ### Cockpit ordini: un ordine non appare dove atteso
 
@@ -1432,7 +1522,8 @@ Vedere `docs/SHIPPING_FLAT_RATE_CHECKOUT.md` §11.6. Stop immediato: «Désactiv
 Non ancora implementato:
 
 - costo reale degli imballaggi e margine completo per ordine al forfait;
-- creazione automatica delle spedizioni/etichette Packlink (restano create a mano in Packlink PRO);
+- acquisto/etichette Packlink da Lepefy (Lepefy crea solo bozze, §2.4) e ricerca automatica di una bozza per riferimento ordine (non offerta da Packlink: un esito ambiguo si riconcilia a mano);
+- annullamento automatico della bozza Packlink quando l'ordine Lepefy viene annullato (da fare in Packlink PRO);
 - filtro `inbox` / ricerca lato Packlink sull'intero account (oggi ricerca e filtri valgono solo per la pagina mostrata) e associazione manuale spedizione ↔ ordine dall'elenco;
 - rétrotest delle bozze sul motore condiviso `priceFromTariff` (oggi `applyTariffDraft` distinto);
 - costi finali `real_shipment` acquisiti come consuntivo separato;

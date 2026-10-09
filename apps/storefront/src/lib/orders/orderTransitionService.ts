@@ -1,6 +1,7 @@
 import type { Order, OrderStatus } from '@lepefy/types';
 import type { createServiceClient } from '@/lib/supabase/server';
 import { runOrderTransitionSideEffects, validateOrderTransition } from './adminOrderWorkflow';
+import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
 
 export type OrderService = ReturnType<typeof createServiceClient>;
 export class OrderWorkflowError extends Error {
@@ -51,6 +52,7 @@ export async function assertPreparationComplete(service: OrderService, order: Or
  */
 export async function updateWorkflowOrder({ service, order, nextStatus, patch = {}, source = 'admin', shippedAt,
   sideEffects = runOrderTransitionSideEffects,
+  onPreparationStarted = (db, tenantId, orderId) => requestShipmentDraft(db, tenantId, orderId, 'preparation_started'),
 }: {
   service: OrderService;
   order: Order;
@@ -59,6 +61,8 @@ export async function updateWorkflowOrder({ service, order, nextStatus, patch = 
   source?: 'admin' | 'provider' | 'manual_fallback';
   shippedAt?: string | null;
   sideEffects?: typeof runOrderTransitionSideEffects;
+  /** Provider-neutral shipment-draft queue (trigger « preparing »); never throws. */
+  onPreparationStarted?: (service: OrderService, tenantId: string, orderId: string) => Promise<unknown>;
 }): Promise<Order> {
   const next = nextStatus ?? order.status;
   const trackingCode = patch.tracking_code !== undefined ? patch.tracking_code as string | null : order.tracking_code;
@@ -90,6 +94,11 @@ export async function updateWorkflowOrder({ service, order, nextStatus, patch = 
   if (error) throw new OrderWorkflowError('Impossible de mettre à jour la commande.', 503);
   if (!data) throw new OrderWorkflowError('La commande a été modifiée. Actualisez et réessayez.');
   const saved = data as Order;
+  // Début de la préparation = première écriture de picking_started_at (new → preparing) ;
+  // l'autre point d'entrée est la première ligne prélevée (api/admin/orders/[id]/picking).
+  if (update.picking_started_at && order.fulfillment_type === 'delivery') {
+    await onPreparationStarted(service, order.tenant_id, order.id);
+  }
   if (next !== order.status) {
     await sideEffects({ tenantId: order.tenant_id, orderId: order.id, previousStatus: order.status, nextStatus: next,
       email: order.email, fullName: order.full_name, fulfillmentType: order.fulfillment_type,
