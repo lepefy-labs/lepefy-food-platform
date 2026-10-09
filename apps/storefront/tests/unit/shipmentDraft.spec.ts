@@ -526,3 +526,25 @@ test('release: never while the draft still exists, the provider is unreachable, 
   expect(db.updates).toHaveLength(0);
   expect(permissionForAdminApi(`/api/admin/orders/${ORDER_ID}/shipment/release`, 'POST')).toBe('orders.manage');
 });
+
+test('regression: an unpurchased draft (shipment 200, /track 404) still exists — sync works and release is refused', async () => {
+  const original = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.endsWith('/track')) return new Response('{"messages":[{"message":"Not found"}]}', { status: 404 });
+    if (/\/shipments\/IT2026PRO0006698079$/.test(url)) return new Response(JSON.stringify({ reference: 'IT2026PRO0006698079', state: 'AWAITING_COMPLETION' }), { status: 200 });
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+  try {
+    const snapshot = await packlinkAdapter.resolveShipment({ tenantId: 'tenant-a', tenant: { packlink_api_key: 'k' } }, 'IT2026PRO0006698079');
+    expect(snapshot).toMatchObject({ providerStatus: 'AWAITING_COMPLETION', normalizedStatus: 'pending', events: [] });
+    const db = fakeDb(DRAFTED);
+    expect(await releaseDeletedShipmentDraft(db.service, 'tenant-a', ORDER_ID, deps())).toEqual({ outcome: 'still_exists' });
+    expect(db.order().shipping_provider_reference).toBe('IT2026PRO0006698079');
+    // A shipment that really is gone (404 on the shipment itself) is still reported as not found.
+    await expect(packlinkAdapter.resolveShipment({ tenantId: 'tenant-a', tenant: { packlink_api_key: 'k' } }, 'IT2026PRO0000000404'))
+      .rejects.toThrow('shipment_not_found');
+  } finally { globalThis.fetch = original; }
+});

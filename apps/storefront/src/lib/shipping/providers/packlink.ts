@@ -254,7 +254,16 @@ export const packlinkAdapter: ShippingProviderAdapter = {
     const key = tenantApiKey(context);
     if (!key) throw new ShippingProviderError('shipping_provider_not_configured');
     const path = '/shipments/' + encodeURIComponent(reference);
-    const [shipment, timeline] = await Promise.all([request(key, path), request(key, path + '/track')]);
+    // A draft not yet purchased has no tracking: Packlink answers 404 on /track while
+    // GET /shipments/{ref} is 200 (observed on IT2026PRO0006698079). Only the shipment
+    // endpoint proves existence; a missing timeline is an empty one.
+    const [shipment, timeline] = await Promise.all([
+      request(key, path),
+      request(key, path + '/track').catch((error: unknown) => {
+        if (error instanceof ShippingProviderError && error.code === 'shipment_not_found') return [];
+        throw error;
+      }),
+    ]);
     return parsePacklinkShipment(reference, shipment, timeline);
   },
 };
