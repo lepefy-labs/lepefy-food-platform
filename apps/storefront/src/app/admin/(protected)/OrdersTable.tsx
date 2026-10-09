@@ -75,7 +75,7 @@ function formatOrderDate(value: string) {
 function handlingBadges(operation: OrderOperation) {
   const { international, fresh, frozen, score } = operation.handling;
   if (!international && !fresh && !frozen) return null;
-  return <span className="mt-1 flex flex-wrap gap-1" aria-label="Attention logistique">
+  return <span className="flex flex-wrap gap-1" aria-label="Attention logistique">
     {score === 3 && <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-900 dark:bg-rose-950 dark:text-rose-200">Priorité élevée</span>}
     {international && <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-900 dark:bg-blue-950 dark:text-blue-200">International</span>}
     {fresh && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-200">Produits frais</span>}
@@ -187,9 +187,9 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     const style = done(order)
       ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800'
       : action.primary && (canManage || action.intent === 'tracking')
-        ? 'bg-[var(--admin-primary)] text-white hover:opacity-90'
+        ? 'border border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200'
         : 'border border-[var(--admin-border)] bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200';
-    const className = `${full ? 'w-full ' : ''}inline-flex min-h-11 items-center justify-center gap-1 rounded-lg px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--admin-primary)] ${style}`;
+    const className = `${full ? 'w-full ' : ''}inline-flex min-h-10 items-center justify-center gap-1 rounded-lg px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--admin-primary)] ${style}`;
     if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={13} aria-hidden="true" /><span className="sr-only"> (suivi transporteur, nouvel onglet) — commande {shortId(order.id)}</span></a>;
     return <Link href={`/admin/orders/${order.id}`} className={className}>{label}<span className="sr-only"> — commande {shortId(order.id)}</span></Link>;
   }
@@ -247,6 +247,13 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     </>;
   }
 
+  const rowAccent = (operation: OrderOperation) => operation.group === 'action_required'
+    ? 'border-l-4 border-l-rose-500'
+    : ['preparation_overdue', 'pickup_overdue'].includes(operation.group)
+      ? 'border-l-4 border-l-amber-500'
+      : operation.handling.score === 3
+        ? 'border-l-4 border-l-violet-500'
+        : 'border-l-4 border-l-transparent';
   const showGroups = sort === 'priority';
   const ariaSort = sort === 'newest' ? 'descending' : sort === 'oldest' ? 'ascending' : sort === 'priority' ? 'other' : 'none';
 
@@ -258,7 +265,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         <caption className="sr-only">Commandes, triées par {sort === 'priority' ? 'priorité opérationnelle' : sort === 'newest' ? 'date décroissante' : sort === 'oldest' ? 'date croissante' : 'montant'}</caption>
         <thead><tr className="border-b border-gray-100 bg-gray-50 text-left text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-800">
           <th scope="col" className="w-10 p-3"><input type="checkbox" checked={selected.size === orders.length} onChange={() => setSelected(selected.size === orders.length ? new Set() : new Set(orders.map(order => order.id)))} aria-label="Sélectionner les commandes de cette page" /></th>
-          <th scope="col" className="p-3" aria-sort={ariaSort}>Commande</th><th scope="col" className="p-3">À préparer</th><th scope="col" className="p-3">Livraison / Retrait</th><th scope="col" className="p-3">État</th><th scope="col" className="p-3 text-right">Action</th>
+          <th scope="col" className="p-3 text-gray-800 dark:text-gray-200" aria-sort={ariaSort}>Commande</th><th scope="col" className="p-3">À préparer</th><th scope="col" className="p-3">Livraison / Retrait</th><th scope="col" className="p-3">État</th><th scope="col" className="p-3 text-right">Action</th>
         </tr></thead>
         <tbody>{orders.map((order, index) => {
           const operation = operationOf(order);
@@ -267,19 +274,18 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           const header = showGroups && (index === 0 || operationOf(orders[index - 1]!).group !== operation.group);
           return <Fragment key={order.id}>
             {header && <tr className="border-b border-gray-100 dark:border-gray-800"><th scope="rowgroup" colSpan={6} className={`bg-gray-50/70 px-3 py-1.5 text-left text-[11px] font-semibold dark:bg-gray-800/50 ${operation.group === 'action_required' ? 'text-red-700 dark:text-red-300' : ['preparation_overdue', 'pickup_overdue'].includes(operation.group) ? 'text-amber-800 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'}`}>{PRIORITY_GROUP_LABELS[operation.group]}</th></tr>}
-            <tr className={`border-b border-gray-100 align-top dark:border-gray-800 ${isDone ? 'text-gray-500 [&_b]:font-medium' : 'hover:bg-violet-50/60 dark:hover:bg-violet-900/10'}`}>
+            <tr className={`border-b border-gray-100 align-top dark:border-gray-800 ${rowAccent(operation)} ${isDone ? 'text-gray-500 [&_b]:font-medium' : 'hover:bg-violet-50/60 dark:hover:bg-violet-900/10'}`}>
               <td className="p-3"><input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleSelect(order.id)} aria-label={`Sélectionner ${shortId(order.id)}`} /></td>
               <td className="p-3">
                 <button type="button" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`} className="-m-1 flex items-start gap-1 rounded-lg p-1 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:hover:bg-gray-800">
                   {open ? <IconChevronDown size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-gray-400" /> : <IconChevronRight size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-gray-400" />}
-                  <span className="min-w-0"><span className="font-mono text-xs font-bold">{shortId(order.id)}</span><span className="sr-only"> — {open ? 'masquer' : 'afficher'} le détail</span>
+                  <span className="min-w-0"><span className="font-mono text-xs font-bold text-gray-900 dark:text-gray-100">{shortId(order.id)}</span><span className="sr-only"> — {open ? 'masquer' : 'afficher'} le détail</span>
                     <span className="block max-w-[170px] truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</span></span>
                 </button>
-                <p className="mt-0.5 pl-5 text-[11px] text-gray-400">{formatOrderDate(order.created_at)} · {money.format(Number(order.total ?? 0))}</p>
-                {handlingBadges(operation)}
+                <p className="mt-0.5 pl-5 text-xs font-medium text-gray-600 dark:text-gray-300">{formatOrderDate(order.created_at)} · {money.format(Number(order.total ?? 0))}</p>
                 {operation.urgency && <p className="mt-1 flex items-start gap-1 pl-5 text-[11px] font-semibold text-amber-800 dark:text-amber-300"><IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
               </td>
-              <td className="max-w-[220px] p-3">{preparationSummary(order)}</td>
+              <td className="max-w-[220px] p-3">{preparationSummary(order)}{handlingBadges(operation)}</td>
               <td className="p-3">{fulfillmentCell(order)}</td>
               <td className="p-3">{stateCell(order, operation)}</td>
               <td className="p-3 text-right">{actionLink(order, operation)}</td>
@@ -296,12 +302,12 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         const flag = operation.urgency ?? operation.anomaly?.label ?? null;
         return <li key={order.id}>
           {header && <p className="bg-gray-50 px-4 py-1.5 text-[11px] font-semibold text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">{PRIORITY_GROUP_LABELS[operation.group]}</p>}
-          <div className={`p-4 ${done(order) ? 'text-gray-500' : ''}`}>
+          <div className={`border-l-4 p-3 ${rowAccent(operation)} ${done(order) ? 'text-gray-500' : ''}`}>
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><b className="font-mono text-xs">{shortId(order.id)}</b><p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p><p className="text-[11px] text-gray-400">{formatOrderDate(order.created_at)} · {money.format(Number(order.total ?? 0))}</p>{handlingBadges(operation)}</div>
+              <div className="min-w-0"><b className="font-mono text-xs">{shortId(order.id)}</b><p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p><p className="text-xs font-medium text-gray-600 dark:text-gray-300">{formatOrderDate(order.created_at)} · {money.format(Number(order.total ?? 0))}</p></div>
               {flag && <span className="inline-flex max-w-[45%] items-start gap-1 text-right text-[11px] font-semibold text-amber-800 dark:text-amber-300"><IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />{flag}</span>}
             </div>
-            <div className="mt-2">{preparationSummary(order, true)}</div>
+            <div className="mt-2">{preparationSummary(order, true)}{handlingBadges(operation)}</div>
             <div className="mt-2">{fulfillmentCell(order)}</div>
             <div className="mt-2">{stateCell(order, operation)}</div>
             <div className="mt-3 flex gap-2">

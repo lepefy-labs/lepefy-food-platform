@@ -61,7 +61,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <div className="min-h-screen bg-[var(--admin-page-bg)] text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <div className="min-h-screen bg-[var(--admin-page-bg)] font-[family-name:var(--font-body)] text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
         {children}
       </div>
     </>

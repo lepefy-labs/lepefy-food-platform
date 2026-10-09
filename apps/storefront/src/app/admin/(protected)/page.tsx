@@ -156,7 +156,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const pageHref = (page: number) => buildHref(searchParams, { page: page > 1 ? String(page) : undefined })
 
   const operationalViews: { key: OrderView; label: string; helper: string; tone: string }[] = [
-    { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'border-violet-200 bg-violet-50/70 dark:border-violet-900 dark:bg-violet-950/20' },
+    { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'border-violet-300 bg-violet-50/90 dark:border-violet-900 dark:bg-violet-950/20' },
     { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' },
     { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' },
     { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20' },
