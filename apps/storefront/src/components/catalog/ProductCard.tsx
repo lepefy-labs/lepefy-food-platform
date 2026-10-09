@@ -8,6 +8,7 @@ import { useQuickAdd } from './useQuickAdd';
 import { formatPrice } from '@/lib/utils/format';
 import { useTenant } from '@/providers/TenantProvider';
 import { ShopTag } from '@/components/ui/ShopTag';
+import { rememberShoppingReturn } from '@/lib/catalog/shoppingReturn';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
@@ -125,6 +126,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   return (
     <Link
       href={`/products/${product.slug}${merchandise ? '?from=gadgets' : ''}`}
+      onClick={() => rememberShoppingReturn(window.location)}
       className={
         variant === 'grid'
           ? 'group relative block min-w-0'

@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { getShoppingReturn } from '@/lib/catalog/shoppingReturn';
 import { useLocaleStore, resolveLocale } from '@/lib/store/localeStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
@@ -17,6 +19,7 @@ import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import type { ProductWithCategory } from '@lepefy/types';
 
 export function ProductDetail({ product }: { product: ProductWithCategory }) {
+  const router = useRouter();
   const tenant = useTenant();
   const catalogHref = product.category?.catalog_scope === 'gadgets' ? '/gadgets' : '/';
   const { currency } = tenant;
@@ -45,6 +48,10 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const groupMissing = Math.max(0, groupTarget - groupQuantity);
   const hasIndividualRule = minOrderQuantity > 1 || orderQuantityStep > 1;
   const explicitQuantityLabel = `Ajouter ${quantity} au panier`;
+
+  function continueShopping() {
+    router.push(getShoppingReturn(catalogHref));
+  }
 
   function handleAddToCart() {
     if (outOfStock || quantity > maxPurchasable) return;
@@ -79,6 +86,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
         <span>/</span>
         <span className="text-gray-600">{product.name}</span>
       </nav>
+
+      <button type="button" onClick={continueShopping}
+        className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+        ← Retour au catalogue
+      </button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-14">
         <ProductGallery
@@ -193,10 +205,25 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                     {!added && <span className="text-xs font-medium opacity-90">{formatPrice(totalPrice, currency)}</span>}
                   </button>
                 </div>
+                {added && (
+                  <div className="mx-auto flex max-w-7xl gap-2 px-3 pb-2">
+                    <button type="button" onClick={continueShopping} className="min-h-11 flex-1 rounded-lg border border-gray-300 bg-white text-xs font-bold">Continuer mes achats</button>
+                    <Link href="/cart" className="flex min-h-11 flex-1 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Voir mon panier</Link>
+                  </div>
+                )}
               </div>
             </>
           )}
 
+          {added && (
+            <div role="status" className="hidden rounded-xl border border-green-200 bg-green-50 p-3 md:block">
+              <p className="mb-2 text-sm font-semibold text-green-900">✓ {quantity} unité{quantity > 1 ? 's' : ''} ajoutée{quantity > 1 ? 's' : ''} au panier</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={continueShopping} className="min-h-11 flex-1 rounded-lg px-3 font-semibold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Continuer mes achats</button>
+                <Link href="/cart" className="flex min-h-11 flex-1 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-semibold">Voir mon panier</Link>
+              </div>
+            </div>
+          )}
           <TrustBadges storageType={product.storage_type} />
         </div>
       </div>

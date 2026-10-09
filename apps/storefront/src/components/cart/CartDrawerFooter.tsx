@@ -63,7 +63,7 @@ export function CartDrawerFooter({
       <button
         type="button"
         onClick={onContinueShopping}
-        className="block w-full text-center py-1 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+        className="flex min-h-11 w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-bold text-gray-800 hover:bg-gray-50 transition-colors"
       >
         Continuer mes achats
       </button>

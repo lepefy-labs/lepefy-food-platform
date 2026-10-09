@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getShoppingReturn } from '@/lib/catalog/shoppingReturn';
 import { IconArrowLeft, IconArrowRight, IconLock } from '@tabler/icons-react';
 import { CartEmpty } from '@/components/cart/CartEmpty';
 import { CartItem } from '@/components/cart/CartItem';
@@ -76,6 +76,10 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
     setUndo(null);
   }
 
+  function continueShopping() {
+    router.push(getShoppingReturn('/'));
+  }
+
   function startCheckout() {
     if (!canProceed) return;
     sessionStorage.removeItem('lepefy-checkout-shipping');
@@ -84,6 +88,9 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-4 pb-44 sm:px-6 sm:py-7 md:pb-10 lg:px-8">
+      <button type="button" onClick={continueShopping} className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-800 hover:bg-gray-50">
+        <IconArrowLeft size={17} /> Continuer mes achats
+      </button>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4 lg:order-1">
           <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] sm:p-5 lg:hidden" aria-label="Total du panier">
@@ -127,9 +134,9 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
           <div className="hidden flex-col gap-2 md:flex lg:max-w-xl">
             {blockedMessage && <p className="text-xs font-semibold text-amber-700">{blockedMessage}</p>}
             <div className="flex items-center gap-3">
-              <Link href="/" className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
+              <button type="button" onClick={continueShopping} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
                 <IconArrowLeft size={16} /> Continuer mes achats
-              </Link>
+              </button>
               <button
                 type="button"
                 onClick={startCheckout}
@@ -170,9 +177,9 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
         <div className="mx-auto max-w-xl">
           {blockedMessage && <p className="mb-1.5 text-center text-xs font-semibold text-amber-700">{blockedMessage}</p>}
           <div className="grid grid-cols-[0.9fr_1.25fr] gap-2.5">
-            <Link href="/" className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-3 py-3 text-sm font-bold text-gray-800">
-              <IconArrowLeft size={15} /> Achats
-            </Link>
+            <button type="button" onClick={continueShopping} className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-2 py-3 text-xs font-bold text-gray-800">
+              <IconArrowLeft size={15} /> Continuer mes achats
+            </button>
             <button
               type="button"
               onClick={startCheckout}
