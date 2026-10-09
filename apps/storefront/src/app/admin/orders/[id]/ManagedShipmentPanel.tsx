@@ -20,12 +20,16 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [manualConfirm, setManualConfirm] = useState(false);
+  const [releaseConfirm, setReleaseConfirm] = useState(false);
   const associated = Boolean(order.shipping_provider_reference);
   const active = order.status === 'preparing' || order.status === 'shipped';
   const fromDraft = associated && order.shipping_creation_status === 'draft_created';
   const showDraft = draftCreation && !associated && (order.status === 'new' || order.status === 'preparing');
+  // A draft deleted in the provider back-office can be detached (server re-verifies with the provider).
+  const releasable = fromDraft && canManage && (order.status === 'new' || order.status === 'preparing')
+    && ['pending', 'unknown', 'cancelled', ''].includes(order.shipping_normalized_status ?? '');
   const autoSync = active && !['returned', 'cancelled', 'delivered'].includes(order.shipping_normalized_status ?? '');
-  async function request(action: 'attach' | 'sync' | 'manual') {
+  async function request(action: 'attach' | 'sync' | 'manual' | 'release') {
     setBusy(true); setMessage(null);
     try {
       const response = await fetch(`/api/admin/orders/${order.id}/shipment/${action}`, {
@@ -34,8 +38,9 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error ?? 'Opération indisponible.');
-      setMessage(action === 'manual' ? 'Suivi manuel activé.' : 'Expédition synchronisée.');
-      setManualConfirm(false); router.refresh();
+      setMessage(action === 'manual' ? 'Suivi manuel activé.'
+        : action === 'release' ? 'Référence retirée : vous pouvez recréer le brouillon.' : 'Expédition synchronisée.');
+      setManualConfirm(false); setReleaseConfirm(false); router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Opération indisponible.'); }
     finally { setBusy(false); }
   }
@@ -55,6 +60,13 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
           {order.shipping_sync_error && <p role="status" className="text-xs text-amber-800 dark:text-amber-300">La dernière synchronisation a échoué. Les dernières données connues sont conservées.</p>}
           <p className="text-xs text-gray-500">{autoSync ? 'Synchronisation automatique active' : 'Suivi terminé'}</p>
           {active && canManage && <button disabled={busy} onClick={() => void request('sync')} className={button}>{busy ? 'Synchronisation…' : 'Synchroniser maintenant'}</button>}
+          {releasable && (releaseConfirm ? (
+            <div className="space-y-2 rounded-xl border border-amber-200 p-3">
+              <p className="text-xs text-amber-800 dark:text-amber-200">Lepefy vérifie auprès de {provider.displayName} que le brouillon {order.shipping_provider_reference} a bien été supprimé, puis retire la référence de la commande. Rien n’est supprimé chez le transporteur.</p>
+              <button disabled={busy} onClick={() => void request('release')} className={button}>{busy ? 'Vérification…' : 'Vérifier et retirer la référence'}</button>
+              <button disabled={busy} onClick={() => setReleaseConfirm(false)} className={button}>Annuler</button>
+            </div>
+          ) : <button disabled={busy} onClick={() => setReleaseConfirm(true)} className="min-h-11 w-full text-xs font-medium text-gray-500 underline">Brouillon supprimé dans {provider.displayName} PRO ? Recréer</button>)}
         </>
       ) : (
         <>

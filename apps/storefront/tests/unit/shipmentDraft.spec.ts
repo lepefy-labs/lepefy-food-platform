@@ -4,13 +4,13 @@ import {
   buildPacklinkDraftPayload, classifyPacklinkDraftStatus, packlinkAdapter, selectPacklinkWarehouse,
 } from '../../src/lib/shipping/providers/packlink';
 import { getShippingProvider } from '../../src/lib/shipping/providers/registry';
-import type { ShippingProviderAdapter } from '../../src/lib/shipping/providers/types';
+import { ShippingProviderError, type ShippingProviderAdapter } from '../../src/lib/shipping/providers/types';
 import {
   buildShipmentDraftInput, orderContactPhone, resolveOrderWeightG, shipmentOrderReference, splitRecipientName,
 } from '../../src/lib/shipping/shipmentDraft/buildDraftInput';
 import { resolveShippingAutomationSettings, type ShippingAutomationSettings } from '../../src/lib/shipping/shipmentDraft/settings';
 import {
-  createShipmentDraftForOrder, linkShipmentDraftReference, MAX_AUTOMATIC_ATTEMPTS, requestShipmentDraft, runShipmentDraftBatch,
+  createShipmentDraftForOrder, linkShipmentDraftReference, MAX_AUTOMATIC_ATTEMPTS, releaseDeletedShipmentDraft, requestShipmentDraft, runShipmentDraftBatch,
   STALE_CREATING_MS, type ShipmentDraftDependencies,
 } from '../../src/lib/shipping/shipmentDraft/shipmentDraftService';
 import { shipmentDraftErrorMessage } from '../../src/lib/shipping/shipmentDraft/shipmentDraftPresentation';
@@ -34,6 +34,13 @@ const baseOrder = (patch: Partial<Order> = {}): Order => ({
 } as Order);
 
 type Row = Record<string, unknown>;
+/** Emballages profiles with suggestion ranges, as on the order « Carton à utiliser » card. */
+const PROFILES = [
+  { id: 'carton-s', name: 'Carton S', box_length_cm: 30, box_width_cm: 20, box_height_cm: 15, active: true, position: 1, is_default: false,
+    suggest_min_weight_g: 0, suggest_max_weight_g: 5000, tare_g: 300 },
+  { id: 'carton-m', name: 'Carton M', box_length_cm: 40, box_width_cm: 30, box_height_cm: 30, active: true, position: 2, is_default: true,
+    suggest_min_weight_g: 5000, suggest_max_weight_g: 10000, tare_g: 500 },
+];
 /** Fluent fake applying the same filters/CAS as PostgREST, lazily at await time; no network. */
 function fakeDb(order: Order = baseOrder(), tenantPatch: Row = {}, extra: Partial<Record<string, Row[]>> = {}) {
   const rows: Record<string, Row[]> = {
@@ -46,6 +53,7 @@ function fakeDb(order: Order = baseOrder(), tenantPatch: Row = {}, extra: Partia
     ],
     products: [{ id: 'p1', tenant_id: 'tenant-a', weight_grams: 1000 }, { id: 'p2', tenant_id: 'tenant-a', weight_grams: 500 }],
     packaging_surcharges: [{ tenant_id: 'tenant-a', active: true, max_pack_kg: 10, box_length_cm: 40, box_width_cm: 30, box_height_cm: 30 }],
+    shipping_packaging_profiles: PROFILES.map(profile => ({ ...profile, tenant_id: 'tenant-a' })),
     ...extra,
   };
   let revision = 0;
@@ -87,7 +95,7 @@ function fakeDb(order: Order = baseOrder(), tenantPatch: Row = {}, extra: Partia
 }
 
 const settings = (patch: Partial<ShippingAutomationSettings> = {}): ShippingAutomationSettings =>
-  ({ enabled: true, trigger: 'preparing', available: true, status: 'ok', ...patch });
+  ({ enabled: true, trigger: 'preparing', content: 'Alimenti Non Deperibili', available: true, status: 'ok', ...patch });
 const deps = (patch: Partial<ShippingAutomationSettings> = {}, adapterLookup: ShipmentDraftDependencies['adapterLookup'] = getShippingProvider,
   now = new Date('2026-10-09T10:00:00Z')): ShipmentDraftDependencies =>
   ({ adapterLookup, readSettings: async () => settings(patch), now: () => now });
@@ -131,27 +139,45 @@ const mock = (reply?: DraftReply) => (api = packlink(reply));
 test.afterEach(() => { api?.restore(); api = null; });
 
 // ─── Pure building blocks ──────────────────────────────────────────────────────
-test('payload: default warehouse as sender, recipient, quote parcel rule, no service (draft only)', () => {
+const PACKAGING = { max_pack_kg: 10, box_length_cm: 40, box_width_cm: 30, box_height_cm: 20 };
+
+test('payload: default warehouse as sender, suggested cartons with tare, declared content, no service (draft only)', () => {
   const built = buildShipmentDraftInput({ order: baseOrder(), items: [{ product_id: 'p1', name: 'Attiéké', quantity: 10 }],
-    productWeights: new Map(), packaging: { max_pack_kg: 10, box_length_cm: 40, box_width_cm: 30, box_height_cm: 30 }, currency: 'EUR' });
+    productWeights: new Map(), profiles: PROFILES, packaging: PACKAGING, content: 'Alimenti Non Deperibili', currency: 'EUR' });
   expect(built.ok).toBe(true);
   if (!built.ok) return;
-  // Same split as calculateShipping.splitIntoParcels: 12.5 kg / 10 kg → 2 equal parcels.
+  // Same plan as the order « Carton à utiliser » card: filled parcels 10 kg + 2.5 kg,
+  // carton per parcel from its suggestion range, tare added to the gross weight.
   expect(built.input.parcels).toEqual([
-    { weightKg: 6.25, lengthCm: 40, widthCm: 30, heightCm: 30 }, { weightKg: 6.25, lengthCm: 40, widthCm: 30, heightCm: 30 },
+    { weightKg: 10.5, lengthCm: 40, widthCm: 30, heightCm: 30 }, { weightKg: 2.8, lengthCm: 30, widthCm: 20, heightCm: 15 },
   ]);
+  expect(built.input.content).toBe('Alimenti Non Deperibili');
   const warehouse = selectPacklinkWarehouse(WAREHOUSES)!;
   expect(warehouse).toMatchObject({ street1: 'Via Emilia 10', zip_code: '42122', city: 'Reggio Emilia', country: 'IT' });
   const payload = buildPacklinkDraftPayload(warehouse, built.input);
   expect(payload).not.toHaveProperty('service_id');
   expect(payload).toMatchObject({
-    shipment_custom_reference: 'LEPEFY-3F2A91C0', contentvalue: 84.5, contentValue_currency: 'EUR',
+    shipment_custom_reference: 'LEPEFY-3F2A91C0', contentvalue: 84.5, contentValue_currency: 'EUR', content: 'Alimenti Non Deperibili',
     to: { name: 'Awa Marie', surname: 'Diallo', street1: 'Via Roma 1', zip_code: '42121', city: 'Reggio Emilia', country: 'IT', phone: '+39 333 123 4567' },
-    packages: [{ weight: 6.25, width: 30, height: 30, length: 40 }, { weight: 6.25, width: 30, height: 30, length: 40 }],
+    packages: [{ weight: 10.5, width: 30, height: 30, length: 40 }, { weight: 2.8, width: 20, height: 15, length: 30 }],
   });
   // The customer shipping price is never part of the draft.
   expect(JSON.stringify(payload)).not.toContain('14.9');
   expect(selectPacklinkWarehouse([WAREHOUSES[0], { ...WAREHOUSES[0], id: 'w2' }])).toBeNull();
+});
+
+test('parcels fall back to the default profile, then to the checkout box; empty content is refused', () => {
+  const order = baseOrder({ shipping_details: { totalWeightG: 7000 } });
+  const base = { order, items: [], productWeights: new Map<string, number | null>(), content: 'Alimenti Non Deperibili', currency: 'EUR' };
+  // Weight outside every suggestion range → default profile (Carton M).
+  const ranged = PROFILES.map(profile => ({ ...profile, suggest_max_weight_g: 1000, suggest_min_weight_g: 0 }));
+  const fallback = buildShipmentDraftInput({ ...base, profiles: ranged, packaging: PACKAGING });
+  expect(fallback.ok && fallback.input.parcels).toEqual([{ weightKg: 7.5, lengthCm: 40, widthCm: 30, heightCm: 30 }]);
+  // No profiles at all → packaging_surcharges box, no tare.
+  const box = buildShipmentDraftInput({ ...base, profiles: [], packaging: PACKAGING });
+  expect(box.ok && box.input.parcels).toEqual([{ weightKg: 7, lengthCm: 40, widthCm: 30, heightCm: 20 }]);
+  expect(buildShipmentDraftInput({ ...base, profiles: PROFILES, packaging: PACKAGING, content: '  ' }))
+    .toMatchObject({ ok: false, code: 'invalid_parcel', detail: 'contenu' });
 });
 
 test('helpers: reference, phone from notes, name split, weight fallback without invented weights', () => {
@@ -179,7 +205,12 @@ test('Packlink HTTP classification: only 429/503 are retryable, other 5xx are am
 });
 
 test('22. existing tenants: no row means disabled, manual only', () => {
-  expect(resolveShippingAutomationSettings(null)).toMatchObject({ enabled: false, trigger: 'manual' });
+  expect(resolveShippingAutomationSettings(null)).toMatchObject({ enabled: false, trigger: 'manual', content: 'Alimenti Non Deperibili' });
+  // A 151-era row (no shipment_content) keeps working with the default content.
+  expect(resolveShippingAutomationSettings({ enabled: true, config: { version: 1, create_shipment_trigger: 'preparing' } }))
+    .toMatchObject({ enabled: true, content: 'Alimenti Non Deperibili' });
+  expect(resolveShippingAutomationSettings({ enabled: true, config: { create_shipment_trigger: 'manual', shipment_content: 'x'.repeat(61) } }))
+    .toMatchObject({ enabled: false, status: 'invalid' });
   expect(resolveShippingAutomationSettings({ enabled: true, config: { create_shipment_trigger: 'soon' } })).toMatchObject({ enabled: false });
   expect(resolveShippingAutomationSettings({ enabled: true, config: { version: 1, create_shipment_trigger: 'order_created' } }))
     .toMatchObject({ enabled: true, trigger: 'order_created' });
@@ -236,6 +267,9 @@ test('5. order_created: queued on creation, created by the tick, reference saved
   expect(await runShipmentDraftBatch(db.service, d)).toMatchObject({ processed: 1, created: 1 });
   expect(http.posts()).toHaveLength(1);
   expect(http.calls.every(call => call.auth === 'tenant-a-test-key')).toBe(true);
+  expect(http.posts()[0]!.body).toMatchObject({ content: 'Alimenti Non Deperibili', packages: [
+    { weight: 10.5, width: 30, height: 30, length: 40 }, { weight: 2.8, width: 20, height: 15, length: 30 },
+  ] });
   // 19/21. Reference stored, order untouched (still preparing, not shipped, same prices, no e-mail call).
   expect(db.order()).toMatchObject({
     status: 'preparing', shipped_at: null, shipping_cost: 14.9, total: 99.4,
@@ -390,7 +424,7 @@ test('14-16. incomplete address, missing weight or box size: explicit error, Pac
   await createShipmentDraftForOrder(noWeight.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
   expect(noWeight.order().shipping_creation_error).toBe('invalid_parcel:poids');
 
-  const noBox = fakeDb(baseOrder(), {}, { packaging_surcharges: [] });
+  const noBox = fakeDb(baseOrder(), {}, { packaging_surcharges: [], shipping_packaging_profiles: [] });
   await createShipmentDraftForOrder(noBox.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps());
   expect(noBox.order().shipping_creation_error).toBe('invalid_parcel:dimensions');
 
@@ -444,4 +478,51 @@ test('23. tenant isolation: another tenant cannot create, link or queue the orde
   expect(await requestShipmentDraft(db.service, 'tenant-b', ORDER_ID, 'preparation_started', deps())).toBe('skipped');
   expect(http.calls).toHaveLength(0);
   expect(db.updates).toHaveLength(0);
+});
+
+// ─── Draft deleted in Packlink PRO → release and recreate ────────────────────
+const DRAFTED = baseOrder({
+  shipping_creation_status: 'draft_created', shipping_creation_attempts: 1, shipping_tracking_mode: 'managed',
+  shipping_provider_key: 'packlink', shipping_provider_reference: 'IT2026PRO0006698079', shipping_normalized_status: 'pending',
+  shipping_provider_created_at: '2026-10-09T09:00:00Z',
+});
+const resolving = (outcome: 'missing' | 'exists' | 'cancelled' | 'down') => (key: string | null | undefined) =>
+  key === 'packlink' ? { ...packlinkAdapter, async resolveShipment(_context: unknown, reference: string) {
+    if (outcome === 'missing') throw new ShippingProviderError('shipment_not_found');
+    if (outcome === 'down') throw new ShippingProviderError('shipping_provider_unavailable');
+    return { provider: 'packlink', providerReference: reference, carrier: null, trackingCode: null, trackingUrl: null, estimatedDeliveryAt: null,
+      providerStatus: outcome === 'cancelled' ? 'CANCELLED' : 'AWAITING_COMPLETION', normalizedStatus: outcome === 'cancelled' ? 'cancelled' : 'pending', events: [] };
+  } } as ShippingProviderAdapter : null;
+
+test('release: a draft deleted in Packlink (404) is detached, then a corrected draft is created', async () => {
+  const db = fakeDb(DRAFTED);
+  expect(await releaseDeletedShipmentDraft(db.service, 'tenant-a', ORDER_ID, deps(undefined, resolving('missing')))).toEqual({ outcome: 'released' });
+  expect(db.order()).toMatchObject({
+    shipping_provider_reference: null, shipping_provider_key: null, shipping_tracking_mode: null,
+    shipping_creation_status: null, shipping_normalized_status: null, status: 'preparing',
+  });
+  const http = mock();
+  expect((await createShipmentDraftForOrder(db.service, 'tenant-a', ORDER_ID, { mode: 'manual' }, deps())).outcome).toBe('created');
+  expect(http.posts()).toHaveLength(1);
+  // A shipment cancelled at the provider is releasable too.
+  expect(await releaseDeletedShipmentDraft(fakeDb(DRAFTED).service, 'tenant-a', ORDER_ID, deps(undefined, resolving('cancelled'))))
+    .toEqual({ outcome: 'released' });
+});
+
+test('release: never while the draft still exists, the provider is unreachable, the parcel moves or for another tenant', async () => {
+  const db = fakeDb(DRAFTED);
+  expect(await releaseDeletedShipmentDraft(db.service, 'tenant-a', ORDER_ID, deps(undefined, resolving('exists')))).toEqual({ outcome: 'still_exists' });
+  await expect(releaseDeletedShipmentDraft(db.service, 'tenant-a', ORDER_ID, deps(undefined, resolving('down')))).rejects.toThrow('shipping_provider_unavailable');
+  expect(db.order().shipping_provider_reference).toBe('IT2026PRO0006698079');
+  const moving = fakeDb({ ...DRAFTED, shipping_normalized_status: 'in_transit' });
+  expect(await releaseDeletedShipmentDraft(moving.service, 'tenant-a', ORDER_ID, deps(undefined, resolving('missing'))))
+    .toEqual({ outcome: 'skipped', reason: 'in_transit' });
+  // A reference attached by hand (not created by Lepefy) is not touched by this action.
+  const attached = fakeDb({ ...DRAFTED, shipping_creation_status: null });
+  expect(await releaseDeletedShipmentDraft(attached.service, 'tenant-a', ORDER_ID, deps(undefined, resolving('missing'))))
+    .toEqual({ outcome: 'skipped', reason: 'no_draft' });
+  expect(await releaseDeletedShipmentDraft(db.service, 'tenant-b', ORDER_ID, deps(undefined, resolving('missing'))))
+    .toEqual({ outcome: 'skipped', reason: 'order_inactive' });
+  expect(db.updates).toHaveLength(0);
+  expect(permissionForAdminApi(`/api/admin/orders/${ORDER_ID}/shipment/release`, 'POST')).toBe('orders.manage');
 });

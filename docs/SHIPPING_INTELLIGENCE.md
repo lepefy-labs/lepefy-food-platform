@@ -2,9 +2,9 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@0e0d04addd2b9de0c1661955b9bf5f68d10b0048`
+> **Base codice verificata:** `main@4fc003851296c4a47663215d621220dedd966795`
 > **Ultima verifica:** 9 ottobre 2026
-> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` (brouillons d'expédition, §2.4)
+> **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
 >
@@ -86,7 +86,7 @@ Comprende:
 
 Lepefy può creare **solo una bozza** (draft) della spedizione presso il provider a partire da un ordine reale. Acquisto, scelta definitiva del servizio, pagamento ed etichetta restano in Packlink PRO. Prezzo cliente (`shipping_cost`, totale, versione tariffaria, forfait) e costo operativo provider restano separati: la bozza non li legge né li modifica.
 
-**Configurazione tenant.** Modulo `shipping_automation` di `tenant_feature_settings` (nessuna colonna `tenants.*`): `enabled` = «Créer les brouillons d'expédition depuis Lepefy», `config = { version: 1, create_shipment_trigger: 'order_created' | 'preparing' | 'manual' }` (CHECK `is_valid_shipping_automation_config`). Riga assente, invalida o illeggibile = **disattivato** (nessuna creazione, nemmeno manuale): la migration non attiva nessun tenant. UI: `Admin → Livraison → Expéditions` (`/admin/livraison/expeditions`, lettura `shipping.view`, scrittura `shipping.manage` via `GET/PATCH /api/admin/shipping-automation`). Alla prima attivazione la UI preseleziona «Au début de la préparation» (raccomandato). Se il provider del tenant non ha la capability `createDraft` la pagina lo dice e non mostra opzioni. Il cambio di impostazione vale per gli eventi successivi, nessun effetto retroattivo.
+**Configurazione tenant.** Modulo `shipping_automation` di `tenant_feature_settings` (nessuna colonna `tenants.*`): `enabled` = «Créer les brouillons d'expédition depuis Lepefy», `config = { version: 1, create_shipment_trigger: 'order_created' | 'preparing' | 'manual', shipment_content: string (1–60, default « Alimenti Non Deperibili ») }` (CHECK `is_valid_shipping_automation_config`, 151 ridefinita da 152 per `shipment_content`; senza 152 la lettura funziona con il default ma il salvataggio risponde 409). Riga assente, invalida o illeggibile = **disattivato** (nessuna creazione, nemmeno manuale): la migration non attiva nessun tenant. UI: `Admin → Livraison → Expéditions` (`/admin/livraison/expeditions`, lettura `shipping.view`, scrittura `shipping.manage` via `GET/PATCH /api/admin/shipping-automation`). Alla prima attivazione la UI preseleziona «Au début de la préparation» (raccomandato). Se il provider del tenant non ha la capability `createDraft` la pagina lo dice e non mostra opzioni. Il cambio di impostazione vale per gli eventi successivi, nessun effetto retroattivo.
 
 **Condizioni (`draftIneligibility`, pura).** Impostazione attiva; adapter del `tenants.shipping_provider` con `capabilities.createDraft` e `createShipmentDraft`; `fulfillment_type = 'delivery'`; `shipping_provider_reference` nullo; ordine `new`/`preparing`; `shipping_tracking_mode` diverso da `manual` (il team ha scelto il suivi manuel). Chiave API e dati mancanti producono un errore classificato, non un salto silenzioso.
 
@@ -104,7 +104,7 @@ Tutti i percorsi di creazione attuali creano l'ordine direttamente in `preparing
 
 **Packlink.** Verificato sul connettore ufficiale `packlink-dev/ecommerce_module_core` (`Proxy::sendDraft`, `Draft::toArray`, `OrderService::convertOrderToDraftDto`):
 - mittente = magazzino predefinito dell'account (`GET /v1/clients/warehouses`, `default_selection`; un unico magazzino vale come predefinito; `postal_code` può essere `"<cap> - <città>"`). Nessun mittente hardcoded; l'origine `IT/42122` delle quote (§5) non è usata qui;
-- `POST /v1/shipments` JSON con `from`, `to` (`name`, `surname`, `street1`, `street2`, `zip_code`, `city`, `country`, `phone`, `email`), `packages` (`weight` kg a 2 decimali, `width/height/length` cm interi), `content` (≤ 60 car.), `contentvalue`, `contentValue_currency`, `content_second_hand: false`, `shipment_custom_reference`. **Nessun `service_id`**: il connettore ufficiale lo omette quando nessun servizio è scelto; il servizio si sceglie e si paga in Packlink PRO;
+- `POST /v1/shipments` JSON con `from`, `to` (`name`, `surname`, `street1`, `street2`, `zip_code`, `city`, `country`, `phone`, `email`), `packages` (`weight` kg a 2 decimali, `width/height/length` cm interi), `content` (= `shipment_content` del tenant, ≤ 60 car., mai l'elenco articoli), `contentvalue`, `contentValue_currency`, `content_second_hand: false`, `shipment_custom_reference`. **Nessun `service_id`**: il connettore ufficiale lo omette quando nessun servizio è scelto; il servizio si sceglie e si paga in Packlink PRO;
 - risposta: `{ reference }` (es. `IT2026PRO0006415025`), validata `^[A-Z0-9]{6,40}$`.
 
 **Riferimenti.** `shipment_custom_reference = LEPEFY-<8 caratteri>` (stesso codice del numero ordine admin `#3F2A91C0`, nessun dato personale) ↔ `orders.shipping_provider_reference = <reference Packlink>`.
@@ -112,7 +112,7 @@ Tutti i percorsi di creazione attuali creano l'ordine direttamente in `preparing
 **Dati.** `buildShipmentDraftInput` (puro, `buildDraftInput.ts`):
 - destinatario da `orders.shipping_address` (`full_name` o `orders.full_name` → nome/cognome sull'ultimo spazio), e-mail opzionale (ordini assistiti senza e-mail), telefono letto dalla riga `Téléphone: …` di `orders.notes` (unico punto in cui i tre percorsi di creazione lo persistono). Campo mancante → `invalid_recipient:<campi>`, nessuna chiamata;
 - peso: `orders.shipping_details.totalWeightG`, altrimenti Σ `order_items.quantity × products.weight_grams` **solo** se ogni riga ha un peso (nessun `WEIGHT_FALLBACK_G`). Assente → `invalid_parcel:poids`;
-- colli: stessa regola delle quote (`splitIntoParcels(peso, packaging_surcharges.max_pack_kg)` + dimensioni della riga `packaging_surcharges` attiva). Il carton suggestion (§6) e `packing_parcel_count` restano supporto operativo, non verità fisica inviata: la bozza si corregge in Packlink PRO se la preparazione differisce. Dimensioni assenti → `invalid_parcel:dimensions`.
+- colli: **lo stesso piano fisico della card «Carton à utiliser»** del dettaglio ordine, tramite `planTariffParcels` (`tariff/tariffQuote.ts`, già usato dal controllo di disponibilità del forfait): colli riempiti fino a `packaging_surcharges.max_pack_kg` (default 15 kg come `loadCartonContext`; 12,5 kg → 10 + 2,5), cartone per collo da `cartonsForWeight` sui profili `shipping_packaging_profiles` attivi, poi il profilo `is_default`, poi la scatola `packaging_surcharges`; peso inviato = netto + `tare_g` del cartone. Nessuna formula aggiuntiva. `packing_parcel_count` non è letto: se la preparazione usa colli diversi la bozza si corregge in Packlink PRO. Nessun cartone né scatola → `invalid_parcel:dimensions`; `shipment_content` vuoto → `invalid_parcel:contenu`.
 
 **Stato di provisioning (`orders.shipping_creation_*`, separato da `shipping_normalized_status`).**
 
@@ -133,6 +133,8 @@ Colonne: `shipping_creation_status`, `shipping_creation_attempts`, `shipping_cre
 **Esecuzione asincrona.** Gli eventi fanno solo un update CAS `→ pending` e non lanciano mai eccezioni (migration assente, lettura fallita: log `queue_unavailable`): errore provider ≠ errore di creazione ordine ≠ errore di preparazione. La creazione avviene nel tick esistente `POST /api/internal/shipping-sync` (n8n ogni 15 min, §23) dopo la sync tracking (`runShipmentDraftBatch`: claim interrotti → `ambiguous`, poi ≤ 3 ordini `pending`/`failed` ritentabili; nessuna nuova creazione dopo 35 s per restare in `maxDuration = 60`). Timeout adapter: magazzini 8 s, bozza 12 s. Nessuna nuova infrastruttura.
 
 **Fallback manuale.** Scheda ordine, pannello «Expédition Packlink» (`ManagedShipmentPanel` → `ShipmentDraftBlock`), visibile per delivery `new`/`preparing` senza reference quando l'impostazione è attiva: «Aucun brouillon créé» → «Créer le brouillon Packlink»; «Création en attente» → «Créer maintenant»; «Échec de création» + messaggio → «Réessayer»; «Création incertaine» → associare/recreare; dopo il successo «✓ Brouillon Packlink créé», reference copiabile, data, stato transporteur. Endpoint `POST /api/admin/orders/[id]/shipment/create` (`orders.manage`, come attach/sync/manual: è un'azione sull'ordine, non un réglage; tenant dal deploy, ordine filtrato per `tenant_id`). Corpo: `{}` | `{ confirmNoExistingDraft: true }` | `{ providerReference }`.
+
+**Bozza da correggere (eliminazione).** Packlink non offre un'API verificata di eliminazione/annullamento (il connettore ufficiale non ne ha; l'unica `DELETE` riguarda le integrazioni): Lepefy **non elimina mai** una bozza. Il team la elimina in Packlink PRO, poi nel pannello «Brouillon supprimé dans Packlink PRO ? Recréer» → `POST /api/admin/orders/[id]/shipment/release` (`orders.manage`, `releaseDeletedShipmentDraft`). Il server verifica con `resolveShipment` che la bozza non esista più (404 `shipment_not_found`, stessa logica di `isDraftExpired` del connettore ufficiale) o sia `cancelled`; solo allora azzera, con CAS su reference + `draft_created`, reference, snapshot provider e stato di provisioning (→ not_required), e la bozza si ricrea con «Créer le brouillon». Rifiutato se la bozza esiste ancora (`still_exists`), se il provider non risponde (nessun rilascio senza prova), se il collo è già in movimento (stato normalizzato diverso da pending/unknown/cancelled), se la reference non è stata creata da Lepefy (associazione manuale: usare il suivi manuel) o per un altro tenant.
 
 **Dopo la creazione.** Patch: `shipping_tracking_mode = 'managed'`, `shipping_provider_key`, `shipping_provider_reference`, `shipping_normalized_status = 'pending'`, `shipping_provider_synced_at = null`. Lo stato ordine non cambia: una bozza **non** è una spedizione, nessun `shipped`, nessuna e-mail (né alla creazione né all'associazione). Da lì `runShippingSyncBatch`/`syncOrderShipment` gestiscono `pending → ready_for_collection → in_transit → … → delivered/exception/returned/cancelled`; `order_shipped` parte solo dalla vera transizione `shipped`. «Utiliser un suivi manuel» stacca la reference e blocca nuove creazioni (`manual_tracking`).
 
@@ -1185,6 +1187,7 @@ Qualsiasi modifica futura deve mantenere queste regole, salvo esplicita decision
 33. Un errore del provider o della coda bozze non fa mai fallire la creazione dell'ordine né l'inizio della preparazione; l'evento mette solo in coda.
 34. Un esito che può seguire una bozza creata (timeout, rete, 5xx ≠ 503, 2xx senza reference, claim interrotto) è `ambiguous` e non viene mai ritentato automaticamente; si riconcilia a mano.
 35. La state machine ordini dipende solo dall'interfaccia provider (`capabilities.createDraft`), mai da Packlink; la migration e l'assenza di riga lasciano la funzione disattivata.
+36. Lepefy non elimina né annulla mai una bozza presso il provider; stacca una reference solo dopo che il provider conferma l'assenza (404) o l'annullamento della bozza.
 
 ---
 
@@ -1237,6 +1240,7 @@ apps/storefront/src/app/api/admin/
   shipping-zones/
   shipping-automation/route.ts     (GET/PATCH réglage brouillons: shipping.view / shipping.manage)
   orders/[id]/shipment/create/route.ts  (POST creazione/associazione bozza: orders.manage)
+  orders/[id]/shipment/release/route.ts (POST rilascio di una bozza eliminata in Packlink PRO, verificato: orders.manage)
   shipping-simulation-campaigns/   (platform_owner, tutte le route)
     route.ts                    GET lista / POST creazione (samplingMode, contesto città, destinationMode)
     zone-sentinels/route.ts     GET anteprima CAP campione per zona (sola lettura)
@@ -1332,6 +1336,7 @@ supabase/migrations/120_shipping_postal_code_index.sql
 supabase/migrations/124_shipping_tariff_versions.sql
 supabase/migrations/125_shipping_tariff_activation.sql
 supabase/migrations/151_shipping_shipment_creation.sql   (modulo shipping_automation + orders.shipping_creation_*)
+supabase/migrations/152_shipping_automation_content.sql  (shipment_content nel CHECK del modulo)
 packages/types/shippingIntelligence.ts   (ShippingScenarioMatrix: samplingMode, weightsByProfileId, part, sourceCampaignId; destinazione con city/adminCode1/adminCode2/adminName)
 ```
 
@@ -1414,9 +1419,13 @@ Se n8n si ferma o non esegue i job, impostare `SHIPPING_CAMPAIGN_N8N_ACTIVE=fals
 - **Resta «Création en attente»:** il tick n8n non gira (vedi Executions) o la risposta ha `drafts: null`/`unavailable` (migration 151 assente). «Créer maintenant» crea subito.
 - **`missing_configuration`:** chiave Packlink assente (un tenant di test non usa mai la chiave di piattaforma) o rifiutata (401/403), oppure nessun magazzino predefinito in Packlink PRO (Paramètres → Entrepôts).
 - **`invalid_recipient:<campi>`:** campi mancanti nell'indirizzo o telefono assente da `orders.notes`; correggere nella commande / in Packlink PRO, poi «Réessayer».
-- **`invalid_parcel:poids` / `:dimensions`:** `shipping_details.totalWeightG` assente e prodotto senza `weight_grams`, oppure nessuna riga `packaging_surcharges` attiva con dimensioni.
+- **`invalid_parcel:poids` / `:dimensions`:** `shipping_details.totalWeightG` assente e prodotto senza `weight_grams`, oppure nessun profilo Emballages adatto né profilo di default né riga `packaging_surcharges` con dimensioni.
+- **Cartone diverso da quello atteso:** la bozza usa il cartone mostrato in «Carton à utiliser» (tranches `suggest_min/max_weight_g` dei profili Emballages); correggere le tranches o il profilo di default, non la bozza.
+- **Salvataggio del réglage → 409 «migration 152»:** applicare `152_shipping_automation_content.sql`.
 - **`provider_rejected`:** Packlink ha rifiutato il payload (4xx). Il messaggio grezzo non viene salvato: riprodurre la bozza a mano in Packlink PRO per vedere il campo.
 - **`ambiguous`:** cercare `LEPEFY-<8 car.>` (riferimento mostrato nel pannello) in Packlink PRO. Trovata → «Associer la référence». Assente → «Aucun brouillon trouvé ? → recréer». Mai ricreare senza verificare: Packlink non permette la ricerca automatica per riferimento ordine.
+- **Bozza sbagliata (cartone, contenuto, indirizzo):** eliminarla in Packlink PRO, poi «Brouillon supprimé dans Packlink PRO ? Recréer». `still_exists` = Packlink la vede ancora (eliminazione non ancora effettiva o bozza solo modificata); 503 = Packlink non raggiungibile, riprovare.
+- **n8n «Shipping sync scheduler» in errore ogni 15 min con `shipment_not_found`:** una bozza creata da Lepefy è stata eliminata in Packlink PRO e la sync tracking riceve 404 (`failed > 0` → `Check sync outcome` fallisce). Nella scheda ordine: «Brouillon supprimé dans Packlink PRO ? Recréer» (rilascio verificato), poi ricreare la bozza.
 - **Il pannello non appare:** réglage disattivato, provider del tenant senza `createDraft`, ordine in ritiro, già associato, `shipped`/`cancelled`, o suivi manuel attivo.
 
 ### Cockpit ordini: un ordine non appare dove atteso

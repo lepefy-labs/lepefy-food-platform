@@ -4,7 +4,7 @@ import { getShippingProvider } from '@/lib/shipping/providers/registry';
 import {
   ShipmentDraftError, ShippingProviderError, type ShipmentDraftErrorCode, type ShippingProviderAdapter,
 } from '@/lib/shipping/providers/types';
-import { buildShipmentDraftInput, type DraftItemRow, type DraftPackagingRow } from './buildDraftInput';
+import { buildShipmentDraftInput, type DraftCartonProfile, type DraftItemRow, type DraftPackagingRow } from './buildDraftInput';
 import { readShippingAutomationSettings, type ShippingAutomationSettings } from './settings';
 import { shipmentDraftErrorCode } from './shipmentDraftPresentation';
 
@@ -57,7 +57,7 @@ export const defaultShipmentDraftDependencies: ShipmentDraftDependencies = {
   now: () => new Date(),
 };
 
-type LogEvent = 'queued' | 'started' | 'created' | 'failed' | 'skipped_existing' | 'ambiguous' | 'linked';
+type LogEvent = 'queued' | 'started' | 'created' | 'failed' | 'skipped_existing' | 'ambiguous' | 'linked' | 'released';
 function log(event: LogEvent, order: { id: string; tenant_id: string }, provider: string | null, code?: string) {
   // Ids, provider and result code only: never address, phone, email, key or provider payload.
   const write = event === 'failed' || event === 'ambiguous' ? console.warn : console.info;
@@ -151,17 +151,21 @@ async function loadDraftData(service: OrderService, order: Order) {
   if (itemsResult.error) throw new Error('items_unavailable');
   const items = (itemsResult.data ?? []) as DraftItemRow[];
   const productIds = [...new Set(items.map(item => item.product_id).filter((id): id is string => Boolean(id)))];
-  const [products, packaging] = await Promise.all([
+  const [products, packaging, profiles] = await Promise.all([
     productIds.length
       ? service.from('products').select('id, weight_grams').eq('tenant_id', order.tenant_id).in('id', productIds)
       : Promise.resolve({ data: [], error: null }),
     service.from('packaging_surcharges').select('max_pack_kg, box_length_cm, box_width_cm, box_height_cm')
       .eq('tenant_id', order.tenant_id).eq('active', true).maybeSingle(),
+    service.from('shipping_packaging_profiles').select('*').eq('tenant_id', order.tenant_id).eq('active', true),
   ]);
-  if (products.error || packaging.error) throw new Error('draft_data_unavailable');
+  if (products.error || packaging.error || profiles.error) throw new Error('draft_data_unavailable');
   const productWeights = new Map(((products.data ?? []) as { id: string; weight_grams: number | null }[])
     .map(product => [product.id, product.weight_grams]));
-  return { items, productWeights, packaging: (packaging.data as DraftPackagingRow | null) ?? null };
+  return {
+    items, productWeights, packaging: (packaging.data as DraftPackagingRow | null) ?? null,
+    profiles: (profiles.data ?? []) as DraftCartonProfile[],
+  };
 }
 
 /**
@@ -228,7 +232,9 @@ export async function createShipmentDraftForOrder(service: OrderService, tenantI
   let built: ReturnType<typeof buildShipmentDraftInput>;
   try {
     const data = await loadDraftData(service, order);
-    built = buildShipmentDraftInput({ order, ...data, currency: typeof tenant.currency === 'string' ? tenant.currency : 'EUR' });
+    built = buildShipmentDraftInput({
+      order, ...data, content: settings.content, currency: typeof tenant.currency === 'string' ? tenant.currency : 'EUR',
+    });
   } catch {
     // Our own read failed before any provider call: safe to retry.
     return finish('failed', 'provider_unavailable', 'lecture');
@@ -292,6 +298,60 @@ export async function linkShipmentDraftReference(service: OrderService, tenantId
   if (!saved) return { outcome: 'busy' };
   log('linked', order, adapter!.key);
   return { outcome: 'created', reference: snapshot.providerReference };
+}
+
+/** Provider states in which a stored draft may be released (never once the parcel moves). */
+const RELEASABLE_NORMALIZED = [null, 'pending', 'unknown', 'cancelled'];
+
+export type DraftReleaseOutcome =
+  | { outcome: 'released' }
+  | { outcome: 'still_exists' }
+  | { outcome: 'skipped'; reason: 'no_draft' | 'provider_unsupported' | 'order_inactive' | 'in_transit' }
+  | { outcome: 'busy' };
+
+/**
+ * Detaches a Lepefy-created draft that the team deleted in the provider
+ * back-office, so a corrected draft can be created. The provider has no
+ * verified delete API: Lepefy never deletes, it only verifies absence with
+ * resolveShipment (404, as the official connector's isDraftExpired) or a
+ * cancelled shipment. A draft that still exists is never released.
+ */
+export async function releaseDeletedShipmentDraft(service: OrderService, tenantId: string, orderId: string,
+  deps: ShipmentDraftDependencies = defaultShipmentDraftDependencies): Promise<DraftReleaseOutcome> {
+  const [order, tenant] = await Promise.all([loadOrder(service, tenantId, orderId), loadTenant(service, tenantId)]);
+  if (!order || !tenant || order.tenant_id !== tenantId) return { outcome: 'skipped', reason: 'order_inactive' };
+  const reference = order.shipping_provider_reference;
+  if (!reference || order.shipping_creation_status !== 'draft_created') return { outcome: 'skipped', reason: 'no_draft' };
+  if (!ACTIVE_ORDER_STATUSES.includes(order.status)) return { outcome: 'skipped', reason: 'order_inactive' };
+  if (!RELEASABLE_NORMALIZED.includes(order.shipping_normalized_status ?? null)) return { outcome: 'skipped', reason: 'in_transit' };
+  const adapter = deps.adapterLookup(order.shipping_provider_key);
+  if (!adapter?.capabilities.createDraft) return { outcome: 'skipped', reason: 'provider_unsupported' };
+
+  try {
+    const snapshot = await adapter.resolveShipment({ tenantId: order.tenant_id, tenant }, reference);
+    if (snapshot.normalizedStatus !== 'cancelled') return { outcome: 'still_exists' };
+  } catch (error) {
+    // Only an explicit "not found" proves the deletion; any other failure keeps the draft.
+    if (!(error instanceof ShippingProviderError) || error.code !== 'shipment_not_found') throw error;
+  }
+
+  const query = service.from('orders').update({
+    shipping_tracking_mode: null, shipping_provider_key: null, shipping_provider_reference: null,
+    shipping_provider_status: null, shipping_normalized_status: null, shipping_provider_synced_at: null,
+    shipping_sync_error: null, shipping_tracking_url: null, shipping_tracking_events: null,
+    shipping_estimated_delivery_at: null, tracking_code: null, tracking_carrier: null,
+    shipping_creation_status: null, shipping_creation_error: null, shipping_provider_created_at: null,
+    shipping_creation_updated_at: deps.now().toISOString(),
+  }) as unknown as {
+    eq(key: string, value: unknown): typeof query;
+    select(columns: string): Promise<{ data: unknown[] | null; error: unknown }>;
+  };
+  const { data, error } = await query.eq('id', order.id).eq('tenant_id', order.tenant_id)
+    .eq('shipping_provider_reference', reference).eq('shipping_creation_status', 'draft_created').select('id');
+  if (error) throw new Error('order_update_failed');
+  if (!(data ?? []).length) return { outcome: 'busy' };
+  log('released', order, adapter.key);
+  return { outcome: 'released' };
 }
 
 /**

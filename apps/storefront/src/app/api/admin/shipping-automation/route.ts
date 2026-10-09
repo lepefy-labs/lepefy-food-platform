@@ -41,6 +41,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(await readShippingAutomationSettings(db, tenant.id), { headers });
   } catch (error) {
     if (error instanceof ModuleConfigValidationError) return NextResponse.json({ error: 'Réglage invalide.' }, { status: 400, headers });
+    // CHECK SQL plus ancien que le code (152 non appliquée) : message explicite, pas un 500 opaque.
+    if (error instanceof Error && /check constraint|23514/i.test(error.message)) {
+      return NextResponse.json({ error: 'La migration 152 doit être appliquée avant d’enregistrer ce réglage.' }, { status: 409, headers });
+    }
     console.error(`[shipping/draft] settings update failed — tenant_id: ${tenant.id}`);
     return NextResponse.json({ error: 'Enregistrement impossible.' }, { status: 500, headers });
   }

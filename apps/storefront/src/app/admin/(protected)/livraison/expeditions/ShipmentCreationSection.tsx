@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { IconInfoCircle, IconTruckDelivery } from '@tabler/icons-react';
 import Button from '../../../_components/ui/Button';
-import type { ShipmentCreationTrigger, ShippingAutomationSettings } from '@/lib/shipping/shipmentDraft/settings';
+import { SHIPMENT_CONTENT_MAX, type ShipmentCreationTrigger, type ShippingAutomationSettings } from '@/lib/shipping/shipmentDraft/settings';
 import { SHIPMENT_TRIGGER_LABELS } from '@/lib/shipping/shipmentDraft/shipmentDraftPresentation';
-import { SettingsFeedback, SettingsIconTile } from '../../parametres/_components/SettingsUi';
+import { SettingsFeedback, SettingsIconTile, SETTINGS_HINT_CLS, SETTINGS_INPUT_CLS, SETTINGS_LABEL_CLS } from '../../parametres/_components/SettingsUi';
 import { useSettingsFeedback } from '../../parametres/_components/useSettingsFeedback';
 
 const TRIGGERS: ReadonlyArray<{ key: ShipmentCreationTrigger; hint: string; recommended?: boolean }> = [
@@ -20,26 +20,30 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
   provider: { key: string; displayName: string } | null;
   canManage: boolean;
 }) {
-  const [saved, setSaved] = useState({ enabled: initial.enabled, trigger: initial.trigger });
+  const [saved, setSaved] = useState({ enabled: initial.enabled, trigger: initial.trigger, content: initial.content });
   // Activating for the first time preselects the recommended moment.
-  const [form, setForm] = useState({ enabled: initial.enabled, trigger: initial.status === 'missing' ? 'preparing' as const : initial.trigger });
+  const [form, setForm] = useState({
+    enabled: initial.enabled, trigger: initial.status === 'missing' ? 'preparing' as const : initial.trigger, content: initial.content,
+  });
   const [saving, setSaving] = useState(false);
   const { feedback, show } = useSettingsFeedback();
   const available = initial.available;
   const disabled = !available || !canManage || saving || !provider;
-  const dirty = form.enabled !== saved.enabled || (form.enabled && form.trigger !== saved.trigger);
+  const contentValid = form.content.trim().length > 0;
+  const dirty = form.enabled !== saved.enabled || (form.enabled && (form.trigger !== saved.trigger || form.content.trim() !== saved.content));
 
   async function save() {
     setSaving(true);
     try {
       const response = await fetch('/api/admin/shipping-automation', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: form.enabled, config: { create_shipment_trigger: form.trigger } }),
+        body: JSON.stringify({ enabled: form.enabled, config: { create_shipment_trigger: form.trigger, shipment_content: form.content.trim() } }),
       });
       const body = await response.json().catch(() => ({})) as Partial<ShippingAutomationSettings> & { error?: string };
       if (!response.ok || body.enabled === undefined || !body.trigger) throw new Error(body.error || 'Enregistrement impossible.');
-      setSaved({ enabled: body.enabled, trigger: body.trigger });
-      setForm({ enabled: body.enabled, trigger: body.trigger });
+      const next = { enabled: body.enabled, trigger: body.trigger, content: body.content ?? form.content.trim() };
+      setSaved(next);
+      setForm(next);
       show(body.enabled ? 'Création des brouillons activée.' : 'Création des brouillons désactivée.', 'success');
     } catch (error) {
       show(error instanceof Error ? error.message : 'Enregistrement impossible.', 'error');
@@ -86,13 +90,22 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
               ))}
             </fieldset>
 
+            <div>
+              <label htmlFor="shipment-content" className={SETTINGS_LABEL_CLS}>Contenu déclaré</label>
+              <input id="shipment-content" className={`${SETTINGS_INPUT_CLS} max-w-md`} value={form.content} maxLength={SHIPMENT_CONTENT_MAX}
+                disabled={disabled || !form.enabled} aria-invalid={!contentValid}
+                onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))} />
+              <p className={SETTINGS_HINT_CLS}>Envoyé au transporteur pour chaque brouillon (champ « Contenu » de {provider.displayName}), {SHIPMENT_CONTENT_MAX} caractères maximum.</p>
+              {!contentValid && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">Indiquez le contenu déclaré.</p>}
+            </div>
+
             <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
               <IconInfoCircle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
               Lepefy crée uniquement un brouillon. L’achat et la validation finale restent effectués dans {provider.displayName} PRO.
             </p>
             <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-gray-500 dark:text-gray-400">
               <li>Expéditeur : l’entrepôt par défaut de votre compte {provider.displayName} PRO.</li>
-              <li>Colis : poids de la commande et carton des règles d’emballage du checkout (Emballages).</li>
+              <li>Colis : le carton suggéré dans la fiche commande (« Carton à utiliser », profils Emballages), tare incluse dans le poids.</li>
               <li>Aucun e-mail client et aucun changement de prix : la commande passe « expédiée » seulement quand le transporteur la prend en charge.</li>
               <li>Le réglage s’applique aux commandes suivantes ; les autres se créent depuis la fiche commande.</li>
             </ul>
@@ -103,7 +116,7 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
           <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 px-4 py-3 sm:px-6 dark:border-gray-800">
             <SettingsFeedback feedback={feedback} />
             <Button type="button" variant="outline" onClick={() => setForm(saved)} disabled={!dirty || saving} className="min-h-11">Annuler</Button>
-            <Button type="button" onClick={() => void save()} disabled={disabled || !dirty} loading={saving} className="min-h-11">Enregistrer</Button>
+            <Button type="button" onClick={() => void save()} disabled={disabled || !dirty || !contentValid} loading={saving} className="min-h-11">Enregistrer</Button>
           </footer>
         )}
       </article>

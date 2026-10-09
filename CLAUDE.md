@@ -89,6 +89,7 @@ The shipping logic is the most complex part of the codebase:
 - Per-tenant setting `tenant_feature_settings('shipping_automation')` (migration 151): no row = disabled. Triggers `order_created` (Stripe webhook, `convertCheckoutSessionToOrder` when `created = true`, in-store checkout) or `preparing` (first write of `picking_started_at`), or `manual`.
 - Order code calls only `requestShipmentDraft` (`lib/shipping/shipmentDraft/shipmentDraftService.ts`): it queues `pending` and never throws or calls the provider. The `/api/internal/shipping-sync` tick (or `POST /api/admin/orders/[id]/shipment/create`) claims with compare-and-set and calls `adapter.createShipmentDraft` (capability `createDraft`).
 - Timeouts / 5xx other than 503 / 2xx without reference → `ambiguous`, never auto-retried (Packlink cannot look up by our `LEPEFY-<8>` reference); only 429/503 retry, max 3.
+- Parcels = the order's « Carton à utiliser » plan (`planTariffParcels`, tare in gross weight); content = tenant `shipment_content` (migration 152). Lepefy never deletes a provider draft: `.../shipment/release` detaches it only after the provider returns 404/cancelled.
 
 ### Storefront Caching
 

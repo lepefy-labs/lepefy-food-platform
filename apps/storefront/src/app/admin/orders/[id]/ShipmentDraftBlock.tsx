@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconAlertTriangle, IconClock, IconLoader2 } from '@tabler/icons-react';
 import type { Order } from '@lepefy/types';
-import { shipmentOrderReference } from '@/lib/shipping/shipmentDraft/buildDraftInput';
-import { SHIPMENT_CREATION_STATUS_LABELS, shipmentDraftErrorMessage } from '@/lib/shipping/shipmentDraft/shipmentDraftPresentation';
+import {
+  SHIPMENT_CREATION_STATUS_LABELS, shipmentDraftErrorMessage, shipmentOrderReference,
+} from '@/lib/shipping/shipmentDraft/shipmentDraftPresentation';
 
 /**
  * Draft provisioning state for an order without provider reference

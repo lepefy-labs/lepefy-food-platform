@@ -7,6 +7,11 @@ import type { ShipmentDraftErrorCode } from '@/lib/shipping/providers/types';
  * personal data or provider payload).
  */
 
+/** Same 8-character reference as the admin order number (`orderNumberFor`: #3F2A91C0). */
+export function shipmentOrderReference(orderId: string): string {
+  return `LEPEFY-${orderId.slice(0, 8).toUpperCase()}`;
+}
+
 const CODES: readonly ShipmentDraftErrorCode[] = [
   'missing_configuration', 'invalid_recipient', 'invalid_parcel', 'provider_timeout', 'provider_unavailable',
   'provider_rejected', 'invalid_provider_response', 'ambiguous_creation',
@@ -31,6 +36,7 @@ const MESSAGES: Record<ShipmentDraftErrorCode, string> = {
 const DETAILS: Record<string, string> = {
   poids: 'poids des produits manquant',
   dimensions: 'dimensions du carton manquantes (Livraison → Emballages)',
+  contenu: 'contenu déclaré manquant (Livraison → Expéditions)',
   lecture: 'lecture de la commande impossible',
   interrompu: 'création interrompue',
   'non enregistré': 'brouillon créé mais non enregistré dans Lepefy',

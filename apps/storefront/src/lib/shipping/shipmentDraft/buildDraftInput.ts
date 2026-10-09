@@ -1,6 +1,9 @@
-import type { Order } from '@lepefy/types';
-import { splitIntoParcels } from '@/lib/shipping/calculateShipping';
+import type { Order, ShippingPackagingProfileRow } from '@lepefy/types';
+import { planTariffParcels } from '@/lib/shipping/tariff/tariffQuote';
 import type { ProviderShipmentDraftInput, ShipmentDraftErrorCode } from '@/lib/shipping/providers/types';
+import { shipmentOrderReference } from './shipmentDraftPresentation';
+
+export { shipmentOrderReference };
 
 /**
  * Pure: builds the provider-neutral draft request from a Lepefy order. Never
@@ -9,6 +12,9 @@ import type { ProviderShipmentDraftInput, ShipmentDraftErrorCode } from '@/lib/s
  */
 
 export interface DraftItemRow { product_id: string | null; name: string; quantity: number }
+export type DraftCartonProfile = Pick<ShippingPackagingProfileRow,
+  'id' | 'name' | 'box_length_cm' | 'box_width_cm' | 'box_height_cm' | 'active' | 'position' | 'is_default'
+  | 'suggest_min_weight_g' | 'suggest_max_weight_g' | 'tare_g'>;
 export interface DraftPackagingRow {
   max_pack_kg: number | null;
   box_length_cm: number | null;
@@ -19,11 +25,6 @@ export interface DraftPackagingRow {
 export type DraftInputResult =
   | { ok: true; input: ProviderShipmentDraftInput; totalWeightG: number }
   | { ok: false; code: Extract<ShipmentDraftErrorCode, 'invalid_recipient' | 'invalid_parcel'>; detail: string };
-
-/** Same 8-character reference as the admin order number (`orderNumberFor`: #3F2A91C0). */
-export function shipmentOrderReference(orderId: string): string {
-  return `LEPEFY-${orderId.slice(0, 8).toUpperCase()}`;
-}
 
 /**
  * The customer phone is persisted only as the `Téléphone: …` line written into
@@ -62,12 +63,19 @@ export function resolveOrderWeightG(order: Pick<Order, 'shipping_details'>, item
   return total > 0 ? Math.round(total) : null;
 }
 
-export function buildShipmentDraftInput({ order, items, productWeights, packaging, currency }: {
+/** Same default as loadCartonContext when packaging_surcharges has no max_pack_kg. */
+const DEFAULT_MAX_PACK_KG = 15;
+
+export function buildShipmentDraftInput({ order, items, productWeights, profiles, packaging, content, currency }: {
   order: Order;
   items: DraftItemRow[];
   productWeights: ReadonlyMap<string, number | null>;
-  /** Active packaging_surcharges row: the same parcel rule as the checkout quote. */
+  /** Active shipping_packaging_profiles: the cartons suggested to the team (« Carton à utiliser »). */
+  profiles: DraftCartonProfile[];
+  /** Active packaging_surcharges row: max parcel weight and last-resort box. */
   packaging: DraftPackagingRow | null;
+  /** Tenant-declared content (shipping_automation.shipment_content). */
+  content: string;
   currency: string;
 }): DraftInputResult {
   const address = (order.shipping_address ?? {}) as unknown as Record<string, unknown>;
@@ -85,17 +93,23 @@ export function buildShipmentDraftInput({ order, items, productWeights, packagin
 
   const totalWeightG = resolveOrderWeightG(order, items, productWeights);
   if (!totalWeightG) return { ok: false, code: 'invalid_parcel', detail: 'poids' };
-  const box = packaging;
-  if (!box || !(Number(box.max_pack_kg) > 0) || !(Number(box.box_length_cm) > 0)
-    || !(Number(box.box_width_cm) > 0) || !(Number(box.box_height_cm) > 0)) {
+  // Same physical plan as the order's « Carton à utiliser » card and the flat-rate
+  // availability check: filled parcels up to max_pack_kg, suggested carton per
+  // parcel (then default profile, then the packaging_surcharges box), tare added
+  // to the gross weight sent to the provider.
+  const maxPackKg = Number(packaging?.max_pack_kg) > 0 ? Number(packaging!.max_pack_kg) : DEFAULT_MAX_PACK_KG;
+  const box = packaging && Number(packaging.box_length_cm) > 0 && Number(packaging.box_width_cm) > 0 && Number(packaging.box_height_cm) > 0
+    ? { length: Number(packaging.box_length_cm), width: Number(packaging.box_width_cm), height: Number(packaging.box_height_cm) }
+    : null;
+  const plan = planTariffParcels(totalWeightG, maxPackKg * 1000, profiles, box);
+  if (!plan || plan.length === 0 || plan.some(parcel => !(parcel.lengthCm > 0 && parcel.widthCm > 0 && parcel.heightCm > 0))) {
     return { ok: false, code: 'invalid_parcel', detail: 'dimensions' };
   }
-  const parcels = splitIntoParcels(totalWeightG, Number(box.max_pack_kg)).map(weightG => ({
-    weightKg: weightG / 1000, lengthCm: Number(box.box_length_cm), widthCm: Number(box.box_width_cm), heightCm: Number(box.box_height_cm),
+  const parcels = plan.map(parcel => ({
+    weightKg: parcel.grossG / 1000, lengthCm: parcel.lengthCm, widthCm: parcel.widthCm, heightCm: parcel.heightCm,
   }));
-
-  const content = items.map(item => `${item.quantity}x ${item.name.trim()}`).join(', ').replace(/[^\p{L}\p{N} ,.'x×-]/gu, '').slice(0, 60)
-    || 'Produits alimentaires';
+  const declared = content.trim().slice(0, 60);
+  if (!declared) return { ok: false, code: 'invalid_parcel', detail: 'contenu' };
   const { firstName, lastName } = splitRecipientName(fullName);
   return {
     ok: true,
@@ -107,7 +121,7 @@ export function buildShipmentDraftInput({ order, items, productWeights, packagin
         email: clean(order.email, 160) || null,
       },
       parcels,
-      content,
+      content: declared,
       contentValue: Math.max(0, Number(order.subtotal) || 0),
       currency,
     },
