@@ -39,7 +39,7 @@ export interface ListOrder {
 interface DetailData { suggestion: CartonSuggestion | null; missingWeightLines: number }
 interface Props {
   orders: ListOrder[]; tenantCurrency: string; carriers: string[]; thresholds: OperationalThresholds;
-  canManage: boolean; managedProviderAvailable: boolean; nowIso: string; sort: OrderSortKey;
+  canManage: boolean; managedProviderAvailable: boolean; nowIso: string; originCountry: string; sort: OrderSortKey;
   documentDefaults: OrderDocumentsDefaults;
 }
 
@@ -66,11 +66,27 @@ const TRANSPORT_TONES = {
   success: 'bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900',
   neutral: 'bg-gray-50 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700',
 };
+function formatOrderDate(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }).format(date)
+    : 'Date indisponible';
+}
+function handlingBadges(operation: OrderOperation) {
+  const { international, fresh, frozen, score } = operation.handling;
+  if (!international && !fresh && !frozen) return null;
+  return <span className="mt-1 flex flex-wrap gap-1" aria-label="Attention logistique">
+    {score === 3 && <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-900 dark:bg-rose-950 dark:text-rose-200">Priorité élevée</span>}
+    {international && <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-900 dark:bg-blue-950 dark:text-blue-200">International</span>}
+    {fresh && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-200">Produits frais</span>}
+    {frozen && <span className="rounded-md bg-cyan-100 px-2 py-0.5 text-[11px] font-bold text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200">Surgelés</span>}
+  </span>;
+}
 function formatEta(value: string | null) {
   return value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Rome' }).format(new Date(value)) : null;
 }
 
-export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, sort, documentDefaults }: Props) {
+export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Record<string, DetailData>>({});
@@ -82,7 +98,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const money = useMemo(() => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: tenantCurrency || 'EUR' }), [tenantCurrency]);
-  const operations = useMemo(() => new Map(orders.map(order => [order.id, classifyOrderOperation({ ...order, managedProviderAvailable }, thresholds, now)])), [orders, managedProviderAvailable, thresholds, now]);
+  const operations = useMemo(() => new Map(orders.map(order => [order.id, classifyOrderOperation({ ...order, originCountry, managedProviderAvailable }, thresholds, now)])), [orders, managedProviderAvailable, thresholds, now]);
   useEffect(() => { setSelected(new Set()); setExpanded(new Set()); setDetail({}); setDetailError(new Set()); }, [orders]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), 4000); return () => clearTimeout(timer); }, [toast]);
 
@@ -251,7 +267,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           const header = showGroups && (index === 0 || operationOf(orders[index - 1]!).group !== operation.group);
           return <Fragment key={order.id}>
             {header && <tr className="border-b border-gray-100 dark:border-gray-800"><th scope="rowgroup" colSpan={6} className={`bg-gray-50/70 px-3 py-1.5 text-left text-[11px] font-semibold dark:bg-gray-800/50 ${operation.group === 'action_required' ? 'text-red-700 dark:text-red-300' : ['preparation_overdue', 'pickup_overdue'].includes(operation.group) ? 'text-amber-800 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'}`}>{PRIORITY_GROUP_LABELS[operation.group]}</th></tr>}
-            <tr className={`border-b border-gray-100 align-top dark:border-gray-800 ${isDone ? 'text-gray-500 [&_b]:font-medium' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}>
+            <tr className={`border-b border-gray-100 align-top dark:border-gray-800 ${isDone ? 'text-gray-500 [&_b]:font-medium' : 'hover:bg-violet-50/60 dark:hover:bg-violet-900/10'}`}>
               <td className="p-3"><input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleSelect(order.id)} aria-label={`Sélectionner ${shortId(order.id)}`} /></td>
               <td className="p-3">
                 <button type="button" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`} className="-m-1 flex items-start gap-1 rounded-lg p-1 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:hover:bg-gray-800">
@@ -259,7 +275,8 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
                   <span className="min-w-0"><span className="font-mono text-xs font-bold">{shortId(order.id)}</span><span className="sr-only"> — {open ? 'masquer' : 'afficher'} le détail</span>
                     <span className="block max-w-[170px] truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</span></span>
                 </button>
-                <p className="mt-0.5 pl-5 text-[11px] text-gray-400">{formatSince(order.created_at, now)} · {money.format(Number(order.total ?? 0))}</p>
+                <p className="mt-0.5 pl-5 text-[11px] text-gray-400">{formatOrderDate(order.created_at)} · {money.format(Number(order.total ?? 0))}</p>
+                {handlingBadges(operation)}
                 {operation.urgency && <p className="mt-1 flex items-start gap-1 pl-5 text-[11px] font-semibold text-amber-800 dark:text-amber-300"><IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
               </td>
               <td className="max-w-[220px] p-3">{preparationSummary(order)}</td>
@@ -281,7 +298,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           {header && <p className="bg-gray-50 px-4 py-1.5 text-[11px] font-semibold text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">{PRIORITY_GROUP_LABELS[operation.group]}</p>}
           <div className={`p-4 ${done(order) ? 'text-gray-500' : ''}`}>
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><b className="font-mono text-xs">{shortId(order.id)}</b><p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p><p className="text-[11px] text-gray-400">{formatSince(order.created_at, now)} · {money.format(Number(order.total ?? 0))}</p></div>
+              <div className="min-w-0"><b className="font-mono text-xs">{shortId(order.id)}</b><p className="truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</p><p className="text-[11px] text-gray-400">{formatOrderDate(order.created_at)} · {money.format(Number(order.total ?? 0))}</p>{handlingBadges(operation)}</div>
               {flag && <span className="inline-flex max-w-[45%] items-start gap-1 text-right text-[11px] font-semibold text-amber-800 dark:text-amber-300"><IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />{flag}</span>}
             </div>
             <div className="mt-2">{preparationSummary(order, true)}</div>

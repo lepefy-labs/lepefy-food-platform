@@ -1287,3 +1287,5 @@ Prima di consegnare codice:
 **Base audit:** `main` @ `8e08df3789168364cf12b2a6beda769a2ffedc84` — stato revisionato per l'export Excel Gestion.
 **Data:** 1 ottobre 2026
 **Obiettivo:** descrivere lo stato architetturale corrente, non la cronologia delle conversazioni.
+
+**Priorità logistica Commandes (ottobre 2026):** il classificatore `adminOrderOperations.ts` usa i dati sintetici del tenant per contrassegnare ordini internazionali rispetto a `tenant.country`, freschi (`fresh`) e surgelati (`frozen`). Nella coda di preparazione gli ordini pagati con estero + catena del freddo precedono gli altri; incidenti e ritardi restano superiori. `loadOrderWorkQueue` legge `shipping_address` e `order_items(storage_type)` in forma light prima della paginazione; nessun cambiamento allo stato dell'ordine. La lista mostra data e ora nel fuso Europe/Rome.

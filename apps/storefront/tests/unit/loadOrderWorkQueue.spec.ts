@@ -47,15 +47,15 @@ function answer(ops: Op[]) {
   const idsFilter = ops.find(([m, args]) => m === 'in' && args[0] === 'id')?.[1][1] as string[] | undefined;
   if (columns === 'id, shipping_tracking_events') return { data: (idsFilter ?? []).map((id) => ({ id, shipping_tracking_events: [] })), error: null };
   if (head) return { data: null, count: TERMINAL.length, error: null };
-  if (columns.includes('order_items')) {
+  if (columns.includes('full_name')) {
     if (idsFilter) return { data: ACTIVE.filter((row) => idsFilter.includes(row.id)).map((row) => ({ ...row, order_items: [] })), error: null };
     const range = ops.find(([m]) => m === 'range')?.[1] as [number, number];
     return { data: TERMINAL.slice(range[0], range[1] + 1), count: TERMINAL.length, error: null };
   }
-  return { data: ACTIVE, error: null };
+  return { data: ACTIVE.map(row => ({ ...row, shipping_address: { country: 'IT' }, order_items: [] })), error: null };
 }
 const input = (patch: Partial<Parameters<typeof loadOrderWorkQueue>[2]> = {}) => ({
-  filters: noFilters, sort: 'priority' as const, page: 1, pageSize: 3, thresholds, now, managedProviderAvailable: false, ...patch,
+  filters: noFilters, sort: 'priority' as const, page: 1, pageSize: 3, thresholds, now, managedProviderAvailable: false, originCountry: 'IT', ...patch,
 });
 
 test('page window is planned on [sorted active][terminal] before fetching rows', () => {

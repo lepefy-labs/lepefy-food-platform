@@ -15,6 +15,9 @@ export interface OperationalOrder {
   created_at: string;
   updated_at: string;
   total?: number | null;
+  shipping_address?: { country?: string | null } | null;
+  order_items?: Array<{ storage_type?: string | null }> | null;
+  originCountry?: string | null;
   shipped_at?: string | null;
   picking_started_at?: string | null;
   picking_completed_at?: string | null;
@@ -173,8 +176,21 @@ export function nextOrderAction(order: OperationalOrder, anomaly: OrderAnomaly |
   return action('Voir', 'detail', false, 'none');
 }
 
+export function orderHandlingFlags(order: OperationalOrder) {
+  const rawDestination = order.fulfillment_type === 'delivery' ? order.shipping_address?.country?.trim().toUpperCase() : null;
+  const rawOrigin = order.originCountry?.trim().toUpperCase();
+  const normalize = (value: string) => ({ ITALIA: 'IT', ITALIE: 'IT', ITALY: 'IT', FRANCE: 'FR', GERMANY: 'DE', DEUTSCHLAND: 'DE', BELGIUM: 'BE', BELGIQUE: 'BE' }[value] ?? value);
+  const international = Boolean(rawDestination && rawOrigin && normalize(rawDestination) !== normalize(rawOrigin));
+  const fresh = Boolean(order.order_items?.some(item => item.storage_type === 'fresh'));
+  const frozen = Boolean(order.order_items?.some(item => item.storage_type === 'frozen'));
+  const actionable = order.payment_status === 'paid' && ['new', 'preparing'].includes(order.status);
+  const score = actionable ? international && (fresh || frozen) ? 3 : fresh || frozen ? 2 : international ? 1 : 0 : 0;
+  return { international, fresh, frozen, score };
+}
+
 export interface OrderOperation {
   group: PriorityGroup;
+  handling: ReturnType<typeof orderHandlingFlags>;
   flags: Set<QueueKey>;
   anomaly: OrderAnomaly | null;
   /** Contextual delay ("En préparation depuis 18 j"), only beyond tenant thresholds. */
@@ -188,9 +204,10 @@ export interface OrderOperation {
 
 export function classifyOrderOperation(order: OperationalOrder, thresholds: OperationalThresholds, now: Date): OrderOperation {
   const flags = new Set<QueueKey>();
+  const handling = orderHandlingFlags(order);
   if (isTerminalOrder(order)) {
     flags.add('finished');
-    return { group: 'finished', flags, anomaly: null, urgency: null, notice: null, operationalAt: order.updated_at, action: nextOrderAction(order) };
+    return { group: 'finished', handling, flags, anomaly: null, urgency: null, notice: null, operationalAt: order.updated_at, action: nextOrderAction(order) };
   }
 
   const anomaly = orderAnomaly(order, thresholds, now);
@@ -211,6 +228,7 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
   else if (order.status === 'ready_for_pickup') { group = 'pickup_ready'; operationalAt = order.updated_at; }
   else { group = 'preparing'; operationalAt = preparationStartedAt(order); }
 
+  if (handling.score === 3) flags.add('urgent');
   if (hasLogisticsIncident(order)) flags.add('incidents');
   if (['action_required', 'preparation_overdue', 'pickup_overdue'].includes(group)) flags.add('urgent');
   if (group !== 'shipping' && group !== 'pickup_ready') flags.add('to_treat');
@@ -224,7 +242,7 @@ export function classifyOrderOperation(order: OperationalOrder, thresholds: Oper
     : pickupOverdue ? `Inactive depuis ${formatOperationalDuration(pickupAge!)}` : null;
   const notice = readyToShip && usesManagedShipment(order) && !order.shipping_provider_reference ? 'Expédition à associer' : null;
 
-  return { group, flags, anomaly, urgency, notice, operationalAt, action: nextOrderAction(order, anomaly) };
+  return { group, handling, flags, anomaly, urgency, notice, operationalAt, action: nextOrderAction(order, anomaly) };
 }
 
 /** Back-compat: queue flags of one order. */
@@ -252,6 +270,10 @@ export interface PrioritizedOrder { order: OperationalOrder; operation: OrderOpe
 export function compareOperationalPriority(a: PrioritizedOrder, b: PrioritizedOrder): number {
   const group = PRIORITY_GROUP_ORDER.indexOf(a.operation.group) - PRIORITY_GROUP_ORDER.indexOf(b.operation.group);
   if (group !== 0) return group;
+  if (a.operation.group === 'preparing') {
+    const handling = b.operation.handling.score - a.operation.handling.score;
+    if (handling !== 0) return handling;
+  }
   const direction = a.operation.group === 'finished' ? -1 : 1;
   const operational = (timeOf(a.operation.operationalAt) - timeOf(b.operation.operationalAt)) * direction;
   if (operational !== 0) return operational;

@@ -39,7 +39,7 @@ export interface OrderListFilters {
 
 const LIGHT_SELECT = 'id, status, fulfillment_type, payment_status, created_at, updated_at, total, shipped_at, '
   + 'picking_started_at, picking_completed_at, packing_completed_at, shipping_tracking_mode, shipping_provider_reference, '
-  + 'shipping_normalized_status, shipping_sync_error, shipping_estimated_delivery_at, tracking_code';
+  + 'shipping_normalized_status, shipping_sync_error, shipping_estimated_delivery_at, tracking_code, shipping_address, order_items(storage_type)';
 
 const FULL_SELECT = `
   id, created_at, updated_at, email, full_name, status, total,
@@ -152,6 +152,7 @@ export interface WorkQueueInput {
   thresholds: OperationalThresholds;
   now: Date;
   managedProviderAvailable: boolean;
+  originCountry: string;
 }
 
 export interface WorkQueueResult {
@@ -178,7 +179,7 @@ export async function loadOrderWorkQueue(db: SupabaseClient, tenantId: string, i
 
   const events = await loadTrackingEvents(db, tenantId, [...all.rows, ...(filtered ? scoped.rows : [])].filter(needsEvents).map((row) => row.id!));
   const classify = (row: OperationalOrder): PrioritizedOrder => {
-    const order = { ...row, managedProviderAvailable: input.managedProviderAvailable, shipping_tracking_events: (events.get(row.id!) ?? null) as OperationalOrder['shipping_tracking_events'] };
+    const order = { ...row, originCountry: input.originCountry, managedProviderAvailable: input.managedProviderAvailable, shipping_tracking_events: (events.get(row.id!) ?? null) as OperationalOrder['shipping_tracking_events'] };
     return { order, operation: classifyOrderOperation(order, thresholds, now) };
   };
   const allClassified = all.rows.map(classify);

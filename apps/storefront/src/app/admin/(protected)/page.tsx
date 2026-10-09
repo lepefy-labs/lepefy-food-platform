@@ -127,7 +127,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       .eq('tenant_id', tenant.id)
       .eq('origin', 'assisted')
       .eq('status', 'awaiting_verification'),
-    loadOrderWorkQueue(supabase, tenant.id, { filters, sort: sortKey, page: requestedPage, pageSize: PAGE_SIZE, thresholds, now, managedProviderAvailable })
+    loadOrderWorkQueue(supabase, tenant.id, { filters, sort: sortKey, page: requestedPage, pageSize: PAGE_SIZE, thresholds, now, managedProviderAvailable, originCountry: tenant.country })
       .catch((error: unknown): WorkQueueResult | null => { console.error('[admin/orders] work queue unavailable', error); return null }),
   ])
   const carriers = ((carriersRaw ?? []) as { name: string }[]).map(carrier => carrier.name)
@@ -270,7 +270,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
       {!queue
         ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">Impossible de charger les commandes. <Link href={pageHref(1)} className="font-bold underline">Réessayer</Link></div>
-        : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={thresholds} canManage={canManage} managedProviderAvailable={managedProviderAvailable} nowIso={now.toISOString()} sort={queue.appliedSort} documentDefaults={documentDefaults} />}
+        : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={thresholds} canManage={canManage} managedProviderAvailable={managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} />}
 
       <div className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs text-gray-500 dark:text-gray-400">{pageStart}–{pageEnd} sur {filteredCount} commande{filteredCount !== 1 ? 's' : ''}</span>
