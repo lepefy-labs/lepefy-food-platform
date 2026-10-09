@@ -261,9 +261,9 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
   return <div>
     <AdminOrdersPoller onNewOrders={onNewOrders} isEditing={pendingTracking !== null || expanded.size > 0} />
     <div className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:bg-gray-900">
-      <div className="hidden overflow-x-auto md:block"><table className="w-full text-sm">
+      <div className="hidden overflow-x-auto md:block"><table className="w-full border-separate border-spacing-0 text-sm">
         <caption className="sr-only">Commandes, triées par {sort === 'priority' ? 'priorité opérationnelle' : sort === 'newest' ? 'date décroissante' : sort === 'oldest' ? 'date croissante' : 'montant'}</caption>
-        <thead><tr className="border-b border-gray-100 bg-gray-50 text-left text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-800">
+        <thead><tr className="border-b border-gray-200 bg-slate-100 text-left text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:border-gray-800 dark:bg-gray-800 dark:text-slate-200">
           <th scope="col" className="w-10 p-3"><input type="checkbox" checked={selected.size === orders.length} onChange={() => setSelected(selected.size === orders.length ? new Set() : new Set(orders.map(order => order.id)))} aria-label="Sélectionner les commandes de cette page" /></th>
           <th scope="col" className="p-3 text-gray-800 dark:text-gray-200" aria-sort={ariaSort}>Commande</th><th scope="col" className="p-3">À préparer</th><th scope="col" className="p-3">Livraison / Retrait</th><th scope="col" className="p-3">État</th><th scope="col" className="p-3 text-right">Action</th>
         </tr></thead>
@@ -274,7 +274,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           const header = showGroups && (index === 0 || operationOf(orders[index - 1]!).group !== operation.group);
           return <Fragment key={order.id}>
             {header && <tr className="border-b border-gray-100 dark:border-gray-800"><th scope="rowgroup" colSpan={6} className={`bg-gray-50/70 px-3 py-1.5 text-left text-[11px] font-semibold dark:bg-gray-800/50 ${operation.group === 'action_required' ? 'text-red-700 dark:text-red-300' : ['preparation_overdue', 'pickup_overdue'].includes(operation.group) ? 'text-amber-800 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'}`}>{PRIORITY_GROUP_LABELS[operation.group]}</th></tr>}
-            <tr className={`border-b border-gray-100 align-top dark:border-gray-800 ${rowAccent(operation)} ${isDone ? 'text-gray-500 [&_b]:font-medium' : 'hover:bg-violet-50/60 dark:hover:bg-violet-900/10'}`}>
+            <tr className={`border-b border-gray-200 align-top dark:border-gray-800 ${rowAccent(operation)} ${isDone ? 'text-gray-500 [&_b]:font-medium' : 'hover:bg-violet-50/60 dark:hover:bg-violet-900/10'}`}>
               <td className="p-3"><input type="checkbox" checked={selected.has(order.id)} onChange={() => toggleSelect(order.id)} aria-label={`Sélectionner ${shortId(order.id)}`} /></td>
               <td className="p-3">
                 <button type="button" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`} className="-m-1 flex items-start gap-1 rounded-lg p-1 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:hover:bg-gray-800">
@@ -295,7 +295,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         })}</tbody>
       </table></div>
 
-      <ul className="divide-y divide-gray-100 dark:divide-gray-800 md:hidden" aria-label="Commandes">{orders.map((order, index) => {
+      <ul className="divide-y divide-gray-200 dark:divide-gray-800 md:hidden" aria-label="Commandes">{orders.map((order, index) => {
         const operation = operationOf(order);
         const open = expanded.has(order.id);
         const header = showGroups && (index === 0 || operationOf(orders[index - 1]!).group !== operation.group);

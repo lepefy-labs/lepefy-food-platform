@@ -24,9 +24,9 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ workspace = 'shop', permissions = [], pendingPaymentsCount = 0, pendingEventRequestsCount = 0, pendingRentalRequestsCount = 0, newInquiriesCount = 0, isPlatformOwner = false, gestionEnabled = false, whatsappEnabled = false }: AdminSidebarProps) {
   const pathname = usePathname();
   const has = (permission: string) => isPlatformOwner || permissions.includes('*') || permissions.includes(permission);
-  function navClass(active: boolean) { return active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] font-semibold ring-1 ring-[#D9D3FF] shadow-[inset_3px_0_0_var(--admin-primary)] dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-500/30' : 'text-gray-600 dark:text-gray-300 hover:bg-white hover:text-gray-950 dark:hover:bg-white/5 dark:hover:text-white'; }
-  const groupLabel = 'mb-2 mt-5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]/60 dark:text-violet-300/60';
-  const linkClass = (active: boolean) => `mx-1 flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all ${navClass(active)}`;
+  function navClass(active: boolean) { return active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] font-semibold ring-1 ring-[var(--admin-primary)]/20 shadow-[inset_3px_0_0_var(--admin-primary)] dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-500/30' : 'text-gray-700 dark:text-gray-300 hover:bg-[var(--admin-primary-soft)]/60 hover:text-gray-950 dark:hover:bg-white/5 dark:hover:text-white'; }
+  const groupLabel = 'mb-2 mt-5 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-300';
+  const linkClass = (active: boolean) => `mx-1 flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--admin-focus)] ${navClass(active)}`;
   const shopVisible = ['orders.view','catalog.view','customers.view','reviews.view','loyalty.scan','shipping.view','loyalty.manage','growth.manage','ai_knowledge.manage','ai_usage.view'].some(has);
   const eventsVisible = ['events.view','event_reservations.view','event_payments.view','event_content.manage','scan.access'].some(has);
   const commonVisible = ['tenant_settings.view','billing.view','ai_usage.view'].some(has);
@@ -35,16 +35,16 @@ export default function AdminSidebar({ workspace = 'shop', permissions = [], pen
   return <nav className="flex h-full flex-col pb-3">
     {workspace === 'shop' && shopVisible ? <>
       <p className={groupLabel}>Boutique</p>
-      {has('orders.view') && <Link href="/admin" className={linkClass(pathname === '/admin')}><IconShoppingBag size={20}/><span className="flex-1">Commandes</span>{pendingPaymentsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{pendingPaymentsCount}</span>}</Link>}
+      {has('orders.view') && <Link href="/admin" aria-current={pathname === '/admin' ? 'page' : undefined} className={linkClass(pathname === '/admin')}><IconShoppingBag size={20}/><span className="flex-1">Commandes</span>{pendingPaymentsCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{pendingPaymentsCount}</span>}</Link>}
       {has('orders.view') && <Link href="/admin/paiements-carte" className={linkClass(pathname.startsWith('/admin/paiements-carte'))}><IconCreditCard size={20}/>Paiements carte</Link>}
       {has('orders.view') && <Link href="/admin/checkout-funnel" className={linkClass(pathname === '/admin/checkout-funnel')}><IconChartBar size={20}/>Funnel checkout</Link>}
-      {has('catalog.view') && <Link href="/admin/catalogue" className={linkClass(pathname.startsWith('/admin/catalogue'))}><IconPackage size={20}/>Catalogue</Link>}
-      {has('customers.view') && <Link href="/admin/clients" className={linkClass(pathname.startsWith('/admin/clients'))}><IconUsers size={20}/>Clients</Link>}
+      {has('catalog.view') && <Link href="/admin/catalogue" aria-current={pathname.startsWith('/admin/catalogue') ? 'page' : undefined} className={linkClass(pathname.startsWith('/admin/catalogue'))}><IconPackage size={20}/>Catalogue</Link>}
+      {has('customers.view') && <Link href="/admin/clients" aria-current={pathname.startsWith('/admin/clients') ? 'page' : undefined} className={linkClass(pathname.startsWith('/admin/clients'))}><IconUsers size={20}/>Clients</Link>}
       {has('growth.manage') && <div className="mx-1 flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-300 dark:text-gray-600"><IconTag size={20}/><span className="flex-1">Promotions</span><span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">Bientôt</span></div>}
       {has('catalog.manage') && <Link href="/admin/accueil-slides" className={linkClass(pathname === '/admin/accueil-slides')}><IconPhoto size={20}/>Slides d&apos;accueil</Link>}
       {(has('loyalty.scan') || has('shipping.view')) && <p className={groupLabel}>Opérations</p>}
       {has('loyalty.scan') && <Link href="/admin/loyalty/scan" className={linkClass(pathname === '/admin/loyalty/scan')}><IconScan size={20}/>Scan fidélité</Link>}
-      {has('shipping.view') && <Link href="/admin/livraison" className={linkClass(pathname.startsWith('/admin/livraison'))}><IconTruck size={20}/>Livraison</Link>}
+      {has('shipping.view') && <Link href="/admin/livraison" aria-current={pathname.startsWith('/admin/livraison') ? 'page' : undefined} className={linkClass(pathname.startsWith('/admin/livraison'))}><IconTruck size={20}/>Livraison</Link>}
       {(has('loyalty.manage') || has('growth.manage') || has('reviews.view') || has('ai_knowledge.manage') || has('ai_usage.view')) && <p className={groupLabel}>Croissance</p>}
       {has('loyalty.manage') && <Link href="/admin/loyalty" className={linkClass(pathname === '/admin/loyalty')}><IconGift size={20}/>Fidélité &amp; parrainage</Link>}
       {has('growth.manage') && <Link href="/admin/ambassadeurs" className={linkClass(pathname === '/admin/ambassadeurs')}><IconStar size={20}/>Ambassadeurs</Link>}
