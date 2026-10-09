@@ -28,10 +28,10 @@ export default function AdminPageHeader({
               <h1 className="text-xl font-semibold tracking-tight text-gray-950 dark:text-gray-100 sm:text-2xl">
                 {title}
               </h1>
-              {meta && <div className="text-sm text-gray-500 dark:text-gray-400">{meta}</div>}
+              {meta && <div className="text-sm text-gray-600 dark:text-gray-300">{meta}</div>}
             </div>
             {description && (
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600 dark:text-gray-300">
                 {description}
               </p>
             )}

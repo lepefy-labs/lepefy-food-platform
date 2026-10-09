@@ -21,6 +21,7 @@ import OrdersTable from './OrdersTable'
 import OrdersSortSelect from './OrdersSortSelect'
 import PendingPaymentsBanner from './PendingPaymentsBanner'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
+import AdminStatCard from '../_components/ui/AdminStatCard'
 import type { ListOrder } from './OrdersTable'
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
@@ -210,14 +211,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
             const active = filterView === view.key
             const count = kpi(view.key as QueueKey)
             return (
-              <Link key={view.key} href={buildHref(searchParams, { view: active ? undefined : view.key, status: undefined })} aria-current={active ? 'page' : undefined}
-                className={`min-h-[76px] rounded-xl border p-3 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] ${active ? 'border-[#C9C1FF] bg-[var(--admin-primary-soft)] ring-1 ring-[#D9D3FF]' : view.tone}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{view.label}</p>
-                  <span className={`min-w-8 rounded-full px-2 py-0.5 text-center text-sm font-bold ${count > 0 ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-900 dark:text-gray-100' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>{count}</span>
-                </div>
-                <p className="mt-1 text-[11px] leading-4 text-gray-500 dark:text-gray-400">{view.helper}</p>
-              </Link>
+              <AdminStatCard
+                key={view.key}
+                href={buildHref(searchParams, { view: active ? undefined : view.key, status: undefined })}
+                title={view.label}
+                value={count}
+                description={view.helper}
+                active={active}
+                tone={view.key === 'incidents' ? 'danger' : view.key === 'preparing' || view.key === 'to_ship' ? 'warning' : view.key === 'in_transit' ? 'info' : view.key === 'pickup_ready' ? 'success' : 'brand'}
+              />
             )
           })}
         </div>

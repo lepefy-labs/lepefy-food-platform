@@ -42,6 +42,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           --admin-surface-subtle: ${platform.surfaceSubtle};
           --admin-page-bg: ${platform.pageBackground};
           --admin-border: ${platform.border};
+          --admin-text: #172033;
+          --admin-text-muted: #475569;
+          --admin-focus: ${platform.primary};
+          --admin-info-bg: #EFF6FF;
+          --admin-info-fg: #1D4ED8;
+          --admin-warning-bg: #FFFBEB;
+          --admin-warning-fg: #92400E;
+          --admin-danger-bg: #FEF2F2;
+          --admin-danger-fg: #B91C1C;
+          --admin-success-bg: #ECFDF5;
+          --admin-success-fg: #047857;
 
           /* Existing admin components keep working while progressively
              migrating to explicit --admin-* tokens. */
