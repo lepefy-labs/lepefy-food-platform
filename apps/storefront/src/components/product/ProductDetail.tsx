@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useLocaleStore, resolveLocale } from '@/lib/store/localeStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { useCartStore } from '@/stores/cartStore';
+import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import { QuantitySelector } from './QuantitySelector';
 import { ProductTitle } from './ProductTitle';
 import { ProductDescription } from './ProductDescription';
@@ -24,6 +25,8 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const activeLocale = resolveLocale(storeLocale, tenantLocales);
 
   const addItem = useCartStore((s) => s.addItem);
+  const cartItems = useCartStore((s) => s.items);
+  const { groups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const orderQuantityStep = product.order_quantity_step ?? 1;
   const [quantity, setQuantity] = useState(minOrderQuantity);
@@ -31,6 +34,17 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
   const totalPrice = product.price * quantity;
+  const group = groups.find((entry) => entry.productIds.includes(product.id));
+  const groupQuantity = group
+    ? cartItems.filter((item) => group.productIds.includes(item.product.id))
+        .reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
+  const groupTarget = group && groupQuantity > 0
+    ? group.min_quantity + Math.max(0, Math.ceil((groupQuantity - group.min_quantity) / group.quantity_step)) * group.quantity_step
+    : group?.min_quantity ?? 0;
+  const groupMissing = Math.max(0, groupTarget - groupQuantity);
+  const hasIndividualRule = minOrderQuantity > 1 || orderQuantityStep > 1;
+  const explicitQuantityLabel = `Ajouter ${quantity} au panier`;
 
   function handleAddToCart() {
     if (outOfStock || quantity > maxPurchasable) return;
@@ -91,6 +105,40 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
             )}
           </div>
 
+          {hasIndividualRule && (
+            <section aria-label="Conditions de vente" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="font-semibold">Vendu à partir de {minOrderQuantity} unité{minOrderQuantity > 1 ? 's' : ''}</p>
+              <p className="mt-1 text-amber-900">
+                {orderQuantityStep > 1
+                  ? `Quantités possibles : ${minOrderQuantity}, ${minOrderQuantity + orderQuantityStep}, ${minOrderQuantity + orderQuantityStep * 2}…`
+                  : `Quantité minimale : ${minOrderQuantity} unité${minOrderQuantity > 1 ? 's' : ''}.`}
+              </p>
+              <p className="mt-2 flex items-center justify-between gap-3 border-t border-amber-200 pt-2">
+                <span>Montant minimum</span>
+                <strong className="tabular-nums">{formatPrice(product.price * minOrderQuantity, currency)}</strong>
+              </p>
+            </section>
+          )}
+          {group && (
+            <section aria-label="Quantité combinable" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+              <p className="font-semibold">Groupe « {group.name} » : minimum {group.min_quantity} unités combinables</p>
+              <p className="mt-1">Composez votre sélection avec les produits participants{group.quantity_step > 1 ? ` (paliers de ${group.quantity_step})` : ''}.</p>
+              {groupQuantity > 0 && (
+                <p className="mt-2 font-medium" aria-live="polite">
+                  Dans votre panier : {groupQuantity} / {groupTarget} unités
+                  {groupMissing > 0 ? ` · Encore ${groupMissing} à ajouter` : ' · Objectif atteint'}
+                </p>
+              )}
+              <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir les produits combinables</Link>
+            </section>
+          )}
+          {groupsError && (
+            <div className="text-xs text-gray-600" role="status">
+              Règles des groupes indisponibles. <button type="button" onClick={reloadGroups} className="font-semibold underline">Réessayer</button>
+            </div>
+          )}
+          {!group && groupsLoading && <p className="text-xs text-gray-500" role="status">Vérification des offres combinables…</p>}
+
           <ProductSpecs
             netQuantityDisplay={product.net_quantity_display}
             weightGrams={product.weight_grams}
@@ -118,18 +166,14 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium text-gray-700">Quantité</span>
                   <QuantitySelector value={quantity} min={minOrderQuantity} step={orderQuantityStep} max={maxPurchasable} onChange={setQuantity} />
-                  {minOrderQuantity > 1 && (
-                    <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
-                      Minimum {minOrderQuantity}{orderQuantityStep > 1 ? ` · par ${orderQuantityStep}` : ''}
-                    </span>
-                  )}
+
                 </div>
                 <button
                   onClick={handleAddToCart}
                   className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
                   style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
                 >
-                  {added ? '✓ Ajouté au panier' : `Ajouter au panier — ${formatPrice(totalPrice, currency)}`}
+                  {added ? '✓ Ajouté au panier' : `${explicitQuantityLabel} · ${formatPrice(totalPrice, currency)}`}
                 </button>
               </div>
 
@@ -145,7 +189,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                     className="flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-3 py-2 font-semibold text-white transition-all active:scale-[0.98]"
                     style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
                   >
-                    <span className="max-w-full truncate text-sm">{added ? '✓ Ajouté au panier' : 'Ajouter au panier'}</span>
+                    <span className="max-w-full truncate text-sm">{added ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
                     {!added && <span className="text-xs font-medium opacity-90">{formatPrice(totalPrice, currency)}</span>}
                   </button>
                 </div>
