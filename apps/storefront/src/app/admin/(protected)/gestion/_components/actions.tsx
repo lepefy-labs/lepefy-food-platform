@@ -2,15 +2,16 @@
 
 import { useState } from 'react';
 import Button from '../../../_components/ui/Button';
-import { ErrorText, useGestionMutation } from './useGestionMutation';
-import { INPUT_CLS } from './ui';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { controlClasses } from '@/app/admin/_components/ui/Form';
 
 /** Azione immediata (es. vérifier un paiement, passer commande). */
 export function SimpleAction({ url, label, pendingLabel, variant = 'primary', body, confirmText }: {
   url: string; label: string; pendingLabel?: string; variant?: 'primary' | 'outline' | 'ghost';
   body?: Record<string, unknown>; confirmText?: string;
 }) {
-  const { run, pending, error } = useGestionMutation();
+  const { run, pending, error } = useAdminMutation();
   const [confirming, setConfirming] = useState(false);
   async function submit() {
     if (confirmText && !confirming) { setConfirming(true); return; }
@@ -24,12 +25,12 @@ export function SimpleAction({ url, label, pendingLabel, variant = 'primary', bo
           {pending ? pendingLabel ?? label : confirming ? `Confirmer : ${label.toLowerCase()}` : label}
         </Button>
         {confirming && !pending && (
-          <button type="button" onClick={() => setConfirming(false)} className="min-h-11 px-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300">
+          <button type="button" onClick={() => setConfirming(false)} className="min-h-11 px-2 text-sm text-a-text-2 hover:text-a-text">
             Annuler
           </button>
         )}
       </div>
-      {confirming && confirmText && <p className="text-xs text-gray-600 dark:text-gray-300">{confirmText}</p>}
+      {confirming && confirmText && <p className="text-xs text-a-text-2">{confirmText}</p>}
       <ErrorText message={error} />
     </div>
   );
@@ -43,40 +44,40 @@ export function ReasonAction({ url, label, confirmLabel, description, body, tone
   url: string; label: string; confirmLabel: string; description: string;
   body?: Record<string, unknown>; tone?: 'danger' | 'neutral';
 }) {
-  const { run, pending, error } = useGestionMutation();
+  const { run, pending, error } = useAdminMutation();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const buttonTone = tone === 'danger'
-    ? 'border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30'
-    : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800';
+    ? 'border-tone-danger-border text-tone-danger-fg hover:bg-tone-danger-bg'
+    : 'border-a-border-strong text-a-text-2 hover:bg-a-surface-2';
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className={`inline-flex min-h-11 items-center rounded-lg border bg-white px-3 text-sm font-medium dark:bg-gray-900 ${buttonTone}`}>
+      <button type="button" onClick={() => setOpen(true)} className={`inline-flex min-h-11 items-center rounded-lg border bg-a-surface px-3 text-sm font-medium ${buttonTone}`}>
         {label}
       </button>
     );
   }
   return (
     <form
-      className="w-full space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/60"
+      className="w-full space-y-2 rounded-xl border border-a-border bg-a-surface-2 p-3"
       onSubmit={async (event) => {
         event.preventDefault();
         const result = await run(url, { body: { ...(body ?? {}), reason } });
         if (result) { setOpen(false); setReason(''); }
       }}
     >
-      <p className="text-sm text-gray-700 dark:text-gray-200">{description}</p>
+      <p className="text-sm text-a-text-2">{description}</p>
       <label className="block">
         <span className="sr-only">Motif</span>
-        <input className={INPUT_CLS} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motif (obligatoire)" minLength={3} maxLength={1000} required autoFocus />
+        <input className={controlClasses} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Motif (obligatoire)" minLength={3} maxLength={1000} required autoFocus />
       </label>
       <ErrorText message={error} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" loading={pending} disabled={reason.trim().length < 3} className="min-h-11 !bg-red-700">
+        <Button type="submit" loading={pending} disabled={reason.trim().length < 3} className="min-h-11 !bg-tone-danger-solid">
           {confirmLabel}
         </Button>
-        <button type="button" onClick={() => { setOpen(false); setReason(''); }} className="min-h-11 px-3 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300">
+        <button type="button" onClick={() => { setOpen(false); setReason(''); }} className="min-h-11 px-3 text-sm text-a-text-2 hover:text-a-text">
           Annuler
         </button>
       </div>

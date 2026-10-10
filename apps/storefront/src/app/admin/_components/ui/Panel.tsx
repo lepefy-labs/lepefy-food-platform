@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils/cn';
 
+export const cardClasses = 'rounded-[10px] border border-a-border bg-a-surface';
+
 /** Card surface used by list and detail pages (no title). */
 export function Card({ children, className, as: Tag = 'div' }: { children: ReactNode; className?: string; as?: 'div' | 'section' }) {
   return <Tag className={cn('rounded-[10px] border border-a-border bg-a-surface', className)}>{children}</Tag>;
@@ -43,6 +45,17 @@ export function DescriptionItem({ label, children, hint }: { label: ReactNode; c
       <dt className="text-xs text-a-text-3">{label}</dt>
       <dd className="mt-0.5 break-words text-sm text-a-text">{children}</dd>
       {hint && <dd className="text-xs text-a-text-3">{hint}</dd>}
+    </div>
+  );
+}
+
+/** Label/value pair outside a <dl> (cards, grids). */
+export function InfoField({ label, children, hint }: { label: ReactNode; children: ReactNode; hint?: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-a-text-3">{label}</p>
+      <div className="mt-0.5 break-words text-sm text-a-text">{children}</div>
+      {hint && <p className="text-xs text-a-text-3">{hint}</p>}
     </div>
   );
 }

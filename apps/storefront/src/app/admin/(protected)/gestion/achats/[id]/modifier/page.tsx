@@ -2,7 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import AdminPageHeader from '../../../../../_components/ui/AdminPageHeader';
 import { requireBusinessManagementPage } from '@/lib/gestion/featureGate';
 import { getPurchaseDetail, listActiveSupplierOptions } from '@/lib/gestion/queries';
-import { Breadcrumb, CARD_CLS } from '../../../_components/ui';
+import { cardClasses } from '@/app/admin/_components/ui/Panel';
+import { Breadcrumb } from '@/app/admin/_components/ui/AdminPageHeader';
 import { PurchaseForm } from '../../PurchaseForm';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ export default async function EditPurchasePage({ params }: { params: { id: strin
         { label: purchase.reference, href: `/admin/gestion/achats/${purchase.id}` }, { label: 'Modifier' },
       ]} />
       <AdminPageHeader title={`Modifier ${purchase.reference}`} />
-      <div className={`${CARD_CLS} p-4 sm:p-6`}>
+      <div className={`${cardClasses} p-4 sm:p-6`}>
         <PurchaseForm
           suppliers={withCurrent}
           currency={purchase.currency}

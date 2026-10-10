@@ -5,7 +5,8 @@ import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 import { getProductCost } from '@/lib/gestion/queries';
 import { PURCHASE_UNIT_LABELS, indicativeMargin } from '@/lib/gestion/domain';
 import { formatDate, formatMoney, formatQuantity, formatQuantityWithUnit } from '@/lib/gestion/format';
-import { Badge, Panel } from './ui';
+import Badge from '@/app/admin/_components/ui/Badge';
+import { Panel } from '@/app/admin/_components/ui/Panel';
 
 /**
  * Coût d'achat (lecture seule) dans la fiche produit du Catalogue admin.
@@ -27,14 +28,14 @@ export async function ProductCostPanel({ tenantId, productId, price, currency }:
     <div className="mt-6">
       <Panel id="cout-achat" title="Coût d'achat" description="Dernier coût d'achat reçu, par unité de stock. Frais supplémentaires (transport, douane) non inclus.">
         {!cost ? (
-          <p className="text-sm text-gray-600 dark:text-gray-300">Aucun coût connu : ce produit n&apos;a pas encore été reçu via un achat fournisseur.</p>
+          <p className="text-sm text-a-text-2">Aucun coût connu : ce produit n&apos;a pas encore été reçu via un achat fournisseur.</p>
         ) : (
           <div className="space-y-4">
             <dl className="grid gap-4 sm:grid-cols-3">
               <div>
-                <dt className="text-xs text-gray-500 dark:text-gray-400">Dernier coût d&apos;achat</dt>
-                <dd className="text-xl font-semibold tabular-nums text-gray-950 dark:text-gray-100">{formatMoney(cost.current_purchase_cost, cost.currency)} <span className="text-sm font-normal text-gray-500">/ unité</span></dd>
-                <dd className="text-xs text-gray-500 dark:text-gray-400">
+                <dt className="text-xs text-a-text-3">Dernier coût d&apos;achat</dt>
+                <dd className="text-xl font-semibold tabular-nums text-a-text">{formatMoney(cost.current_purchase_cost, cost.currency)} <span className="text-sm font-normal text-a-text-3">/ unité</span></dd>
+                <dd className="text-xs text-a-text-3">
                   Reçu le {formatDate(cost.effective_at)}{cost.supplier_name ? ` • ${cost.supplier_name}` : ''}
                   {cost.purchase_reference && (canOpenPurchase
                     ? <> • <Link href={`/admin/gestion/achats/${cost.purchase_id}`} className="font-mono underline">{cost.purchase_reference}</Link></>
@@ -42,36 +43,36 @@ export async function ProductCostPanel({ tenantId, productId, price, currency }:
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-500 dark:text-gray-400">Prix de vente</dt>
-                <dd className="text-xl font-semibold tabular-nums text-gray-950 dark:text-gray-100">{formatMoney(price, currency)}</dd>
+                <dt className="text-xs text-a-text-3">Prix de vente</dt>
+                <dd className="text-xl font-semibold tabular-nums text-a-text">{formatMoney(price, currency)}</dd>
               </div>
               {cost.currency === currency && (() => {
                 const margin = indicativeMargin(price, cost.current_purchase_cost);
                 return (
                   <div>
-                    <dt className="text-xs text-gray-500 dark:text-gray-400">Marge indicative</dt>
-                    <dd className={`text-xl font-semibold tabular-nums ${margin.amount >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                    <dt className="text-xs text-a-text-3">Marge indicative</dt>
+                    <dd className={`text-xl font-semibold tabular-nums ${margin.amount >= 0 ? 'text-tone-success-fg' : 'text-tone-danger-fg'}`}>
                       {formatMoney(margin.amount, currency)}{margin.percent !== null ? ` (${formatQuantity(margin.percent)} %)` : ''}
                     </dd>
-                    <dd className="text-xs text-gray-500 dark:text-gray-400">Prix - dernier coût d&apos;achat. Ni marge nette, ni marge comptable.</dd>
+                    <dd className="text-xs text-a-text-3">Prix - dernier coût d&apos;achat. Ni marge nette, ni marge comptable.</dd>
                   </div>
                 );
               })()}
             </dl>
             {cost.history.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Historique récent</p>
-                <ul className="divide-y divide-gray-100 text-sm dark:divide-gray-800">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-a-text-3">Historique récent</p>
+                <ul className="divide-y divide-a-border text-sm">
                   {cost.history.map((entry) => (
                     <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                      <span className="text-gray-700 dark:text-gray-300">
+                      <span className="text-a-text-2">
                         {formatDate(entry.received_at)} • {formatQuantityWithUnit(entry.purchase_quantity, entry.purchase_unit)} à {formatMoney(entry.purchase_unit_cost, cost.currency)} / {PURCHASE_UNIT_LABELS[entry.purchase_unit]}
                         {' '}(× {formatQuantity(entry.conversion_factor)})
                       </span>
                       <span className="flex items-center gap-2">
                         {entry.id === cost.source_history_id && <Badge tone="success">Coût courant</Badge>}
                         {entry.status === 'reversed' && <Badge tone="neutral">Réception annulée</Badge>}
-                        <span className={`tabular-nums ${entry.status === 'reversed' ? 'text-gray-400 line-through' : 'font-medium'}`}>{formatMoney(entry.cost_per_stock_unit, cost.currency)} / unité</span>
+                        <span className={`tabular-nums ${entry.status === 'reversed' ? 'text-a-text-3 line-through' : 'font-medium'}`}>{formatMoney(entry.cost_per_stock_unit, cost.currency)} / unité</span>
                       </span>
                     </li>
                   ))}

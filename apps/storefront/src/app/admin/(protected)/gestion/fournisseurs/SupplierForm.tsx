@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '../../../_components/ui/Button';
-import { ErrorText, useGestionMutation } from '../_components/useGestionMutation';
-import { HINT_CLS, INPUT_CLS, LABEL_CLS } from '../_components/ui';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { controlClasses, labelClasses, hintClasses } from '@/app/admin/_components/ui/Form';
 import { PAYMENT_TERMS_PRESETS } from '@/lib/gestion/domain';
 
 export interface SupplierFormValues {
@@ -33,7 +34,7 @@ export function SupplierForm({ supplierId, initial, defaultCurrency, onDone }: {
   supplierId?: string; initial?: Partial<SupplierFormValues>; defaultCurrency: string; onDone?: () => void;
 }) {
   const router = useRouter();
-  const { run, pending, error, setError } = useGestionMutation();
+  const { run, pending, error, setError } = useAdminMutation();
   const [values, setValues] = useState<SupplierFormValues>({ ...EMPTY, currency: defaultCurrency, ...initial });
   const set = <K extends keyof SupplierFormValues>(key: K, value: SupplierFormValues[K]) => setValues((prev) => ({ ...prev, [key]: value }));
   const editing = Boolean(supplierId);
@@ -60,13 +61,13 @@ export function SupplierForm({ supplierId, initial, defaultCurrency, onDone }: {
 
   const text = (key: keyof SupplierFormValues, label: string, options: { type?: string; max?: number; hint?: string; required?: boolean; autoComplete?: string } = {}) => (
     <label className="block">
-      <span className={LABEL_CLS}>{label}{options.required ? ' *' : ''}</span>
+      <span className={labelClasses}>{label}{options.required ? ' *' : ''}</span>
       <input
-        className={INPUT_CLS} type={options.type ?? 'text'} value={String(values[key])} maxLength={options.max ?? 200}
+        className={controlClasses} type={options.type ?? 'text'} value={String(values[key])} maxLength={options.max ?? 200}
         required={options.required} autoComplete={options.autoComplete ?? 'off'}
         onChange={(event) => set(key, event.target.value as never)}
       />
-      {options.hint && <span className={HINT_CLS}>{options.hint}</span>}
+      {options.hint && <span className={hintClasses}>{options.hint}</span>}
     </label>
   );
 
@@ -84,8 +85,8 @@ export function SupplierForm({ supplierId, initial, defaultCurrency, onDone }: {
       </div>
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className={LABEL_CLS}>Conditions de paiement</span>
-          <select className={INPUT_CLS} value={customTerms ? 'custom' : values.payment_terms}
+          <span className={labelClasses}>Conditions de paiement</span>
+          <select className={controlClasses} value={customTerms ? 'custom' : values.payment_terms}
             onChange={(event) => {
               if (event.target.value === 'custom') { setCustomTerms(true); return; }
               setCustomTerms(false);
@@ -95,33 +96,33 @@ export function SupplierForm({ supplierId, initial, defaultCurrency, onDone }: {
             {PAYMENT_TERMS_PRESETS.map((preset) => <option key={preset.value} value={String(preset.value)}>{preset.label}</option>)}
             <option value="custom">Personnalisé</option>
           </select>
-          <span className={HINT_CLS}>Échéance proposée pour les nouveaux achats : date de commande + délai. Les achats existants ne changent pas.</span>
+          <span className={hintClasses}>Échéance proposée pour les nouveaux achats : date de commande + délai. Les achats existants ne changent pas.</span>
         </label>
         {customTerms && (
           <label className="block">
-            <span className={LABEL_CLS}>Délai en jours</span>
-            <input inputMode="numeric" className={INPUT_CLS} value={values.payment_terms} onChange={(event) => set('payment_terms', event.target.value)} placeholder="45" />
+            <span className={labelClasses}>Délai en jours</span>
+            <input inputMode="numeric" className={controlClasses} value={values.payment_terms} onChange={(event) => set('payment_terms', event.target.value)} placeholder="45" />
           </label>
         )}
       </fieldset>
       <label className="block">
-        <span className={LABEL_CLS}>Adresse</span>
-        <textarea className={`${INPUT_CLS} min-h-20`} value={values.address} maxLength={500} onChange={(event) => set('address', event.target.value)} />
+        <span className={labelClasses}>Adresse</span>
+        <textarea className={`${controlClasses} min-h-20`} value={values.address} maxLength={500} onChange={(event) => set('address', event.target.value)} />
       </label>
       <label className="block">
-        <span className={LABEL_CLS}>Notes internes</span>
-        <textarea className={`${INPUT_CLS} min-h-24`} value={values.notes} maxLength={4000} onChange={(event) => set('notes', event.target.value)} />
+        <span className={labelClasses}>Notes internes</span>
+        <textarea className={`${controlClasses} min-h-24`} value={values.notes} maxLength={4000} onChange={(event) => set('notes', event.target.value)} />
       </label>
       {editing && (
-        <label className="flex min-h-11 items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
-          <input type="checkbox" className="h-5 w-5 rounded border-gray-300" checked={values.active} onChange={(event) => set('active', event.target.checked)} />
+        <label className="flex min-h-11 items-center gap-3 text-sm text-a-text">
+          <input type="checkbox" className="h-5 w-5 rounded border-a-border-strong" checked={values.active} onChange={(event) => set('active', event.target.checked)} />
           Fournisseur actif (un fournisseur inactif ne peut plus recevoir de nouvel achat)
         </label>
       )}
       <ErrorText message={error} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" loading={pending} className="min-h-11">{editing ? 'Enregistrer les modifications' : 'Créer le fournisseur'}</Button>
-        {onDone && <button type="button" onClick={onDone} className="min-h-11 px-3 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300">Annuler</button>}
+        {onDone && <button type="button" onClick={onDone} className="min-h-11 px-3 text-sm text-a-text-2 hover:text-a-text">Annuler</button>}
       </div>
     </form>
   );
@@ -131,7 +132,7 @@ export function SupplierEditToggle(props: { supplierId: string; initial: Partial
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center rounded-lg border border-a-border-strong bg-a-surface px-4 text-sm font-medium text-a-text hover:bg-a-surface-2">
         Modifier le fournisseur
       </button>
     );

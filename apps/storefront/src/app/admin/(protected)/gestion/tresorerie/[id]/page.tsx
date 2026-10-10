@@ -5,7 +5,10 @@ import { requireBusinessManagementPage } from '@/lib/gestion/featureGate';
 import { listAuditEvents, listDocuments, listPayments, listPurchases } from '@/lib/gestion/queries';
 import { formatDate, formatDateTime, formatMoney } from '@/lib/gestion/format';
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES } from '@/lib/gestion/domain';
-import { Badge, Breadcrumb, Field, Panel, Stat } from '../../_components/ui';
+import Badge from '@/app/admin/_components/ui/Badge';
+import { Panel, InfoField as Field } from '@/app/admin/_components/ui/Panel';
+import { Breadcrumb } from '@/app/admin/_components/ui/AdminPageHeader';
+import AdminStatCard from '@/app/admin/_components/ui/AdminStatCard';
 import { ReasonAction, SimpleAction } from '../../_components/actions';
 import { DocumentsPanel } from '../../_components/DocumentsPanel';
 import { AuditTimeline } from '../../_components/AuditTimeline';
@@ -40,15 +43,15 @@ export default async function PaymentDetailPage({ params }: { params: { id: stri
         <Breadcrumb items={[{ label: 'Gestion', href: '/admin/gestion' }, { label: 'Trésorerie', href: '/admin/gestion/tresorerie' }, { label: payment.reference }]} />
         <AdminPageHeader
           title={`Paiement ${payment.reference}`}
-          meta={<Link href={`/admin/gestion/fournisseurs/${payment.supplier_id}`} className="font-medium text-[var(--admin-primary-fg)] hover:underline">{payment.supplier_name}</Link>}
+          meta={<Link href={`/admin/gestion/fournisseurs/${payment.supplier_id}`} className="font-medium text-a-brand-fg hover:underline">{payment.supplier_name}</Link>}
           description={`${formatDate(payment.payment_date)} • ${PAYMENT_METHOD_LABELS[payment.method]}`}
           actions={<Badge tone={PAYMENT_STATUS_TONES[payment.status]}>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>}
         />
       </div>
 
       {payment.status === 'recorded' && (
-        <div className="flex flex-col gap-3 rounded-xl bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:bg-amber-950/40">
-          <p className="text-sm text-amber-900 dark:text-amber-100">Paiement enregistré, pas encore vérifié : il ne réduit pas encore la dette du fournisseur.</p>
+        <div className="flex flex-col gap-3 rounded-xl bg-tone-warning-bg p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-tone-warning-fg">Paiement enregistré, pas encore vérifié : il ne réduit pas encore la dette du fournisseur.</p>
           {can('supplier_payments.verify') && (
             <SimpleAction url={`/api/admin/gestion/payments/${payment.id}/verify`} label="Vérifier le paiement"
               confirmText={`Confirmez que ${money(payment.amount)} ont bien quitté votre compte ou votre caisse.`} />
@@ -56,15 +59,15 @@ export default async function PaymentDetailPage({ params }: { params: { id: stri
         </div>
       )}
       {payment.status === 'voided' && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100">
+        <p className="rounded-xl bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">
           Paiement annulé le {formatDateTime(payment.voided_at)}{payment.void_reason ? ` : ${payment.void_reason}` : ''}. Ses affectations ont été retirées.
         </p>
       )}
 
       <section aria-label="Montants" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat label="Montant" value={money(payment.amount)} />
-        <Stat label="Affecté aux achats" value={money(payment.allocated)} />
-        <Stat label="Non affecté" value={money(unallocated)} tone={unallocated > 0 && payment.status !== 'voided' ? 'warn' : 'neutral'} />
+        <AdminStatCard title="Montant" value={money(payment.amount)} />
+        <AdminStatCard title="Affecté aux achats" value={money(payment.allocated)} />
+        <AdminStatCard title="Non affecté" value={money(unallocated)} tone={unallocated > 0 && payment.status !== 'voided' ? 'warning' : 'neutral'} />
       </section>
 
       <Panel title="Détails">
@@ -82,12 +85,12 @@ export default async function PaymentDetailPage({ params }: { params: { id: stri
           <Field label="Vérifié">{payment.verified_at ? `${formatDateTime(payment.verified_at)}${payment.verified_by ? ` par ${payment.verified_by}` : ''}` : 'Non'}</Field>
         </div>
         {payment.supplier_instruction_note && (
-          <div className="mt-4 rounded-xl bg-sky-50 p-3 text-sm text-sky-900 dark:bg-sky-950/40 dark:text-sky-100">
+          <div className="mt-4 rounded-xl bg-tone-info-bg p-3 text-sm text-tone-info-fg">
             <p className="text-xs font-medium">Instruction du fournisseur</p>
             <p className="mt-0.5 whitespace-pre-line">{payment.supplier_instruction_note}</p>
           </div>
         )}
-        {payment.notes && <p className="mt-3 whitespace-pre-line rounded-xl bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-800/60 dark:text-gray-200">{payment.notes}</p>}
+        {payment.notes && <p className="mt-3 whitespace-pre-line rounded-xl bg-a-surface-2 p-3 text-sm text-a-text-2">{payment.notes}</p>}
         {canVoid && (
           <div className="mt-4">
             <ReasonAction url={`/api/admin/gestion/payments/${payment.id}/void`} label="Annuler le paiement" confirmLabel="Confirmer l'annulation"
@@ -100,11 +103,11 @@ export default async function PaymentDetailPage({ params }: { params: { id: stri
 
       <Panel title="Affectations" description="Répartition du paiement sur les achats du fournisseur.">
         <div className="space-y-4">
-          {payment.allocations.length === 0 ? <p className="text-sm text-gray-500 dark:text-gray-400">Paiement non affecté (avance au fournisseur).</p> : (
-            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {payment.allocations.length === 0 ? <p className="text-sm text-a-text-3">Paiement non affecté (avance au fournisseur).</p> : (
+            <ul className="divide-y divide-a-border">
               {payment.allocations.map((allocation) => (
                 <li key={allocation.id} className={`flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between ${allocation.reversed_at ? 'opacity-60' : ''}`}>
-                  <Link href={`/admin/gestion/achats/${allocation.purchase_id}`} className="font-mono text-sm font-medium text-gray-900 hover:underline dark:text-gray-100">
+                  <Link href={`/admin/gestion/achats/${allocation.purchase_id}`} className="font-mono text-sm font-medium text-a-text hover:underline">
                     {allocation.purchase_reference}
                   </Link>
                   <div className="flex flex-wrap items-center gap-2">

@@ -2,7 +2,10 @@ import Link from 'next/link';
 import AdminPageHeader from '../../../../_components/ui/AdminPageHeader';
 import { requireBusinessManagementPage } from '@/lib/gestion/featureGate';
 import { listActiveSupplierOptions } from '@/lib/gestion/queries';
-import { Breadcrumb, CARD_CLS, EmptyState, PRIMARY_LINK_CLS } from '../../_components/ui';
+import { cardClasses } from '@/app/admin/_components/ui/Panel';
+import { EmptyState } from '@/app/admin/_components/ui/States';
+import { Breadcrumb } from '@/app/admin/_components/ui/AdminPageHeader';
+import { buttonClasses } from '@/app/admin/_components/ui/Button';
 import { PurchaseForm } from '../PurchaseForm';
 
 export const dynamic = 'force-dynamic';
@@ -21,10 +24,10 @@ export default async function NewPurchasePage({ searchParams }: { searchParams: 
         <EmptyState
           title="Aucun fournisseur actif"
           description="Créez d'abord le fournisseur auprès duquel vous achetez."
-          action={can('suppliers.manage') ? <Link href="/admin/gestion/fournisseurs/nouveau" className={PRIMARY_LINK_CLS}>Nouveau fournisseur</Link> : undefined}
+          action={can('suppliers.manage') ? <Link href="/admin/gestion/fournisseurs/nouveau" className={buttonClasses({ variant: 'primary' })}>Nouveau fournisseur</Link> : undefined}
         />
       ) : (
-        <div className={`${CARD_CLS} p-4 sm:p-6`}>
+        <div className={`${cardClasses} p-4 sm:p-6`}>
           <PurchaseForm suppliers={suppliers} currency={tenant.currency} initial={{ supplier_id: preselected }} />
         </div>
       )}

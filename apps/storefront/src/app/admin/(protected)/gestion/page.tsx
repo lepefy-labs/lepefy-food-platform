@@ -8,7 +8,11 @@ import {
   GESTION_VIEW_PERMISSIONS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONES,
   PAYMENT_STATE_LABELS, PAYMENT_STATE_TONES, PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, purchasePaymentState,
 } from '@/lib/gestion/domain';
-import { Badge, CARD_CLS, EmptyState, Panel, SECONDARY_LINK_CLS, Stat } from './_components/ui';
+import Badge from '@/app/admin/_components/ui/Badge';
+import { Panel, cardClasses } from '@/app/admin/_components/ui/Panel';
+import { EmptyState } from '@/app/admin/_components/ui/States';
+import { buttonClasses } from '@/app/admin/_components/ui/Button';
+import AdminStatCard from '@/app/admin/_components/ui/AdminStatCard';
 import { DueList } from './_components/DueList';
 import ExportExcelButton from './_components/ExportExcelButton';
 import type { GestionExportType } from '@/lib/gestion/exportData';
@@ -49,30 +53,30 @@ export default async function GestionDashboardPage() {
       {quickActions.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {quickActions.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className={SECONDARY_LINK_CLS}><Icon size={18} aria-hidden="true" />{label}</Link>
+            <Link key={href} href={href} className={buttonClasses({ variant: 'secondary' })}><Icon size={18} aria-hidden="true" />{label}</Link>
           ))}
         </div>
       )}
 
       <section aria-label="Échéances" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="À payer" value={money(data.dues.toPay)} hint={`${data.dues.toPayCount} achat(s) engagé(s)`} tone={data.dues.toPay > 0 ? 'warn' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=unpaid' : undefined} />
-        <Stat label="À payer sous 7 jours" value={money(data.dues.dueSoon)} hint={`${data.dues.dueSoonCount} échéance(s)`} tone={data.dues.dueSoonCount > 0 ? 'warn' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=due_soon' : undefined} />
-        <Stat label="En retard" value={money(data.dues.overdue)} hint={`${data.dues.overdueCount} échéance(s) dépassée(s)`} tone={data.dues.overdueCount > 0 ? 'danger' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=overdue' : undefined} />
-        <Stat label="Paiements à vérifier" value={String(data.paymentsToVerifyCount)} hint={money(data.paymentsToVerifyAmount)} tone={data.paymentsToVerifyCount > 0 ? 'warn' : 'neutral'} href={can('treasury.view') ? '/admin/gestion/tresorerie?status=recorded' : undefined} />
+        <AdminStatCard title="À payer" value={money(data.dues.toPay)} description={`${data.dues.toPayCount} achat(s) engagé(s)`} tone={data.dues.toPay > 0 ? 'warning' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=unpaid' : undefined} />
+        <AdminStatCard title="À payer sous 7 jours" value={money(data.dues.dueSoon)} description={`${data.dues.dueSoonCount} échéance(s)`} tone={data.dues.dueSoonCount > 0 ? 'warning' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=due_soon' : undefined} />
+        <AdminStatCard title="En retard" value={money(data.dues.overdue)} description={`${data.dues.overdueCount} échéance(s) dépassée(s)`} tone={data.dues.overdueCount > 0 ? 'danger' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?pay=overdue' : undefined} />
+        <AdminStatCard title="Paiements à vérifier" value={String(data.paymentsToVerifyCount)} description={money(data.paymentsToVerifyAmount)} tone={data.paymentsToVerifyCount > 0 ? 'warning' : 'neutral'} href={can('treasury.view') ? '/admin/gestion/tresorerie?status=recorded' : undefined} />
       </section>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Achats ouverts" value={String(data.openPurchases)} hint="Brouillons, commandés, reçus en partie" href={can('purchases.view') ? '/admin/gestion/achats?status=open' : undefined} />
-        <Stat label="Réceptions en attente" value={String(data.toReceive)} hint="Commandés, pas encore tout reçu" tone={data.toReceive > 0 ? 'info' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?status=to_receive' : undefined} />
-        <Stat label="Payé vérifié (30 jours)" value={money(data.paidVerified30d)} tone="success" />
-        <div className={`${CARD_CLS} px-4 py-3.5`}>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Points d&apos;attention</p>
+        <AdminStatCard title="Achats ouverts" value={String(data.openPurchases)} description="Brouillons, commandés, reçus en partie" href={can('purchases.view') ? '/admin/gestion/achats?status=open' : undefined} />
+        <AdminStatCard title="Réceptions en attente" value={String(data.toReceive)} description="Commandés, pas encore tout reçu" tone={data.toReceive > 0 ? 'info' : 'neutral'} href={can('purchases.view') ? '/admin/gestion/achats?status=to_receive' : undefined} />
+        <AdminStatCard title="Payé vérifié (30 jours)" value={money(data.paidVerified30d)} tone="success" />
+        <div className={`${cardClasses} px-4 py-3.5`}>
+          <p className="text-xs font-medium uppercase tracking-wide text-a-text-3">Points d&apos;attention</p>
           {anomalies.length === 0 ? (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Aucune anomalie détectée.</p>
+            <p className="mt-1 text-sm text-a-text-2">Aucune anomalie détectée.</p>
           ) : (
             <ul className="mt-1 space-y-1.5">
               {anomalies.map((anomaly) => (
                 <li key={anomaly.text}>
-                  <Link href={anomaly.href} className="flex items-start gap-2 text-sm text-amber-800 hover:underline dark:text-amber-200">
+                  <Link href={anomaly.href} className="flex items-start gap-2 text-sm text-tone-warning-fg hover:underline">
                     <IconAlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" />{anomaly.text}
                   </Link>
                 </li>
@@ -84,28 +88,28 @@ export default async function GestionDashboardPage() {
 
       {(can('purchases.view') || can('treasury.view')) && (
         <Panel id="echeances" title="Échéances fournisseurs" description={data.dues.noDueCount > 0 ? `${data.dues.noDueCount} achat(s) à payer sans échéance.` : 'Achats engagés avec un reste à payer, par urgence.'}
-          actions={can('purchases.view') ? <Link href="/admin/gestion/achats?pay=unpaid" className="text-sm font-medium text-[var(--admin-primary-fg)] hover:underline">Tout voir</Link> : undefined}>
+          actions={can('purchases.view') ? <Link href="/admin/gestion/achats?pay=unpaid" className="text-sm font-medium text-a-brand-fg hover:underline">Tout voir</Link> : undefined}>
           <DueList items={data.dues.items} today={data.dues.today} />
         </Panel>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {can('purchases.view') && (
-          <Panel title="Derniers achats" actions={<Link href="/admin/gestion/achats" className="text-sm font-medium text-[var(--admin-primary-fg)] hover:underline">Tout voir</Link>}>
+          <Panel title="Derniers achats" actions={<Link href="/admin/gestion/achats" className="text-sm font-medium text-a-brand-fg hover:underline">Tout voir</Link>}>
             {data.recentPurchases.length === 0 ? (
               <EmptyState title="Aucun achat enregistré" description="Créez un achat pour suivre la marchandise commandée et ce qui reste à payer." />
             ) : (
-              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              <ul className="divide-y divide-a-border">
                 {data.recentPurchases.map((purchase) => {
                   const state = purchasePaymentState(purchase);
                   return (
                     <li key={purchase.id}>
-                      <Link href={`/admin/gestion/achats/${purchase.id}`} className="flex flex-col gap-1 py-3 hover:bg-gray-50 sm:-mx-2 sm:px-2 dark:hover:bg-white/5">
+                      <Link href={`/admin/gestion/achats/${purchase.id}`} className="flex flex-col gap-1 py-3 hover:bg-a-surface-2 sm:-mx-2 sm:px-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">{purchase.reference}</span>
+                          <span className="font-mono text-sm font-medium text-a-text">{purchase.reference}</span>
                           <span className="text-sm font-semibold tabular-nums">{formatMoney(purchase.total, purchase.currency)}</span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">
                           <span>{purchase.supplier_name} • {formatDate(purchase.order_date)}</span>
                           <Badge tone={PURCHASE_STATUS_TONES[purchase.status]}>{PURCHASE_STATUS_LABELS[purchase.status]}</Badge>
                           <Badge tone={PAYMENT_STATE_TONES[state]}>{PAYMENT_STATE_LABELS[state]}</Badge>
@@ -119,19 +123,19 @@ export default async function GestionDashboardPage() {
           </Panel>
         )}
         {can('treasury.view') && (
-          <Panel title="Derniers paiements" actions={<Link href="/admin/gestion/tresorerie" className="text-sm font-medium text-[var(--admin-primary-fg)] hover:underline">Trésorerie</Link>}>
+          <Panel title="Derniers paiements" actions={<Link href="/admin/gestion/tresorerie" className="text-sm font-medium text-a-brand-fg hover:underline">Trésorerie</Link>}>
             {data.recentPayments.length === 0 ? (
               <EmptyState title="Aucun paiement fournisseur" description="Les paiements enregistrés apparaîtront ici, avec leur statut de vérification." />
             ) : (
-              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              <ul className="divide-y divide-a-border">
                 {data.recentPayments.map((payment) => (
                   <li key={payment.id}>
-                    <Link href={`/admin/gestion/tresorerie/${payment.id}`} className="flex flex-col gap-1 py-3 hover:bg-gray-50 sm:-mx-2 sm:px-2 dark:hover:bg-white/5">
+                    <Link href={`/admin/gestion/tresorerie/${payment.id}`} className="flex flex-col gap-1 py-3 hover:bg-a-surface-2 sm:-mx-2 sm:px-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{payment.supplier_name}</span>
+                        <span className="text-sm font-medium text-a-text">{payment.supplier_name}</span>
                         <span className="text-sm font-semibold tabular-nums">{formatMoney(payment.amount, payment.currency)}</span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">
                         <span>{formatDate(payment.payment_date)} • {PAYMENT_METHOD_LABELS[payment.method]}{payment.beneficiary_type === 'third_party' ? ` • Tiers : ${payment.beneficiary_name}` : ''}</span>
                         <Badge tone={PAYMENT_STATUS_TONES[payment.status]}>{PAYMENT_STATUS_LABELS[payment.status]}</Badge>
                       </div>

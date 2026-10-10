@@ -75,7 +75,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - **Selezione** (`RowSelection.tsx`, client): `RowSelectionProvider` (si azzera con le righe visibili), `RowCheckbox`, `SelectAllCheckbox` (stato indeterminato), `BulkBar` fluttuante con le azioni sugli id selezionati.
 - **`Pagination`** (server, solo link): « 1–50 sur 312 », pagine con salti, « Lignes par page 25 · 50 · 100 ».
 - **Stati** (`ui/States.tsx`): `EmptyState` (`empty` / `filtered`), `ErrorState` (con azione « Réessayer »), `Skeleton`, `ListPageSkeleton` per i `loading.tsx`.
-- **`Panel`**, `Card`, `DescriptionList`/`DescriptionItem` (`ui/Panel.tsx`, promossi da Gestion); **`AdminTabs`** (`ui/Tabs.tsx`) per le sotto-pagine (Livraison, WhatsApp, sezioni piattaforma).
+- **`Panel`**, `Card`, `cardClasses`, `DescriptionList`/`DescriptionItem`, `InfoField` (`ui/Panel.tsx`, promossi da Gestion); `Breadcrumb` autonomo (`ui/AdminPageHeader.tsx`); `controlClasses`, `labelClasses`, `hintClasses` per i form scritti a mano (`ui/Form.tsx`); **`AdminTabs`** (`ui/Tabs.tsx`) per le sotto-pagine (Livraison, WhatsApp, sezioni piattaforma).
 
 ### Shell e navigazione (`src/lib/admin/navigation.ts`, `src/app/admin/_components/shell/`)
 - **Registry** `ADMIN_NAV` (voci) e `ADMIN_QUICK_ACTIONS` (azioni della palette): `id`, `label`, `href`, `icon`, `group`, `workspace`, `anyOf` (capability), `flag` (`gestion`, `whatsapp`), `match`/`alsoActive`, `badge` (chiave + tono), `mobile` (posizione nella barra), `keywords`. Aggiungere un modulo = una voce; il gruppo appare se ha almeno una voce visibile.
@@ -118,5 +118,6 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U6 | Livraison: classi legacy convertite ai token (codemod), token « inverse » | ✅ |
 | U7 | Clients: lista sul kit (segmenti come viste, KPI con icone, pannello filtri con numeri/date, DataTable con card mobile, Pagination), export con lo stesso ordinamento della lista; componenti condivisi residui sui token | ✅ |
 | U8 | Catalogue: lista convertita a Server Component + URL (`lib/catalog/catalogueList.ts` condiviso con `GET /api/admin/catalogue`), isola client per stock/statut inline e azioni massive con esito per prodotto; editor, media, categorie, gruppi di quantità ed etichette sui token | ✅ |
-| U9–U11 | Gestion, Événementiel, altri moduli | — |
+| U9 | Gestion: kit locale rimosso, tutto sul kit condiviso (`Panel`, `AdminStatCard`, `Badge`, `EmptyState`, `InfoField`, `Breadcrumb`, `controlClasses`/`labelClasses`/`hintClasses`, `useAdminMutation`), toni di dominio allineati (`warning`) | ✅ |
+| U10–U11 | Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |

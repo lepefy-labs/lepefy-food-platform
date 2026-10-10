@@ -10,7 +10,12 @@ import {
   PURCHASE_STATUS_LABELS, PURCHASE_STATUS_TONES, PURCHASE_UNIT_LABELS, DUE_STATE_TONES, dueInfo, dueLabel, gestionToday,
   purchasePaymentState, receiptProgress,
 } from '@/lib/gestion/domain';
-import { Badge, Breadcrumb, EmptyState, Panel, PRIMARY_LINK_CLS, SECONDARY_LINK_CLS, Stat } from '../../_components/ui';
+import Badge from '@/app/admin/_components/ui/Badge';
+import { Panel } from '@/app/admin/_components/ui/Panel';
+import { EmptyState } from '@/app/admin/_components/ui/States';
+import { Breadcrumb } from '@/app/admin/_components/ui/AdminPageHeader';
+import { buttonClasses } from '@/app/admin/_components/ui/Button';
+import AdminStatCard from '@/app/admin/_components/ui/AdminStatCard';
 import { ReasonAction, SimpleAction } from '../../_components/actions';
 import { DocumentsPanel } from '../../_components/DocumentsPanel';
 import { AuditTimeline } from '../../_components/AuditTimeline';
@@ -53,7 +58,7 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
         <Breadcrumb items={[{ label: 'Gestion', href: '/admin/gestion' }, { label: 'Achats', href: '/admin/gestion/achats' }, { label: purchase.reference }]} />
         <AdminPageHeader
           title={`Achat ${purchase.reference}`}
-          meta={<Link href={`/admin/gestion/fournisseurs/${purchase.supplier_id}`} className="font-medium text-[var(--admin-primary-fg)] hover:underline">{purchase.supplier_name}</Link>}
+          meta={<Link href={`/admin/gestion/fournisseurs/${purchase.supplier_id}`} className="font-medium text-a-brand-fg hover:underline">{purchase.supplier_name}</Link>}
           description={`Commandé le ${formatDate(purchase.order_date)}${purchase.supplier_reference ? ` • Réf. fournisseur ${purchase.supplier_reference}` : ''}${purchase.expected_date ? ` • livraison prévue le ${formatDate(purchase.expected_date)}` : ''}`}
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -65,39 +70,39 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
       </div>
 
       {purchase.status === 'cancelled' && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-100">
+        <p className="rounded-xl bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">
           Achat annulé{purchase.cancel_reason ? ` : ${purchase.cancel_reason}` : ''}. Il n&apos;entre plus dans la dette fournisseur.
         </p>
       )}
 
       <section aria-label="Synthèse" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Commandé" value={money(purchase.total)} hint={purchase.additional_costs ? `dont frais ${money(purchase.additional_costs)}` : undefined} />
-        <Stat label="Reçu" value={purchase.status === 'draft' ? '-' : `${received} %`} hint={`${progress.completeLines} / ${progress.lines} ligne(s) complète(s)`} tone={received === 100 ? 'success' : received > 0 ? 'warn' : 'neutral'} />
-        <Stat label="Payé vérifié" value={money(purchase.paid_verified)} tone="success" />
-        <Stat label="Enregistré à vérifier" value={money(purchase.paid_unverified)} hint="Ne réduit pas encore la dette" tone={purchase.paid_unverified > 0 ? 'warn' : 'neutral'} />
-        <Stat label="Reste à payer" value={money(purchase.outstanding)} tone={purchase.outstanding > 0 ? 'warn' : 'success'} />
+        <AdminStatCard title="Commandé" value={money(purchase.total)} description={purchase.additional_costs ? `dont frais ${money(purchase.additional_costs)}` : undefined} />
+        <AdminStatCard title="Reçu" value={purchase.status === 'draft' ? '-' : `${received} %`} description={`${progress.completeLines} / ${progress.lines} ligne(s) complète(s)`} tone={received === 100 ? 'success' : received > 0 ? 'warning' : 'neutral'} />
+        <AdminStatCard title="Payé vérifié" value={money(purchase.paid_verified)} tone="success" />
+        <AdminStatCard title="Enregistré à vérifier" value={money(purchase.paid_unverified)} description="Ne réduit pas encore la dette" tone={purchase.paid_unverified > 0 ? 'warning' : 'neutral'} />
+        <AdminStatCard title="Reste à payer" value={money(purchase.outstanding)} tone={purchase.outstanding > 0 ? 'warning' : 'success'} />
       </section>
 
-      <section aria-label="Échéance de paiement" className="flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800 dark:bg-gray-900">
+      <section aria-label="Échéance de paiement" className="flex flex-col gap-2 rounded-2xl border border-a-border bg-a-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Échéance de paiement</span>
-          <span className="text-sm font-semibold text-gray-950 dark:text-gray-100">{purchase.payment_due_date ? formatDate(purchase.payment_due_date) : 'Aucune'}</span>
+          <span className="text-sm text-a-text-3">Échéance de paiement</span>
+          <span className="text-sm font-semibold text-a-text">{purchase.payment_due_date ? formatDate(purchase.payment_due_date) : 'Aucune'}</span>
           <Badge tone={DUE_STATE_TONES[due.state]}>{dueLabel(due)}</Badge>
         </div>
         {can('purchases.manage') && purchase.status !== 'cancelled' && <DueDateForm purchaseId={purchase.id} current={purchase.payment_due_date} />}
       </section>
 
       <div className="flex flex-wrap gap-2">
-        {receivable && can('inventory.manage') && <a href="#reception" className={PRIMARY_LINK_CLS}><IconPackageImport size={18} aria-hidden="true" />Enregistrer une réception</a>}
+        {receivable && can('inventory.manage') && <a href="#reception" className={buttonClasses({ variant: 'primary' })}><IconPackageImport size={18} aria-hidden="true" />Enregistrer une réception</a>}
         {payable && can('treasury.manage') && (
-          <Link href={`/admin/gestion/tresorerie/nouveau?supplier=${purchase.supplier_id}&purchase=${purchase.id}`} className={receivable ? SECONDARY_LINK_CLS : PRIMARY_LINK_CLS}>
+          <Link href={`/admin/gestion/tresorerie/nouveau?supplier=${purchase.supplier_id}&purchase=${purchase.id}`} className={receivable ? buttonClasses({ variant: 'secondary' }) : buttonClasses({ variant: 'primary' })}>
             <IconCash size={18} aria-hidden="true" />Enregistrer un paiement
           </Link>
         )}
         {can('purchases.manage') && purchase.status === 'draft' && (
           <SimpleAction url={`/api/admin/gestion/purchases/${purchase.id}/status`} body={{ status: 'ordered' }} label="Passer la commande" variant="outline" />
         )}
-        {can('purchases.manage') && editable && <Link href={`/admin/gestion/achats/${purchase.id}/modifier`} className={SECONDARY_LINK_CLS}>Modifier</Link>}
+        {can('purchases.manage') && editable && <Link href={`/admin/gestion/achats/${purchase.id}/modifier`} className={buttonClasses({ variant: 'secondary' })}>Modifier</Link>}
         {can('purchases.manage') && cancellable && (
           <ReasonAction url={`/api/admin/gestion/purchases/${purchase.id}/status`} body={{ status: 'cancelled' }}
             label="Annuler l'achat" confirmLabel="Confirmer l'annulation"
@@ -108,32 +113,32 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
       <Panel id="articles" title="Articles" description={`${purchase.items.length} ligne(s) • coûts saisis, total recalculé par le serveur`}>
         {purchase.items.length === 0 ? <EmptyState title="Aucun article" description="Ajoutez des articles avant de passer la commande." /> : (
           <>
-            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            <ul className="divide-y divide-a-border">
               {purchase.items.map((item) => (
                 <li key={item.id} className="grid gap-1 py-3 first:pt-0 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.description}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{item.product_id ? `Catalogue : ${item.product_name ?? 'produit'}` : 'Hors catalogue (stock non suivi)'}</p>
+                    <p className="text-sm font-medium text-a-text">{item.description}</p>
+                    <p className="text-xs text-a-text-3">{item.product_id ? `Catalogue : ${item.product_name ?? 'produit'}` : 'Hors catalogue (stock non suivi)'}</p>
                   </div>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <p className="text-sm text-a-text-2">
                     {formatQuantityWithUnit(item.ordered_quantity, item.purchase_unit)} × {formatMoney(item.unit_cost, purchase.currency)} / {PURCHASE_UNIT_LABELS[item.purchase_unit]}
-                    <span className="block text-xs text-gray-500 dark:text-gray-400">Reçu {formatQuantityWithUnit(item.received_quantity, item.purchase_unit)} / {formatQuantity(item.ordered_quantity)}</span>
+                    <span className="block text-xs text-a-text-3">Reçu {formatQuantityWithUnit(item.received_quantity, item.purchase_unit)} / {formatQuantity(item.ordered_quantity)}</span>
                     {item.product_id && item.stock_units_per_purchase_unit !== null && (
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">1 {PURCHASE_UNIT_LABELS[item.purchase_unit]} = {formatStockUnits(item.stock_units_per_purchase_unit)} en stock</span>
+                      <span className="block text-xs text-a-text-3">1 {PURCHASE_UNIT_LABELS[item.purchase_unit]} = {formatStockUnits(item.stock_units_per_purchase_unit)} en stock</span>
                     )}
                   </p>
-                  <p className="text-sm font-semibold tabular-nums text-gray-900 sm:text-right dark:text-gray-100">{money(item.line_total)}</p>
+                  <p className="text-sm font-semibold tabular-nums text-a-text sm:text-right">{money(item.line_total)}</p>
                 </li>
               ))}
             </ul>
-            <dl className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-sm dark:border-gray-800">
-              <div className="flex justify-between"><dt className="text-gray-500 dark:text-gray-400">Sous-total</dt><dd className="tabular-nums">{money(purchase.subtotal)}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500 dark:text-gray-400">Frais supplémentaires</dt><dd className="tabular-nums">{money(purchase.additional_costs)}</dd></div>
+            <dl className="mt-3 space-y-1 border-t border-a-border pt-3 text-sm">
+              <div className="flex justify-between"><dt className="text-a-text-3">Sous-total</dt><dd className="tabular-nums">{money(purchase.subtotal)}</dd></div>
+              <div className="flex justify-between"><dt className="text-a-text-3">Frais supplémentaires</dt><dd className="tabular-nums">{money(purchase.additional_costs)}</dd></div>
               <div className="flex justify-between font-semibold"><dt>Total</dt><dd className="tabular-nums">{money(purchase.total)}</dd></div>
             </dl>
           </>
         )}
-        {purchase.notes && <p className="mt-3 whitespace-pre-line rounded-xl bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-800/60 dark:text-gray-200">{purchase.notes}</p>}
+        {purchase.notes && <p className="mt-3 whitespace-pre-line rounded-xl bg-a-surface-2 p-3 text-sm text-a-text-2">{purchase.notes}</p>}
       </Panel>
 
       <Panel id="receptions" title="Réceptions" description="Chaque réception augmente le stock des produits liés, une seule fois.">
@@ -145,28 +150,28 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
               unit: item.purchase_unit, conversion: item.stock_units_per_purchase_unit,
             }))} />
           )}
-          {purchase.status === 'draft' && <p className="text-sm text-gray-600 dark:text-gray-300">Passez la commande pour pouvoir enregistrer une réception.</p>}
+          {purchase.status === 'draft' && <p className="text-sm text-a-text-2">Passez la commande pour pouvoir enregistrer une réception.</p>}
           {purchase.receipts.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Aucune réception enregistrée.</p>
+            <p className="text-sm text-a-text-3">Aucune réception enregistrée.</p>
           ) : (
             <ul className="space-y-3">
               {purchase.receipts.map((receipt) => (
-                <li key={receipt.id} className={`rounded-xl border p-3 ${receipt.status === 'reversed' ? 'border-gray-200 opacity-70 dark:border-gray-800' : 'border-gray-200 dark:border-gray-700'}`}>
+                <li key={receipt.id} className={`rounded-xl border p-3 ${receipt.status === 'reversed' ? 'border-a-border opacity-70' : 'border-a-border'}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <p className="text-sm font-medium text-a-text">
                       <span className="font-mono">{receipt.reference}</span> • {formatDateTime(receipt.received_at)}
                     </p>
                     {receipt.status === 'reversed' ? <Badge tone="danger">Annulée</Badge> : <Badge tone="success">Reçue</Badge>}
                   </div>
-                  <ul className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                  <ul className="mt-1 text-sm text-a-text-2">
                     {receipt.lines.map((line) => (
                       <li key={line.purchase_item_id}>
                         {formatQuantityWithUnit(line.quantity, line.purchase_unit)} • {line.description}
-                        {line.stock_units !== null && <span className="text-gray-500 dark:text-gray-400"> (+{formatStockUnits(line.stock_units)} en stock)</span>}
+                        {line.stock_units !== null && <span className="text-a-text-3"> (+{formatStockUnits(line.stock_units)} en stock)</span>}
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-a-text-3">
                     {receipt.created_by ? `Par ${receipt.created_by}` : ''}{receipt.notes ? ` • ${receipt.notes}` : ''}
                     {receipt.reversal_reason ? ` • Annulée : ${receipt.reversal_reason}` : ''}
                   </p>
@@ -188,17 +193,17 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
           {purchase.allocations.length === 0 ? (
             <EmptyState title="Aucun paiement affecté" description={payable ? 'Enregistrez un paiement puis affectez-le à cet achat.' : undefined} />
           ) : (
-            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            <ul className="divide-y divide-a-border">
               {purchase.allocations.map((allocation) => {
                 const payment = allocation.payment;
                 const reversed = Boolean(allocation.reversed_at);
                 return (
                   <li key={allocation.id} className={`flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between ${reversed ? 'opacity-60' : ''}`}>
                     <Link href={`/admin/gestion/tresorerie/${payment.id}`} className="min-w-0 hover:underline">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <p className="text-sm font-medium text-a-text">
                         {formatDate(payment.payment_date)} • <span className="tabular-nums">{money(allocation.amount)}</span> • {PAYMENT_METHOD_LABELS[payment.method]}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-a-text-3">
                         {payment.beneficiary_type === 'third_party' ? `Tiers : ${payment.beneficiary_name}` : payment.beneficiary_name}
                         {' • '}<span className="font-mono">{payment.reference}</span>
                         {allocation.amount !== payment.amount ? ` • sur un paiement de ${formatMoney(payment.amount, payment.currency)}` : ''}

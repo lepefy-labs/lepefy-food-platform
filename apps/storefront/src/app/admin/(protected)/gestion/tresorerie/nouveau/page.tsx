@@ -2,7 +2,10 @@ import Link from 'next/link';
 import AdminPageHeader from '../../../../_components/ui/AdminPageHeader';
 import { requireBusinessManagementPage } from '@/lib/gestion/featureGate';
 import { listActiveSupplierOptions, listPurchases } from '@/lib/gestion/queries';
-import { Breadcrumb, CARD_CLS, EmptyState, PRIMARY_LINK_CLS } from '../../_components/ui';
+import { cardClasses } from '@/app/admin/_components/ui/Panel';
+import { EmptyState } from '@/app/admin/_components/ui/States';
+import { Breadcrumb } from '@/app/admin/_components/ui/AdminPageHeader';
+import { buttonClasses } from '@/app/admin/_components/ui/Button';
 import { PaymentForm } from '../PaymentForm';
 
 export const dynamic = 'force-dynamic';
@@ -27,9 +30,9 @@ export default async function NewPaymentPage({ searchParams }: { searchParams: {
       <Breadcrumb items={[{ label: 'Gestion', href: '/admin/gestion' }, { label: 'Trésorerie', href: '/admin/gestion/tresorerie' }, { label: 'Nouveau paiement' }]} />
       <AdminPageHeader title="Enregistrer un paiement fournisseur" description="Une référence PAY est attribuée automatiquement. Ajoutez le justificatif après l'enregistrement." />
       {suppliers.length === 0 ? (
-        <EmptyState title="Aucun fournisseur actif" action={can('suppliers.manage') ? <Link href="/admin/gestion/fournisseurs/nouveau" className={PRIMARY_LINK_CLS}>Nouveau fournisseur</Link> : undefined} />
+        <EmptyState title="Aucun fournisseur actif" action={can('suppliers.manage') ? <Link href="/admin/gestion/fournisseurs/nouveau" className={buttonClasses({ variant: 'primary' })}>Nouveau fournisseur</Link> : undefined} />
       ) : (
-        <div className={`${CARD_CLS} p-4 sm:p-6`}>
+        <div className={`${cardClasses} p-4 sm:p-6`}>
           <PaymentForm suppliers={suppliers} purchases={open} initialSupplierId={searchParams.supplier} initialPurchaseId={searchParams.purchase} />
         </div>
       )}

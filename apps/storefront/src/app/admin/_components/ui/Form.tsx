@@ -9,6 +9,11 @@ export const inputClasses = cn(
   'aria-[invalid=true]:border-tone-danger-solid',
 );
 
+/** Text control with the standard height, for hand-written forms. */
+export const controlClasses = cn(inputClasses, 'min-h-10 py-2');
+export const labelClasses = 'mb-1.5 block text-sm font-semibold text-a-text';
+export const hintClasses = 'mt-1.5 text-xs leading-5 text-a-text-3';
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
   return <input ref={ref} className={cn(inputClasses, 'min-h-10 py-2', className)} {...rest} />;
 });

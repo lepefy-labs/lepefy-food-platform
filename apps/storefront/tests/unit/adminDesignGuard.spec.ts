@@ -28,6 +28,7 @@ const MIGRATED = [
   '(protected)/clients',
   '(protected)/catalogue',
   '(protected)/products',
+  '(protected)/gestion',
   '_components/ui/Menu.tsx',
   '_components/ui/NotificationBell.tsx',
   '_components/ThemeToggleButton.tsx',

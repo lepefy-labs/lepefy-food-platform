@@ -48,33 +48,33 @@ export default function ExportExcelButton({ allowed }: { allowed: GestionExportT
 
   return <>
     <button type="button" onClick={() => dialog.current?.showModal()}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800">
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border bg-a-surface px-4 py-2 text-sm font-medium text-a-text shadow-sm hover:bg-a-surface-2">
       <IconDownload size={18} aria-hidden="true" />Exporter Excel
     </button>
-    <dialog ref={dialog} aria-label="Exporter Excel" className="w-[calc(100%-2rem)] max-w-md rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 shadow-2xl backdrop:bg-black/50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+    <dialog ref={dialog} aria-label="Exporter Excel" className="w-[calc(100%-2rem)] max-w-md rounded-2xl border border-a-border bg-a-surface p-0 text-a-text shadow-2xl backdrop:bg-black/50">
       <div className="max-h-[85vh] overflow-y-auto p-5 sm:p-6">
         <h2 className="text-lg font-semibold">Exporter Excel</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Photographie des données Gestion à consulter hors ligne.</p>
+        <p className="mt-1 text-sm text-a-text-3">Photographie des données Gestion à consulter hors ligne.</p>
         <fieldset className="mt-5 space-y-2">
           <legend className="mb-2 text-sm font-medium">Contenu</legend>
           {OPTIONS.filter((option) => allowed.includes(option.type)).map((option) =>
-            <label key={option.type} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700">
+            <label key={option.type} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-a-border px-3 py-2 text-sm">
               <input type="radio" name="gestion-export-type" value={option.type} checked={type === option.type} onChange={() => setType(option.type)} />
               {option.label}
             </label>)}
         </fieldset>
         <fieldset className="mt-5">
           <legend className="text-sm font-medium">Période personnalisée</legend>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Les fournisseurs et le stock actuel restent des données du jour.</p>
+          <p className="mt-1 text-xs text-a-text-3">Les fournisseurs et le stock actuel restent des données du jour.</p>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="text-sm">Du<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-700 dark:bg-gray-800" /></label>
-            <label className="text-sm">Au<input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-700 dark:bg-gray-800" /></label>
+            <label className="text-sm">Du<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-a-border-strong bg-a-surface p-2" /></label>
+            <label className="text-sm">Au<input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-a-border-strong bg-a-surface p-2" /></label>
           </div>
         </fieldset>
-        {error && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-tone-danger-fg">{error}</p>}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <button type="button" disabled={busy} onClick={() => dialog.current?.close()} className="rounded-lg border border-gray-300 px-4 py-2 text-sm dark:border-gray-700">Annuler</button>
-          <button type="button" disabled={busy} onClick={download} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
+          <button type="button" disabled={busy} onClick={() => dialog.current?.close()} className="rounded-lg border border-a-border-strong px-4 py-2 text-sm">Annuler</button>
+          <button type="button" disabled={busy} onClick={download} className="rounded-lg bg-a-inverse px-4 py-2 text-sm font-medium text-a-on-inverse disabled:opacity-50">
             {busy ? 'Préparation...' : 'Télécharger .xlsx'}
           </button>
         </div>

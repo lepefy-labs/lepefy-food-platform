@@ -253,7 +253,7 @@ Interne: `next_business_reference`, `log_business_event`, `business_text`, `busi
 
 ## Idempotency
 
-- Ogni creazione porta una **request key** (UUID generato dal form, riusato per retry/doppio clic, rinnovato solo dopo un successo: `useGestionMutation`).
+- Ogni creazione porta una **request key** (UUID generato dal form, riusato per retry/doppio clic, rinnovato solo dopo un successo: `useAdminMutation` del kit admin condiviso, opzione `withKey`).
 - Vincoli unici `(tenant_id, request_key)` su fornitori, acquisti, ricezioni, pagamenti, allocazioni, rettifiche; `pg_advisory_xact_lock` sulla chiave per le creazioni senza riga padre da bloccare.
 - Una seconda chiamata con la stessa chiave restituisce la riga esistente con `out_created = false` (nessun secondo incremento di stock, nessun secondo pagamento); stessa chiave su un'altra entità → `request_key_conflict`.
 - Verifica, annullamento e storni sono idempotenti sullo stato (`out_changed = false`).
@@ -341,3 +341,5 @@ L'export sincrono in memoria usa pagine da 500 righe e limiti espliciti: 1.000 f
 ## Future roadmap
 
 Workspace autonomo `gestion`, landed cost e costo medio ponderato con valorizzazione dell'inventario, promemoria delle scadenze, cash-flow consolidato con gli incassi (`tenant_card_payments`, ordini), import fatture/OCR, multi-magazzino e lotti, riconciliazione bancaria.
+
+> Interfaccia (ottobre 2026): Gestion usa il kit condiviso dell'Admin Design System V2 (`docs/ADMIN_DESIGN_SYSTEM.md`) — `Panel`, `AdminStatCard`, `Badge`, `EmptyState`, `InfoField`, `Breadcrumb`, classi di form `controlClasses`/`labelClasses`/`hintClasses`, `useAdminMutation`. Il kit locale `gestion/_components/ui.tsx` non esiste più; i toni di dominio (`lib/gestion/domain.ts` `Tone`) sono un sottoinsieme dei toni admin (`warning`, non più `warn`).

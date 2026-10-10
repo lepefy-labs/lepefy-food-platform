@@ -8,7 +8,7 @@ const DETAIL_KEYS: [string, string][] = [
 
 /** Historique issu de business_audit_events (métadonnées déjà assainies en base). */
 export function AuditTimeline({ events }: { events: AuditRow[] }) {
-  if (!events.length) return <p className="text-sm text-gray-500 dark:text-gray-400">Aucun événement enregistré.</p>;
+  if (!events.length) return <p className="text-sm text-a-text-3">Aucun événement enregistré.</p>;
   return (
     <ol className="space-y-3">
       {events.map((event) => {
@@ -17,11 +17,11 @@ export function AuditTimeline({ events }: { events: AuditRow[] }) {
           .map(([key, label]) => `${label} : ${String(event.metadata[key])}`);
         return (
           <li key={event.id} className="flex gap-3">
-            <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--admin-primary)]" />
+            <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-a-brand" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{AUDIT_EVENT_LABELS[event.event_type] ?? event.event_type}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(event.created_at)}{event.actor ? ` • ${event.actor}` : ''}</p>
-              {details.length > 0 && <p className="mt-0.5 break-words text-xs text-gray-600 dark:text-gray-300">{details.join(' • ')}</p>}
+              <p className="text-sm font-medium text-a-text">{AUDIT_EVENT_LABELS[event.event_type] ?? event.event_type}</p>
+              <p className="text-xs text-a-text-3">{formatDateTime(event.created_at)}{event.actor ? ` • ${event.actor}` : ''}</p>
+              {details.length > 0 && <p className="mt-0.5 break-words text-xs text-a-text-2">{details.join(' • ')}</p>}
             </div>
           </li>
         );

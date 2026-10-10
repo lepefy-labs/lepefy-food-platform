@@ -61,18 +61,19 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   other: 'Autre',
 };
 
-export type Tone = 'neutral' | 'info' | 'warn' | 'success' | 'danger';
+/** Subset of the admin semantic tones (lib/admin/tokens.ts). */
+export type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'danger';
 
 export const PURCHASE_STATUS_TONES: Record<PurchaseStatus, Tone> = {
   draft: 'neutral',
   ordered: 'info',
-  partially_received: 'warn',
+  partially_received: 'warning',
   received: 'success',
   cancelled: 'danger',
 };
 
 export const PAYMENT_STATUS_TONES: Record<PaymentStatus, Tone> = {
-  recorded: 'warn',
+  recorded: 'warning',
   verified: 'success',
   voided: 'danger',
 };
@@ -117,9 +118,9 @@ export const PAYMENT_STATE_TONES: Record<PaymentState, Tone> = {
   cancelled: 'danger',
   not_committed: 'neutral',
   paid: 'success',
-  to_verify: 'warn',
+  to_verify: 'warning',
   partially_paid: 'info',
-  to_pay: 'warn',
+  to_pay: 'warning',
   nothing_due: 'neutral',
 };
 
@@ -296,7 +297,7 @@ export function dueLabel(info: DueInfo): string {
 
 export const DUE_STATE_TONES: Record<DueState, Tone> = {
   cancelled: 'neutral', not_committed: 'neutral', paid: 'success', no_due: 'neutral',
-  overdue: 'danger', today: 'warn', due_soon: 'warn', upcoming: 'info',
+  overdue: 'danger', today: 'warning', due_soon: 'warning', upcoming: 'info',
 };
 
 /** Conditions de paiement proposées (persistance : nombre de jours, aucune énumération figée). */

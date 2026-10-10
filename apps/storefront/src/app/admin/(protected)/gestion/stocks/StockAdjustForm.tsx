@@ -5,8 +5,9 @@ import Link from 'next/link';
 import Button from '../../../_components/ui/Button';
 import { ADJUSTMENT_REASONS } from '@/lib/gestion/domain';
 import { formatStockUnits } from '@/lib/gestion/format';
-import { ErrorText, useGestionMutation } from '../_components/useGestionMutation';
-import { HINT_CLS, INPUT_CLS, LABEL_CLS } from '../_components/ui';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { controlClasses, labelClasses, hintClasses } from '@/app/admin/_components/ui/Form';
 
 interface ProductChoice { id: string; name: string; stock: number }
 
@@ -15,7 +16,7 @@ interface ProductChoice { id: string; name: string; stock: number }
  * directe de products.stock, jamais de stock négatif, aucun coût créé.
  */
 export function StockAdjustForm({ initialProduct, closeHref }: { initialProduct: ProductChoice | null; closeHref: string }) {
-  const { run, pending, error, setError } = useGestionMutation();
+  const { run, pending, error, setError } = useAdminMutation();
   const [product, setProduct] = useState<ProductChoice | null>(initialProduct);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ProductChoice[]>([]);
@@ -64,22 +65,22 @@ export function StockAdjustForm({ initialProduct, closeHref }: { initialProduct:
       }}
     >
       <div>
-        <span className={LABEL_CLS}>Produit *</span>
+        <span className={labelClasses}>Produit *</span>
         {product ? (
-          <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--admin-primary-soft)] px-3 py-2 text-sm">
-            <span className="font-medium text-[var(--admin-primary-fg)]">{product.name} • stock actuel {formatStockUnits(product.stock)}</span>
-            <button type="button" onClick={() => { setProduct(null); setDone(null); }} className="min-h-11 text-sm text-gray-700 underline dark:text-gray-200">Changer</button>
+          <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-lg bg-a-brand-soft px-3 py-2 text-sm">
+            <span className="font-medium text-a-brand-fg">{product.name} • stock actuel {formatStockUnits(product.stock)}</span>
+            <button type="button" onClick={() => { setProduct(null); setDone(null); }} className="min-h-11 text-sm text-a-text-2 underline">Changer</button>
           </div>
         ) : (
           <>
-            <input className={INPUT_CLS} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Rechercher un produit" aria-label="Rechercher un produit" />
+            <input className={controlClasses} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Rechercher un produit" aria-label="Rechercher un produit" />
             {results.length > 0 && (
-              <ul className="mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+              <ul className="mt-1 max-h-60 overflow-y-auto rounded-lg border border-a-border bg-a-surface">
                 {results.map((choice) => (
                   <li key={choice.id}>
-                    <button type="button" onClick={() => { setProduct(choice); setQ(''); }} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/5">
+                    <button type="button" onClick={() => { setProduct(choice); setQ(''); }} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-a-surface-2">
                       <span className="truncate">{choice.name}</span>
-                      <span className="shrink-0 text-xs text-gray-500">stock {choice.stock}</span>
+                      <span className="shrink-0 text-xs text-a-text-3">stock {choice.stock}</span>
                     </button>
                   </li>
                 ))}
@@ -91,10 +92,10 @@ export function StockAdjustForm({ initialProduct, closeHref }: { initialProduct:
 
       <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,10rem)_minmax(0,1fr)]">
         <fieldset>
-          <legend className={LABEL_CLS}>Variation *</legend>
+          <legend className={labelClasses}>Variation *</legend>
           <div className="flex gap-2">
             {(['add', 'remove'] as const).map((value) => (
-              <label key={value} className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${direction === value ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)] font-semibold' : 'border-gray-200 dark:border-gray-700'}`}>
+              <label key={value} className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${direction === value ? 'border-a-brand bg-a-brand-soft font-semibold' : 'border-a-border'}`}>
                 <input type="radio" name="direction" className="sr-only" checked={direction === value} onChange={() => setDirection(value)} />
                 {value === 'add' ? '+ Ajouter' : '- Retirer'}
               </label>
@@ -102,37 +103,37 @@ export function StockAdjustForm({ initialProduct, closeHref }: { initialProduct:
           </div>
         </fieldset>
         <label className="block">
-          <span className={LABEL_CLS}>Unités *</span>
-          <input inputMode="numeric" className={INPUT_CLS} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" />
+          <span className={labelClasses}>Unités *</span>
+          <input inputMode="numeric" className={controlClasses} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Motif *</span>
-          <select className={INPUT_CLS} value={reason} onChange={(event) => setReason(event.target.value)}>
+          <span className={labelClasses}>Motif *</span>
+          <select className={controlClasses} value={reason} onChange={(event) => setReason(event.target.value)}>
             {[...ADJUSTMENT_REASONS, 'Autre'].map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
       </div>
       {reason === 'Autre' && (
         <label className="block">
-          <span className={LABEL_CLS}>Motif précis *</span>
-          <input className={INPUT_CLS} value={customReason} maxLength={300} onChange={(event) => setCustomReason(event.target.value)} />
+          <span className={labelClasses}>Motif précis *</span>
+          <input className={controlClasses} value={customReason} maxLength={300} onChange={(event) => setCustomReason(event.target.value)} />
         </label>
       )}
       <label className="block">
-        <span className={LABEL_CLS}>Note (facultative)</span>
-        <input className={INPUT_CLS} value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} />
+        <span className={labelClasses}>Note (facultative)</span>
+        <input className={controlClasses} value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} />
       </label>
       {product && delta !== null && (
-        <p className={HINT_CLS}>
+        <p className={hintClasses}>
           {product.name} : {formatStockUnits(product.stock)} {delta > 0 ? '+' : '-'} {Math.abs(delta)} = {formatStockUnits(product.stock + delta)}.
           Une rectification ne modifie pas le coût d&apos;achat.
         </p>
       )}
       <ErrorText message={error} />
-      {done && <p role="status" className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{done}</p>}
+      {done && <p role="status" className="text-sm font-medium text-tone-success-fg">{done}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={pending} className="min-h-11">Enregistrer la rectification</Button>
-        <Link href={closeHref} className="inline-flex min-h-11 items-center px-3 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300">Fermer</Link>
+        <Link href={closeHref} className="inline-flex min-h-11 items-center px-3 text-sm text-a-text-2 hover:text-a-text">Fermer</Link>
       </div>
     </form>
   );

@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import Button from '../../../_components/ui/Button';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, isMoneyAmount, type PaymentMethod } from '@/lib/gestion/domain';
 import { formatDate, formatMoney, todayIso } from '@/lib/gestion/format';
-import { ErrorText, useGestionMutation } from '../_components/useGestionMutation';
-import { HINT_CLS, INPUT_CLS, LABEL_CLS } from '../_components/ui';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { controlClasses, labelClasses, hintClasses } from '@/app/admin/_components/ui/Form';
 
 export interface OpenPurchase {
   id: string;
@@ -33,7 +34,7 @@ export function PaymentForm({ suppliers, purchases, initialSupplierId, initialPu
   initialPurchaseId?: string;
 }) {
   const router = useRouter();
-  const { run, pending, error, setError } = useGestionMutation();
+  const { run, pending, error, setError } = useAdminMutation();
   const initialPurchase = purchases.find((purchase) => purchase.id === initialPurchaseId);
   const [supplierId, setSupplierId] = useState(initialPurchase?.supplier_id ?? initialSupplierId ?? '');
   const [amount, setAmount] = useState(initialPurchase ? String(initialPurchase.allocatable) : '');
@@ -102,56 +103,56 @@ export function PaymentForm({ suppliers, purchases, initialSupplierId, initialPu
     <form onSubmit={submit} className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className={LABEL_CLS}>Fournisseur (créancier) *</span>
-          <select className={INPUT_CLS} value={supplierId} required onChange={(event) => { setSupplierId(event.target.value); setAllocations({}); }}>
+          <span className={labelClasses}>Fournisseur (créancier) *</span>
+          <select className={controlClasses} value={supplierId} required onChange={(event) => { setSupplierId(event.target.value); setAllocations({}); }}>
             <option value="">Choisir un fournisseur</option>
             {suppliers.map((option) => <option key={option.id} value={option.id}>{option.name} ({option.code})</option>)}
           </select>
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Montant ({currency}) *</span>
-          <input inputMode="decimal" className={INPUT_CLS} value={amount} onChange={(event) => setAmount(event.target.value)} required placeholder="0,00" />
+          <span className={labelClasses}>Montant ({currency}) *</span>
+          <input inputMode="decimal" className={controlClasses} value={amount} onChange={(event) => setAmount(event.target.value)} required placeholder="0,00" />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Date du paiement *</span>
-          <input type="date" className={INPUT_CLS} value={date} max={todayIso()} onChange={(event) => setDate(event.target.value)} required />
+          <span className={labelClasses}>Date du paiement *</span>
+          <input type="date" className={controlClasses} value={date} max={todayIso()} onChange={(event) => setDate(event.target.value)} required />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Mode de paiement *</span>
-          <select className={INPUT_CLS} value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>
+          <span className={labelClasses}>Mode de paiement *</span>
+          <select className={controlClasses} value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>
             {PAYMENT_METHODS.map((value) => <option key={value} value={value}>{PAYMENT_METHOD_LABELS[value]}</option>)}
           </select>
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Compte ou caisse utilisé</span>
-          <input className={INPUT_CLS} value={payerAccount} maxLength={120} onChange={(event) => setPayerAccount(event.target.value)} placeholder="Ex. compte pro, caisse magasin" />
+          <span className={labelClasses}>Compte ou caisse utilisé</span>
+          <input className={controlClasses} value={payerAccount} maxLength={120} onChange={(event) => setPayerAccount(event.target.value)} placeholder="Ex. compte pro, caisse magasin" />
         </label>
       </div>
 
-      <fieldset className="space-y-3 rounded-xl border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-        <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-gray-100">Bénéficiaire</legend>
-        <label className="flex min-h-11 items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
+      <fieldset className="space-y-3 rounded-xl border border-a-border p-3 sm:p-4">
+        <legend className="px-1 text-sm font-semibold text-a-text">Bénéficiaire</legend>
+        <label className="flex min-h-11 items-center gap-3 text-sm text-a-text">
           <input type="radio" name="beneficiary" className="h-5 w-5" checked={!thirdParty} onChange={() => setThirdParty(false)} />
           Payé au fournisseur{supplier ? ` (${supplier.name})` : ''}
         </label>
-        <label className="flex min-h-11 items-center gap-3 text-sm text-gray-800 dark:text-gray-200">
+        <label className="flex min-h-11 items-center gap-3 text-sm text-a-text">
           <input type="radio" name="beneficiary" className="h-5 w-5" checked={thirdParty} onChange={() => setThirdParty(true)} />
           Payé à un tiers sur instruction du fournisseur
         </label>
         {thirdParty && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className={LABEL_CLS}>Nom du bénéficiaire *</span>
-              <input className={INPUT_CLS} value={beneficiaryName} maxLength={200} onChange={(event) => setBeneficiaryName(event.target.value)} required />
+              <span className={labelClasses}>Nom du bénéficiaire *</span>
+              <input className={controlClasses} value={beneficiaryName} maxLength={200} onChange={(event) => setBeneficiaryName(event.target.value)} required />
             </label>
             <label className="block">
-              <span className={LABEL_CLS}>Référence du bénéficiaire</span>
-              <input className={INPUT_CLS} value={beneficiaryReference} maxLength={200} onChange={(event) => setBeneficiaryReference(event.target.value)} placeholder="IBAN, n° de compte…" />
+              <span className={labelClasses}>Référence du bénéficiaire</span>
+              <input className={controlClasses} value={beneficiaryReference} maxLength={200} onChange={(event) => setBeneficiaryReference(event.target.value)} placeholder="IBAN, n° de compte…" />
             </label>
             <label className="block sm:col-span-2">
-              <span className={LABEL_CLS}>Instruction du fournisseur</span>
-              <textarea className={`${INPUT_CLS} min-h-20`} value={instruction} maxLength={2000} onChange={(event) => setInstruction(event.target.value)} placeholder="Qui a demandé ce paiement, quand et comment" />
-              <span className={HINT_CLS}>La dette reste due au fournisseur ; ajoutez ensuite la preuve de l&apos;instruction dans les documents du paiement.</span>
+              <span className={labelClasses}>Instruction du fournisseur</span>
+              <textarea className={`${controlClasses} min-h-20`} value={instruction} maxLength={2000} onChange={(event) => setInstruction(event.target.value)} placeholder="Qui a demandé ce paiement, quand et comment" />
+              <span className={hintClasses}>La dette reste due au fournisseur ; ajoutez ensuite la preuve de l&apos;instruction dans les documents du paiement.</span>
             </label>
           </div>
         )}
@@ -159,35 +160,35 @@ export function PaymentForm({ suppliers, purchases, initialSupplierId, initialPu
 
       <fieldset className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <legend className="text-sm font-semibold text-gray-900 dark:text-gray-100">Affectation aux achats</legend>
+          <legend className="text-sm font-semibold text-a-text">Affectation aux achats</legend>
           {supplierPurchases.length > 0 && (
-            <button type="button" onClick={autoAllocate} className="min-h-11 rounded-lg px-3 text-sm font-medium text-[var(--admin-primary-fg)] hover:bg-[var(--admin-primary-soft)]">
+            <button type="button" onClick={autoAllocate} className="min-h-11 rounded-lg px-3 text-sm font-medium text-a-brand-fg hover:bg-a-brand-soft">
               Répartir du plus ancien au plus récent
             </button>
           )}
         </div>
         {!supplierId ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">Choisissez un fournisseur pour voir ses achats à payer.</p>
+          <p className="text-sm text-a-text-3">Choisissez un fournisseur pour voir ses achats à payer.</p>
         ) : supplierPurchases.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">Aucun achat avec un reste à payer. Le paiement restera non affecté (avance).</p>
+          <p className="text-sm text-a-text-3">Aucun achat avec un reste à payer. Le paiement restera non affecté (avance).</p>
         ) : (
           <ul className="space-y-2">
             {supplierPurchases.map((purchase) => (
-              <li key={purchase.id} className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+              <li key={purchase.id} className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-3 rounded-xl border border-a-border p-3">
                 <div className="min-w-0">
-                  <p className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100">{purchase.reference}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(purchase.order_date)} • affectable {formatMoney(purchase.allocatable, purchase.currency)} sur {formatMoney(purchase.total, purchase.currency)}</p>
+                  <p className="font-mono text-sm font-medium text-a-text">{purchase.reference}</p>
+                  <p className="text-xs text-a-text-3">{formatDate(purchase.order_date)} • affectable {formatMoney(purchase.allocatable, purchase.currency)} sur {formatMoney(purchase.total, purchase.currency)}</p>
                 </div>
                 <label>
                   <span className="sr-only">Montant affecté à {purchase.reference}</span>
-                  <input inputMode="decimal" className={`${INPUT_CLS} text-right`} value={allocations[purchase.id] ?? ''} placeholder="0,00"
+                  <input inputMode="decimal" className={`${controlClasses} text-right`} value={allocations[purchase.id] ?? ''} placeholder="0,00"
                     onChange={(event) => setAllocations((prev) => ({ ...prev, [purchase.id]: event.target.value }))} />
                 </label>
               </li>
             ))}
           </ul>
         )}
-        <p className={`text-sm ${remainderCents < 0 ? 'font-medium text-red-700 dark:text-red-300' : 'text-gray-600 dark:text-gray-300'}`}>
+        <p className={`text-sm ${remainderCents < 0 ? 'font-medium text-tone-danger-fg' : 'text-a-text-2'}`}>
           Affecté {formatMoney(allocatedCents / 100, currency)} sur {formatMoney(Number.isFinite(amountValue) ? amountValue : 0, currency)}
           {remainderCents > 0 ? ` • ${formatMoney(remainderCents / 100, currency)} resteront non affectés` : ''}
         </p>
@@ -195,16 +196,16 @@ export function PaymentForm({ suppliers, purchases, initialSupplierId, initialPu
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className={LABEL_CLS}>Référence externe</span>
-          <input className={INPUT_CLS} value={externalReference} maxLength={200} onChange={(event) => setExternalReference(event.target.value)} placeholder="Réf. du virement, n° de reçu…" />
+          <span className={labelClasses}>Référence externe</span>
+          <input className={controlClasses} value={externalReference} maxLength={200} onChange={(event) => setExternalReference(event.target.value)} placeholder="Réf. du virement, n° de reçu…" />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Notes internes</span>
-          <input className={INPUT_CLS} value={notes} maxLength={4000} onChange={(event) => setNotes(event.target.value)} />
+          <span className={labelClasses}>Notes internes</span>
+          <input className={controlClasses} value={notes} maxLength={4000} onChange={(event) => setNotes(event.target.value)} />
         </label>
       </div>
 
-      <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+      <div className="rounded-xl bg-tone-warning-bg p-3 text-sm text-tone-warning-fg">
         Le paiement sera enregistré avec le statut « à vérifier ». Il ne réduira la dette qu&apos;une fois vérifié.
       </div>
       <ErrorText message={error} />

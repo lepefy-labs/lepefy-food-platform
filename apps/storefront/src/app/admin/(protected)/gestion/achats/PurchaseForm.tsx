@@ -7,8 +7,9 @@ import Button from '../../../_components/ui/Button';
 import { PURCHASE_UNITS, PURCHASE_UNIT_LABELS, addDays, paymentTermsLabel, type PurchaseUnit } from '@/lib/gestion/domain';
 import { formatDate, formatMoney, formatQuantityWithUnit, formatStockUnits, todayIso } from '@/lib/gestion/format';
 import { canonicalConversion, canonicalQuantity, parseConversion, parseQuantity, stockUnitsFor } from '@/lib/gestion/quantity';
-import { ErrorText, useGestionMutation } from '../_components/useGestionMutation';
-import { HINT_CLS, INPUT_CLS, LABEL_CLS } from '../_components/ui';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { controlClasses, labelClasses, hintClasses } from '@/app/admin/_components/ui/Form';
 
 export interface SupplierOption { id: string; code: string; name: string; currency: string; default_payment_terms_days?: number | null }
 
@@ -55,15 +56,15 @@ function ProductPicker({ onPick }: { onPick: (product: { id: string; name: strin
   }, [q]);
   return (
     <div>
-      <input className={INPUT_CLS} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Rechercher un produit du catalogue" aria-label="Rechercher un produit du catalogue" />
+      <input className={controlClasses} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Rechercher un produit du catalogue" aria-label="Rechercher un produit du catalogue" />
       {results.length > 0 && (
-        <ul className="mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <ul className="mt-1 max-h-60 overflow-y-auto rounded-lg border border-a-border bg-a-surface">
           {results.map((product) => (
             <li key={product.id}>
               <button type="button" onClick={() => { onPick(product); setQ(''); setResults([]); }}
-                className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/5">
+                className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-a-surface-2">
                 <span className="truncate">{product.name}{product.active ? '' : ' (inactif)'}</span>
-                <span className="shrink-0 text-xs text-gray-500">stock {product.stock}</span>
+                <span className="shrink-0 text-xs text-a-text-3">stock {product.stock}</span>
               </button>
             </li>
           ))}
@@ -75,17 +76,17 @@ function ProductPicker({ onPick }: { onPick: (product: { id: string; name: strin
 
 /** Aperçu exact (BigInt) de l'impact stock d'une réception complète de la ligne. */
 function StockPreview({ item }: { item: PurchaseItemDraft }) {
-  if (!item.product_id) return <p className={HINT_CLS}>Hors catalogue : la réception n&apos;augmente pas le stock de la boutique.</p>;
+  if (!item.product_id) return <p className={hintClasses}>Hors catalogue : la réception n&apos;augmente pas le stock de la boutique.</p>;
   const quantity = parseQuantity(item.ordered_quantity);
   const conversion = parseConversion(item.conversion);
   if (quantity === null || conversion === null || conversion === BigInt(0)) {
-    return <p className={HINT_CLS}>Quantité (3 décimales au plus) et conversion positive requises.</p>;
+    return <p className={hintClasses}>Quantité (3 décimales au plus) et conversion positive requises.</p>;
   }
   const result = stockUnitsFor(quantity, conversion);
   const quantityLabel = formatQuantityWithUnit(canonicalQuantity(item.ordered_quantity) ?? '0', item.purchase_unit);
   return result.exact
-    ? <p className={HINT_CLS}>{quantityLabel} = {formatStockUnits(Number(result.units))} ajoutées au stock lors d&apos;une réception complète.</p>
-    : <p className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">{quantityLabel} × {canonicalConversion(item.conversion)} ne donne pas un nombre entier d&apos;unités : la réception complète sera refusée. Ajustez la quantité ou la conversion.</p>;
+    ? <p className={hintClasses}>{quantityLabel} = {formatStockUnits(Number(result.units))} ajoutées au stock lors d&apos;une réception complète.</p>
+    : <p className="mt-1.5 text-xs font-medium text-tone-warning-fg">{quantityLabel} × {canonicalConversion(item.conversion)} ne donne pas un nombre entier d&apos;unités : la réception complète sera refusée. Ajustez la quantité ou la conversion.</p>;
 }
 
 /** Création d'un achat ou modification avant toute réception. Le total final est calculé par le serveur. */
@@ -94,7 +95,7 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
   purchaseId?: string; purchaseStatus?: 'draft' | 'ordered';
 }) {
   const router = useRouter();
-  const { run, pending, error, setError } = useGestionMutation();
+  const { run, pending, error, setError } = useAdminMutation();
   const [supplierId, setSupplierId] = useState(initial?.supplier_id ?? '');
   const [supplierReference, setSupplierReference] = useState(initial?.supplier_reference ?? '');
   const [orderDate, setOrderDate] = useState(initial?.order_date ?? todayIso());
@@ -169,25 +170,25 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
     <form onSubmit={(event) => { event.preventDefault(); void submit('draft'); }} className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className={LABEL_CLS}>Fournisseur *</span>
-          <select className={INPUT_CLS} value={supplierId} disabled={editing} onChange={(event) => setSupplierId(event.target.value)} required>
+          <span className={labelClasses}>Fournisseur *</span>
+          <select className={controlClasses} value={supplierId} disabled={editing} onChange={(event) => setSupplierId(event.target.value)} required>
             <option value="">Choisir un fournisseur</option>
             {suppliers.map((option) => <option key={option.id} value={option.id}>{option.name}{option.code ? ` (${option.code})` : ''}</option>)}
           </select>
-          {editing && <span className={HINT_CLS}>Le fournisseur d&apos;un achat ne peut pas être changé.</span>}
+          {editing && <span className={hintClasses}>Le fournisseur d&apos;un achat ne peut pas être changé.</span>}
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Date de commande</span>
-          <input type="date" className={INPUT_CLS} value={orderDate} onChange={(event) => setOrderDate(event.target.value)} required />
+          <span className={labelClasses}>Date de commande</span>
+          <input type="date" className={controlClasses} value={orderDate} onChange={(event) => setOrderDate(event.target.value)} required />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Livraison prévue</span>
-          <input type="date" className={INPUT_CLS} value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} />
+          <span className={labelClasses}>Livraison prévue</span>
+          <input type="date" className={controlClasses} value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Échéance de paiement</span>
-          <input type="date" className={INPUT_CLS} value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-          <span className={HINT_CLS}>
+          <span className={labelClasses}>Échéance de paiement</span>
+          <input type="date" className={controlClasses} value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+          <span className={hintClasses}>
             {dueDate || editing
               ? 'Date à laquelle le fournisseur doit être payé.'
               : derivedDue
@@ -196,34 +197,34 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           </span>
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Référence du fournisseur</span>
-          <input className={INPUT_CLS} value={supplierReference} maxLength={120} onChange={(event) => setSupplierReference(event.target.value)} placeholder="N° de facture ou de commande" />
+          <span className={labelClasses}>Référence du fournisseur</span>
+          <input className={controlClasses} value={supplierReference} maxLength={120} onChange={(event) => setSupplierReference(event.target.value)} placeholder="N° de facture ou de commande" />
         </label>
         <label className="block">
-          <span className={LABEL_CLS}>Frais supplémentaires ({supplierCurrency})</span>
-          <input inputMode="decimal" className={INPUT_CLS} value={additionalCosts} onChange={(event) => setAdditionalCosts(event.target.value)} placeholder="Transport, douane…" />
-          <span className={HINT_CLS}>Non inclus dans le coût d&apos;achat des produits.</span>
+          <span className={labelClasses}>Frais supplémentaires ({supplierCurrency})</span>
+          <input inputMode="decimal" className={controlClasses} value={additionalCosts} onChange={(event) => setAdditionalCosts(event.target.value)} placeholder="Transport, douane…" />
+          <span className={hintClasses}>Non inclus dans le coût d&apos;achat des produits.</span>
         </label>
       </div>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Articles</legend>
+        <legend className="mb-2 text-sm font-semibold text-a-text">Articles</legend>
         <ul className="space-y-3">
           {items.map((item, index) => (
-            <li key={item.key} className="rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+            <li key={item.key} className="rounded-xl border border-a-border p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Article {index + 1}</span>
+                <span className="text-xs font-medium text-a-text-3">Article {index + 1}</span>
                 {items.length > 1 && (
                   <button type="button" onClick={() => setItems((prev) => prev.filter((candidate) => candidate.key !== item.key))}
-                    className="inline-flex min-h-11 items-center gap-1 px-2 text-sm text-red-700 dark:text-red-300" aria-label={`Retirer l'article ${index + 1}`}>
+                    className="inline-flex min-h-11 items-center gap-1 px-2 text-sm text-tone-danger-fg" aria-label={`Retirer l'article ${index + 1}`}>
                     <IconTrash size={16} aria-hidden="true" />Retirer
                   </button>
                 )}
               </div>
               <div className="space-y-2">
                 {item.product_id ? (
-                  <div className="flex min-h-11 items-center justify-between gap-2 rounded-lg bg-[var(--admin-primary-soft)] px-3 text-sm">
-                    <span className="truncate font-medium text-[var(--admin-primary-fg)]">Catalogue : {item.product_name}</span>
+                  <div className="flex min-h-11 items-center justify-between gap-2 rounded-lg bg-a-brand-soft px-3 text-sm">
+                    <span className="truncate font-medium text-a-brand-fg">Catalogue : {item.product_name}</span>
                     <button type="button" onClick={() => updateItem(item.key, { product_id: null, product_name: null })} aria-label="Délier le produit"
                       className="inline-flex min-h-11 items-center"><IconX size={16} aria-hidden="true" /></button>
                   </div>
@@ -232,28 +233,28 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
                     product_id: product.id, product_name: product.name, description: item.description || product.name, purchase_unit: 'unit', conversion: '1',
                   })} />
                 )}
-                <input className={INPUT_CLS} value={item.description} maxLength={300} onChange={(event) => updateItem(item.key, { description: event.target.value })}
+                <input className={controlClasses} value={item.description} maxLength={300} onChange={(event) => updateItem(item.key, { description: event.target.value })}
                   placeholder={item.product_id ? 'Description (optionnelle)' : 'Description (article hors catalogue)'} aria-label="Description" />
               </div>
               <div className={`mt-3 grid grid-cols-2 gap-3 ${item.product_id ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
                 <label className="block">
-                  <span className={LABEL_CLS}>Quantité</span>
-                  <input inputMode="decimal" className={INPUT_CLS} value={item.ordered_quantity} onChange={(event) => updateItem(item.key, { ordered_quantity: event.target.value })} />
+                  <span className={labelClasses}>Quantité</span>
+                  <input inputMode="decimal" className={controlClasses} value={item.ordered_quantity} onChange={(event) => updateItem(item.key, { ordered_quantity: event.target.value })} />
                 </label>
                 <label className="block">
-                  <span className={LABEL_CLS}>Unité</span>
-                  <select className={INPUT_CLS} value={item.purchase_unit} onChange={(event) => updateItem(item.key, { purchase_unit: event.target.value as PurchaseUnit })}>
+                  <span className={labelClasses}>Unité</span>
+                  <select className={controlClasses} value={item.purchase_unit} onChange={(event) => updateItem(item.key, { purchase_unit: event.target.value as PurchaseUnit })}>
                     {PURCHASE_UNITS.map((unit) => <option key={unit} value={unit}>{PURCHASE_UNIT_LABELS[unit]}</option>)}
                   </select>
                 </label>
                 <label className="block">
-                  <span className={LABEL_CLS}>Coût / {PURCHASE_UNIT_LABELS[item.purchase_unit]}</span>
-                  <input inputMode="decimal" className={INPUT_CLS} value={item.unit_cost} onChange={(event) => updateItem(item.key, { unit_cost: event.target.value })} placeholder="0,00" />
+                  <span className={labelClasses}>Coût / {PURCHASE_UNIT_LABELS[item.purchase_unit]}</span>
+                  <input inputMode="decimal" className={controlClasses} value={item.unit_cost} onChange={(event) => updateItem(item.key, { unit_cost: event.target.value })} placeholder="0,00" />
                 </label>
                 {item.product_id && (
                   <label className="block">
-                    <span className={LABEL_CLS}>Unités stock / {PURCHASE_UNIT_LABELS[item.purchase_unit]}</span>
-                    <input inputMode="decimal" className={INPUT_CLS} value={item.conversion} onChange={(event) => updateItem(item.key, { conversion: event.target.value })} />
+                    <span className={labelClasses}>Unités stock / {PURCHASE_UNIT_LABELS[item.purchase_unit]}</span>
+                    <input inputMode="decimal" className={controlClasses} value={item.conversion} onChange={(event) => updateItem(item.key, { conversion: event.target.value })} />
                   </label>
                 )}
               </div>
@@ -262,20 +263,20 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           ))}
         </ul>
         <button type="button" onClick={() => setItems((prev) => [...prev, newItem()])}
-          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200">
+          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-dashed border-a-border-strong px-4 text-sm font-medium text-a-text-2 hover:bg-a-surface-2">
           <IconPlus size={16} aria-hidden="true" />Ajouter un article
         </button>
       </fieldset>
 
       <label className="block">
-        <span className={LABEL_CLS}>Notes internes</span>
-        <textarea className={`${INPUT_CLS} min-h-20`} value={notes} maxLength={4000} onChange={(event) => setNotes(event.target.value)} />
+        <span className={labelClasses}>Notes internes</span>
+        <textarea className={`${controlClasses} min-h-20`} value={notes} maxLength={4000} onChange={(event) => setNotes(event.target.value)} />
       </label>
 
-      <div className="flex flex-col gap-3 rounded-xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-800/60">
+      <div className="flex flex-col gap-3 rounded-xl bg-a-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Total estimé (recalculé par le serveur)</p>
-          <p className="text-xl font-semibold tabular-nums text-gray-950 dark:text-gray-100">{formatMoney(estimate, supplierCurrency)}</p>
+          <p className="text-xs text-a-text-3">Total estimé (recalculé par le serveur)</p>
+          <p className="text-xl font-semibold tabular-nums text-a-text">{formatMoney(estimate, supplierCurrency)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {editing ? (
@@ -288,7 +289,7 @@ export function PurchaseForm({ suppliers, currency, initial, purchaseId, purchas
           )}
         </div>
       </div>
-      {purchaseStatus === 'ordered' && <p className={HINT_CLS}>Achat déjà commandé : les articles restent modifiables tant qu&apos;aucune réception n&apos;est enregistrée.</p>}
+      {purchaseStatus === 'ordered' && <p className={hintClasses}>Achat déjà commandé : les articles restent modifiables tant qu&apos;aucune réception n&apos;est enregistrée.</p>}
       <ErrorText message={error} />
     </form>
   );
