@@ -260,7 +260,7 @@ Interne: `next_business_reference`, `log_business_event`, `business_text`, `busi
 
 ## Audit
 
-`business_audit_events` (append-only: niente UPDATE/DELETE per il service role). Eventi: `supplier.created|updated`, `purchase.created|updated|status_changed`, `receipt.recorded|reversed`, `inventory.adjusted`, `payment.recorded|verified|voided`, `allocation.created|reversed`, `document.uploaded|deleted`. Scritti **nella stessa transazione** dell'operazione (RPC) tranne i documenti (API). Metadata limitati a riferimenti, importi, stati, motivi troncati; mai segreti, file o dati bancari completi (CHECK ≤ 8 KB). Visibili nelle sezioni "Historique".
+`business_audit_events` (append-only: niente UPDATE/DELETE per il service role). Eventi: `supplier.created|updated`, `purchase.created|updated|status_changed`, `receipt.recorded|reversed`, `inventory.adjusted`, `payment.recorded|verified|voided`, `allocation.created|reversed`, `document.uploaded|deleted`. Scritti **nella stessa transazione** dell'operazione (RPC) tranne i documenti (API). Metadata limitati a riferimenti, importi, stati, motivi troncati; mai segreti, file o dati bancari completi (CHECK ≤ 8 KB). Visibili nelle sezioni "Historique". Il Journal d’activité (`/admin/activite`, migration 153, `docs/ADMIN_ACTIVITY_AUDIT.md`) li legge tramite un adapter di sola lettura (`audit_feed`, id `ba:<uuid>`, moduli `gestion_*` filtrati per capability e flag): nessuna copia, nessuna scrittura, le RPC 139–142 non sono state modificate; le sezioni « Historique » restano e offrono « Voir dans le journal » quando il journal è aperto.
 
 ## Attachments
 

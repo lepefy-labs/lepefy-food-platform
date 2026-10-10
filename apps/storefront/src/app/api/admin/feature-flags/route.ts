@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { listTenantFeatureFlags, setFeatureFlag } from '@/lib/featureFlags/featureFlags';
 import { FEATURE_FLAG_KEY_PATTERN } from '@/lib/featureFlags/featureFlagRegistry';
 
@@ -46,8 +47,12 @@ export async function PATCH(req: NextRequest) {
   try {
     // Seuls les flags déclarés dans le code ou déjà présents pour ce tenant.
     const known = await listTenantFeatureFlags(tenantId);
-    if (!known.some((flag) => flag.key === parsed.data.flagKey)) {
+    const target = known.find((flag) => flag.key === parsed.data.flagKey);
+    if (!target) {
       return NextResponse.json({ error: 'Fonctionnalité inconnue.' }, { status: 404 });
+    }
+    if (target.platformOnly && !(await getCurrentAdminAccessContext(tenantId))?.isPlatformOwner) {
+      return NextResponse.json({ error: 'Cette fonctionnalité est activée par Lepefy.' }, { status: 403 });
     }
     await setFeatureFlag(tenantId, parsed.data.flagKey, parsed.data.enabled);
     revalidatePath(SETTINGS_PAGE);

@@ -14,7 +14,8 @@ export type AdminApiPermission =
   | 'event_content.manage' | 'tenant_settings.view' | 'tenant_settings.manage'
   | 'suppliers.view' | 'suppliers.manage' | 'purchases.view' | 'purchases.manage'
   | 'inventory.view' | 'inventory.manage' | 'treasury.view' | 'treasury.manage' | 'supplier_payments.verify'
-  | 'whatsapp.view' | 'whatsapp.reply' | 'whatsapp.manage';
+  | 'whatsapp.view' | 'whatsapp.reply' | 'whatsapp.manage'
+  | 'audit.view' | 'audit.export';
 
 function isRead(method: string): boolean {
   const normalized = method.toUpperCase();
@@ -82,6 +83,9 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path === '/api/admin/daily-digest') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/order-documents/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path === '/api/admin/feature-flags') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
+  // Journal d'activité (lecture seule ; le flag activity_journal est vérifié par requireActivityJournalApi).
+  if (path === '/api/admin/activite/export') return read ? 'audit.export' : null;
+  if (path === '/api/admin/activite' || /^\/api\/admin\/activite\/[^/]+$/.test(path)) return read ? 'audit.view' : null;
   // Gestion du commerce: mappa dedicata, fail-closed (null = nessuna capability).
   if (path.startsWith('/api/admin/gestion/')) return gestionApiPermission(path, method) as AdminApiPermission | null;
   // Canal WhatsApp (migration 147). Identité du numéro et envoi de test : platform owner en plus (requireWhatsAppApi).

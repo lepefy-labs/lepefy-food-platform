@@ -1,6 +1,6 @@
 import {
   IconBrandWhatsapp, IconBriefcase, IconBuildingWarehouse, IconCalendarEvent, IconCash, IconChartBar, IconCreditCard,
-  IconFileInvoice, IconFileText, IconGift, IconLayoutDashboard, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
+  IconFileInvoice, IconFileText, IconGift, IconHistory, IconLayoutDashboard, IconMessageCircle, IconPackage, IconPackages, IconPhoto,
   IconPlus, IconQrcode, IconScan, IconSettings, IconShoppingBag, IconSparkles, IconStar, IconToolsKitchen2, IconTruck,
   IconTruckDelivery, IconTruckLoading, IconUserPlus, IconUsers, type Icon,
 } from '@tabler/icons-react';
@@ -19,7 +19,7 @@ import type { AdminTone } from './tokens';
  */
 
 export type AdminNavGroup = 'Boutique' | 'Opérations' | 'Croissance' | 'Canaux' | 'Gestion' | 'Événementiel' | 'Service sur place' | 'Commun';
-export type AdminNavFlag = 'gestion' | 'whatsapp';
+export type AdminNavFlag = 'gestion' | 'whatsapp' | 'activity';
 export type AdminNavBadgeKey = 'pendingPayments' | 'pendingEventRequests' | 'newInquiries' | 'pendingRentalRequests';
 
 export interface AdminNavItem {
@@ -94,6 +94,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { id: 'public-content', label: 'Contenu public', href: '/admin/contenu', icon: IconFileText, group: 'Commun', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['notre origine', 'histoire'] },
   { id: 'tools', label: 'Outils & QR', href: '/admin/outils', icon: IconQrcode, group: 'Commun', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['affiche', 'qr code'] },
   { id: 'settings', label: 'Paramètres', href: '/admin/parametres', icon: IconSettings, group: 'Commun', workspace: 'all', anyOf: ['tenant_settings.view'], keywords: ['réglages', 'configuration', 'notifications'] },
+  { id: 'activity', label: 'Journal d’activité', href: '/admin/activite', icon: IconHistory, group: 'Commun', workspace: 'all', anyOf: ['audit.view'], flag: 'activity', keywords: ['audit', 'historique', 'traçabilité', 'qui a modifié'] },
   { id: 'billing', label: 'Abonnement', href: '/admin/billing', icon: IconCreditCard, group: 'Commun', workspace: 'all', anyOf: ['billing.view'], match: 'exact', keywords: ['facture'] },
   { id: 'ai-usage', label: 'Utilisation IA', href: '/admin/ai-usage', icon: IconChartBar, group: 'Commun', workspace: 'all', anyOf: ['ai_usage.view'], match: 'exact' },
 ];

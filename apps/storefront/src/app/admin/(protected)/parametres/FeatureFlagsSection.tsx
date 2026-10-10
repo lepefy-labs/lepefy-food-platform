@@ -10,10 +10,12 @@ interface Props {
   /** null: table indisponible (migration 138 non appliquée) ou erreur de lecture. */
   initialFlags: TenantFeatureFlag[] | null;
   isTestTenant: boolean;
+  /** Flags `platformOnly`: modifiables seulement par le propriétaire de la plateforme (l'API refuse les autres). */
+  isPlatformOwner: boolean;
 }
 
 /** Flags de déploiement du tenant courant ; une ligne absente = désactivé. */
-export function FeatureFlagsSection({ initialFlags, isTestTenant }: Props) {
+export function FeatureFlagsSection({ initialFlags, isTestTenant, isPlatformOwner }: Props) {
   const [flags, setFlags] = useState<TenantFeatureFlag[] | null>(initialFlags);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const { feedback, show } = useSettingsFeedback();
@@ -59,6 +61,7 @@ export function FeatureFlagsSection({ initialFlags, isTestTenant }: Props) {
         <ul className="divide-y divide-a-border">
           {flags.map((flag) => {
             const busy = pendingKey === flag.key;
+            const locked = Boolean(flag.platformOnly) && !isPlatformOwner;
             return (
               <li key={flag.key} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
@@ -67,8 +70,14 @@ export function FeatureFlagsSection({ initialFlags, isTestTenant }: Props) {
                     <p className="text-sm font-medium text-a-text">{flag.label}</p>
                     <p className="mt-0.5 text-sm leading-6 text-a-text-3">{flag.description}</p>
                     <p className="mt-1 break-all font-mono text-xs text-a-text-3">{flag.key}</p>
+                    {flag.platformOnly && <p className="mt-1 text-xs text-a-text-3">Activation gérée par Lepefy.</p>}
                   </div>
                 </div>
+                {locked ? (
+                  <span className="shrink-0 self-start sm:self-auto">
+                    <SettingsStatusBadge status={flag.enabled ? { label: 'Activée', tone: 'ok' } : { label: 'Désactivée', tone: 'neutral' }} />
+                  </span>
+                ) : (
                 <button
                   type="button"
                   role="switch"
@@ -86,6 +95,7 @@ export function FeatureFlagsSection({ initialFlags, isTestTenant }: Props) {
                   </span>
                   {busy ? 'Enregistrement…' : flag.enabled ? 'Activée' : 'Désactivée'}
                 </button>
+                )}
               </li>
             );
           })}

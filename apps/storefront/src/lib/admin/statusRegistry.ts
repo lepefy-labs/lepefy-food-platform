@@ -36,6 +36,22 @@ export const PAYMENT_STATUS_META: Record<string, AdminStatusMeta> = {
   cancelled: { label: 'Annulé', tone: 'neutral' },
 };
 
+/** Journal d'activité: outcome of an event (docs/ADMIN_ACTIVITY_AUDIT.md). */
+export const AUDIT_OUTCOME_META: Record<string, AdminStatusMeta> = {
+  success: { label: 'Réussi', tone: 'success' },
+  failure: { label: 'Échec', tone: 'danger' },
+  pending: { label: 'En attente', tone: 'info' },
+  unknown: { label: 'À vérifier', tone: 'warning' },
+};
+
+/** Journal d'activité: severity of an event. */
+export const AUDIT_SEVERITY_META: Record<string, AdminStatusMeta> = {
+  info: { label: 'Info', tone: 'neutral' },
+  notice: { label: 'À noter', tone: 'info' },
+  warning: { label: 'Attention', tone: 'warning' },
+  critical: { label: 'Critique', tone: 'urgent' },
+};
+
 export function statusMeta(registry: Record<string, AdminStatusMeta>, status: string | null | undefined): AdminStatusMeta {
   if (!status) return { label: '—', tone: 'neutral' };
   return registry[status] ?? { label: status, tone: 'neutral' };

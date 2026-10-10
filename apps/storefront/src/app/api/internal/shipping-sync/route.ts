@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
   if (!shippingSyncSchedulerAuthorized(request.headers.get('authorization'))) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers });
   const startedAt = Date.now();
   try {
-    const service = createServiceClient();
+    // Journal d'activité: changes written by this tick are attributed to the sync job.
+    const service = createServiceClient({ auditActor: { actorType: 'automation', ref: 'shipping-sync', source: 'worker' } });
     const result = await runShippingSyncBatch(service);
     // Isolated: a draft failure never fails the tracking sync tick. Start before 35 s, end by ~55 s.
     const drafts = await runShipmentDraftBatch(service, defaultShipmentDraftDependencies, { limit: 3, startBefore: startedAt + 35_000 })

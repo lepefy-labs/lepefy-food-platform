@@ -12,6 +12,7 @@ import AdminStatCard from '@/app/admin/_components/ui/AdminStatCard';
 import { ReasonAction, SimpleAction } from '../../_components/actions';
 import { DocumentsPanel } from '../../_components/DocumentsPanel';
 import { AuditTimeline } from '../../_components/AuditTimeline';
+import JournalLink from '../../../../_components/data/JournalLink';
 import { AllocateForm } from './AllocateForm';
 
 export const dynamic = 'force-dynamic';
@@ -131,7 +132,7 @@ export default async function PaymentDetailPage({ params }: { params: { id: stri
           allowedTypes={['payment_proof', 'supplier_instruction', 'receipt', 'invoice', 'other']} />
       </Panel>
 
-      <Panel title="Historique">
+      <Panel title="Historique" actions={<JournalLink tenant={tenant} resourceType="payment" resourceId={payment.id} />}>
         <AuditTimeline events={events} />
       </Panel>
     </div>

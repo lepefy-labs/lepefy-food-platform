@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
 import { isAdminApiAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
+import { adminActorLabel, registerRequestActor, REQUEST_ID_HEADER, routeRef } from '@/lib/audit/requestContext';
 
 export interface AdminAccessContext {
   userId: string;
@@ -31,6 +32,7 @@ const LEGACY_TENANT_ADMIN_PERMISSIONS = [
   'suppliers.view','suppliers.manage','purchases.view','purchases.manage','inventory.view','inventory.manage',
   'treasury.view','treasury.manage','supplier_payments.verify',
   'whatsapp.view','whatsapp.reply','whatsapp.manage',
+  'audit.view','audit.export','audit.security.view',
 ];
 const LEGACY_CASHIER_PERMISSIONS = ['loyalty.scan','scan.access','scan.search','scan.redeem','scan.metrics','scan.undo_own'];
 
@@ -107,10 +109,19 @@ export async function requirePermission(tenantId: string | null, permission: str
   if (!context) return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
   if (!canAdmin(context, permission)) return NextResponse.json({ error: 'Permission insuffisante.' }, { status: 403 });
   if (!context.isPlatformOwner && context.tenantId !== tenantId) return NextResponse.json({ error: 'Accès refusé pour ce tenant.' }, { status: 403 });
+  // Verified actor of this request, read by the service client for the audit triggers.
+  const requestHeaders = headers();
+  registerRequestActor(requestHeaders.get(REQUEST_ID_HEADER), {
+    actorType: context.isPlatformOwner ? 'platform_owner' : 'admin',
+    adminId: context.userId,
+    label: adminActorLabel(context),
+    ref: routeRef(requestHeaders.get('x-lepefy-admin-path')),
+    source: 'app',
+  });
   // Suspended tenant: its team keeps read-only orders and billing; the
   // platform owner is never limited.
   if (!context.isPlatformOwner && tenantId && (await getTenantServiceState(tenantId)).suspended) {
-    const method = headers().get('x-lepefy-admin-method') ?? 'GET';
+    const method = requestHeaders.get('x-lepefy-admin-method') ?? 'GET';
     if (!isAdminApiAllowedWhenSuspended(permission, method)) {
       return NextResponse.json(
         { error: 'Abonnement suspendu : cette action est indisponible. Réglez l’abonnement pour rétablir le service.', code: 'TENANT_SUSPENDED' },

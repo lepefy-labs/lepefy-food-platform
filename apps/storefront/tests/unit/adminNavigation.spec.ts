@@ -4,7 +4,7 @@ import {
 } from '../../src/lib/admin/navigation';
 import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
-const NO_FLAGS = { gestion: false, whatsapp: false };
+const NO_FLAGS = { gestion: false, whatsapp: false, activity: false };
 const ctx = (patch: Partial<AdminNavContext>): AdminNavContext => ({ workspace: 'shop', permissions: [], isPlatformOwner: false, flags: NO_FLAGS, ...patch });
 
 test('entry ids are unique', () => {
@@ -75,13 +75,19 @@ test('full shop admin sees the shop and common entries, flagged modules only wit
   expect(full.actions).toEqual(['new-order', 'new-product', 'new-customer']);
   expect(full.platform).toBe(false);
 
-  const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true } }));
-  expect(withFlags.items).toEqual(expect.arrayContaining(['whatsapp', 'gestion', 'suppliers', 'purchases', 'inventory', 'treasury']));
+  const withFlags = resolveAdminNavigation(ctx({ permissions: ['*'], flags: { gestion: true, whatsapp: true, activity: true } }));
+  expect(withFlags.items).toEqual(expect.arrayContaining(['whatsapp', 'gestion', 'suppliers', 'purchases', 'inventory', 'treasury', 'activity']));
+});
+
+test('activity journal: hidden until the platform enables it, and only with audit.view', () => {
+  expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'] })).items).not.toContain('activity');
+  expect(resolveAdminNavigation(ctx({ permissions: ['orders.view'], flags: { gestion: false, whatsapp: false, activity: true } })).items).not.toContain('activity');
+  expect(resolveAdminNavigation(ctx({ permissions: ['audit.view'], flags: { gestion: false, whatsapp: false, activity: true } })).items).toContain('activity');
 });
 
 test('a cashier only sees the loyalty scanner; a stock clerk only sees Stocks', () => {
   expect(resolveAdminNavigation(ctx({ permissions: ['loyalty.scan'] })).items).toEqual(['loyalty-scan']);
-  const clerk = resolveAdminNavigation(ctx({ permissions: ['inventory.view'], flags: { gestion: true, whatsapp: false } }));
+  const clerk = resolveAdminNavigation(ctx({ permissions: ['inventory.view'], flags: { gestion: true, whatsapp: false, activity: false } }));
   expect(clerk.items).toEqual(['gestion', 'inventory']);
 });
 
@@ -95,7 +101,7 @@ test('events workspace shows events entries, never shop ones', () => {
 });
 
 test('platform owner sees everything of the workspace plus the platform block', () => {
-  const owner = resolveAdminNavigation(ctx({ isPlatformOwner: true, flags: { gestion: true, whatsapp: true } }));
+  const owner = resolveAdminNavigation(ctx({ isPlatformOwner: true, flags: { gestion: true, whatsapp: true, activity: true } }));
   expect(owner.platform).toBe(true);
   expect(owner.items).toContain('treasury');
 });

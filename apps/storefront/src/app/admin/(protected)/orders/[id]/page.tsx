@@ -1,6 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
+import ResourceActivity from '../../../_components/data/ResourceActivity'
 import Link from 'next/link'
 import {
   IconAlertTriangle,
@@ -514,6 +516,9 @@ export default async function AdminOrderPage({ params }: PageProps) {
               packingSlipQrUnavailable: !documentSettings.available && documentSettings.config.packing_slip_show_qr,
             }}
           />
+          <Suspense fallback={null}>
+            <ResourceActivity tenant={tenant} hostPermission="orders.view" resourceType="order" resourceId={order.id} />
+          </Suspense>
         </aside>
       </div>
     </div>

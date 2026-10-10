@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@4fc003851296c4a47663215d621220dedd966795`
-> **Ultima verifica:** 9 ottobre 2026
+> **Base codice verificata:** `main@72f06d0e3f69fd55bdbfc4cb2cf8b9ab72e86ce9`
+> **Ultima verifica:** 10 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -135,6 +135,8 @@ Colonne: `shipping_creation_status`, `shipping_creation_attempts`, `shipping_cre
 **Fallback manuale.** Scheda ordine, pannello «Expédition Packlink» (`ManagedShipmentPanel` → `ShipmentDraftBlock`), visibile per delivery `new`/`preparing` senza reference quando l'impostazione è attiva: «Aucun brouillon créé» → «Créer le brouillon Packlink»; «Création en attente» → «Créer maintenant»; «Échec de création» + messaggio → «Réessayer»; «Création incertaine» → associare/recreare; dopo il successo «✓ Brouillon Packlink créé», reference copiabile, data, stato transporteur. Endpoint `POST /api/admin/orders/[id]/shipment/create` (`orders.manage`, come attach/sync/manual: è un'azione sull'ordine, non un réglage; tenant dal deploy, ordine filtrato per `tenant_id`). Corpo: `{}` | `{ confirmNoExistingDraft: true }` | `{ providerReference }`.
 
 **Bozza da correggere (eliminazione).** Packlink non offre un'API verificata di eliminazione/annullamento (il connettore ufficiale non ne ha; l'unica `DELETE` riguarda le integrazioni): Lepefy **non elimina mai** una bozza. Il team la elimina in Packlink PRO, poi nel pannello «Brouillon supprimé dans Packlink PRO ? Recréer» → `POST /api/admin/orders/[id]/shipment/release` (`orders.manage`, `releaseDeletedShipmentDraft`). Il server verifica con `resolveShipment` che la bozza non esista più (404 di `GET /shipments/{ref}` — mai il 404 di `/track`, normale per una bozza senza tracking —, stessa logica di `isDraftExpired` del connettore ufficiale) o sia `cancelled`; solo allora azzera, con CAS su reference + `draft_created`, reference, snapshot provider e stato di provisioning (→ not_required), e la bozza si ricrea con «Créer le brouillon». Rifiutato se la bozza esiste ancora (`still_exists`), se il provider non risponde (nessun rilascio senza prova), se il collo è già in movimento (stato normalizzato diverso da pending/unknown/cancelled), se la reference non è stata creata da Lepefy (associazione manuale: usare il suivi manuel) o per un altro tenant.
+
+**Journal d'activité (migration 153).** Ogni cambio di `shipping_creation_status` (`pending` → «Brouillon d’expédition demandé», `draft_created`, `failed`, `ambiguous`, rilascio verso `not_required`), di `shipping_normalized_status` e la prima comparsa di `shipping_sync_error` producono un evento `shipping.*` scritto da un trigger su `orders` nella stessa transazione (fail-open: un errore del journal non blocca mai il tick). Il tick `/api/internal/shipping-sync` crea il client service role con `auditActor: automation / shipping-sync`: gli eventi del tick sono attribuiti al job, quelli dei pulsanti della scheda ordine all'admin. Nessun cambiamento di logica, di prezzi o di chiamate provider. Dettagli: `docs/ADMIN_ACTIVITY_AUDIT.md`.
 
 **Dopo la creazione.** Patch: `shipping_tracking_mode = 'managed'`, `shipping_provider_key`, `shipping_provider_reference`, `shipping_normalized_status = 'pending'`, `shipping_provider_synced_at = null`. Lo stato ordine non cambia: una bozza **non** è una spedizione, nessun `shipped`, nessuna e-mail (né alla creazione né all'associazione). Da lì `runShippingSyncBatch`/`syncOrderShipment` gestiscono `pending → ready_for_collection → in_transit → … → delivered/exception/returned/cancelled`; `order_shipped` parte solo dalla vera transizione `shipped`. «Utiliser un suivi manuel» stacca la reference e blocca nuove creazioni (`manual_tracking`).
 
@@ -1353,7 +1355,7 @@ apps/storefront/src/lib/shipping/providers/types.ts        (ShippingProviderAdap
 apps/storefront/src/lib/shipping/providers/packlink.ts     (resolveShipment + createShipmentDraft: magazzino predefinito, payload Draft, classificazione HTTP)
 apps/storefront/src/lib/shipping/shipmentDraft/            (settings, buildDraftInput puro, shipmentDraftService: coda/claim/batch/link, shipmentDraftPresentation client-safe)
 apps/storefront/src/app/admin/orders/[id]/ShipmentDraftBlock.tsx  (stati e CTA della bozza nel pannello spedizione)
-apps/storefront/src/app/api/internal/shipping-sync/route.ts  (tick n8n: sync tracking, poi coda bozze)
+apps/storefront/src/app/api/internal/shipping-sync/route.ts  (tick n8n: sync tracking, poi coda bozze; client service role attribuito al job nel Journal d'activité)
 apps/storefront/src/lib/orders/adminOrderOperations.ts      (classificatore unico del cockpit: gruppi di priorità, flag KPI, anomalie, durate, prossima azione, sort; puro)
 apps/storefront/src/lib/orders/loadOrderWorkQueue.ts        (work queue server-side: set attivo leggero, KPI, sort prima della paginazione, righe di pagina)
 apps/storefront/src/lib/orders/loadOrderOperationDetail.ts  (letture tenant-scoped dell'espansione)

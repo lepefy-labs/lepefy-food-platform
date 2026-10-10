@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
+  // Always regenerated, never taken from the client: it keys the verified admin
+  // actor of the Journal d'activité (lib/audit/requestContext.ts) and is the
+  // correlation id of every event written by this request.
+  requestHeaders.set('x-request-id', crypto.randomUUID());
 
   if (request.nextUrl.pathname.startsWith('/api/admin/')) {
     requestHeaders.set('x-lepefy-admin-path', request.nextUrl.pathname);

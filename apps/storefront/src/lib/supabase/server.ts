@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { createAuditFetch, type AuditActor } from '@/lib/audit/requestContext';
 
 export function createClient() {
   const cookieStore = cookies();
@@ -92,7 +93,12 @@ export function createRouteClient() {
   return { supabase, applyCookies };
 }
 
-export function createServiceClient() {
+/**
+ * Client service role. Le scritture portano l'attore della richiesta ai trigger
+ * del Journal d'activité (lib/audit/requestContext.ts); `auditActor` lo impone
+ * per i worker e i job senza admin (es. sync spedizioni).
+ */
+export function createServiceClient(options: { auditActor?: AuditActor } = {}) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -101,6 +107,7 @@ export function createServiceClient() {
         getAll() { return []; },
         setAll() {},
       },
+      global: { fetch: createAuditFetch(options.auditActor) },
     },
   );
 }

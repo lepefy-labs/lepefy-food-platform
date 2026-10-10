@@ -2,11 +2,21 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 9 ottobre 2026 — **v7.21 Current-State Snapshot** (Brouillons d'expédition provider-neutral: Packlink `POST /v1/shipments` da Lepefy, configurabile per tenant, cartone suggerito e contenuto dichiarato, rilascio verificato di una bozza eliminata; migration 151 e 152 applicate; base `main` @ `4fc00385`)
+> **Aggiornato:** 10 ottobre 2026 — **v7.22 Current-State Snapshot** (Journal d'activité: audit centralizzato multi-tenant append-only, trigger transazionali su ordini/pagamenti/catalogo/configurazione/RBAC, adapter di lettura sulle fonti di audit esistenti, `/admin/activite` solo platform owner finché il flag `activity_journal` non è attivato; migration 153 da applicare; base `main` @ `72f06d0e`)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
 ---
+
+## Journal d'activité (migration 153 — da applicare; accesso: platform owner, tenant solo con flag `activity_journal`) — `docs/ADMIN_ACTIVITY_AUDIT.md`
+
+- **Registro unico** `audit_events` (append-only: `service_role` solo SELECT, trigger che rifiuta UPDATE/DELETE/TRUNCATE anche al proprietario), catalogo `audit_event_types` (FK) allineato a `lib/audit/eventCatalog.ts` da un test; unico punto di scrittura `record_audit_event` (security definer).
+- **Trigger nella stessa transazione** su `orders` (creazione, stato, pagamento manuale, tracking, modifiche, brouillons d'expédition, stato transporteur), `products` (prezzo, disponibilità, minimo/step, stock solo se l'attore è admin, scheda), `customers` (solo admin, solo nomi dei campi), `tenants`/`tenant_feature_flags`/`tenant_payment_methods` (fail-closed), `tenant_feature_settings`, RBAC (`admin_role_permissions`, `admin_roles`, `admin_memberships`, `admin_users`, fail-closed). Ordini, pagamenti, catalogo, spedizioni e clienti sono **fail-open** (savepoint, `audit_write_failures`): il checkout e il webhook Stripe non falliscono mai per il registro. Allow-list di campi: segreti e PII mai in chiaro.
+- **Attore**: il middleware rigenera `x-request-id` su `/admin` e `/api/admin`; `requirePermission()` registra l'admin verificato; `createServiceClient()` aggiunge `x-lepefy-audit-*` solo alle scritture (tabelle + `AUDITED_WRITE_RPCS`), mai alle letture o alle RPC delle pagine ISR; i trigger credono agli header solo per un JWT `service_role`. Ordini creati: attore dedotto da `created_by_admin_id`/`order_origin`/`payment_confirmed_by`; worker con `createServiceClient({ auditActor })` (sync spedizioni = `automation`). Altrimenti `unknown`, mai inventato. Il webhook Stripe non è stato modificato.
+- **Lettura** `audit_feed` (vista `security_invoker`) = `audit_events` ∪ adapter di `business_audit_events`, `whatsapp_audit_events`, `assisted_order_events`, `tenant_subscription_audit`, `review_moderation_events`, `external_catalog_events`, `event_capacity_adjustments`, `notification_deliveries` (falliti), `admin_access_audit` (solo prima dell'installazione): nessuna copia, nessun backfill, id originali prefissati; un adapter è incluso solo se la sua tabella esiste (rieseguire la 153 dopo la migration di un modulo). RPC `audit_feed_page|count|summary|actors` con WHERE dinamico quotato, fail-closed senza tenant o moduli.
+- **Admin** `/admin/activite` (gruppo Commun, voce `activity`): schede Activité / Automatisations / Sécurité, KPI-filtro, FilterBar (periodo, modulo, evento, autore, esito, ricerca per riferimento/ID), DataTable con card mobile, paginazione server, Drawer di dettaglio via `?detail=` (prima/dopo, metadati sanificati, copia ID/correlazione, eventi della stessa azione), export CSV `GET /api/admin/activite/export` (`audit.export`, max 5 000 righe, formule neutralizzate, export auditato). Il platform owner sceglie un tenant o «Toutes les boutiques» (`platform.audit.view`); ogni consultazione è auditata una volta al giorno per perimetro.
+- **Timeline contestuali** `ResourceActivity` (dettaglio ordine, editor prodotto, hub Paramètres) con il permesso della pagina ospite; Gestion conserva `AuditTimeline` + link «Voir dans le journal».
+- **Flag `activity_journal`** `platformOnly`: `PATCH /api/admin/feature-flags` rifiuta i non platform owner (403), riga in sola lettura per il tenant. Retention 24 mesi / 90 giorni / 36 mesi configurata, **nessuna purge schedulata**.
 
 ## Admin → Commandes: cockpit operativo
 
@@ -512,6 +522,7 @@ inventory.view / inventory.manage
 treasury.view / treasury.manage
 supplier_payments.verify
 whatsapp.view / whatsapp.reply / whatsapp.manage
+audit.view / audit.export / audit.security.view
 platform.*
 ```
 
@@ -1027,6 +1038,8 @@ Ordini senza e-mail (assistiti, cliente solo telefono): `order-confirmed` e tutt
 
 La presenza nel repo non prova l'applicazione in ogni Supabase remoto.
 
+`153` (Journal d'activité) è additiva e rieseguibile, senza backfill: tabelle `audit_events`, `audit_event_types`, `audit_write_failures`, `audit_settings`, viste `audit_feed`/`audit_volume_stats` (`security_invoker`), trigger su `orders`, `products`, `customers`, `tenants`, `tenant_feature_flags`, `tenant_feature_settings`, `tenant_payment_methods`, `admin_role_permissions`, `admin_roles`, `admin_memberships`, `admin_users`, RPC `record_audit_event` e `audit_feed_*` (EXECUTE solo `service_role`), `purge_audit_events` (solo SQL, non schedulata), 4 capability (`audit.*` a `platform_owner`/`tenant_admin`, `platform.audit.view` al solo `platform_owner`). Nessuna tabella esistente modificata nei dati; i trigger girano nelle transazioni di checkout/webhook/sync (fail-open) e RBAC/configurazione (fail-closed). **Da applicare** prima su `lepefy-test`, poi verificare con `supabase/verification/153_admin_activity_audit_verification.sql` e una modifica reale (runbook `docs/ADMIN_ACTIVITY_AUDIT.md` §13). Test CI: `supabase/tests/153_admin_activity_audit.{fixture,test}.sql`. Rollback in fondo al file.
+
 `152` ridefinisce solo `is_valid_shipping_automation_config` per accettare `shipment_content` (stringa 1–60 dopo trim); nessuna tabella o dato toccati, config 151 ancora valide. **Applicata in produzione il 09/10/2026** (verificato: nuova chiave accettata, config 151 valide, contenuto vuoto o > 60 rifiutato, `anon` rifiutato). Test CI: `supabase/tests/152_shipping_automation_content.test.sql`.
 
 `151` (brouillons d'expédition) è additiva e rieseguibile, senza backfill: registra `shipping_automation` in `platform_features` (non fatturabile) con il CHECK `is_valid_shipping_automation_config` su `tenant_feature_settings`, aggiunge a `orders` `shipping_creation_status` (CHECK sui 6 stati), `shipping_creation_attempts` (default 0), `shipping_creation_error` (≤ 64), `shipping_creation_updated_at`, `shipping_provider_created_at` e l'indice parziale `orders_shipping_creation_queue_idx`. Nessuna riga esistente modificata, nessun tenant attivato; RLS/grant invariati. **Applicata in produzione il 09/10/2026** (verificato: modulo registrato non fatturabile, nessuna riga di settings, colonne presenti con stato vuoto su tutti gli ordini, `anon` rifiutato). Test CI: `supabase/tests/151_shipping_shipment_creation.{fixture,test}.sql`. Rollback nell'intestazione. Vedi `docs/SHIPPING_INTELLIGENCE.md` §2.4.
@@ -1201,6 +1214,8 @@ Solo `app/layout.tsx` emette `<html>/<head>/<body>`: `app/admin/layout.tsx` è u
 
 ```text
 apps/storefront/middleware.ts
+apps/storefront/src/lib/audit/*
+apps/storefront/src/lib/supabase/server.ts
 apps/storefront/src/lib/auth/adminRbac.ts
 apps/storefront/src/lib/auth/adminApiPermissions.ts
 apps/storefront/src/lib/auth/adminRoutePermissions.ts
@@ -1268,6 +1283,7 @@ supabase/migrations/*
 - AI credits predisposti semanticamente ma non monetizzati/applicati;
 - WhatsApp (147, in collaudo su `lepefy-test`): migration 148 (username/BSUID, eco dall'app Business in coexistence) e relativo codice pronti solo in locale; coexistence possibile solo come Solution Partner/Tech Provider (Lepefy non ancora struttura giuridica); nessun template message (risposte solo entro 24 h), nessuna notifica all'équipe sugli handoff (solo badge inbox, polling 10 s), media in arrivo non scaricati, interazioni WhatsApp non incluse in Nala Analytics, widget `/api/chat` non ancora migrato su `runNalaChannelTurn` (cascata Nala in due punti); uno status Meta che arriva prima dell'aggiornamento `provider_message_id` dell'outbound viene ignorato (`status_unmatched`);
 - brouillons d'expédition: il telefono del destinatario esiste solo come riga `Téléphone: …` in `orders.notes` (nessuna colonna `orders.phone`); Packlink non permette di ritrovare una bozza dal riferimento ordine (`LEPEFY-<8>`), quindi un esito ambiguo richiede verifica manuale; l'annullamento di un ordine non annulla la bozza Packlink; i colli inviati seguono il cartone suggerito, non il numero reale di colli registrato in preparazione (`packing_parcel_count`);
+- Journal d'activité: l'attribuzione degli admin dipende da `request.headers` di PostgREST (da confermare in produzione); le scritture del webhook Stripe sugli ordini esistenti, della dashboard Supabase e degli script hanno autore `unknown`; `admin_access_audit` continua a essere scritta dalle route (letta solo per lo storico pre-153); stati delle prenotazioni Événementiel, login admin e campagne non ancora coperti; `audit_write_failures` senza alert;
 - documenti delle commande: nel PDF di lotto la numerazione «Page X/Y» è quella dell'intero file (Chromium non riparte da 1 per commande); nessuna UI di revoca del token del portale (solo `revokeOrderPublicTokens`); una rotazione di `TRACKING_SECRET` invalida i QR già stampati, come i link di suivi e `/pay`.
 
 ---

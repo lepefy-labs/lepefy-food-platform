@@ -52,6 +52,8 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/canaux/whatsapp', permission: 'whatsapp.view' },
   { prefix: '/admin/ai-lab', permission: 'ai_knowledge.manage' },
   { prefix: '/admin/parametres', permission: 'tenant_settings.view' },
+  // Journal d'activité: le flag activity_journal (sauf platform owner) est vérifié par la page.
+  { prefix: '/admin/activite', permission: 'audit.view' },
   // Moved out of Paramètres with the same access (story, QR/poster: tenant_settings.*).
   { prefix: '/admin/contenu', permission: 'tenant_settings.view' },
   { prefix: '/admin/outils', permission: 'tenant_settings.view' },

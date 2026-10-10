@@ -10,6 +10,7 @@ import { defaultAdminDestination, isPersonalAdminPath, permissionsForAdminPath }
 import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 import { GESTION_VIEW_PERMISSIONS } from '@/lib/gestion/domain';
 import { isWhatsAppEnabled } from '@/lib/whatsapp/server/featureGate';
+import { isActivityJournalEnabled } from '@/lib/audit/access';
 import AdminHeader from '../_components/AdminHeader';
 import AdminShell from '../_components/shell/AdminShell';
 import type { AdminSearchScope, AdminShellNav } from '../_components/shell/shellState';
@@ -90,7 +91,10 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   const whatsappEnabled = workspace === 'shop' && canAdmin(access, 'whatsapp.view') ? await isWhatsAppEnabled(tenant.id) : false;
   // Navigation is resolved here from the same permissions the route check
   // above uses; the client only renders the visible entries (UX, not RBAC).
-  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled } };
+  // Journal d'activité: always for the platform owner, otherwise flag activity_journal (platform-managed).
+  const activityEnabled = access.isPlatformOwner
+    || (canAdmin(access, 'audit.view') && !limitedBySuspension ? await isActivityJournalEnabled(tenant.id) : false);
+  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled, activity: activityEnabled } };
   const resolvedNav = resolveAdminNavigation(navContext);
   const searchScopes: AdminSearchScope[] = workspace === 'events'
     ? (canSee(navContext, ['events.view']) ? ['events'] : [])

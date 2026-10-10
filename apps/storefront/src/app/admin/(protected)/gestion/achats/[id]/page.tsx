@@ -19,6 +19,7 @@ import AdminStatCard from '@/app/admin/_components/ui/AdminStatCard';
 import { ReasonAction, SimpleAction } from '../../_components/actions';
 import { DocumentsPanel } from '../../_components/DocumentsPanel';
 import { AuditTimeline } from '../../_components/AuditTimeline';
+import JournalLink from '../../../../_components/data/JournalLink';
 import { ReceiptForm } from './ReceiptForm';
 import { DueDateForm } from './DueDateForm';
 
@@ -236,7 +237,7 @@ export default async function PurchaseDetailPage({ params }: { params: { id: str
         />
       </Panel>
 
-      <Panel id="historique" title="Historique">
+      <Panel id="historique" title="Historique" actions={<JournalLink tenant={tenant} resourceType="purchase" resourceId={purchase.id} />}>
         <AuditTimeline events={events} />
       </Panel>
     </div>

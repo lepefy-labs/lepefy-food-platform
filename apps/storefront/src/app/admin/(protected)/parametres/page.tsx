@@ -1,4 +1,6 @@
 import Image from 'next/image';
+import { Suspense } from 'react';
+import ResourceActivity from '../../_components/data/ResourceActivity';
 import { getTenant } from '@/lib/tenant/getTenant';
 import AdminPageHeader from '../../_components/ui/AdminPageHeader';
 import { SettingsHub } from './_components/SettingsHub';
@@ -39,6 +41,11 @@ export default async function ParametresPage() {
         actions={tenantContext}
       />
       <SettingsHub statuses={statuses} />
+      <div className="mt-6">
+        <Suspense fallback={null}>
+          <ResourceActivity tenant={tenant} hostPermission="tenant_settings.view" module="admin" title="Dernières modifications" limit={8} />
+        </Suspense>
+      </div>
     </div>
   );
 }

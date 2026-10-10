@@ -15,6 +15,7 @@ import { Breadcrumb } from '@/app/admin/_components/ui/AdminPageHeader';
 import { buttonClasses } from '@/app/admin/_components/ui/Button';
 import AdminStatCard from '@/app/admin/_components/ui/AdminStatCard';
 import { AuditTimeline } from '../../_components/AuditTimeline';
+import JournalLink from '../../../../_components/data/JournalLink';
 import { DocumentsPanel } from '../../_components/DocumentsPanel';
 import { SupplierEditToggle } from '../SupplierForm';
 
@@ -150,7 +151,7 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
         <DocumentsPanel entityType="supplier" entityId={supplier.id} documents={documents} canManage={can('suppliers.manage')} defaultType="other" />
       </Panel>
 
-      <Panel id="historique" title="Historique">
+      <Panel id="historique" title="Historique" actions={<JournalLink tenant={tenant} resourceType="supplier" resourceId={supplier.id} />}>
         <AuditTimeline events={events} />
       </Panel>
     </div>

@@ -53,7 +53,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 ### `src/lib/admin/`
 - `tokens.ts` — token e contrasto.
 - `format.ts` — `formatMoney`, `formatNumber`, `formatWeight`, `formatDate` (`date` / `datetime` / `time` / `short`, fuso Europe/Rome), `formatRelative`, `pluralize`.
-- `statusRegistry.ts` — stato di dominio → `{ label, tone }` (`ORDER_STATUS_META`, `PAYMENT_STATUS_META`, `statusMeta()`).
+- `statusRegistry.ts` — stato di dominio → `{ label, tone }` (`ORDER_STATUS_META`, `PAYMENT_STATUS_META`, `AUDIT_OUTCOME_META`, `AUDIT_SEVERITY_META`, `statusMeta()`).
 
 ### `src/app/admin/_components/ui/`
 - `Button` (`primary` · `secondary` · `outline` · `ghost` · `danger`, taglie `md`/`sm`, `type="button"` di default), `ButtonLink`, `ButtonAnchor`, `IconButton` (etichetta obbligatoria), `buttonClasses()`.
@@ -75,6 +75,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - **Selezione** (`RowSelection.tsx`, client): `RowSelectionProvider` (si azzera con le righe visibili), `RowCheckbox`, `SelectAllCheckbox` (stato indeterminato), `BulkBar` fluttuante con le azioni sugli id selezionati.
 - **`Pagination`** (server, solo link): « 1–50 sur 312 », pagine con salti, « Lignes par page 25 · 50 · 100 ».
 - **Stati** (`ui/States.tsx`): `EmptyState` (`empty` / `filtered`), `ErrorState` (con azione « Réessayer »), `Skeleton`, `ListPageSkeleton` per i `loading.tsx`.
+- **Storico e audit** (`docs/ADMIN_ACTIVITY_AUDIT.md`): `AuditChanges` (tabella « Avant / Après », variante `compact` in riga; i campi senza valore mostrano « modifié »), `ResourceActivity` (Server Component: cronologia di una risorsa o di un modulo dal Journal d'activité, permesso della pagina ospite, non rende nulla se il journal non è aperto all'admin), `JournalLink` (« Voir dans le journal » per le pagine con storico proprio, es. Gestion). Il Journal `/admin/activite` è sul kit (AdminTabs, AdminStatCard filtro, FilterBar, DataTable con card mobile, Pagination, Drawer guidato da `?detail=`).
 - **`Panel`**, `Card`, `cardClasses`, `DescriptionList`/`DescriptionItem`, `InfoField` (`ui/Panel.tsx`, promossi da Gestion); `Breadcrumb` autonomo (`ui/AdminPageHeader.tsx`); `controlClasses`, `labelClasses`, `hintClasses` per i form scritti a mano (`ui/Form.tsx`); **`AdminTabs`** (`ui/Tabs.tsx`) per le sotto-pagine (Livraison, WhatsApp, sezioni piattaforma).
 
 ### Shell e navigazione (`src/lib/admin/navigation.ts`, `src/app/admin/_components/shell/`)
@@ -122,3 +123,4 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U10 | Événementiel (back-office, prenotazioni, contenuti, noleggi, scan sul posto) sui token | ✅ |
 | U11 | Altri moduli (Paramètres, Paiements, Avis, Fidélité, Ambassadeurs, Canaux, Billing, IA, Contenu, Outils, dettaglio ordine, ordini assistiti, console Platform, Team, Sécurité, onboarding, login) sui token; Paiements carte convertito a Server Component + URL (`lib/card/cardPaymentsList.ts` condiviso con `GET /api/admin/card-payments`); guard esteso a tutto `app/admin` | ✅ `b0084cc2` |
 | U12 | Rete di sicurezza dark (`adminDarkTheme.ts`), rimappatura `--color-*` e alias token legacy rimossi; guard senza eccezioni | ✅ |
+| — | Journal d'activité (`/admin/activite`, `AuditChanges`, `ResourceActivity`, `JournalLink`), nato sul kit | ✅ |

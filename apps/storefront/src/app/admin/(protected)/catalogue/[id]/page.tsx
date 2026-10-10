@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
+import ResourceActivity from '../../../_components/data/ResourceActivity';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getAiCapabilities } from '@/lib/ai/aiSettings';
@@ -109,6 +111,12 @@ export default async function AdminProductEditPage({
       </ProductEditWorkspace>
       {/* Gestion (flag business_management) : coût d'achat en lecture seule, rendu serveur uniquement. */}
       <ProductCostPanel tenantId={tenant.id} productId={product.id} price={Number(product.price)} currency={tenant.currency} />
+      {/* Journal d'activité : prix, disponibilité, règles de vente, stock ajusté par un admin. */}
+      <div className="mt-4">
+        <Suspense fallback={null}>
+          <ResourceActivity tenant={tenant} hostPermission="catalog.view" resourceType="product" resourceId={product.id} />
+        </Suspense>
+      </div>
     </div>
   );
 }

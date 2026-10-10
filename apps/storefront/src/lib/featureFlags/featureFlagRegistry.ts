@@ -20,6 +20,11 @@ export interface FeatureFlagDefinition {
   label: string;
   /** Cosa cambia quando il flag è attivo (francese). */
   description: string;
+  /**
+   * Solo il platform owner può cambiarlo (PATCH /api/admin/feature-flags rifiuta
+   * gli altri con 403); il tenant lo vede in sola lettura.
+   */
+  platformOnly?: boolean;
 }
 
 /** Stesso formato del CHECK SQL tenant_feature_flags_key_format. */
@@ -45,6 +50,14 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
     key: 'external_catalog_import',
     label: 'Import de catalogues WhatsApp',
     description: 'Autorise la console plateforme à créer ou mettre à jour des produits de cette boutique depuis un catalogue WhatsApp externe, après validation produit par produit.',
+  },
+  {
+    // Journal d'activité (migration 153, docs/ADMIN_ACTIVITY_AUDIT.md). Il platform
+    // owner lo vede sempre; il flag lo apre all'équipe del tenant.
+    key: 'activity_journal',
+    label: 'Journal d’activité',
+    description: 'Donne à l’équipe de la boutique l’accès au journal des actions, des automatisations et des accès (/admin/activite). Activation réservée à Lepefy.',
+    platformOnly: true,
   },
 ];
 
