@@ -1,6 +1,6 @@
 # Journal d'activité — audit centralizzato multi-tenant
 
-> **Stato:** implementato (migration `153_admin_activity_audit.sql`, da applicare manualmente — §13). Accesso: solo platform owner; i tenant solo dopo l'attivazione del flag `activity_journal` da parte del platform owner.
+> **Stato:** implementato; migration `153_admin_activity_audit.sql` **applicata il 10/10/2026**, script di verifica OK (§13.1–13.2). Da confermare: attribuzione dell'autore su una modifica reale (§13.3). Accesso: solo platform owner; i tenant solo dopo l'attivazione del flag `activity_journal` da parte del platform owner.
 > **Base codice verificata:** `main@72f06d0e3f69fd55bdbfc4cb2cf8b9ab72e86ce9` (10/10/2026).
 > **Proposta approvata (audit, mockup PRE/POST, permessi, rischi):** artifact «Journal d'activité Lepefy».
 > Il codice resta la fonte di verità; questo documento descrive lo stato corrente.
