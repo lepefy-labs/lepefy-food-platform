@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconAlertTriangle, IconBuildingStore, IconChevronDown, IconChevronRight, IconDownload, IconExternalLink,
+  IconAlertTriangle, IconBuildingStore, IconChevronDown, IconDownload, IconExternalLink,
   IconFileTypePdf, IconLeaf, IconPrinter, IconSnowflake, IconTruck, IconTruckDelivery,
 } from '@tabler/icons-react';
 import { ORDER_DOCUMENT_FORMATS } from '@/lib/orders/documents/formats';
@@ -296,16 +296,22 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         const operation = operationOf(order);
         const open = expanded.has(order.id);
         return <>
-          <button type="button" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`}
-            className="-m-1 flex items-start gap-1 rounded-lg p-1 text-left hover:bg-a-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
-            {open ? <IconChevronDown size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-a-text-3" /> : <IconChevronRight size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-a-text-3" />}
+          {/* Visible toggle (the whole row also toggles on click, see onRowClick). */}
+          <div className="flex items-start gap-2">
+            <button type="button" onClick={() => toggleDetail(order)} aria-expanded={open} aria-controls={`order-detail-${order.id}`}
+              title={open ? 'Masquer le détail' : 'Afficher le détail'}
+              className={cn('mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus',
+                open ? 'border-a-brand bg-a-brand-soft text-a-brand-fg' : 'border-a-border-strong bg-a-surface text-a-text-2 group-hover/row:border-a-brand group-hover/row:text-a-brand-fg')}>
+              <IconChevronDown size={16} aria-hidden="true" className={cn('transition-transform', !open && '-rotate-90')} />
+              <span className="sr-only">{open ? 'Masquer' : 'Afficher'} le détail de {shortId(order.id)}</span>
+            </button>
             <span className="min-w-0">
-              <span className="font-mono text-xs font-semibold text-a-text-2">{shortId(order.id)}</span><span className="sr-only"> — {open ? 'masquer' : 'afficher'} le détail</span>
+              <span className="font-mono text-xs font-semibold text-a-text-2">{shortId(order.id)}</span>
               <span className="block max-w-[200px] truncate font-semibold">{order.full_name ?? order.email ?? 'Client'}</span>
             </span>
-          </button>
-          <p className="mt-0.5 pl-5 text-xs text-a-text-3"><time dateTime={order.created_at}>{formatDate(order.created_at, 'datetime')}</time></p>
-          {operation.urgency && <p className="mt-1 flex items-start gap-1 pl-5 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
+          </div>
+          <p className="mt-0.5 pl-9 text-xs text-a-text-3"><time dateTime={order.created_at}>{formatDate(order.created_at, 'datetime')}</time></p>
+          {operation.urgency && <p className="mt-1 flex items-start gap-1 pl-9 text-xs font-semibold text-tone-urgent-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.urgency}</p>}
         </>;
       },
     },
@@ -370,6 +376,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         rowClassName={(order) => (done(order) ? 'text-a-text-2' : undefined)}
         selectable={{ label: (order) => `Sélectionner ${shortId(order.id)}` }}
         rowDetail={(order) => (expanded.has(order.id) ? detailPanel(order, operationOf(order)) : null)}
+        onRowClick={toggleDetail}
         mobileCard={mobileCard}
         empty={hasFilters
           ? <EmptyState variant="filtered" title="Aucune commande ne correspond à ces filtres." description="Modifiez la recherche ou les filtres pour élargir la liste." action={<Link href={resetHref} className={buttonClasses({ variant: 'secondary' })}>Effacer les filtres</Link>} />

@@ -72,6 +72,12 @@ interface DataTableProps<Row> {
   mobileCard?: (row: Row) => ReactNode;
   /** Expanded content under a row (rendered by the caller, e.g. detail). */
   rowDetail?: (row: Row) => ReactNode;
+  /**
+   * Mouse shortcut on the whole row (e.g. toggle its detail). Clicks on links,
+   * buttons, form controls or while selecting text are ignored; keyboard users
+   * keep the row's own button.
+   */
+  onRowClick?: (row: Row) => void;
   empty?: ReactNode;
   density?: 'comfortable' | 'compact';
   className?: string;
@@ -98,7 +104,7 @@ function SortHeader({ column, sort }: { column: DataColumn<never>; sort: DataSor
  * through the URL. Selection checkboxes are small client islands.
  */
 export default function DataTable<Row>({
-  caption, columns, rowKey, rows, groups, rowTone, rowClassName, selectable, sort, mobileCard, rowDetail, empty, density = 'comfortable', className,
+  caption, columns, rowKey, rows, groups, rowTone, rowClassName, selectable, sort, mobileCard, rowDetail, onRowClick, empty, density = 'comfortable', className,
 }: DataTableProps<Row>) {
   const allGroups: DataRowGroup<Row>[] = groups ?? [{ id: 'all', label: null, rows: rows ?? [] }];
   const allRows = allGroups.flatMap((group) => group.rows);
@@ -145,7 +151,12 @@ export default function DataTable<Row>({
                   const detail = rowDetail?.(row);
                   return (
                     <Fragment key={id}>
-                      <tr className={cn('group/row hover:bg-a-hover', rowClassName?.(row))}>
+                      <tr className={cn('group/row hover:bg-a-hover', onRowClick && 'cursor-pointer', rowClassName?.(row))}
+                        onClick={onRowClick ? (event) => {
+                          if ((event.target as HTMLElement).closest('a, button, input, select, textarea, label, [role="button"]')) return;
+                          if (window.getSelection()?.toString()) return;
+                          onRowClick(row);
+                        } : undefined}>
                         {selectable && (
                           <td className={cn('relative w-10 border-b border-a-border align-top', pad)}>
                             {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-[3px]', TONE_SOLID_BG_CLASS[tone])} />}
