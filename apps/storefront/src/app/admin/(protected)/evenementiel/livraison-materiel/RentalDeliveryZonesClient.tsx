@@ -35,7 +35,7 @@ export default function RentalDeliveryZonesClient({ initialZones, currency, init
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = saving || removingId !== null;
-  const inputClass = 'mt-1.5 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:text-sm';
+  const inputClass = 'mt-1.5 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
 
   async function saveSettings() {
     setSavingSettings(true);
@@ -128,36 +128,36 @@ export default function RentalDeliveryZonesClient({ initialZones, currency, init
   return (
     <div className="space-y-6">
       {confirmDialog}
-      <section className="rounded-2xl border border-gray-100 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Activation</h2>
-        <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-4">
+        <h2 className="mb-3 text-sm font-semibold text-a-text-2">Activation</h2>
+        <label className="flex min-h-11 items-center gap-2 text-sm text-a-text-2">
           <input type="checkbox" checked={deliveryEnabled} onChange={(e) => setDeliveryEnabled(e.target.checked)} className="size-4" />
           Proposer la livraison sur la page location matériel
         </label>
-        <label className="mt-3 block text-sm text-gray-600">Pays autorisés (codes ISO2, séparés par des virgules)
+        <label className="mt-3 block text-sm text-a-text-2">Pays autorisés (codes ISO2, séparés par des virgules)
           <input value={countriesInput} onChange={(e) => setCountriesInput(e.target.value)} placeholder="Ex. IT, FR" className={inputClass} />
         </label>
-        <p className="mt-1 text-xs text-gray-500">Si l’adresse du client n’est pas dans un de ces pays, l’option livraison n’est pas proposée.</p>
+        <p className="mt-1 text-xs text-a-text-3">Si l’adresse du client n’est pas dans un de ces pays, l’option livraison n’est pas proposée.</p>
         <div className="mt-3 flex items-center gap-3">
           <Button type="button" onClick={saveSettings} loading={savingSettings}>Enregistrer</Button>
-          {settingsSaved && <span className="text-xs text-green-700">Enregistré.</span>}
+          {settingsSaved && <span className="text-xs text-tone-success-fg">Enregistré.</span>}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-gray-100 bg-white p-4">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-gray-700">Zones de livraison</h2>
-          <span className="text-xs text-gray-500">{zones.length} zone{zones.length > 1 ? 's' : ''}</span>
+          <h2 className="text-sm font-semibold text-a-text-2">Zones de livraison</h2>
+          <span className="text-xs text-a-text-3">{zones.length} zone{zones.length > 1 ? 's' : ''}</span>
         </div>
         <div className="mb-5 space-y-3">
           {zones.map((zone) => (
-            <article key={zone.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 p-3">
+            <article key={zone.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-a-border p-3">
               <div className="min-w-0 flex-1 basis-40">
-                <p className={'break-words text-sm font-medium ' + (zone.active ? 'text-gray-900' : 'text-gray-400')}>{zone.label}</p>
-                <p className="text-xs text-gray-500">
+                <p className={'break-words text-sm font-medium ' + (zone.active ? 'text-a-text' : 'text-a-text-3')}>{zone.label}</p>
+                <p className="text-xs text-a-text-3">
                   {zone.country ?? 'Tous pays'}{zone.postal_code_prefixes?.length ? ` · CP ${zone.postal_code_prefixes.join(', ')}` : ''}{zone.city ? ` · ${zone.city}` : ''}
                 </p>
-                <p className="mt-1 text-xs text-gray-500">{formatPrice(zone.fee_amount, currency)}{!zone.active && ' · Inactive'}</p>
+                <p className="mt-1 text-xs text-a-text-3">{formatPrice(zone.fee_amount, currency)}{!zone.active && ' · Inactive'}</p>
               </div>
               <div className="flex gap-1">
                 <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => editZone(zone)} aria-label={'Modifier ' + zone.label}>
@@ -169,37 +169,37 @@ export default function RentalDeliveryZonesClient({ initialZones, currency, init
               </div>
             </article>
           ))}
-          {zones.length === 0 && <p className="text-sm text-gray-400">Aucune zone — hors zone, le supplément reste à évaluer manuellement.</p>}
+          {zones.length === 0 && <p className="text-sm text-a-text-3">Aucune zone — hors zone, le supplément reste à évaluer manuellement.</p>}
         </div>
 
-        <form onSubmit={saveZone} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-800">{editingId ? 'Modifier la zone' : 'Ajouter une zone'}</h3>
+        <form onSubmit={saveZone} className="rounded-xl border border-a-border bg-a-surface-2 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-a-text">{editingId ? 'Modifier la zone' : 'Ajouter une zone'}</h3>
           <fieldset disabled={busy} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm text-gray-600 sm:col-span-2">Label *
+              <label className="text-sm text-a-text-2 sm:col-span-2">Label *
                 <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex. Paris intra-muros" required className={inputClass} />
               </label>
-              <label className="text-sm text-gray-600">Pays (ISO2)
+              <label className="text-sm text-a-text-2">Pays (ISO2)
                 <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Ex. FR" className={inputClass} />
               </label>
-              <label className="text-sm text-gray-600">Supplément ({currency}) *
+              <label className="text-sm text-a-text-2">Supplément ({currency}) *
                 <input value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} type="number" min="0" step="0.01" inputMode="decimal" required className={inputClass} />
               </label>
-              <label className="text-sm text-gray-600">Préfixes code postal
+              <label className="text-sm text-a-text-2">Préfixes code postal
                 <input value={prefixes} onChange={(e) => setPrefixes(e.target.value)} placeholder="Ex. 75, 92" className={inputClass} />
               </label>
-              <label className="text-sm text-gray-600">Ville
+              <label className="text-sm text-a-text-2">Ville
                 <input value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
               </label>
-              <label className="text-sm text-gray-600 sm:col-span-2">Note (visible admin uniquement)
+              <label className="text-sm text-a-text-2 sm:col-span-2">Note (visible admin uniquement)
                 <input value={note} onChange={(e) => setNote(e.target.value)} className={inputClass} />
               </label>
             </div>
-            <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-a-text-2">
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-4" />
               Zone active
             </label>
-            <p className="text-xs text-gray-500">Laissez préfixes/ville vides pour une zone valable sur tout le pays.</p>
+            <p className="text-xs text-a-text-3">Laissez préfixes/ville vides pour une zone valable sur tout le pays.</p>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" loading={saving} disabled={busy}>
                 <IconPlus size={16} /> {saving ? 'Enregistrement…' : editingId ? 'Enregistrer la zone' : 'Ajouter la zone'}
@@ -207,7 +207,7 @@ export default function RentalDeliveryZonesClient({ initialZones, currency, init
               {editingId && <Button type="button" variant="ghost" onClick={resetForm}>Annuler</Button>}
             </div>
           </fieldset>
-          {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-sm text-tone-danger-fg">{error}</p>}
         </form>
       </section>
     </div>

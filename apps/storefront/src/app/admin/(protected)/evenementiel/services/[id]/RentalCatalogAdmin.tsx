@@ -27,7 +27,7 @@ export default function RentalCatalogAdmin({ serviceId, initialItems, currency }
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = uploading || saving || removingId !== null;
-  const inputClass = 'mt-1.5 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:text-sm';
+  const inputClass = 'mt-1.5 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
 
   function resetForm() {
     setEditingId(null);
@@ -122,24 +122,24 @@ export default function RentalCatalogAdmin({ serviceId, initialItems, currency }
   }
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-4">
+    <section className="rounded-2xl border border-a-border bg-a-surface p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">Catalogue matériel</h2>
-        <span className="text-xs text-gray-500">{items.length} article{items.length > 1 ? 's' : ''}</span>
+        <h2 className="text-sm font-semibold text-a-text-2">Catalogue matériel</h2>
+        <span className="text-xs text-a-text-3">{items.length} article{items.length > 1 ? 's' : ''}</span>
       </div>
       <div className="mb-5 space-y-3">
         {items.map((item) => (
-          <article key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 p-3">
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-white">
+          <article key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-a-border p-3">
+            <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-a-border bg-a-surface">
               {item.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={item.image_url} alt={item.name} className="size-full object-contain p-1" />
-              ) : <IconPhoto size={22} className="text-gray-300" />}
+              ) : <IconPhoto size={22} className="text-a-text-3" />}
             </div>
             <div className="min-w-0 flex-1 basis-40">
-              <p className={'break-words text-sm font-medium ' + (item.active ? 'text-gray-900' : 'text-gray-400')}>{item.name}</p>
-              {item.category && <p className="text-xs text-gray-500">{item.category}</p>}
-              <p className="mt-1 text-xs text-gray-500">{formatPrice(item.price_per_unit, currency)} · {item.stock_quantity} disponible{item.stock_quantity > 1 ? 's' : ''}{!item.active && ' · Inactif'}</p>
+              <p className={'break-words text-sm font-medium ' + (item.active ? 'text-a-text' : 'text-a-text-3')}>{item.name}</p>
+              {item.category && <p className="text-xs text-a-text-3">{item.category}</p>}
+              <p className="mt-1 text-xs text-a-text-3">{formatPrice(item.price_per_unit, currency)} · {item.stock_quantity} disponible{item.stock_quantity > 1 ? 's' : ''}{!item.active && ' · Inactif'}</p>
             </div>
             <div className="flex gap-1">
               <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => editItem(item)} aria-label={'Modifier ' + item.name}>
@@ -151,48 +151,48 @@ export default function RentalCatalogAdmin({ serviceId, initialItems, currency }
             </div>
           </article>
         ))}
-        {items.length === 0 && <p className="text-sm text-gray-400">Aucun article — ajoutez le premier ci-dessous.</p>}
+        {items.length === 0 && <p className="text-sm text-a-text-3">Aucun article — ajoutez le premier ci-dessous.</p>}
       </div>
 
-      <form onSubmit={saveItem} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-800">{editingId ? 'Modifier l’article' : 'Ajouter un article'}</h3>
+      <form onSubmit={saveItem} className="rounded-xl border border-a-border bg-a-surface-2 p-4">
+        <h3 className="mb-3 text-sm font-semibold text-a-text">{editingId ? 'Modifier l’article' : 'Ajouter un article'}</h3>
         <fieldset disabled={busy} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm text-gray-600 sm:col-span-2">Nom de l’article *
+            <label className="text-sm text-a-text-2 sm:col-span-2">Nom de l’article *
               <input value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} />
             </label>
-            <label className="text-sm text-gray-600 sm:col-span-2">Catégorie
+            <label className="text-sm text-a-text-2 sm:col-span-2">Catégorie
               <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex. Chauffe-plats, Barbecue" className={inputClass} />
             </label>
-            <label className="text-sm text-gray-600">Prix par unité ({currency}) *
+            <label className="text-sm text-a-text-2">Prix par unité ({currency}) *
               <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" step="0.01" inputMode="decimal" required className={inputClass} />
             </label>
-            <label className="text-sm text-gray-600">Quantité disponible *
+            <label className="text-sm text-a-text-2">Quantité disponible *
               <input value={stock} onChange={(e) => setStock(e.target.value)} type="number" min="0" step="1" inputMode="numeric" required className={inputClass} />
             </label>
           </div>
           <div>
-            <label className="block text-sm text-gray-600">Photo de l’article
-              <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm file:mr-3 file:min-h-11 file:rounded-lg file:border file:border-gray-200 file:bg-white file:px-3 file:text-gray-700" onChange={(e) => {
+            <label className="block text-sm text-a-text-2">Photo de l’article
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm file:mr-3 file:min-h-11 file:rounded-lg file:border file:border-a-border file:bg-a-surface file:px-3 file:text-a-text-2" onChange={(e) => {
                 const file = e.currentTarget.files?.[0] ?? null;
                 e.currentTarget.value = '';
                 void uploadPhoto(file);
               }} />
             </label>
-            <p className="mt-1 text-xs text-gray-500">{uploading ? 'Téléversement…' : 'JPG, PNG ou WebP · 4 Mo maximum'}</p>
+            <p className="mt-1 text-xs text-a-text-3">{uploading ? 'Téléversement…' : 'JPG, PNG ou WebP · 4 Mo maximum'}</p>
             {imageUrl && (
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt="Aperçu de la photo de l’article" className="size-28 rounded-lg border border-gray-200 bg-white object-contain p-2" />
-                <button type="button" onClick={() => setImageUrl(null)} className="min-h-11 px-3 text-sm text-gray-600">Retirer la photo</button>
+                <img src={imageUrl} alt="Aperçu de la photo de l’article" className="size-28 rounded-lg border border-a-border bg-a-surface object-contain p-2" />
+                <button type="button" onClick={() => setImageUrl(null)} className="min-h-11 px-3 text-sm text-a-text-2">Retirer la photo</button>
               </div>
             )}
           </div>
-          <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600">
+          <label className="flex min-h-11 items-center gap-2 text-sm text-a-text-2">
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-4" />
             Visible dans le catalogue public
           </label>
-          <p className="text-xs text-gray-500">Une quantité de 0 bloque la réservation de cet article.</p>
+          <p className="text-xs text-a-text-3">Une quantité de 0 bloque la réservation de cet article.</p>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={saving} disabled={busy}>
               <IconPlus size={16} /> {saving ? 'Enregistrement…' : editingId ? 'Enregistrer l’article' : 'Ajouter l’article'}
@@ -200,7 +200,7 @@ export default function RentalCatalogAdmin({ serviceId, initialItems, currency }
             {editingId && <Button type="button" variant="ghost" onClick={resetForm}>Annuler</Button>}
           </div>
         </fieldset>
-        {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-tone-danger-fg">{error}</p>}
       </form>
     </section>
   );

@@ -94,7 +94,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 I moduli esistenti passano ai token con un codemod a regole fisse (una unità per modulo), poi con gli interventi strutturali del modulo:
 - grigi → `a-text` (800–950), `a-text-2` (600–700), `a-text-3` (≤ 500); fondi `a-surface`/`a-surface-2`/`a-hover`/`a-border`, scuri (≥ 600) → `a-inverse`; bordi `a-border`/`a-border-strong`;
 - rosso/rosa → `danger`, ambra/giallo → `warning`, arancio → `urgent`, verde/smeraldo/teal → `success`, blu/sky/ciano/indaco → `info` (fondi chiari → `-bg`, pieni → `-solid`, testi → `-fg`, bordi → `-border`); viola → brand;
-- `text-white` su `bg-a-brand` / `bg-a-inverse` → `text-a-on-brand` / `text-a-on-inverse`;
+- `text-white` su `bg-a-brand` (anche via `style={{ backgroundColor: 'var(--admin-primary)' }}`) / `bg-a-inverse` → `text-a-on-brand` / `text-a-on-inverse`; gradienti `from/via/to-white` → `a-surface`;
 - varianti `dark:` rimosse (i token cambiano tema); un `bg-white` accompagnato da `dark:bg-white` (logo, QR) resta bianco;
 - `text-[10px]`, `text-[11px]`, `text-2xs` → `text-xs`; `var(--color-primary*)` → `var(--admin-primary*)` / token.
 
@@ -119,5 +119,6 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U7 | Clients: lista sul kit (segmenti come viste, KPI con icone, pannello filtri con numeri/date, DataTable con card mobile, Pagination), export con lo stesso ordinamento della lista; componenti condivisi residui sui token | ✅ |
 | U8 | Catalogue: lista convertita a Server Component + URL (`lib/catalog/catalogueList.ts` condiviso con `GET /api/admin/catalogue`), isola client per stock/statut inline e azioni massive con esito per prodotto; editor, media, categorie, gruppi di quantità ed etichette sui token | ✅ |
 | U9 | Gestion: kit locale rimosso, tutto sul kit condiviso (`Panel`, `AdminStatCard`, `Badge`, `EmptyState`, `InfoField`, `Breadcrumb`, `controlClasses`/`labelClasses`/`hintClasses`, `useAdminMutation`), toni di dominio allineati (`warning`) | ✅ |
-| U10–U11 | Événementiel, altri moduli | — |
+| U10 | Événementiel (back-office, prenotazioni, contenuti, noleggi, scan sul posto) sui token | ✅ |
+| U11 | Altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |

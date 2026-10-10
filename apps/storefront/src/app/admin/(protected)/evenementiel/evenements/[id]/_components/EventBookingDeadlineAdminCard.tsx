@@ -56,12 +56,12 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
   const hoursRemaining = now !== null && deadlineTimestamp !== null && !closed ? (deadlineTimestamp - now) / 3_600_000 : null;
   const status = !savedValue ? 'Sans échéance dédiée' : closed ? 'Clôturée' : hoursRemaining !== null && hoursRemaining <= 6 ? 'Dernières heures' : 'Ouverte';
   const statusClass = !savedValue
-    ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+    ? 'bg-a-hover text-a-text-2'
     : closed
-      ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+      ? 'bg-tone-danger-bg text-tone-danger-fg'
       : hoursRemaining !== null && hoursRemaining <= 6
-        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
+        ? 'bg-tone-warning-bg text-tone-warning-fg'
+        : 'bg-tone-success-bg text-tone-success-fg';
 
   const fallbackNumber = Number(fallbackHours);
   const computedReportTime = useMemo(() => {
@@ -135,47 +135,47 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
         : `Envoi automatique prévu${reportState.scheduledFor ? ` : ${formatDateTime(reportState.scheduledFor)}` : ''}`;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-        <div className="flex items-center gap-2"><IconClock size={16} className="text-[var(--color-primary-dark)]" /><h2 className="text-sm font-semibold text-gray-950 dark:text-white">Réservations & billets</h2></div>
-        <span className={`rounded-full px-2 py-1 text-2xs font-semibold ${statusClass}`}>{status}</span>
+    <section className="overflow-hidden rounded-xl border border-a-border bg-a-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-a-border px-4 py-3">
+        <div className="flex items-center gap-2"><IconClock size={16} className="text-a-brand-fg" /><h2 className="text-sm font-semibold text-a-text">Réservations & billets</h2></div>
+        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass}`}>{status}</span>
       </div>
       <div className="p-4">
-        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Fin des réservations
-          <input type="datetime-local" value={bookingClosesAt} max={toDateTimeLocal(event.date_start)} onChange={(e) => { setBookingClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+        <label className="block text-xs font-semibold text-a-text-2">Fin des réservations
+          <input type="datetime-local" value={bookingClosesAt} max={toDateTimeLocal(event.date_start)} onChange={(e) => { setBookingClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" />
         </label>
-        <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Ferme uniquement les nouvelles réservations publiques. Les billets déjà émis restent valides.</p>
+        <p className="mt-2 text-xs leading-relaxed text-a-text-3">Ferme uniquement les nouvelles réservations publiques. Les billets déjà émis restent valides.</p>
 
-        <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/40 p-3 dark:border-sky-950/50 dark:bg-sky-950/20">
-          <div className="flex items-start gap-2"><IconTicket size={16} className="mt-0.5 shrink-0 text-sky-700" /><div className="min-w-0 flex-1">
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200">Fin de validité des billets
-              <input type="datetime-local" value={checkinClosesAt} min={toDateTimeLocal(event.date_start)} onChange={(e) => { setCheckinClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus-visible:ring-sky-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+        <div className="mt-4 rounded-xl border border-tone-info-border bg-tone-info-bg p-3">
+          <div className="flex items-start gap-2"><IconTicket size={16} className="mt-0.5 shrink-0 text-tone-info-fg" /><div className="min-w-0 flex-1">
+            <label className="block text-xs font-semibold text-a-text-2">Fin de validité des billets
+              <input type="datetime-local" value={checkinClosesAt} min={toDateTimeLocal(event.date_start)} onChange={(e) => { setCheckinClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus-visible:ring-tone-info-solid" />
             </label>
-            <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Après cette heure, le QR est expiré et le scanner refuse toute consommation restante.</p>
-            {!savedCheckinClosesAt && effectiveCheckinClose && <p className="mt-1 text-xs font-medium text-sky-700 dark:text-sky-300">Automatique si non défini : {formatDateTime(effectiveCheckinClose)} (début + 12 h).</p>}
+            <p className="mt-2 text-xs leading-relaxed text-a-text-3">Après cette heure, le QR est expiré et le scanner refuse toute consommation restante.</p>
+            {!savedCheckinClosesAt && effectiveCheckinClose && <p className="mt-1 text-xs font-medium text-tone-info-fg">Automatique si non défini : {formatDateTime(effectiveCheckinClose)} (début + 12 h).</p>}
           </div></div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3 dark:border-violet-950/50 dark:bg-violet-950/20">
-          <div className="flex items-start gap-2"><IconFileExport size={16} className="mt-0.5 shrink-0 text-violet-600" /><div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Rapports de clôture automatiques</p>
-            <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">Rapport détaillé, liste imprimable et codes A5 sont envoyés ensemble aux destinataires configurés.</p>
-            <label className="mt-2 block text-xs text-gray-600 dark:text-gray-300">Si aucune fin des réservations n’est définie, envoyer les rapports
-              <span className="mt-1 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={fallbackHours} onChange={(e) => { setFallbackHours(e.target.value); setSaved(false); }} className="min-h-10 w-24 rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950" /><span>heure(s) avant l’événement</span></span>
+        <div className="mt-4 rounded-xl border border-a-border bg-a-brand-soft p-3">
+          <div className="flex items-start gap-2"><IconFileExport size={16} className="mt-0.5 shrink-0 text-a-brand-fg" /><div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-a-text">Rapports de clôture automatiques</p>
+            <p className="mt-1 text-xs leading-relaxed text-a-text-3">Rapport détaillé, liste imprimable et codes A5 sont envoyés ensemble aux destinataires configurés.</p>
+            <label className="mt-2 block text-xs text-a-text-2">Si aucune fin des réservations n’est définie, envoyer les rapports
+              <span className="mt-1 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={fallbackHours} onChange={(e) => { setFallbackHours(e.target.value); setSaved(false); }} className="min-h-10 w-24 rounded-lg border border-a-border bg-a-surface px-3 text-sm" /><span>heure(s) avant l’événement</span></span>
             </label>
-            {computedReportTime && <p className="mt-2 text-xs font-medium text-violet-700 dark:text-violet-300">Heure effective : {formatDateTime(computedReportTime)}</p>}
-            <p className={`mt-1 text-xs ${reportState.status === 'error' ? 'text-red-600' : reportState.sentAt ? 'font-semibold text-emerald-700' : 'text-gray-500'}`}>{reportStatusLabel}</p>
-            {reportState.lastError && <p className="mt-1 text-[11px] text-red-500">Dernière erreur : {reportState.lastError}</p>}
+            {computedReportTime && <p className="mt-2 text-xs font-medium text-a-brand-fg">Heure effective : {formatDateTime(computedReportTime)}</p>}
+            <p className={`mt-1 text-xs ${reportState.status === 'error' ? 'text-tone-danger-fg' : reportState.sentAt ? 'font-semibold text-tone-success-fg' : 'text-a-text-3'}`}>{reportStatusLabel}</p>
+            {reportState.lastError && <p className="mt-1 text-xs text-tone-danger-fg">Dernière erreur : {reportState.lastError}</p>}
           </div></div>
         </div>
 
-        <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
-          <label className="flex cursor-pointer items-start justify-between gap-4"><span className="min-w-0"><span className="block text-xs font-semibold text-gray-700 dark:text-gray-200">Afficher le nombre de places restantes</span><span className="mt-1 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">Activé : nombre exact. Désactivé : disponibilité qualitative uniquement.</span></span><span className="relative mt-0.5 shrink-0"><input type="checkbox" checked={showRemainingPlaces} onChange={(e) => { setShowRemainingPlaces(e.target.checked); setSaved(false); }} className="peer sr-only" /><span className="block h-6 w-11 rounded-full bg-gray-200 transition-colors peer-checked:bg-[var(--color-primary)] dark:bg-gray-700" /><span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" /></span></label>
+        <div className="mt-4 border-t border-a-border pt-4">
+          <label className="flex cursor-pointer items-start justify-between gap-4"><span className="min-w-0"><span className="block text-xs font-semibold text-a-text-2">Afficher le nombre de places restantes</span><span className="mt-1 block text-xs leading-relaxed text-a-text-3">Activé : nombre exact. Désactivé : disponibilité qualitative uniquement.</span></span><span className="relative mt-0.5 shrink-0"><input type="checkbox" checked={showRemainingPlaces} onChange={(e) => { setShowRemainingPlaces(e.target.checked); setSaved(false); }} className="peer sr-only" /><span className="block h-6 w-11 rounded-full bg-a-border transition-colors peer-checked:bg-a-brand" /><span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-a-surface shadow-sm transition-transform peer-checked:translate-x-5" /></span></label>
         </div>
 
-        {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
-        {saved && !error && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Paramètres enregistrés.</p>}
-        <div className="mt-3 flex gap-2"><button type="button" onClick={() => void save()} disabled={saving || !dirty} className="min-h-11 flex-1 rounded-lg bg-[var(--color-primary)] px-3 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>{bookingClosesAt && <button type="button" onClick={() => { setBookingClosesAt(''); setSaved(false); }} disabled={saving} className="min-h-11 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">Effacer clôture</button>}</div>
+        {error && <p className="mt-3 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{error}</p>}
+        {saved && !error && <p className="mt-3 rounded-lg bg-tone-success-bg px-3 py-2 text-xs font-medium text-tone-success-fg">Paramètres enregistrés.</p>}
+        <div className="mt-3 flex gap-2"><button type="button" onClick={() => void save()} disabled={saving || !dirty} className="min-h-11 flex-1 rounded-lg bg-a-brand px-3 text-sm font-semibold text-a-on-brand hover:bg-a-brand disabled:opacity-60">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>{bookingClosesAt && <button type="button" onClick={() => { setBookingClosesAt(''); setSaved(false); }} disabled={saving} className="min-h-11 rounded-lg border border-a-border px-3 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2">Effacer clôture</button>}</div>
       </div>
     </section>
   );

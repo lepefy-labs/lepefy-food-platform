@@ -36,15 +36,15 @@ export default function ModuleSettingsToggle({ field, label, initialValue }: Pro
       onClick={toggle}
       disabled={saving}
       className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl border disabled:opacity-50 ${enabled
-        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)] dark:border-violet-400/60 dark:text-violet-200'
-        : 'border-gray-200 bg-white text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400'}`}
+        ? 'border-a-brand bg-a-brand-soft text-a-brand-fg'
+        : 'border-a-border bg-a-surface text-a-text-3'}`}
     >
       <span
         className="w-8 h-4 rounded-full relative transition-colors"
-        style={{ backgroundColor: enabled ? 'var(--color-primary)' : '#D1D5DB' }}
+        style={{ backgroundColor: enabled ? 'var(--admin-primary)' : '#D1D5DB' }}
       >
         <span
-          className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all"
+          className="absolute top-0.5 w-3 h-3 rounded-full bg-a-surface transition-all"
           style={{ left: enabled ? 18 : 2 }}
         />
       </span>

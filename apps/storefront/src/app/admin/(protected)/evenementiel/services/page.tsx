@@ -21,10 +21,10 @@ export default async function AdminServicesPage() {
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between gap-3 mb-1">
-        <h1 className="text-xl font-semibold text-gray-900">Services</h1>
+        <h1 className="text-xl font-semibold text-a-text">Services</h1>
         <ModuleSettingsToggle field="services_enabled" label="Module services" initialValue={tenant.services_enabled} />
       </div>
-      <p className="text-sm text-gray-500 mb-6">
+      <p className="text-sm text-a-text-3 mb-6">
         Traiteur (devis) et location de matériel (catalogue payant) — chaque service ouvre sur
         sa propre page publique <code>/evenementiel/services/[slug]</code>.
       </p>

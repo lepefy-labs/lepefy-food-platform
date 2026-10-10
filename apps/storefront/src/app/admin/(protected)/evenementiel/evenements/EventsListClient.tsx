@@ -12,10 +12,10 @@ type EventFilter = 'upcoming' | 'drafts' | 'history' | 'all';
 
 const STATUS_LABELS: Record<EventStatus, string> = { draft: 'Brouillon', published: 'Publié', closed: 'Clôturé', cancelled: 'Annulé' };
 const STATUS_COLORS: Record<EventStatus, string> = {
-  draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
-  published: 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300',
-  closed: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+  draft: 'bg-a-hover text-a-text-2',
+  published: 'bg-tone-success-bg text-tone-success-fg',
+  closed: 'bg-tone-warning-bg text-tone-warning-fg',
+  cancelled: 'bg-tone-danger-bg text-tone-danger-fg',
 };
 
 export default function EventsListClient({ initialEvents }: { initialEvents: EventRow[] }) {
@@ -35,8 +35,8 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const inputClass = 'w-full min-h-11 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
-  const flexInputClass = 'min-h-11 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+  const inputClass = 'w-full min-h-11 border border-a-border bg-a-surface text-a-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
+  const flexInputClass = 'min-h-11 border border-a-border bg-a-surface text-a-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
 
   const visibleEvents = useMemo(() => {
     const now = Date.now();
@@ -107,29 +107,29 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Button type="button" onClick={() => setShowForm((v) => !v)}><IconPlus size={16} /> Nouvel événement</Button>
-        <label className="relative w-full sm:max-w-xs"><span className="sr-only">Rechercher un événement</span><IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className={`${inputClass} pl-9`} /></label>
+        <label className="relative w-full sm:max-w-xs"><span className="sr-only">Rechercher un événement</span><IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className={`${inputClass} pl-9`} /></label>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900" role="tablist" aria-label="Filtrer les événements">
-        {filters.map((item) => <button key={item.value} type="button" role="tab" aria-selected={filter === item.value} onClick={() => setFilter(item.value)} className={`min-h-11 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${filter === item.value ? 'bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5'}`}>{item.label}</button>)}
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-a-border bg-a-surface p-1" role="tablist" aria-label="Filtrer les événements">
+        {filters.map((item) => <button key={item.value} type="button" role="tab" aria-selected={filter === item.value} onClick={() => setFilter(item.value)} className={`min-h-11 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus ${filter === item.value ? 'bg-a-brand-soft text-a-brand-fg' : 'text-a-text-2 hover:bg-a-surface-2'}`}>{item.label}</button>)}
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+        <form onSubmit={handleCreate} className="space-y-3 rounded-xl border border-a-border bg-a-surface p-4">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre de l'événement" className={inputClass} />
           <div className="grid gap-3 sm:grid-cols-2"><input value={dateStart} onChange={(e) => setDateStart(e.target.value)} type="datetime-local" className={inputClass} /><input value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Capacité totale" className={inputClass} /></div>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Lieu (optionnel)" className={inputClass} />
-          <label className="block rounded-lg border border-violet-100 bg-violet-50/40 p-3 text-xs font-semibold text-gray-700 dark:border-violet-950/50 dark:bg-violet-950/20 dark:text-gray-200">Envoi des rapports si aucune clôture n’est définie
-            <span className="mt-1.5 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={reportFallbackHours} onChange={(e) => setReportFallbackHours(e.target.value)} className={`${flexInputClass} w-24`} /><span className="font-normal text-gray-500">heure(s) avant le début · défaut 2 h</span></span>
+          <label className="block rounded-lg border border-a-border bg-a-brand-soft p-3 text-xs font-semibold text-a-text-2">Envoi des rapports si aucune clôture n’est définie
+            <span className="mt-1.5 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={reportFallbackHours} onChange={(e) => setReportFallbackHours(e.target.value)} className={`${flexInputClass} w-24`} /><span className="font-normal text-a-text-3">heure(s) avant le début · défaut 2 h</span></span>
           </label>
-          <div><p className="mb-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">Bannière</p>{bannerImageUrl && <img src={bannerImageUrl} alt="Aperçu de la bannière" className="mb-2 max-h-40 w-full rounded-lg object-cover" />}<label className="inline-flex min-h-11 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold dark:border-gray-700"><IconUpload size={14} /> {uploadingBanner ? 'Téléversement…' : bannerImageUrl ? 'Changer l’image' : 'Ajouter une bannière'}<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={uploadingBanner} /></label></div>
-          <div><div className="mb-1.5 flex items-center justify-between"><p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Formules</p><Button type="button" variant="ghost" size="sm" onClick={addTicketTypeRow}><IconPlus size={14} /> Ajouter une formule</Button></div>{ticketTypes.length === 0 && <p className="text-xs text-gray-400">Aucune formule — un événement publié doit avoir au moins une formule.</p>}<div className="space-y-2">{ticketTypes.map((t, i) => <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-gray-100 p-2 dark:border-gray-800"><div className="flex items-start gap-2"><input value={t.label} onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)} placeholder="Nom de la formule" className={`${flexInputClass} min-w-0 flex-1`} /><input value={t.price} onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)} placeholder="Prix €" inputMode="decimal" className={`${flexInputClass} w-24 shrink-0`} /><Button type="button" variant="ghost" size="sm" onClick={() => removeTicketTypeRow(i)} className="shrink-0" title="Supprimer la formule"><IconTrash size={16} /></Button></div><input value={t.description} onChange={(e) => updateTicketTypeRow(i, 'description', e.target.value)} placeholder="Description (optionnel)" className={inputClass} /></div>)}</div></div>
-          {error && <p className="text-xs text-red-500">{error}</p>}<Button type="submit" loading={isSubmitting}>{isSubmitting ? 'Création…' : 'Créer'}</Button>
+          <div><p className="mb-1.5 text-xs font-semibold text-a-text-2">Bannière</p>{bannerImageUrl && <img src={bannerImageUrl} alt="Aperçu de la bannière" className="mb-2 max-h-40 w-full rounded-lg object-cover" />}<label className="inline-flex min-h-11 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-a-border px-3 py-2 text-xs font-semibold"><IconUpload size={14} /> {uploadingBanner ? 'Téléversement…' : bannerImageUrl ? 'Changer l’image' : 'Ajouter une bannière'}<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleBannerChange} disabled={uploadingBanner} /></label></div>
+          <div><div className="mb-1.5 flex items-center justify-between"><p className="text-xs font-semibold text-a-text-2">Formules</p><Button type="button" variant="ghost" size="sm" onClick={addTicketTypeRow}><IconPlus size={14} /> Ajouter une formule</Button></div>{ticketTypes.length === 0 && <p className="text-xs text-a-text-3">Aucune formule — un événement publié doit avoir au moins une formule.</p>}<div className="space-y-2">{ticketTypes.map((t, i) => <div key={i} className="flex flex-col gap-1.5 rounded-lg border border-a-border p-2"><div className="flex items-start gap-2"><input value={t.label} onChange={(e) => updateTicketTypeRow(i, 'label', e.target.value)} placeholder="Nom de la formule" className={`${flexInputClass} min-w-0 flex-1`} /><input value={t.price} onChange={(e) => updateTicketTypeRow(i, 'price', e.target.value)} placeholder="Prix €" inputMode="decimal" className={`${flexInputClass} w-24 shrink-0`} /><Button type="button" variant="ghost" size="sm" onClick={() => removeTicketTypeRow(i)} className="shrink-0" title="Supprimer la formule"><IconTrash size={16} /></Button></div><input value={t.description} onChange={(e) => updateTicketTypeRow(i, 'description', e.target.value)} placeholder="Description (optionnel)" className={inputClass} /></div>)}</div></div>
+          {error && <p className="text-xs text-tone-danger-fg">{error}</p>}<Button type="submit" loading={isSubmitting}>{isSubmitting ? 'Création…' : 'Créer'}</Button>
         </form>
       )}
 
-      {visibleEvents.length === 0 ? <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Aucun événement dans cette vue.</div> : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"><div className="divide-y divide-gray-100 dark:divide-gray-800">{visibleEvents.map((event) => <Link key={event.id} href={`/admin/evenementiel/evenements/${event.id}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] dark:hover:bg-white/5"><div className="flex min-w-0 items-center gap-3"><IconCalendarEvent size={16} className="shrink-0 text-gray-400" /><div className="min-w-0"><p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{event.title}</p><p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.date_start)} · {event.capacity_remaining}/{event.capacity_total} places</p></div></div><span className={`shrink-0 rounded-full px-2 py-1 text-2xs font-semibold ${STATUS_COLORS[event.status]}`}>{STATUS_LABELS[event.status]}</span></Link>)}</div></div>
+      {visibleEvents.length === 0 ? <div className="rounded-xl border border-a-border bg-a-surface px-4 py-6 text-sm text-a-text-3">Aucun événement dans cette vue.</div> : (
+        <div className="overflow-hidden rounded-xl border border-a-border bg-a-surface"><div className="divide-y divide-a-border">{visibleEvents.map((event) => <Link key={event.id} href={`/admin/evenementiel/evenements/${event.id}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-a-focus"><div className="flex min-w-0 items-center gap-3"><IconCalendarEvent size={16} className="shrink-0 text-a-text-3" /><div className="min-w-0"><p className="truncate text-sm font-medium text-a-text">{event.title}</p><p className="text-xs text-a-text-3">{formatDate(event.date_start)} · {event.capacity_remaining}/{event.capacity_total} places</p></div></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${STATUS_COLORS[event.status]}`}>{STATUS_LABELS[event.status]}</span></Link>)}</div></div>
       )}
     </div>
   );

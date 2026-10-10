@@ -45,7 +45,7 @@ export default function EventPendingPaymentActions({
 
   if (!canConfirm && !canCancel) {
     return (
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-5 text-sm text-a-text-3">
         Votre rôle permet de consulter ce paiement, mais pas de le confirmer ni de l’annuler.
       </section>
     );
@@ -54,15 +54,15 @@ export default function EventPendingPaymentActions({
   return (
     <>
       {canConfirm && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <h2 className="font-bold text-gray-950 dark:text-white">Paiement externe à vérifier</h2>
-          <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">Contrôlez d’abord le prestataire externe, puis confirmez uniquement si le paiement est réellement reçu. La réservation et les places ne seront créées qu’après cette validation.</p>
+        <section className="rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-5">
+          <h2 className="font-bold text-a-text">Paiement externe à vérifier</h2>
+          <p className="mt-1 text-sm leading-6 text-a-text-2">Contrôlez d’abord le prestataire externe, puis confirmez uniquement si le paiement est réellement reçu. La réservation et les places ne seront créées qu’après cette validation.</p>
           <div className="mt-4 max-w-sm">
             <ConfirmPaymentButton
               endpoint={`/api/admin/evenementiel/reservation-requests/${requestId}/confirm-payment`}
               label="Vérifier et confirmer"
               confirmingLabel="Confirmation…"
-              className="min-h-11 w-full rounded-xl bg-amber-600 px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+              className="min-h-11 w-full rounded-xl bg-tone-warning-solid px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
               onSuccess={(warning) => {
                 if (!warning) {
                   router.push('/admin/evenementiel/reservations');
@@ -75,11 +75,11 @@ export default function EventPendingPaymentActions({
       )}
 
       {canCancel && (
-        <section className="rounded-2xl border border-red-200 bg-white p-5 dark:border-red-900/60 dark:bg-gray-900">
-          <h2 className="font-bold text-gray-950 dark:text-white">Zone sensible</h2>
-          <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">Annuler retire la demande de la file sans créer de réservation. Cela n’annule ni ne rembourse un paiement éventuellement déjà effectué chez PayPal, Revolut ou un autre prestataire.</p>
-          {cancelError && <p className="mt-2 text-sm text-red-600" role="alert">{cancelError}</p>}
-          <button type="button" onClick={() => setCancelOpen(true)} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><IconX size={17} /> Annuler la demande</button>
+        <section className="rounded-2xl border border-tone-danger-border bg-a-surface p-5">
+          <h2 className="font-bold text-a-text">Zone sensible</h2>
+          <p className="mt-1 text-sm leading-6 text-a-text-3">Annuler retire la demande de la file sans créer de réservation. Cela n’annule ni ne rembourse un paiement éventuellement déjà effectué chez PayPal, Revolut ou un autre prestataire.</p>
+          {cancelError && <p className="mt-2 text-sm text-tone-danger-fg" role="alert">{cancelError}</p>}
+          <button type="button" onClick={() => setCancelOpen(true)} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-tone-danger-border px-4 text-sm font-semibold text-tone-danger-fg hover:bg-tone-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tone-danger-solid"><IconX size={17} /> Annuler la demande</button>
         </section>
       )}
 

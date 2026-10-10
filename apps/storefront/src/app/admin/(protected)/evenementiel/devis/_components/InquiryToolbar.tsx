@@ -23,15 +23,15 @@ export default function InquiryToolbar({
   onFilterChange: (value: InquiryFilter) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white p-3 lg:flex-row lg:items-center lg:justify-between dark:border-gray-800 dark:bg-gray-900">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-a-border bg-a-surface p-3 lg:flex-row lg:items-center lg:justify-between">
       <label className="relative block w-full min-w-0 lg:max-w-md">
         <span className="sr-only">Rechercher une demande</span>
-        <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
         <input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Rechercher un client ou un email…"
-          className="min-h-11 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          className="min-h-11 w-full rounded-lg border border-a-border bg-a-surface pl-9 pr-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
         />
       </label>
       <div className="flex max-w-full gap-1 overflow-x-auto pb-0.5" aria-label="Filtrer les demandes">
@@ -40,10 +40,10 @@ export default function InquiryToolbar({
             key={item.value}
             type="button"
             onClick={() => onFilterChange(item.value)}
-            className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+            className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus ${
               filter === item.value
-                ? 'bg-[var(--color-primary-light)] text-[var(--color-primary-dark)] dark:text-white'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200'
+                ? 'bg-a-brand-soft text-a-brand-fg'
+                : 'text-a-text-3 hover:bg-a-surface-2 hover:text-a-text'
             }`}
           >
             {item.label}

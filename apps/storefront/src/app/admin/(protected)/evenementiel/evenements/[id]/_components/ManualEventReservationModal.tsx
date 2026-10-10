@@ -109,43 +109,43 @@ export default function ManualEventReservationModal({
     >
         {success ? (
           <div>
-            <div className="rounded-2xl bg-emerald-50 p-5 text-center dark:bg-emerald-950/35">
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300"><IconCheck size={24} /></div>
-              <h3 className="mt-3 font-bold text-emerald-950 dark:text-emerald-100">Réservation créée</h3>
-              <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">#{success.reservation.id.slice(0, 8).toUpperCase()} · {success.reservation.quantity_total} personne{success.reservation.quantity_total > 1 ? 's' : ''} · {formatPrice(success.reservation.amount_paid, currency)}</p>
-              <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Le billet est immédiatement valide pour le scan et les impressions.</p>
+            <div className="rounded-2xl bg-tone-success-bg p-5 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-tone-success-bg text-tone-success-fg"><IconCheck size={24} /></div>
+              <h3 className="mt-3 font-bold text-tone-success-fg">Réservation créée</h3>
+              <p className="mt-1 text-sm text-tone-success-fg">#{success.reservation.id.slice(0, 8).toUpperCase()} · {success.reservation.quantity_total} personne{success.reservation.quantity_total > 1 ? 's' : ''} · {formatPrice(success.reservation.amount_paid, currency)}</p>
+              <p className="mt-2 text-xs text-tone-success-fg">Le billet est immédiatement valide pour le scan et les impressions.</p>
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <a href={success.ticketUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconTicket size={17} /> Ouvrir le billet</a>
-              <button type="button" onClick={onClose} className="min-h-11 rounded-lg bg-[var(--color-primary)] px-4 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2">Fermer</button>
+              <a href={success.ticketUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-a-border px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconTicket size={17} /> Ouvrir le billet</a>
+              <button type="button" onClick={onClose} className="min-h-11 rounded-lg bg-a-brand px-4 text-sm font-semibold text-a-on-brand hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus focus-visible:ring-offset-2">Fermer</button>
             </div>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-5">
             <section>
-              <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Client</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wide text-a-text-3">Client</h3>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Nom et prénom *<input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} autoComplete="name" className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-normal text-gray-950 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-white" /></label>
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">E-mail *<input required type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} autoComplete="email" className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-normal text-gray-950 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-white" /></label>
+                <label className="text-xs font-semibold text-a-text-2">Nom et prénom *<input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} autoComplete="name" className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
+                <label className="text-xs font-semibold text-a-text-2">E-mail *<input required type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} autoComplete="email" className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
               </div>
-              <label className="mt-3 block text-xs font-semibold text-gray-700 dark:text-gray-300">Téléphone<input type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} autoComplete="tel" className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-normal text-gray-950 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-white" /></label>
+              <label className="mt-3 block text-xs font-semibold text-a-text-2">Téléphone<input type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} autoComplete="tel" className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
             </section>
 
             <section>
-              <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Formules</h3>
-              <div className="mt-2 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-700">
-                {activeTickets.length === 0 ? <p className="p-4 text-sm text-gray-500">Aucune formule active.</p> : activeTickets.map((ticket) => {
+              <h3 className="text-xs font-bold uppercase tracking-wide text-a-text-3">Formules</h3>
+              <div className="mt-2 divide-y divide-a-border overflow-hidden rounded-xl border border-a-border">
+                {activeTickets.length === 0 ? <p className="p-4 text-sm text-a-text-3">Aucune formule active.</p> : activeTickets.map((ticket) => {
                   const quantity = quantities[ticket.id] ?? 0;
                   return (
                     <div key={ticket.id} className="flex items-center justify-between gap-3 p-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{ticket.label}</p>
-                        <p className="mt-0.5 text-xs text-gray-500">{formatPrice(ticket.price, currency)}</p>
+                        <p className="truncate text-sm font-semibold text-a-text">{ticket.label}</p>
+                        <p className="mt-0.5 text-xs text-a-text-3">{formatPrice(ticket.price, currency)}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => adjust(ticket.id, -1)} disabled={quantity === 0} className="grid min-h-10 min-w-10 place-items-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-30 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5" aria-label={`Retirer une ${ticket.label}`}><IconMinus size={16} /></button>
-                        <span className="w-8 text-center text-sm font-bold tabular-nums text-gray-950 dark:text-white">{quantity}</span>
-                        <button type="button" onClick={() => adjust(ticket.id, 1)} className="grid min-h-10 min-w-10 place-items-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5" aria-label={`Ajouter une ${ticket.label}`}><IconPlus size={16} /></button>
+                        <button type="button" onClick={() => adjust(ticket.id, -1)} disabled={quantity === 0} className="grid min-h-10 min-w-10 place-items-center rounded-lg border border-a-border text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus disabled:opacity-30" aria-label={`Retirer une ${ticket.label}`}><IconMinus size={16} /></button>
+                        <span className="w-8 text-center text-sm font-bold tabular-nums text-a-text">{quantity}</span>
+                        <button type="button" onClick={() => adjust(ticket.id, 1)} className="grid min-h-10 min-w-10 place-items-center rounded-lg border border-a-border text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus" aria-label={`Ajouter une ${ticket.label}`}><IconPlus size={16} /></button>
                       </div>
                     </div>
                   );
@@ -153,19 +153,19 @@ export default function ManualEventReservationModal({
               </div>
             </section>
 
-            <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200"><IconBuildingStore size={18} /> Paiement effectué en magasin</div>
+            <section className="rounded-xl border border-tone-success-border bg-tone-success-bg p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-tone-success-fg"><IconBuildingStore size={18} /> Paiement effectué en magasin</div>
               <div className="mt-3 flex items-end justify-between gap-4">
-                <div><p className="text-xs text-gray-500">{totalQuantity} personne{totalQuantity > 1 ? 's' : ''}</p><p className="mt-0.5 text-xs text-gray-500">Montant recalculé côté serveur</p></div>
-                <p className="text-xl font-bold text-gray-950 dark:text-white">{formatPrice(totalAmount, currency)}</p>
+                <div><p className="text-xs text-a-text-3">{totalQuantity} personne{totalQuantity > 1 ? 's' : ''}</p><p className="mt-0.5 text-xs text-a-text-3">Montant recalculé côté serveur</p></div>
+                <p className="text-xl font-bold text-a-text">{formatPrice(totalAmount, currency)}</p>
               </div>
             </section>
 
-            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
+            {error && <p className="rounded-lg bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">{error}</p>}
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={onClose} disabled={submitting} className="min-h-11 rounded-lg border border-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5">Annuler</button>
-              <button type="submit" disabled={submitting || totalQuantity <= 0 || activeTickets.length === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"><IconCheck size={17} /> {submitting ? 'Création…' : 'Confirmer la réservation'}</button>
+              <button type="button" onClick={onClose} disabled={submitting} className="min-h-11 rounded-lg border border-a-border px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus disabled:opacity-50">Annuler</button>
+              <button type="submit" disabled={submitting || totalQuantity <= 0 || activeTickets.length === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-a-brand px-4 text-sm font-semibold text-a-on-brand hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"><IconCheck size={17} /> {submitting ? 'Création…' : 'Confirmer la réservation'}</button>
             </div>
           </form>
         )}

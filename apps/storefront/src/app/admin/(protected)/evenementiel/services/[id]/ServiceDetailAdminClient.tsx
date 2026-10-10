@@ -96,38 +96,38 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/evenementiel/services" className="text-sm text-gray-500 flex items-center gap-1.5 hover:text-gray-700">
+      <Link href="/admin/evenementiel/services" className="text-sm text-a-text-3 flex items-center gap-1.5 hover:text-a-text-2">
         <IconArrowLeft size={14} /> Retour aux services
       </Link>
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{offering.title}</h1>
-          <p className="text-sm text-gray-500">/evenementiel/services/{offering.slug}</p>
+          <h1 className="text-xl font-semibold text-a-text">{offering.title}</h1>
+          <p className="text-sm text-a-text-3">/evenementiel/services/{offering.slug}</p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={toggleCtaType}
-            className="text-xs font-semibold px-3 py-2 rounded-lg border border-gray-200 text-gray-600"
+            className="text-xs font-semibold px-3 py-2 rounded-lg border border-a-border text-a-text-2"
           >
             Mode : {offering.cta_type === 'devis' ? 'Devis' : 'Réservation'}
           </button>
           <button
             type="button"
             onClick={toggleActive}
-            className={`text-xs font-semibold px-3 py-2 rounded-lg border ${offering.active ? 'border-green-200 text-green-700 bg-green-50' : 'border-gray-200 text-gray-500'}`}
+            className={`text-xs font-semibold px-3 py-2 rounded-lg border ${offering.active ? 'border-tone-success-border text-tone-success-fg bg-tone-success-bg' : 'border-a-border text-a-text-3'}`}
           >
             {offering.active ? 'Actif' : 'Inactif'}
           </button>
         </div>
       </div>
 
-      <section className="bg-white rounded-2xl border border-gray-100 p-4">
+      <section className="bg-a-surface rounded-2xl border border-a-border p-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <p className="text-sm font-semibold text-gray-700">Photo de couverture</p>
-            <p className="text-xs text-gray-400">Utilisée sur la page Événementiel et sur la page publique du service.</p>
+            <p className="text-sm font-semibold text-a-text-2">Photo de couverture</p>
+            <p className="text-xs text-a-text-3">Utilisée sur la page Événementiel et sur la page publique du service.</p>
           </div>
           {offering.cover_image_url && (
             <Button type="button" variant="ghost" size="sm" onClick={removeCover}>
@@ -137,11 +137,11 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
         </div>
 
         {offering.cover_image_url ? (
-          <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+          <div className="overflow-hidden rounded-xl border border-a-border bg-a-surface-2">
             <div className="aspect-[16/7] w-full bg-cover bg-center" style={{ backgroundImage: `url(${offering.cover_image_url})` }} />
           </div>
         ) : (
-          <div className="flex aspect-[16/7] items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 text-gray-400">
+          <div className="flex aspect-[16/7] items-center justify-center rounded-xl border border-dashed border-a-border bg-a-surface-2 text-a-text-3">
             <div className="text-center">
               <IconPhoto size={28} className="mx-auto mb-2" />
               <p className="text-xs">Aucune photo de couverture</p>
@@ -150,7 +150,7 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
         )}
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+          <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-a-border bg-a-surface px-3 text-xs font-semibold text-a-text-2 hover:bg-a-surface-2">
             {uploadingCover ? 'Téléversement…' : offering.cover_image_url ? 'Remplacer la photo' : 'Ajouter une photo'}
             <input
               type="file"
@@ -163,20 +163,20 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
               }}
             />
           </label>
-          <span className="text-xs text-gray-400">JPG, PNG ou WebP · image large recommandée</span>
+          <span className="text-xs text-a-text-3">JPG, PNG ou WebP · image large recommandée</span>
         </div>
-        {coverError && <p className="mt-2 text-xs text-red-500">{coverError}</p>}
+        {coverError && <p className="mt-2 text-xs text-tone-danger-fg">{coverError}</p>}
       </section>
 
-      <section className="bg-white rounded-2xl border border-gray-100 p-4">
-        <p className="text-sm font-semibold text-gray-700 mb-2">Description</p>
+      <section className="bg-a-surface rounded-2xl border border-a-border p-4">
+        <p className="text-sm font-semibold text-a-text-2 mb-2">Description</p>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={saveDescription}
           rows={4}
           disabled={savingDescription}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus"
         />
       </section>
 

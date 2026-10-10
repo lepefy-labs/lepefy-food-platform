@@ -48,43 +48,43 @@ export default async function EventPendingPaymentPage({ params }: { params: { id
   const reference = `#${request.id.slice(0, 8).toUpperCase()}`;
   const itemCount = request.items.reduce((sum, item) => sum + Number(item.quantity), 0);
   const status = request.status === 'pending'
-    ? { label: 'Réception à vérifier', tone: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200', text: 'Le paiement externe doit être contrôlé avant toute création de réservation.' }
+    ? { label: 'Réception à vérifier', tone: 'border-tone-warning-border bg-tone-warning-bg text-tone-warning-fg', text: 'Le paiement externe doit être contrôlé avant toute création de réservation.' }
     : request.status === 'confirmed'
-      ? { label: 'Paiement confirmé', tone: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-200', text: 'Cette demande a déjà créé une réservation.' }
+      ? { label: 'Paiement confirmé', tone: 'border-tone-success-border bg-tone-success-bg text-tone-success-fg', text: 'Cette demande a déjà créé une réservation.' }
       : request.status === 'cancelled'
-        ? { label: 'Demande annulée', tone: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300', text: 'Aucune réservation n’a été créée depuis cette demande.' }
-        : { label: 'Conflit de capacité', tone: 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200', text: 'La capacité était insuffisante au moment de la confirmation. Vérifiez le remboursement externe avec le client.' };
+        ? { label: 'Demande annulée', tone: 'border-a-border bg-a-surface-2 text-a-text-2', text: 'Aucune réservation n’a été créée depuis cette demande.' }
+        : { label: 'Conflit de capacité', tone: 'border-tone-danger-border bg-tone-danger-bg text-tone-danger-fg', text: 'La capacité était insuffisante au moment de la confirmation. Vérifiez le remboursement externe avec le client.' };
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-12">
-      <Link href="/admin/evenementiel/reservations" className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white"><IconArrowLeft size={16} /> Réservations / Paiements</Link>
+      <Link href="/admin/evenementiel/reservations" className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-a-text-3 hover:text-a-text"><IconArrowLeft size={16} /> Réservations / Paiements</Link>
 
       <AdminPageHeader title="Gérer le paiement événement" description="Vérifiez la demande complète avant de confirmer la réception du paiement externe." meta={reference} />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={15} /> Client</div><p className="mt-2 truncate text-sm font-bold text-gray-950 dark:text-white">{request.customer_name}</p><p className="mt-1 truncate text-xs text-gray-500">{request.customer_email}</p>{request.customer_phone && <p className="mt-1 truncate text-xs text-gray-500">{request.customer_phone}</p>}</div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconWallet size={15} /> Paiement</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{request.payment_method_label}</p><p className="mt-1 text-xl font-bold text-gray-950 dark:text-white">{formatPrice(request.amount, tenant.currency)}</p></div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconClock size={15} /> Ancienneté</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{elapsedLabel(request.created_at)}</p><p className="mt-1 text-xs text-gray-500">{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(request.created_at))}</p></div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconCalendarEvent size={15} /> Réservation</div><p className="mt-2 truncate text-sm font-bold text-gray-950 dark:text-white">{event.title}</p><p className="mt-1 text-xs text-gray-500">{itemCount} place{itemCount > 1 ? 's' : ''}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconUser size={15} /> Client</div><p className="mt-2 truncate text-sm font-bold text-a-text">{request.customer_name}</p><p className="mt-1 truncate text-xs text-a-text-3">{request.customer_email}</p>{request.customer_phone && <p className="mt-1 truncate text-xs text-a-text-3">{request.customer_phone}</p>}</div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconWallet size={15} /> Paiement</div><p className="mt-2 text-sm font-bold text-a-text">{request.payment_method_label}</p><p className="mt-1 text-xl font-bold text-a-text">{formatPrice(request.amount, tenant.currency)}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconClock size={15} /> Ancienneté</div><p className="mt-2 text-sm font-bold text-a-text">{elapsedLabel(request.created_at)}</p><p className="mt-1 text-xs text-a-text-3">{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(request.created_at))}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconCalendarEvent size={15} /> Réservation</div><p className="mt-2 truncate text-sm font-bold text-a-text">{event.title}</p><p className="mt-1 text-xs text-a-text-3">{itemCount} place{itemCount > 1 ? 's' : ''}</p></div>
       </div>
 
       <div className={`mb-5 rounded-2xl border p-4 ${status.tone}`}><div className="flex items-start gap-2"><IconAlertTriangle size={19} className="mt-0.5 shrink-0" /><div><p className="font-bold">{status.label}</p><p className="mt-1 text-sm leading-6 opacity-90">{status.text}</p>{request.status === 'pending' && <p className="mt-1 text-xs font-semibold">Les places ne sont pas réservées tant que le paiement n’est pas confirmé.</p>}</div></div></div>
 
       <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,.8fr)]">
-        <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800"><h2 className="font-bold text-gray-950 dark:text-white">Détail de la demande</h2><p className="mt-1 text-sm text-gray-500">Formules demandées avant confirmation du paiement.</p></div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+        <section className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+          <div className="border-b border-a-border px-5 py-4"><h2 className="font-bold text-a-text">Détail de la demande</h2><p className="mt-1 text-sm text-a-text-3">Formules demandées avant confirmation du paiement.</p></div>
+          <div className="divide-y divide-a-border">
             {request.items.map((item) => {
               const ticket = ticketById.get(item.ticket_type_id);
-              return <div key={item.ticket_type_id} className="flex items-center justify-between gap-4 px-5 py-4"><div><p className="text-sm font-semibold text-gray-950 dark:text-white">{ticket?.label ?? 'Formule'}</p><p className="mt-1 text-xs text-gray-500">Quantité {item.quantity}</p></div><p className="text-sm font-bold text-gray-950 dark:text-white">{ticket ? formatPrice(Number(ticket.price) * Number(item.quantity), tenant.currency) : '—'}</p></div>;
+              return <div key={item.ticket_type_id} className="flex items-center justify-between gap-4 px-5 py-4"><div><p className="text-sm font-semibold text-a-text">{ticket?.label ?? 'Formule'}</p><p className="mt-1 text-xs text-a-text-3">Quantité {item.quantity}</p></div><p className="text-sm font-bold text-a-text">{ticket ? formatPrice(Number(ticket.price) * Number(item.quantity), tenant.currency) : '—'}</p></div>;
             })}
           </div>
-          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4 dark:border-gray-800"><span className="font-semibold text-gray-700 dark:text-gray-200">Total attendu</span><strong className="text-lg text-gray-950 dark:text-white">{formatPrice(request.amount, tenant.currency)}</strong></div>
+          <div className="flex items-center justify-between border-t border-a-border px-5 py-4"><span className="font-semibold text-a-text-2">Total attendu</span><strong className="text-lg text-a-text">{formatPrice(request.amount, tenant.currency)}</strong></div>
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900"><h2 className="font-bold text-gray-950 dark:text-white">Événement</h2><p className="mt-3 text-sm font-semibold text-gray-950 dark:text-white">{event.title}</p><p className="mt-1 text-xs text-gray-500">{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.date_start))}</p>{event.location && <p className="mt-1 text-xs text-gray-500">{event.location}</p>}<Link href={`/admin/evenementiel/evenements/${event.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-violet-700 dark:text-violet-300">Voir l’événement →</Link></section>
-          <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900"><h2 className="font-bold text-gray-950 dark:text-white">Prestataire externe</h2><p className="mt-2 text-sm text-gray-500">Lepefy ne peut pas vérifier automatiquement ce paiement. Contrôlez le prestataire avant toute confirmation.</p><a href={request.payment_link} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200">Ouvrir {request.payment_method_label} <IconExternalLink size={16} /></a></section>
+          <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm"><h2 className="font-bold text-a-text">Événement</h2><p className="mt-3 text-sm font-semibold text-a-text">{event.title}</p><p className="mt-1 text-xs text-a-text-3">{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.date_start))}</p>{event.location && <p className="mt-1 text-xs text-a-text-3">{event.location}</p>}<Link href={`/admin/evenementiel/evenements/${event.id}`} className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-a-brand-fg">Voir l’événement →</Link></section>
+          <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm"><h2 className="font-bold text-a-text">Prestataire externe</h2><p className="mt-2 text-sm text-a-text-3">Lepefy ne peut pas vérifier automatiquement ce paiement. Contrôlez le prestataire avant toute confirmation.</p><a href={request.payment_link} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-a-border-strong px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2">Ouvrir {request.payment_method_label} <IconExternalLink size={16} /></a></section>
         </aside>
       </div>
 
@@ -98,7 +98,7 @@ export default async function EventPendingPaymentPage({ params }: { params: { id
           />
         </div>
       )}
-      {request.status !== 'pending' && <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Cette demande n’est plus actionnable. Consultez la réservation ou l’événement pour poursuivre le suivi.</div>}
+      {request.status !== 'pending' && <div className="rounded-2xl border border-a-border bg-a-surface p-5 text-sm text-a-text-3">Cette demande n’est plus actionnable. Consultez la réservation ou l’événement pour poursuivre le suivi.</div>}
     </div>
   );
 }

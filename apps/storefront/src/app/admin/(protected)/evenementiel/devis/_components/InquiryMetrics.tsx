@@ -28,10 +28,10 @@ export default function InquiryMetrics({ inquiries }: { inquiries: InquiryWithSe
   return (
     <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
       {metrics.map((metric) => (
-        <div key={metric.label} className="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{metric.label}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-950 dark:text-white">{metric.value}</p>
-          <p className="mt-0.5 text-2xs text-gray-400 dark:text-gray-500">{metric.detail}</p>
+        <div key={metric.label} className="rounded-xl border border-a-border bg-a-surface px-4 py-3">
+          <p className="text-xs font-medium text-a-text-3">{metric.label}</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-a-text">{metric.value}</p>
+          <p className="mt-0.5 text-xs text-a-text-3">{metric.detail}</p>
         </div>
       ))}
     </div>

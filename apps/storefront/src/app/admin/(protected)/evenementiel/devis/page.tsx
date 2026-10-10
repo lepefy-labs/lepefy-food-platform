@@ -20,8 +20,8 @@ export default async function AdminInquiriesPage() {
   return (
     <div className="mx-auto w-full max-w-[1500px]">
       <header className="mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-950 dark:text-white">Demandes</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <h1 className="text-2xl font-semibold tracking-tight text-a-text">Demandes</h1>
+        <p className="mt-1 text-sm text-a-text-3">
           Suivez les demandes événementielles et concentrez-vous sur celles qui nécessitent une action.
         </p>
       </header>

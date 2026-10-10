@@ -17,9 +17,9 @@ const STATUS_LABELS: Record<EventReservationStatus, string> = {
 };
 
 function sourceLabel(reservation: AdminEventReservation) {
-  if (reservation.source === 'admin_in_store') return { label: 'En magasin', className: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300' };
-  if (reservation.source === 'external_link' || (!reservation.source && !reservation.stripe_payment_intent_id)) return { label: 'Paiement externe', className: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' };
-  return { label: 'En ligne', className: 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' };
+  if (reservation.source === 'admin_in_store') return { label: 'En magasin', className: 'bg-tone-info-bg text-tone-info-fg' };
+  if (reservation.source === 'external_link' || (!reservation.source && !reservation.stripe_payment_intent_id)) return { label: 'Paiement externe', className: 'bg-tone-warning-bg text-tone-warning-fg' };
+  return { label: 'En ligne', className: 'bg-a-brand-soft text-a-brand-fg' };
 }
 
 export default function EventReservationsTab({
@@ -138,60 +138,60 @@ export default function EventReservationsTab({
 
   return (
     <div className="mt-4 space-y-3">
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+      <section className="rounded-xl border border-a-border bg-a-surface p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h2 className="text-base font-bold text-gray-950 dark:text-white">Réservations</h2>
-              <span className="text-sm font-semibold text-gray-500">{confirmed.length} confirmées · {confirmedPeople} personnes</span>
+              <h2 className="text-base font-bold text-a-text">Réservations</h2>
+              <span className="text-sm font-semibold text-a-text-3">{confirmed.length} confirmées · {confirmedPeople} personnes</span>
             </div>
             {formulaTotals.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {formulaTotals.map((item) => (
-                  <span key={item.id} className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">{item.quantity} {item.label}</span>
+                  <span key={item.id} className="rounded-full bg-a-brand-soft px-2.5 py-1 text-xs font-semibold text-a-brand-fg">{item.quantity} {item.label}</span>
                 ))}
               </div>
             )}
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            <button type="button" onClick={() => setManualOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2"><IconPlus size={16} /> Ajouter une réservation</button>
-            <a href={`${exportBase}/report?${eventQuery}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconFileSpreadsheet size={16} /> Rapport détaillé</a>
-            <a href={`${exportBase}/print-list?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconPrinter size={16} /> Liste imprimable</a>
-            <a href={`${exportBase}/table-cards?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconTicket size={16} /> Codes A5</a>
+            <button type="button" onClick={() => setManualOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-a-brand px-3 text-xs font-semibold text-a-on-brand transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus focus-visible:ring-offset-2"><IconPlus size={16} /> Ajouter une réservation</button>
+            <a href={`${exportBase}/report?${eventQuery}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconFileSpreadsheet size={16} /> Rapport détaillé</a>
+            <a href={`${exportBase}/print-list?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconPrinter size={16} /> Liste imprimable</a>
+            <a href={`${exportBase}/table-cards?${eventQuery}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-a-border px-3 text-xs font-semibold text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconTicket size={16} /> Codes A5</a>
           </div>
         </div>
       </section>
 
-      <div className="flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white p-3 lg:flex-row lg:items-center lg:justify-between dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex flex-col gap-2.5 rounded-xl border border-a-border bg-a-surface p-3 lg:flex-row lg:items-center lg:justify-between">
         <label className="relative block w-full min-w-0 lg:w-[420px]">
           <span className="sr-only">Rechercher une réservation</span>
-          <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Client, email, référence ou formule" className="min-h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+          <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
+          <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Client, email, référence ou formule" className="min-h-10 w-full rounded-lg border border-a-border bg-a-surface pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus" />
         </label>
         <div className="flex max-w-full flex-wrap items-center gap-2">
-          <select value={formulaFilter} onChange={(event) => setFormulaFilter(event.target.value)} className="min-h-10 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200" aria-label="Filtrer par formule">
+          <select value={formulaFilter} onChange={(event) => setFormulaFilter(event.target.value)} className="min-h-10 rounded-lg border border-a-border bg-a-surface px-3 text-xs font-semibold text-a-text-2 focus:outline-none focus:ring-2 focus:ring-a-focus" aria-label="Filtrer par formule">
             <option value="all">Toutes les formules</option>
             {ticketTypes.map((ticket) => <option key={ticket.id} value={ticket.id}>{ticket.label}</option>)}
           </select>
-          <div className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-gray-50 p-1 dark:bg-gray-950" aria-label="Filtrer les réservations par statut">
+          <div className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-a-surface-2 p-1" aria-label="Filtrer les réservations par statut">
             {([['all', 'Toutes'], ['confirmed', 'Confirmées'], ['refunded', 'Remboursées'], ['cancelled', 'Annulées']] as const).map(([value, label]) => (
-              <button key={value} type="button" onClick={() => onStatusFilterChange(value)} className={`min-h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${statusFilter === value ? 'bg-white text-[var(--color-primary-dark)] shadow-sm dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}>{label}</button>
+              <button key={value} type="button" onClick={() => onStatusFilterChange(value)} className={`min-h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus ${statusFilter === value ? 'bg-a-surface text-a-brand-fg shadow-sm' : 'text-a-text-3 hover:text-a-text'}`}>{label}</button>
             ))}
           </div>
         </div>
       </div>
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
+      {error && <p className="rounded-lg bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">{error}</p>}
 
-      <section className="overflow-visible rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <section className="overflow-visible rounded-xl border border-a-border bg-a-surface">
         {filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">Aucune réservation correspondant aux filtres.</div>
+          <div className="px-4 py-8 text-center text-sm text-a-text-3">Aucune réservation correspondant aux filtres.</div>
         ) : (
           <>
-            <div className="hidden grid-cols-[minmax(240px,1fr)_minmax(220px,1fr)_105px_110px_150px] gap-3 border-b border-gray-100 px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-gray-400 md:grid dark:border-gray-800">
+            <div className="hidden grid-cols-[minmax(240px,1fr)_minmax(220px,1fr)_105px_110px_150px] gap-3 border-b border-a-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-a-text-3 md:grid">
               <span>Client / référence</span><span>Formules</span><span>Montant</span><span>Statut</span><span className="text-right">Actions</span>
             </div>
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            <div className="divide-y divide-a-border">
               {filtered.map((reservation) => {
                 const reference = reservation.id.slice(0, 8).toUpperCase();
                 const source = sourceLabel(reservation);
@@ -199,51 +199,51 @@ export default function EventReservationsTab({
                   <div key={reservation.id} className="grid gap-2.5 px-4 py-3 md:grid-cols-[minmax(240px,1fr)_minmax(220px,1fr)_105px_110px_150px] md:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{reservation.customer_name}</p>
-                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-2xs font-bold tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">#{reference}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${source.className}`}>{source.label}</span>
+                        <p className="truncate text-sm font-semibold text-a-text">{reservation.customer_name}</p>
+                        <span className="rounded-md bg-a-hover px-1.5 py-0.5 font-mono text-xs font-bold tracking-wide text-a-text-2">#{reference}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${source.className}`}>{source.label}</span>
                       </div>
                       {editingEmailId === reservation.id ? (
                         <div className="mt-1 flex max-w-md items-center gap-1.5">
-                          <input type="email" value={emailDraft} onChange={(event) => onEmailDraftChange(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:border-gray-700 dark:bg-gray-950" autoFocus />
-                          <button type="button" onClick={() => onConfirmEmailEdit(reservation.id)} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" aria-label="Confirmer l’email"><IconCheck size={16} /></button>
-                          <button type="button" onClick={onCancelEditEmail} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-50" aria-label="Annuler la modification"><IconX size={16} /></button>
+                          <input type="email" value={emailDraft} onChange={(event) => onEmailDraftChange(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-a-border px-2 text-xs focus:outline-none focus:ring-2 focus:ring-a-focus" autoFocus />
+                          <button type="button" onClick={() => onConfirmEmailEdit(reservation.id)} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-tone-success-fg hover:bg-tone-success-bg disabled:opacity-50" aria-label="Confirmer l’email"><IconCheck size={16} /></button>
+                          <button type="button" onClick={onCancelEditEmail} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-a-text-3 hover:bg-a-surface-2 disabled:opacity-50" aria-label="Annuler la modification"><IconX size={16} /></button>
                         </div>
                       ) : (
-                        <p className="mt-0.5 max-w-md truncate text-xs text-gray-500 dark:text-gray-400" title={reservation.customer_email}>{reservation.customer_email}{resendFeedbackId === reservation.id && <span className="font-semibold text-emerald-600"> · Billet renvoyé</span>}</p>
+                        <p className="mt-0.5 max-w-md truncate text-xs text-a-text-3" title={reservation.customer_email}>{reservation.customer_email}{resendFeedbackId === reservation.id && <span className="font-semibold text-tone-success-fg"> · Billet renvoyé</span>}</p>
                       )}
-                      <p className="mt-1 text-xs text-gray-400">{reservation.quantity_total} personne{reservation.quantity_total > 1 ? 's' : ''} · {reservation.quantity_remaining} restante{reservation.quantity_remaining > 1 ? 's' : ''}</p>
+                      <p className="mt-1 text-xs text-a-text-3">{reservation.quantity_total} personne{reservation.quantity_total > 1 ? 's' : ''} · {reservation.quantity_remaining} restante{reservation.quantity_remaining > 1 ? 's' : ''}</p>
                     </div>
-                    <div className="space-y-1 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="space-y-1 text-xs text-a-text-2">
                       {reservation.items.length > 0 ? reservation.items.map((item) => (
                         <div key={item.id} className="flex items-baseline justify-between gap-3 md:justify-start">
                           <span><strong>{item.quantity}×</strong> {item.ticket_type_label}</span>
-                          <span className="text-gray-400 md:hidden">{formatPrice(item.unit_price * item.quantity, currency)}</span>
+                          <span className="text-a-text-3 md:hidden">{formatPrice(item.unit_price * item.quantity, currency)}</span>
                         </div>
-                      )) : <span className="text-gray-400">Détail indisponible</span>}
+                      )) : <span className="text-a-text-3">Détail indisponible</span>}
                     </div>
-                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formatPrice(reservation.amount_paid, currency)}</div>
-                    <div><span className={`rounded-full px-2 py-1 text-2xs font-semibold ${reservation.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : reservation.status === 'refunded' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}>{STATUS_LABELS[reservation.status]}</span></div>
+                    <div className="text-sm font-semibold text-a-text">{formatPrice(reservation.amount_paid, currency)}</div>
+                    <div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${reservation.status === 'confirmed' ? 'bg-tone-success-bg text-tone-success-fg' : reservation.status === 'refunded' ? 'bg-a-hover text-a-text-2' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{STATUS_LABELS[reservation.status]}</span></div>
                     <div className="flex min-h-10 items-center gap-1.5 md:justify-end">
                       {reservation.status === 'confirmed' && editingEmailId !== reservation.id ? (
                         <>
                           <Button type="button" variant="ghost" size="sm" onClick={() => onResend(reservation.id)} loading={resendingId === reservation.id} title="Renvoyer le billet"><IconSend size={14} /> Renvoyer</Button>
                           <div className="relative" data-reservation-actions={reservation.id}>
-                            <button type="button" onClick={() => setOpenActionsId((current) => current === reservation.id ? null : reservation.id)} aria-haspopup="menu" aria-expanded={openActionsId === reservation.id} aria-label="Plus d’actions" title="Plus d’actions" className="grid min-h-10 min-w-10 place-items-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"><IconDotsVertical size={17} aria-hidden="true" /></button>
+                            <button type="button" onClick={() => setOpenActionsId((current) => current === reservation.id ? null : reservation.id)} aria-haspopup="menu" aria-expanded={openActionsId === reservation.id} aria-label="Plus d’actions" title="Plus d’actions" className="grid min-h-10 min-w-10 place-items-center rounded-lg text-a-text-3 transition-colors hover:bg-a-surface-2 hover:text-a-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconDotsVertical size={17} aria-hidden="true" /></button>
                             {openActionsId === reservation.id && (
-                              <div role="menu" className="absolute right-0 z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                                <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); onStartEditEmail(reservation.id, reservation.customer_email); }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:text-gray-200 dark:hover:bg-white/5"><IconPencil size={14} aria-hidden="true" /> Modifier l’email</button>
+                              <div role="menu" className="absolute right-0 z-30 mt-1 w-52 overflow-hidden rounded-xl border border-a-border bg-a-surface p-1 shadow-lg">
+                                <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); onStartEditEmail(reservation.id, reservation.customer_email); }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-a-text-2 transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconPencil size={14} aria-hidden="true" /> Modifier l’email</button>
                                 {reservation.stripe_payment_intent_id && (
                                   <>
-                                    <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-                                    <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); setRefundTargetId(reservation.id); }} disabled={refundingId === reservation.id} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"><IconReceiptRefund size={14} aria-hidden="true" /> Rembourser la réservation</button>
+                                    <div className="my-1 border-t border-a-border" />
+                                    <button type="button" role="menuitem" onClick={() => { setOpenActionsId(null); setRefundTargetId(reservation.id); }} disabled={refundingId === reservation.id} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs font-medium text-tone-danger-fg transition-colors hover:bg-tone-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tone-danger-solid disabled:opacity-50"><IconReceiptRefund size={14} aria-hidden="true" /> Rembourser la réservation</button>
                                   </>
                                 )}
                               </div>
                             )}
                           </div>
                         </>
-                      ) : <span className="text-xs text-gray-300 dark:text-gray-600" aria-label="Aucune action disponible">—</span>}
+                      ) : <span className="text-xs text-a-text-3" aria-label="Aucune action disponible">—</span>}
                     </div>
                   </div>
                 );

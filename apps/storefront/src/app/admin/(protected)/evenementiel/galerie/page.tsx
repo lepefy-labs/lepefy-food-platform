@@ -34,8 +34,8 @@ export default async function AdminGalleryPage() {
 
   return (
     <div className="max-w-5xl">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">Galerie événementielle</h1>
-      <p className="mb-6 max-w-2xl text-sm text-gray-500">
+      <h1 className="mb-1 text-xl font-semibold text-a-text">Galerie événementielle</h1>
+      <p className="mb-6 max-w-2xl text-sm text-a-text-3">
         Classez vos photos d’événements, de traiteur et de location, choisissez celles à mettre en avant dans le hero et gérez le kit social des événements.
       </p>
 

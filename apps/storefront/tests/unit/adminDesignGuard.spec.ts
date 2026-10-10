@@ -29,6 +29,8 @@ const MIGRATED = [
   '(protected)/catalogue',
   '(protected)/products',
   '(protected)/gestion',
+  '(protected)/evenementiel',
+  'evenementiel',
   '_components/ui/Menu.tsx',
   '_components/ui/NotificationBell.tsx',
   '_components/ThemeToggleButton.tsx',

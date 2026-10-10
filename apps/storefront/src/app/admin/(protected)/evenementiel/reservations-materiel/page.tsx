@@ -89,12 +89,12 @@ export default async function AdminRentalReservationsPage() {
   return (
     <div className="max-w-4xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-gray-950 dark:text-white">Locations</h1>
-        <Link href="/admin/evenementiel/services" className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+        <h1 className="text-xl font-semibold text-a-text">Locations</h1>
+        <Link href="/admin/evenementiel/services" className="inline-flex min-h-11 items-center rounded-xl border border-a-border bg-a-surface px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2">
           Gérer le catalogue
         </Link>
       </div>
-      <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <p className="mb-6 mt-1 text-sm text-a-text-3">
         Retraits confirmés à venir en priorité, puis historique des réservations.
       </p>
       <RentalReservationsClient initialReservations={result} initialPendingRequests={pendingRequests} rentalItemNameById={Object.fromEntries(rentalItemNameById)} currency={tenant.currency} externalPaymentMethods={externalPaymentMethods} />

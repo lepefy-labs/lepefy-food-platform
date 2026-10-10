@@ -19,8 +19,8 @@ export default async function AdminRentalDeliveryZonesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-xl font-semibold text-gray-950 dark:text-white">Livraison matériel</h1>
-      <p className="mb-6 mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <h1 className="text-xl font-semibold text-a-text">Livraison matériel</h1>
+      <p className="mb-6 mt-1 text-sm text-a-text-3">
         Configurez les pays où la livraison est proposée et les zones avec un supplément fixe calculé automatiquement au checkout.
       </p>
       <RentalDeliveryZonesClient

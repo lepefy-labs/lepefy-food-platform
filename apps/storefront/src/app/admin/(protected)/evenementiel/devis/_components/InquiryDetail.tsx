@@ -53,64 +53,64 @@ export default function InquiryDetail({
   ] as const;
 
   return (
-    <aside className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="border-b border-gray-100 p-4 dark:border-gray-800">
+    <aside className="rounded-xl border border-a-border bg-a-surface">
+      <div className="border-b border-a-border p-4">
         {onBack && (
-          <button type="button" onClick={onBack} className="mb-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] lg:hidden">
+          <button type="button" onClick={onBack} className="mb-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-a-text-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus lg:hidden">
             <IconArrowLeft size={15} /> Retour aux demandes
           </button>
         )}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold text-gray-950 dark:text-white">{inquiry.customer_name}</h2>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{inquiry.service_offerings?.title ?? 'Service'} · reçue {elapsedLabel(inquiry.created_at)}</p>
+            <h2 className="truncate text-lg font-semibold text-a-text">{inquiry.customer_name}</h2>
+            <p className="mt-1 text-xs text-a-text-3">{inquiry.service_offerings?.title ?? 'Service'} · reçue {elapsedLabel(inquiry.created_at)}</p>
           </div>
           <InquiryStatusBadge status={inquiry.status} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <a href={`mailto:${inquiry.customer_email}?subject=${mailSubject}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconMail size={15} /> Envoyer un email</a>
-          {phoneHref && <a href={`tel:${phoneHref}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/5"><IconPhone size={15} /> Appeler</a>}
+          <a href={`mailto:${inquiry.customer_email}?subject=${mailSubject}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-a-border px-3 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconMail size={15} /> Envoyer un email</a>
+          {phoneHref && <a href={`tel:${phoneHref}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-a-border px-3 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"><IconPhone size={15} /> Appeler</a>}
         </div>
       </div>
 
       <div className="space-y-5 p-4">
         <section>
-          <h3 className="text-sm font-semibold text-gray-950 dark:text-white">Informations</h3>
+          <h3 className="text-sm font-semibold text-a-text">Informations</h3>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div><dt className="text-xs text-gray-400">Date souhaitée</dt><dd className="mt-1 flex items-center gap-1.5 text-gray-800 dark:text-gray-200"><IconCalendar size={14} />{inquiry.date_souhaitee ? new Date(inquiry.date_souhaitee).toLocaleDateString('fr-FR') : 'Non renseigné'}</dd></div>
-            <div><dt className="text-xs text-gray-400">Invités</dt><dd className="mt-1 flex items-center gap-1.5 text-gray-800 dark:text-gray-200"><IconUsers size={14} />{inquiry.nombre_invites ?? 'Non renseigné'}</dd></div>
-            <div className="col-span-2"><dt className="text-xs text-gray-400">Email</dt><dd className="mt-1 break-all text-gray-800 dark:text-gray-200"><a className="hover:underline" href={`mailto:${inquiry.customer_email}`}>{inquiry.customer_email}</a></dd></div>
-            <div className="col-span-2"><dt className="text-xs text-gray-400">Téléphone</dt><dd className="mt-1 text-gray-800 dark:text-gray-200">{inquiry.customer_phone ? <a className="hover:underline" href={`tel:${phoneHref}`}>{inquiry.customer_phone}</a> : 'Non renseigné'}</dd></div>
+            <div><dt className="text-xs text-a-text-3">Date souhaitée</dt><dd className="mt-1 flex items-center gap-1.5 text-a-text"><IconCalendar size={14} />{inquiry.date_souhaitee ? new Date(inquiry.date_souhaitee).toLocaleDateString('fr-FR') : 'Non renseigné'}</dd></div>
+            <div><dt className="text-xs text-a-text-3">Invités</dt><dd className="mt-1 flex items-center gap-1.5 text-a-text"><IconUsers size={14} />{inquiry.nombre_invites ?? 'Non renseigné'}</dd></div>
+            <div className="col-span-2"><dt className="text-xs text-a-text-3">Email</dt><dd className="mt-1 break-all text-a-text"><a className="hover:underline" href={`mailto:${inquiry.customer_email}`}>{inquiry.customer_email}</a></dd></div>
+            <div className="col-span-2"><dt className="text-xs text-a-text-3">Téléphone</dt><dd className="mt-1 text-a-text">{inquiry.customer_phone ? <a className="hover:underline" href={`tel:${phoneHref}`}>{inquiry.customer_phone}</a> : 'Non renseigné'}</dd></div>
           </dl>
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-gray-950 dark:text-white">Message du client</h3>
-          <div className="mt-2 whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm leading-6 text-gray-700 dark:bg-gray-950/60 dark:text-gray-200">{inquiry.message?.trim() || 'Aucun message.'}</div>
+          <h3 className="text-sm font-semibold text-a-text">Message du client</h3>
+          <div className="mt-2 whitespace-pre-wrap rounded-lg bg-a-surface-2 p-3 text-sm leading-6 text-a-text-2">{inquiry.message?.trim() || 'Aucun message.'}</div>
         </section>
 
         <section>
-          <label htmlFor={`inquiry-status-${inquiry.id}`} className="text-sm font-semibold text-gray-950 dark:text-white">Statut</label>
-          <select id={`inquiry-status-${inquiry.id}`} value={inquiry.status} onChange={(e) => onStatusChange(e.target.value as ServiceInquiryStatus)} disabled={statusSaving} className="mt-2 min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200">
+          <label htmlFor={`inquiry-status-${inquiry.id}`} className="text-sm font-semibold text-a-text">Statut</label>
+          <select id={`inquiry-status-${inquiry.id}`} value={inquiry.status} onChange={(e) => onStatusChange(e.target.value as ServiceInquiryStatus)} disabled={statusSaving} className="mt-2 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-60">
             {INQUIRY_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
           </select>
-          {statusError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{statusError}</p>}
+          {statusError && <p className="mt-2 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{statusError}</p>}
         </section>
 
         <section>
-          <label htmlFor={`inquiry-note-${inquiry.id}`} className="text-sm font-semibold text-gray-950 dark:text-white">Note interne</label>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Visible uniquement par l’équipe admin.</p>
-          <textarea id={`inquiry-note-${inquiry.id}`} value={noteDraft} onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }} rows={5} placeholder="Ajouter une note pour l'équipe…" className="mt-2 w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
-          {noteError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{noteError}</p>}
-          {noteSaved && !noteError && <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">Note enregistrée</p>}
+          <label htmlFor={`inquiry-note-${inquiry.id}`} className="text-sm font-semibold text-a-text">Note interne</label>
+          <p className="mt-0.5 text-xs text-a-text-3">Visible uniquement par l’équipe admin.</p>
+          <textarea id={`inquiry-note-${inquiry.id}`} value={noteDraft} onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }} rows={5} placeholder="Ajouter une note pour l'équipe…" className="mt-2 w-full resize-y rounded-lg border border-a-border bg-a-surface px-3 py-2 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm" />
+          {noteError && <p className="mt-2 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{noteError}</p>}
+          {noteSaved && !noteError && <p className="mt-2 text-xs font-medium text-tone-success-fg">Note enregistrée</p>}
           <Button type="button" onClick={saveNote} loading={noteSaving} disabled={!noteDirty || noteSaving} className="mt-3">{noteSaving ? 'Enregistrement…' : 'Enregistrer la note'}</Button>
         </section>
 
         <section>
-          <h3 className="text-sm font-semibold text-gray-950 dark:text-white">Suivi</h3>
+          <h3 className="text-sm font-semibold text-a-text">Suivi</h3>
           <dl className="mt-2 space-y-2 text-xs">
             {milestones.map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between gap-3"><dt className="text-gray-500 dark:text-gray-400">{label}</dt><dd className="text-right font-medium text-gray-700 dark:text-gray-200">{value ? new Date(value).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</dd></div>
+              <div key={label} className="flex items-center justify-between gap-3"><dt className="text-a-text-3">{label}</dt><dd className="text-right font-medium text-a-text-2">{value ? new Date(value).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</dd></div>
             ))}
           </dl>
         </section>

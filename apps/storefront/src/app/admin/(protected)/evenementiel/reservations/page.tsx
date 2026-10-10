@@ -53,50 +53,50 @@ export default async function EventReservationsPaymentsPage() {
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-700"><IconWallet size={16} /> À vérifier</div>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{pending.length}</p>
-          <p className="mt-1 text-xs text-gray-500">{formatPrice(pendingAmount, tenant.currency)} en attente</p>
+        <div className="rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-tone-warning-fg"><IconWallet size={16} /> À vérifier</div>
+          <p className="mt-2 text-2xl font-bold text-a-text">{pending.length}</p>
+          <p className="mt-1 text-xs text-a-text-3">{formatPrice(pendingAmount, tenant.currency)} en attente</p>
         </div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconFileInvoice size={16} /> Réservations</div>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{reservations.length}</p>
-          <p className="mt-1 text-xs text-gray-500">50 dernières au maximum</p>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconFileInvoice size={16} /> Réservations</div>
+          <p className="mt-2 text-2xl font-bold text-a-text">{reservations.length}</p>
+          <p className="mt-1 text-xs text-a-text-3">50 dernières au maximum</p>
         </div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconCalendarEvent size={16} /> Événements</div>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{rawEvents?.length ?? 0}</p>
-          <p className="mt-1 text-xs text-gray-500">avec historique conservé</p>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconCalendarEvent size={16} /> Événements</div>
+          <p className="mt-2 text-2xl font-bold text-a-text">{rawEvents?.length ?? 0}</p>
+          <p className="mt-1 text-xs text-a-text-3">avec historique conservé</p>
         </div>
       </div>
 
-      <section className="mb-6 overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+      <section className="mb-6 overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+        <div className="flex items-center justify-between border-b border-a-border px-5 py-4">
           <div>
-            <h2 className="font-bold text-gray-950 dark:text-white">Paiements à vérifier</h2>
-            <p className="mt-1 text-sm text-gray-500">Aucune place n’est réservée avant confirmation manuelle du paiement externe.</p>
+            <h2 className="font-bold text-a-text">Paiements à vérifier</h2>
+            <p className="mt-1 text-sm text-a-text-3">Aucune place n’est réservée avant confirmation manuelle du paiement externe.</p>
           </div>
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">{pending.length}</span>
+          <span className="rounded-full bg-tone-warning-bg px-2.5 py-1 text-xs font-semibold text-tone-warning-fg">{pending.length}</span>
         </div>
         {pending.length === 0 ? (
-          <div className="px-5 py-8 text-center text-sm text-gray-500">Aucun paiement externe à vérifier.</div>
+          <div className="px-5 py-8 text-center text-sm text-a-text-3">Aucun paiement externe à vérifier.</div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="divide-y divide-a-border">
             {pending.map((request) => {
               const event = eventById.get(request.event_id);
               return (
-                <Link key={request.id} href={`/admin/evenementiel/paiements-en-attente/${request.id}`} className="grid gap-3 px-5 py-4 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <Link key={request.id} href={`/admin/evenementiel/paiements-en-attente/${request.id}`} className="grid gap-3 px-5 py-4 transition-colors hover:bg-a-surface-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-gray-950 dark:text-white">{request.customer_name || request.customer_email}</p>
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">{request.payment_method_label}</span>
+                      <p className="font-semibold text-a-text">{request.customer_name || request.customer_email}</p>
+                      <span className="rounded-full bg-tone-warning-bg px-2 py-0.5 text-xs font-semibold text-tone-warning-fg">{request.payment_method_label}</span>
                     </div>
-                    <p className="mt-1 truncate text-sm text-gray-500">{event?.title ?? 'Événement'} · {request.customer_email}</p>
-                    <p className="mt-1 flex items-center gap-1 text-xs text-gray-400"><IconClock size={13} /> {elapsedLabel(request.created_at)}</p>
+                    <p className="mt-1 truncate text-sm text-a-text-3">{event?.title ?? 'Événement'} · {request.customer_email}</p>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-a-text-3"><IconClock size={13} /> {elapsedLabel(request.created_at)}</p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <p className="font-bold text-gray-950 dark:text-white">{formatPrice(request.amount, tenant.currency)}</p>
-                    <p className="mt-1 text-xs font-semibold text-violet-700 dark:text-violet-300">Gérer →</p>
+                    <p className="font-bold text-a-text">{formatPrice(request.amount, tenant.currency)}</p>
+                    <p className="mt-1 text-xs font-semibold text-a-brand-fg">Gérer →</p>
                   </div>
                 </Link>
               );
@@ -105,24 +105,24 @@ export default async function EventReservationsPaymentsPage() {
         )}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <h2 className="font-bold text-gray-950 dark:text-white">Réservations récentes</h2>
-          <p className="mt-1 text-sm text-gray-500">Historique tous événements confondus.</p>
+      <section className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+        <div className="border-b border-a-border px-5 py-4">
+          <h2 className="font-bold text-a-text">Réservations récentes</h2>
+          <p className="mt-1 text-sm text-a-text-3">Historique tous événements confondus.</p>
         </div>
-        {reservations.length === 0 ? <div className="px-5 py-8 text-center text-sm text-gray-500">Aucune réservation.</div> : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+        {reservations.length === 0 ? <div className="px-5 py-8 text-center text-sm text-a-text-3">Aucune réservation.</div> : (
+          <div className="divide-y divide-a-border">
             {reservations.map((reservation) => {
               const event = eventById.get(reservation.event_id);
               return (
-                <Link key={reservation.id} href={`/admin/evenementiel/evenements/${reservation.event_id}?tab=reservations`} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link key={reservation.id} href={`/admin/evenementiel/evenements/${reservation.event_id}?tab=reservations`} className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-a-surface-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-950 dark:text-white">{reservation.customer_name}</p>
-                    <p className="mt-1 truncate text-xs text-gray-500">{event?.title ?? 'Événement'} · {reservation.quantity_total} place{reservation.quantity_total > 1 ? 's' : ''}</p>
+                    <p className="truncate text-sm font-semibold text-a-text">{reservation.customer_name}</p>
+                    <p className="mt-1 truncate text-xs text-a-text-3">{event?.title ?? 'Événement'} · {reservation.quantity_total} place{reservation.quantity_total > 1 ? 's' : ''}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold text-gray-950 dark:text-white">{formatPrice(reservation.amount_paid, tenant.currency)}</p>
-                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold ${reservation.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : reservation.status === 'refunded' ? 'bg-gray-100 text-gray-600' : 'bg-red-50 text-red-700'}`}>{reservation.status === 'confirmed' ? 'Confirmée' : reservation.status === 'refunded' ? 'Remboursée' : 'Annulée'}</span>
+                    <p className="text-sm font-semibold text-a-text">{formatPrice(reservation.amount_paid, tenant.currency)}</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${reservation.status === 'confirmed' ? 'bg-tone-success-bg text-tone-success-fg' : reservation.status === 'refunded' ? 'bg-a-hover text-a-text-2' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{reservation.status === 'confirmed' ? 'Confirmée' : reservation.status === 'refunded' ? 'Remboursée' : 'Annulée'}</span>
                   </div>
                 </Link>
               );

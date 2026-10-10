@@ -83,11 +83,11 @@ export default function RentalReservationsClient({
       {/* Paiements en attente (Phase 3 — lien externe) — même structure
           visuelle que les bandeaux boutique/billetterie (Phase 1/2). */}
       {pendingRequests.length > 0 && (
-        <section className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl p-4">
-          <h2 className="text-sm font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5 mb-1">
+        <section className="bg-tone-warning-bg border border-tone-warning-border rounded-2xl p-4">
+          <h2 className="text-sm font-bold text-tone-warning-fg flex items-center gap-1.5 mb-1">
             <IconClock size={16} /> Paiements en attente ({pendingRequests.length})
           </h2>
-          <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+          <p className="text-xs text-tone-warning-fg mb-3">
             Ces demandes ne sont pas encore des réservations — aucun stock n&apos;est réservé.
           </p>
           <div className="space-y-2">
@@ -98,23 +98,23 @@ export default function RentalReservationsClient({
               return (
                 <div
                   key={request.id}
-                  className="bg-white dark:bg-gray-900 rounded-xl border border-amber-100 dark:border-amber-900/60 p-3 flex flex-col sm:flex-row sm:items-center gap-3"
+                  className="bg-a-surface rounded-xl border border-tone-warning-border p-3 flex flex-col sm:flex-row sm:items-center gap-3"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <span className="text-sm font-semibold text-a-text">
                         {request.payment_method_label}
                       </span>
-                      <span className="text-xs text-gray-400">·</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-a-text-3">·</span>
+                      <span className="text-xs text-a-text-3">
                         {request.customer_name || request.customer_email}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{itemsSummary}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{elapsedLabel(request.created_at)}</p>
+                    <p className="text-xs text-a-text-3 truncate mt-0.5">{itemsSummary}</p>
+                    <p className="text-xs text-a-text-3 mt-0.5">{elapsedLabel(request.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    <span className="text-sm font-bold text-a-text">
                       {formatPrice(request.amount, currency)}
                     </span>
                     <ConfirmPaymentButton
@@ -139,27 +139,27 @@ export default function RentalReservationsClient({
       )}
 
       {reservations.length === 0 ? (
-        <p className="text-sm text-gray-400 bg-white rounded-2xl border border-gray-100 p-6 text-center">
+        <p className="text-sm text-a-text-3 bg-a-surface rounded-2xl border border-a-border p-6 text-center">
           Aucune réservation pour le moment.
         </p>
       ) : (
       <div className="space-y-3">
       {reservations.map((r) => (
-        <div key={r.id} className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div key={r.id} className="bg-a-surface rounded-2xl border border-a-border p-4">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div>
-              <p className="text-sm font-semibold text-gray-900">{r.customer_name}</p>
-              <p className="text-xs text-gray-500">{r.customer_email} · {r.service_offerings?.title ?? 'Service'}</p>
-              <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+              <p className="text-sm font-semibold text-a-text">{r.customer_name}</p>
+              <p className="text-xs text-a-text-3">{r.customer_email} · {r.service_offerings?.title ?? 'Service'}</p>
+              <p className="text-xs text-a-text-3 flex items-center gap-1 mt-0.5">
                 <IconCalendar size={12} /> Retrait le {new Date(r.pickup_date).toLocaleDateString('fr-FR')}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="text-2xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex items-center gap-1">
+              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-a-hover text-a-text-2 flex items-center gap-1">
                 {r.fulfillment_type === 'delivery' ? <IconTruckDelivery size={12} /> : <IconBuildingStore size={12} />}
                 {r.fulfillment_type === 'delivery' ? 'Livraison' : 'Retrait boutique'}
               </span>
-              <span className="text-2xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-a-hover text-a-text-2">
                 {STATUS_LABELS[r.status]}
               </span>
               {r.status === 'confirmed' && (
@@ -176,21 +176,21 @@ export default function RentalReservationsClient({
               )}
             </div>
           </div>
-          <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 space-y-0.5">
+          <div className="text-xs text-a-text-2 bg-a-surface-2 rounded-lg p-2 space-y-0.5">
             {r.items.map((item, i) => (
               <div key={i} className="flex justify-between">
                 <span>{item.rental_items?.name ?? 'Article'} × {item.quantity}</span>
                 <span>{formatPrice(item.unit_price * item.quantity, currency)}</span>
               </div>
             ))}
-            <div className="flex justify-between font-semibold pt-1 border-t border-gray-200 mt-1">
+            <div className="flex justify-between font-semibold pt-1 border-t border-a-border mt-1">
               <span>Total</span>
               <span>{formatPrice(r.amount_paid, currency)}</span>
             </div>
           </div>
 
           {r.fulfillment_type === 'delivery' && (
-            <div className="mt-2 text-xs text-gray-600">
+            <div className="mt-2 text-xs text-a-text-2">
               <p>{r.delivery_street} {r.delivery_house_number}, {r.delivery_postal_code} {r.delivery_city} ({r.delivery_country})</p>
               <DeliveryFeeSection reservation={r} currency={currency} externalPaymentMethods={externalPaymentMethods} onUpdate={(patch) => updateReservation(r.id, patch)} />
             </div>
@@ -254,12 +254,12 @@ function DeliveryFeeSection({
   }
 
   if (reservation.delivery_fee_status === 'paid') {
-    return <p className="mt-1 rounded-lg bg-green-50 px-2 py-1.5 text-green-700 font-semibold">Supplément payé — {formatPrice(reservation.delivery_fee_amount ?? 0, currency)}</p>;
+    return <p className="mt-1 rounded-lg bg-tone-success-bg px-2 py-1.5 text-tone-success-fg font-semibold">Supplément payé — {formatPrice(reservation.delivery_fee_amount ?? 0, currency)}</p>;
   }
 
   if (editing) {
     return (
-      <div className="mt-1.5 space-y-1.5 rounded-lg bg-amber-50 p-2">
+      <div className="mt-1.5 space-y-1.5 rounded-lg bg-tone-warning-bg p-2">
         <div className="flex gap-2">
           <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="Montant" className="min-h-9 w-24 rounded-lg border border-black/10 px-2 text-xs" />
           <select value={methodId} onChange={(e) => setMethodId(e.target.value)} className="min-h-9 flex-1 rounded-lg border border-black/10 px-2 text-xs">
@@ -277,17 +277,17 @@ function DeliveryFeeSection({
 
   if (reservation.delivery_fee_status === 'quoted') {
     return (
-      <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-2 py-1.5">
-        <span className="font-semibold text-amber-800">Supplément : {formatPrice(reservation.delivery_fee_amount ?? 0, currency)}</span>
-        {link && <button type="button" onClick={() => navigator.clipboard.writeText(link)} className="text-amber-700 underline">Copier le lien</button>}
-        <button type="button" onClick={() => setEditing(true)} className="text-amber-700 underline">Modifier</button>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-tone-warning-bg px-2 py-1.5">
+        <span className="font-semibold text-tone-warning-fg">Supplément : {formatPrice(reservation.delivery_fee_amount ?? 0, currency)}</span>
+        {link && <button type="button" onClick={() => navigator.clipboard.writeText(link)} className="text-tone-warning-fg underline">Copier le lien</button>}
+        <button type="button" onClick={() => setEditing(true)} className="text-tone-warning-fg underline">Modifier</button>
         <Button type="button" size="sm" onClick={markPaid} loading={isMarkingPaid}>Marquer comme payé</Button>
       </div>
     );
   }
 
   return (
-    <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-amber-800">
+    <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-tone-warning-bg px-2 py-1.5 text-tone-warning-fg">
       <span>Supplément à évaluer</span>
       <button type="button" onClick={() => setEditing(true)} className="font-semibold underline">Évaluer le supplément</button>
     </div>
@@ -332,11 +332,11 @@ function ConvertToDeliveryAction({
   }
 
   if (!open) {
-    return <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs font-semibold text-[var(--color-primary,#1d4ed8)] underline">Convertir en livraison</button>;
+    return <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs font-semibold text-a-brand-fg underline">Convertir en livraison</button>;
   }
 
   return (
-    <div className="mt-2 space-y-1.5 rounded-lg bg-gray-50 p-2">
+    <div className="mt-2 space-y-1.5 rounded-lg bg-a-surface-2 p-2">
       <div className="grid grid-cols-2 gap-1.5">
         <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rue" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs" />
         <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} placeholder="Numéro" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs" />

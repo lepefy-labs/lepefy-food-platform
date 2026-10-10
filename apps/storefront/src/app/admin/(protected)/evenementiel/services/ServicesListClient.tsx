@@ -21,7 +21,7 @@ export default function ServicesListClient({ initialServices }: { initialService
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+  const inputClass = 'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
 
   // Un service Traiteur ouvre un formulaire de devis, un service Location
   // matériel ouvre un catalogue payant — mapping fixe, modifiable ensuite
@@ -64,15 +64,15 @@ export default function ServicesListClient({ initialServices }: { initialService
       </Button>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+        <form onSubmit={handleCreate} className="bg-a-surface rounded-2xl border border-a-border p-4 space-y-3">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre du service" className={inputClass} />
           <select value={type} onChange={(e) => setType(e.target.value as ServiceOfferingType)} className={inputClass}>
             {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-a-text-3">
             {ctaType === 'devis' ? 'Ce service ouvrira un formulaire de demande de devis.' : 'Ce service ouvrira un catalogue de matériel à réserver et payer en ligne.'}
           </p>
-          {error && <p className="text-red-500 text-xs">{error}</p>}
+          {error && <p className="text-tone-danger-fg text-xs">{error}</p>}
           <Button type="submit" loading={isSubmitting}>
             {isSubmitting ? 'Création…' : 'Créer'}
           </Button>
@@ -80,25 +80,25 @@ export default function ServicesListClient({ initialServices }: { initialService
       )}
 
       {services.length === 0 ? (
-        <p className="text-sm text-gray-400 bg-white rounded-2xl border border-gray-100 p-6 text-center">
+        <p className="text-sm text-a-text-3 bg-a-surface rounded-2xl border border-a-border p-6 text-center">
           Aucun service pour le moment.
         </p>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+        <div className="bg-a-surface rounded-2xl border border-a-border divide-y divide-a-border">
           {services.map((service) => (
             <Link
               key={service.id}
               href={`/admin/evenementiel/services/${service.id}`}
-              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-a-surface-2 transition-colors"
             >
               <div className="min-w-0 flex items-center gap-3">
-                {service.type === 'traiteur' ? <IconChefHat size={16} className="text-gray-400 shrink-0" /> : <IconTools size={16} className="text-gray-400 shrink-0" />}
+                {service.type === 'traiteur' ? <IconChefHat size={16} className="text-a-text-3 shrink-0" /> : <IconTools size={16} className="text-a-text-3 shrink-0" />}
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{service.title}</p>
-                  <p className="text-xs text-gray-500">{service.cta_type === 'devis' ? 'Demande de devis' : 'Réservation en ligne'}</p>
+                  <p className="text-sm font-medium text-a-text truncate">{service.title}</p>
+                  <p className="text-xs text-a-text-3">{service.cta_type === 'devis' ? 'Demande de devis' : 'Réservation en ligne'}</p>
                 </div>
               </div>
-              <span className={`text-2xs font-semibold px-2 py-1 rounded-full shrink-0 ${service.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full shrink-0 ${service.active ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-a-hover text-a-text-3'}`}>
                 {service.active ? 'Actif' : 'Inactif'}
               </span>
             </Link>

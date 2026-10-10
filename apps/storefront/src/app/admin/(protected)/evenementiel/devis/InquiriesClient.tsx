@@ -132,7 +132,7 @@ export default function InquiriesClient({ initialInquiries }: { initialInquiries
   }
 
   if (inquiries.length === 0) {
-    return <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Aucune demande pour le moment.</div>;
+    return <div className="rounded-xl border border-a-border bg-a-surface px-4 py-8 text-sm text-a-text-3">Aucune demande pour le moment.</div>;
   }
 
   return (
@@ -162,7 +162,7 @@ export default function InquiriesClient({ initialInquiries }: { initialInquiries
               noteError={noteError}
             />
           ) : (
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Sélectionnez une demande pour afficher les détails.</div>
+            <div className="rounded-xl border border-a-border bg-a-surface px-4 py-6 text-sm text-a-text-3">Sélectionnez une demande pour afficher les détails.</div>
           )}
         </div>
       </div>
