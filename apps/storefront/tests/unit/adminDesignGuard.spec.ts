@@ -5,21 +5,17 @@ import { join, relative } from 'node:path';
 /**
  * Admin Design System V2 guard (stands in for lint, which this repo does not
  * run). Every admin file uses the shared kit and the a-* / tone-* tokens only
- * (docs: docs/ADMIN_DESIGN_SYSTEM.md). LEGACY lists the files still allowed to
- * reference the old palette; it only shrinks.
+ * (docs: docs/ADMIN_DESIGN_SYSTEM.md). Tenant colours appear only as
+ * --tenant-* (identity, storefront previews).
  */
 const ADMIN_ROOT = join(__dirname, '../../src/app/admin');
-
-const LEGACY = [
-  // Dark safety net for the pre-token pages, removed with the --color-primary remap (U12).
-  '_components/adminDarkTheme.ts',
-];
 
 const RULES: { name: string; pattern: RegExp }[] = [
   { name: 'text under 12px', pattern: /\btext-(?:\[(?:[0-9]|1[01])(?:\.\d+)?px\]|2xs)\b/ },
   { name: 'raw Tailwind palette colour (use a-* / tone-* tokens)', pattern: /\b(?:bg|text|border|ring|divide|outline|from|to|fill|stroke|placeholder)-(?:gray|slate|zinc|neutral|stone|violet|purple|indigo|blue|sky|cyan|teal|emerald|green|lime|yellow|amber|orange|red|rose|pink)-\d{2,3}\b/ },
   { name: 'dark: variant (tokens already switch theme)', pattern: /(?<![\w-])dark:(?=[\w[!-])/ },
-  { name: 'legacy --color-primary token in admin', pattern: /var\(--color-primary/ },
+  { name: 'storefront --color-* token in admin (use --admin-* or --tenant-*)', pattern: /var\(--color-/ },
+  { name: 'storefront tenant colour class in admin', pattern: /\b(?:bg|text|border|ring|outline|from|to|accent)-(?:primary|secondary)(?:-(?:hover|light))?\b/ },
   { name: 'hard-coded hex colour', pattern: /(?:bg|text|border|ring)-\[#[0-9a-fA-F]{3,8}\]/ },
 ];
 
@@ -41,7 +37,7 @@ const rel = (file: string) => relative(ADMIN_ROOT, file).split('\\').join('/');
 
 test('admin files follow the design system rules', () => {
   const violations: string[] = [];
-  for (const file of filesUnder('.').filter((file) => !LEGACY.includes(rel(file)))) {
+  for (const file of filesUnder('.')) {
     readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
       for (const rule of RULES) {
         if (rule.pattern.test(line)) violations.push(`${rel(file)}:${index + 1} ${rule.name}: ${line.trim().slice(0, 120)}`);

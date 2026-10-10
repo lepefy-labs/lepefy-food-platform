@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getPlatformBranding } from '@/lib/admin/platformBranding';
 import { adminTokensCss } from '@/lib/admin/tokens';
-import { ADMIN_DARK_CSS } from './_components/adminDarkTheme';
 import { SHELL_CSS } from './_components/shell/shellState';
 
 export const metadata: Metadata = {
@@ -37,19 +36,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const css = `
         ${adminTokensCss(platform)}
         :root {
-          /* Existing admin components keep working while progressively
-             migrating to explicit --admin-* tokens. */
-          --color-primary: ${platform.primary};
-          --color-primary-light: ${platform.primarySoft};
-          --color-primary-dark: ${platform.primaryForeground};
-          --color-secondary: ${platform.primaryHover};
-
-          /* Tenant branding is contextual only inside /admin. */
+          /* Tenant branding is contextual only inside /admin (identity,
+             storefront previews); the admin UI uses the --admin-* tokens. */
           --tenant-primary: ${tenant.primary_color};
           --tenant-primary-light: ${tenant.accent_light};
           --tenant-secondary: ${tenant.secondary_color};
         }
-        ${ADMIN_DARK_CSS}
         ${SHELL_CSS}
       `.replace(/</g, '\\3C ');
 

@@ -25,7 +25,7 @@ export default async function ParametresApparencePage() {
       >
         <div className="grid gap-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
           <figure>
-            <div className="flex h-28 w-44 items-center justify-center overflow-hidden rounded-xl border border-a-border bg-a-surface p-3">
+            <div className="flex h-28 w-44 items-center justify-center overflow-hidden rounded-xl border border-a-border bg-white p-3">
               {tenant.logo_url
                 ? <Image src={tenant.logo_url} alt={`Logo ${tenant.name}`} width={160} height={96} className="h-full w-full object-contain" />
                 : <span className="text-sm text-a-text-3">Aucun logo</span>}

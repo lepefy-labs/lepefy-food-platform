@@ -115,7 +115,7 @@ export default function PickingChecklist({ orderId, orderStatus, items, canManag
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <span className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-base font-bold ${picked ? 'bg-tone-success-solid text-a-on-inverse' : 'bg-a-inverse text-a-on-inverse'}`}>
+                  <span className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-base font-bold ${picked ? 'bg-tone-success-solid text-white' : 'bg-a-inverse text-a-on-inverse'}`}>
                     ×{item.quantity}
                   </span>
                   <div className="min-w-0 flex-1">

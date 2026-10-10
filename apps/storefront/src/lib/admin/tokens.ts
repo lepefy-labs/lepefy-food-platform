@@ -98,8 +98,6 @@ function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tone
     `--admin-text: ${surface.text}`,
     `--admin-text-2: ${surface.text2}`,
     `--admin-text-3: ${surface.text3}`,
-    // Legacy alias kept until every caller uses --admin-text-2.
-    `--admin-text-muted: ${surface.text2}`,
     `--admin-hover: ${surface.hover}`,
     `--admin-disabled-bg: ${surface.disabledBg}`,
     `--admin-disabled-fg: ${surface.disabledFg}`,
@@ -109,10 +107,6 @@ function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tone
   for (const tone of ADMIN_TONES) {
     const value = tones[tone];
     lines.push(`--admin-tone-${tone}-bg: ${value.bg}`, `--admin-tone-${tone}-fg: ${value.fg}`, `--admin-tone-${tone}-border: ${value.border}`, `--admin-tone-${tone}-solid: ${value.solid}`);
-  }
-  // Legacy aliases of the first token set (--admin-info-bg, …).
-  for (const [legacy, tone] of [['info', 'info'], ['warning', 'warning'], ['danger', 'danger'], ['success', 'success']] as const) {
-    lines.push(`--admin-${legacy}-bg: ${tones[tone].bg}`, `--admin-${legacy}-fg: ${tones[tone].fg}`);
   }
   return lines.map((line) => `  ${line};`).join('\n');
 }

@@ -53,7 +53,7 @@ function SlidePreview({ form }: { form: SlideFormState }) {
     <div className="relative overflow-hidden rounded-xl" style={{ backgroundImage: VARIANT_BACKGROUND[form.background_variant] }} aria-label="Aperçu de la slide">
       <div className="grid min-h-[150px] grid-cols-[1fr_auto] items-center gap-3 p-4">
         <div className="min-w-0">
-          {form.badge_text.trim() && <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ backgroundColor: 'var(--color-secondary)', color: '#1a1a1a' }}>{form.badge_text}</span>}
+          {form.badge_text.trim() && <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ backgroundColor: 'var(--tenant-secondary)', color: '#1a1a1a' }}>{form.badge_text}</span>}
           <p className="text-lg font-bold leading-tight text-white">{form.title.trim() || 'Titre de la slide'}</p>
           {form.subtitle.trim() && <p className="mt-1 line-clamp-2 text-xs text-white/90">{form.subtitle}</p>}
           {(primary || secondary) && <div className="mt-3 flex flex-wrap gap-1.5">

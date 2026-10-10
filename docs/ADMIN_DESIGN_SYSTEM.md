@@ -1,6 +1,6 @@
 # Admin Design System V2
 
-> Stato: in adozione progressiva (unità U0–U12, avvio 10/10/2026). Regole vincolanti in `AGENTS.md › Admin Design System V2 contract`.
+> Stato: adottato su tutto `app/admin` (unità U0–U12, 10/10/2026). Regole vincolanti in `AGENTS.md › Admin Design System V2 contract`.
 > Proposta approvata (audit, mockup PRE/POST, piano): artifact «Lepefy Admin V2».
 
 ## 1. Principi
@@ -32,7 +32,7 @@ Le classi Tailwind devono comparire letterali nel sorgente (niente `bg-tone-${to
 
 `platform_branding` può sovrascrivere brand e superfici chiare; i testi restano fissi. `tests/unit/adminTokens.spec.ts` verifica AA (4,5:1) per ogni coppia testo/fondo in entrambi i temi.
 
-Transitorio fino a U12: alias `--admin-text-muted`, `--admin-{info,warning,danger,success}-{bg,fg}`, rimappatura `--color-primary*` e rete di sicurezza dark (`adminDarkTheme.ts`) per le pagine non ancora migrate.
+Dentro `/admin` le variabili storefront `--color-*` non sono più rimappate (U12): valgono il colore del tenant e nessun file admin le usa. Il colore del tenant compare solo come `--tenant-primary`, `--tenant-primary-light`, `--tenant-secondary` (identità, anteprime storefront come slide hero e template email, che restano bianche). Non esiste più una rete di sicurezza dark: ogni elemento scuro in tema scuro lo è tramite i token. Un elemento volutamente bianco in entrambi i temi (logo, QR, anteprima) usa `bg-white` esplicito.
 
 ## 3. Tipografia
 
@@ -95,13 +95,13 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 - grigi → `a-text` (800–950), `a-text-2` (600–700), `a-text-3` (≤ 500); fondi `a-surface`/`a-surface-2`/`a-hover`/`a-border`, scuri (≥ 600) → `a-inverse`; bordi `a-border`/`a-border-strong`;
 - rosso/rosa → `danger`, ambra/giallo → `warning`, arancio → `urgent`, verde/smeraldo/teal → `success`, blu/sky/ciano/indaco → `info` (fondi chiari → `-bg`, pieni → `-solid`, testi → `-fg`, bordi → `-border`); viola → brand;
 - `text-white` su `bg-a-brand` (anche via `style={{ backgroundColor: 'var(--admin-primary)' }}`) / `bg-a-inverse` → `text-a-on-brand` / `text-a-on-inverse`; gradienti `from/via/to-white` → `a-surface`;
-- varianti `dark:` rimosse (i token cambiano tema); un `bg-white` accompagnato da `dark:bg-white` (logo, QR) resta bianco;
+- varianti `dark:` rimosse (i token cambiano tema); un `bg-white` accompagnato da `dark:bg-white` (logo, QR) va lasciato bianco — controllare a mano dopo il codemod;
 - `text-[10px]`, `text-[11px]`, `text-2xs` → `text-xs`; `var(--color-primary*)` → `var(--admin-primary*)` / token.
 
 ## 5. Controllo automatico
 
 `tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa):
-- sui percorsi in `MIGRATED` rifiuta testo < 12 px, palette Tailwind diretta, varianti `dark:`, `var(--color-primary…)`, colori esadecimali. Ogni modulo migrato si aggiunge alla lista;
+- su ogni file di `app/admin` rifiuta testo < 12 px, palette Tailwind diretta, varianti `dark:`, `var(--color-…)` e classi `bg-primary`/`text-secondary`… dello storefront, colori esadecimali in classi;
 - su tutto `app/admin` rifiuta già `confirm()` nativo e overlay `fixed inset-0` scritti a mano. Eccezione: il mirino fotocamera di `loyalty/scan/CameraScanButton.tsx` (vista a schermo intero, non un dialog).
 - `tests/unit/adminNavigation.spec.ts`: id unici, coerenza registry ↔ `adminRoutePermissions`, visibilità per ruolo, stato attivo, barra mobile.
 
@@ -120,5 +120,5 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U8 | Catalogue: lista convertita a Server Component + URL (`lib/catalog/catalogueList.ts` condiviso con `GET /api/admin/catalogue`), isola client per stock/statut inline e azioni massive con esito per prodotto; editor, media, categorie, gruppi di quantità ed etichette sui token | ✅ |
 | U9 | Gestion: kit locale rimosso, tutto sul kit condiviso (`Panel`, `AdminStatCard`, `Badge`, `EmptyState`, `InfoField`, `Breadcrumb`, `controlClasses`/`labelClasses`/`hintClasses`, `useAdminMutation`), toni di dominio allineati (`warning`) | ✅ |
 | U10 | Événementiel (back-office, prenotazioni, contenuti, noleggi, scan sul posto) sui token | ✅ |
-| U11 | Altri moduli | — |
-| U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |
+| U11 | Altri moduli (Paramètres, Paiements, Avis, Fidélité, Ambassadeurs, Canaux, Billing, IA, Contenu, Outils, dettaglio ordine, ordini assistiti, console Platform, Team, Sécurité, onboarding, login) sui token; Paiements carte convertito a Server Component + URL (`lib/card/cardPaymentsList.ts` condiviso con `GET /api/admin/card-payments`); guard esteso a tutto `app/admin` | ✅ `b0084cc2` |
+| U12 | Rete di sicurezza dark (`adminDarkTheme.ts`), rimappatura `--color-*` e alias token legacy rimossi; guard senza eccezioni | ✅ |
