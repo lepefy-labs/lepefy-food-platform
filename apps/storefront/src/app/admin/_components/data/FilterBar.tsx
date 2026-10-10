@@ -31,6 +31,8 @@ interface FilterBarProps {
   resultLabel?: string;
   /** Extra controls on the right (export, density…). */
   trailing?: ReactNode;
+  /** URL keys removed when a panel select changes (e.g. a quick view that the new filter replaces). */
+  panelClears?: string[];
 }
 
 /**
@@ -38,7 +40,7 @@ interface FilterBarProps {
  * to 1) and the Server Component re-renders with the new data; the URL is the
  * only state.
  */
-export default function FilterBar({ views, viewsLabel = 'Vues', search, filters, activeChips = [], resetHref, sort, resultLabel, trailing }: FilterBarProps) {
+export default function FilterBar({ views, viewsLabel = 'Vues', search, filters, activeChips = [], resetHref, sort, resultLabel, trailing, panelClears = [] }: FilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -76,7 +78,11 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
     setPanelOpen(true);
   }
   function applyPanel() {
-    replace(Object.fromEntries(filterKeys.map((key) => [key, draft[key] || null])));
+    const selectChanged = (filters ?? []).some((def) => def.type === 'select' && (draft[def.key] ?? '') !== (searchParams.get(def.key) ?? ''));
+    replace({
+      ...Object.fromEntries(filterKeys.map((key) => [key, draft[key] || null])),
+      ...(selectChanged ? Object.fromEntries(panelClears.map((key) => [key, null])) : {}),
+    });
     setPanelOpen(false);
   }
   const panelActive = filterKeys.filter((key) => searchParams.get(key)).length;

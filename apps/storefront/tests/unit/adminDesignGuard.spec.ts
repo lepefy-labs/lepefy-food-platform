@@ -41,6 +41,11 @@ const MIGRATED = [
   '_components/PlatformSectionTabs.tsx',
   '(protected)/livraison/LivraisonTabs.tsx',
   '(protected)/canaux/whatsapp/_components/WhatsAppTabs.tsx',
+  '(protected)/page.tsx',
+  '(protected)/loading.tsx',
+  '(protected)/OrdersTable.tsx',
+  '(protected)/PendingPaymentsBanner.tsx',
+  '_components/ui/ConfirmPaymentButton.tsx',
 ];
 
 const RULES: { name: string; pattern: RegExp }[] = [

@@ -134,7 +134,7 @@ export default function PaymentRecoveryActions({
           <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/60 dark:bg-amber-950/20">
             <h2 className="font-bold text-gray-950 dark:text-white">Décision paiement</h2>
             <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">Confirmez uniquement après avoir réellement constaté la réception du paiement externe.</p>
-            <div className="mt-4 max-w-xs"><ConfirmPaymentButton endpoint={`/api/admin/checkout-sessions/${sessionId}/confirm-payment`} label="Confirmer réception" confirmingLabel="Confirmation…" className="min-h-11 w-full rounded-xl px-4 text-sm font-semibold text-white transition-opacity disabled:opacity-50" style={{ backgroundColor: '#D97706' }} onSuccess={(warning) => { if (!warning) { router.push('/admin'); router.refresh(); } }} /></div>
+            <div className="mt-4 max-w-xs"><ConfirmPaymentButton endpoint={`/api/admin/checkout-sessions/${sessionId}/confirm-payment`} label="Confirmer réception" confirmingLabel="Confirmation…" style={{ backgroundColor: '#D97706' }} onSuccess={(warning) => { if (!warning) { router.push('/admin'); router.refresh(); } }} /></div>
           </section>
         ) : (
           <section className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Votre rôle permet de consulter cette demande, mais pas de confirmer manuellement un paiement externe.</section>

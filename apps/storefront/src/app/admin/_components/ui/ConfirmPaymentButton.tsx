@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { buttonClasses } from './Button';
 
 // Bouton de confirmation de paiement, générique — un seul point de vérité
 // pour tous les contextes "confirmer réception d'un paiement en attente"
@@ -75,13 +76,13 @@ export default function ConfirmPaymentButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        className={className ?? 'w-full py-2.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50 transition-opacity'}
-        style={style ?? { backgroundColor: '#D97706' }}
+        className={className ?? buttonClasses({ variant: 'primary', className: 'w-full' })}
+        style={style}
       >
         {loading ? confirmingLabel : label}
       </button>
       {message && (
-        <p className={`text-sm mt-2 ${isError ? 'text-red-600' : 'text-green-700'}`}>
+        <p role={isError ? 'alert' : 'status'} className={`mt-2 text-sm ${isError ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`}>
           {message}
         </p>
       )}

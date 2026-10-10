@@ -83,6 +83,12 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - **`Menu`** (`ui/Menu.tsx`): menu a tendina accessibile (frecce, Home/End, Esc riporta il focus, click esterno) per workspace e account.
 - La piattaforma resta in `platformNavConfig.ts` (gruppi espandibili), resa dalla stessa shell.
 
+### Commandes (modulo pilota)
+- Stato URL in `lib/orders/orderListParams.ts` (`ORDER_LIST`, `parseOrderList`, sort legacy `date_desc`… ancora accettati), condiviso da `/admin` ed export.
+- `GET /api/admin/orders/export` (`orders.view`): stessi filtri e ordinamento della lista, max 2 000 righe (`X-Export-Truncated`), CSV UTF-8 con BOM, `;`, importi con virgola, formule neutralizzate (`lib/orders/ordersCsv.ts`).
+- Le card KPI e i chip « Contrôles » sono filtri (secondo clic annulla); cambiare statut/paiement dal pannello azzera la vista (`panelClears`).
+- « Traiter la sélection » chiede conferma (solo le commande « En préparation » cambiano stato).
+
 ## 5. Controllo automatico
 
 `tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa):
@@ -99,5 +105,6 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 | U2 | Dialog, ConfirmDialog, Drawer, Toaster, InlineAlert, Form, useAdminMutation; 18 overlay e 10 `confirm()` migrati | ✅ `0c949f50` |
 | U3 | Shell: registry navigazione, sidebar comprimibile, workspace, palette comandi, barra mobile, ricerca Gestion | ✅ `0661cbcb` |
 | U4 | Kit dati: listParams, FilterBar, DataTable, selezione e BulkBar, Pagination, stati, Panel, Tabs | ✅ |
-| U5–U11 | Commandes, Livraison, Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
+| U5 | Commandes: lista sul kit (FilterBar, DataTable a gruppi di priorità, BulkBar con conferma, Pagination 25/50/100), Contrôles cliccabili, export CSV della lista filtrata, `loading.tsx` del gruppo protetto | ✅ |
+| U6–U11 | Livraison, Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |

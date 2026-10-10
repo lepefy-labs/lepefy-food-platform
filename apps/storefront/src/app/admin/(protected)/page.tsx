@@ -1,77 +1,59 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { IconClipboardList, IconDownload, IconPlus, IconSnowflake } from '@tabler/icons-react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getTenant } from '@/lib/tenant/getTenant'
 import { getCurrentAdminAccessContext, canAdmin } from '@/lib/auth/adminRbac'
-import { dailyDigestModule, DAILY_DIGEST_DEFAULTS } from '@/lib/notifications/dailyDigestConfig'
-import { readModuleConfig } from '@/lib/tenantConfig/moduleConfig'
-import { parseOrderSort, type OperationalThresholds, type QueueKey } from '@/lib/orders/adminOrderOperations'
-import { loadOrderWorkQueue, ORDER_VIEWS, type OrderView, type WorkQueueResult } from '@/lib/orders/loadOrderWorkQueue'
-import { managedShippingProviderInfo } from '@/lib/shipping/providers/registry'
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconClipboardList,
-  IconPlus,
-  IconSearch,
-  IconX,
-} from '@tabler/icons-react'
-import AdminFilters from './AdminFilters'
-import OrdersTable from './OrdersTable'
-import OrdersSortSelect from './OrdersSortSelect'
-import PendingPaymentsBanner from './PendingPaymentsBanner'
+import { ORDER_SORT_OPTIONS, type QueueKey } from '@/lib/orders/adminOrderOperations'
+import { loadOrderWorkQueue, type OrderView, type WorkQueueResult } from '@/lib/orders/loadOrderWorkQueue'
+import { loadOrderOperationalContext, ORDER_LIST, parseOrderList, type OrderListValues } from '@/lib/orders/orderListParams'
+import { pageWindow } from '@/lib/admin/listParams'
+import { formatNumber, pluralize } from '@/lib/admin/format'
+import { ORDER_STATUS_META } from '@/lib/admin/statusRegistry'
+import type { AdminTone } from '@/lib/admin/tokens'
+import { cn } from '@/lib/utils/cn'
+import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
+import OrdersTable, { type ListOrder } from './OrdersTable'
+import PendingPaymentsBanner, { type PendingPaymentSession } from './PendingPaymentsBanner'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
 import AdminStatCard from '../_components/ui/AdminStatCard'
-import type { AdminTone } from '@/lib/admin/tokens'
-import type { ListOrder } from './OrdersTable'
-import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
-import type { PendingPaymentSession } from './PendingPaymentsBanner'
+import { CountBadge, TONE_BADGE_CLASS } from '../_components/ui/Badge'
+import { ButtonAnchor, ButtonLink } from '../_components/ui/Button'
+import InlineAlert from '../_components/ui/InlineAlert'
+import { Card } from '../_components/ui/Panel'
+import { ErrorState } from '../_components/ui/States'
+import FilterBar, { type ActiveFilterChip, type FilterView } from '../_components/data/FilterBar'
+import Pagination from '../_components/data/Pagination'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-const PAGE_SIZE = 50
-const STATUSES = ['new', 'preparing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled', 'stock_conflict']
-
-type SearchParams = {
-  status?: string
-  dateFrom?: string
-  dateTo?: string
-  fulfillment?: string
-  payment?: string
-  q?: string
-  page?: string
-  view?: string
-  sort?: string
+const PAYMENT_LABELS: Record<string, string> = {
+  stripe: 'Carte bancaire', satispay: 'Satispay', in_store: 'En magasin', external_link: 'Lien de paiement', cash: 'Espèces', manual: 'Manuel',
 }
 
-function sanitizeSearch(raw: string) {
-  return raw.trim().replace(/[^a-zA-Z0-9À-ÿ@._\-# ]/g, '').slice(0, 60)
+const OPERATIONAL_VIEWS: { key: Exclude<OrderView, ''> & QueueKey; label: string; helper: string; tone: AdminTone }[] = [
+  { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info' },
+  { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning' },
+  { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning' },
+  { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info' },
+  { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger' },
+  { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success' },
+]
+
+const VIEW_LABELS: Partial<Record<OrderView, string>> = {
+  to_treat: 'À traiter', preparing: 'En préparation', to_ship: 'À expédier', in_transit: 'En transit', incidents: 'Incidents',
+  pickup_ready: 'Retraits prêts', urgent: 'Urgents', finished: 'Terminés', payment_pending: 'Paiement à vérifier', aged: 'Plus de 24 h',
+  picking_incomplete: 'Préparation incomplète', packing_pending: 'Emballage à terminer', tracking_missing: 'Suivi manquant',
 }
 
-function sanitizeView(raw: string | undefined): OrderView {
-  return ORDER_VIEWS.includes((raw ?? '') as OrderView) ? (raw ?? '') as OrderView : ''
-}
-
-/** /admin URL keeping the current list state, with `patch` applied (undefined/'' removes a key). Page always resets. */
-function buildHref(searchParams: SearchParams, patch: Partial<SearchParams>) {
-  const params = new URLSearchParams()
-  const merged: SearchParams = { ...searchParams, page: undefined, ...patch }
-  for (const key of ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo', 'q', 'sort', 'page'] as const) {
-    const value = merged[key]
-    if (value) params.set(key, key === 'q' ? sanitizeSearch(value) : value)
-  }
-  const query = params.toString()
-  return query ? `/admin?${query}` : '/admin'
-}
-
-export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
-  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood'
-  const tenant = await getTenant(tenantSlug)
+export default async function AdminPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+  const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
   const supabase = createServiceClient()
-  const [access, digest, documentSettings] = await Promise.all([
+  const { values, filters, sort } = parseOrderList(searchParams)
+  const [access, operational, documentSettings] = await Promise.all([
     getCurrentAdminAccessContext(tenant.id),
-    readModuleConfig(supabase, dailyDigestModule, tenant.id).catch(() => null),
+    loadOrderOperationalContext(supabase, tenant),
     readOrderDocumentSettings(supabase, tenant.id),
   ])
   const documentDefaults = {
@@ -81,27 +63,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     packingSlipQrUnavailable: !documentSettings.available && documentSettings.config.packing_slip_show_qr,
   }
   const canManage = Boolean(access && canAdmin(access, 'orders.manage'))
-  // Same tenant-scoped thresholds as the daily digest; module defaults otherwise.
-  const digestConfig = digest?.status === 'ok' ? digest.config : DAILY_DIGEST_DEFAULTS
-  const thresholds: OperationalThresholds = {
-    prepareHours: digestConfig.prepare_hours,
-    pickupHours: digestConfig.pickup_hours,
-    trackingStaleHours: digestConfig.tracking_stale_hours,
-  }
-  const managedProviderAvailable = Boolean(managedShippingProviderInfo(tenant.shipping_provider))
-
-  const filterView = sanitizeView(searchParams.view)
-  const filters = {
-    view: filterView,
-    status: STATUSES.includes(searchParams.status ?? '') ? searchParams.status! : '',
-    dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(searchParams.dateFrom ?? '') ? searchParams.dateFrom! : '',
-    dateTo: /^\d{4}-\d{2}-\d{2}$/.test(searchParams.dateTo ?? '') ? searchParams.dateTo! : '',
-    fulfillment: ['delivery', 'pickup'].includes(searchParams.fulfillment ?? '') ? searchParams.fulfillment! : '',
-    payment: ['stripe', 'external_link', 'satispay', 'in_store', 'cash', 'manual'].includes(searchParams.payment ?? '') ? searchParams.payment! : '',
-    search: sanitizeSearch(searchParams.q ?? ''),
-  }
-  const sortKey = parseOrderSort(searchParams.sort)
-  const requestedPage = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
   const now = new Date()
 
   const [{ data: stats, error: statsError }, { data: carriersRaw }, { data: pendingPaymentsRaw }, { count: activePreordersCount }, { count: preordersToVerifyCount }, queue] = await Promise.all([
@@ -117,24 +78,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       .in('status', ['open', 'expired', 'awaiting_verification'])
       .is('order_id', null)
       .order('created_at', { ascending: true }),
-    supabase
-      .from('checkout_sessions')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenant.id)
-      .eq('origin', 'assisted')
-      .in('status', ['draft', 'open', 'awaiting_verification']),
-    supabase
-      .from('checkout_sessions')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenant.id)
-      .eq('origin', 'assisted')
-      .eq('status', 'awaiting_verification'),
-    loadOrderWorkQueue(supabase, tenant.id, { filters, sort: sortKey, page: requestedPage, pageSize: PAGE_SIZE, thresholds, now, managedProviderAvailable, originCountry: tenant.country })
+    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').in('status', ['draft', 'open', 'awaiting_verification']),
+    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('origin', 'assisted').eq('status', 'awaiting_verification'),
+    loadOrderWorkQueue(supabase, tenant.id, { filters, sort, page: values.page, pageSize: values.pageSize, thresholds: operational.thresholds, now, managedProviderAvailable: operational.managedProviderAvailable, originCountry: tenant.country })
       .catch((error: unknown): WorkQueueResult | null => { console.error('[admin/orders] work queue unavailable', error); return null }),
   ])
   const carriers = ((carriersRaw ?? []) as { name: string }[]).map(carrier => carrier.name)
   const pendingPayments = (pendingPaymentsRaw ?? []) as PendingPaymentSession[]
 
+  const href = (patch: Partial<Record<keyof OrderListValues, unknown>>) => ORDER_LIST.href('/admin', values, patch)
   const totalCount = Number(stats?.total_count ?? 0)
   const kpi = (key: QueueKey) => queue?.kpis[key] ?? 0
   const countsUnavailable = Boolean(statsError || !queue)
@@ -147,141 +99,130 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
     cancelled: Number(stats?.cancelled_count ?? 0),
     stock_conflict: queue?.activeStatusCounts.stock_conflict ?? 0,
   }
-
   const orderList = (queue?.rows ?? []) as unknown as ListOrder[]
-  const filteredCount = queue?.total ?? 0
-  const currentPage = queue?.currentPage ?? 1
-  const totalPages = queue?.totalPages ?? 1
-  const pageStart = filteredCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredCount)
-  const activeFilterCount = [filters.dateFrom, filters.dateTo, filters.fulfillment, filters.payment, filters.status, filterView].filter(Boolean).length
-  const pageHref = (page: number) => buildHref(searchParams, { page: page > 1 ? String(page) : undefined })
+  const window = pageWindow(queue?.total ?? 0, queue?.currentPage ?? 1, values.pageSize)
+  const view = filters.view
+  const hasFilters = ORDER_LIST.activeCount(values, ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo']) > 0 || Boolean(filters.search)
+  // Reset keeps the chosen sort and page size: they are preferences, not filters.
+  const resetHref = ORDER_LIST.href('/admin', { ...ORDER_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {})
 
-  const operationalViews: { key: OrderView; label: string; helper: string; tone: AdminTone }[] = [
-    { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info' },
-    { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning' },
-    { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning' },
-    { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info' },
-    { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger' },
-    { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success' },
+  // Quick views: fulfillment and a few queue views; KPI cards cover the rest.
+  const views: FilterView[] = [
+    { key: 'all', label: 'Tous', active: !view && !filters.fulfillment, href: href({ view: undefined, fulfillment: undefined }) },
+    { key: 'delivery', label: 'Livraison', active: filters.fulfillment === 'delivery', href: href({ fulfillment: filters.fulfillment === 'delivery' ? undefined : 'delivery' }) },
+    { key: 'pickup', label: 'Retrait', active: filters.fulfillment === 'pickup', href: href({ fulfillment: filters.fulfillment === 'pickup' ? undefined : 'pickup' }) },
+    { key: 'urgent', label: 'Urgents', count: kpi('urgent'), countTone: 'urgent', active: view === 'urgent', href: href({ view: view === 'urgent' ? undefined : 'urgent', status: undefined }) },
+    { key: 'incidents', label: 'Incidents', count: kpi('incidents'), countTone: 'danger', active: view === 'incidents', href: href({ view: view === 'incidents' ? undefined : 'incidents', status: undefined }) },
+    { key: 'finished', label: 'Terminés', active: view === 'finished', href: href({ view: view === 'finished' ? undefined : 'finished', status: undefined }) },
   ]
-
-  // One filter system: quick filters (fulfillment + queue views) and the
-  // Statut / dates / paiement selects; each keeps the rest of the state.
-  const quickFilters: { key: string; label: string; count?: number; active: boolean; href: string }[] = [
-    { key: 'all', label: 'Tous', active: !filterView && !filters.fulfillment, href: buildHref(searchParams, { view: undefined, fulfillment: undefined }) },
-    { key: 'delivery', label: 'Livraison', active: filters.fulfillment === 'delivery', href: buildHref(searchParams, { fulfillment: filters.fulfillment === 'delivery' ? undefined : 'delivery' }) },
-    { key: 'pickup', label: 'Retrait', active: filters.fulfillment === 'pickup', href: buildHref(searchParams, { fulfillment: filters.fulfillment === 'pickup' ? undefined : 'pickup' }) },
-    { key: 'urgent', label: 'Urgents', count: kpi('urgent'), active: filterView === 'urgent', href: buildHref(searchParams, { view: filterView === 'urgent' ? undefined : 'urgent', status: undefined }) },
-    { key: 'incidents', label: 'Incidents', count: kpi('incidents'), active: filterView === 'incidents', href: buildHref(searchParams, { view: filterView === 'incidents' ? undefined : 'incidents', status: undefined }) },
-    { key: 'finished', label: 'Terminés', active: filterView === 'finished', href: buildHref(searchParams, { view: filterView === 'finished' ? undefined : 'finished', status: undefined }) },
+  const chips: ActiveFilterChip[] = [
+    ...(view && !['urgent', 'incidents', 'finished'].includes(view) ? [{ key: 'view', label: VIEW_LABELS[view] ?? view, href: href({ view: undefined }) }] : []),
+    ...(filters.status ? [{ key: 'status', label: `Statut : ${ORDER_STATUS_META[filters.status]?.label ?? filters.status}`, href: href({ status: undefined }) }] : []),
+    ...(filters.payment ? [{ key: 'payment', label: `Paiement : ${PAYMENT_LABELS[filters.payment] ?? filters.payment}`, href: href({ payment: undefined }) }] : []),
+    ...(filters.dateFrom ? [{ key: 'dateFrom', label: `Depuis le ${filters.dateFrom.split('-').reverse().join('/')}`, href: href({ dateFrom: undefined }) }] : []),
+    ...(filters.dateTo ? [{ key: 'dateTo', label: `Jusqu’au ${filters.dateTo.split('-').reverse().join('/')}`, href: href({ dateTo: undefined }) }] : []),
   ]
+  const controls: { view: OrderView | null; label: string; count: number; tone: AdminTone; icon?: boolean }[] = [
+    { view: 'picking_incomplete', label: 'Préparation incomplète', count: Number(stats?.picking_incomplete_count ?? 0), tone: 'warning' },
+    { view: 'packing_pending', label: 'Emballage à terminer', count: Number(stats?.packing_pending_count ?? 0), tone: 'warning' },
+    { view: 'tracking_missing', label: 'Suivi manquant', count: Number(stats?.tracking_missing_count ?? 0), tone: 'warning' },
+    { view: null, label: 'Chaîne du froid', count: Number(stats?.cold_chain_action_count ?? 0), tone: 'urgent', icon: true },
+    { view: 'payment_pending', label: 'Paiement à vérifier', count: Number(stats?.pending_payment_count ?? 0), tone: 'warning' },
+  ]
+  const exportQuery = ORDER_LIST.query({ ...values, page: 1, pageSize: ORDER_LIST.defaultPageSize })
 
   return (
-    <div className="mx-auto w-full max-w-7xl pb-8">
+    <div className="mx-auto w-full max-w-7xl">
       <AdminPageHeader
         title="Commandes"
-        description="Traitez d'abord les commandes qui demandent votre attention."
-        meta={`${totalCount} commande${totalCount !== 1 ? 's' : ''}`}
-        actions={(
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/admin/orders/precommandes" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-              <IconClipboardList size={17} /> Précommandes
-              {(activePreordersCount ?? 0) > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800">{activePreordersCount}</span>}
-            </Link>
-            {canManage && <Link href="/admin/orders/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white hover:opacity-90">
-              <IconPlus size={17} /> Nouvelle commande
-            </Link>}
-          </div>
-        )}
+        meta={pluralize(totalCount, 'commande')}
+        description="Traitez d’abord les commandes qui demandent votre attention."
+        actions={<>
+          <ButtonLink href="/admin/orders/precommandes">
+            <IconClipboardList size={17} aria-hidden="true" /> Précommandes
+            <CountBadge tone="warning" count={activePreordersCount ?? 0} label={`${activePreordersCount ?? 0} précommandes actives`} />
+          </ButtonLink>
+          <ButtonAnchor href={`/api/admin/orders/export${exportQuery ? `?${exportQuery}` : ''}`} variant="secondary" title="Exporter la liste filtrée (CSV, 2 000 commandes max.)">
+            <IconDownload size={17} aria-hidden="true" /> Exporter
+          </ButtonAnchor>
+          {canManage && <ButtonLink href="/admin/orders/new" variant="primary"><IconPlus size={17} aria-hidden="true" /> Nouvelle commande</ButtonLink>}
+        </>}
       />
 
-      {countsUnavailable && <p role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">Certains compteurs sont indisponibles. <Link href="/admin" className="underline">Réessayer</Link></p>}
-      {queue && !queue.priorityAvailable && <p role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Plus de 5 000 commandes actives : la liste est triée par date et les compteurs sont partiels.</p>}
+      <div className="space-y-3">
+        {countsUnavailable && <InlineAlert tone="warning" action={<Link href="/admin" className="underline">Réessayer</Link>}>Certains compteurs sont indisponibles.</InlineAlert>}
+        {queue && !queue.priorityAvailable && <InlineAlert tone="info">Plus de 5 000 commandes actives : la liste est triée par date et les compteurs sont partiels.</InlineAlert>}
 
-      <section aria-labelledby="work-queue-title" className="mb-4 rounded-2xl border border-[var(--admin-border)] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-4">
-        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">À faire maintenant</p>
-            <h2 id="work-queue-title" className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">File de fulfillment</h2>
+        <section aria-labelledby="work-queue-title">
+          <h2 id="work-queue-title" className="sr-only">File de fulfillment</h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            {OPERATIONAL_VIEWS.map(item => {
+              const active = view === item.key
+              return (
+                <AdminStatCard
+                  key={item.key}
+                  href={href({ view: active ? undefined : item.key, status: undefined })}
+                  title={item.label}
+                  value={formatNumber(kpi(item.key))}
+                  description={item.helper}
+                  active={active}
+                  tone={item.tone}
+                />
+              )
+            })}
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Chaque carte filtre la liste ; un second clic l’annule.</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          {operationalViews.map(view => {
-            const active = filterView === view.key
-            const count = kpi(view.key as QueueKey)
-            return (
-              <AdminStatCard
-                key={view.key}
-                href={buildHref(searchParams, { view: active ? undefined : view.key, status: undefined })}
-                title={view.label}
-                value={count}
-                description={view.helper}
-                active={active}
-                tone={view.tone}
-              />
-            )
-          })}
-        </div>
-        <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400">Contrôles : préparation incomplète {Number(stats?.picking_incomplete_count ?? 0)} · emballage à terminer {Number(stats?.packing_pending_count ?? 0)} · suivi manquant {Number(stats?.tracking_missing_count ?? 0)} · chaîne du froid {Number(stats?.cold_chain_action_count ?? 0)} · paiement à vérifier {Number(stats?.pending_payment_count ?? 0)}</p>
-      </section>
-
-      {pendingPayments.length > 0 && <div className="mb-4"><PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} /></div>}
-      {(preordersToVerifyCount ?? 0) > 0 && (
-        <Link href="/admin/orders/precommandes" className="mb-4 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-          <span>{preordersToVerifyCount} précommande{(preordersToVerifyCount ?? 0) > 1 ? 's' : ''} avec un paiement à vérifier</span>
-          <span aria-hidden="true">→</span>
-        </Link>
-      )}
-
-      <section aria-label="Filtres des commandes" className="mb-3 rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex flex-col gap-2 border-b border-[var(--admin-border)] p-2 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <nav className="flex gap-1 overflow-x-auto" aria-label="Filtres rapides">
-            {quickFilters.map(item => (
-              <Link key={item.key} href={item.href} aria-current={item.active ? 'page' : undefined}
-                className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] ${item.active ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'}`}>
-                {item.label}
-                {item.count !== undefined && item.count > 0 && <span className={`rounded-full px-1.5 text-[10px] ${item.key === 'incidents' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{item.count}</span>}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex flex-wrap items-center gap-2 px-1">
-            <Suspense fallback={<div className="h-9" />}><AdminFilters currentStatus={filters.status} currentDateFrom={filters.dateFrom} currentDateTo={filters.dateTo} currentFulfillment={filters.fulfillment} currentPayment={filters.payment} statusCounts={statusCounts} hideFulfillment /></Suspense>
-            {(activeFilterCount > 0 || filters.search) && <Link href={sortKey === 'priority' ? '/admin' : `/admin?sort=${sortKey}`} className="shrink-0 text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">Réinitialiser{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Link>}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-a-text-3">
+            <span className="mr-0.5">Contrôles</span>
+            {controls.map(control => {
+              const className = cn('inline-flex min-h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
+                control.count > 0 ? TONE_BADGE_CLASS[control.tone] : 'border-a-border bg-a-surface text-a-text-3')
+              const content = <>{control.icon && <IconSnowflake size={13} aria-hidden="true" />}{control.label} <b className="font-semibold tabular-nums">{control.count}</b></>
+              return control.view && control.count > 0
+                ? <Link key={control.label} href={href({ view: view === control.view ? undefined : control.view, status: undefined })} aria-current={view === control.view ? 'true' : undefined} className={cn(className, 'hover:underline', view === control.view && 'ring-1 ring-a-brand')}>{content}</Link>
+                : <span key={control.label} className={className}>{content}</span>
+            })}
           </div>
-        </div>
+        </section>
 
-        <div className="flex flex-col gap-2 p-2 sm:p-3 lg:flex-row lg:items-center lg:justify-between">
-          <form method="get" action="/admin" role="search" className="flex min-w-0 flex-1 items-center gap-2">
-            {filters.status && <input type="hidden" name="status" value={filters.status} />}
-            {filterView && <input type="hidden" name="view" value={filterView} />}
-            {filters.dateFrom && <input type="hidden" name="dateFrom" value={filters.dateFrom} />}
-            {filters.dateTo && <input type="hidden" name="dateTo" value={filters.dateTo} />}
-            {filters.fulfillment && <input type="hidden" name="fulfillment" value={filters.fulfillment} />}
-            {filters.payment && <input type="hidden" name="payment" value={filters.payment} />}
-            {sortKey !== 'priority' && <input type="hidden" name="sort" value={sortKey} />}
-            <div className="relative w-full max-w-xl"><IconSearch size={16} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input type="search" name="q" defaultValue={filters.search} aria-label="Rechercher une commande" placeholder="Client, email, n° ou UUID de commande" className="h-10 w-full rounded-xl border border-[var(--admin-border)] bg-white pl-9 pr-9 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />{filters.search && <Link href={buildHref(searchParams, { q: undefined })} aria-label="Effacer la recherche" className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100"><IconX size={14} /></Link>}</div>
-            <button type="submit" className="h-10 shrink-0 rounded-xl bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90">Rechercher</button>
-          </form>
-          <div className="flex items-center justify-between gap-3 lg:justify-end">
-            <p className="shrink-0 text-xs text-gray-500 dark:text-gray-400" aria-live="polite">{filteredCount} résultat{filteredCount !== 1 ? 's' : ''}</p>
-            <Suspense fallback={<div className="h-10 w-48" />}><OrdersSortSelect value={queue?.appliedSort ?? sortKey} /></Suspense>
-          </div>
-        </div>
-      </section>
+        {pendingPayments.length > 0 && <PendingPaymentsBanner sessions={pendingPayments} tenantCurrency={tenant.currency} />}
+        {(preordersToVerifyCount ?? 0) > 0 && (
+          <InlineAlert tone="warning" action={<Link href="/admin/orders/precommandes" className="underline">Vérifier</Link>}>
+            {pluralize(preordersToVerifyCount ?? 0, 'précommande')} avec un paiement à vérifier.
+          </InlineAlert>
+        )}
 
-      {!queue
-        ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">Impossible de charger les commandes. <Link href={pageHref(1)} className="font-bold underline">Réessayer</Link></div>
-        : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={thresholds} canManage={canManage} managedProviderAvailable={managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} />}
-
-      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-xs text-gray-500 dark:text-gray-400">{pageStart}–{pageEnd} sur {filteredCount} commande{filteredCount !== 1 ? 's' : ''}</span>
-        <nav className="flex items-center gap-1" aria-label="Pagination des commandes">
-          {currentPage > 1 ? <Link href={pageHref(currentPage - 1)} className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--admin-border)] px-2.5 text-xs font-semibold text-gray-600 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-300"><IconChevronLeft size={14} /> Précédent</Link> : <span className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-100 px-2.5 text-xs font-semibold text-gray-300 dark:border-gray-800 dark:text-gray-600"><IconChevronLeft size={14} /> Précédent</span>}
-          <span className="min-w-20 px-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-200">{currentPage} / {totalPages}</span>
-          {currentPage < totalPages ? <Link href={pageHref(currentPage + 1)} className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--admin-border)] px-2.5 text-xs font-semibold text-gray-600 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-300">Suivant <IconChevronRight size={14} /></Link> : <span className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-100 px-2.5 text-xs font-semibold text-gray-300 dark:border-gray-800 dark:text-gray-600">Suivant <IconChevronRight size={14} /></span>}
-        </nav>
+        <Card as="section" className="overflow-hidden">
+          <h2 className="sr-only">Liste des commandes</h2>
+          <Suspense fallback={<div className="h-14 border-b border-a-border" />}>
+            <FilterBar
+              views={views}
+              viewsLabel="Filtres rapides"
+              search={{ label: 'Rechercher une commande', placeholder: 'Client, e-mail, n° ou UUID de commande' }}
+              filters={[
+                { type: 'select', key: 'status', label: 'Statut', allLabel: 'Tous les statuts', options: Object.entries(ORDER_STATUS_META).map(([key, meta]) => ({ value: key, label: statusCounts[key] ? `${meta.label} (${formatNumber(statusCounts[key]!)})` : meta.label })) },
+                { type: 'select', key: 'payment', label: 'Paiement', allLabel: 'Tous les paiements', options: Object.entries(PAYMENT_LABELS).filter(([key]) => key !== 'manual').map(([value, label]) => ({ value, label })) },
+                { type: 'date-range', label: 'Date de commande', fromKey: 'dateFrom', toKey: 'dateTo' },
+              ]}
+              activeChips={chips}
+              resetHref={resetHref}
+              panelClears={['view']}
+              sort={{ value: queue?.appliedSort ?? sort, options: ORDER_SORT_OPTIONS.map(option => ({ value: option.key, label: option.label })) }}
+              resultLabel={pluralize(window.total, 'résultat')}
+            />
+          </Suspense>
+          {!queue
+            ? <ErrorState title="Impossible de charger les commandes." description="La file de travail n’a pas répondu. Les commandes ne sont pas perdues." action={<ButtonLink href={href({ page: window.page })}>Réessayer</ButtonLink>} />
+            : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={operational.thresholds} canManage={canManage} managedProviderAvailable={operational.managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} resetHref={resetHref} hasFilters={hasFilters} />}
+          {queue && window.total > 0 && (
+            <Pagination
+              window={window}
+              noun="commandes"
+              hrefForPage={(page) => href({ page })}
+              hrefForPageSize={(pageSize) => href({ pageSize })}
+              pageSizes={ORDER_LIST.pageSizes}
+            />
+          )}
+        </Card>
       </div>
     </div>
   )

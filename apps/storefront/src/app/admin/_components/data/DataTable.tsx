@@ -42,6 +42,8 @@ interface DataTableProps<Row> {
   groups?: DataRowGroup<Row>[];
   /** Left stripe on a row that needs attention. */
   rowTone?: (row: Row) => AdminTone | undefined;
+  /** Extra classes of a row (e.g. dimmed finished rows). */
+  rowClassName?: (row: Row) => string | undefined;
   /** Requires a surrounding <RowSelectionProvider> (client). */
   selectable?: { label: (row: Row) => string };
   sort?: DataSort;
@@ -75,7 +77,7 @@ function SortHeader({ column, sort }: { column: DataColumn<never>; sort: DataSor
  * through the URL. Selection checkboxes are small client islands.
  */
 export default function DataTable<Row>({
-  caption, columns, rowKey, rows, groups, rowTone, selectable, sort, mobileCard, rowDetail, empty, density = 'comfortable', className,
+  caption, columns, rowKey, rows, groups, rowTone, rowClassName, selectable, sort, mobileCard, rowDetail, empty, density = 'comfortable', className,
 }: DataTableProps<Row>) {
   const allGroups: DataRowGroup<Row>[] = groups ?? [{ id: 'all', label: null, rows: rows ?? [] }];
   const allRows = allGroups.flatMap((group) => group.rows);
@@ -124,7 +126,7 @@ export default function DataTable<Row>({
                   const detail = rowDetail?.(row);
                   return (
                     <Fragment key={id}>
-                      <tr className="group/row hover:bg-a-hover">
+                      <tr className={cn('group/row hover:bg-a-hover', rowClassName?.(row))}>
                         {selectable && (
                           <td className={cn('relative w-10 border-b border-a-border align-top', pad)}>
                             {tone && <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-[3px]', TONE_SOLID_BG_CLASS[tone])} />}

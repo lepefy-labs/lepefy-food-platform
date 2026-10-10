@@ -20,6 +20,8 @@ import {
 import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
 import ConfirmPaymentButton from '../_components/ui/ConfirmPaymentButton';
+import Badge from '../_components/ui/Badge';
+import Button, { ButtonLink, buttonClasses } from '../_components/ui/Button';
 import { PAYMENT_METHOD_REGISTRY, type PaymentMethodType } from '@lepefy/types';
 
 const PAYMENT_ICONS = {
@@ -114,116 +116,72 @@ export default function PendingPaymentsBanner({
   if (visible.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/25">
+    <section aria-labelledby="pending-payments-title" className="overflow-hidden rounded-[10px] border border-tone-warning-border bg-tone-warning-bg">
       <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h2 className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
-              <IconClock size={15} /> Paiements à vérifier
-            </h2>
-            <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-              {visible.length} · {formatPrice(pendingTotal, tenantCurrency)}
-            </span>
-            {agedCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/50 dark:text-red-300">
-                <IconAlertTriangle size={11} />
-                {agedCount} depuis +24 h
-              </span>
-            )}
-            <Link
-              href="/admin/checkout-funnel"
-              className="text-[10px] font-semibold text-amber-800 underline decoration-amber-400 underline-offset-2 hover:text-amber-950 dark:text-amber-300 dark:hover:text-amber-100"
-            >
-              Voir le funnel
-            </Link>
-          </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-tone-warning-fg">
+          <h2 id="pending-payments-title" className="flex items-center gap-1.5 text-sm font-semibold">
+            <IconClock size={16} aria-hidden="true" /> Paiements à vérifier
+          </h2>
+          <span className="text-sm tabular-nums">{visible.length} · {formatPrice(pendingTotal, tenantCurrency)}</span>
+          {agedCount > 0 && <Badge tone="danger" icon={<IconAlertTriangle size={12} aria-hidden="true" />}>{agedCount} depuis +24 h</Badge>}
+          <Link href="/admin/checkout-funnel" className="text-xs font-semibold underline underline-offset-2">Voir le funnel</Link>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setExpanded(value => !value)}
-          aria-expanded={expanded}
-          className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-200 dark:hover:bg-amber-950"
-        >
+        <Button variant="secondary" size="sm" onClick={() => setExpanded(value => !value)} aria-expanded={expanded} className="shrink-0">
           {expanded ? 'Masquer' : 'Détails'}
-          {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
-        </button>
+          {expanded ? <IconChevronUp size={14} aria-hidden="true" /> : <IconChevronDown size={14} aria-hidden="true" />}
+        </Button>
       </div>
 
       {expanded && (
-        <div className="border-t border-amber-200/80 px-3 py-2.5 dark:border-amber-900">
-          <p className="mb-2 text-[11px] text-amber-700 dark:text-amber-400">
+        <div className="border-t border-tone-warning-border bg-a-surface px-3 py-2.5">
+          <p className="mb-2 text-xs text-a-text-2">
             Paiements externes à vérifier manuellement · aucun stock réservé · les plus anciens sont affichés en premier.
           </p>
-          <div className="space-y-2">
+          <ul className="space-y-2">
             {visible.map((session) => {
               const total = sessionTotal(session);
               const methodType = (session.external_payment_type ?? 'other') as PaymentMethodType;
               const meta = PAYMENT_METHOD_REGISTRY[methodType] ?? PAYMENT_METHOD_REGISTRY.other;
               const Icon = PAYMENT_ICONS[meta.iconName];
+              // Payment method identity colour (like a brand logo), not a state.
               const color = methodColor(methodType, '#92400E');
               const itemsSummary = session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ');
               const aged = isAgedPayment(session.created_at);
 
               return (
-                <div
-                  key={session.id}
-                  className={`flex flex-col gap-2 rounded-lg border bg-white px-3 py-2 dark:bg-gray-900 sm:flex-row sm:items-center ${aged ? 'border-red-200 dark:border-red-900/70' : 'border-amber-100 dark:border-amber-900/60'}`}
-                >
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                    style={{ backgroundColor: color }}
-                  >
-                    <Icon size={15} stroke={1.8} className="text-white" />
+                <li key={session.id} className={`relative flex flex-col gap-2 overflow-hidden rounded-lg border bg-a-surface px-3 py-2 sm:flex-row sm:items-center ${aged ? 'border-tone-danger-border' : 'border-a-border'}`}>
+                  {aged && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-tone-danger-solid" />}
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: color }}>
+                    <Icon size={15} stroke={1.8} aria-hidden="true" className="text-white" />
                   </span>
-
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                        {session.external_payment_label ?? meta.label}
-                      </span>
-                      <span className="text-[11px] text-gray-400">·</span>
-                      <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                        {session.full_name ?? session.email ?? 'Client'}
-                      </span>
-                      {aged && (
-                        <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-700 dark:bg-red-950/50 dark:text-red-300">
-                          Prioritaire
-                        </span>
-                      )}
+                    <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                      <span className="font-semibold text-a-text">{session.external_payment_label ?? meta.label}</span>
+                      <span aria-hidden="true" className="text-a-text-3">·</span>
+                      <span className="truncate text-a-text-2">{session.full_name ?? session.email ?? 'Client'}</span>
+                      {aged && <Badge tone="danger">Prioritaire</Badge>}
                     </div>
-                    <p className="mt-0.5 truncate text-[11px] text-gray-500 dark:text-gray-400">{itemsSummary}</p>
-                    <p className={`mt-0.5 text-[10px] ${aged ? 'font-semibold text-red-600 dark:text-red-300' : 'text-gray-400 dark:text-gray-500'}`}>
-                      {elapsedLabel(session.created_at)}
-                    </p>
+                    <p className="mt-0.5 truncate text-xs text-a-text-2">{itemsSummary}</p>
+                    <p className={`mt-0.5 text-xs ${aged ? 'font-semibold text-tone-danger-fg' : 'text-a-text-3'}`}>{elapsedLabel(session.created_at)}</p>
                   </div>
-
                   <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 sm:justify-end">
-                    <span className="mr-1 text-sm font-bold text-gray-900 dark:text-gray-100">
-                      {formatPrice(total, tenantCurrency)}
-                    </span>
-                    <Link
-                      href={`/admin/paiements-en-attente/${session.id}`}
-                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-                    >
-                      <IconSettings size={14} /> Gérer
-                    </Link>
+                    <span className="mr-1 text-sm font-semibold tabular-nums text-a-text">{formatPrice(total, tenantCurrency)}</span>
+                    <ButtonLink href={`/admin/paiements-en-attente/${session.id}`} size="sm"><IconSettings size={14} aria-hidden="true" /> Gérer</ButtonLink>
                     <ConfirmPaymentButton
                       endpoint={`/api/admin/checkout-sessions/${session.id}/confirm-payment`}
                       label="Confirmer réception"
                       confirmingLabel="Confirmation…"
-                      className="min-h-10 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-opacity disabled:opacity-50"
-                      style={{ backgroundColor: '#D97706' }}
+                      className={buttonClasses({ variant: 'primary', size: 'sm' })}
                       onSuccess={(warning) => {
                         if (!warning) setResolvedIds((prev) => new Set(prev).add(session.id));
                         router.refresh();
                       }}
                     />
                   </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
       )}
     </section>

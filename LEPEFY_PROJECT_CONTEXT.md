@@ -14,14 +14,14 @@
 
 L'ordinamento predefinito è `sort=priority` («Priorité opérationnelle»), nell'ordine: Action requise → Préparation en retard → Retrait en retard → En préparation → À expédier → Expéditions en cours → Retraits prêts → Terminées. Gli ordini attivi vanno dal più vecchio, i terminati dal più recente. Restano disponibili `newest`, `oldest`, `amount_desc`, `amount_asc`, e le vecchie chiavi `date_*`/`total_*` sono alias.
 
-`lib/orders/loadOrderWorkQueue.ts` legge una sola volta, in forma leggera, gli ordini attivi del tenant (senza items). Gli eventi tracking si leggono solo per le spedizioni in movimento. Da qui escono i KPI tenant-wide e l'ordinamento, che avviene **prima** della paginazione da 50; i terminati seguono dal DB e le righe complete si leggono solo per la pagina. Oltre 5 000 ordini attivi la lista ripiega sull'ordine per data, con un avviso.
+`lib/orders/loadOrderWorkQueue.ts` legge una sola volta, in forma leggera, gli ordini attivi del tenant (senza items). Gli eventi tracking si leggono solo per le spedizioni in movimento. Da qui escono i KPI tenant-wide e l'ordinamento, che avviene **prima** della paginazione (25/50/100, default 50, `?size=`); i terminati seguono dal DB e le righe complete si leggono solo per la pagina. Oltre 5 000 ordini attivi la lista ripiega sull'ordine per data, con un avviso.
 
 Semantica dei KPI e delle viste:
 - `À traiter`: esclude ritiri in attesa normale e transiti regolari.
 - `Incidents`: solo stati provider `exception`/`returned`/`cancelled` o `shipping_sync_error`.
 - `Urgents`: i primi tre gruppi.
 
-Filtri: un solo sistema, cioè i filtri rapidi più i select Statut/date/Paiement; lo stato è in query string.
+Filtri: un solo sistema (Admin Design System V2, `FilterBar`): viste rapide (Tous/Livraison/Retrait/Urgents/Incidents/Terminés), card KPI e chip « Contrôles » (préparation incomplète, emballage, suivi manquant, paiement à vérifier) come filtri di vista, ricerca istantanea, pannello « Filtres » (statut con conteggi, paiement, période) con chip dei filtri attivi. Lo stato è solo in query string (`lib/orders/orderListParams.ts`), condiviso con `GET /api/admin/orders/export` (CSV della lista filtrata, max 2 000 righe). Selezione multipla → documenti, export della selezione, « Traiter la sélection » con conferma.
 
 Ogni riga separa: stato ordine, modalità, pill `Transport : …` (stato provider persistito), anomalia e CTA.
 - Durate in ore sotto 48 h, poi in giorni.

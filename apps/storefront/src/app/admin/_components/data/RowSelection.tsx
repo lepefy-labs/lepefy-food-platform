@@ -74,7 +74,7 @@ export function BulkBar({ rowIds, noun = 'sélectionnée', nounPlural = 'sélect
   return (
     <div role="region" aria-label="Actions sur la sélection" className={cn(
       'fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 flex flex-wrap items-center gap-2 rounded-xl border border-a-border bg-a-surface px-3 py-2 shadow-xl',
-      'md:inset-x-auto md:bottom-6 md:left-1/2 md:-translate-x-1/2',
+      'md:inset-x-auto md:bottom-6 md:left-1/2 md:w-max md:max-w-[calc(100vw-3rem)] md:-translate-x-1/2 md:flex-nowrap',
     )}>
       <span className="mr-1 text-sm font-semibold text-a-text" aria-live="polite">{ids.length} {ids.length > 1 ? nounPlural : noun}</span>
       <span aria-hidden="true" className="hidden h-5 w-px bg-a-border sm:block" />
