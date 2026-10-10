@@ -81,8 +81,16 @@ function formatAmount(amount: number, currency: string): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(Number(amount || 0));
 }
 
-export async function getEvenementielOverview(tenantId: string, currency: string): Promise<EvenementielOverview> {
+/**
+ * Events workspace dashboard. Requests, quotes, rentals and pending payments
+ * carry customer data: they are read only when the caller has
+ * event_reservations.view (`canViewReservations`), the capability of the pages
+ * they link to; otherwise the overview has events only.
+ */
+export async function getEvenementielOverview(tenantId: string, currency: string, { canViewReservations }: { canViewReservations: boolean }): Promise<EvenementielOverview> {
   const supabase = createServiceClient();
+  const EMPTY = Promise.resolve({ data: [] as unknown[], count: 0 });
+  const reservationsQuery = <T,>(query: PromiseLike<T>) => (canViewReservations ? query : EMPTY) as PromiseLike<T>;
   const now = new Date();
   const nowIso = now.toISOString();
   const today = nowIso.slice(0, 10);
@@ -111,43 +119,43 @@ export async function getEvenementielOverview(tenantId: string, currency: string
       .eq('tenant_id', tenantId)
       .eq('status', 'published')
       .gte('date_start', nowIso),
-    supabase
+    reservationsQuery(supabase
       .from('service_inquiries')
       .select('id, customer_name, date_souhaitee, nombre_invites, status, created_at, service_offerings(title)')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
-      .limit(5),
-    supabase
+      .limit(5)),
+    reservationsQuery(supabase
       .from('service_inquiries')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
-      .eq('status', 'nouveau'),
-    supabase
+      .eq('status', 'nouveau')),
+    reservationsQuery(supabase
       .from('event_reservation_requests')
       .select('id, event_id, customer_name, amount, created_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'pending')
-      .order('created_at', { ascending: true }),
-    supabase
+      .order('created_at', { ascending: true })),
+    reservationsQuery(supabase
       .from('rental_reservation_requests')
       .select('id, customer_name, amount, pickup_date, created_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'pending')
-      .order('created_at', { ascending: true }),
-    supabase
+      .order('created_at', { ascending: true })),
+    reservationsQuery(supabase
       .from('rental_reservations')
       .select('id, customer_name, pickup_date, status')
       .eq('tenant_id', tenantId)
       .eq('status', 'confirmed')
       .gte('pickup_date', today)
       .order('pickup_date', { ascending: true })
-      .limit(5),
-    supabase
+      .limit(5)),
+    reservationsQuery(supabase
       .from('rental_reservations')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
       .eq('status', 'confirmed')
-      .gte('pickup_date', today),
+      .gte('pickup_date', today)),
   ]);
 
   const upcomingEvents = (upcomingEventsResult.data ?? []) as OverviewEvent[];
@@ -157,7 +165,7 @@ export async function getEvenementielOverview(tenantId: string, currency: string
   const upcomingRentalRows = (upcomingRentalsResult.data ?? []) as Omit<OverviewRental, 'items'>[];
 
   const rentalIds = upcomingRentalRows.map((reservation) => reservation.id);
-  const { data: rentalItems } = rentalIds.length > 0
+  const { data: rentalItems } = canViewReservations && rentalIds.length > 0
     ? await supabase
         .from('rental_reservation_items')
         .select('reservation_id, quantity, rental_items(name)')

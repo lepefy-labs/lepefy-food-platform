@@ -33,6 +33,8 @@ test('route prefixes match whole path segments', () => {
   expect(permissionsForAdminPath('/admin/evenementiel/reservations/abc', 'events')).toEqual(['event_reservations.view']);
   // Locations has its own rule (rental reservations: customer data, same capability as its APIs).
   expect(permissionsForAdminPath('/admin/evenementiel/reservations-materiel', 'events')).toEqual(['event_reservations.view']);
+  // Demandes traiteur: customer data, same capability as /api/admin/evenementiel/inquiries.
+  expect(permissionsForAdminPath('/admin/evenementiel/devis', 'events')).toEqual(['event_reservations.view']);
   expect(permissionsForAdminPath('/admin/evenementiel/livraison-materiel', 'events')).toEqual(['event_content.manage']);
   expect(permissionsForAdminPath('/admin/cataloguex', 'shop')).toBeNull();
 });

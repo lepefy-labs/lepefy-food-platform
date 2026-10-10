@@ -26,7 +26,8 @@ const RULES: RoutePermissionRule[] = [
   // rental-reservations APIs it calls.
   { prefix: '/admin/evenementiel/reservations-materiel', permission: 'event_reservations.view' },
   { prefix: '/admin/evenementiel/evenements', permission: 'events.view' },
-  { prefix: '/admin/evenementiel/devis', permission: 'events.view' },
+  // Demandes traiteur (service_inquiries: customer data), same capability as /api/admin/evenementiel/inquiries.
+  { prefix: '/admin/evenementiel/devis', permission: 'event_reservations.view' },
   { prefix: '/admin/evenementiel/livraison-materiel', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/contenu', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/services', permission: 'event_content.manage' },

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { IconCalendarEvent, IconChevronDown, IconPlus, IconScan } from '@tabler/icons-react';
 import { getTenant } from '@/lib/tenant/getTenant';
+import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { getEvenementielOverview } from '@/lib/admin/evenementiel/getEvenementielOverview';
 import { EventActionList, OverviewMetricCard, RecentInquiries, UpcomingRentals } from './_components/OverviewSections';
 
@@ -24,7 +25,10 @@ function formatEventDate(value: string) {
 export default async function AdminEvenementielOverviewPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const overview = await getEvenementielOverview(tenant.id, tenant.currency);
+  const access = await getCurrentAdminAccessContext(tenant.id);
+  // Requests, quotes, rentals and payments are customer data (event_reservations.view).
+  const canViewReservations = Boolean(access && canAdmin(access, 'event_reservations.view'));
+  const overview = await getEvenementielOverview(tenant.id, tenant.currency, { canViewReservations });
   const nextEvent = overview.upcomingEvents[0] ?? null;
   const reserved = nextEvent ? Math.max(0, nextEvent.capacity_total - nextEvent.capacity_remaining) : 0;
   const progress = nextEvent && nextEvent.capacity_total > 0
@@ -106,7 +110,7 @@ export default async function AdminEvenementielOverviewPage() {
         </section>
       )}
 
-      <section className="grid grid-cols-3 gap-2 sm:gap-3">
+      {canViewReservations && <section className="grid grid-cols-3 gap-2 sm:gap-3">
         <OverviewMetricCard
           label="Paiements"
           value={overview.pendingPaymentsCount}
@@ -115,7 +119,7 @@ export default async function AdminEvenementielOverviewPage() {
         />
         <OverviewMetricCard label="Demandes" value={overview.newInquiriesCount} tone={overview.newInquiriesCount > 0 ? 'amber' : 'neutral'} />
         <OverviewMetricCard label="Locations" value={overview.upcomingRentalCount} tone={overview.upcomingRentalCount > 0 ? 'amber' : 'neutral'} />
-      </section>
+      </section>}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,.9fr)]">
         <div className="space-y-4">
@@ -126,10 +130,12 @@ export default async function AdminEvenementielOverviewPage() {
             </Link>
           </div>
         </div>
-        <div className="space-y-4">
-          <RecentInquiries inquiries={overview.recentInquiries} />
-          <UpcomingRentals rentals={overview.upcomingRentals} />
-        </div>
+        {canViewReservations && (
+          <div className="space-y-4">
+            <RecentInquiries inquiries={overview.recentInquiries} />
+            <UpcomingRentals rentals={overview.upcomingRentals} />
+          </div>
+        )}
       </div>
     </div>
   );
