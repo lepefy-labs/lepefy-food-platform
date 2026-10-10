@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   ADMIN_NAV, ADMIN_QUICK_ACTIONS, isNavItemActive, mobileNavItems, navItemsById, resolveAdminNavigation, type AdminNavContext,
 } from '../../src/lib/admin/navigation';
-import { permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
+import { defaultAdminDestination, permissionsForAdminPath } from '../../src/lib/auth/adminRoutePermissions';
 
 const NO_FLAGS = { gestion: false, whatsapp: false };
 const ctx = (patch: Partial<AdminNavContext>): AdminNavContext => ({ workspace: 'shop', permissions: [], isPlatformOwner: false, flags: NO_FLAGS, ...patch });
@@ -12,16 +12,8 @@ test('entry ids are unique', () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-/**
- * Known route-rule bug, kept visible here until the RBAC fix is approved:
- * in adminRoutePermissions the '/admin/evenementiel/reservations' prefix is
- * matched before '/admin/evenementiel/reservations-materiel', so Locations
- * requires event_reservations.view instead of the intended events.view.
- */
-const KNOWN_ROUTE_MISMATCHES = new Set(['rentals']);
-
 test('every capability that shows an entry also opens its page (nav never links to a redirect)', () => {
-  for (const item of ADMIN_NAV.filter((entry) => entry.href.startsWith('/admin') && !KNOWN_ROUTE_MISMATCHES.has(entry.id))) {
+  for (const item of ADMIN_NAV.filter((entry) => entry.href.startsWith('/admin'))) {
     const workspaces = item.workspace === 'all' ? (['shop', 'events'] as const) : [item.workspace];
     for (const workspace of workspaces) {
       const routePermissions = permissionsForAdminPath(item.href, workspace);
@@ -31,10 +23,43 @@ test('every capability that shows an entry also opens its page (nav never links 
       }
     }
   }
-  expect(permissionsForAdminPath('/admin/evenementiel/reservations-materiel', 'events'), 'route bug fixed: remove KNOWN_ROUTE_MISMATCHES').toEqual(['event_reservations.view']);
   for (const action of ADMIN_QUICK_ACTIONS) {
     expect(permissionsForAdminPath(action.href.split('?')[0] ?? action.href, 'shop'), action.id).not.toBeNull();
   }
+});
+
+test('route prefixes match whole path segments', () => {
+  expect(permissionsForAdminPath('/admin/evenementiel/reservations', 'events')).toEqual(['event_reservations.view']);
+  expect(permissionsForAdminPath('/admin/evenementiel/reservations/abc', 'events')).toEqual(['event_reservations.view']);
+  // Locations has its own rule (rental reservations: customer data, same capability as its APIs).
+  expect(permissionsForAdminPath('/admin/evenementiel/reservations-materiel', 'events')).toEqual(['event_reservations.view']);
+  expect(permissionsForAdminPath('/admin/evenementiel/livraison-materiel', 'events')).toEqual(['event_content.manage']);
+  expect(permissionsForAdminPath('/admin/cataloguex', 'shop')).toBeNull();
+});
+
+const SINGLE_PERMISSIONS = [...new Set([
+  ...ADMIN_NAV.flatMap((item) => item.anyOf),
+  'orders.view', 'catalog.view', 'customers.view', 'reviews.view', 'loyalty.scan', 'shipping.view', 'billing.view', 'ai_usage.view',
+  'events.view', 'event_reservations.view', 'event_payments.view', 'event_content.manage', 'scan.access', 'platform.access',
+])];
+
+test('the default destination always opens for the same permissions (no redirect loop)', () => {
+  for (const workspace of ['shop', 'events'] as const) {
+    for (const permission of SINGLE_PERMISSIONS) {
+      const destination = defaultAdminDestination([permission], workspace);
+      if (!destination || !destination.startsWith('/admin')) continue;
+      const required = permissionsForAdminPath(destination, workspace);
+      expect(required?.includes(permission), `${workspace} ${permission} -> ${destination} requires ${required}`).toBe(true);
+    }
+  }
+  // Payments-only role: no page opens with event_payments.view alone, so no admin landing page.
+  expect(defaultAdminDestination(['event_payments.view'], 'events')).toBeNull();
+  expect(defaultAdminDestination(['event_payments.view', 'scan.access'], 'events')).toBe('/scan');
+  expect(defaultAdminDestination(['event_reservations.view'], 'events')).toBe('/admin/evenementiel/reservations');
+  expect(defaultAdminDestination(['events.view'], 'events')).toBe('/admin');
+  expect(defaultAdminDestination(['catalog.view'], 'shop')).toBe('/admin/catalogue');
+  expect(defaultAdminDestination(['*'], 'shop')).toBe('/admin');
+  expect(defaultAdminDestination(['platform.access'], 'shop')).toBe('/admin/platform');
 });
 
 test('full shop admin sees the shop and common entries, flagged modules only with their flag', () => {

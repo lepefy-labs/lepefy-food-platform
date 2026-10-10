@@ -22,9 +22,11 @@ const RULES: RoutePermissionRule[] = [
   { prefix: '/admin/team', permission: 'platform.users.manage' },
   { prefix: '/admin/evenementiel/paiements-en-attente', permission: 'event_payments.view' },
   { prefix: '/admin/evenementiel/reservations', permission: 'event_reservations.view' },
+  // Locations: rental reservations and requests (customer data), same capability as the
+  // rental-reservations APIs it calls.
+  { prefix: '/admin/evenementiel/reservations-materiel', permission: 'event_reservations.view' },
   { prefix: '/admin/evenementiel/evenements', permission: 'events.view' },
   { prefix: '/admin/evenementiel/devis', permission: 'events.view' },
-  { prefix: '/admin/evenementiel/reservations-materiel', permission: 'events.view' },
   { prefix: '/admin/evenementiel/livraison-materiel', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/contenu', permission: 'event_content.manage' },
   { prefix: '/admin/evenementiel/services', permission: 'event_content.manage' },
@@ -60,8 +62,14 @@ export function isPersonalAdminPath(pathname: string): boolean {
   return pathname.startsWith('/admin/securite');
 }
 
+// A prefix matches whole path segments only: `/admin/evenementiel/reservations`
+// must not capture `/admin/evenementiel/reservations-materiel`.
+function matchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 function ruleForAdminPath(pathname: string): RoutePermissionRule | undefined {
-  return RULES.find((candidate) => candidate.exact ? pathname === candidate.prefix : pathname.startsWith(candidate.prefix));
+  return RULES.find((candidate) => candidate.exact ? pathname === candidate.prefix : matchesPrefix(pathname, candidate.prefix));
 }
 
 export function permissionForAdminPath(pathname: string, workspace: AdminWorkspace): string | null {
@@ -76,25 +84,21 @@ export function permissionsForAdminPath(pathname: string, workspace: AdminWorksp
   return rule ? [rule.permission, ...(rule.anyOf ?? [])] : null;
 }
 
+// Landing pages in order of preference. A candidate is used only when the
+// permissions really open it (same rules as the layout guard), so the layout
+// redirect can never point to a page that redirects again.
+const LANDING_PAGES: Record<AdminWorkspace, string[]> = {
+  events: ['/admin', '/admin/evenementiel/reservations', '/admin/evenementiel/contenu'],
+  shop: ['/admin', '/admin/catalogue', '/admin/clients', '/admin/avis', '/admin/loyalty/scan', '/admin/livraison', '/admin/billing', '/admin/ai-usage'],
+};
+
 export function defaultAdminDestination(permissions: string[], workspace: AdminWorkspace): string | null {
   const has = (permission: string) => permissions.includes('*') || permissions.includes(permission);
-  if (workspace === 'events') {
-    if (has('events.view')) return '/admin';
-    if (has('event_reservations.view')) return '/admin/evenementiel/reservations';
-    if (has('event_payments.view')) return '/admin/evenementiel/reservations';
-    if (has('event_content.manage')) return '/admin/evenementiel/contenu';
-    if (has('scan.access')) return '/scan';
-  } else {
-    if (has('orders.view')) return '/admin';
-    if (has('catalog.view')) return '/admin/catalogue';
-    if (has('customers.view')) return '/admin/clients';
-    if (has('reviews.view')) return '/admin/avis';
-    if (has('loyalty.scan')) return '/admin/loyalty/scan';
-    if (has('shipping.view')) return '/admin/livraison';
-    if (has('billing.view')) return '/admin/billing';
-    if (has('ai_usage.view')) return '/admin/ai-usage';
-  }
-  if (has('platform.access')) return '/admin/platform';
+  const opens = (path: string, pathWorkspace: AdminWorkspace) => (permissionsForAdminPath(path, pathWorkspace) ?? []).some(has);
+  const page = LANDING_PAGES[workspace].find((path) => opens(path, workspace));
+  if (page) return page;
+  if (workspace === 'events' && has('scan.access')) return '/scan';
+  if (opens('/admin/platform', workspace)) return '/admin/platform';
   if (has('scan.access')) return '/scan';
   return null;
 }
