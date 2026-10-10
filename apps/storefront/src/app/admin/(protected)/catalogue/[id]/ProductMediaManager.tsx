@@ -232,9 +232,9 @@ export default function ProductMediaManager({
 
   if (isNew) {
     return (
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Médias</h2>
-        <p className="text-xs text-gray-400">
+      <section className="rounded-xl border border-a-border bg-a-surface p-5">
+        <h2 className="mb-2 text-sm font-semibold text-a-text-2">Médias</h2>
+        <p className="text-xs text-a-text-3">
           Enregistrez d’abord le produit pour ajouter sa galerie d’images.
         </p>
       </section>
@@ -243,11 +243,11 @@ export default function ProductMediaManager({
 
   return (
     <>
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
+      <section className="rounded-xl border border-a-border bg-a-surface p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-gray-700">Médias</h2>
-            <p className="mt-1 text-xs text-gray-400">
+            <h2 className="text-sm font-semibold text-a-text-2">Médias</h2>
+            <p className="mt-1 text-xs text-a-text-3">
               {images.length} / {MAX_PRODUCT_IMAGES} images · la première est utilisée comme couverture
             </p>
           </div>
@@ -269,7 +269,7 @@ export default function ProductMediaManager({
             {images.map((image, index) => (
               <div
                 key={image.url}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100"
+                className="group relative aspect-square overflow-hidden rounded-lg border border-a-border bg-a-hover"
               >
                 <Image
                   src={image.url}
@@ -279,7 +279,7 @@ export default function ProductMediaManager({
                   sizes="(max-width: 640px) 45vw, 180px"
                 />
                 {index === 0 && (
-                  <span className="absolute left-2 top-2 rounded-full bg-white/95 px-2 py-1 text-[11px] font-semibold text-gray-800 shadow-sm">
+                  <span className="absolute left-2 top-2 rounded-full bg-a-surface px-2 py-1 text-xs font-semibold text-a-text shadow-sm">
                     Principale
                   </span>
                 )}
@@ -292,7 +292,7 @@ export default function ProductMediaManager({
                         index === 1 ? 'Image définie comme principale' : 'Ordre mis à jour',
                       )}
                       disabled={isSavingOrder}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/95 text-gray-700 shadow-sm transition-colors hover:text-[var(--color-primary)] disabled:opacity-50"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-a-surface text-a-text-2 shadow-sm transition-colors hover:text-a-brand-fg disabled:opacity-50"
                       aria-label={index === 1 ? 'Définir comme image principale' : 'Déplacer vers la gauche'}
                     >
                       {index === 1 ? <IconStar size={17} aria-hidden="true" /> : <IconArrowLeft size={17} aria-hidden="true" />}
@@ -306,7 +306,7 @@ export default function ProductMediaManager({
                         'Ordre mis à jour',
                       )}
                       disabled={isSavingOrder}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/95 text-gray-700 shadow-sm transition-colors hover:text-[var(--color-primary)] disabled:opacity-50"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-a-surface text-a-text-2 shadow-sm transition-colors hover:text-a-brand-fg disabled:opacity-50"
                       aria-label="Déplacer vers la droite"
                     >
                       <IconArrowRight size={17} aria-hidden="true" />
@@ -316,7 +316,7 @@ export default function ProductMediaManager({
                     type="button"
                     onClick={() => setPendingDelete(image)}
                     disabled={isSavingOrder}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/95 text-red-500 shadow-sm transition-colors hover:bg-red-50 disabled:opacity-50"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-a-surface text-tone-danger-fg shadow-sm transition-colors hover:bg-tone-danger-bg disabled:opacity-50"
                     aria-label={'Supprimer l’image ' + (index + 1)}
                   >
                     <IconTrash size={17} aria-hidden="true" />
@@ -326,7 +326,7 @@ export default function ProductMediaManager({
             ))}
           </div>
         ) : (
-          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-lg bg-gray-100 text-gray-400">
+          <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-lg bg-a-hover text-a-text-3">
             <IconPhoto size={32} aria-hidden="true" />
             <span className="text-xs">Aucune image</span>
           </div>
@@ -334,12 +334,12 @@ export default function ProductMediaManager({
 
         {remaining > 0 && (
           <>
-            <label className="mb-2 mt-4 flex cursor-pointer items-center gap-2 text-xs text-gray-500">
+            <label className="mb-2 mt-4 flex cursor-pointer items-center gap-2 text-xs text-a-text-3">
               <input
                 type="checkbox"
                 checked={removeBackground}
                 onChange={(event) => setRemoveBackground(event.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-a-border-strong"
               />
               Supprimer le fond automatiquement (IA)
             </label>
@@ -359,19 +359,19 @@ export default function ProductMediaManager({
               className={
                 'cursor-pointer rounded-lg border-2 border-dashed p-4 text-center transition-colors ' +
                 (isDragging
-                  ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
-                  : 'border-gray-200 hover:border-gray-300')
+                  ? 'border-a-brand bg-a-brand-soft'
+                  : 'border-a-border hover:border-a-border-strong')
               }
             >
-              <IconUpload size={20} className="mx-auto mb-1 text-gray-400" aria-hidden="true" />
-              <p className="text-xs text-gray-500">
+              <IconUpload size={20} className="mx-auto mb-1 text-a-text-3" aria-hidden="true" />
+              <p className="text-xs text-a-text-3">
                 {isUploading && uploadProgress
                   ? uploadProgress.current === 0
                     ? 'Optimisation des images…'
                     : 'Téléversement ' + uploadProgress.current + ' / ' + uploadProgress.total + '…'
                   : 'Glisser une ou plusieurs images ici'}
               </p>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-a-text-3">
                 ou cliquer pour parcourir · {remaining} emplacement(s) disponible(s)
               </span>
             </div>
@@ -401,7 +401,7 @@ export default function ProductMediaManager({
               {!isGenerating && <IconSparkles size={16} aria-hidden="true" />}
               Générer avec l’IA
             </Button>
-            <p className="mt-2 text-center text-xs text-gray-400">
+            <p className="mt-2 text-center text-xs text-a-text-3">
               L’image générée devient la couverture de la galerie
             </p>
           </>

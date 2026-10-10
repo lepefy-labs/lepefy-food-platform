@@ -7,19 +7,11 @@ import { assignBarcodeToProduct } from '@/lib/barcode';
 
 import { parseCompareAtPrice, parseCatalogPosition } from '@/lib/catalog/productMerchandising';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
-import { applyCatalogueStatus, CATALOGUE_STATUS_OPTIONS, parseCatalogueState } from '@/lib/catalog/catalogueFilters';
+import { parseCatalogueState } from '@/lib/catalog/catalogueFilters';
+import { loadCatalogueList } from '@/lib/catalog/catalogueList';
 
 export const runtime = 'nodejs';
 
-const SORT_MAP: Record<string, { column: string; ascending: boolean }> = {
-  position_asc: { column: 'position', ascending: true },
-  name_asc: { column: 'name', ascending: true },
-  name_desc: { column: 'name', ascending: false },
-  price_asc: { column: 'price', ascending: true },
-  price_desc: { column: 'price', ascending: false },
-  stock_asc: { column: 'stock', ascending: true },
-  stock_desc: { column: 'stock', ascending: false },
-};
 
 function cleanNutrition(raw: unknown): Record<string, number> | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -44,65 +36,12 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   const params = req.nextUrl.searchParams;
-  const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1);
   const limit = Math.min(100, Math.max(10, Number.parseInt(params.get('limit') ?? '25', 10) || 25));
-  const q = (params.get('q') ?? '').trim();
-  const categorySlug = (params.get('category') ?? '').trim();
-  const status = parseCatalogueState(params).status;
-  const requestedSort = params.get('sort') ?? 'position_asc';
-  const sort = SORT_MAP[requestedSort] ?? { column: 'position', ascending: true };
-  const supabase = createServiceClient();
-
-  let categoryId: string | null = null;
-  if (categorySlug) {
-    const { data: category } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('tenant_id', tenant.id)
-      .eq('slug', categorySlug)
-      .maybeSingle();
-    categoryId = category?.id ?? '__missing__';
+  try {
+    return NextResponse.json(await loadCatalogueList(createServiceClient(), tenant.id, parseCatalogueState(params), limit));
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erreur de chargement' }, { status: 500 });
   }
-
-  let query = supabase
-    .from('products')
-    .select(`
-      id, name, slug, price, stock, active, weight_grams, category_id,
-      image_url, storage_type, warehouse_location, description_source,
-      barcode_value, categories(name, slug)
-    `, { count: 'exact' })
-    .eq('tenant_id', tenant.id);
-
-  if (categoryId) query = query.eq('category_id', categoryId);
-  if (q) {
-    const safe = q.replace(/[%_,]/g, ' ').trim();
-    query = query.or(`name.ilike.%${safe}%,slug.ilike.%${safe}%,barcode_value.ilike.%${safe}%`);
-  }
-
-  query = applyCatalogueStatus(query, status);
-
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-  // Counters cover the whole tenant catalogue (not the current page), one
-  // count(head) per status; search and category do not narrow them.
-  const countFor = (key: (typeof CATALOGUE_STATUS_OPTIONS)[number]['key']) =>
-    applyCatalogueStatus(supabase.from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id), key);
-  const [{ data, count, error }, ...countResults] = await Promise.all([
-    query.order(sort.column, { ascending: sort.ascending }).order('id', { ascending: true }).range(from, to),
-    ...CATALOGUE_STATUS_OPTIONS.map((option) => countFor(option.key)),
-  ]);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    products: data ?? [],
-    total: count ?? 0,
-    page,
-    limit,
-    counts: Object.fromEntries(CATALOGUE_STATUS_OPTIONS.map((option, index) => [option.key, countResults[index]?.error ? null : countResults[index]?.count ?? 0])),
-  });
 }
 
 async function handlePOST(req: NextRequest) {

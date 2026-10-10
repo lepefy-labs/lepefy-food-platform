@@ -16,8 +16,8 @@ interface Group {
 interface ProductOption { id: string; name: string; active: boolean }
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 function validQuantitiesPreview(min: number, step: number): string {
   return Array.from({ length: 5 }, (_, i) => min + i * step).join(' · ');
@@ -125,13 +125,13 @@ export default function QuantityGroupsClient({ products }: { products: ProductOp
   return (
     <div className="space-y-6">
       {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-lg ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+        <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-lg ${toast.type === 'success' ? 'bg-tone-success-solid' : 'bg-tone-danger-solid'}`}>
           {toast.msg}
         </div>
       )}
 
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Nouveau groupe</h2>
+      <section className="bg-a-surface rounded-xl border border-a-border p-5">
+        <h2 className="text-sm font-semibold text-a-text-2 mb-4">Nouveau groupe</h2>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
           <div className="sm:col-span-2">
             <label className={LABEL_CLS}>Nom</label>
@@ -149,16 +149,16 @@ export default function QuantityGroupsClient({ products }: { products: ProductOp
         <button
           onClick={createGroup}
           disabled={creating}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-a-brand px-4 py-2 text-sm font-semibold text-a-on-brand disabled:opacity-50"
         >
           <IconPlus size={16} /> Créer le groupe
         </button>
       </section>
 
       {loading ? (
-        <div className="h-40 animate-pulse rounded-xl bg-gray-50" />
+        <div className="h-40 animate-pulse rounded-xl bg-a-surface-2" />
       ) : groups.length === 0 ? (
-        <p className="text-sm text-gray-400">Aucun groupe pour le moment.</p>
+        <p className="text-sm text-a-text-3">Aucun groupe pour le moment.</p>
       ) : (
         groups.map((group) => (
           <GroupCard
@@ -208,7 +208,7 @@ function GroupCard({
     : [];
 
   return (
-    <section className={`bg-white rounded-xl border p-5 ${group.active ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}>
+    <section className={`bg-a-surface rounded-xl border p-5 ${group.active ? 'border-a-border' : 'border-a-border opacity-60'}`}>
       <div className="flex flex-col sm:flex-row sm:items-end gap-4">
         <div className="flex-1">
           <label className={LABEL_CLS}>Nom</label>
@@ -226,10 +226,10 @@ function GroupCard({
           <button
             type="button"
             onClick={() => onPatch({ active: !group.active })}
-            className={`relative w-10 h-6 rounded-full transition-colors ${group.active ? 'bg-[var(--color-primary)]' : 'bg-gray-200'}`}
+            className={`relative w-10 h-6 rounded-full transition-colors ${group.active ? 'bg-a-brand' : 'bg-a-border'}`}
             aria-label="Activer le groupe"
           >
-            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${group.active ? 'right-1' : 'left-1'}`} />
+            <span className={`absolute top-1 w-4 h-4 bg-a-surface rounded-full transition-all ${group.active ? 'right-1' : 'left-1'}`} />
           </button>
           {dirty && (
             <button
@@ -238,18 +238,18 @@ function GroupCard({
                 if (![Number(minQuantity), Number(quantityStep)].every((value) => Number.isInteger(value) && value >= 1)) return;
                 onPatch({ name, min_quantity: Number(minQuantity), quantity_step: Number(quantityStep) });
               }}
-              className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white"
+              className="rounded-lg bg-a-brand px-3 py-2 text-xs font-semibold text-a-on-brand"
             >
               Enregistrer
             </button>
           )}
-          <button type="button" onClick={onDelete} aria-label="Supprimer le groupe" className="rounded-lg border border-gray-200 p-2 text-gray-400 hover:text-red-600 hover:border-red-200">
+          <button type="button" onClick={onDelete} aria-label="Supprimer le groupe" className="rounded-lg border border-a-border p-2 text-a-text-3 hover:text-tone-danger-fg hover:border-tone-danger-border">
             <IconTrash size={16} />
           </button>
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-a-text-3">
         Quantités valides : {validQuantitiesPreview(Number(minQuantity) || 1, Number(quantityStep) || 1)}...
         <span className="ml-2">Première quantité : {minQuantity || '1'} · puis +{quantityStep || '1'}</span>
       </p>
@@ -258,14 +258,14 @@ function GroupCard({
         <label className={LABEL_CLS}>Produits membres ({group.products.length})</label>
         <div className="flex flex-wrap gap-2 mb-3">
           {group.products.map((p) => (
-            <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 pl-3 pr-1.5 py-1 text-xs font-medium text-gray-700">
+            <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-a-hover pl-3 pr-1.5 py-1 text-xs font-medium text-a-text-2">
               {p.name}
-              <button type="button" onClick={() => onRemoveProduct(p.id)} aria-label={`Retirer ${p.name}`} className="rounded-full p-0.5 hover:bg-gray-200">
+              <button type="button" onClick={() => onRemoveProduct(p.id)} aria-label={`Retirer ${p.name}`} className="rounded-full p-0.5 hover:bg-a-border">
                 <IconX size={12} />
               </button>
             </span>
           ))}
-          {group.products.length === 0 && <span className="text-xs text-gray-400">Aucun produit associé.</span>}
+          {group.products.length === 0 && <span className="text-xs text-a-text-3">Aucun produit associé.</span>}
         </div>
         <div className="relative max-w-sm">
           <input
@@ -276,16 +276,16 @@ function GroupCard({
             className={INPUT_CLS}
           />
           {candidates.length > 0 && (
-            <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto">
+            <div className="absolute z-10 mt-1 w-full rounded-lg border border-a-border bg-a-surface shadow-lg max-h-56 overflow-y-auto">
               {candidates.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => { onAddProduct(p.id); setSearch(''); }}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-a-surface-2"
                 >
                   <span>{p.name}</span>
-                  {!p.active && <span className="text-xs text-gray-400">inactif</span>}
+                  {!p.active && <span className="text-xs text-a-text-3">inactif</span>}
                 </button>
               ))}
             </div>

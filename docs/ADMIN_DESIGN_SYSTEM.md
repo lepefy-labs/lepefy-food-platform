@@ -117,5 +117,6 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U5 | Commandes: lista sul kit (FilterBar, DataTable a gruppi di priorità, BulkBar con conferma, Pagination 25/50/100), Contrôles cliccabili, export CSV della lista filtrata, `loading.tsx` del gruppo protetto | ✅ |
 | U6 | Livraison: classi legacy convertite ai token (codemod), token « inverse » | ✅ |
 | U7 | Clients: lista sul kit (segmenti come viste, KPI con icone, pannello filtri con numeri/date, DataTable con card mobile, Pagination), export con lo stesso ordinamento della lista; componenti condivisi residui sui token | ✅ |
-| U8–U11 | Catalogue, Gestion, Événementiel, altri moduli | — |
+| U8 | Catalogue: lista convertita a Server Component + URL (`lib/catalog/catalogueList.ts` condiviso con `GET /api/admin/catalogue`), isola client per stock/statut inline e azioni massive con esito per prodotto; editor, media, categorie, gruppi di quantità ed etichette sui token | ✅ |
+| U9–U11 | Gestion, Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |

@@ -124,9 +124,9 @@ interface FormState {
 }
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
-const SECTION_TITLE_CLS = 'text-sm font-semibold text-gray-700 mb-4';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+const SECTION_TITLE_CLS = 'text-sm font-semibold text-a-text-2 mb-4';
 
 const NUTRITION_FIELDS: { key: keyof NutritionInfo; label: string }[] = [
   { key: 'kcal',             label: 'Énergie (kcal)' },
@@ -484,16 +484,16 @@ export default function ProductEditClient({
       {unsavedGuard}
       <div className={canManage ? 'pb-24' : ''}>
         {!canManage && (
-          <p role="status" className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          <p role="status" className="mb-4 rounded-xl border border-a-border bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
             <strong>Lecture seule.</strong> La modification du catalogue nécessite le droit « catalogue : gérer ».
           </p>
         )}
         {!isNew && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-gray-400">slug : <span className="font-mono">{product.slug}</span></p>
+            <p className="text-sm text-a-text-3">slug : <span className="font-mono">{product.slug}</span></p>
             <Link
               href={`/admin/products/${product.id}/etichetta`}
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-a-border px-4 text-sm font-medium text-a-text-2 transition-colors hover:bg-a-surface-2"
             >
               <IconTag size={16} aria-hidden="true" />
               Étiquette
@@ -501,13 +501,13 @@ export default function ProductEditClient({
           </div>
         )}
 
-        <div className="flex items-center gap-1 border-b border-gray-200 mb-5">
+        <div className="flex items-center gap-1 border-b border-a-border mb-5">
           <button
             onClick={() => setActiveTab('generale')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'generale'
-                ? 'border-[var(--color-primary)] text-gray-900'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
+                ? 'border-a-brand text-a-text'
+                : 'border-transparent text-a-text-3 hover:text-a-text-2'
             }`}
           >
             Général
@@ -516,8 +516,8 @@ export default function ProductEditClient({
             onClick={() => setActiveTab('etichetta')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'etichetta'
-                ? 'border-[var(--color-primary)] text-gray-900'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
+                ? 'border-a-brand text-a-text'
+                : 'border-transparent text-a-text-3 hover:text-a-text-2'
             }`}
           >
             Étiquette
@@ -527,8 +527,8 @@ export default function ProductEditClient({
               onClick={() => setActiveTab('associations')}
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === 'associations'
-                  ? 'border-[var(--color-primary)] text-gray-900'
-                  : 'border-transparent text-gray-400 hover:text-gray-600'
+                  ? 'border-a-brand text-a-text'
+                  : 'border-transparent text-a-text-3 hover:text-a-text-2'
               }`}
             >
               Produits associés
@@ -543,7 +543,7 @@ export default function ProductEditClient({
           style={{ display: activeTab === 'generale' ? 'grid' : 'none' }}
         >
           <div className="space-y-5">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h2 className={SECTION_TITLE_CLS}>Informations</h2>
               <div className="space-y-4">
                 <div>
@@ -585,18 +585,18 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className={SECTION_TITLE_CLS.replace('mb-4', '')}>Descriptions</h2>
                 {formData.descriptionSource === 'ai' && (
                   <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-tone-warning-bg text-tone-warning-fg font-medium">
                       IA — à revoir
                     </span>
                     <button
                       type="button"
                       onClick={() => setField('descriptionSource', 'human')}
-                      className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-gray-200 px-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                      className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-a-border px-2.5 text-xs font-semibold text-a-text-2 hover:bg-a-surface-2"
                     >
                       <IconCheck size={14} aria-hidden="true" /> Marquer comme relue
                     </button>
@@ -629,18 +629,18 @@ export default function ProductEditClient({
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h2 className={SECTION_TITLE_CLS}>Tarification &amp; Logistique</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label htmlFor="compare-at-price" className={LABEL_CLS}>Prix avant remise (€)</label>
                   <input id="compare-at-price" type="number" step="0.01" min="0" value={formData.compare_at_price} onChange={(e) => setField('compare_at_price', e.target.value)} className={INPUT_CLS} />
-                  <p className="text-xs text-gray-500 mt-1">Laisser vide sans remise. Doit dépasser le prix de vente.</p>
+                  <p className="text-xs text-a-text-3 mt-1">Laisser vide sans remise. Doit dépasser le prix de vente.</p>
                 </div>
                 <div>
                   <label htmlFor="catalog-position" className={LABEL_CLS}>Position catalogue</label>
                   <input id="catalog-position" type="number" step="1" value={formData.position} onChange={(e) => setField('position', e.target.value)} className={INPUT_CLS} />
-                  <p className="text-xs text-gray-500 mt-1">Une position négative donne priorité au classement recommandé, si le produit est en stock.</p>
+                  <p className="text-xs text-a-text-3 mt-1">Une position négative donne priorité au classement recommandé, si le produit est en stock.</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
@@ -665,10 +665,10 @@ export default function ProductEditClient({
                     value={formData.weight_grams}
                     onChange={(e) => setField('weight_grams', e.target.value)}
                     aria-describedby={missingWeight ? 'product-weight-hint' : undefined}
-                    className={`${INPUT_CLS} ${missingWeight ? 'border-amber-300 bg-amber-50' : ''}`}
+                    className={`${INPUT_CLS} ${missingWeight ? 'border-tone-warning-border bg-tone-warning-bg' : ''}`}
                   />
                   {missingWeight && (
-                    <p id="product-weight-hint" className="mt-1 flex items-start gap-1 text-xs font-medium text-amber-800">
+                    <p id="product-weight-hint" className="mt-1 flex items-start gap-1 text-xs font-medium text-tone-warning-fg">
                       <IconAlertTriangle size={13} aria-hidden="true" className="mt-px shrink-0" />
                       Requis pour les frais de livraison et le carton suggéré.
                     </p>
@@ -688,18 +688,18 @@ export default function ProductEditClient({
             </section>
 
             {!isNew && (
-              <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <section className="bg-a-surface rounded-xl border border-a-border p-5">
                 <h2 className={SECTION_TITLE_CLS}>Code-barres</h2>
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     {displayBarcode ? (
-                      <p className="font-mono text-sm text-gray-800">
+                      <p className="font-mono text-sm text-a-text">
                         {formatBarcodeDisplay(displayBarcode)}
                       </p>
                     ) : (
-                      <p className="text-sm text-gray-400">Aucun code-barres généré</p>
+                      <p className="text-sm text-a-text-3">Aucun code-barres généré</p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-a-text-3 mt-1">
                       Généré automatiquement en interne — jamais un vrai code GS1 fabricant.
                     </p>
                   </div>
@@ -739,12 +739,12 @@ export default function ProductEditClient({
               onToast={showToast}
             />
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h2 className={SECTION_TITLE_CLS}>Statut</h2>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
+              <div className="flex items-center justify-between py-2 border-b border-a-border">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Actif</p>
-                  <p className="text-xs text-gray-400">Visible en boutique</p>
+                  <p className="text-sm font-medium text-a-text">Actif</p>
+                  <p className="text-xs text-a-text-3">Visible en boutique</p>
                 </div>
                 <button
                   type="button"
@@ -752,12 +752,12 @@ export default function ProductEditClient({
                   aria-checked={formData.active}
                   onClick={() => setField('active', !formData.active)}
                   className={`relative w-10 h-6 rounded-full transition-colors ${
-                    formData.active ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
+                    formData.active ? 'bg-a-brand' : 'bg-a-border'
                   }`}
                   aria-label="Produit actif (visible en boutique)"
                 >
                   <span
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                    className={`absolute top-1 w-4 h-4 bg-a-surface rounded-full transition-all ${
                       formData.active ? 'right-1' : 'left-1'
                     }`}
                   />
@@ -765,8 +765,8 @@ export default function ProductEditClient({
               </div>
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">En vedette</p>
-                  <p className="text-xs text-gray-400">Affiché en homepage</p>
+                  <p className="text-sm font-medium text-a-text">En vedette</p>
+                  <p className="text-xs text-a-text-3">Affiché en homepage</p>
                 </div>
                 <button
                   type="button"
@@ -774,12 +774,12 @@ export default function ProductEditClient({
                   aria-checked={formData.featured}
                   onClick={() => setField('featured', !formData.featured)}
                   className={`relative w-10 h-6 rounded-full transition-colors ${
-                    formData.featured ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
+                    formData.featured ? 'bg-a-brand' : 'bg-a-border'
                   }`}
                   aria-label="Produit en vedette (homepage)"
                 >
                   <span
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                    className={`absolute top-1 w-4 h-4 bg-a-surface rounded-full transition-all ${
                       formData.featured ? 'right-1' : 'left-1'
                     }`}
                   />
@@ -787,7 +787,7 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h2 className={SECTION_TITLE_CLS}>Stock</h2>
               <div>
                 <label htmlFor="product-stock" className={LABEL_CLS}>Quantité disponible</label>
@@ -799,11 +799,11 @@ export default function ProductEditClient({
                   onChange={(e) => setField('stock', e.target.value)}
                   className={INPUT_CLS}
                 />
-                {!isNew && <p className="mt-1 text-xs text-gray-400">Enregistré seulement si vous le modifiez : les ventes en cours ne sont pas écrasées.</p>}
+                {!isNew && <p className="mt-1 text-xs text-a-text-3">Enregistré seulement si vous le modifiez : les ventes en cours ne sont pas écrasées.</p>}
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h2 className={SECTION_TITLE_CLS}>Règles de vente</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -829,7 +829,7 @@ export default function ProductEditClient({
                   />
                 </div>
               </div>
-              <p className="mt-3 text-xs text-gray-400">
+              <p className="mt-3 text-xs text-a-text-3">
                 Quantités autorisées : {(() => {
                   const min = Math.max(1, parseInt(formData.min_order_quantity, 10) || 1);
                   const step = Math.max(1, parseInt(formData.order_quantity_step, 10) || 1);
@@ -841,14 +841,14 @@ export default function ProductEditClient({
                 const minimum = Number(formData.min_order_quantity);
                 const step = Number(formData.order_quantity_step);
                 if (!Number.isInteger(minimum) || minimum < 1 || !Number.isInteger(step) || step < 1) {
-                  return <p role="alert" className="mt-2 text-xs font-semibold text-red-700">Saisissez un minimum et un incrément valides.</p>;
+                  return <p role="alert" className="mt-2 text-xs font-semibold text-tone-danger-fg">Saisissez un minimum et un incrément valides.</p>;
                 }
                 const max = getMaximumValidQuantity(stock, minimum, step);
                 if (stock > 0 && max === 0) {
-                  return <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">Attention : le stock disponible ne permet pas d’atteindre le minimum de vente.</p>;
+                  return <p role="alert" className="mt-2 text-xs font-semibold text-tone-warning-fg">Attention : le stock disponible ne permet pas d’atteindre le minimum de vente.</p>;
                 }
                 if (stock > max && max > 0) {
-                  return <p className="mt-2 text-xs font-medium text-amber-700">Stock : {stock} · Quantité maximale achetable : {max}.</p>;
+                  return <p className="mt-2 text-xs font-medium text-tone-warning-fg">Stock : {stock} · Quantité maximale achetable : {max}.</p>;
                 }
                 return null;
               })()}
@@ -867,7 +867,7 @@ export default function ProductEditClient({
           style={{ display: activeTab === 'etichetta' ? 'grid' : 'none' }}
         >
           <div className="space-y-5">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Traduction du nom</h3>
               <div>
                 <label className={LABEL_CLS}>Nome in italiano / traduzione</label>
@@ -881,7 +881,7 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Producteur et importateur</h3>
               <div className="space-y-4">
                 <div>
@@ -913,7 +913,7 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Ingrédients et allergènes</h3>
               <div className="space-y-4">
                 <div>
@@ -935,23 +935,23 @@ export default function ProductEditClient({
                   />
                 </div>
                 <div>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-2 text-sm text-a-text-2">
                     <input
                       type="checkbox"
                       checked={formData.gluten_free_certified}
                       onChange={(e) => setField('gluten_free_certified', e.target.checked)}
-                      className="accent-[var(--color-primary)]"
+                      className="accent-[var(--admin-primary)]"
                     />
                     Certifié sans gluten (nécessite analyse/certification)
                   </label>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-a-text-3 mt-1">
                     Activez uniquement si une certification ou une analyse de laboratoire existe. Ne vous basez pas sur le fait que les ingrédients soient naturellement sans gluten — risque de contamination croisée.
                   </p>
                 </div>
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Instructions</h3>
               <div className="space-y-4">
                 <div>
@@ -984,7 +984,7 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Origine et conformité</h3>
               <div className="space-y-4">
                 <div>
@@ -999,23 +999,23 @@ export default function ProductEditClient({
                 <div>
                   <label className={LABEL_CLS}>Type de durabilité</label>
                   <div className="space-y-1.5 mt-1">
-                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <label className="flex items-center gap-2 text-sm text-a-text-2">
                       <input
                         type="radio"
                         name="durability_type"
                         checked={formData.durability_type === 'best_before'}
                         onChange={() => setField('durability_type', 'best_before')}
-                        className="accent-[var(--color-primary)]"
+                        className="accent-[var(--admin-primary)]"
                       />
                       DLUO — à consommer de préférence avant le
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <label className="flex items-center gap-2 text-sm text-a-text-2">
                       <input
                         type="radio"
                         name="durability_type"
                         checked={formData.durability_type === 'use_by'}
                         onChange={() => setField('durability_type', 'use_by')}
-                        className="accent-[var(--color-primary)]"
+                        className="accent-[var(--admin-primary)]"
                       />
                       DLC — à consommer jusqu&apos;au
                     </label>
@@ -1060,28 +1060,28 @@ export default function ProductEditClient({
           </div>
 
           <div className="space-y-5">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Valeurs nutritionnelles</h3>
               <div className="mb-4">
                 <label className={LABEL_CLS}>Base</label>
                 <div className="flex items-center gap-4 mt-1">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-2 text-sm text-a-text-2">
                     <input
                       type="radio"
                       name="nutrition_basis"
                       checked={formData.nutrition_basis === '100g'}
                       onChange={() => setField('nutrition_basis', '100g')}
-                      className="accent-[var(--color-primary)]"
+                      className="accent-[var(--admin-primary)]"
                     />
                     100 g
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-2 text-sm text-a-text-2">
                     <input
                       type="radio"
                       name="nutrition_basis"
                       checked={formData.nutrition_basis === '100ml'}
                       onChange={() => setField('nutrition_basis', '100ml')}
-                      className="accent-[var(--color-primary)]"
+                      className="accent-[var(--admin-primary)]"
                     />
                     100 ml
                   </label>
@@ -1104,7 +1104,7 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Quantité et emballage</h3>
               <div className="space-y-4">
                 <div>
@@ -1139,15 +1139,15 @@ export default function ProductEditClient({
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
               <h3 className={SECTION_TITLE_CLS}>Fond d&apos;étiquette</h3>
               {isNew ? (
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-a-text-3">
                   Enregistrez d&apos;abord le produit pour ajouter un fond d&apos;étiquette.
                 </p>
               ) : (
                 <>
-                  <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-gray-100 mb-4">
+                  <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-a-hover mb-4">
                     {formData.label_background_image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -1157,8 +1157,8 @@ export default function ProductEditClient({
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                        <IconPhoto size={32} className="text-gray-300" />
-                        <span className="text-xs text-gray-400">Aucun fond</span>
+                        <IconPhoto size={32} className="text-a-text-3" />
+                        <span className="text-xs text-a-text-3">Aucun fond</span>
                       </div>
                     )}
                   </div>
@@ -1166,19 +1166,19 @@ export default function ProductEditClient({
                   {formData.label_background_image_url && (
                     <button
                       onClick={handleDeleteLabelBg}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors mb-3"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-tone-danger-border text-tone-danger-fg hover:bg-tone-danger-bg transition-colors mb-3"
                     >
                       <IconTrash size={14} />
                       Supprimer le fond
                     </button>
                   )}
 
-                  <label className="flex items-center gap-2 text-xs text-gray-500 mb-2 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-a-text-3 mb-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={removeBgOnLabelBg}
                       onChange={(e) => setRemoveBgOnLabelBg(e.target.checked)}
-                      className="rounded border-gray-300"
+                      className="rounded border-a-border-strong"
                     />
                     Supprimer le fond automatiquement (IA)
                   </label>
@@ -1190,15 +1190,15 @@ export default function ProductEditClient({
                     onClick={() => labelBgFileInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-lg p-4 text-center mb-4 transition-colors cursor-pointer ${
                       isDraggingLabelBg
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-a-brand bg-a-brand-soft'
+                        : 'border-a-border hover:border-a-border-strong'
                     }`}
                   >
-                    <IconUpload size={20} className="mx-auto mb-1 text-gray-400" />
-                    <p className="text-xs text-gray-500">
+                    <IconUpload size={20} className="mx-auto mb-1 text-a-text-3" />
+                    <p className="text-xs text-a-text-3">
                       {isUploadingLabelBg ? 'Envoi...' : 'Glisser une image ici'}
                     </p>
-                    <span className="text-xs text-gray-400">ou cliquer pour parcourir</span>
+                    <span className="text-xs text-a-text-3">ou cliquer pour parcourir</span>
                   </div>
                   <input
                     ref={labelBgFileInputRef}
@@ -1220,7 +1220,7 @@ export default function ProductEditClient({
                     type="color"
                     value={/^#[0-9a-fA-F]{6}$/.test(formData.label_background_color) ? formData.label_background_color : '#ffffff'}
                     onChange={(e) => setField('label_background_color', e.target.value)}
-                    className="h-10 w-14 rounded border border-gray-200 cursor-pointer shrink-0"
+                    className="h-10 w-14 rounded border border-a-border cursor-pointer shrink-0"
                   />
                   <input
                     type="text"
@@ -1232,7 +1232,7 @@ export default function ProductEditClient({
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 mt-3">
+              <p className="text-xs text-a-text-3 mt-3">
                 Si non défini, utilise le fond de la catégorie ; si celui-ci n&apos;est pas défini non plus, utilise la couleur par défaut du modèle.
               </p>
             </section>
@@ -1245,7 +1245,7 @@ export default function ProductEditClient({
           <div
             role="status"
             className={`fixed bottom-24 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
-              toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
+              toast.type === 'success' ? 'bg-a-brand' : 'bg-tone-danger-solid'
             }`}
           >
             {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}
@@ -1255,19 +1255,19 @@ export default function ProductEditClient({
       </div>
 
       {canManage && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-a-border bg-a-surface px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-            <p className="min-w-0 text-sm text-gray-600" aria-live="polite">
+            <p className="min-w-0 text-sm text-a-text-2" aria-live="polite">
               {isNew
                 ? 'Nouveau produit : complétez l’essentiel puis créez-le.'
                 : dirty
-                  ? <><span className="text-amber-600" aria-hidden="true">● </span>{changedKeys.length} modification{changedKeys.length > 1 ? 's' : ''} non enregistrée{changedKeys.length > 1 ? 's' : ''} · <span className="text-gray-500">{changedFieldLabels(changedKeys).join(', ')}</span></>
+                  ? <><span className="text-tone-warning-fg" aria-hidden="true">● </span>{changedKeys.length} modification{changedKeys.length > 1 ? 's' : ''} non enregistrée{changedKeys.length > 1 ? 's' : ''} · <span className="text-a-text-3">{changedFieldLabels(changedKeys).join(', ')}</span></>
                   : 'Aucune modification'}
             </p>
             <div className="flex gap-2">
               {!isNew && dirty && (
                 <button type="button" onClick={() => setFormData(baseline)} disabled={isSaving}
-                  className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                  className="min-h-11 rounded-xl border border-a-border px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 disabled:opacity-50">
                   Annuler les modifications
                 </button>
               )}

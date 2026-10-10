@@ -13,8 +13,8 @@ interface LabelGeneratorProps {
 }
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 const SECTION_LABELS: { key: keyof LabelSections; label: string }[] = [
   { key: 'image', label: 'Immagine' },
@@ -169,23 +169,23 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Étiquette — {product.name}</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Génération PDF prêt pour l&apos;impression</p>
+        <h1 className="text-xl font-bold text-a-text">Étiquette — {product.name}</h1>
+        <p className="text-sm text-a-text-3 mt-0.5">Génération PDF prêt pour l&apos;impression</p>
       </div>
 
       {!hasLogo && (
-        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-4">
           <div className="flex items-center gap-3">
-            <IconAlertTriangle size={20} className="text-amber-500 shrink-0" />
+            <IconAlertTriangle size={20} className="text-tone-warning-fg shrink-0" />
             <div>
-              <p className="text-sm font-medium text-amber-800">Aucun logo étiquette n&apos;est configuré pour ce tenant.</p>
-              <p className="text-xs text-amber-700 mt-0.5">Téléversez-le pour débloquer la génération.</p>
+              <p className="text-sm font-medium text-tone-warning-fg">Aucun logo étiquette n&apos;est configuré pour ce tenant.</p>
+              <p className="text-xs text-tone-warning-fg mt-0.5">Téléversez-le pour débloquer la génération.</p>
             </div>
           </div>
           <button
             onClick={() => logoInputRef.current?.click()}
             disabled={isUploadingLogo}
-            className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-amber-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-tone-warning-solid text-white hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             <IconUpload size={14} />
             {isUploadingLogo ? 'Envoi...' : 'Téléverser le logo'}
@@ -208,16 +208,16 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
 
           {/* ── Formulaire ─────────────────────────────────────────────── */}
           <div className="space-y-5">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Sections incluses</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Sections incluses</h2>
               <div className="grid grid-cols-2 gap-3">
                 {SECTION_LABELS.map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                  <label key={key} className="flex items-center gap-2 text-sm text-a-text-2">
                     <input
                       type="checkbox"
                       checked={sections[key]}
                       onChange={(e) => setSections((s) => ({ ...s, [key]: e.target.checked }))}
-                      className="accent-[var(--color-primary)]"
+                      className="accent-[var(--admin-primary)]"
                     />
                     {label}
                   </label>
@@ -225,8 +225,8 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Lot &amp; dates</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Lot &amp; dates</h2>
               <div className="space-y-4">
                 <div>
                   <label className={LABEL_CLS}>Numéro de lot</label>
@@ -269,8 +269,8 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Format feuille &amp; étiquette</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Format feuille &amp; étiquette</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={LABEL_CLS}>Feuille — largeur (mm)</label>
@@ -290,7 +290,7 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
                 </div>
               </div>
 
-              <div className="mt-4 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-sm text-gray-600">
+              <div className="mt-4 rounded-lg bg-a-surface-2 border border-a-border px-3 py-2 text-sm text-a-text-2">
                 {layout
                   ? `${layout.cols}×${layout.rows} = ${layout.perSheet} étiquettes / feuille, ${layout.sheets} feuille(s) au total`
                   : previewError ?? 'Calcul en cours...'}
@@ -300,7 +300,7 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
             <button
               onClick={handleGeneratePdf}
               disabled={isGenerating || !layout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-a-brand text-a-on-brand hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <IconPrinter size={16} />
               {isGenerating ? 'Génération...' : 'Générer le PDF'}
@@ -308,20 +308,20 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
           </div>
 
           {/* ── Aperçu ─────────────────────────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Aperçu</h2>
+          <div className="bg-a-surface rounded-xl border border-a-border p-5">
+            <h2 className="text-sm font-semibold text-a-text-2 mb-4">Aperçu</h2>
             {previewError && !layout && (
-              <p className="text-sm text-red-500 mb-3">{previewError}</p>
+              <p className="text-sm text-tone-danger-fg mb-3">{previewError}</p>
             )}
             {previewHtml ? (
               <iframe
                 title="Aperçu étiquette"
                 srcDoc={previewHtml}
-                className="w-full border border-gray-100 rounded-lg"
+                className="w-full border border-a-border rounded-lg"
                 style={{ height: '75vh' }}
               />
             ) : (
-              <div className="w-full h-[75vh] flex items-center justify-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg">
+              <div className="w-full h-[75vh] flex items-center justify-center text-sm text-a-text-3 border border-dashed border-a-border rounded-lg">
                 Aperçu en cours de chargement...
               </div>
             )}
@@ -332,7 +332,7 @@ export default function LabelGeneratorClient({ product, tenantId, tenantHasLogo,
       {toast && (
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
-            toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
+            toast.type === 'success' ? 'bg-a-brand' : 'bg-tone-danger-solid'
           }`}
         >
           {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}

@@ -26,6 +26,8 @@ const MIGRATED = [
   '_components/ui/BulkTrackingModal.tsx',
   '(protected)/BulkDocumentsDialog.tsx',
   '(protected)/clients',
+  '(protected)/catalogue',
+  '(protected)/products',
   '_components/ui/Menu.tsx',
   '_components/ui/NotificationBell.tsx',
   '_components/ThemeToggleButton.tsx',

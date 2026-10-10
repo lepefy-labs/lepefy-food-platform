@@ -58,16 +58,16 @@ export default function ProductEditWorkspace({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-a-brand-fg">
               {isNew ? 'Création produit' : 'Espace produit'}
             </p>
-            <h1 className="mt-1 truncate text-lg font-bold text-gray-900 sm:text-xl">
+            <h1 className="mt-1 truncate text-lg font-bold text-a-text sm:text-xl">
               {isNew ? 'Créer un produit sans se perdre' : productName}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            <p className="mt-1 max-w-2xl text-sm text-a-text-3">
               {isNew
                 ? "Commencez par l'essentiel, enregistrez, puis complétez contenu, média et conformité sans quitter le même écran."
                 : 'Accédez directement à la section utile et gardez les actions d’enregistrement à portée pendant le défilement.'}
@@ -75,25 +75,25 @@ export default function ProductEditWorkspace({
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-600">
+            <span className="rounded-full bg-a-hover px-2.5 py-1 font-medium text-a-text-2">
               {categoryName || 'Catégorie à définir'}
             </span>
-            <span className={`rounded-full px-2.5 py-1 font-medium ${active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+            <span className={`rounded-full px-2.5 py-1 font-medium ${active ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-a-hover text-a-text-3'}`}>
               {active ? 'Actif' : 'Inactif'}
             </span>
-            <span className={`rounded-full px-2.5 py-1 font-medium ${stock === 0 ? 'bg-red-50 text-red-700' : stock < 10 ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+            <span className={`rounded-full px-2.5 py-1 font-medium ${stock === 0 ? 'bg-tone-danger-bg text-tone-danger-fg' : stock < 10 ? 'bg-tone-warning-bg text-tone-warning-fg' : 'bg-a-hover text-a-text-2'}`}>
               Stock {stock}
             </span>
-            <span className={`rounded-full px-2.5 py-1 font-medium ${hasImage ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>
+            <span className={`rounded-full px-2.5 py-1 font-medium ${hasImage ? 'bg-tone-info-bg text-tone-info-fg' : 'bg-tone-warning-bg text-tone-warning-fg'}`}>
               {hasImage ? 'Image prête' : 'Image à compléter'}
             </span>
             {!isNew && missingWeight && (
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
+              <span className="rounded-full bg-tone-warning-bg px-2.5 py-1 font-medium text-tone-warning-fg">
                 Poids à compléter
               </span>
             )}
             {descriptionSource === 'ai' && (
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
+              <span className="rounded-full bg-tone-warning-bg px-2.5 py-1 font-medium text-tone-warning-fg">
                 Description IA à revoir
               </span>
             )}
@@ -103,7 +103,7 @@ export default function ProductEditWorkspace({
 
       <nav
         aria-label="Sections du produit"
-        className="sticky top-0 z-30 -mx-1 overflow-x-auto border-y border-gray-200 bg-white/95 px-1 py-2 shadow-sm backdrop-blur"
+        className="sticky top-0 z-30 -mx-1 overflow-x-auto border-y border-a-border bg-a-surface px-1 py-2 shadow-sm backdrop-blur"
       >
         <div className="flex min-w-max items-center gap-1.5">
           {WORKFLOW_SECTIONS.filter((section) => !isNew || section.tab !== 'Produits associés').map((section, index) => (
@@ -111,9 +111,9 @@ export default function ProductEditWorkspace({
               key={section.label}
               type="button"
               onClick={() => openSection(section.tab, section.heading)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-a-border bg-a-surface px-3 text-sm font-medium text-a-text-2 transition-colors hover:border-a-brand hover:text-a-brand-fg focus:outline-none focus:ring-2 focus:ring-a-focus"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-a-hover text-xs font-bold text-a-text-3">
                 {index + 1}
               </span>
               {section.label}
@@ -123,8 +123,8 @@ export default function ProductEditWorkspace({
       </nav>
 
       {isNew && (
-        <div className="rounded-xl border border-[var(--color-primary)]/20 bg-[var(--color-primary-light)] px-4 py-3 text-sm text-gray-700">
-          <span className="font-semibold text-gray-900">Priorité recommandée :</span>{' '}
+        <div className="rounded-xl border border-[var(--admin-primary)]/20 bg-a-brand-soft px-4 py-3 text-sm text-a-text-2">
+          <span className="font-semibold text-a-text">Priorité recommandée :</span>{' '}
           nom, catégorie, prix, stock et statut d’abord. Les sections avancées restent disponibles immédiatement mais ne bloquent pas le premier passage.
         </div>
       )}

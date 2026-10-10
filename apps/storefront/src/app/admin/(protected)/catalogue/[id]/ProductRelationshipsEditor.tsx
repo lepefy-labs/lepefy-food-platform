@@ -69,9 +69,9 @@ function productStatus(product: Pick<RelatedProduct, 'active' | 'stock'>): {
   label: string;
   className: string;
 } {
-  if (!product.active) return { label: 'Inactif', className: 'bg-gray-100 text-gray-600' };
-  if (product.stock <= 0) return { label: 'Épuisé', className: 'bg-red-50 text-red-700' };
-  return { label: 'Disponible', className: 'bg-emerald-50 text-emerald-700' };
+  if (!product.active) return { label: 'Inactif', className: 'bg-a-hover text-a-text-2' };
+  if (product.stock <= 0) return { label: 'Épuisé', className: 'bg-tone-danger-bg text-tone-danger-fg' };
+  return { label: 'Disponible', className: 'bg-tone-success-bg text-tone-success-fg' };
 }
 
 export default function ProductRelationshipsEditor({ productId }: { productId: string }) {
@@ -242,9 +242,9 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
 
   if (loading) {
     return (
-      <div className="flex min-h-40 items-center justify-center rounded-xl border border-gray-200 bg-white">
-        <IconLoader2 className="animate-spin text-[var(--color-primary)] motion-reduce:animate-none" aria-hidden="true" />
-        <span className="ml-2 text-sm text-gray-500">Chargement des produits associés…</span>
+      <div className="flex min-h-40 items-center justify-center rounded-xl border border-a-border bg-a-surface">
+        <IconLoader2 className="animate-spin text-a-brand-fg motion-reduce:animate-none" aria-hidden="true" />
+        <span className="ml-2 text-sm text-a-text-3">Chargement des produits associés…</span>
       </div>
     );
   }
@@ -252,10 +252,10 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
   return (
     <section aria-labelledby="relationships-heading" className="space-y-4">
       <div>
-        <h2 id="relationships-heading" className="text-lg font-semibold text-gray-900">
+        <h2 id="relationships-heading" className="text-lg font-semibold text-a-text">
           Produits associés
         </h2>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-a-text-3">
           Les relations sont directionnelles. Une priorité plus élevée est proposée en premier.
         </p>
       </div>
@@ -265,8 +265,8 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
           role={message.type === 'error' ? 'alert' : 'status'}
           className={`rounded-lg px-3 py-2 text-sm ${
             message.type === 'error'
-              ? 'bg-red-50 text-red-700'
-              : 'bg-emerald-50 text-emerald-700'
+              ? 'bg-tone-danger-bg text-tone-danger-fg'
+              : 'bg-tone-success-bg text-tone-success-fg'
           }`}
         >
           {message.text}
@@ -279,11 +279,11 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
           .sort((left, right) => right.priority - left.priority);
 
         return (
-          <div key={group.type} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div key={group.type} className="overflow-hidden rounded-xl border border-a-border bg-a-surface">
+            <div className="flex flex-col gap-3 border-b border-a-border p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">{group.title}</h3>
-                <p className="mt-0.5 text-xs text-gray-500">{group.description}</p>
+                <h3 className="text-sm font-semibold text-a-text">{group.title}</h3>
+                <p className="mt-0.5 text-xs text-a-text-3">{group.description}</p>
               </div>
               <button
                 type="button"
@@ -293,7 +293,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                   setResults([]);
                 }}
                 aria-expanded={addingType === group.type}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--color-primary)] px-3 text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-a-brand px-3 text-sm font-medium text-a-brand-fg hover:bg-a-brand-soft focus:outline-none focus:ring-2 focus:ring-a-focus"
               >
                 <IconPlus size={17} aria-hidden="true" />
                 Ajouter
@@ -301,15 +301,15 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
             </div>
 
             {addingType === group.type && (
-              <div className="border-b border-gray-100 bg-gray-50 p-4">
-                <label htmlFor={`relationship-search-${group.type}`} className="text-xs font-medium text-gray-700">
+              <div className="border-b border-a-border bg-a-surface-2 p-4">
+                <label htmlFor={`relationship-search-${group.type}`} className="text-xs font-medium text-a-text-2">
                   Rechercher un produit
                 </label>
                 <div className="relative mt-1">
                   <IconSearch
                     size={17}
                     aria-hidden="true"
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3"
                   />
                   <input
                     id={`relationship-search-${group.type}`}
@@ -318,21 +318,21 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Nom, slug ou code-barres"
                     autoComplete="off"
-                    className="min-h-11 w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:text-sm"
+                    className="min-h-11 w-full rounded-lg border border-a-border bg-a-surface py-2 pl-10 pr-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
                   />
                   {searching && (
                     <IconLoader2
                       size={17}
                       aria-hidden="true"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400 motion-reduce:animate-none"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-a-text-3 motion-reduce:animate-none"
                     />
                   )}
                 </div>
 
                 {query.trim().length >= 2 && !searching && (
-                  <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white">
+                  <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-a-border bg-a-surface">
                     {results.length === 0 ? (
-                      <p className="p-3 text-sm text-gray-500">Aucun produit trouvé.</p>
+                      <p className="p-3 text-sm text-a-text-3">Aucun produit trouvé.</p>
                     ) : results.map((product) => {
                       const status = productStatus(product);
                       const duplicate = relationshipKeys.has(`${group.type}:${product.id}`);
@@ -342,14 +342,14 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                           type="button"
                           disabled={duplicate || busyId === product.id}
                           onClick={() => void addRelationship(group.type, product.id)}
-                          className="flex min-h-14 w-full items-center gap-3 border-b border-gray-100 px-3 py-2 text-left last:border-b-0 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)] disabled:cursor-default disabled:opacity-55"
+                          className="flex min-h-14 w-full items-center gap-3 border-b border-a-border px-3 py-2 text-left last:border-b-0 hover:bg-a-surface-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-a-focus disabled:cursor-default disabled:opacity-55"
                         >
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-a-hover text-a-text-3">
                             <IconPackage size={19} aria-hidden="true" />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-gray-900">{product.name}</span>
-                            <span className="block truncate text-xs text-gray-500">{categoryName(product.categories)}</span>
+                            <span className="block truncate text-sm font-medium text-a-text">{product.name}</span>
+                            <span className="block truncate text-xs text-a-text-3">{categoryName(product.categories)}</span>
                           </span>
                           <span className={`rounded-full px-2 py-1 text-xs font-medium ${status.className}`}>
                             {duplicate ? 'Déjà ajouté' : status.label}
@@ -363,7 +363,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
             )}
 
             {items.length === 0 ? (
-              <p className="p-4 text-sm text-gray-500">Aucun produit configuré.</p>
+              <p className="p-4 text-sm text-a-text-3">Aucun produit configuré.</p>
             ) : (
               <ul>
                 {items.map((relationship) => {
@@ -371,16 +371,16 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                   return (
                     <li
                       key={relationship.id}
-                      className="grid gap-3 border-b border-gray-100 p-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_110px_110px_44px] sm:items-center"
+                      className="grid gap-3 border-b border-a-border p-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_110px_110px_44px] sm:items-center"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-a-hover text-a-text-3">
                           <IconPackage size={20} aria-hidden="true" />
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-gray-900">{relationship.product.name}</p>
+                          <p className="truncate text-sm font-medium text-a-text">{relationship.product.name}</p>
                           <div className="mt-1 flex flex-wrap gap-1.5">
-                            <span className="text-xs text-gray-500">{categoryName(relationship.product.category)}</span>
+                            <span className="text-xs text-a-text-3">{categoryName(relationship.product.category)}</span>
                             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
                               {status.label}
                             </span>
@@ -388,7 +388,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                         </div>
                       </div>
 
-                      <label className="text-xs font-medium text-gray-600">
+                      <label className="text-xs font-medium text-a-text-2">
                         Priorité
                         <input
                           type="number"
@@ -404,7 +404,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                           onBlur={(event) => void updateRelationship(relationship, {
                             priority: Math.max(0, Number.parseInt(event.target.value, 10) || 0),
                           })}
-                          className="mt-1 min-h-11 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:text-sm"
+                          className="mt-1 min-h-11 w-full rounded-lg border border-a-border px-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
                         />
                       </label>
 
@@ -413,10 +413,10 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                         aria-pressed={relationship.active}
                         disabled={busyId === relationship.id}
                         onClick={() => void updateRelationship(relationship, { active: !relationship.active })}
-                        className={`min-h-11 rounded-lg px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                        className={`min-h-11 rounded-lg px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-a-focus ${
                           relationship.active
-                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'bg-tone-success-bg text-tone-success-fg hover:bg-tone-success-bg'
+                            : 'bg-a-hover text-a-text-2 hover:bg-a-border'
                         }`}
                       >
                         {relationship.active ? 'Active' : 'Désactivée'}
@@ -427,7 +427,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                         aria-label={`Supprimer la relation avec ${relationship.product.name}`}
                         disabled={busyId === relationship.id}
                         onClick={() => void removeRelationship(relationship)}
-                        className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-tone-danger-fg hover:bg-tone-danger-bg focus:outline-none focus:ring-2 focus:ring-tone-danger-solid disabled:opacity-50"
                       >
                         {busyId === relationship.id
                           ? <IconLoader2 size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />

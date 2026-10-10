@@ -36,8 +36,8 @@ const ORIGIN_STYLE_OPTIONS: { key: LabelOriginStyleKey; label: string; descripti
 ];
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 const SECTION_LABELS: { key: keyof LabelSections; label: string }[] = [
   { key: 'image', label: 'Immagine' },
@@ -283,32 +283,32 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
         <div>
           <Link
             href={`/admin/products/${product.id}/etichetta`}
-            className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-1"
+            className="text-sm text-a-text-3 hover:text-a-text-2 flex items-center gap-1 mb-1"
           >
             <IconArrowLeft size={14} />
             Retour aux étiquettes
           </Link>
-          <h1 className="text-xl font-bold text-gray-900">Étiquette — {product.name}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Génération PDF prêt pour l&apos;impression</p>
+          <h1 className="text-xl font-bold text-a-text">Étiquette — {product.name}</h1>
+          <p className="text-sm text-a-text-3 mt-0.5">Génération PDF prêt pour l&apos;impression</p>
         </div>
         {saveIndicator && (
-          <span className="text-xs text-gray-400">{saveIndicator}</span>
+          <span className="text-xs text-a-text-3">{saveIndicator}</span>
         )}
       </div>
 
       {!hasLogo && (
-        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-4">
           <div className="flex items-center gap-3">
-            <IconAlertTriangle size={20} className="text-amber-500 shrink-0" />
+            <IconAlertTriangle size={20} className="text-tone-warning-fg shrink-0" />
             <div>
-              <p className="text-sm font-medium text-amber-800">Aucun logo étiquette n&apos;est configuré pour ce tenant.</p>
-              <p className="text-xs text-amber-700 mt-0.5">Téléversez-le pour débloquer la génération.</p>
+              <p className="text-sm font-medium text-tone-warning-fg">Aucun logo étiquette n&apos;est configuré pour ce tenant.</p>
+              <p className="text-xs text-tone-warning-fg mt-0.5">Téléversez-le pour débloquer la génération.</p>
             </div>
           </div>
           <button
             onClick={() => logoInputRef.current?.click()}
             disabled={isUploadingLogo}
-            className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-amber-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-tone-warning-solid text-white hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             <IconUpload size={14} />
             {isUploadingLogo ? 'Envoi...' : 'Téléverser le logo'}
@@ -327,9 +327,9 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
       )}
 
       {hasLogo && tenantLabelLogoUrl?.toLowerCase().endsWith('.jpg') && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <IconAlertTriangle size={20} className="text-amber-500 shrink-0" />
-          <p className="text-sm text-amber-800">
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-4">
+          <IconAlertTriangle size={20} className="text-tone-warning-fg shrink-0" />
+          <p className="text-sm text-tone-warning-fg">
             Il logo è un JPG: se ha uno sfondo bianco, apparirà come un riquadro sull&apos;etichetta.
             Consigliato PNG con trasparenza o SVG.
           </p>
@@ -341,14 +341,14 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
 
           {/* ── Formulaire ─────────────────────────────────────────────── */}
           <div className="space-y-5">
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Template</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Template</h2>
               <div className="grid grid-cols-1 gap-2">
                 {TEMPLATE_OPTIONS.map((opt) => (
                   <label
                     key={opt.key}
                     className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors flex items-center gap-3 ${
-                      templateKey === opt.key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
+                      templateKey === opt.key ? 'border-a-brand bg-[var(--admin-primary)]/5' : 'border-a-border hover:border-a-border-strong'
                     }`}
                   >
                     <input
@@ -360,45 +360,46 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                       className="sr-only"
                     />
                     {opt.key === 'default' && (
-                      <div className="flex h-10 w-14 shrink-0 overflow-hidden rounded border border-gray-200">
-                        <div className="w-[32%] bg-gray-300" />
-                        <div className="flex-1 bg-gray-100" />
+                      <div className="flex h-10 w-14 shrink-0 overflow-hidden rounded border border-a-border">
+                        <div className="w-[32%] bg-a-border-strong" />
+                        <div className="flex-1 bg-a-hover" />
                       </div>
                     )}
                     {opt.key === 'fullbleed' && (
-                      <div className="relative h-10 w-14 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-300">
-                        <div className="absolute right-1 top-1 h-6 w-[55%] rounded-sm bg-white/80" />
+                      <div className="relative h-10 w-14 shrink-0 overflow-hidden rounded border border-a-border bg-a-border-strong">
+                        <div className="absolute right-1 top-1 h-6 w-[55%] rounded-sm bg-a-surface" />
                       </div>
                     )}
                     {opt.key === 'banner' && (
-                      <div className="flex h-10 w-14 shrink-0 flex-col overflow-hidden rounded border border-gray-200">
-                        <div className="h-3 w-full bg-amber-300" />
+                      <div className="flex h-10 w-14 shrink-0 flex-col overflow-hidden rounded border border-a-border">
+                        <div className="h-3 w-full bg-tone-warning-solid" />
                         <div className="flex flex-1">
-                          <div className="w-[27%] bg-gray-200" />
-                          <div className="w-[33%] bg-gray-100" />
-                          <div className="flex-1 bg-gray-300" />
+                          <div className="w-[27%] bg-a-border" />
+                          <div className="w-[33%] bg-a-hover" />
+                          <div className="flex-1 bg-a-border-strong" />
                         </div>
                       </div>
                     )}
                     {opt.key === 'etnico' && (
-                      <div className="flex h-10 w-14 shrink-0 flex-col overflow-hidden rounded border border-gray-200">
-                        <div className="h-6 w-full bg-gray-300" />
-                        <div className="flex-1 bg-[#1E3A8A]" />
+                      <div className="flex h-10 w-14 shrink-0 flex-col overflow-hidden rounded border border-a-border">
+                        <div className="h-6 w-full bg-a-border-strong" />
+                        {/* Printed label colour (content, not UI): fixed in both themes. */}
+                        <div className="flex-1" style={{ backgroundColor: '#1E3A8A' }} />
                       </div>
                     )}
                     <span>
-                      <div className="font-medium text-gray-800">{opt.label}</div>
-                      <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
+                      <div className="font-medium text-a-text">{opt.label}</div>
+                      <div className="mt-0.5 text-xs text-a-text-3">{opt.description}</div>
                     </span>
                   </label>
                 ))}
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Palette colori</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Palette colori</h2>
               {templateKey === 'etnico' ? (
-                <p className="text-xs text-gray-400 mb-4">Questo template ha una palette fissa.</p>
+                <p className="text-xs text-a-text-3 mb-4">Questo template ha una palette fissa.</p>
               ) : null}
               <div className={`grid grid-cols-1 gap-2 ${templateKey === 'etnico' ? 'opacity-50 pointer-events-none' : ''}`}>
                 {PALETTE_OPTIONS.map(({ key }) => {
@@ -407,7 +408,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                     <label
                       key={key}
                       className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors flex items-center gap-3 ${
-                        palette === key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
+                        palette === key ? 'border-a-brand bg-[var(--admin-primary)]/5' : 'border-a-border hover:border-a-border-strong'
                       }`}
                     >
                       <input
@@ -418,41 +419,41 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                         onChange={() => setPalette(key)}
                         className="sr-only"
                       />
-                      <span className="flex shrink-0 overflow-hidden rounded-md border border-gray-200" style={{ width: 32, height: 32 }}>
+                      <span className="flex shrink-0 overflow-hidden rounded-md border border-a-border" style={{ width: 32, height: 32 }}>
                         <span style={{ background: p.primary, width: '50%' }} />
                         <span style={{ background: p.secondary, width: '25%' }} />
                         <span style={{ background: p.accent, width: '25%' }} />
                       </span>
                       <span>
-                        <div className="font-medium text-gray-800">{p.label}</div>
-                        <div className="mt-0.5 text-xs text-gray-400">{p.description}</div>
+                        <div className="font-medium text-a-text">{p.label}</div>
+                        <div className="mt-0.5 text-xs text-a-text-3">{p.description}</div>
                       </span>
                     </label>
                   );
                 })}
               </div>
 
-              <label className="mt-4 flex items-center gap-2 text-sm text-gray-700 border-t border-gray-100 pt-4">
+              <label className="mt-4 flex items-center gap-2 text-sm text-a-text-2 border-t border-a-border pt-4">
                 <input
                   type="checkbox"
                   checked={naturalBadge}
                   onChange={(e) => setNaturalBadge(e.target.checked)}
-                  className="accent-[var(--color-primary)]"
+                  className="accent-[var(--admin-primary)]"
                 />
                 Bollino « 100% Naturale »
               </label>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Sections incluses</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Sections incluses</h2>
               <div className="grid grid-cols-2 gap-3">
                 {SECTION_LABELS.map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                  <label key={key} className="flex items-center gap-2 text-sm text-a-text-2">
                     <input
                       type="checkbox"
                       checked={sections[key]}
                       onChange={(e) => setSections((s) => ({ ...s, [key]: e.target.checked }))}
-                      className="accent-[var(--color-primary)]"
+                      className="accent-[var(--admin-primary)]"
                     />
                     {label}
                   </label>
@@ -460,9 +461,9 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
               </div>
             </section>
 
-            <section className={`bg-white rounded-xl border border-gray-200 p-5 ${!sections.origin ? 'opacity-50 pointer-events-none' : ''}`}>
-              <h2 className="text-sm font-semibold text-gray-700 mb-1">Bandiera origine</h2>
-              <p className="text-xs text-gray-400 mb-4">
+            <section className={`bg-a-surface rounded-xl border border-a-border p-5 ${!sections.origin ? 'opacity-50 pointer-events-none' : ''}`}>
+              <h2 className="text-sm font-semibold text-a-text-2 mb-1">Bandiera origine</h2>
+              <p className="text-xs text-a-text-3 mb-4">
                 {sections.origin ? 'Come mostrare il paese d’origine sull’etichetta.' : 'Attiva "Origine" tra le sections incluse per usarla.'}
               </p>
               <div className="grid grid-cols-1 gap-2">
@@ -470,7 +471,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                   <label
                     key={opt.key}
                     className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
-                      originStyle === opt.key ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'
+                      originStyle === opt.key ? 'border-a-brand bg-[var(--admin-primary)]/5' : 'border-a-border hover:border-a-border-strong'
                     }`}
                   >
                     <input
@@ -481,31 +482,31 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                       onChange={() => setOriginStyle(opt.key)}
                       className="sr-only"
                     />
-                    <div className="font-medium text-gray-800">{opt.label}</div>
-                    <div className="mt-0.5 text-xs text-gray-400">{opt.description}</div>
+                    <div className="font-medium text-a-text">{opt.label}</div>
+                    <div className="mt-0.5 text-xs text-a-text-3">{opt.description}</div>
                   </label>
                 ))}
               </div>
               {originStyle === 'medallion' && naturalBadge && templateKey === 'default' && (
-                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <p className="mt-3 text-xs text-tone-warning-fg bg-tone-warning-bg border border-tone-warning-border rounded-lg px-3 py-2">
                   Con il bollino « 100% Naturale » attivo, il pannello foto avrà due bollini circolari
                   (in alto e in basso a destra) — verifica che il risultato ti piaccia nell&apos;anteprima.
                 </p>
               )}
               {originStyle === 'medallion' && templateKey !== 'default' && templateKey !== 'etnico' && (
-                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <p className="mt-3 text-xs text-tone-warning-fg bg-tone-warning-bg border border-tone-warning-border rounded-lg px-3 py-2">
                   Il bollino speculare è disponibile solo sul template Classico — su questo template l&apos;origine verrà mostrata nell&apos;asola.
                 </p>
               )}
               {templateKey === 'etnico' && (
-                <p className="mt-3 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <p className="mt-3 text-xs text-a-text-3 bg-a-surface-2 border border-a-border rounded-lg px-3 py-2">
                   Il template Etnico mostra sempre la bandiera come pillola in alto a destra — questa scelta non ha effetto qui.
                 </p>
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Lot &amp; dates</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Lot &amp; dates</h2>
               <div className="space-y-4">
                 <div>
                   <label className={LABEL_CLS}>Numéro de lot</label>
@@ -548,8 +549,8 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
               </div>
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Format feuille &amp; étiquette</h2>
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className="text-sm font-semibold text-a-text-2 mb-4">Format feuille &amp; étiquette</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={LABEL_CLS}>Feuille — largeur (mm)</label>
@@ -569,7 +570,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                 </div>
               </div>
 
-              <div className="mt-4 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-sm text-gray-600">
+              <div className="mt-4 rounded-lg bg-a-surface-2 border border-a-border px-3 py-2 text-sm text-a-text-2">
                 {layout
                   ? `${layout.cols}×${layout.rows} = ${layout.perSheet} étiquettes / feuille, ${layout.sheets} feuille(s) au total`
                   : previewError ?? 'Calcul en cours...'}
@@ -579,7 +580,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
             <button
               onClick={handleGeneratePdf}
               disabled={isGenerating || !layout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-a-brand text-a-on-brand hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <IconPrinter size={16} />
               {isGenerating ? 'Génération...' : 'Générer le PDF'}
@@ -587,20 +588,20 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
           </div>
 
           {/* ── Aperçu ─────────────────────────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Aperçu</h2>
+          <div className="bg-a-surface rounded-xl border border-a-border p-5">
+            <h2 className="text-sm font-semibold text-a-text-2 mb-4">Aperçu</h2>
             {previewError && !layout && (
-              <p className="text-sm text-red-500 mb-3">{previewError}</p>
+              <p className="text-sm text-tone-danger-fg mb-3">{previewError}</p>
             )}
             {previewHtml ? (
               <iframe
                 title="Aperçu étiquette"
                 srcDoc={previewHtml}
-                className="w-full border border-gray-100 rounded-lg"
+                className="w-full border border-a-border rounded-lg"
                 style={{ height: '75vh' }}
               />
             ) : (
-              <div className="w-full h-[75vh] flex items-center justify-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg">
+              <div className="w-full h-[75vh] flex items-center justify-center text-sm text-a-text-3 border border-dashed border-a-border rounded-lg">
                 Aperçu en cours de chargement...
               </div>
             )}
@@ -611,7 +612,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
       {toast && (
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${
-            toast.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-500'
+            toast.type === 'success' ? 'bg-a-brand' : 'bg-tone-danger-solid'
           }`}
         >
           {toast.type === 'success' ? <IconCheck size={16} /> : <IconX size={16} />}
