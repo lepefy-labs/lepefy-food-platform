@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { getPlatformBranding } from '@/lib/admin/platformBranding';
 import { adminTokensCss } from '@/lib/admin/tokens';
 import { ADMIN_DARK_CSS } from './_components/adminDarkTheme';
+import { SHELL_CSS } from './_components/shell/shellState';
 
 export const metadata: Metadata = {
   title: 'Administration',
@@ -49,6 +50,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           --tenant-secondary: ${tenant.secondary_color};
         }
         ${ADMIN_DARK_CSS}
+        ${SHELL_CSS}
       `.replace(/</g, '\\3C ');
 
   return (

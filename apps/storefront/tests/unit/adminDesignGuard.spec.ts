@@ -29,6 +29,11 @@ const MIGRATED = [
   '(protected)/clients/campagnes/CampaignComposer.tsx',
   '(protected)/clients/campagnes/[id]/DispatchButton.tsx',
   '(protected)/clients/segments/SegmentBuilder.tsx',
+  '_components/ui/Menu.tsx',
+  '_components/ui/NotificationBell.tsx',
+  '_components/ThemeToggleButton.tsx',
+  '_components/AdminHeader.tsx',
+  '_components/shell',
 ];
 
 const RULES: { name: string; pattern: RegExp }[] = [
@@ -44,7 +49,7 @@ const GLOBAL_RULES: { name: string; pattern: RegExp; allow: string[] }[] = [
   { name: 'native confirm() (use ConfirmDialog / useConfirm)', pattern: /\b(?:window\.)?confirm\(['"`]/, allow: [] },
   // Overlays go through Dialog/Drawer (native <dialog>: focus trap, Escape,
   // top layer). The loyalty camera viewfinder is a full-screen camera view.
-  { name: 'hand-made overlay (use Dialog / Drawer)', pattern: /\bfixed inset-0\b/, allow: ['loyalty/scan/CameraScanButton.tsx', '_components/AdminMobileNav.tsx'] },
+  { name: 'hand-made overlay (use Dialog / Drawer)', pattern: /\bfixed inset-0\b/, allow: ['loyalty/scan/CameraScanButton.tsx'] },
 ];
 
 function filesUnder(path: string): string[] {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { IconBell, IconBellRinging, IconBellOff } from '@tabler/icons-react';
+import { IconButton } from './Button';
 
 /**
  * Bouton pour activer les notifications système (Notification API) quand
@@ -41,15 +42,12 @@ export default function NotificationBell() {
     : IconBell;
 
   return (
-    <button
+    <IconButton
+      label={title}
+      icon={<Icon size={18} aria-hidden="true" />}
+      // Granted / denied: the icon and the label carry the state; a click does nothing.
       onClick={handleClick}
-      disabled={permission !== 'default'}
-      title={title}
-      aria-label={title}
-      className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800
-                 disabled:cursor-default transition-colors"
-    >
-      <Icon size={18} />
-    </button>
+      className={permission !== 'default' ? 'cursor-default' : undefined}
+    />
   );
 }

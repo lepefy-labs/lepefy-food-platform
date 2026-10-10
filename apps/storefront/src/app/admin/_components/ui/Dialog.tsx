@@ -6,7 +6,7 @@ import { IconX } from '@tabler/icons-react';
 import { cn } from '@/lib/utils/cn';
 
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
-export type DialogPlacement = 'center' | 'right' | 'bottom';
+export type DialogPlacement = 'center' | 'right' | 'left' | 'bottom' | 'top';
 
 const SIZE_CLASS: Record<DialogSize, string> = {
   sm: 'sm:max-w-md',
@@ -19,7 +19,10 @@ const PLACEMENT_CLASS: Record<DialogPlacement, string> = {
   // Bottom sheet on phones, centred card from sm.
   center: 'mb-0 mt-auto w-full max-w-none rounded-t-2xl sm:m-auto sm:w-[calc(100%-2rem)] sm:rounded-xl',
   right: 'ml-auto mr-0 h-[100dvh] max-h-[100dvh] w-full max-w-none rounded-none sm:w-[min(100%,28rem)]',
+  left: 'ml-0 mr-auto h-[100dvh] max-h-[100dvh] w-[min(88vw,20rem)] max-w-none rounded-none',
   bottom: 'mb-0 mt-auto w-full max-w-none rounded-t-2xl',
+  // Command palette: near the top so results grow downwards.
+  top: 'mb-auto mt-2 w-[calc(100%-1rem)] rounded-xl sm:mt-[12vh] sm:w-[calc(100%-2rem)]',
 };
 
 export interface DialogProps {
@@ -39,6 +42,8 @@ export interface DialogProps {
   dismissible?: boolean;
   /** Hide the × button (e.g. when the footer already has « Fermer »). */
   hideCloseButton?: boolean;
+  /** No header/footer chrome: children fill the dialog; `title` stays as the accessible name. */
+  bare?: boolean;
   className?: string;
   bodyClassName?: string;
 }
@@ -50,7 +55,7 @@ export interface DialogProps {
  */
 export default function Dialog({
   open, onClose, title, description, icon, children, footer, size = 'md', placement = 'center',
-  dismissible = true, hideCloseButton = false, className, bodyClassName,
+  dismissible = true, hideCloseButton = false, bare = false, className, bodyClassName,
 }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -97,12 +102,18 @@ export default function Dialog({
       className={cn(
         'max-h-[calc(100dvh-1rem)] overflow-hidden border border-a-border bg-a-surface p-0 text-a-text shadow-2xl backdrop:bg-black/50',
         PLACEMENT_CLASS[placement],
-        placement === 'center' && SIZE_CLASS[size],
+        (placement === 'center' || placement === 'top') && SIZE_CLASS[size],
         className,
       )}
     >
-      {open && (
-        <div className={cn('flex flex-col', placement === 'right' ? 'h-full' : 'max-h-[calc(100dvh-1rem)]')}>
+      {open && bare && (
+        <div className="flex max-h-[calc(100dvh-1rem)] flex-col sm:max-h-[76vh]">
+          <h2 id={titleId} className="sr-only">{title}</h2>
+          {children}
+        </div>
+      )}
+      {open && !bare && (
+        <div className={cn('flex flex-col', placement === 'right' || placement === 'left' ? 'h-full' : 'max-h-[calc(100dvh-1rem)]')}>
           <div className="flex items-start gap-3 border-b border-a-border px-5 py-4">
             {icon && <span aria-hidden="true" className="mt-0.5 shrink-0">{icon}</span>}
             <div className="min-w-0 flex-1">

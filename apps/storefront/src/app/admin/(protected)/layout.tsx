@@ -1,6 +1,5 @@
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Suspense } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -11,8 +10,10 @@ import { defaultAdminDestination, isPersonalAdminPath, permissionsForAdminPath }
 import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 import { GESTION_VIEW_PERMISSIONS } from '@/lib/gestion/domain';
 import { isWhatsAppEnabled } from '@/lib/whatsapp/server/featureGate';
-import AdminSidebar from '../_components/AdminSidebar';
 import AdminHeader from '../_components/AdminHeader';
+import AdminShell from '../_components/shell/AdminShell';
+import type { AdminSearchScope, AdminShellNav } from '../_components/shell/shellState';
+import { canSee, resolveAdminNavigation } from '@/lib/admin/navigation';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import SubscriptionBanner from '../_components/SubscriptionBanner';
 import { AdminToaster } from '../_components/ui/Toaster';
@@ -75,8 +76,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     : access.permissions;
 
   const adminClient = createServiceClient();
-  const [{ data: categories }, pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
-    adminClient.from('categories').select('id, name, slug').eq('tenant_id', tenant.id).order('position'),
+  const [pendingPaymentsResult, pendingEventRequestsResult, pendingRentalRequestsResult, newInquiriesResult] = await Promise.all([
     adminClient.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('payment_method', 'external_link').in('status', ['open', 'expired', 'awaiting_verification']).is('order_id', null),
     adminClient.from('event_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
     adminClient.from('rental_reservation_requests').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant.id).eq('status', 'pending'),
@@ -88,20 +88,43 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
     : false;
   // WhatsApp (flag whatsapp_business): letto solo se l'admin potrebbe vedere la sezione.
   const whatsappEnabled = workspace === 'shop' && canAdmin(access, 'whatsapp.view') ? await isWhatsAppEnabled(tenant.id) : false;
-  const pendingPaymentsCount = pendingPaymentsResult.count ?? 0;
-  const pendingEventRequestsCount = pendingEventRequestsResult.count ?? 0;
-  const pendingRentalRequestsCount = pendingRentalRequestsResult.count ?? 0;
-  const newInquiriesCount = newInquiriesResult.count ?? 0;
+  // Navigation is resolved here from the same permissions the route check
+  // above uses; the client only renders the visible entries (UX, not RBAC).
+  const navContext = { workspace, permissions: navPermissions, isPlatformOwner: access.isPlatformOwner, flags: { gestion: gestionEnabled, whatsapp: whatsappEnabled } };
+  const resolvedNav = resolveAdminNavigation(navContext);
+  const searchScopes: AdminSearchScope[] = workspace === 'events'
+    ? (canSee(navContext, ['events.view']) ? ['events'] : [])
+    : ([
+        ['orders', ['orders.view']], ['customers', ['customers.view']], ['products', ['catalog.view']],
+        ...(gestionEnabled ? [['suppliers', ['suppliers.view']], ['purchases', ['purchases.view']]] as const : []),
+      ] as const).filter(([, anyOf]) => canSee(navContext, [...anyOf])).map(([scope]) => scope);
+  const shellNav: AdminShellNav = {
+    ...resolvedNav,
+    workspace,
+    searchScopes,
+    badges: {
+      pendingPayments: pendingPaymentsResult.count ?? 0,
+      pendingEventRequests: pendingEventRequestsResult.count ?? 0,
+      newInquiries: newInquiriesResult.count ?? 0,
+      pendingRentalRequests: pendingRentalRequestsResult.count ?? 0,
+    },
+  };
+  const canShop = canSee(navContext, ['orders.view', 'catalog.view', 'customers.view', 'shipping.view', 'loyalty.scan']);
+  const canEvents = canSee(navContext, ['events.view', 'event_reservations.view', 'event_payments.view', 'event_content.manage', 'scan.access']);
   const displayName = access.nickname || [access.firstName, access.lastName].filter(Boolean).join(' ') || user.email || '';
 
   return (
     <AdminThemeProvider>
       <AdminToaster>
-      <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={navPermissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} />
-      <div className="flex min-h-[calc(100vh-57px)] bg-[var(--admin-page-bg)] dark:bg-gray-950">
-        <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-64 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-2 py-3 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={navPermissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} /></Suspense></aside>
-        <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8"><SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />{children}</main>
-      </div>
+        <AdminShell
+          nav={shellNav}
+          workspaceLabel={workspace === 'events' ? 'Événementiel' : 'Boutique'}
+          tenantName={tenant.name}
+          header={<AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} canShop={canShop} canEvents={canEvents} adminEmail={user.email ?? ''} adminDisplayName={displayName} />}
+        >
+          <SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />
+          {children}
+        </AdminShell>
       </AdminToaster>
     </AdminThemeProvider>
   );

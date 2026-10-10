@@ -1,3 +1,4 @@
+import { isHrefActive } from '@/lib/admin/navigation';
 import { IconBell, IconBrandWhatsapp, IconBriefcase, IconReceipt, IconDeviceMobile, IconSettings, IconShieldLock, IconSparkles, IconTruck, type Icon } from '@tabler/icons-react';
 
 /**
@@ -60,9 +61,8 @@ export const PLATFORM_NAV: PlatformNavGroup[] = [
   },
 ];
 
-export function isNavHrefActive(pathname: string, href: string, match: 'exact' | 'prefix' = 'prefix') {
-  return match === 'exact' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-}
+/** Same active-state rule as the main navigation registry. */
+export const isNavHrefActive = isHrefActive;
 
 export function isGroupActive(pathname: string, group: PlatformNavGroup) {
   if (group.href) return isNavHrefActive(pathname, group.href, group.match);

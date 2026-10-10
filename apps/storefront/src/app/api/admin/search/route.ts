@@ -5,18 +5,23 @@ import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { formatPrice } from '@/lib/utils/format';
 import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
 import { referenceRange } from '@/lib/card/cardPaymentsAdmin';
+import { isBusinessManagementEnabled } from '@/lib/gestion/featureGate';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-type Scope = 'orders' | 'products' | 'events' | 'customers';
-const ALL_SCOPES: Scope[] = ['orders', 'products', 'events', 'customers'];
+type Scope = 'orders' | 'products' | 'events' | 'customers' | 'suppliers' | 'purchases';
+const ALL_SCOPES: Scope[] = ['orders', 'products', 'events', 'customers', 'suppliers', 'purchases'];
 const SCOPE_PERMISSION: Record<Scope, string> = {
   orders: 'orders.view',
   products: 'catalog.view',
   events: 'events.view',
   customers: 'customers.view',
+  suppliers: 'suppliers.view',
+  purchases: 'purchases.view',
 };
+// Gestion scopes also need the business_management release flag (404 elsewhere).
+const GESTION_SCOPES: Scope[] = ['suppliers', 'purchases'];
 
 interface SearchResultItem {
   id: string;
@@ -40,9 +45,11 @@ export async function GET(req: NextRequest) {
   const requestedScopes = scopeParam
     ? scopeParam.split(',').filter((scope): scope is Scope => ALL_SCOPES.includes(scope as Scope))
     : ALL_SCOPES;
-  const scopes = requestedScopes.filter((scope) => canAdmin(access, SCOPE_PERMISSION[scope]));
+  const permitted = requestedScopes.filter((scope) => canAdmin(access, SCOPE_PERMISSION[scope]));
+  const gestionEnabled = permitted.some((scope) => GESTION_SCOPES.includes(scope)) && await isBusinessManagementEnabled(tenant.id);
+  const scopes = permitted.filter((scope) => gestionEnabled || !GESTION_SCOPES.includes(scope));
 
-  const empty: Record<Scope, SearchResultItem[]> = { orders: [], products: [], events: [], customers: [] };
+  const empty: Record<Scope, SearchResultItem[]> = { orders: [], products: [], events: [], customers: [], suppliers: [], purchases: [] };
   if (scopes.length === 0) return NextResponse.json({ query: q, results: empty });
   if (q.length < 2) return NextResponse.json({ query: q, results: empty });
 
@@ -103,6 +110,29 @@ export async function GET(req: NextRequest) {
           const merged = new Map<string, CustomerRow>();
           for (const row of [...(byName.data ?? []), ...(byEmail.data ?? [])] as CustomerRow[]) merged.set(row.id, row);
           results.customers = [...merged.values()].slice(0, LIMIT).map((customer) => ({ id: customer.id, label: customer.full_name ?? customer.email ?? customer.phone ?? 'Client', sublabel: customer.full_name ? customer.email : customer.phone, href: `/admin/clients/${customer.id}` }));
+        })()
+      : Promise.resolve(),
+    scopes.includes('suppliers')
+      ? (async () => {
+          const [byName, byCode] = await Promise.all([
+            supabase.from('suppliers').select('id, code, name, contact_name').eq('tenant_id', tenant.id).ilike('name', like).order('name').limit(LIMIT),
+            supabase.from('suppliers').select('id, code, name, contact_name').eq('tenant_id', tenant.id).ilike('code', like).order('name').limit(LIMIT),
+          ]);
+          type SupplierRow = { id: string; code: string | null; name: string; contact_name: string | null };
+          const merged = new Map<string, SupplierRow>();
+          for (const row of [...(byName.data ?? []), ...(byCode.data ?? [])] as SupplierRow[]) merged.set(row.id, row);
+          results.suppliers = [...merged.values()].slice(0, LIMIT).map((supplier) => ({ id: supplier.id, label: supplier.name, sublabel: supplier.code ?? supplier.contact_name, href: `/admin/gestion/fournisseurs/${supplier.id}` }));
+        })()
+      : Promise.resolve(),
+    scopes.includes('purchases')
+      ? (async () => {
+          const { data } = await supabase.from('supplier_purchases').select('id, reference, supplier_reference, total, currency, suppliers(name)')
+            .eq('tenant_id', tenant.id).or(`reference.ilike.${like},supplier_reference.ilike.${like}`).order('order_date', { ascending: false }).limit(LIMIT);
+          type PurchaseRow = { id: string; reference: string; supplier_reference: string | null; total: number; currency: string; suppliers: { name: string } | { name: string }[] | null };
+          results.purchases = ((data ?? []) as PurchaseRow[]).map((purchase) => {
+            const supplier = Array.isArray(purchase.suppliers) ? purchase.suppliers[0] : purchase.suppliers;
+            return { id: purchase.id, label: `${purchase.reference}${supplier ? ` — ${supplier.name}` : ''}`, sublabel: formatPrice(Number(purchase.total), purchase.currency || tenant.currency), href: `/admin/gestion/achats/${purchase.id}` };
+          });
         })()
       : Promise.resolve(),
   ]);

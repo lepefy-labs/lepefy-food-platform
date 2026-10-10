@@ -67,11 +67,19 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - `Form`: `FormField` (label, hint, errore, `required`/`optional`, collega `aria-describedby`/`aria-invalid`), `Input`, `Select`, `Textarea`, `inputClasses`.
 - `BulkTrackingModal`, `BulkDocumentsDialog` (Commandes) già sul kit.
 
+### Shell e navigazione (`src/lib/admin/navigation.ts`, `src/app/admin/_components/shell/`)
+- **Registry** `ADMIN_NAV` (voci) e `ADMIN_QUICK_ACTIONS` (azioni della palette): `id`, `label`, `href`, `icon`, `group`, `workspace`, `anyOf` (capability), `flag` (`gestion`, `whatsapp`), `match`/`alsoActive`, `badge` (chiave + tono), `mobile` (posizione nella barra), `keywords`. Aggiungere un modulo = una voce; il gruppo appare se ha almeno una voce visibile.
+- **Risoluzione** `resolveAdminNavigation()` nel layout protetto (permessi già ristretti dalla sospensione, flag letti sul server): il client riceve solo gli id visibili, i badge e gli scope di ricerca.
+- **`AdminShell`**: rail desktop 240 px comprimibile a 64 px (pallino al posto del contatore), drawer mobile `Dialog placement="left"`, barra mobile in basso, palette comandi (`Dialog bare placement="top"`, combobox + listbox, ↑ ↓ Entrée, ricerca remota con debounce), link « Aller au contenu ».
+- **`Menu`** (`ui/Menu.tsx`): menu a tendina accessibile (frecce, Home/End, Esc riporta il focus, click esterno) per workspace e account.
+- La piattaforma resta in `platformNavConfig.ts` (gruppi espandibili), resa dalla stessa shell.
+
 ## 5. Controllo automatico
 
 `tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa):
 - sui percorsi in `MIGRATED` rifiuta testo < 12 px, palette Tailwind diretta, varianti `dark:`, `var(--color-primary…)`, colori esadecimali. Ogni modulo migrato si aggiunge alla lista;
-- su tutto `app/admin` rifiuta già `confirm()` nativo e overlay `fixed inset-0` scritti a mano. Eccezioni: il mirino fotocamera di `loyalty/scan/CameraScanButton.tsx` (vista a schermo intero, non un dialog) e `AdminMobileNav` fino a U3.
+- su tutto `app/admin` rifiuta già `confirm()` nativo e overlay `fixed inset-0` scritti a mano. Eccezione: il mirino fotocamera di `loyalty/scan/CameraScanButton.tsx` (vista a schermo intero, non un dialog).
+- `tests/unit/adminNavigation.spec.ts`: id unici, coerenza registry ↔ `adminRoutePermissions`, visibilità per ruolo, stato attivo, barra mobile.
 
 ## 6. Stato di adozione
 
@@ -79,8 +87,8 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 |---|---|---|
 | U0 | Font di piattaforma risolti su `<html>` | ✅ `49b1d3b7` |
 | U1 | Token, Tailwind `a-*`/`tone-*`, format, registry stati, Button, Badge, StatCard, PageHeader, guard | ✅ `de70404a` |
-| U2 | Dialog, ConfirmDialog, Drawer, Toaster, InlineAlert, Form, useAdminMutation; 18 overlay e 10 `confirm()` migrati | ✅ |
-| U3 | Shell: registry navigazione, sidebar, workspace, palette comandi, barra mobile | — |
+| U2 | Dialog, ConfirmDialog, Drawer, Toaster, InlineAlert, Form, useAdminMutation; 18 overlay e 10 `confirm()` migrati | ✅ `0c949f50` |
+| U3 | Shell: registry navigazione, sidebar comprimibile, workspace, palette comandi, barra mobile, ricerca Gestion | ✅ |
 | U4 | Kit dati: listParams, FilterBar, DataTable, Pagination, stati vuoto/errore | — |
 | U5–U11 | Commandes, Livraison, Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |
