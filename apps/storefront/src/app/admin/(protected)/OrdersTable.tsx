@@ -181,7 +181,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     const carrier = carrierOf(order);
     const meta = [carrier, parcelCount(order) != null && `${parcelCount(order)} colis`, weightLabel(order)].filter(Boolean).join(' · ');
     return (
-      <div className="max-w-[260px] space-y-0.5">
+      <div className="max-w-[240px] space-y-0.5">
         <p className="flex items-center gap-1.5"><IconTruck size={16} aria-hidden="true" className="shrink-0" /><b className="font-semibold">Livraison</b><span className="truncate text-a-text-2">· {compactAddress(order) || 'Destination indisponible'}</span></p>
         {meta && <p className="truncate text-xs text-a-text-3">{meta}</p>}
         {order.shipping_provider_reference && <CopyableValue label="Réf." value={order.shipping_provider_reference} />}
@@ -215,7 +215,9 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     const label = canManage || action.intent === 'tracking' ? action.label : 'Voir la commande';
     const trackingUrl = action.intent === 'tracking' ? safeShipmentTrackingUrl(order.shipping_tracking_url) : null;
     const variant = done(order) ? 'ghost' : action.primary && (canManage || action.intent === 'tracking') ? 'outline' : 'secondary';
-    const className = buttonClasses({ variant, size: 'sm', className: full ? 'w-full' : undefined });
+    // In the table the label may wrap on two lines: a long action (« Poursuivre la préparation »)
+    // must not push the row wider than the page and hide the button behind a horizontal scroll.
+    const className = buttonClasses({ variant, size: 'sm', className: full ? 'w-full' : 'w-[9.5rem] !whitespace-normal py-1 text-center leading-tight' });
     if (trackingUrl) return <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className={className}>{label}<IconExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (suivi transporteur, nouvel onglet) — commande {shortId(order.id)}</span></a>;
     return <Link href={`/admin/orders/${order.id}`} className={className}>{label}<span className="sr-only"> — commande {shortId(order.id)}</span></Link>;
   }
@@ -297,7 +299,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
         </>;
       },
     },
-    { key: 'items', header: 'À préparer', className: 'max-w-[240px]', cell: (order) => <>{preparationSummary(order)}<HandlingBadges operation={operationOf(order)} /></> },
+    { key: 'items', header: 'À préparer', className: 'max-w-[220px]', cell: (order) => <>{preparationSummary(order)}<HandlingBadges operation={operationOf(order)} /></> },
     { key: 'fulfillment', header: 'Livraison / Retrait', cell: fulfillmentCell },
     { key: 'state', header: 'État', cell: (order) => stateCell(order, operationOf(order)) },
     { key: 'total', header: 'Total', align: 'right', cell: (order) => <span className="font-semibold">{money(order.total)}</span> },
