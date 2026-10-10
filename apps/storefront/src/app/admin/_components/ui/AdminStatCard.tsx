@@ -1,34 +1,57 @@
 import Link from 'next/link';
+import type { ComponentType, ReactNode } from 'react';
+import type { AdminTone } from '@/lib/admin/tokens';
+import { cn } from '@/lib/utils/cn';
+import { TONE_SOLID_BG_CLASS } from './Badge';
 
-type Tone = 'brand' | 'info' | 'warning' | 'danger' | 'success';
-const styles: Record<Tone, string> = {
-  brand: 'border-violet-200 bg-violet-50 text-violet-950 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-100',
-  info: 'border-blue-200 bg-blue-50 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100',
-  warning: 'border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100',
-  danger: 'border-rose-200 bg-rose-50 text-rose-950 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-100',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100',
-};
+type Tone = AdminTone | 'brand';
 
-/** Shared administrative KPI, clickable only when a destination is provided. */
-export default function AdminStatCard({
-  title, value, description, href, tone = 'brand', active = false,
-}: {
+const STRIPE: Record<Tone, string> = { ...TONE_SOLID_BG_CLASS, brand: 'bg-a-brand' };
+
+interface AdminStatCardProps {
   title: string;
   value: number | string;
-  description?: string;
+  description?: ReactNode;
+  /** When set, the card is a link (typically a filter of the list below). */
   href?: string;
   tone?: Tone;
+  /** The filter this card represents is applied. */
   active?: boolean;
-}) {
-  const classes = `block min-h-[92px] rounded-xl border p-3 transition-shadow ${styles[tone]} ${active ? 'ring-2 ring-[var(--admin-primary)] ring-offset-2 dark:ring-offset-gray-950' : ''} ${href ? 'hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--admin-focus)]' : ''}`;
-  const content = <>
-    <div className="flex items-start justify-between gap-2">
-      <span className="text-sm font-semibold">{title}</span>
-      <strong className="rounded-lg bg-white/80 px-2 py-0.5 text-lg font-bold tabular-nums text-gray-950 dark:bg-gray-950/50 dark:text-white">{value}</strong>
-    </div>
-    {description && <p className="mt-2 text-xs leading-4 opacity-85">{description}</p>}
-  </>;
+  icon?: ComponentType<{ size?: string | number; stroke?: string | number; className?: string; 'aria-hidden'?: boolean }>;
+  /** Variation in % (e.g. month over month). */
+  delta?: number | null;
+}
+
+/**
+ * The only admin KPI card: neutral surface, tone stripe on the left, tabular
+ * value. A zero value is dimmed so non-zero counts stand out.
+ */
+export default function AdminStatCard({ title, value, description, href, tone = 'neutral', active = false, icon: Icon, delta }: AdminStatCardProps) {
+  const isZero = value === 0 || value === '0';
+  const classes = cn(
+    'relative block min-w-0 overflow-hidden rounded-[10px] border bg-a-surface py-2.5 pl-4 pr-3 transition-colors',
+    active ? 'border-a-brand bg-a-selected ring-1 ring-a-brand' : 'border-a-border',
+    href && 'hover:border-a-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus',
+  );
+  const content = (
+    <>
+      <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-1', STRIPE[tone])} />
+      <span className="flex items-center gap-1.5 text-sm font-semibold text-a-text-2">
+        {Icon && <Icon size={16} stroke={1.8} aria-hidden className="shrink-0" />}
+        <span className="truncate">{title}</span>
+      </span>
+      <span className="mt-0.5 flex items-baseline gap-2">
+        <span className={cn('text-2xl font-bold leading-7 tabular-nums', isZero ? 'text-a-text-3' : 'text-a-text')}>{value}</span>
+        {delta != null && (
+          <span className={cn('text-xs font-semibold tabular-nums', delta >= 0 ? 'text-tone-success-fg' : 'text-tone-danger-fg')}>
+            {delta >= 0 ? '+' : '−'}{Math.abs(delta)} %
+          </span>
+        )}
+      </span>
+      {description && <span className="mt-0.5 block text-xs text-a-text-3">{description}</span>}
+    </>
+  );
   return href
-    ? <Link href={href} aria-current={active ? 'page' : undefined} className={classes}>{content}</Link>
+    ? <Link href={href} aria-current={active ? 'true' : undefined} className={classes}>{content}</Link>
     : <div className={classes}>{content}</div>;
 }

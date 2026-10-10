@@ -94,15 +94,14 @@ function buildSafetyNet(): string {
   return out.join('\n');
 }
 
+/**
+ * Transitional: the dark values of the --admin-* tokens live in
+ * lib/admin/tokens.ts. This block only keeps legacy pages (raw Tailwind greys
+ * and tints, --color-primary-light) readable until Admin Design System V2
+ * migrates them; it is deleted once no admin page needs it.
+ */
 export const ADMIN_DARK_CSS = `
 :root.dark {
-  color-scheme: dark;
-  --admin-primary-soft: rgb(139 92 246 / .16);
-  --admin-primary-fg: rgb(196 181 253);
-  --admin-surface: rgb(${GRAY[900]});
-  --admin-surface-subtle: rgb(${GRAY[800]} / .45);
-  --admin-page-bg: rgb(${GRAY[950]});
-  --admin-border: rgb(${GRAY[800]});
   --color-primary-light: rgb(139 92 246 / .16);
 }
 ${buildSafetyNet()}

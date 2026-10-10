@@ -78,6 +78,24 @@ Non-negotiable invariants:
 4. inference, source data and confirmed decisions stay separate; the WhatsApp price is the total for the minimum quantity: the unit price is computed only by `computeUnitPrice` (lot ÷ minimum × (1 − discount), shown rounding gap), never applied without explicit confirmation;
 5. CLI outputs stay under `artifacts/whatsapp-catalog/` (git-ignored); never enable the flag on a real tenant (e.g. Chloe Food) without explicit approval; the document is a mandatory co-change.
 
+### Admin Design System V2 contract
+
+For **any task that touches admin UI** (`apps/storefront/src/app/admin/**`), read and follow:
+
+```text
+docs/ADMIN_DESIGN_SYSTEM.md
+```
+
+Non-negotiable rules:
+
+1. colours only through the admin tokens (`lib/admin/tokens.ts`, Tailwind `a-*` and `tone-*`): no raw Tailwind palette (`gray-*`, `violet-*`, `emerald-*`…), no hex values, no `dark:` variants, no `var(--color-primary*)` — tokens already switch light/dark;
+2. three colour families never mix: Lepefy brand (actions, selection, focus), tenant branding (identity only), semantic tones (`info`, `success`, `warning`, `urgent`, `danger`, `neutral`) for states — a state's tone comes from `lib/admin/statusRegistry.ts`, never from a page;
+3. no text under 12px (`text-[10px]`, `text-[11px]`, `text-2xs` are forbidden), metadata uses `text-a-text-3`;
+4. use the shared kit (`app/admin/_components/ui`, `data`, `shell`) before writing markup: buttons, badges, KPI cards, page header, dialogs, toasts, tables, filters, pagination; no native `confirm()`, no hand-made `fixed inset-0` overlays; amounts and dates through `lib/admin/format.ts`;
+5. lists are Server Components driven by URL state (search, filters, sort, pagination on the server over the full dataset), never client-side sorting of a partial page;
+6. navigation entries come from the registry (`lib/admin/navigation.ts`); hiding an entry is UX, never a substitute for the server permission check;
+7. a migrated folder is added to `MIGRATED` in `tests/unit/adminDesignGuard.spec.ts`, which must stay green; the document is a mandatory co-change when the kit or the rules change.
+
 ## Core workflow
 
 Follow this sequence:

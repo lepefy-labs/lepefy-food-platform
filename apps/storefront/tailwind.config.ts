@@ -14,6 +14,33 @@ const config: Config = {
         'primary-hover': 'var(--color-primary-hover)',
         'primary-light': 'var(--color-primary-light)',
         secondary: 'var(--color-secondary)',
+        // Admin Design System V2 (lib/admin/tokens.ts): defined only inside
+        // /admin, light on :root and dark on :root.dark — no dark: variants.
+        a: {
+          bg: 'var(--admin-page-bg)',
+          surface: 'var(--admin-surface)',
+          'surface-2': 'var(--admin-surface-subtle)',
+          border: 'var(--admin-border)',
+          'border-strong': 'var(--admin-border-strong)',
+          text: 'var(--admin-text)',
+          'text-2': 'var(--admin-text-2)',
+          'text-3': 'var(--admin-text-3)',
+          hover: 'var(--admin-hover)',
+          selected: 'var(--admin-selected)',
+          focus: 'var(--admin-focus)',
+          brand: 'var(--admin-primary)',
+          'brand-hover': 'var(--admin-primary-hover)',
+          'brand-soft': 'var(--admin-primary-soft)',
+          'brand-fg': 'var(--admin-primary-fg)',
+          'on-brand': 'var(--admin-on-primary)',
+          'disabled-bg': 'var(--admin-disabled-bg)',
+          'disabled-fg': 'var(--admin-disabled-fg)',
+        },
+        tone: Object.fromEntries(
+          ['info', 'success', 'warning', 'urgent', 'danger', 'neutral'].flatMap((tone) =>
+            ['bg', 'fg', 'border', 'solid'].map((part) => [`${tone}-${part}`, `var(--admin-tone-${tone}-${part})`]),
+          ),
+        ),
       },
       fontFamily: {
         sans: ['var(--font-body)'],

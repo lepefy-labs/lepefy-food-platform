@@ -22,6 +22,7 @@ import OrdersSortSelect from './OrdersSortSelect'
 import PendingPaymentsBanner from './PendingPaymentsBanner'
 import AdminPageHeader from '../_components/ui/AdminPageHeader'
 import AdminStatCard from '../_components/ui/AdminStatCard'
+import type { AdminTone } from '@/lib/admin/tokens'
 import type { ListOrder } from './OrdersTable'
 import { readOrderDocumentSettings } from '@/lib/orders/documents/settings'
 import type { PendingPaymentSession } from './PendingPaymentsBanner'
@@ -156,13 +157,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
   const activeFilterCount = [filters.dateFrom, filters.dateTo, filters.fulfillment, filters.payment, filters.status, filterView].filter(Boolean).length
   const pageHref = (page: number) => buildHref(searchParams, { page: page > 1 ? String(page) : undefined })
 
-  const operationalViews: { key: OrderView; label: string; helper: string; tone: string }[] = [
-    { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'border-violet-300 bg-violet-50/90 dark:border-violet-900 dark:bg-violet-950/20' },
-    { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' },
-    { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20' },
-    { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/20' },
-    { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20' },
-    { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20' },
+  const operationalViews: { key: OrderView; label: string; helper: string; tone: AdminTone }[] = [
+    { key: 'to_treat', label: 'À traiter', helper: 'Une action de l’équipe est attendue', tone: 'info' },
+    { key: 'preparing', label: 'En préparation', helper: 'Préparation et emballage', tone: 'warning' },
+    { key: 'to_ship', label: 'À expédier', helper: 'Colis prêts à partir', tone: 'warning' },
+    { key: 'in_transit', label: 'En transit', helper: 'Confirmé par le transporteur', tone: 'info' },
+    { key: 'incidents', label: 'Incidents', helper: 'Signalés par le transporteur', tone: 'danger' },
+    { key: 'pickup_ready', label: 'Retraits prêts', helper: 'Client attendu en boutique', tone: 'success' },
   ]
 
   // One filter system: quick filters (fulfillment + queue views) and the
@@ -218,7 +219,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
                 value={count}
                 description={view.helper}
                 active={active}
-                tone={view.key === 'incidents' ? 'danger' : view.key === 'preparing' || view.key === 'to_ship' ? 'warning' : view.key === 'in_transit' ? 'info' : view.key === 'pickup_ready' ? 'success' : 'brand'}
+                tone={view.tone}
               />
             )
           })}

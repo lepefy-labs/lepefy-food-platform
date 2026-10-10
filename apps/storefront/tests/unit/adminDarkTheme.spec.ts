@@ -11,9 +11,10 @@ test('every safety-net rule is scoped to the dark theme with low specificity', (
   }
 });
 
-test('dark tokens only apply when <html> has the dark class', () => {
+test('legacy dark overrides only apply when <html> has the dark class', () => {
   expect(ADMIN_DARK_CSS).toContain(':root.dark {');
-  expect(ADMIN_DARK_CSS).toContain('--admin-primary-fg: rgb(196 181 253)');
+  // Admin tokens are owned by lib/admin/tokens.ts, never redefined here.
+  expect(ADMIN_DARK_CSS.match(/:root\.dark \{([^}]*)\}/)?.[1]).not.toContain('--admin-');
   // The primary button background token is intentionally not remapped.
   expect(ADMIN_DARK_CSS).not.toContain('--color-primary-dark:');
 });
