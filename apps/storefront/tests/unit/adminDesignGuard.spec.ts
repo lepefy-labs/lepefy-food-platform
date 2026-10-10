@@ -39,7 +39,7 @@ const MIGRATED = [
   '_components/ui/Panel.tsx',
   '_components/ui/Tabs.tsx',
   '_components/PlatformSectionTabs.tsx',
-  '(protected)/livraison/LivraisonTabs.tsx',
+  '(protected)/livraison',
   '(protected)/canaux/whatsapp/_components/WhatsAppTabs.tsx',
   '(protected)/page.tsx',
   '(protected)/loading.tsx',
@@ -47,6 +47,7 @@ const MIGRATED = [
   '(protected)/PendingPaymentsBanner.tsx',
   '_components/ui/ConfirmPaymentButton.tsx',
 ];
+
 
 const RULES: { name: string; pattern: RegExp }[] = [
   { name: 'text under 12px', pattern: /\btext-(?:\[(?:[0-9]|1[01])(?:\.\d+)?px\]|2xs)\b/ },

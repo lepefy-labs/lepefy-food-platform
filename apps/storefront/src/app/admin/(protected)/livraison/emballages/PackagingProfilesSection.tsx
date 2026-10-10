@@ -6,8 +6,8 @@ import type { ShippingPackagingProfileRow } from '@lepefy/types';
 import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 interface FormState {
   name: string;
@@ -96,7 +96,7 @@ function ProfileForm({
 
   return (
     <div className="space-y-3">
-      {error && <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
+      {error && <div className="px-3 py-2 rounded-lg text-xs bg-tone-danger-bg text-tone-danger-fg">{error}</div>}
       <div>
         <label className={LABEL_CLS}>Nom</label>
         <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex. Moyen" className={INPUT_CLS} />
@@ -116,26 +116,26 @@ function ProfileForm({
           <input type="number" min={0} step="0.5" value={form.suggest_min_kg} onChange={(e) => set('suggest_min_kg', e.target.value)} placeholder="Au-delà de (ex. 0)" className={INPUT_CLS} />
           <input type="number" min={0} step="0.5" value={form.suggest_max_kg} onChange={(e) => set('suggest_max_kg', e.target.value)} placeholder="Jusqu'à (ex. 5)" className={INPUT_CLS} />
         </div>
-        <p className="mt-1 text-[11px] text-gray-400">Vide = jamais suggéré (laboratoire uniquement). Si plusieurs cartons couvrent un poids, le premier est suggéré, les autres proposés si volumineux.</p>
+        <p className="mt-1 text-xs text-a-text-3">Vide = jamais suggéré (laboratoire uniquement). Si plusieurs cartons couvrent un poids, le premier est suggéré, les autres proposés si volumineux.</p>
       </div>
       <div>
         <label className={LABEL_CLS}>Tare du carton (g)</label>
         <input type="number" min={0} value={form.tare_g} onChange={(e) => set('tare_g', e.target.value)} placeholder="Ex. 450" className={INPUT_CLS} />
-        <p className="mt-1 text-[11px] text-gray-400">Ajoutée au poids du colis pour vérifier la disponibilité Packlink au forfait. Jamais utilisée pour le prix client.</p>
+        <p className="mt-1 text-xs text-a-text-3">Ajoutée au poids du colis pour vérifier la disponibilité Packlink au forfait. Jamais utilisée pour le prix client.</p>
       </div>
       <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 text-sm text-a-text-2">
           <input type="checkbox" checked={form.is_default} onChange={(e) => set('is_default', e.target.checked)} className="w-5 h-5" />
           Profil par défaut
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-600">
+        <label className="flex items-center gap-2 text-sm text-a-text-2">
           <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)} className="w-5 h-5" />
           Actif
         </label>
       </div>
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">{submitLabel}</button>
-        {onCancel && <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Annuler</button>}
+        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50">{submitLabel}</button>
+        {onCancel && <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-a-border text-a-text-3 disabled:opacity-50">Annuler</button>}
       </div>
     </div>
   );
@@ -216,11 +216,11 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      {toast && <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.msg}</div>}
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
+      {toast && <div className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{toast.msg}</div>}
 
       {profiles.length === 0 && !creating && (
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-a-text-3 mb-4">
           Aucun profil configuré — ajoutez au moins une boîte pour utiliser le laboratoire de simulation et l&apos;assistant expédition.
         </p>
       )}
@@ -229,24 +229,24 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
           {profiles.map((profile) => (
             <Fragment key={profile.id}>
-              <div className={`rounded-xl border p-4 ${profile.is_default ? 'border-[var(--color-primary)]' : 'border-gray-200 dark:border-gray-800'}`}>
+              <div className={`rounded-xl border p-4 ${profile.is_default ? 'border-a-brand' : 'border-a-border'}`}>
                 <div className="flex items-start justify-between mb-1">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{profile.name}</p>
-                  {profile.is_default && <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">Défaut</span>}
+                  <p className="text-sm font-semibold text-a-text">{profile.name}</p>
+                  {profile.is_default && <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-a-brand-soft text-a-brand-fg">Défaut</span>}
                 </div>
-                <p className="text-xs text-gray-500 mb-0.5">{profile.box_length_cm} × {profile.box_width_cm} × {profile.box_height_cm} cm</p>
-                <p className="text-xs text-gray-400">≤ {(profile.max_weight_g / 1000).toLocaleString('fr-FR')} kg{!profile.active && ' · inactif'}</p>
+                <p className="text-xs text-a-text-3 mb-0.5">{profile.box_length_cm} × {profile.box_width_cm} × {profile.box_height_cm} cm</p>
+                <p className="text-xs text-a-text-3">≤ {(profile.max_weight_g / 1000).toLocaleString('fr-FR')} kg{!profile.active && ' · inactif'}</p>
                 {profile.suggest_max_weight_g != null && (
-                  <p className="mt-0.5 text-xs font-medium text-[var(--color-primary-dark)]">
+                  <p className="mt-0.5 text-xs font-medium text-a-brand-fg">
                     Suggéré en préparation : {((profile.suggest_min_weight_g ?? 0) / 1000).toLocaleString('fr-FR')}–{(profile.suggest_max_weight_g / 1000).toLocaleString('fr-FR')} kg
                   </p>
                 )}
                 <div className="flex items-center gap-2 mt-3">
-                  <button onClick={() => setEditingId(editingId === profile.id ? null : profile.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === profile.id ? 'Fermer' : 'Modifier'}</button>
-                  <button onClick={() => setPendingDeleteId(profile.id)} disabled={savingId === profile.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
+                  <button onClick={() => setEditingId(editingId === profile.id ? null : profile.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border">{editingId === profile.id ? 'Fermer' : 'Modifier'}</button>
+                  <button onClick={() => setPendingDeleteId(profile.id)} disabled={savingId === profile.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border text-tone-danger-fg flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
                 </div>
                 {editingId === profile.id && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <div className="mt-3 pt-3 border-t border-a-border">
                     <ProfileForm initial={profile} submitLabel="Enregistrer" isSaving={savingId === profile.id} onSubmit={(form) => handleUpdate(profile.id, form)} onCancel={() => setEditingId(null)} />
                   </div>
                 )}
@@ -257,9 +257,9 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
       )}
 
       {creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4"><p className="text-xs font-medium text-gray-500 mb-3">Nouveau profil</p><ProfileForm submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
+        <div className="border border-dashed border-a-border rounded-lg p-4"><p className="text-xs font-medium text-a-text-3 mb-3">Nouveau profil</p><ProfileForm submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
       ) : (
-        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter un profil</button>
+        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand"><IconPlus size={14} stroke={1.5} />Ajouter un profil</button>
       )}
 
       <ConfirmDialog

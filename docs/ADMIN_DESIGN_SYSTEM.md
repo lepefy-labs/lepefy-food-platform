@@ -23,6 +23,7 @@ Emessi da `app/admin/layout.tsx`: valori chiari su `:root`, scuri su `:root.dark
 | `bg-a-hover`, `bg-a-selected` | `--admin-hover`, `--admin-selected` | hover di riga/voce, riga o voce selezionata |
 | `bg-a-brand`, `text-a-on-brand`, `bg-a-brand-soft`, `text-a-brand-fg` | `--admin-primary*` | azione primaria, voce attiva, link d'azione |
 | `outline-a-focus` | `--admin-focus` | focus visibile |
+| `bg-a-inverse`, `text-a-on-inverse` | `--admin-inverse-*` | superficie invertita (scura in chiaro, chiara in scuro) e il suo testo |
 | `bg-tone-{t}-bg`, `text-tone-{t}-fg`, `border-tone-{t}-border`, `bg-tone-{t}-solid` | `--admin-tone-{t}-*` | stati: `info`, `success`, `warning`, `urgent`, `danger`, `neutral` |
 
 Significato dei toni: `info` nuovo / in corso normale · `warning` serve lavoro · `urgent` critico nel tempo (ritardi, catena del freddo) · `danger` errore o blocco · `success` concluso · `neutral` inerte (annullato, bozza).
@@ -89,6 +90,14 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - Le card KPI e i chip « Contrôles » sono filtri (secondo clic annulla); cambiare statut/paiement dal pannello azzera la vista (`panelClears`).
 - « Traiter la sélection » chiede conferma (solo le commande « En préparation » cambiano stato).
 
+### Migrazione dei moduli legacy
+I moduli esistenti passano ai token con un codemod a regole fisse (una unità per modulo), poi con gli interventi strutturali del modulo:
+- grigi → `a-text` (800–950), `a-text-2` (600–700), `a-text-3` (≤ 500); fondi `a-surface`/`a-surface-2`/`a-hover`/`a-border`, scuri (≥ 600) → `a-inverse`; bordi `a-border`/`a-border-strong`;
+- rosso/rosa → `danger`, ambra/giallo → `warning`, arancio → `urgent`, verde/smeraldo/teal → `success`, blu/sky/ciano/indaco → `info` (fondi chiari → `-bg`, pieni → `-solid`, testi → `-fg`, bordi → `-border`); viola → brand;
+- `text-white` su `bg-a-brand` / `bg-a-inverse` → `text-a-on-brand` / `text-a-on-inverse`;
+- varianti `dark:` rimosse (i token cambiano tema); un `bg-white` accompagnato da `dark:bg-white` (logo, QR) resta bianco;
+- `text-[10px]`, `text-[11px]`, `text-2xs` → `text-xs`; `var(--color-primary*)` → `var(--admin-primary*)` / token.
+
 ## 5. Controllo automatico
 
 `tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa):
@@ -106,5 +115,6 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 | U3 | Shell: registry navigazione, sidebar comprimibile, workspace, palette comandi, barra mobile, ricerca Gestion | ✅ `0661cbcb` |
 | U4 | Kit dati: listParams, FilterBar, DataTable, selezione e BulkBar, Pagination, stati, Panel, Tabs | ✅ |
 | U5 | Commandes: lista sul kit (FilterBar, DataTable a gruppi di priorità, BulkBar con conferma, Pagination 25/50/100), Contrôles cliccabili, export CSV della lista filtrata, `loading.tsx` del gruppo protetto | ✅ |
-| U6–U11 | Livraison, Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
+| U6 | Livraison: classi legacy convertite ai token (codemod), token « inverse » | ✅ |
+| U7–U11 | Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |

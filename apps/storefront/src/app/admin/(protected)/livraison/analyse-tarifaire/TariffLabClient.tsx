@@ -12,8 +12,8 @@ import type {
 import { applyTariffDraft, splitParcelsFilled, type CostComparisonRow } from '@/lib/shipping/intelligence/tariffBacktest';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 interface BacktestMetrics {
   sampleSize: number; avgProviderCost: number | null; medianProviderCost: number | null;
@@ -41,9 +41,9 @@ interface BacktestResults {
 type Population = 'scenario' | 'order';
 
 const RELIABILITY_LABEL: Record<ScenarioSample['reliability'], { text: string; cls: string }> = {
-  insufficient: { text: 'Données insuffisantes', cls: 'bg-red-50 text-red-700' },
-  limited: { text: 'Couverture limitée', cls: 'bg-amber-50 text-amber-800' },
-  indicative: { text: 'Indicatif', cls: 'bg-blue-50 text-blue-700' },
+  insufficient: { text: 'Données insuffisantes', cls: 'bg-tone-danger-bg text-tone-danger-fg' },
+  limited: { text: 'Couverture limitée', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
+  indicative: { text: 'Indicatif', cls: 'bg-tone-info-bg text-tone-info-fg' },
 };
 
 const STRATEGY_OPTIONS: Array<{ value: ShippingMultiParcelStrategyType; label: string; help: string }> = [
@@ -66,10 +66,10 @@ function kg(value: number): string {
 }
 
 function gapCls(value: number | null): string {
-  if (value == null) return 'text-gray-400';
-  if (value < 0) return 'text-red-600 font-semibold';
-  if (value < 1) return 'text-amber-600 font-semibold';
-  return 'text-green-700 font-semibold';
+  if (value == null) return 'text-a-text-3';
+  if (value < 0) return 'text-tone-danger-fg font-semibold';
+  if (value < 1) return 'text-tone-warning-fg font-semibold';
+  return 'text-tone-success-fg font-semibold';
 }
 
 export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTariffDraftRow[] }) {
@@ -190,23 +190,23 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     const unit = population === 'scenario' ? 'scénario' : 'commande';
     const unitPlural = population === 'scenario' ? 'scénarios' : 'commandes';
     return (
-      <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label} <span className="normal-case font-normal text-gray-400">(n = {metrics.sampleSize} {metrics.sampleSize > 1 ? unitPlural : unit})</span></h3>
-        <p className="text-xs text-gray-400 mb-3">{subtitle}</p>
+      <div className="rounded-xl border border-a-border p-4">
+        <h3 className="text-xs font-semibold text-a-text-3 uppercase tracking-wide mb-1">{label} <span className="normal-case font-normal text-a-text-3">(n = {metrics.sampleSize} {metrics.sampleSize > 1 ? unitPlural : unit})</span></h3>
+        <p className="text-xs text-a-text-3 mb-3">{subtitle}</p>
         {extra}
-        {warn && <p className="text-xs text-amber-600 mb-2">{warn}</p>}
+        {warn && <p className="text-xs text-tone-warning-fg mb-2">{warn}</p>}
         {metrics.sampleSize === 0 ? (
-          <p className="text-sm text-gray-400">Aucune donnée disponible.</p>
+          <p className="text-sm text-a-text-3">Aucune donnée disponible.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <div><p className="text-2xs text-gray-400" title="Devis Packlink TTC + frais d'emballage actuels — un devis, pas une facture">Coût réel moyen</p><p className="font-medium">{eur(metrics.avgProviderCost)}</p></div>
-            <div><p className="text-2xs text-gray-400" title={`La moitié des ${unitPlural} ont un coût réel inférieur, l'autre moitié supérieur`}>Médiane</p><p className="font-medium">{eur(metrics.medianProviderCost)}</p></div>
-            <div><p className="text-2xs text-gray-400" title={`90 % des ${unitPlural} ont un coût réel inférieur à ce montant`}>P90 (cas cher, 1 sur 10)</p><p className="font-medium">{eur(metrics.p90ProviderCost)}</p></div>
-            <div><p className="text-2xs text-gray-400" title={`95 % des ${unitPlural} ont un coût réel inférieur à ce montant`}>P95 (cas très cher, 1 sur 20)</p><p className="font-medium">{eur(metrics.p95ProviderCost)}</p></div>
-            <div><p className="text-2xs text-gray-400" title="Forfait moins coût réel, en moyenne">Écart moyen</p><p className={`font-medium ${((metrics.avgMargin ?? 0) < 0) ? 'text-red-600' : 'text-green-600'}`}>{eur(metrics.avgMargin)}</p></div>
-            <div><p className="text-2xs text-gray-400" title={population === 'scenario' ? 'Part des scénarios de la grille synthétique où le forfait est inférieur au coût réel — pas une part de vos commandes réelles' : 'Part des commandes où le forfait aurait été inférieur au coût réel'}>% de {unitPlural} à perte</p><p className="font-medium">{metrics.negativeMarginPct}%</p></div>
-            <div><p className="text-2xs text-gray-400" title={`Le plus faible écart sur un(e) seul(e) ${unit} ; négatif = perte`}>Écart minimal (1 {unit})</p><p className={`font-medium ${((metrics.minMargin ?? metrics.maxLoss ?? 0) < 0) ? 'text-red-600' : 'text-green-600'}`}>{eur(metrics.minMargin ?? metrics.maxLoss)}</p></div>
-            <div><p className="text-2xs text-gray-400" title={population === 'scenario' ? 'Somme des écarts sur les scénarios mesurés — dépend de la grille testée, pas un résultat financier' : 'Somme des écarts si ce forfait avait été appliqué à ces commandes'}>Écart cumulé</p><p className="font-medium">{eur(metrics.aggregateMargin)}</p></div>
+            <div><p className="text-xs text-a-text-3" title="Devis Packlink TTC + frais d'emballage actuels — un devis, pas une facture">Coût réel moyen</p><p className="font-medium">{eur(metrics.avgProviderCost)}</p></div>
+            <div><p className="text-xs text-a-text-3" title={`La moitié des ${unitPlural} ont un coût réel inférieur, l'autre moitié supérieur`}>Médiane</p><p className="font-medium">{eur(metrics.medianProviderCost)}</p></div>
+            <div><p className="text-xs text-a-text-3" title={`90 % des ${unitPlural} ont un coût réel inférieur à ce montant`}>P90 (cas cher, 1 sur 10)</p><p className="font-medium">{eur(metrics.p90ProviderCost)}</p></div>
+            <div><p className="text-xs text-a-text-3" title={`95 % des ${unitPlural} ont un coût réel inférieur à ce montant`}>P95 (cas très cher, 1 sur 20)</p><p className="font-medium">{eur(metrics.p95ProviderCost)}</p></div>
+            <div><p className="text-xs text-a-text-3" title="Forfait moins coût réel, en moyenne">Écart moyen</p><p className={`font-medium ${((metrics.avgMargin ?? 0) < 0) ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`}>{eur(metrics.avgMargin)}</p></div>
+            <div><p className="text-xs text-a-text-3" title={population === 'scenario' ? 'Part des scénarios de la grille synthétique où le forfait est inférieur au coût réel — pas une part de vos commandes réelles' : 'Part des commandes où le forfait aurait été inférieur au coût réel'}>% de {unitPlural} à perte</p><p className="font-medium">{metrics.negativeMarginPct}%</p></div>
+            <div><p className="text-xs text-a-text-3" title={`Le plus faible écart sur un(e) seul(e) ${unit} ; négatif = perte`}>Écart minimal (1 {unit})</p><p className={`font-medium ${((metrics.minMargin ?? metrics.maxLoss ?? 0) < 0) ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`}>{eur(metrics.minMargin ?? metrics.maxLoss)}</p></div>
+            <div><p className="text-xs text-a-text-3" title={population === 'scenario' ? 'Somme des écarts sur les scénarios mesurés — dépend de la grille testée, pas un résultat financier' : 'Somme des écarts si ce forfait avait été appliqué à ces commandes'}>Écart cumulé</p><p className="font-medium">{eur(metrics.aggregateMargin)}</p></div>
           </div>
         )}
       </div>
@@ -217,12 +217,12 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
     if (!sample) return null;
     const reliability = RELIABILITY_LABEL[sample.reliability];
     return (
-      <div className="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/40 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+      <div className="mb-3 rounded-lg bg-a-surface-2 px-3 py-2 text-xs text-a-text-2">
         <p className="flex flex-wrap items-center gap-2">
-          <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${reliability.cls}`}>{reliability.text}</span>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${reliability.cls}`}>{reliability.text}</span>
           <span><b>{sample.scenarios}</b> scénario(s) mesuré(s) · <b>{sample.postalCodes}</b> CAP · {sample.zones} zone(s) · {sample.countries} pays</span>
         </p>
-        <p className="mt-1 text-2xs text-gray-400">
+        <p className="mt-1 text-xs text-a-text-3">
           Une observation par scénario (service éligible au coût le plus bas, devis le plus récent).
           {' '}{sample.alternativeOffersExcluded} offre(s) alternative(s) et {sample.olderExecutionsExcluded} devis plus ancien(s) du même scénario non comptés comme échantillons.
           {sample.topPostalCodeShare > 0.5 && <> Plus de la moitié des scénarios concernent un seul CAP : ne pas extrapoler à une couverture nationale.</>}
@@ -240,21 +240,21 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
       ? `${eur(res.packaging.amount)} ${res.packaging.mode === 'per_parcel' ? 'par colis' : 'par commande'}`
       : 'aucun';
     return (
-      <section className="rounded-xl border-2 border-[var(--color-primary)] bg-white dark:bg-gray-900 p-5">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Coûts réels Packlink vs forfait</h2>
-        <p className="text-xs text-gray-500 mt-1 mb-4">
+      <section className="rounded-xl border-2 border-a-brand bg-a-surface p-5">
+        <h2 className="text-base font-semibold text-a-text">Coûts réels Packlink vs forfait</h2>
+        <p className="text-xs text-a-text-3 mt-1 mb-4">
           Coût réel = devis Packlink TTC (TVA ajoutée, Packlink renvoyant des devis HT) + frais d&apos;emballage actuels ({packagingText}) — c&apos;est ce que vos clients paient aujourd&apos;hui et ce que le forfait (TTC, emballage compris) remplace. Italie, scénarios mesurés.
         </p>
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3"><p className="text-2xs uppercase text-gray-400">Coût réel moyen</p><p className="text-xl font-bold">{eur(main.avgProviderCost)}</p></div>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3"><p className="text-2xs uppercase text-gray-400">Forfait moyen</p><p className="text-xl font-bold">{eur(forfaitAvg)}</p></div>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3"><p className="text-2xs uppercase text-gray-400">Écart moyen</p><p className={`text-xl font-bold ${gapCls(main.avgMargin)}`}>{eur(main.avgMargin)}</p></div>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3"><p className="text-2xs uppercase text-gray-400">Scénarios à perte</p><p className={`text-xl font-bold ${(main.negativeMarginPct ?? 0) > 0 ? 'text-red-600' : 'text-green-700'}`}>{main.negativeMarginPct ?? 0}%</p></div>
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3"><p className="text-2xs uppercase text-gray-400">Écart le plus défavorable</p><p className={`text-xl font-bold ${gapCls(main.minMargin ?? null)}`}>{eur(main.minMargin ?? main.maxLoss)}</p></div>
+          <div className="rounded-lg bg-a-surface-2 p-3"><p className="text-xs uppercase text-a-text-3">Coût réel moyen</p><p className="text-xl font-bold">{eur(main.avgProviderCost)}</p></div>
+          <div className="rounded-lg bg-a-surface-2 p-3"><p className="text-xs uppercase text-a-text-3">Forfait moyen</p><p className="text-xl font-bold">{eur(forfaitAvg)}</p></div>
+          <div className="rounded-lg bg-a-surface-2 p-3"><p className="text-xs uppercase text-a-text-3">Écart moyen</p><p className={`text-xl font-bold ${gapCls(main.avgMargin)}`}>{eur(main.avgMargin)}</p></div>
+          <div className="rounded-lg bg-a-surface-2 p-3"><p className="text-xs uppercase text-a-text-3">Scénarios à perte</p><p className={`text-xl font-bold ${(main.negativeMarginPct ?? 0) > 0 ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`}>{main.negativeMarginPct ?? 0}%</p></div>
+          <div className="rounded-lg bg-a-surface-2 p-3"><p className="text-xs uppercase text-a-text-3">Écart le plus défavorable</p><p className={`text-xl font-bold ${gapCls(main.minMargin ?? null)}`}>{eur(main.minMargin ?? main.maxLoss)}</p></div>
         </div>
         {packlinkOnly && (
-          <p className="text-xs text-gray-500 mb-4">
+          <p className="text-xs text-a-text-3 mb-4">
             Sans l&apos;emballage (forfait contre devis Packlink TTC seul) : écart moyen {eur(packlinkOnly.avgMargin)}, {packlinkOnly.negativeMarginPct ?? 0}% à perte, écart minimal {eur(packlinkOnly.minMargin ?? packlinkOnly.maxLoss)}.
           </p>
         )}
@@ -263,7 +263,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
+                <tr className="text-left text-xs font-medium text-a-text-3 uppercase tracking-wide border-b border-a-border">
                   <th className="py-2 pr-3">Poids</th>
                   <th className="py-2 pr-3">Zones</th>
                   <th className="py-2 pr-3 text-right" title="Devis Packlink TTC, médiane (max) des scénarios">Packlink TTC</th>
@@ -276,22 +276,22 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
               </thead>
               <tbody>
                 {res.comparison.flatMap((row) => row.cells.map((cell, i) => (
-                  <tr key={`${row.weightKg}-${cell.zoneSurcharge}`} className={`border-b border-gray-50 dark:border-gray-800/60 ${cell.typicalGap != null && cell.typicalGap < 0 ? 'bg-red-50/60 dark:bg-red-950/20' : ''}`}>
-                    <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{i === 0 ? <>{kg(row.weightKg)} <span className="text-2xs text-gray-400">· {row.numParcels} colis</span></> : ''}</td>
-                    <td className="py-1.5 pr-3 text-xs text-gray-500" title={cell.zones.join(', ')}>
-                      {cell.zoneSurcharge > 0 ? `Supplément ${eur(cell.zoneSurcharge)}` : 'Zones standard'} <span className="text-2xs text-gray-400">({cell.zones.length})</span>
+                  <tr key={`${row.weightKg}-${cell.zoneSurcharge}`} className={`border-b border-a-border ${cell.typicalGap != null && cell.typicalGap < 0 ? 'bg-tone-danger-bg' : ''}`}>
+                    <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{i === 0 ? <>{kg(row.weightKg)} <span className="text-xs text-a-text-3">· {row.numParcels} colis</span></> : ''}</td>
+                    <td className="py-1.5 pr-3 text-xs text-a-text-3" title={cell.zones.join(', ')}>
+                      {cell.zoneSurcharge > 0 ? `Supplément ${eur(cell.zoneSurcharge)}` : 'Zones standard'} <span className="text-xs text-a-text-3">({cell.zones.length})</span>
                     </td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{eur(cell.packlinkMedian)}{cell.packlinkMax !== cell.packlinkMedian && <span className="text-2xs text-gray-400"> ({eur(cell.packlinkMax)})</span>}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums text-gray-500">{eur(cell.packaging)}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{eur(cell.realCostMedian ?? cell.realCostMax)}{cell.realCostMedian != null && cell.realCostMedian !== cell.realCostMax && <span className="text-2xs font-normal text-gray-400"> ({eur(cell.realCostMax)})</span>}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{cell.forfait == null ? <span className="text-gray-400" title="Aucune bande ne couvre ce poids">hors bandes</span> : eur(cell.forfait)}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">{eur(cell.packlinkMedian)}{cell.packlinkMax !== cell.packlinkMedian && <span className="text-xs text-a-text-3"> ({eur(cell.packlinkMax)})</span>}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums text-a-text-3">{eur(cell.packaging)}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{eur(cell.realCostMedian ?? cell.realCostMax)}{cell.realCostMedian != null && cell.realCostMedian !== cell.realCostMax && <span className="text-xs font-normal text-a-text-3"> ({eur(cell.realCostMax)})</span>}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{cell.forfait == null ? <span className="text-a-text-3" title="Aucune bande ne couvre ce poids">hors bandes</span> : eur(cell.forfait)}</td>
                     <td className={`py-1.5 pr-3 text-right tabular-nums ${gapCls(cell.typicalGap ?? null)}`}>{eur(cell.typicalGap)}</td>
                     <td className={`py-1.5 pr-3 text-right tabular-nums text-xs ${gapCls(cell.worstGap)}`}>{eur(cell.worstGap)}</td>
                   </tr>
                 )))}
               </tbody>
             </table>
-            <p className="mt-2 text-2xs text-gray-400">Écart typique : cas médian (boîte et zone les plus courantes du groupe) · pire écart : cas le plus cher du groupe. Vert : ≥ 1 € · orange : 0–1 € · rouge : le forfait ne couvre pas le coût réel. Devis Packlink, pas des factures payées.</p>
+            <p className="mt-2 text-xs text-a-text-3">Écart typique : cas médian (boîte et zone les plus courantes du groupe) · pire écart : cas le plus cher du groupe. Vert : ≥ 1 € · orange : 0–1 € · rouge : le forfait ne couvre pas le coût réel. Devis Packlink, pas des factures payées.</p>
           </div>
         )}
       </section>
@@ -303,25 +303,25 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
   return (
     <div className="space-y-6">
-      <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+      <section className="bg-a-surface rounded-xl border border-a-border p-5">
         <h2 className="text-sm font-semibold mb-2">À quoi sert cet écran ?</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+        <p className="text-sm text-a-text-2 mb-3">
           Le Laboratoire (via ses campagnes) interroge automatiquement Packlink PRO sur des combinaisons poids × emballage × destination
           pour construire une base de devis provider. Ici, vous testez un <b>forfait client</b> (prix TTC, emballage compris) contre le coût réel
           (devis Packlink TTC + emballage), avant d&apos;activer quoi que ce soit en caisse.
         </p>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-a-text-3">
           Rien ici n&apos;affecte le prix payé par vos clients — un brouillon reste un brouillon tant qu&apos;il n&apos;est pas explicitement activé (fonctionnalité future, hors périmètre actuel).
         </p>
       </section>
 
       {drafts.length > 0 && (
-        <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <section className="bg-a-surface rounded-xl border border-a-border p-5">
           <h2 className="text-sm font-semibold mb-1">Brouillons existants</h2>
-          <p className="text-xs text-gray-400 mb-3">Cliquer un brouillon relance son rétrotest et le recopie dans le formulaire pour tester une variante. Pour figer un brouillon et le comparer aux commandes réelles sans le facturer : <Link href="/admin/livraison/forfait-shadow" className="underline text-[var(--color-primary-dark)]">créer une version shadow</Link>.</p>
+          <p className="text-xs text-a-text-3 mb-3">Cliquer un brouillon relance son rétrotest et le recopie dans le formulaire pour tester une variante. Pour figer un brouillon et le comparer aux commandes réelles sans le facturer : <Link href="/admin/livraison/forfait-shadow" className="underline text-a-brand-fg">créer une version shadow</Link>.</p>
           <div className="flex flex-wrap gap-2">
             {drafts.map((d) => (
-              <button key={d.id} onClick={() => loadDraft(d)} className={`text-xs px-3 py-1.5 rounded-lg border ${selectedId === d.id ? 'border-[var(--color-primary)] text-[var(--color-primary-dark)]' : 'border-gray-200 text-gray-500'}`}>
+              <button key={d.id} onClick={() => loadDraft(d)} className={`text-xs px-3 py-1.5 rounded-lg border ${selectedId === d.id ? 'border-a-brand text-a-brand-fg' : 'border-a-border text-a-text-3'}`}>
                 {d.name}
               </button>
             ))}
@@ -329,9 +329,9 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
         </section>
       )}
 
-      <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+      <section className="bg-a-surface rounded-xl border border-a-border p-5">
         <h2 className="text-sm font-semibold mb-4">Nouveau brouillon</h2>
-        {error && <div className="mb-4 px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
+        {error && <div className="mb-4 px-3 py-2 rounded-lg text-xs bg-tone-danger-bg text-tone-danger-fg">{error}</div>}
 
         <div className="mb-4">
           <label className={LABEL_CLS}>Nom</label>
@@ -340,20 +340,20 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
         <div className="mb-4">
           <label className={LABEL_CLS}>Bandes de poids (prix client TTC, emballage compris)</label>
-          <p className="text-xs text-gray-400 mb-2">Le prix que <b>le client</b> paierait pour une tranche de poids. Avec une stratégie « 1er colis + … », la bande s&apos;applique au poids de chaque colis.</p>
+          <p className="text-xs text-a-text-3 mb-2">Le prix que <b>le client</b> paierait pour une tranche de poids. Avec une stratégie « 1er colis + … », la bande s&apos;applique au poids de chaque colis.</p>
           <div className="space-y-2">
             {bands.map((band, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input type="number" step="0.1" value={band.minKg} onChange={(e) => setBands((prev) => prev.map((b, idx) => idx === i ? { ...b, minKg: Number(e.target.value) } : b))} placeholder="Min kg" aria-label="Min kg" className={`${INPUT_CLS} w-24`} />
-                <span className="text-xs text-gray-400">à</span>
+                <span className="text-xs text-a-text-3">à</span>
                 <input type="number" step="0.1" value={band.maxKg ?? ''} onChange={(e) => setBands((prev) => prev.map((b, idx) => idx === i ? { ...b, maxKg: e.target.value === '' ? null : Number(e.target.value) } : b))} placeholder="Max kg (vide = illimité)" aria-label="Max kg" className={`${INPUT_CLS} w-40`} />
-                <span className="text-xs text-gray-400">=</span>
+                <span className="text-xs text-a-text-3">=</span>
                 <input type="number" step="0.01" value={band.price} onChange={(e) => setBands((prev) => prev.map((b, idx) => idx === i ? { ...b, price: Number(e.target.value) } : b))} placeholder="Prix €" aria-label="Prix €" className={`${INPUT_CLS} w-28`} />
-                <button onClick={() => setBands((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500" aria-label="Supprimer la bande"><IconTrash size={14} stroke={1.5} /></button>
+                <button onClick={() => setBands((prev) => prev.filter((_, idx) => idx !== i))} className="text-tone-danger-fg" aria-label="Supprimer la bande"><IconTrash size={14} stroke={1.5} /></button>
               </div>
             ))}
           </div>
-          <button onClick={() => setBands((prev) => [...prev, emptyBand()])} className="mt-2 text-xs text-[var(--color-primary-dark)] flex items-center gap-1"><IconPlus size={13} stroke={1.5} />Ajouter une bande</button>
+          <button onClick={() => setBands((prev) => [...prev, emptyBand()])} className="mt-2 text-xs text-a-brand-fg flex items-center gap-1"><IconPlus size={13} stroke={1.5} />Ajouter une bande</button>
         </div>
 
         <div className="mb-4">
@@ -361,28 +361,28 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
           <select value={strategyType} onChange={(e) => setStrategyType(e.target.value as ShippingMultiParcelStrategyType)} className={INPUT_CLS} aria-label="Stratégie colis supplémentaires">
             {STRATEGY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          {strategyHelp && <p className="text-xs text-gray-400 mt-1">{strategyHelp}</p>}
+          {strategyHelp && <p className="text-xs text-a-text-3 mt-1">{strategyHelp}</p>}
           <div className="mt-2 flex flex-wrap gap-3">
             {perParcel && (
-              <label className="text-xs text-gray-500">
+              <label className="text-xs text-a-text-3">
                 Poids max par colis (kg)
                 <input type="number" step="0.5" min="1" value={parcelMaxKg} onChange={(e) => setParcelMaxKg(Number(e.target.value))} className={`${INPUT_CLS} mt-0.5 w-28`} />
               </label>
             )}
             {strategyType === 'first_parcel_plus_percentage' && (
-              <label className="text-xs text-gray-500">
+              <label className="text-xs text-a-text-3">
                 Remise sur chaque colis supplémentaire (%)
                 <input type="number" step="1" min="0" max="100" value={percentageDiscount} onChange={(e) => setPercentageDiscount(Number(e.target.value))} className={`${INPUT_CLS} mt-0.5 w-28`} />
               </label>
             )}
             {strategyType === 'first_parcel_plus_discounted' && (
-              <label className="text-xs text-gray-500">
+              <label className="text-xs text-a-text-3">
                 Montant par colis supplémentaire (€)
                 <input type="number" step="0.01" min="0" value={fixedParcelRate} onChange={(e) => setFixedParcelRate(Number(e.target.value))} className={`${INPUT_CLS} mt-0.5 w-28`} />
               </label>
             )}
             {strategyType === 'flat_multi_parcel_rate' && (
-              <label className="text-xs text-gray-500">
+              <label className="text-xs text-a-text-3">
                 Prix unique dès 2 colis (€)
                 <input type="number" step="0.01" min="0" value={flatRate} onChange={(e) => setFlatRate(Number(e.target.value))} className={`${INPUT_CLS} mt-0.5 w-28`} />
               </label>
@@ -392,7 +392,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
 
         <div className="mb-4">
           <label className={LABEL_CLS}>Surcharges de zone (code=montant, séparés par des virgules)</label>
-          <p className="text-xs text-gray-400 mb-2">Montant additionnel pour une zone (îles, régions éloignées). Codes de zone : onglet « Tarification ».</p>
+          <p className="text-xs text-a-text-3 mb-2">Montant additionnel pour une zone (îles, régions éloignées). Codes de zone : onglet « Tarification ».</p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input type="text" value={zoneSurchargesText} onChange={(e) => setZoneSurchargesText(e.target.value)} className={INPUT_CLS} placeholder="IT_SICILY=2" />
             <select value={zoneSurchargeMode} onChange={(e) => setZoneSurchargeMode(e.target.value as 'per_order' | 'per_parcel')} className={`${INPUT_CLS} sm:w-56`} aria-label="Application de la surcharge de zone">
@@ -402,22 +402,22 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
           </div>
         </div>
 
-        <div className="mb-4 rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3">
-          <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Aperçu des prix client</p>
+        <div className="mb-4 rounded-lg bg-a-surface-2 p-3">
+          <p className="text-xs font-semibold text-a-text-2 mb-2">Aperçu des prix client</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-left text-2xs uppercase text-gray-400">
+                <tr className="text-left text-xs uppercase text-a-text-3">
                   <th className="py-1 pr-3">Poids</th><th className="py-1 pr-3">Colis (kg)</th><th className="py-1 pr-3 text-right">Zones standard</th>
                   {preview[0]?.surchargeZone && <th className="py-1 pr-3 text-right">{preview[0].surchargeZone}</th>}
                 </tr>
               </thead>
               <tbody>
                 {preview.map((p) => (
-                  <tr key={p.weightKg} className="border-t border-gray-100 dark:border-gray-800">
+                  <tr key={p.weightKg} className="border-t border-a-border">
                     <td className="py-1 pr-3 tabular-nums">{kg(p.weightKg)}</td>
-                    <td className="py-1 pr-3 text-gray-500">{p.parcels.map((w) => w.toLocaleString('fr-FR')).join(' + ')}</td>
-                    <td className="py-1 pr-3 text-right tabular-nums font-medium">{p.standard == null ? <span className="text-gray-400">hors bandes</span> : eur(p.standard)}</td>
+                    <td className="py-1 pr-3 text-a-text-3">{p.parcels.map((w) => w.toLocaleString('fr-FR')).join(' + ')}</td>
+                    <td className="py-1 pr-3 text-right tabular-nums font-medium">{p.standard == null ? <span className="text-a-text-3">hors bandes</span> : eur(p.standard)}</td>
                     {p.surchargeZone && <td className="py-1 pr-3 text-right tabular-nums">{p.withSurcharge == null ? '—' : eur(p.withSurcharge)}</td>}
                   </tr>
                 ))}
@@ -426,10 +426,10 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
           </div>
         </div>
 
-        <button onClick={() => void handleSave()} disabled={saving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer et rétrotester'}</button>
+        <button onClick={() => void handleSave()} disabled={saving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer et rétrotester'}</button>
       </section>
 
-      {simulating && <p className="text-sm text-gray-400">Calcul du rétrotest…</p>}
+      {simulating && <p className="text-sm text-a-text-3">Calcul du rétrotest…</p>}
 
       {results && (
         <section className="space-y-4">
@@ -453,7 +453,7 @@ export function TariffLabClient({ initialDrafts }: { initialDrafts: ShippingTari
               ? 'Échantillon faible (moins de 30 commandes) — interprétez ces chiffres avec prudence.'
               : null,
           )}
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-a-text-3">
             Les deux populations ne sont jamais moyennées ensemble : les scénarios synthétiques disent « que se passerait-il sur la gamme de poids/destinations mesurée », les commandes réelles disent « qu&apos;est-ce que cela aurait changé sur ce que vous avez réellement vendu ».
             {' '}Coûts finaux d&apos;expédition vérifiés disponibles : {results.verifiedShipmentCosts ?? 0} — aucun résultat ci-dessus ne représente une facture Packlink payée.
           </p>

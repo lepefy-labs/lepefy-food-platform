@@ -52,16 +52,16 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
 
   return (
     <div className="space-y-4">
-      {!available && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">La migration 151 doit être appliquée pour activer ce réglage. La création reste manuelle dans le back-office du transporteur.</p>}
-      {available && initial.status === 'invalid' && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">Le réglage enregistré est invalide : la création est désactivée. Vérifiez puis enregistrez.</p>}
-      {available && !canManage && <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800/60 dark:text-gray-300">Lecture seule : la modification demande la gestion de la livraison.</p>}
+      {!available && <p role="alert" className="rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-sm text-tone-warning-fg">La migration 151 doit être appliquée pour activer ce réglage. La création reste manuelle dans le back-office du transporteur.</p>}
+      {available && initial.status === 'invalid' && <p role="alert" className="rounded-xl border border-tone-danger-border bg-tone-danger-bg p-3 text-sm text-tone-danger-fg">Le réglage enregistré est invalide : la création est désactivée. Vérifiez puis enregistrez.</p>}
+      {available && !canManage && <p className="rounded-xl bg-a-surface-2 p-3 text-sm text-a-text-2">Lecture seule : la modification demande la gestion de la livraison.</p>}
 
-      <article aria-labelledby="shipment-creation-title" className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <header className="flex items-start gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-800">
+      <article aria-labelledby="shipment-creation-title" className="rounded-2xl border border-a-border bg-a-surface">
+        <header className="flex items-start gap-4 border-b border-a-border px-4 py-4 sm:px-6">
           <SettingsIconTile icon={IconTruckDelivery} accent="blue" />
           <div className="min-w-0">
-            <h2 id="shipment-creation-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Création des expéditions</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <h2 id="shipment-creation-title" className="text-base font-semibold text-a-text">Création des expéditions</h2>
+            <p className="mt-1 text-sm text-a-text-3">
               {provider ? `Transporteur : ${provider.displayName}` : 'Votre transporteur ne permet pas la création automatique des brouillons.'}
             </p>
           </div>
@@ -69,22 +69,22 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
 
         {provider && (
           <div className="space-y-5 px-4 py-5 sm:px-6">
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-a-text">
               <input type="checkbox" className="h-5 w-5 rounded accent-[var(--admin-primary)]" checked={form.enabled} disabled={disabled}
                 onChange={(event) => setForm((prev) => ({ ...prev, enabled: event.target.checked }))} />
               Créer les brouillons d’expédition depuis Lepefy
             </label>
 
             <fieldset disabled={disabled || !form.enabled} className="space-y-2 disabled:opacity-60">
-              <legend className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Moment de création</legend>
+              <legend className="mb-2 text-sm font-medium text-a-text-2">Moment de création</legend>
               {TRIGGERS.map((option) => (
-                <label key={option.key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${form.trigger === option.key ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)]' : 'border-[var(--admin-border)]'}`}>
+                <label key={option.key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${form.trigger === option.key ? 'border-a-brand bg-a-brand-soft' : 'border-a-border'}`}>
                   <input type="radio" name="shipment-trigger" className="mt-0.5 h-4 w-4 accent-[var(--admin-primary)]" value={option.key}
                     checked={form.trigger === option.key} onChange={() => setForm((prev) => ({ ...prev, trigger: option.key }))} />
                   <span className="min-w-0">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{SHIPMENT_TRIGGER_LABELS[option.key]}</span>
-                    {option.recommended && <span className="ml-2 rounded-full bg-[var(--admin-primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--admin-primary-fg)]">Recommandé</span>}
-                    <span className="mt-0.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">{option.hint}</span>
+                    <span className="font-medium text-a-text">{SHIPMENT_TRIGGER_LABELS[option.key]}</span>
+                    {option.recommended && <span className="ml-2 rounded-full bg-a-brand-soft px-2 py-0.5 text-xs font-semibold text-a-brand-fg">Recommandé</span>}
+                    <span className="mt-0.5 block text-xs leading-5 text-a-text-3">{option.hint}</span>
                   </span>
                 </label>
               ))}
@@ -96,14 +96,14 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
                 disabled={disabled || !form.enabled} aria-invalid={!contentValid}
                 onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))} />
               <p className={SETTINGS_HINT_CLS}>Envoyé au transporteur pour chaque brouillon (champ « Contenu » de {provider.displayName}), {SHIPMENT_CONTENT_MAX} caractères maximum.</p>
-              {!contentValid && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">Indiquez le contenu déclaré.</p>}
+              {!contentValid && <p role="alert" className="mt-1 text-xs text-tone-danger-fg">Indiquez le contenu déclaré.</p>}
             </div>
 
-            <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-sm text-tone-warning-fg">
               <IconInfoCircle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
               Lepefy crée uniquement un brouillon. L’achat et la validation finale restent effectués dans {provider.displayName} PRO.
             </p>
-            <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-gray-500 dark:text-gray-400">
+            <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-a-text-3">
               <li>Expéditeur : l’entrepôt par défaut de votre compte {provider.displayName} PRO.</li>
               <li>Colis : le carton suggéré dans la fiche commande (« Carton à utiliser », profils Emballages), tare incluse dans le poids.</li>
               <li>Aucun e-mail client et aucun changement de prix : la commande passe « expédiée » seulement quand le transporteur la prend en charge.</li>
@@ -113,7 +113,7 @@ export function ShipmentCreationSection({ initial, provider, canManage }: {
         )}
 
         {provider && (
-          <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 px-4 py-3 sm:px-6 dark:border-gray-800">
+          <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-a-border px-4 py-3 sm:px-6">
             <SettingsFeedback feedback={feedback} />
             <Button type="button" variant="outline" onClick={() => setForm(saved)} disabled={!dirty || saving} className="min-h-11">Annuler</Button>
             <Button type="button" onClick={() => void save()} disabled={disabled || !dirty || !contentValid} loading={saving} className="min-h-11">Enregistrer</Button>

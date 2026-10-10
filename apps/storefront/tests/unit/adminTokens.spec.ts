@@ -30,6 +30,11 @@ for (const mode of ['light', 'dark'] as const) {
     }
   });
 
+  test(`${mode}: inverse surface text is AA`, () => {
+    const s = ADMIN_SURFACE_VALUES[mode];
+    expect(contrastRatio(s.inverseFg, s.inverseBg)).toBeGreaterThanOrEqual(AA);
+  });
+
   test(`${mode}: brand label colours are AA`, () => {
     const brand = mode === 'light' ? adminLightBrand(DEFAULT_PLATFORM_BRANDING) : ADMIN_DARK_BRAND;
     const s = ADMIN_SURFACE_VALUES[mode];

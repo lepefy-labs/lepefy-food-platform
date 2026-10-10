@@ -34,6 +34,9 @@ export interface AdminSurfaceValues {
   hover: string;
   disabledBg: string;
   disabledFg: string;
+  /** Inverted surface (dark in light theme, light in dark theme) and its text. */
+  inverseBg: string;
+  inverseFg: string;
 }
 
 export interface AdminBrandValues { primary: string; primaryHover: string; primarySoft: string; primaryFg: string; onPrimary: string }
@@ -61,10 +64,12 @@ export const ADMIN_SURFACE_VALUES: Record<AdminThemeMode, AdminSurfaceValues> = 
   light: {
     pageBg: '#F7F8FA', surface: '#FFFFFF', surfaceSubtle: '#F8FAFC', border: '#E2E8F0', borderStrong: '#CBD5E1',
     text: '#172033', text2: '#475569', text3: '#5B6779', hover: '#F1F5F9', disabledBg: '#F1F5F9', disabledFg: '#5B6779',
+    inverseBg: '#172033', inverseFg: '#FFFFFF',
   },
   dark: {
     pageBg: '#0B0F17', surface: '#111827', surfaceSubtle: '#161E2E', border: '#263042', borderStrong: '#334155',
     text: '#E5E9F0', text2: '#B4BCC8', text3: '#8E98A8', hover: '#1A2333', disabledBg: '#1A2333', disabledFg: '#8E98A8',
+    inverseBg: '#E5E9F0', inverseFg: '#0B0F17',
   },
 };
 
@@ -98,6 +103,8 @@ function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tone
     `--admin-hover: ${surface.hover}`,
     `--admin-disabled-bg: ${surface.disabledBg}`,
     `--admin-disabled-fg: ${surface.disabledFg}`,
+    `--admin-inverse-bg: ${surface.inverseBg}`,
+    `--admin-inverse-fg: ${surface.inverseFg}`,
   ];
   for (const tone of ADMIN_TONES) {
     const value = tones[tone];

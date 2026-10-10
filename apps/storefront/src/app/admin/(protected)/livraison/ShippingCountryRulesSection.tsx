@@ -13,8 +13,8 @@ import {
 } from '@/lib/shipping/shippingRuleConflicts';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 // Mêmes pays que le sélecteur d'adresse du panier (CartClient.tsx) — seuls
 // pays pour lesquels un devis de livraison a un sens sur cette plateforme.
@@ -139,18 +139,18 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
 
   return (
     <div className="space-y-3">
-      {error && <div role="alert" className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
+      {error && <div role="alert" className="px-3 py-2 rounded-lg text-xs bg-tone-danger-bg text-tone-danger-fg">{error}</div>}
 
       <div>
         <label className={LABEL_CLS}>Pays</label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 mb-2">
+        <label className="flex items-center gap-2 text-sm text-a-text-2 mb-2">
           <input type="checkbox" checked={form.allCountries} onChange={(e) => set('allCountries', e.target.checked)} />
           Tous les pays
         </label>
         {!form.allCountries && (
           <div className="flex flex-wrap gap-3">
             {COUNTRIES.map((c) => (
-              <label key={c.value} className="flex items-center gap-1.5 text-sm text-gray-600">
+              <label key={c.value} className="flex items-center gap-1.5 text-sm text-a-text-2">
                 <input type="checkbox" checked={form.countries.includes(c.value)} onChange={() => toggleCountry(c.value)} />
                 {c.label}
               </label>
@@ -169,7 +169,7 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
           <input type="number" step="0.01" min={0} value={form.flat_rate_override} onChange={(e) => set('flat_rate_override', e.target.value)} placeholder="Bypass Packlink" className={INPUT_CLS} />
         </div>
       </div>
-      <p className="text-xs text-gray-400 -mt-1">Un forfait fixe remplace entièrement le calcul Packlink pour ce(s) pays — aucun appel API n&apos;est effectué.</p>
+      <p className="text-xs text-a-text-3 -mt-1">Un forfait fixe remplace entièrement le calcul Packlink pour ce(s) pays — aucun appel API n&apos;est effectué.</p>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -195,30 +195,30 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
 
       <div className="flex items-center gap-2">
         <input type="checkbox" id={`active-${idSuffix}`} checked={form.active} onChange={(e) => set('active', e.target.checked)} className="w-5 h-5" />
-        <label htmlFor={`active-${idSuffix}`} className="text-sm text-gray-600">Actif</label>
+        <label htmlFor={`active-${idSuffix}`} className="text-sm text-a-text-2">Actif</label>
       </div>
 
       {overlap.length > 0 && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div role="alert" className="flex items-start gap-2 rounded-lg bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg">
           <IconAlertTriangle size={14} stroke={1.8} className="mt-0.5 shrink-0" />
           {overlapMessage(overlap)}
         </div>
       )}
 
-      <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">Aperçu</p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+      <div className="rounded-lg border border-a-border bg-a-surface px-3 py-2.5">
+        <p className="text-xs font-semibold text-a-text-2">Aperçu</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-a-text-3">
           <label htmlFor={`example-base-${idSuffix}`}>Prix de base</label>
-          <input id={`example-base-${idSuffix}`} type="text" inputMode="decimal" value={exampleBase} onChange={(e) => setExampleBase(e.target.value)} className="w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900" />
+          <input id={`example-base-${idSuffix}`} type="text" inputMode="decimal" value={exampleBase} onChange={(e) => setExampleBase(e.target.value)} className="w-20 rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text" />
           <span>{currency} ·</span>
           <label htmlFor={`example-cart-${idSuffix}`}>panier</label>
-          <input id={`example-cart-${idSuffix}`} type="text" inputMode="decimal" value={exampleCart} onChange={(e) => setExampleCart(e.target.value)} className="w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900" />
+          <input id={`example-cart-${idSuffix}`} type="text" inputMode="decimal" value={exampleCart} onChange={(e) => setExampleCart(e.target.value)} className="w-20 rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text" />
           <span>{currency}</span>
         </div>
-        <p aria-live="polite" className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
+        <p aria-live="polite" className="mt-1.5 text-xs text-a-text-2">
           {preview ? (
             <>
-              → {body.active ? 'Le client paie' : 'Une fois active, le client paierait'} <strong className="font-semibold text-gray-900 dark:text-gray-100">{formatPrice(preview.finalCost, currency)}</strong>
+              → {body.active ? 'Le client paie' : 'Une fois active, le client paierait'} <strong className="font-semibold text-a-text">{formatPrice(preview.finalCost, currency)}</strong>
               {preview.freeShippingApplied
                 ? ' (livraison offerte)'
                 : preview.discountApplied > 0
@@ -227,18 +227,18 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
               {body.flat_rate_override != null && ' · forfait fixe, sans appel Packlink'}
               {body.free_shipping_above != null && !preview.freeShippingApplied && ` · offerte dès ${formatPrice(body.free_shipping_above, currency)}`}
               {!body.active && (
-                <span className="block text-amber-700">Règle inactive : elle n&apos;est pas appliquée aux devis tant qu&apos;elle n&apos;est pas activée.</span>
+                <span className="block text-tone-warning-fg">Règle inactive : elle n&apos;est pas appliquée aux devis tant qu&apos;elle n&apos;est pas activée.</span>
               )}
             </>
           ) : 'Complétez la règle pour voir le résultat.'}
         </p>
-        <p className="mt-1 text-2xs text-gray-400">Le prix de base est le tarif de la zone en mode grille tarifaire, sinon le coût du devis Packlink.</p>
+        <p className="mt-1 text-xs text-a-text-3">Le prix de base est le tarif de la zone en mode grille tarifaire, sinon le coût du devis Packlink.</p>
       </div>
 
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">{submitLabel}</button>
+        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50">{submitLabel}</button>
         {onCancel && (
-          <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Annuler</button>
+          <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-a-border text-a-text-3 disabled:opacity-50">Annuler</button>
         )}
       </div>
     </div>
@@ -336,11 +336,11 @@ export function ShippingCountryRulesSection({ initialRules, currency, canManage 
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      {toast && <div role={toast.type === 'error' ? 'alert' : 'status'} className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.msg}</div>}
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
+      {toast && <div role={toast.type === 'error' ? 'alert' : 'status'} className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{toast.msg}</div>}
 
       {conflicts.length > 0 && (
-        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg">
           <IconAlertTriangle size={14} stroke={1.8} className="mt-0.5 shrink-0" />
           <span>
             Conflit : {conflicts.map((conflict) => `${countryLabel(conflict.country)} (${conflict.ruleIds.length} règles)`).join(', ')} — plusieurs règles actives pour un même pays, la règle appliquée n&apos;est pas déterminée. Désactivez ou modifiez l&apos;une d&apos;elles.
@@ -348,46 +348,46 @@ export function ShippingCountryRulesSection({ initialRules, currency, canManage 
         </div>
       )}
 
-      {rules.length === 0 && !creating && <p className="text-sm text-gray-400 mb-4">Aucune règle configurée — le calcul de livraison standard s&apos;applique sans modification.</p>}
+      {rules.length === 0 && !creating && <p className="text-sm text-a-text-3 mb-4">Aucune règle configurée — le calcul de livraison standard s&apos;applique sans modification.</p>}
 
       {rules.length > 0 && (
         <div className="overflow-x-auto mb-6">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
+              <tr className="text-left text-xs font-medium text-a-text-3 uppercase tracking-wide border-b border-a-border">
                 <th className="py-2 pr-3">Pays</th><th className="py-2 pr-3">Gratuité dès</th><th className="py-2 pr-3">Forfait</th><th className="py-2 pr-3">Remise</th><th className="py-2 pr-3">Actif</th>{canManage && <th className="py-2 pr-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {rules.map((rule) => (
                 <Fragment key={rule.id}>
-                  <tr className="border-b border-gray-50 dark:border-gray-800/60">
+                  <tr className="border-b border-a-border">
                     <td className="py-2.5 pr-3">
                       <div className="flex flex-wrap gap-1">
                         {rule.countries.includes(ALL_COUNTRIES)
-                          ? <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">Tous les pays</span>
-                          : rule.countries.map((c) => <span key={c} className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]">{countryLabel(c)}</span>)}
-                        {rule.active && conflictedIds.has(rule.id) && <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Conflit</span>}
+                          ? <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-a-hover text-a-text-2">Tous les pays</span>
+                          : rule.countries.map((c) => <span key={c} className="text-xs font-semibold px-1.5 py-0.5 rounded bg-a-brand-soft text-a-brand-fg">{countryLabel(c)}</span>)}
+                        {rule.active && conflictedIds.has(rule.id) && <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-tone-warning-bg text-tone-warning-fg">Conflit</span>}
                       </div>
-                      {rule.note && <p className="mt-1 text-xs text-gray-400">{rule.note}</p>}
+                      {rule.note && <p className="mt-1 text-xs text-a-text-3">{rule.note}</p>}
                     </td>
-                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.free_shipping_above != null ? formatPrice(rule.free_shipping_above, currency) : '—'}</td>
-                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.flat_rate_override != null ? formatPrice(rule.flat_rate_override, currency) : '—'}</td>
-                    <td className="py-2.5 pr-3 text-gray-700 dark:text-gray-300">{rule.discount_type ? rule.discount_type === 'percentage' ? `-${rule.discount_value}%` : `-${formatPrice(rule.discount_value ?? 0, currency)}` : '—'}</td>
+                    <td className="py-2.5 pr-3 text-a-text-2">{rule.free_shipping_above != null ? formatPrice(rule.free_shipping_above, currency) : '—'}</td>
+                    <td className="py-2.5 pr-3 text-a-text-2">{rule.flat_rate_override != null ? formatPrice(rule.flat_rate_override, currency) : '—'}</td>
+                    <td className="py-2.5 pr-3 text-a-text-2">{rule.discount_type ? rule.discount_type === 'percentage' ? `-${rule.discount_value}%` : `-${formatPrice(rule.discount_value ?? 0, currency)}` : '—'}</td>
                     <td className="py-2.5 pr-3">
                       {canManage
                         ? <input type="checkbox" aria-label={rule.active ? 'Désactiver la règle' : 'Activer la règle'} checked={rule.active} onChange={() => setPendingToggle(rule)} disabled={savingId === rule.id} className="w-5 h-5" />
-                        : <span className={`text-xs font-medium ${rule.active ? 'text-green-700' : 'text-gray-400'}`}>{rule.active ? 'Active' : 'Inactive'}</span>}
+                        : <span className={`text-xs font-medium ${rule.active ? 'text-tone-success-fg' : 'text-a-text-3'}`}>{rule.active ? 'Active' : 'Inactive'}</span>}
                     </td>
                     {canManage && (
                       <td className="py-2.5 pr-3"><div className="flex items-center gap-2 justify-end">
-                        <button onClick={() => setEditingId(editingId === rule.id ? null : rule.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === rule.id ? 'Fermer' : 'Modifier'}</button>
-                        <button onClick={() => setPendingDeleteId(rule.id)} disabled={savingId === rule.id} aria-label="Supprimer la règle" className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
+                        <button onClick={() => setEditingId(editingId === rule.id ? null : rule.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border">{editingId === rule.id ? 'Fermer' : 'Modifier'}</button>
+                        <button onClick={() => setPendingDeleteId(rule.id)} disabled={savingId === rule.id} aria-label="Supprimer la règle" className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border text-tone-danger-fg flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
                       </div></td>
                     )}
                   </tr>
                   {canManage && editingId === rule.id && (
-                    <tr><td colSpan={6} className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4"><RuleForm initial={rule} allRules={rules} currency={currency} submitLabel="Enregistrer" isSaving={savingId === rule.id} onSubmit={(form) => handleUpdate(rule.id, form)} onCancel={() => setEditingId(null)} /></td></tr>
+                    <tr><td colSpan={6} className="bg-a-surface-2 rounded-lg p-4"><RuleForm initial={rule} allRules={rules} currency={currency} submitLabel="Enregistrer" isSaving={savingId === rule.id} onSubmit={(form) => handleUpdate(rule.id, form)} onCancel={() => setEditingId(null)} /></td></tr>
                   )}
                 </Fragment>
               ))}
@@ -397,9 +397,9 @@ export function ShippingCountryRulesSection({ initialRules, currency, canManage 
       )}
 
       {!canManage ? null : creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4"><p className="text-xs font-medium text-gray-500 mb-3">Nouvelle règle</p><RuleForm allRules={rules} currency={currency} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
+        <div className="border border-dashed border-a-border rounded-lg p-4"><p className="text-xs font-medium text-a-text-3 mb-3">Nouvelle règle</p><RuleForm allRules={rules} currency={currency} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
       ) : (
-        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter une règle</button>
+        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand"><IconPlus size={14} stroke={1.5} />Ajouter une règle</button>
       )}
 
       <ConfirmDialog

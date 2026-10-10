@@ -13,8 +13,8 @@ import {
 } from '@/lib/shipping/shippingRuleConflicts';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 interface FormState {
   code: string;
@@ -70,7 +70,7 @@ function ZoneForm({ initial, allZones, submitLabel, isSaving, onSubmit, onCancel
 
   return (
     <div className="space-y-3">
-      {error && <div role="alert" className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
+      {error && <div role="alert" className="px-3 py-2 rounded-lg text-xs bg-tone-danger-bg text-tone-danger-fg">{error}</div>}
       <div className="grid grid-cols-2 gap-3">
         <div><label className={LABEL_CLS}>Code de zone</label><input type="text" value={form.code} onChange={(e) => set('code', e.target.value)} placeholder="Ex. IT_SICILY" className={INPUT_CLS} /></div>
         <div><label className={LABEL_CLS}>Pays (ISO2)</label><input type="text" value={form.country} onChange={(e) => set('country', e.target.value)} placeholder="IT" className={INPUT_CLS} /></div>
@@ -78,17 +78,17 @@ function ZoneForm({ initial, allZones, submitLabel, isSaving, onSubmit, onCancel
       <div>
         <label className={LABEL_CLS}>Préfixes de code postal (séparés par des virgules)</label>
         <input type="text" value={form.postal_prefixes} onChange={(e) => set('postal_prefixes', e.target.value)} placeholder="90, 91, 92, 93, 94, 95, 96, 97, 98" className={INPUT_CLS} />
-        <p className="text-xs text-gray-400 mt-1">Saisie manuelle — aucun mapping code postal → région n&apos;est fourni par la plateforme. Un préfixe plus long (30121) est prioritaire sur un plus court (30).</p>
+        <p className="text-xs text-a-text-3 mt-1">Saisie manuelle — aucun mapping code postal → région n&apos;est fourni par la plateforme. Un préfixe plus long (30121) est prioritaire sur un plus court (30).</p>
       </div>
       {duplicates.length > 0 && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div role="alert" className="flex items-start gap-2 rounded-lg bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg">
           <IconAlertTriangle size={14} stroke={1.8} className="mt-0.5 shrink-0" />
           Préfixe(s) déjà utilisé(s) par une autre zone active de ce pays : {duplicates.join(', ')}.
         </div>
       )}
       <div className="flex items-center gap-2 pt-1">
-        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">{submitLabel}</button>
-        {onCancel && <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Annuler</button>}
+        <button onClick={handleSubmit} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50">{submitLabel}</button>
+        {onCancel && <button onClick={onCancel} disabled={isSaving} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-a-border text-a-text-3 disabled:opacity-50">Annuler</button>}
       </div>
     </div>
   );
@@ -179,19 +179,19 @@ export function ZonesSection({ initialZones, canManage, tariffMode }: {
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mt-4">
-      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Zones géographiques</h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+    <section className="bg-a-surface rounded-xl border border-a-border p-5 mt-4">
+      <h2 className="text-sm font-semibold text-a-text mb-1">Zones géographiques</h2>
+      <p className="text-xs text-a-text-3 mb-4">
         {tariffMode
           ? <>En mode grille tarifaire, la zone détermine le prix client : un code postal hors de toute zone n&apos;est pas couvert par le forfait et suit le repli configuré. </>
           : <>Utilisées par la grille tarifaire (si elle est activée), l&apos;assistant expédition et le laboratoire. </>}
         Le préfixe le plus long l&apos;emporte.
       </p>
 
-      {toast && <div role={toast.type === 'error' ? 'alert' : 'status'} className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{toast.msg}</div>}
+      {toast && <div role={toast.type === 'error' ? 'alert' : 'status'} className={`mb-4 px-3 py-2 rounded-lg text-xs ${toast.type === 'success' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{toast.msg}</div>}
 
       {prefixConflicts.length > 0 && (
-        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg">
           <IconAlertTriangle size={14} stroke={1.8} className="mt-0.5 shrink-0" />
           <span>
             Préfixes en conflit (zone ambiguë) : {prefixConflicts.map((conflict) => `${conflict.country} ${conflict.prefix} → ${conflict.zoneCodes.join(' / ')}`).join(' · ')}
@@ -200,31 +200,31 @@ export function ZonesSection({ initialZones, canManage, tariffMode }: {
       )}
 
       {zones.length > 0 && (
-        <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2.5 dark:bg-gray-800/40">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+        <div className="mb-4 rounded-lg bg-a-surface-2 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-a-text-2">
             <label htmlFor="zone-lookup-postal" className="font-semibold">Quelle zone pour</label>
-            <select aria-label="Pays" value={lookupCountry} onChange={(e) => setLookupCountry(e.target.value)} className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900">
+            <select aria-label="Pays" value={lookupCountry} onChange={(e) => setLookupCountry(e.target.value)} className="rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text">
               {countryOptions.map((country) => <option key={country} value={country}>{countryName(country)}</option>)}
             </select>
-            <input id="zone-lookup-postal" type="text" inputMode="numeric" autoComplete="off" value={lookupPostal} onChange={(e) => setLookupPostal(e.target.value)} placeholder="Code postal" className="w-28 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900" />
+            <input id="zone-lookup-postal" type="text" inputMode="numeric" autoComplete="off" value={lookupPostal} onChange={(e) => setLookupPostal(e.target.value)} placeholder="Code postal" className="w-28 rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text" />
             <span aria-live="polite">
               {lookup && (lookup.zoneCode ? (
                 <>
-                  → <strong className="font-semibold text-gray-900 dark:text-gray-100">{lookup.zoneCode}</strong>
-                  <span className="text-gray-500"> (préfixe {lookup.matchedPrefix}{lookup.overridden.length > 0 && `, prioritaire sur ${lookup.overridden.map((match) => `${match.prefix} · ${match.zoneCode}`).join(', ')}`})</span>
+                  → <strong className="font-semibold text-a-text">{lookup.zoneCode}</strong>
+                  <span className="text-a-text-3"> (préfixe {lookup.matchedPrefix}{lookup.overridden.length > 0 && `, prioritaire sur ${lookup.overridden.map((match) => `${match.prefix} · ${match.zoneCode}`).join(', ')}`})</span>
                 </>
               ) : (
-                <span className="text-amber-700">→ Aucune zone{tariffMode ? ' : non couvert par le forfait' : ''}</span>
+                <span className="text-tone-warning-fg">→ Aucune zone{tariffMode ? ' : non couvert par le forfait' : ''}</span>
               ))}
             </span>
           </div>
         </div>
       )}
 
-      {zones.length === 0 && !creating && <p className="text-sm text-gray-400 mb-4">Aucune zone définie — les destinations sont regroupées par pays uniquement.</p>}
+      {zones.length === 0 && !creating && <p className="text-sm text-a-text-3 mb-4">Aucune zone définie — les destinations sont regroupées par pays uniquement.</p>}
 
       {groups.length > 0 && (
-        <div className="mb-4 divide-y divide-gray-100 rounded-lg border border-gray-100 dark:divide-gray-800 dark:border-gray-800">
+        <div className="mb-4 divide-y divide-a-border rounded-lg border border-a-border">
           {groups.map((group) => {
             const open = openCountries.has(group.country);
             return (
@@ -233,34 +233,34 @@ export function ZonesSection({ initialZones, canManage, tariffMode }: {
                   type="button"
                   aria-expanded={open}
                   onClick={() => toggleCountry(group.country)}
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-a-surface-2"
                 >
-                  <span className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <span className="flex items-center gap-2 text-sm font-medium text-a-text">
                     {open ? <IconChevronDown size={16} stroke={1.8} /> : <IconChevronRight size={16} stroke={1.8} />}
                     {countryName(group.country)}
-                    <span className="text-xs font-normal text-gray-400">{group.zones.length} zone{group.zones.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs font-normal text-a-text-3">{group.zones.length} zone{group.zones.length !== 1 ? 's' : ''}</span>
                   </span>
-                  {!open && <span className="min-w-0 truncate text-xs text-gray-400">{group.zones.map((zone) => zone.code).join(' · ')}</span>}
+                  {!open && <span className="min-w-0 truncate text-xs text-a-text-3">{group.zones.map((zone) => zone.code).join(' · ')}</span>}
                 </button>
                 {open && (
                   <div className="space-y-2 px-3 pb-3">
                     {group.zones.map((zone) => (
-                      <div key={zone.id} className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
+                      <div key={zone.id} className="rounded-lg border border-a-border p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{zone.code}</span>
-                            {!zone.active && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-2xs font-semibold text-gray-500">Inactive</span>}
-                            <p className="mt-0.5 break-words text-xs text-gray-400">préfixes {zone.postal_prefixes.join(', ') || '—'}</p>
+                            <span className="text-sm font-medium text-a-text">{zone.code}</span>
+                            {!zone.active && <span className="ml-2 rounded bg-a-hover px-1.5 py-0.5 text-xs font-semibold text-a-text-3">Inactive</span>}
+                            <p className="mt-0.5 break-words text-xs text-a-text-3">préfixes {zone.postal_prefixes.join(', ') || '—'}</p>
                           </div>
                           {canManage && (
                             <div className="flex shrink-0 items-center gap-2">
-                              <button onClick={() => setEditingId(editingId === zone.id ? null : zone.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200">{editingId === zone.id ? 'Fermer' : 'Modifier'}</button>
-                              <button onClick={() => setPendingDeleteId(zone.id)} disabled={savingId === zone.id} aria-label={`Supprimer la zone ${zone.code}`} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
+                              <button onClick={() => setEditingId(editingId === zone.id ? null : zone.id)} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border">{editingId === zone.id ? 'Fermer' : 'Modifier'}</button>
+                              <button onClick={() => setPendingDeleteId(zone.id)} disabled={savingId === zone.id} aria-label={`Supprimer la zone ${zone.code}`} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border text-tone-danger-fg flex items-center gap-1 disabled:opacity-50"><IconTrash size={14} stroke={1.5} /></button>
                             </div>
                           )}
                         </div>
                         {canManage && editingId === zone.id && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                          <div className="mt-3 pt-3 border-t border-a-border">
                             <ZoneForm initial={zone} allZones={zones} submitLabel="Enregistrer" isSaving={savingId === zone.id} onSubmit={(form) => handleUpdate(zone.id, form)} onCancel={() => setEditingId(null)} />
                           </div>
                         )}
@@ -275,9 +275,9 @@ export function ZonesSection({ initialZones, canManage, tariffMode }: {
       )}
 
       {!canManage ? null : creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4"><p className="text-xs font-medium text-gray-500 mb-3">Nouvelle zone</p><ZoneForm allZones={zones} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
+        <div className="border border-dashed border-a-border rounded-lg p-4"><p className="text-xs font-medium text-a-text-3 mb-3">Nouvelle zone</p><ZoneForm allZones={zones} submitLabel="Ajouter" isSaving={savingId === 'new'} onSubmit={handleCreate} onCancel={() => setCreating(false)} /></div>
       ) : (
-        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter une zone</button>
+        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand"><IconPlus size={14} stroke={1.5} />Ajouter une zone</button>
       )}
 
       <ConfirmDialog

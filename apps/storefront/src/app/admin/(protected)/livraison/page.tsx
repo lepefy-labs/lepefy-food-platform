@@ -55,14 +55,14 @@ export default async function AdminLivraisonPage() {
 
       <LivraisonTabs active="rules" />
 
-      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-gray-800 dark:bg-gray-900">
-        <span className="rounded-full bg-[var(--admin-primary-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--admin-primary-fg)]">
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-a-border bg-a-surface px-4 py-3 text-sm">
+        <span className="rounded-full bg-a-brand-soft px-2.5 py-1 text-xs font-semibold text-a-brand-fg">
           Mode : {PRICING_MODE_LABEL[pricingMode]}
         </span>
-        <span className="text-gray-500 dark:text-gray-400">
-          Ordre appliqué : <strong className="font-medium text-gray-800 dark:text-gray-200">prix de base → forfait fixe → remise → gratuité</strong> · la règle d&apos;un pays prime sur « Tous les pays ».
+        <span className="text-a-text-3">
+          Ordre appliqué : <strong className="font-medium text-a-text">prix de base → forfait fixe → remise → gratuité</strong> · la règle d&apos;un pays prime sur « Tous les pays ».
         </span>
-        {!canManage && <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Lecture seule</span>}
+        {!canManage && <span className="ml-auto rounded-full bg-a-hover px-2.5 py-1 text-xs font-medium text-a-text-2">Lecture seule</span>}
       </div>
 
       <AdminBlockAccent tone="info">

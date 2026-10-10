@@ -35,6 +35,8 @@ const config: Config = {
           'on-brand': 'var(--admin-on-primary)',
           'disabled-bg': 'var(--admin-disabled-bg)',
           'disabled-fg': 'var(--admin-disabled-fg)',
+          inverse: 'var(--admin-inverse-bg)',
+          'on-inverse': 'var(--admin-inverse-fg)',
         },
         tone: Object.fromEntries(
           ['info', 'success', 'warning', 'urgent', 'danger', 'neutral'].flatMap((tone) =>

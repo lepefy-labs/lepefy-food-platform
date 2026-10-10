@@ -14,12 +14,12 @@ import { buildVersionFromDraft, parseTariffVersion, TARIFF_ERROR_LABELS } from '
 import { buildActivationChecklist, describeCountryRule, perOrderSurchargeZones } from '@/lib/shipping/tariff/activationChecklist';
 import { resolveCountryRule } from '@/lib/shipping/resolveCountryRule';
 
-const CARD = 'bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5';
+const CARD = 'bg-a-surface rounded-xl border border-a-border p-5';
 const INPUT_CLS =
-  'w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
-const BTN = 'min-h-11 px-4 py-2 text-xs font-semibold rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50';
-const BTN_GHOST = 'min-h-11 px-4 py-2 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-50';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+const BTN = 'min-h-11 px-4 py-2 text-xs font-semibold rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50';
+const BTN_GHOST = 'min-h-11 px-4 py-2 text-xs font-semibold rounded-lg border border-a-border text-a-text-2 disabled:opacity-50';
 
 const SAMPLE_WEIGHTS_G = [1000, 5000, 5001, 10000, 15000, 15001, 20000, 30000, 30001, 45000, 60000, 90000];
 
@@ -38,16 +38,16 @@ const REASON_LABELS: Record<ShadowTariffReason, string> = {
 };
 
 const STATUS_LABELS: Record<string, { text: string; cls: string }> = {
-  complete: { text: 'Complète', cls: 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300' },
-  incomplete: { text: 'Incomplète', cls: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' },
-  unavailable: { text: 'Indisponible', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' },
-  error: { text: 'Erreur', cls: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' },
+  complete: { text: 'Complète', cls: 'bg-tone-success-bg text-tone-success-fg' },
+  incomplete: { text: 'Incomplète', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
+  unavailable: { text: 'Indisponible', cls: 'bg-a-hover text-a-text-2' },
+  error: { text: 'Erreur', cls: 'bg-tone-danger-bg text-tone-danger-fg' },
 };
 
 const RELIABILITY: Record<ShadowReport['reliability'], { text: string; cls: string }> = {
-  insufficient: { text: 'Échantillon insuffisant (< 30 simulations complètes)', cls: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300' },
-  limited: { text: 'Échantillon limité (< 100 simulations complètes)', cls: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' },
-  indicative: { text: 'Indicatif', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' },
+  insufficient: { text: 'Échantillon insuffisant (< 30 simulations complètes)', cls: 'bg-tone-danger-bg text-tone-danger-fg' },
+  limited: { text: 'Échantillon limité (< 100 simulations complètes)', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
+  indicative: { text: 'Indicatif', cls: 'bg-tone-info-bg text-tone-info-fg' },
 };
 
 function eurCents(value: number | null | undefined, signed = false): string {
@@ -61,10 +61,10 @@ function kgFromG(g: number | null | undefined): string {
 }
 
 function gapCls(value: number | null | undefined): string {
-  if (value == null) return 'text-gray-400';
-  if (value < 0) return 'text-red-600 dark:text-red-400 font-semibold';
-  if (value < 100) return 'text-amber-600 dark:text-amber-400 font-semibold';
-  return 'text-green-700 dark:text-green-400 font-semibold';
+  if (value == null) return 'text-a-text-3';
+  if (value < 0) return 'text-tone-danger-fg font-semibold';
+  if (value < 100) return 'text-tone-warning-fg font-semibold';
+  return 'text-tone-success-fg font-semibold';
 }
 
 function vatRateFor(country: string, rates: ForfaitShadowAdminData['vatRates']): number | null {
@@ -78,7 +78,7 @@ function SampleTable({ tariff, vatRate }: { tariff: TariffSnapshot; vatRate: num
     <div className="overflow-x-auto">
       <table className="w-full text-xs tabular-nums">
         <thead>
-          <tr className="text-left text-2xs uppercase tracking-wide text-gray-400 border-b border-gray-100 dark:border-gray-800">
+          <tr className="text-left text-xs uppercase tracking-wide text-a-text-3 border-b border-a-border">
             <th className="py-1.5 pr-3">Poids net</th><th className="py-1.5 pr-3">Colis théoriques</th><th className="py-1.5 pr-3">Tranche / blocs</th>
             <th className="py-1.5 pr-3 text-right">Zones standard</th>
             {zones.map((z) => <th key={z} className="py-1.5 pr-3 text-right">{z}</th>)}
@@ -89,22 +89,22 @@ function SampleTable({ tariff, vatRate }: { tariff: TariffSnapshot; vatRate: num
           {SAMPLE_WEIGHTS_G.map((weightG) => {
             const standard = priceFromTariff(tariff, { weightG, country: tariff.country, zoneCode: null, vatRate });
             return (
-              <tr key={weightG} className="border-b border-gray-50 dark:border-gray-800/60">
+              <tr key={weightG} className="border-b border-a-border">
                 <td className="py-1.5 pr-3 whitespace-nowrap">{kgFromG(weightG)}</td>
-                <td className="py-1.5 pr-3 whitespace-nowrap text-gray-500">{standard.available ? standard.parcelsG.map((g) => (g / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 3 })).join(' + ') : '—'}</td>
-                <td className="py-1.5 pr-3 whitespace-nowrap text-gray-500">
+                <td className="py-1.5 pr-3 whitespace-nowrap text-a-text-3">{standard.available ? standard.parcelsG.map((g) => (g / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 3 })).join(' + ') : '—'}</td>
+                <td className="py-1.5 pr-3 whitespace-nowrap text-a-text-3">
                   {standard.available
                     ? [standard.blocks > 0 ? `${standard.blocks} bloc(s)` : null, standard.band ? `${kgFromG(standard.band.minGExclusive)}–${standard.band.maxGInclusive === null ? '∞' : kgFromG(standard.band.maxGInclusive)}` : null].filter(Boolean).join(' + ')
                     : '—'}
                 </td>
-                <td className="py-1.5 pr-3 text-right font-medium">{standard.available ? eurCents(standard.totalTtcCents) : <span className="text-gray-400">hors tranches</span>}</td>
+                <td className="py-1.5 pr-3 text-right font-medium">{standard.available ? eurCents(standard.totalTtcCents) : <span className="text-a-text-3">hors tranches</span>}</td>
                 {zones.map((z) => {
                   const r = priceFromTariff(tariff, { weightG, country: tariff.country, zoneCode: z, vatRate });
                   return <td key={z} className="py-1.5 pr-3 text-right">{r.available ? eurCents(r.totalTtcCents) : '—'}</td>;
                 })}
                 <td className="py-1.5 pr-3 whitespace-nowrap">
                   {standard.available && standard.warnings.includes('logistics_unverified_weight') && (
-                    <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" title="Prix théorique : la faisabilité logistique n'a pas été vérifiée pour ce poids">logistique non vérifiée</span>
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-tone-warning-bg text-tone-warning-fg" title="Prix théorique : la faisabilité logistique n'a pas été vérifiée pour ce poids">logistique non vérifiée</span>
                   )}
                 </td>
               </tr>
@@ -112,7 +112,7 @@ function SampleTable({ tariff, vatRate }: { tariff: TariffSnapshot; vatRate: num
           })}
         </tbody>
       </table>
-      <p className="mt-2 text-2xs text-gray-400">Simulation avec le moteur utilisé au checkout, sans commande réelle. Prix TTC avant règles pays (remise, gratuité). Colis : remplissage progressif, limite par colis de la version.</p>
+      <p className="mt-2 text-xs text-a-text-3">Simulation avec le moteur utilisé au checkout, sans commande réelle. Prix TTC avant règles pays (remise, gratuité). Colis : remplissage progressif, limite par colis de la version.</p>
     </div>
   );
 }
@@ -124,10 +124,10 @@ function VersionDetails({ version, vatRate }: { version: ShippingTariffVersionRo
       <div className="space-y-3">
         <div className="overflow-x-auto">
           <table className="w-full text-xs tabular-nums">
-            <thead><tr className="text-left text-2xs uppercase tracking-wide text-gray-400 border-b border-gray-100 dark:border-gray-800"><th className="py-1.5 pr-3">Tranche (&gt; min, ≤ max)</th><th className="py-1.5 text-right">Prix {version.prices_include_vat ? 'TTC' : 'HT'}</th></tr></thead>
+            <thead><tr className="text-left text-xs uppercase tracking-wide text-a-text-3 border-b border-a-border"><th className="py-1.5 pr-3">Tranche (&gt; min, ≤ max)</th><th className="py-1.5 text-right">Prix {version.prices_include_vat ? 'TTC' : 'HT'}</th></tr></thead>
             <tbody>
               {version.bands.map((b) => (
-                <tr key={b.min_g_exclusive} className="border-b border-gray-50 dark:border-gray-800/60">
+                <tr key={b.min_g_exclusive} className="border-b border-a-border">
                   <td className="py-1.5 pr-3">{kgFromG(b.min_g_exclusive)} – {b.max_g_inclusive === null ? '∞' : kgFromG(b.max_g_inclusive)}</td>
                   <td className="py-1.5 text-right font-medium">{eurCents(b.price_cents)}</td>
                 </tr>
@@ -135,7 +135,7 @@ function VersionDetails({ version, vatRate }: { version: ShippingTariffVersionRo
             </tbody>
           </table>
         </div>
-        <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+        <ul className="text-xs text-a-text-2 space-y-1">
           <li>Au-delà de {version.block_weight_g ? kgFromG(version.block_weight_g) : '—'} : {version.block_weight_g ? <>blocs de {kgFromG(version.block_weight_g)} à <b>{eurCents(version.block_price_cents)}</b> + tranche du reste</> : 'aucun bloc (hors tranches)'}</li>
           <li>Colis théorique max : <b>{kgFromG(version.max_parcel_weight_g)}</b></li>
           <li>Logistique vérifiée jusqu&apos;à : <b>{version.logistics_verified_max_weight_g ? kgFromG(version.logistics_verified_max_weight_g) : 'non renseigné'}</b></li>
@@ -143,17 +143,17 @@ function VersionDetails({ version, vatRate }: { version: ShippingTariffVersionRo
         </ul>
         <div className="flex flex-wrap gap-1.5">
           {version.zone_surcharges.map((z) => (
-            <span key={z.zone_code} className="text-2xs px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">{z.zone_code} +{eurCents(z.amount_cents)} {z.mode === 'per_parcel' ? '/colis' : '/commande'}</span>
+            <span key={z.zone_code} className="text-xs px-2 py-1 rounded-lg border border-a-border text-a-text-2">{z.zone_code} +{eurCents(z.amount_cents)} {z.mode === 'per_parcel' ? '/colis' : '/commande'}</span>
           ))}
           {version.non_deliverable_zones.map((z) => (
-            <span key={z} className="text-2xs px-2 py-1 rounded-lg border border-red-200 text-red-700 dark:border-red-900 dark:text-red-300">{z} non livrable</span>
+            <span key={z} className="text-xs px-2 py-1 rounded-lg border border-tone-danger-border text-tone-danger-fg">{z} non livrable</span>
           ))}
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Simulation d&apos;exemple</p>
+        <p className="text-xs font-semibold text-a-text-2 mb-2">Simulation d&apos;exemple</p>
         {parsed.ok ? <SampleTable tariff={parsed.tariff} vatRate={vatRate} /> : (
-          <p className="text-xs text-red-600">Version incohérente, jamais utilisée pour un calcul : {parsed.errors.map((e) => TARIFF_ERROR_LABELS[e]).join(' ')}</p>
+          <p className="text-xs text-tone-danger-fg">Version incohérente, jamais utilisée pour un calcul : {parsed.errors.map((e) => TARIFF_ERROR_LABELS[e]).join(' ')}</p>
         )}
       </div>
     </div>
@@ -414,43 +414,43 @@ export function ForfaitShadowClient({
   return (
     <div className="space-y-6">
       {!data.migrationReady && (
-        <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="flex gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-4 text-sm text-tone-warning-fg">
           <IconAlertTriangle size={18} stroke={1.5} className="shrink-0 mt-0.5" />
           <p>La migration <code>124_shipping_tariff_versions.sql</code> n&apos;est pas encore appliquée. Les versions et la collecte shadow sont indisponibles ; le checkout fonctionne comme avant.</p>
         </div>
       )}
       {data.migrationReady && !data.activationReady && (
-        <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="flex gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-4 text-sm text-tone-warning-fg">
           <IconAlertTriangle size={18} stroke={1.5} className="shrink-0 mt-0.5" />
           <p>La migration <code>125_shipping_tariff_activation.sql</code> n&apos;est pas encore appliquée : l&apos;activation commerciale est indisponible. La collecte shadow fonctionne.</p>
         </div>
       )}
 
       {message && (
-        <div role="status" className={`rounded-lg px-3 py-2 text-xs ${message.kind === 'ok' ? 'bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}>{message.text}</div>
+        <div role="status" className={`rounded-lg px-3 py-2 text-xs ${message.kind === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</div>
       )}
 
       {/* États : brouillon / version shadow / tarification active / retirée */}
       <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-4">
+        <div className="rounded-xl border border-dashed border-a-border-strong p-4">
           <p className="text-sm font-semibold">Brouillon</p>
-          <p className="text-xs text-gray-500 mt-1">Modifiable, rétrotesté dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>. Jamais lu par le checkout.</p>
-          <p className="text-2xs text-gray-400 mt-2">{data.drafts.length} brouillon(s)</p>
+          <p className="text-xs text-a-text-3 mt-1">Modifiable, rétrotesté dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>. Jamais lu par le checkout.</p>
+          <p className="text-xs text-a-text-3 mt-2">{data.drafts.length} brouillon(s)</p>
         </div>
-        <div className="rounded-xl border border-[var(--color-primary)] bg-[var(--admin-primary-soft)] p-4">
-          <p className="text-sm font-semibold text-[var(--admin-primary-fg)]">Version shadow</p>
-          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">Figée. Calculée à côté du prix réel quand la collecte est active, jamais facturée.</p>
-          <p className="text-2xs text-gray-500 mt-2">{shadowVersions.length ? shadowVersions.map((v) => `${v.country} v${v.version}`).join(' · ') : 'Aucune version sélectionnée'}</p>
+        <div className="rounded-xl border border-a-brand bg-a-brand-soft p-4">
+          <p className="text-sm font-semibold text-a-brand-fg">Version shadow</p>
+          <p className="text-xs text-a-text-2 mt-1">Figée. Calculée à côté du prix réel quand la collecte est active, jamais facturée.</p>
+          <p className="text-xs text-a-text-3 mt-2">{shadowVersions.length ? shadowVersions.map((v) => `${v.country} v${v.version}`).join(' · ') : 'Aucune version sélectionnée'}</p>
         </div>
-        <div className={`rounded-xl p-4 ${activeVersions.length ? 'border-2 border-green-600 bg-green-50 dark:bg-green-950/30' : 'border border-gray-200 dark:border-gray-800'}`}>
-          <p className="text-sm font-semibold flex items-center gap-1.5">{activeVersions.length ? <IconCircleCheck size={15} stroke={1.8} className="text-green-700" /> : <IconLock size={14} stroke={1.5} />}Tarification active</p>
-          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{activeVersions.length ? 'Facturée aux clients sur les nouveaux devis et paiements.' : 'Aucun tarif facturé : les frais de livraison suivent le calcul actuel.'}</p>
-          <p className="text-2xs text-gray-500 mt-2">{activeVersions.length ? activeVersions.map((v) => `${v.country} v${v.version}`).join(' · ') : '—'}</p>
+        <div className={`rounded-xl p-4 ${activeVersions.length ? 'border-2 border-tone-success-solid bg-tone-success-bg' : 'border border-a-border'}`}>
+          <p className="text-sm font-semibold flex items-center gap-1.5">{activeVersions.length ? <IconCircleCheck size={15} stroke={1.8} className="text-tone-success-fg" /> : <IconLock size={14} stroke={1.5} />}Tarification active</p>
+          <p className="text-xs text-a-text-2 mt-1">{activeVersions.length ? 'Facturée aux clients sur les nouveaux devis et paiements.' : 'Aucun tarif facturé : les frais de livraison suivent le calcul actuel.'}</p>
+          <p className="text-xs text-a-text-3 mt-2">{activeVersions.length ? activeVersions.map((v) => `${v.country} v${v.version}`).join(' · ') : '—'}</p>
         </div>
-        <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+        <div className="rounded-xl border border-a-border p-4">
           <p className="text-sm font-semibold">Version retirée</p>
-          <p className="text-xs text-gray-500 mt-1">Historique immuable, conservé pour expliquer les commandes passées. Peut être réactivée.</p>
-          <p className="text-2xs text-gray-400 mt-2">{retiredVersions.length} version(s)</p>
+          <p className="text-xs text-a-text-3 mt-1">Historique immuable, conservé pour expliquer les commandes passées. Peut être réactivée.</p>
+          <p className="text-xs text-a-text-3 mt-2">{retiredVersions.length} version(s)</p>
         </div>
       </section>
 
@@ -460,32 +460,32 @@ export function ForfaitShadowClient({
           <div className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold">Tarification client : forfait actif</h2>
-              <p className="text-xs text-gray-500 mt-1">Le prix de livraison est calculé par le serveur à partir de la version active du pays, puis vérifié à nouveau à chaque paiement. La collecte shadow est suspendue.</p>
+              <p className="text-xs text-a-text-3 mt-1">Le prix de livraison est calculé par le serveur à partir de la version active du pays, puis vérifié à nouveau à chaque paiement. La collecte shadow est suspendue.</p>
             </div>
             {confirmRollback ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+              <div className="rounded-lg border border-tone-danger-border bg-tone-danger-bg p-3 text-xs text-tone-danger-fg">
                 <p className="mb-2">Tous les tarifs actifs seront retirés. Les nouveaux devis reviendront au calcul actuel (devis Packlink + emballage). Les commandes passées ne changent pas ; les paiements en cours au forfait devront être recalculés.</p>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => void handleMode('provider_cost', true)} disabled={busy !== null} className={`${BTN} bg-red-700`}>{busy === 'mode' ? 'Retrait…' : 'Confirmer le retour au calcul actuel'}</button>
+                  <button onClick={() => void handleMode('provider_cost', true)} disabled={busy !== null} className={`${BTN} bg-tone-danger-solid`}>{busy === 'mode' ? 'Retrait…' : 'Confirmer le retour au calcul actuel'}</button>
                   <button onClick={() => setConfirmRollback(false)} className={BTN_GHOST}>Annuler</button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setConfirmRollback(true)} disabled={busy !== null} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>Revenir au calcul actuel (tous pays)</button>
+              <button onClick={() => setConfirmRollback(true)} disabled={busy !== null} className={`${BTN_GHOST} border-tone-danger-border text-tone-danger-fg`}>Revenir au calcul actuel (tous pays)</button>
             )}
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold">Collecte shadow : {collecting ? 'activée' : 'désactivée'}</h2>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-a-text-3 mt-1">
                 {collecting
                   ? 'Le forfait de la version shadow est calculé et enregistré sur chaque commande livrée. Le client paie toujours les frais actuels.'
                   : 'Aucun calcul de forfait au checkout. Les frais de livraison sont calculés comme aujourd’hui.'}
               </p>
             </div>
             {collecting ? (
-              <button onClick={() => void handleMode('provider_cost')} disabled={busy !== null || !data.migrationReady} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>
+              <button onClick={() => void handleMode('provider_cost')} disabled={busy !== null || !data.migrationReady} className={`${BTN_GHOST} border-tone-danger-border text-tone-danger-fg`}>
                 {busy === 'mode' ? 'Mise à jour…' : 'Désactiver la collecte'}
               </button>
             ) : (
@@ -497,7 +497,7 @@ export function ForfaitShadowClient({
           </div>
         )}
         {data.activationReady && (
-          <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+          <div className="mt-4 border-t border-a-border pt-4">
             <label htmlFor="fs-fallback" className={LABEL_CLS}>Si le forfait ne s&apos;applique pas (pays sans tarif actif, code postal hors zones, produit sans poids)</label>
             <select id="fs-fallback" value={fallback} disabled={busy !== null} onChange={(e) => void handleFallback(e.target.value as 'unavailable' | 'provider_cost')} className={`${INPUT_CLS} sm:max-w-md`}>
               <option value="unavailable">Livraison indisponible, retrait proposé (recommandé)</option>
@@ -507,7 +507,7 @@ export function ForfaitShadowClient({
               <input id="fs-public-grid" type="checkbox" className="mt-1" checked={publicGrid} disabled={busy !== null} onChange={(e) => void handlePublicGrid(e.target.checked)} />
               <span>
                 Afficher la page publique « Frais de livraison » (<code>/livraison</code>)
-                <span className="block text-xs text-gray-500">Grille générée depuis la tarification active, avec un lien dans le panier. Masquée par défaut ; sans tarification active, la page reste introuvable.</span>
+                <span className="block text-xs text-a-text-3">Grille générée depuis la tarification active, avec un lien dans le panier. Masquée par défaut ; sans tarification active, la page reste introuvable.</span>
               </span>
             </label>
           </div>
@@ -516,24 +516,24 @@ export function ForfaitShadowClient({
 
       {/* Tarifs actifs */}
       {activeVersions.map((v) => (
-        <section key={v.id} className={`${CARD} border-2 border-green-600`}>
+        <section key={v.id} className={`${CARD} border-2 border-tone-success-solid`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
             <h2 className="text-sm font-semibold">Tarification active {v.country} · v{v.version} — {v.name}</h2>
-            <p className="text-2xs text-gray-500">active depuis le {v.activated_at ? new Date(v.activated_at).toLocaleString('fr-FR') : '—'} · par {who(v.activated_by)}</p>
+            <p className="text-xs text-a-text-3">active depuis le {v.activated_at ? new Date(v.activated_at).toLocaleString('fr-FR') : '—'} · par {who(v.activated_by)}</p>
           </div>
           <VersionDetails version={v} vatRate={vatRateFor(v.country, data.vatRates)} />
-          <p className="text-xs text-gray-500 mt-3">{describeCountryRule(resolveCountryRule(v.country, data.countryRules))}</p>
+          <p className="text-xs text-a-text-3 mt-3">{describeCountryRule(resolveCountryRule(v.country, data.countryRules))}</p>
           <div className="mt-4">
             {retireCountry === v.country ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+              <div className="rounded-lg border border-tone-danger-border bg-tone-danger-bg p-3 text-xs text-tone-danger-fg">
                 <p className="mb-2">Retirer le tarif {v.country} : les nouveaux devis vers ce pays suivront le calcul actuel, ou la règle de repli si d&apos;autres pays restent au forfait.</p>
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => void handleRetire(v.country)} disabled={busy !== null} className={`${BTN} bg-red-700`}>{busy === `retire-${v.country}` ? 'Retrait…' : 'Confirmer le retrait'}</button>
+                  <button onClick={() => void handleRetire(v.country)} disabled={busy !== null} className={`${BTN} bg-tone-danger-solid`}>{busy === `retire-${v.country}` ? 'Retrait…' : 'Confirmer le retrait'}</button>
                   <button onClick={() => setRetireCountry(null)} className={BTN_GHOST}>Annuler</button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setRetireCountry(v.country)} disabled={busy !== null} className={`${BTN_GHOST} border-red-300 text-red-700 dark:border-red-900 dark:text-red-300`}>Retirer ce tarif</button>
+              <button onClick={() => setRetireCountry(v.country)} disabled={busy !== null} className={`${BTN_GHOST} border-tone-danger-border text-tone-danger-fg`}>Retirer ce tarif</button>
             )}
           </div>
         </section>
@@ -544,7 +544,7 @@ export function ForfaitShadowClient({
         <section key={v.id} className={CARD}>
           <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
             <h2 className="text-sm font-semibold">Version shadow {v.country} · v{v.version} — {v.name}</h2>
-            <p className="text-2xs text-gray-400">créée le {new Date(v.created_at).toLocaleDateString('fr-FR')}{v.selected_at ? ` · sélectionnée le ${new Date(v.selected_at).toLocaleDateString('fr-FR')}` : ''}</p>
+            <p className="text-xs text-a-text-3">créée le {new Date(v.created_at).toLocaleDateString('fr-FR')}{v.selected_at ? ` · sélectionnée le ${new Date(v.selected_at).toLocaleDateString('fr-FR')}` : ''}</p>
           </div>
           <VersionDetails version={v} vatRate={vatRateFor(v.country, data.vatRates)} />
           <div className="mt-4">{activateButton(v)}</div>
@@ -554,12 +554,12 @@ export function ForfaitShadowClient({
       {versions.some((v) => v.status === 'validated' || v.status === 'retired') && (
         <section className={CARD}>
           <h2 className="text-sm font-semibold mb-3">Autres versions</h2>
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          <ul className="divide-y divide-a-border">
             {versions.filter((v) => v.status === 'validated' || v.status === 'retired').map((v) => (
               <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                 <span>
                   {v.country} v{v.version} — {v.name}{' '}
-                  <span className="text-2xs text-gray-400">
+                  <span className="text-xs text-a-text-3">
                     ({v.status === 'retired'
                       ? `retirée${v.retired_at ? ` le ${new Date(v.retired_at).toLocaleDateString('fr-FR')}` : ''}${v.activated_at ? `, active depuis le ${new Date(v.activated_at).toLocaleDateString('fr-FR')}` : ''}`
                       : 'non sélectionnée'})
@@ -574,7 +574,7 @@ export function ForfaitShadowClient({
               </li>
             ))}
           </ul>
-          <p className="text-2xs text-gray-400 mt-2">Réactiver une version précédente est le retour arrière : les commandes déjà passées gardent la version avec laquelle elles ont été payées.</p>
+          <p className="text-xs text-a-text-3 mt-2">Réactiver une version précédente est le retour arrière : les commandes déjà passées gardent la version avec laquelle elles ont été payées.</p>
         </section>
       )}
 
@@ -600,7 +600,7 @@ export function ForfaitShadowClient({
             <ul className="mt-4 space-y-1.5">
               {checklist.map((item) => (
                 <li key={item.key} className="flex gap-2 text-xs">
-                  <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${item.status === 'ok' ? 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300' : item.status === 'warning' ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}>
+                  <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${item.status === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : item.status === 'warning' ? 'bg-tone-warning-bg text-tone-warning-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>
                     {item.status === 'ok' ? 'OK' : item.status === 'warning' ? 'À vérifier' : 'Bloquant'}
                   </span>
                   <span><b>{item.label}</b> — {item.detail}</span>
@@ -625,9 +625,9 @@ export function ForfaitShadowClient({
       {/* Création */}
       <section className={CARD}>
         <h2 className="text-sm font-semibold mb-1">Créer une version shadow depuis un brouillon</h2>
-        <p className="text-xs text-gray-400 mb-4">La version créée est figée : une correction crée une nouvelle version. Seul le prix sur le poids total est pris en charge.</p>
+        <p className="text-xs text-a-text-3 mb-4">La version créée est figée : une correction crée une nouvelle version. Seul le prix sur le poids total est pris en charge.</p>
         {data.drafts.length === 0 ? (
-          <p className="text-sm text-gray-500">Aucun brouillon. Créez-en un dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>.</p>
+          <p className="text-sm text-a-text-3">Aucun brouillon. Créez-en un dans <Link href="/admin/livraison/analyse-tarifaire" className="underline">Analyse tarifaire</Link>.</p>
         ) : (
           <div className="space-y-4">
             <div>
@@ -676,7 +676,7 @@ export function ForfaitShadowClient({
                 <legend className={LABEL_CLS}>Zones non livrables</legend>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {data.zoneCodes.map((z) => (
-                    <label key={z} className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <label key={z} className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg border border-a-border">
                       <input type="checkbox" checked={nonDeliverable.includes(z)} onChange={(e) => setNonDeliverable((prev) => e.target.checked ? [...prev, z] : prev.filter((x) => x !== z))} />
                       {z}
                     </label>
@@ -690,11 +690,11 @@ export function ForfaitShadowClient({
             </div>
 
             {preview && !preview.ok && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{preview.errors.map((e) => TARIFF_ERROR_LABELS[e]).join(' ')}</p>
+              <p className="rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{preview.errors.map((e) => TARIFF_ERROR_LABELS[e]).join(' ')}</p>
             )}
             {preview?.ok && (
-              <div className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3">
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Aperçu de la version à créer</p>
+              <div className="rounded-lg bg-a-surface-2 p-3">
+                <p className="text-xs font-semibold text-a-text-2 mb-2">Aperçu de la version à créer</p>
                 <VersionDetails
                   version={{ ...preview.payload, id: 'preview', tenant_id: '', version: 0, status: 'validated', notes: null, created_by: null, created_at: new Date().toISOString(), selected_at: null, retired_at: null, updated_at: '' }}
                   vatRate={vatRateFor(country, data.vatRates)}
@@ -719,11 +719,11 @@ export function ForfaitShadowClient({
       <section className={CARD}>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h2 className="text-sm font-semibold">Qualité des poids produits</h2>
-          <span className={`text-2xs font-semibold px-2 py-1 rounded ${data.missingWeightProducts.length ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300'}`}>
+          <span className={`text-xs font-semibold px-2 py-1 rounded ${data.missingWeightProducts.length ? 'bg-tone-warning-bg text-tone-warning-fg' : 'bg-tone-success-bg text-tone-success-fg'}`}>
             {data.missingWeightProducts.length} / {data.activeProducts} produit(s) actif(s) sans poids
           </span>
         </div>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-a-text-3 mb-3">
           {tariffMode
             ? fallback === 'provider_cost'
               ? 'Tarification active : un panier contenant ces produits est facturé au devis provider (repli configuré), jamais au forfait avec un poids supposé.'
@@ -731,11 +731,11 @@ export function ForfaitShadowClient({
             : 'Une commande contenant un produit sans poids reste payable normalement, mais sa simulation est « incomplète » et exclue des statistiques (aucun poids par défaut n’est utilisé).'}
         </p>
         {data.missingWeightProducts.length > 0 && (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
+          <ul className="divide-y divide-a-border max-h-80 overflow-y-auto">
             {data.missingWeightProducts.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span>{p.name} <span className="text-2xs text-gray-400">· stock {p.stock ?? '—'}</span></span>
-                <Link href={`/admin/catalogue/${p.id}`} className="text-xs font-semibold text-[var(--color-primary-dark)] min-h-11 inline-flex items-center">Renseigner le poids</Link>
+                <span>{p.name} <span className="text-xs text-a-text-3">· stock {p.stock ?? '—'}</span></span>
+                <Link href={`/admin/catalogue/${p.id}`} className="text-xs font-semibold text-a-brand-fg min-h-11 inline-flex items-center">Renseigner le poids</Link>
               </li>
             ))}
           </ul>
@@ -745,7 +745,7 @@ export function ForfaitShadowClient({
       {/* Rapport */}
       <section className={CARD}>
         <h2 className="text-sm font-semibold mb-1">Résultats sur commandes réelles</h2>
-        <p className="text-xs text-gray-400 mb-4">Commandes livrées du tenant (hors commandes de test). Les scénarios synthétiques du laboratoire ne sont jamais mélangés ici.</p>
+        <p className="text-xs text-a-text-3 mb-4">Commandes livrées du tenant (hors commandes de test). Les scénarios synthétiques du laboratoire ne sont jamais mélangés ici.</p>
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div>
             <label htmlFor="fs-from" className={LABEL_CLS}>Du</label>
@@ -768,13 +768,13 @@ export function ForfaitShadowClient({
         </div>
 
         {!r ? (
-          <p className="text-sm text-gray-400">{data.migrationReady ? 'Aucun rapport chargé.' : 'Disponible après application de la migration 124.'}</p>
+          <p className="text-sm text-a-text-3">{data.migrationReady ? 'Aucun rapport chargé.' : 'Disponible après application de la migration 124.'}</p>
         ) : (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-2xs font-semibold px-2 py-1 rounded ${RELIABILITY[r.reliability].cls}`}>{RELIABILITY[r.reliability].text}</span>
-              {r.latestVersion && <span className="text-2xs text-gray-400">Dernier calcul : v{r.latestVersion.version}, {new Date(r.latestVersion.computedAt).toLocaleString('fr-FR')}</span>}
-              {report?.truncated && <span className="text-2xs text-amber-700">Période tronquée au volume maximal lu.</span>}
+              <span className={`text-xs font-semibold px-2 py-1 rounded ${RELIABILITY[r.reliability].cls}`}>{RELIABILITY[r.reliability].text}</span>
+              {r.latestVersion && <span className="text-xs text-a-text-3">Dernier calcul : v{r.latestVersion.version}, {new Date(r.latestVersion.computedAt).toLocaleString('fr-FR')}</span>}
+              {report?.truncated && <span className="text-xs text-tone-warning-fg">Période tronquée au volume maximal lu.</span>}
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
@@ -787,26 +787,26 @@ export function ForfaitShadowClient({
                 ['Marge complète', '—', 'Coût réel des cartons non renseigné : jamais estimé'],
                 ['Poids non vérifié logistiquement', String(r.logisticsWarnings), 'Prix théorique, faisabilité à confirmer'],
               ].map(([k, v, sub]) => (
-                <div key={k} className="rounded-lg bg-gray-50 dark:bg-gray-800/40 p-3">
-                  <p className="text-2xs uppercase tracking-wide text-gray-400">{k}</p>
+                <div key={k} className="rounded-lg bg-a-surface-2 p-3">
+                  <p className="text-xs uppercase tracking-wide text-a-text-3">{k}</p>
                   <p className="text-lg font-bold tabular-nums">{v}</p>
-                  <p className="text-2xs text-gray-400">{sub}</p>
+                  <p className="text-xs text-a-text-3">{sub}</p>
                 </div>
               ))}
             </div>
             {(r.commercial.orders > 0 || r.commercial.fallbackOrders > 0) && (
-              <div className="rounded-lg border border-green-600/40 bg-green-50/60 dark:bg-green-950/20 p-3">
+              <div className="rounded-lg border border-tone-success-solid bg-tone-success-bg p-3">
                 <p className="text-xs font-semibold mb-2">Commandes facturées au forfait</p>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm tabular-nums">
-                  <div><p className="text-2xs uppercase text-gray-400">Commandes</p><p className="font-bold">{r.commercial.orders}</p><p className="text-2xs text-gray-400">{r.commercial.byVersion.map((v) => `${v.country} v${v.version} : ${v.count}`).join(' · ') || '—'}</p></div>
-                  <div><p className="text-2xs uppercase text-gray-400">Forfait payé (moy.)</p><p className="font-bold">{eurCents(r.commercial.avgChargedCents)}</p></div>
-                  <div><p className="text-2xs uppercase text-gray-400">Devis Packlink TTC (moy.)</p><p className="font-bold">{eurCents(r.commercial.avgProviderQuoteCents)}</p><p className="text-2xs text-gray-400">{r.commercial.providerQuoteVerified} devis connu(s)</p></div>
-                  <div><p className="text-2xs uppercase text-gray-400">Écart avant emballage</p><p className={`font-bold ${gapCls(r.commercial.avgGapBeforePackagingCents)}`}>{eurCents(r.commercial.avgGapBeforePackagingCents, true)}</p><p className="text-2xs text-gray-400">{r.commercial.negativeGap} commande(s) négative(s)</p></div>
+                  <div><p className="text-xs uppercase text-a-text-3">Commandes</p><p className="font-bold">{r.commercial.orders}</p><p className="text-xs text-a-text-3">{r.commercial.byVersion.map((v) => `${v.country} v${v.version} : ${v.count}`).join(' · ') || '—'}</p></div>
+                  <div><p className="text-xs uppercase text-a-text-3">Forfait payé (moy.)</p><p className="font-bold">{eurCents(r.commercial.avgChargedCents)}</p></div>
+                  <div><p className="text-xs uppercase text-a-text-3">Devis Packlink TTC (moy.)</p><p className="font-bold">{eurCents(r.commercial.avgProviderQuoteCents)}</p><p className="text-xs text-a-text-3">{r.commercial.providerQuoteVerified} devis connu(s)</p></div>
+                  <div><p className="text-xs uppercase text-a-text-3">Écart avant emballage</p><p className={`font-bold ${gapCls(r.commercial.avgGapBeforePackagingCents)}`}>{eurCents(r.commercial.avgGapBeforePackagingCents, true)}</p><p className="text-xs text-a-text-3">{r.commercial.negativeGap} commande(s) négative(s)</p></div>
                 </div>
-                <p className="mt-2 text-2xs text-gray-500">Devis au moment du paiement, pas la facture Packlink ; le coût réel des cartons n&apos;est pas inclus. {r.commercial.fallbackOrders > 0 ? `${r.commercial.fallbackOrders} commande(s) facturée(s) au devis provider (repli).` : ''}</p>
+                <p className="mt-2 text-xs text-a-text-3">Devis au moment du paiement, pas la facture Packlink ; le coût réel des cartons n&apos;est pas inclus. {r.commercial.fallbackOrders > 0 ? `${r.commercial.fallbackOrders} commande(s) facturée(s) au devis provider (repli).` : ''}</p>
               </div>
             )}
-            <p className="text-2xs text-gray-400">« Forfait − facturé » compare deux prix client : ce n&apos;est pas une marge. « Écart avant emballage » = forfait − devis Packlink TTC, seulement quand le devis reconstruit exactement le montant signé. Devis, pas des factures.</p>
+            <p className="text-xs text-a-text-3">« Forfait − facturé » compare deux prix client : ce n&apos;est pas une marge. « Écart avant emballage » = forfait − devis Packlink TTC, seulement quand le devis reconstruit exactement le montant signé. Devis, pas des factures.</p>
 
             <div className="grid gap-4 md:grid-cols-3">
               <div>
@@ -814,8 +814,8 @@ export function ForfaitShadowClient({
                 <div className="space-y-1.5">
                   {r.gap.buckets.map((b) => (
                     <div key={b.label} className="text-xs">
-                      <div className="flex justify-between text-gray-500"><span>{b.label}</span><span className="tabular-nums">{b.count}</span></div>
-                      <div className="h-2 rounded bg-gray-100 dark:bg-gray-800 overflow-hidden"><div className="h-full bg-[var(--color-primary)]" style={{ width: `${(b.count / maxBucket) * 100}%` }} /></div>
+                      <div className="flex justify-between text-a-text-3"><span>{b.label}</span><span className="tabular-nums">{b.count}</span></div>
+                      <div className="h-2 rounded bg-a-hover overflow-hidden"><div className="h-full bg-a-brand" style={{ width: `${(b.count / maxBucket) * 100}%` }} /></div>
                     </div>
                   ))}
                 </div>
@@ -823,12 +823,12 @@ export function ForfaitShadowClient({
               {([['Par tranche', r.byBand], ['Par zone', r.byZone]] as const).map(([title, groups]) => (
                 <div key={title}>
                   <p className="text-xs font-semibold mb-2">{title}</p>
-                  {groups.length === 0 ? <p className="text-xs text-gray-400">Aucune simulation complète.</p> : (
+                  {groups.length === 0 ? <p className="text-xs text-a-text-3">Aucune simulation complète.</p> : (
                     <table className="w-full text-xs tabular-nums">
-                      <thead><tr className="text-left text-2xs uppercase text-gray-400"><th className="py-1 pr-2"> </th><th className="py-1 pr-2 text-right">n</th><th className="py-1 pr-2 text-right">Forfait</th><th className="py-1 text-right">Facturé</th></tr></thead>
+                      <thead><tr className="text-left text-xs uppercase text-a-text-3"><th className="py-1 pr-2"> </th><th className="py-1 pr-2 text-right">n</th><th className="py-1 pr-2 text-right">Forfait</th><th className="py-1 text-right">Facturé</th></tr></thead>
                       <tbody>
                         {groups.map((g) => (
-                          <tr key={g.key} className="border-t border-gray-100 dark:border-gray-800"><td className="py-1 pr-2">{g.label}</td><td className="py-1 pr-2 text-right">{g.count}</td><td className="py-1 pr-2 text-right">{eurCents(g.avgShadowCents)}</td><td className="py-1 text-right">{eurCents(g.avgChargedCents)}</td></tr>
+                          <tr key={g.key} className="border-t border-a-border"><td className="py-1 pr-2">{g.label}</td><td className="py-1 pr-2 text-right">{g.count}</td><td className="py-1 pr-2 text-right">{eurCents(g.avgShadowCents)}</td><td className="py-1 text-right">{eurCents(g.avgChargedCents)}</td></tr>
                         ))}
                       </tbody>
                     </table>
@@ -841,7 +841,7 @@ export function ForfaitShadowClient({
               <div>
                 <p className="text-xs font-semibold mb-2">Motifs d&apos;exclusion</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {r.reasons.map((x) => <span key={x.reason} className="text-2xs px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700">{REASON_LABELS[x.reason] ?? x.reason} · {x.count}</span>)}
+                  {r.reasons.map((x) => <span key={x.reason} className="text-xs px-2 py-1 rounded-lg border border-a-border">{REASON_LABELS[x.reason] ?? x.reason} · {x.count}</span>)}
                 </div>
               </div>
             )}
@@ -852,14 +852,14 @@ export function ForfaitShadowClient({
                   <p className="text-xs font-semibold mb-2">{title as string}</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs tabular-nums">
-                      <thead><tr className="text-left text-2xs uppercase text-gray-400 border-b border-gray-100 dark:border-gray-800"><th className="py-1.5 pr-3">Commande</th><th className="py-1.5 pr-3">Date</th><th className="py-1.5 pr-3">Statut</th><th className="py-1.5 pr-3">Motif</th><th className="py-1.5 pr-3">Zone</th><th className="py-1.5 pr-3 text-right">Poids</th><th className="py-1.5 pr-3 text-right">Facturé</th><th className="py-1.5 pr-3 text-right">Forfait</th><th className="py-1.5 text-right">Écart av. emb.</th></tr></thead>
+                      <thead><tr className="text-left text-xs uppercase text-a-text-3 border-b border-a-border"><th className="py-1.5 pr-3">Commande</th><th className="py-1.5 pr-3">Date</th><th className="py-1.5 pr-3">Statut</th><th className="py-1.5 pr-3">Motif</th><th className="py-1.5 pr-3">Zone</th><th className="py-1.5 pr-3 text-right">Poids</th><th className="py-1.5 pr-3 text-right">Facturé</th><th className="py-1.5 pr-3 text-right">Forfait</th><th className="py-1.5 text-right">Écart av. emb.</th></tr></thead>
                       <tbody>
                         {(lines as ShadowReport['excludedOrders']).map((o) => (
-                          <tr key={o.id} className="border-b border-gray-50 dark:border-gray-800/60">
+                          <tr key={o.id} className="border-b border-a-border">
                             <td className="py-1.5 pr-3"><Link href={`/admin/orders/${o.id}`} className="font-mono underline">#{o.id.slice(0, 8)}</Link></td>
                             <td className="py-1.5 pr-3 whitespace-nowrap">{new Date(o.createdAt).toLocaleDateString('fr-FR')}</td>
-                            <td className="py-1.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${STATUS_LABELS[o.status]?.cls ?? ''}`}>{STATUS_LABELS[o.status]?.text ?? o.status}</span></td>
-                            <td className="py-1.5 pr-3 text-gray-500">{o.reasons.map((x) => REASON_LABELS[x] ?? x).join(', ')}{o.missingWeightProducts > 0 ? ` (${o.missingWeightProducts})` : ''}</td>
+                            <td className="py-1.5 pr-3"><span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${STATUS_LABELS[o.status]?.cls ?? ''}`}>{STATUS_LABELS[o.status]?.text ?? o.status}</span></td>
+                            <td className="py-1.5 pr-3 text-a-text-3">{o.reasons.map((x) => REASON_LABELS[x] ?? x).join(', ')}{o.missingWeightProducts > 0 ? ` (${o.missingWeightProducts})` : ''}</td>
                             <td className="py-1.5 pr-3">{o.zoneCode ?? '—'}</td>
                             <td className="py-1.5 pr-3 text-right">{kgFromG(o.weightG)}</td>
                             <td className="py-1.5 pr-3 text-right">{eurCents(o.chargedCents)}</td>
