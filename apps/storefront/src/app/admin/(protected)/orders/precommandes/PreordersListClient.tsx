@@ -3,12 +3,21 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconLink, IconLoader2, IconSearch } from '@tabler/icons-react';
+import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconLink, IconLoader2, IconSearch, IconX } from '@tabler/icons-react';
 import { SALES_CHANNEL_LABELS } from '@lepefy/types';
 import { formatPrice } from '@/lib/utils/format';
 import { PREORDER_GROUP_LABELS, parsePreorderView, type PreorderView } from '@/lib/orders/assisted/preorderQueue';
 import type { PreorderQueueResult } from '@/lib/orders/assisted/loadPreorderQueue';
+import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
+import { useAdminToast } from '../../../_components/ui/Toaster';
 import PreorderStatusBadge from '../_assisted/PreorderStatusBadge';
+
+// Cancelled straight from the list only when nothing can be in flight: an expired link or a
+// draft. An active link or a payment declared by the customer is cancelled from the detail page.
+// Uses the queue group (effective status: an open link past its TTL is in « Liens expirés »).
+const LIST_CANCELLABLE = new Set(['expired', 'draft']);
+
+type QueueItem = PreorderQueueResult['preorders'][number];
 
 const KPI_CARDS: Array<{ group: keyof PreorderQueueResult['kpis']; label: string; helper: string; tone: string }> = [
   { group: 'to_verify', label: 'À vérifier', helper: 'Paiement déclaré par le client', tone: 'border-tone-warning-border bg-tone-warning-bg' },
@@ -17,7 +26,10 @@ const KPI_CARDS: Array<{ group: keyof PreorderQueueResult['kpis']; label: string
   { group: 'waiting', label: 'Attente client', helper: 'Lien envoyé, paiement attendu', tone: 'border-tone-info-border bg-tone-info-bg' },
 ];
 
-export default function PreordersListClient({ currency }: { currency: string }) {
+export default function PreordersListClient({ currency, canManage }: { currency: string; canManage: boolean }) {
+  const toast = useAdminToast();
+  const [cancelTarget, setCancelTarget] = useState<QueueItem | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -75,6 +87,28 @@ export default function PreordersListClient({ currency }: { currency: string }) 
     { key: 'all', label: 'Toutes' },
   ];
   const preorders = data?.preorders ?? [];
+
+  async function cancelPreorder(reason?: string) {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/admin/assisted-orders/${cancelTarget.id}/cancel`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason || undefined }),
+      });
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      if (res.ok) {
+        toast.success(`Précommande ${cancelTarget.reference} annulée`, { description: 'Elle reste consultable dans « Annulées ».' });
+        setReloadKey((key) => key + 1);
+      } else {
+        toast.error('Annulation impossible', { description: body.error });
+      }
+    } catch {
+      toast.error('Annulation impossible', { description: 'Vérifiez la connexion puis réessayez.' });
+    } finally {
+      setCancelling(false);
+      setCancelTarget(null);
+    }
+  }
   const grouped = view === 'to_treat' || view === 'waiting' || view === 'all';
 
   return (
@@ -136,10 +170,13 @@ export default function PreordersListClient({ currency }: { currency: string }) 
               return (
                 <Fragment key={preorder.id}>
                   {header && <li className={`bg-a-surface-2 px-4 py-1.5 text-xs font-semibold ${preorder.group === 'to_verify' ? 'text-tone-warning-fg' : 'text-a-text-3'}`}>{PREORDER_GROUP_LABELS[preorder.group]}</li>}
-                  <li className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4">
+                  {/* The whole row opens the preorder (stretched link on the reference); the buttons sit above it. */}
+                  <li className="relative grid gap-2 px-4 py-3 hover:bg-a-hover sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:gap-4">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-a-text">{preorder.reference}</span>
+                        <Link href={`/admin/orders/precommandes/${preorder.id}`} className="font-mono text-sm font-semibold text-a-text after:absolute after:inset-0 hover:underline focus-visible:outline-2 focus-visible:outline-a-focus">
+                          {preorder.reference}<span className="sr-only"> — ouvrir la précommande</span>
+                        </Link>
                         <PreorderStatusBadge status={preorder.status} />
                         {preorder.hasActiveLink && <span className="inline-flex items-center gap-1 text-xs font-semibold text-tone-info-fg"><IconLink size={13} aria-hidden="true" /> Lien actif</span>}
                       </div>
@@ -151,8 +188,14 @@ export default function PreordersListClient({ currency }: { currency: string }) 
                       {preorder.context && <p className="mt-0.5 text-xs text-a-text-3">{preorder.context}</p>}
                     </div>
                     <span className="text-sm font-bold text-a-text sm:text-right">{formatPrice(preorder.total, currency)}</span>
+                    {canManage && LIST_CANCELLABLE.has(preorder.group) ? (
+                      <button type="button" onClick={() => setCancelTarget(preorder)}
+                        className="relative z-10 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-tone-danger-fg hover:bg-tone-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus sm:w-auto">
+                        <IconX size={15} aria-hidden="true" /> Annuler<span className="sr-only"> la précommande {preorder.reference}</span>
+                      </button>
+                    ) : <span className="hidden sm:block" />}
                     <Link href={`/admin/orders/precommandes/${preorder.id}`}
-                      className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus sm:w-36 ${finished ? 'text-a-text-3 hover:bg-a-hover' : preorder.action.primary ? 'bg-a-brand text-a-on-brand hover:opacity-90' : 'border border-a-border bg-a-surface text-a-text-2 hover:bg-a-surface-2'}`}>
+                      className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-lg px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus sm:w-36 ${finished ? 'text-a-text-3 hover:bg-a-hover' : preorder.action.primary ? 'bg-a-brand text-a-on-brand hover:opacity-90' : 'border border-a-border bg-a-surface text-a-text-2 hover:bg-a-surface-2'}`}>
                       {preorder.action.label}<span className="sr-only"> — précommande {preorder.reference}</span>
                     </Link>
                   </li>
@@ -172,6 +215,19 @@ export default function PreordersListClient({ currency }: { currency: string }) 
           </nav>
         )}
       </section>
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        title={`Annuler la précommande ${cancelTarget?.reference ?? ''} ?`}
+        description="Le client ne pourra plus payer avec son lien et aucune commande ne sera créée. Elle reste consultable dans « Annulées ». Cette action est définitive."
+        confirmLabel="Annuler la précommande"
+        cancelLabel="Garder"
+        destructive
+        loading={cancelling}
+        reason={{ label: 'Motif (facultatif)', placeholder: 'Ex. pas de réponse du client', maxLength: 300 }}
+        onConfirm={cancelPreorder}
+        onCancel={() => setCancelTarget(null)}
+      />
     </div>
   );
 }
