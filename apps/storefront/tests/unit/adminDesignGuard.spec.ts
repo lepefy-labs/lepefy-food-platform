@@ -34,6 +34,13 @@ const MIGRATED = [
   '_components/ThemeToggleButton.tsx',
   '_components/AdminHeader.tsx',
   '_components/shell',
+  '_components/data',
+  '_components/ui/States.tsx',
+  '_components/ui/Panel.tsx',
+  '_components/ui/Tabs.tsx',
+  '_components/PlatformSectionTabs.tsx',
+  '(protected)/livraison/LivraisonTabs.tsx',
+  '(protected)/canaux/whatsapp/_components/WhatsAppTabs.tsx',
 ];
 
 const RULES: { name: string; pattern: RegExp }[] = [

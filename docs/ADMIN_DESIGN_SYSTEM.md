@@ -67,6 +67,15 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - `Form`: `FormField` (label, hint, errore, `required`/`optional`, collega `aria-describedby`/`aria-invalid`), `Input`, `Select`, `Textarea`, `inputClasses`.
 - `BulkTrackingModal`, `BulkDocumentsDialog` (Commandes) già sul kit.
 
+### Liste e dati (`src/lib/admin/listParams.ts`, `src/app/admin/_components/data/`)
+- **`defineListParams(spec, { pageSizes, defaultPageSize })`**: stato URL tipizzato (`search`, `string`, `enum` con default, `date`, `int`, `bool`, `uuid`) + `page`/`size`. `parse(searchParams)` sul server, `href(path, current, patch)` (ogni cambio diverso dalla pagina torna a pagina 1, i default non finiscono nell'URL), `activeCount()`. `pageWindow(total, page, size)` dà limiti `.range()` e la pagina corretta; `pageNumbers()` le pagine con i salti.
+- **`FilterBar`** (client): viste rapide (link calcolati sul server, con contatore e tono), ricerca istantanea (debounce 350 ms, Esc svuota), pannello « Filtres » (`select`, `date-range`) in `Dialog`, chip dei filtri attivi + « Tout effacer », ordinamento, contatore risultati `aria-live`, barra di avanzamento durante la transizione. Ogni modifica sostituisce l'URL e la pagina server si ricarica: niente ordinamenti lato client su pagine parziali.
+- **`DataTable`** (compatibile server): colonne (`cell`, `align`, `hideBelow`, `sortKey` → intestazione link con `aria-sort`), gruppi di righe (`groups` con tono), banda di attenzione (`rowTone`), dettaglio sotto riga (`rowDetail`), card mobile (`mobileCard`, la tabella sparisce sotto `md`), densità `comfortable`/`compact`, `empty`.
+- **Selezione** (`RowSelection.tsx`, client): `RowSelectionProvider` (si azzera con le righe visibili), `RowCheckbox`, `SelectAllCheckbox` (stato indeterminato), `BulkBar` fluttuante con le azioni sugli id selezionati.
+- **`Pagination`** (server, solo link): « 1–50 sur 312 », pagine con salti, « Lignes par page 25 · 50 · 100 ».
+- **Stati** (`ui/States.tsx`): `EmptyState` (`empty` / `filtered`), `ErrorState` (con azione « Réessayer »), `Skeleton`, `ListPageSkeleton` per i `loading.tsx`.
+- **`Panel`**, `Card`, `DescriptionList`/`DescriptionItem` (`ui/Panel.tsx`, promossi da Gestion); **`AdminTabs`** (`ui/Tabs.tsx`) per le sotto-pagine (Livraison, WhatsApp, sezioni piattaforma).
+
 ### Shell e navigazione (`src/lib/admin/navigation.ts`, `src/app/admin/_components/shell/`)
 - **Registry** `ADMIN_NAV` (voci) e `ADMIN_QUICK_ACTIONS` (azioni della palette): `id`, `label`, `href`, `icon`, `group`, `workspace`, `anyOf` (capability), `flag` (`gestion`, `whatsapp`), `match`/`alsoActive`, `badge` (chiave + tono), `mobile` (posizione nella barra), `keywords`. Aggiungere un modulo = una voce; il gruppo appare se ha almeno una voce visibile.
 - **Risoluzione** `resolveAdminNavigation()` nel layout protetto (permessi già ristretti dalla sospensione, flag letti sul server): il client riceve solo gli id visibili, i badge e gli scope di ricerca.
@@ -88,7 +97,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 | U0 | Font di piattaforma risolti su `<html>` | ✅ `49b1d3b7` |
 | U1 | Token, Tailwind `a-*`/`tone-*`, format, registry stati, Button, Badge, StatCard, PageHeader, guard | ✅ `de70404a` |
 | U2 | Dialog, ConfirmDialog, Drawer, Toaster, InlineAlert, Form, useAdminMutation; 18 overlay e 10 `confirm()` migrati | ✅ `0c949f50` |
-| U3 | Shell: registry navigazione, sidebar comprimibile, workspace, palette comandi, barra mobile, ricerca Gestion | ✅ |
-| U4 | Kit dati: listParams, FilterBar, DataTable, Pagination, stati vuoto/errore | — |
+| U3 | Shell: registry navigazione, sidebar comprimibile, workspace, palette comandi, barra mobile, ricerca Gestion | ✅ `0661cbcb` |
+| U4 | Kit dati: listParams, FilterBar, DataTable, selezione e BulkBar, Pagination, stati, Panel, Tabs | ✅ |
 | U5–U11 | Commandes, Livraison, Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |
