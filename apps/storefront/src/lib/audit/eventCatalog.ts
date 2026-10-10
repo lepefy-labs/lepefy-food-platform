@@ -140,9 +140,11 @@ const PREORDER_LABELS: Record<string, string> = {
 };
 
 const WHATSAPP_LABELS: Record<string, string> = {
-  agent_takeover: 'Conversation reprise par l’équipe', channel_settings_updated: 'Réglages WhatsApp modifiés', channel_test_sent: 'Message de test envoyé',
-  conversation_closed: 'Conversation clôturée', conversation_erased: 'Conversation effacée', handoff_requested: 'Passage à un opérateur demandé',
-  rules_updated: 'Réponses automatiques modifiées',
+  agent_takeover: 'Conversation reprise par l’équipe', automation_resumed: 'Automatisation relancée par l’équipe',
+  automation_auto_resumed: 'Automatisation relancée automatiquement', business_app_reply: 'Réponse depuis l’application WhatsApp Business',
+  channel_created: 'Canal WhatsApp connecté', channel_updated: 'Canal WhatsApp modifié', channel_settings_updated: 'Réglages WhatsApp modifiés',
+  channel_test_sent: 'Message de test envoyé', conversation_closed: 'Conversation clôturée', conversation_reopened: 'Conversation rouverte',
+  conversation_erased: 'Conversation effacée', handoff_requested: 'Passage à un opérateur demandé', rules_updated: 'Réponses automatiques modifiées',
 };
 
 const REVIEW_LABELS: Record<string, string> = {
@@ -224,6 +226,40 @@ const FIELD_LABELS: Record<string, string> = {
 export function auditFieldLabel(field: string): string {
   if (field.startsWith('config.')) return `Réglage « ${field.slice(7)} »`;
   return FIELD_LABELS[field] ?? humanize(field);
+}
+
+// ─── « Détails » (metadata) of an event ────────────────────────────────────
+
+const DETAIL_LABELS: Record<string, string> = {
+  fulfillment_type: 'Mode de remise', origin: 'Origine', sales_channel: 'Canal de vente', payment_method: 'Moyen de paiement',
+  payment_status: 'Statut du paiement', total: 'Total', is_test: 'Commande de test', confirmation_source: 'Confirmation',
+  external_payment_type: 'Type de paiement externe', received_at: 'Encaissé le', reference: 'Référence', has_note: 'Note jointe',
+  attempts: 'Tentatives', max_attempts: 'Tentatives maximum', error: 'Erreur', provider: 'Prestataire', provider_reference: 'Référence prestataire',
+  provider_status: 'Statut prestataire', operation: 'Opération', role_code: 'Rôle', permissions: 'Permissions', count: 'Nombre',
+  membership_id: 'Accès', rows: 'Lignes', truncated: 'Tronqué', tab: 'Onglet', period: 'Période', module: 'Module', outcome: 'Résultat',
+  perimeter: 'Périmètre', notification_type: 'Notification', module_key: 'Module', reason: 'Motif', reason_code: 'Code motif',
+  delta: 'Écart', fields: 'Champs', source_id: 'Source', checkout_session_id: 'Précommande', price: 'Prix', active: 'Actif', stock: 'Stock',
+  auto_resume_minutes: 'Reprise automatique (min)', template: 'Modèle', units: 'Unités', amount: 'Montant', purchase: 'Achat', payment: 'Paiement',
+  from: 'De', to: 'Vers', before: 'Avant', after: 'Après', changes_truncated: 'Modifications abrégées', metadata_truncated: 'Détails abrégés',
+};
+
+const DETAIL_VALUE_LABELS: Record<string, Record<string, string>> = {
+  fulfillment_type: { delivery: 'Livraison', pickup: 'Retrait' },
+  origin: { storefront: 'Boutique en ligne', assisted: 'Commande assistée' },
+  operation: { insert: 'Ajout', update: 'Modification', delete: 'Suppression' },
+  perimeter: { tenant: 'Une boutique', all_tenants: 'Toutes les boutiques' },
+  confirmation_source: { stripe_webhook: 'Stripe', admin_verified: 'Vérifié par l’équipe', admin_recorded: 'Encaissement enregistré' },
+  payment_method: { stripe: 'Carte bancaire', external_link: 'Lien de paiement', in_store: 'En magasin', cash: 'Espèces', manual: 'Manuel', satispay: 'Satispay' },
+  tab: { activity: 'Activité', automation: 'Automatisations', security: 'Sécurité' },
+};
+
+export function auditDetailLabel(key: string): string {
+  return DETAIL_LABELS[key] ?? humanize(key);
+}
+
+/** French label of a known value (« delivery » → « Livraison »), else the value itself. */
+export function auditDetailValue(key: string, value: string): string {
+  return DETAIL_VALUE_LABELS[key]?.[value] ?? value;
 }
 
 // ─── Links to the original resource ────────────────────────────────────────

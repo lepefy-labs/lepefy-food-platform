@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { IconArrowRight, IconLink } from '@tabler/icons-react';
 import type { AuditEventView } from '@/lib/audit/feedModel';
-import { AUDIT_ACTOR_LABELS, AUDIT_CATEGORY_LABELS, AUDIT_RESOURCE_LABELS } from '@/lib/audit/eventCatalog';
+import { AUDIT_ACTOR_LABELS, AUDIT_CATEGORY_LABELS, AUDIT_RESOURCE_LABELS, auditDetailLabel, auditDetailValue } from '@/lib/audit/eventCatalog';
 import type { SafeJson } from '@/lib/audit/sanitize';
 import { formatDate } from '@/lib/admin/format';
 import { AUDIT_OUTCOME_META, AUDIT_SEVERITY_META, statusMeta } from '@/lib/admin/statusRegistry';
@@ -24,11 +24,18 @@ const SOURCE_LABELS: Record<string, string> = {
   admin_access_audit: 'Ancien journal des accès',
 };
 
+function detailText(key: string, value: SafeJson): string {
+  if (Array.isArray(value)) return value.map((item) => (typeof item === 'object' ? JSON.stringify(item) : auditDetailValue(key, String(item)))).join(', ');
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+  return auditDetailValue(key, String(value));
+}
+
 function metadataEntries(metadata: SafeJson): [string, string][] {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
   return Object.entries(metadata)
     .filter(([, value]) => value !== null && value !== '')
-    .map(([key, value]) => [key.replace(/_/g, ' '), typeof value === 'object' ? JSON.stringify(value) : typeof value === 'boolean' ? (value ? 'oui' : 'non') : String(value)]);
+    .map(([key, value]) => [auditDetailLabel(key), detailText(key, value)]);
 }
 
 /**
@@ -103,7 +110,7 @@ export default function EventDetailDrawer({ event, closeHref, relatedHref, tenan
               <dl className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
                 {details.map(([key, value]) => (
                   <div key={key} className="contents">
-                    <dt className="text-a-text-3 first-letter:uppercase">{key}</dt>
+                    <dt className="text-a-text-3">{key}</dt>
                     <dd className="break-words text-a-text">{value}</dd>
                   </div>
                 ))}

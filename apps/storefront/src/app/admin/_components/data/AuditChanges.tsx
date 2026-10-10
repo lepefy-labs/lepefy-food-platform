@@ -1,4 +1,4 @@
-import { auditFieldLabel } from '@/lib/audit/eventCatalog';
+import { auditDetailValue, auditFieldLabel } from '@/lib/audit/eventCatalog';
 import type { AuditChange, SafeJson } from '@/lib/audit/sanitize';
 import { formatMoney } from '@/lib/admin/format';
 import { ORDER_STATUS_META, PAYMENT_STATUS_META } from '@/lib/admin/statusRegistry';
@@ -14,7 +14,7 @@ export function auditValueText(field: string, value: SafeJson | undefined): stri
   if (typeof value === 'string' && field === 'status') return ORDER_STATUS_META[value]?.label ?? value;
   if (typeof value === 'string' && field === 'payment_status') return PAYMENT_STATUS_META[value]?.label ?? value;
   if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
+  return auditDetailValue(field, String(value));
 }
 
 /**

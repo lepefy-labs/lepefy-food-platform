@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  AUDIT_EVENT_TYPES, AUDIT_MODULES, AUDIT_MODULE_KEYS, auditEventLabel, auditEventOptions, auditResourceHref,
+  AUDIT_EVENT_TYPES, AUDIT_MODULES, AUDIT_MODULE_KEYS, auditDetailLabel, auditDetailValue, auditEventLabel, auditEventOptions, auditResourceHref,
 } from '../../src/lib/audit/eventCatalog';
 import { resolveJournalScope } from '../../src/lib/audit/scope';
 import { buildFeedFilters, toEventView, type AuditFeedRow } from '../../src/lib/audit/feedModel';
@@ -51,6 +51,23 @@ test('historical event types get readable labels, unknown ones are humanised', (
   expect(auditEventLabel('whatsapp.conversation.agent_takeover')).toBe('Conversation reprise par l’équipe');
   expect(auditEventLabel('security.legacy.membership_created')).toBe('Accès accordé (historique)');
   expect(auditEventLabel('whatsapp.conversation.brand_new_event')).toBe('Brand new event');
+});
+
+test('every WhatsApp audit event written by the code has a French label', () => {
+  for (const type of ['agent_takeover', 'automation_resumed', 'automation_auto_resumed', 'business_app_reply', 'channel_created',
+    'channel_updated', 'channel_settings_updated', 'channel_test_sent', 'conversation_closed', 'conversation_reopened',
+    'conversation_erased', 'handoff_requested', 'rules_updated']) {
+    const label = auditEventLabel(`whatsapp.conversation.${type}`);
+    expect(label, type).not.toBe(type.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()));
+  }
+});
+
+test('event details get French labels and known values', () => {
+  expect(auditDetailLabel('fulfillment_type')).toBe('Mode de remise');
+  expect(auditDetailValue('fulfillment_type', 'delivery')).toBe('Livraison');
+  expect(auditDetailValue('confirmation_source', 'admin_verified')).toBe('Vérifié par l’équipe');
+  expect(auditDetailValue('reference', 'VIR-2231')).toBe('VIR-2231');
+  expect(auditDetailLabel('some_new_key')).toBe('Some new key');
 });
 
 test('resource links only for safe ids', () => {
