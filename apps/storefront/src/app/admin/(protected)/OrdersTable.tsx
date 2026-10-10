@@ -206,6 +206,8 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
           </p>
         )}
         {operation.notice && <p className="flex items-start gap-1 text-xs font-semibold text-tone-warning-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.notice}</p>}
+        {/* Below 2xl the action column is hidden and the action sits under the state, so the row fits without horizontal scroll. */}
+        <div className="mt-1 2xl:hidden">{actionLink(order, operation)}</div>
       </div>
     );
   }
@@ -303,7 +305,7 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
     { key: 'fulfillment', header: 'Livraison / Retrait', cell: fulfillmentCell },
     { key: 'state', header: 'État', cell: (order) => stateCell(order, operationOf(order)) },
     { key: 'total', header: 'Total', align: 'right', cell: (order) => <span className="font-semibold">{money(order.total)}</span> },
-    { key: 'action', header: <span className="sr-only">Action</span>, align: 'right', cell: (order) => actionLink(order, operationOf(order)) },
+    { key: 'action', header: <span className="sr-only">Action</span>, align: 'right', hideBelow: '2xl', cell: (order) => actionLink(order, operationOf(order)) },
   ];
 
   const groups: DataRowGroup<ListOrder>[] | undefined = sort === 'priority'
