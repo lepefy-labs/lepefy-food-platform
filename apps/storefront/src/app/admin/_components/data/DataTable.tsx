@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
-import { IconArrowDown, IconArrowUp, IconArrowsSort } from '@tabler/icons-react';
+import { IconArrowDown, IconArrowUp, IconArrowsSort, IconChevronDown } from '@tabler/icons-react';
 import type { AdminTone } from '@/lib/admin/tokens';
 import { cn } from '@/lib/utils/cn';
 import { TONE_SOLID_BG_CLASS } from '../ui/Badge';
@@ -24,6 +24,27 @@ export interface DataRowGroup<Row> {
   label: ReactNode;
   tone?: AdminTone;
   rows: Row[];
+  /** Collapsible group (controlled by a client caller): rows are not rendered while collapsed. */
+  collapsed?: boolean;
+  onToggle?: () => void;
+}
+
+function GroupHeading<Row>({ group }: { group: DataRowGroup<Row> }) {
+  const content = <>
+    {group.tone && <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', TONE_SOLID_BG_CLASS[group.tone])} />}
+    {group.label}<span className="font-normal text-a-text-3">· {group.rows.length}</span>
+  </>;
+  if (!group.onToggle) return <span className="inline-flex items-center gap-2">{content}</span>;
+  return (
+    <button type="button" onClick={group.onToggle} aria-expanded={!group.collapsed}
+      className="-mx-1 inline-flex min-h-8 items-center gap-2 rounded px-1 hover:text-a-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-a-focus">
+      {content}
+      <span className="inline-flex items-center gap-0.5 font-semibold text-a-brand-fg">
+        {group.collapsed ? 'Afficher' : 'Masquer'}
+        <IconChevronDown size={14} aria-hidden="true" className={cn('transition-transform', !group.collapsed && 'rotate-180')} />
+      </span>
+    </button>
+  );
 }
 
 export interface DataSort {
@@ -81,7 +102,8 @@ export default function DataTable<Row>({
 }: DataTableProps<Row>) {
   const allGroups: DataRowGroup<Row>[] = groups ?? [{ id: 'all', label: null, rows: rows ?? [] }];
   const allRows = allGroups.flatMap((group) => group.rows);
-  const ids = allRows.map(rowKey);
+  // Select-all only covers rows on screen, never those of a collapsed group.
+  const ids = allGroups.flatMap((group) => (group.collapsed ? [] : group.rows)).map(rowKey);
   const pad = density === 'compact' ? 'px-3 py-2' : 'px-3 py-3';
   const colSpan = columns.length + (selectable ? 1 : 0);
 
@@ -113,14 +135,11 @@ export default function DataTable<Row>({
                 {group.label !== null && group.rows.length > 0 && (
                   <tr>
                     <th scope="colgroup" colSpan={colSpan} className="border-b border-a-border bg-a-surface-2 px-3 py-1.5 text-left text-xs font-semibold text-a-text-2">
-                      <span className="inline-flex items-center gap-2">
-                        {group.tone && <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', TONE_SOLID_BG_CLASS[group.tone])} />}
-                        {group.label}<span className="font-normal text-a-text-3">· {group.rows.length}</span>
-                      </span>
+                      <GroupHeading group={group} />
                     </th>
                   </tr>
                 )}
-                {group.rows.map((row) => {
+                {!group.collapsed && group.rows.map((row) => {
                   const id = rowKey(row);
                   const tone = rowTone?.(row);
                   const detail = rowDetail?.(row);
@@ -159,11 +178,10 @@ export default function DataTable<Row>({
             <section key={group.id} aria-label={typeof group.label === 'string' ? group.label : undefined}>
               {group.label !== null && (
                 <h3 className="flex items-center gap-2 border-b border-a-border bg-a-surface-2 px-3 py-1.5 text-xs font-semibold text-a-text-2">
-                  {group.tone && <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', TONE_SOLID_BG_CLASS[group.tone])} />}
-                  {group.label}<span className="font-normal text-a-text-3">· {group.rows.length}</span>
+                  <GroupHeading group={group} />
                 </h3>
               )}
-              <ul className="divide-y divide-a-border">
+              {!group.collapsed && <ul className="divide-y divide-a-border">
                 {group.rows.map((row) => {
                   const tone = rowTone?.(row);
                   return (
@@ -173,7 +191,7 @@ export default function DataTable<Row>({
                     </li>
                   );
                 })}
-              </ul>
+              </ul>}
             </section>
           ))}
         </div>

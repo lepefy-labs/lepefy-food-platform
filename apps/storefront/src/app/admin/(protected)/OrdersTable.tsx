@@ -54,6 +54,8 @@ interface Props {
   /** Link that clears every filter (empty state). */
   resetHref: string;
   hasFilters: boolean;
+  /** Start with the « Terminées » group collapsed (work queue without search, status filter or « Terminés » view). */
+  finishedCollapsed: boolean;
 }
 
 const shortId = (id: string) => `#${id.slice(0, 8).toUpperCase()}`;
@@ -109,10 +111,15 @@ function csvOf(rows: ListOrder[]) {
   return `﻿${lines.join('\r\n')}\r\n`;
 }
 
-export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults, resetHref, hasFilters }: Props) {
+export default function OrdersTable({ orders, tenantCurrency, carriers, thresholds, canManage, managedProviderAvailable, nowIso, originCountry, sort, documentDefaults, resetHref, hasFilters, finishedCollapsed }: Props) {
   const router = useRouter();
   const toast = useAdminToast();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Finished orders need no action: in the work queue their group starts
+  // collapsed (count kept visible); a search, a status filter or the
+  // « Terminés » view opens it. The choice survives polling refreshes.
+  const [finishedOpen, setFinishedOpen] = useState(!finishedCollapsed);
+  useEffect(() => { setFinishedOpen(!finishedCollapsed); }, [finishedCollapsed]);
   const [detail, setDetail] = useState<Record<string, DetailData>>({});
   const [detailError, setDetailError] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<Set<string>>(new Set());
@@ -123,7 +130,8 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const money = (value: number | null | undefined) => formatMoney(Number(value ?? 0), tenantCurrency || 'EUR');
   const operations = useMemo(() => new Map(orders.map(order => [order.id, classifyOrderOperation({ ...order, originCountry, managedProviderAvailable }, thresholds, now)])), [orders, managedProviderAvailable, thresholds, now]);
-  const rowIds = useMemo(() => orders.map(order => order.id), [orders]);
+  // Rows of the collapsed « Terminées » group are off screen: they leave the selection (bulk actions never touch hidden orders).
+  const rowIds = useMemo(() => orders.filter(order => finishedOpen || sort !== 'priority' || operations.get(order.id)?.group !== 'finished').map(order => order.id), [orders, finishedOpen, sort, operations]);
   useEffect(() => { setExpanded(new Set()); setDetail({}); setDetailError(new Set()); }, [orders]);
 
   async function loadDetail(id: string) {
@@ -313,7 +321,10 @@ export default function OrdersTable({ orders, tenantCurrency, carriers, threshol
       const group = operationOf(order).group;
       const last = runs[runs.length - 1];
       if (last && last.id.startsWith(`${group}:`)) last.rows.push(order);
-      else runs.push({ id: `${group}:${runs.length}`, label: PRIORITY_GROUP_LABELS[group], tone: GROUP_TONE[group], rows: [order] });
+      else runs.push({
+        id: `${group}:${runs.length}`, label: PRIORITY_GROUP_LABELS[group], tone: GROUP_TONE[group], rows: [order],
+        ...(group === 'finished' ? { collapsed: !finishedOpen, onToggle: () => setFinishedOpen((open) => !open) } : {}),
+      });
       return runs;
     }, [])
     : undefined;

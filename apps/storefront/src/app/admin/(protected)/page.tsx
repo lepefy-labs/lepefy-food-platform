@@ -103,6 +103,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
   const window = pageWindow(queue?.total ?? 0, queue?.currentPage ?? 1, values.pageSize)
   const view = filters.view
   const hasFilters = ORDER_LIST.activeCount(values, ['view', 'status', 'fulfillment', 'payment', 'dateFrom', 'dateTo']) > 0 || Boolean(filters.search)
+  // A search or a status filter often targets a closed order: show it. Livraison / Retrait / Urgents stay work queues.
+  const finishedCollapsed = !filters.search && !values.status && view !== 'finished'
   // Reset keeps the chosen sort and page size: they are preferences, not filters.
   const resetHref = ORDER_LIST.href('/admin', { ...ORDER_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {})
 
@@ -212,7 +214,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Record
           </Suspense>
           {!queue
             ? <ErrorState title="Impossible de charger les commandes." description="La file de travail n’a pas répondu. Les commandes ne sont pas perdues." action={<ButtonLink href={href({ page: window.page })}>Réessayer</ButtonLink>} />
-            : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={operational.thresholds} canManage={canManage} managedProviderAvailable={operational.managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} resetHref={resetHref} hasFilters={hasFilters} />}
+            : <OrdersTable orders={orderList} tenantCurrency={tenant.currency} carriers={carriers} thresholds={operational.thresholds} canManage={canManage} managedProviderAvailable={operational.managedProviderAvailable} nowIso={now.toISOString()} originCountry={tenant.country} sort={queue.appliedSort} documentDefaults={documentDefaults} resetHref={resetHref} hasFilters={hasFilters} finishedCollapsed={finishedCollapsed} />}
           {queue && window.total > 0 && (
             <Pagination
               window={window}
