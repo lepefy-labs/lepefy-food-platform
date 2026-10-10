@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconAlertTriangle, IconCheck, IconEyeOff, IconRosetteDiscountCheck, IconStar, IconX } from '@tabler/icons-react';
 import { REVIEW_REASON_CODES } from '@/lib/reviews/reviewModeration';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
+import InlineAlert, { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
 import {
   ACTION_LABELS,
   actionsFor,
@@ -48,7 +51,6 @@ function ModerationModal({ review, action, onClose, onDone }: {
   onClose: () => void;
   onDone: () => void;
 }) {
-  const titleId = useId();
   const [reasonCode, setReasonCode] = useState('');
   const [reasonText, setReasonText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -82,45 +84,42 @@ function ModerationModal({ review, action, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}
-      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) onClose(); }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="w-full max-w-md space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-        <h2 id={titleId} className="text-base font-semibold text-gray-950 dark:text-white">
-          {action === 'publish' ? 'Publier cet avis ?' : action === 'restore' ? 'Republier cet avis ?' : action === 'reject' ? 'Rejeter cet avis ?' : 'Masquer cet avis ?'}
-        </h2>
-        <p className="text-sm text-gray-500">
-          {publishing ? 'Il sera visible sur la boutique et compté dans la note moyenne. Le texte du client n’est jamais modifié.'
-            : action === 'reject' ? 'Il ne sera jamais publié. Le client n’est pas prévenu.'
-              : 'Il disparaît de la boutique et de la note moyenne ; vous pourrez le republier.'}
-        </p>
-        {publishing && flagged && (
-          <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            <IconAlertTriangle size={16} className="mt-0.5 shrink-0" />
-            Signalé : {review.moderation_flags.map(flagLabel).join(', ')}. Vérifiez qu’il ne contient pas de données personnelles avant de publier.
-          </p>
-        )}
-        {needsReason(action) && <>
-          <label className="block text-sm">Motif (obligatoire)
-            <select value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950">
-              <option value="">Choisir…</option>
-              {REVIEW_REASON_CODES.map((code) => <option key={code} value={code}>{REASON_LABELS[code]}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm">Précision {reasonCode === 'other' ? '(obligatoire)' : '(facultative)'}
-            <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-          </label>
-        </>}
-        {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={busy} className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">Annuler</button>
-          <button type="button" onClick={() => void confirm()} disabled={busy || issues.length > 0}
-            className={`min-h-11 rounded-xl px-4 text-sm font-semibold text-white disabled:opacity-50 ${publishing ? 'bg-emerald-600' : 'bg-red-600'}`}>
-            {busy ? '…' : publishing && flagged ? `${ACTION_LABELS[action]} malgré le signalement` : ACTION_LABELS[action]}
-          </button>
+    <Dialog
+      open
+      onClose={onClose}
+      dismissible={!busy}
+      size="sm"
+      title={action === 'publish' ? 'Publier cet avis ?' : action === 'restore' ? 'Republier cet avis ?' : action === 'reject' ? 'Rejeter cet avis ?' : 'Masquer cet avis ?'}
+      description={publishing ? 'Il sera visible sur la boutique et compté dans la note moyenne. Le texte du client n’est jamais modifié.'
+        : action === 'reject' ? 'Il ne sera jamais publié. Le client n’est pas prévenu.'
+          : 'Il disparaît de la boutique et de la note moyenne ; vous pourrez le republier.'}
+      footer={<>
+        <Button variant="secondary" onClick={onClose} disabled={busy}>Annuler</Button>
+        <Button variant={publishing ? 'primary' : 'danger'} onClick={() => void confirm()} loading={busy} disabled={issues.length > 0}>
+          {publishing && flagged ? `${ACTION_LABELS[action]} malgré le signalement` : ACTION_LABELS[action]}
+        </Button>
+      </>}
+    >
+      {(publishing && flagged) || needsReason(action) || error ? (
+        <div className="space-y-3">
+          {publishing && flagged && (
+            <InlineAlert tone="warning">Signalé : {review.moderation_flags.map(flagLabel).join(', ')}. Vérifiez qu’il ne contient pas de données personnelles avant de publier.</InlineAlert>
+          )}
+          {needsReason(action) && <>
+            <label className="block text-sm font-semibold text-a-text">Motif (obligatoire)
+              <select value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-a-border-strong bg-a-surface px-3 text-sm font-normal text-a-text">
+                <option value="">Choisir…</option>
+                {REVIEW_REASON_CODES.map((code) => <option key={code} value={code}>{REASON_LABELS[code]}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm font-semibold text-a-text">Précision {reasonCode === 'other' ? '(obligatoire)' : '(facultative)'}
+              <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} maxLength={500} rows={2} className="mt-1.5 font-normal w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
+            </label>
+          </>}
+          <ErrorText message={error} />
         </div>
-      </div>
-    </div>
+      ) : null}
+    </Dialog>
   );
 }
 

@@ -8,7 +8,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { orderDetailTransition } from '@/lib/orders/adminOrderOperations';
 import { carrierDisplayName } from '@/lib/shipping/shipmentPresentation';
 import ConfirmPaymentButton from '../../_components/ui/ConfirmPaymentButton';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import PackingPanel from './PackingPanel';
 import ManagedShipmentPanel from './ManagedShipmentPanel';
 import CartonSuggestionCard from './CartonSuggestionCard';
@@ -374,7 +374,7 @@ export default function OrderDetail({
         </div>
       </section>
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={cancelOpen}
         title="Annuler cette commande ?"
         description="La commande passera au statut annulé. Vérifiez le paiement et les éventuelles actions de remboursement avant de confirmer."

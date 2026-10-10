@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { IconBuildingStore, IconCheck, IconMinus, IconPlus, IconTicket, IconX } from '@tabler/icons-react';
+import { IconBuildingStore, IconCheck, IconMinus, IconPlus, IconTicket } from '@tabler/icons-react';
 import type { EventTicketType } from '@lepefy/types';
 import type { AdminEventReservation } from '../page';
 import { formatPrice } from '@/lib/utils/format';
+import Dialog from '@/app/admin/_components/ui/Dialog';
 
 type SuccessState = { reservation: AdminEventReservation; ticketUrl: string };
 
@@ -99,18 +100,15 @@ export default function ManualEventReservationModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) onClose(); }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="manual-reservation-title" className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:max-w-xl sm:rounded-2xl dark:border-gray-700 dark:bg-gray-900">
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-100 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900">
-          <div>
-            <h2 id="manual-reservation-title" className="text-base font-bold text-gray-950 dark:text-white">Nouvelle réservation</h2>
-            <p className="mt-1 text-xs text-gray-500">Paiement encaissé directement en magasin.</p>
-          </div>
-          <button type="button" onClick={onClose} disabled={submitting} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-gray-500 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 dark:hover:bg-white/5" aria-label="Fermer"><IconX size={18} /></button>
-        </div>
-
+    <Dialog
+      open={open}
+      onClose={onClose}
+      dismissible={!submitting}
+      title="Nouvelle réservation"
+      description="Paiement encaissé directement en magasin."
+    >
         {success ? (
-          <div className="p-5">
+          <div>
             <div className="rounded-2xl bg-emerald-50 p-5 text-center dark:bg-emerald-950/35">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300"><IconCheck size={24} /></div>
               <h3 className="mt-3 font-bold text-emerald-950 dark:text-emerald-100">Réservation créée</h3>
@@ -123,7 +121,7 @@ export default function ManualEventReservationModal({
             </div>
           </div>
         ) : (
-          <form onSubmit={submit} className="space-y-5 p-5">
+          <form onSubmit={submit} className="space-y-5">
             <section>
               <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Client</h3>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -171,7 +169,6 @@ export default function ManualEventReservationModal({
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useUnsavedChangesGuard } from '../../../_components/ui/ConfirmDialog';
 import {
   IconAlertTriangle, IconBrandInstagram, IconBrandWhatsapp, IconBuildingStore, IconCash, IconCheck, IconClock,
   IconDots, IconLink, IconLoader2, IconMinus, IconPhone, IconPlus, IconRepeat, IconSearch, IconTrash, IconTruck, IconUserPlus, IconX,
@@ -438,20 +439,7 @@ export default function AssistedOrderForm({
     if (baseline.current === null && !initialLoading && !prefillPending) baseline.current = snapshot;
   }, [initialLoading, prefillPending, snapshot]);
   const dirty = !submitted.current && baseline.current !== null && snapshot !== baseline.current;
-  useEffect(() => {
-    if (!dirty) return;
-    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
-    const onClick = (event: MouseEvent) => {
-      const anchor = (event.target as HTMLElement | null)?.closest('a');
-      if (!anchor || anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return;
-      const href = anchor.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-      if (!window.confirm('Quitter sans enregistrer ? Vos saisies seront perdues.')) { event.preventDefault(); event.stopPropagation(); }
-    };
-    window.addEventListener('beforeunload', beforeUnload);
-    document.addEventListener('click', onClick, true);
-    return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', onClick, true); };
-  }, [dirty]);
+  const unsavedGuard = useUnsavedChangesGuard(dirty, 'Vos saisies seront perdues.');
 
   function contentPayload() {
     return {
@@ -572,6 +560,7 @@ export default function AssistedOrderForm({
 
   return (
     <div className="grid items-start gap-5 pb-28 lg:grid-cols-[minmax(0,1fr)_340px] lg:pb-8">
+      {unsavedGuard}
       <div className="space-y-4">
         {issuesList && <div className="lg:hidden">{issuesList}</div>}
         {isEdit && initial?.hadActiveLink && (

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { IconAlertTriangle, IconCheck, IconDotsVertical, IconFileSpreadsheet, IconPencil, IconPlus, IconPrinter, IconReceiptRefund, IconSearch, IconSend, IconTicket, IconX } from '@tabler/icons-react';
+import { useEffect, useMemo, useState } from 'react';
+import { IconCheck, IconDotsVertical, IconFileSpreadsheet, IconPencil, IconPlus, IconPrinter, IconReceiptRefund, IconSearch, IconSend, IconTicket, IconX } from '@tabler/icons-react';
 import Button from '../../../../../_components/ui/Button';
 import type { EventReservationStatus, EventTicketType } from '@lepefy/types';
 import type { AdminEventReservation } from '../page';
 import { formatPrice } from '@/lib/utils/format';
 import ManualEventReservationModal from './ManualEventReservationModal';
+import ConfirmDialog from '@/app/admin/_components/ui/ConfirmDialog';
+import InlineAlert from '@/app/admin/_components/ui/InlineAlert';
 
 const STATUS_LABELS: Record<EventReservationStatus, string> = {
   confirmed: 'Confirmée',
@@ -68,7 +70,6 @@ export default function EventReservationsTab({
   const [formulaFilter, setFormulaFilter] = useState('all');
   const [manualOpen, setManualOpen] = useState(false);
   const [manualReservations, setManualReservations] = useState<AdminEventReservation[]>([]);
-  const cancelRefundRef = useRef<HTMLButtonElement>(null);
 
   const allReservations = useMemo(() => {
     const existingIds = new Set(reservations.map((reservation) => reservation.id));
@@ -119,15 +120,8 @@ export default function EventReservationsTab({
   }, [openActionsId]);
 
   useEffect(() => {
-    if (!refundTargetId) return;
-    setOpenActionsId(null);
-    cancelRefundRef.current?.focus();
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !refundInProgress) setRefundTargetId(null);
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [refundTargetId, refundInProgress]);
+    if (refundTargetId) setOpenActionsId(null);
+  }, [refundTargetId]);
 
   async function confirmRefund() {
     if (!refundTarget || refundInProgress) return;
@@ -261,25 +255,19 @@ export default function EventReservationsTab({
 
       <ManualEventReservationModal open={manualOpen} eventId={eventId} ticketTypes={ticketTypes} currency={currency} onClose={() => setManualOpen(false)} onCreated={onManualCreated} />
 
-      {refundTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !refundInProgress) setRefundTargetId(null); }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="refund-dialog-title" aria-describedby="refund-dialog-description" className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-            <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400"><IconAlertTriangle size={20} aria-hidden="true" /></div>
-              <div className="min-w-0 flex-1">
-                <h2 id="refund-dialog-title" className="text-base font-semibold text-gray-950 dark:text-white">Rembourser cette réservation ?</h2>
-                <p id="refund-dialog-description" className="mt-1.5 text-sm leading-5 text-gray-600 dark:text-gray-300">Cette action remboursera <strong className="text-gray-900 dark:text-white">{formatPrice(refundTarget.amount_paid, currency)}</strong> à <strong className="text-gray-900 dark:text-white">{refundTarget.customer_name}</strong> et libérera <strong className="text-gray-900 dark:text-white">{refundTarget.quantity_remaining} place{refundTarget.quantity_remaining > 1 ? 's' : ''}</strong>.</p>
-                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">Vérifiez que le remboursement est bien demandé par le client avant de continuer.</p>
-                {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
-              </div>
-            </div>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button ref={cancelRefundRef} type="button" onClick={() => setRefundTargetId(null)} disabled={refundInProgress} className="min-h-11 rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5">Annuler</button>
-              <button type="button" onClick={confirmRefund} disabled={refundInProgress} className="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:ring-offset-gray-900">{refundInProgress ? 'Remboursement…' : 'Confirmer le remboursement'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(refundTarget)}
+        destructive
+        title="Rembourser cette réservation ?"
+        description={refundTarget && <>Cette action remboursera <strong className="text-a-text">{formatPrice(refundTarget.amount_paid, currency)}</strong> à <strong className="text-a-text">{refundTarget.customer_name}</strong> et libérera <strong className="text-a-text">{refundTarget.quantity_remaining} place{refundTarget.quantity_remaining > 1 ? 's' : ''}</strong>.</>}
+        confirmLabel="Confirmer le remboursement"
+        loading={refundInProgress}
+        error={error}
+        onConfirm={() => void confirmRefund()}
+        onCancel={() => setRefundTargetId(null)}
+      >
+        <InlineAlert tone="warning">Vérifiez que le remboursement est bien demandé par le client avant de continuer.</InlineAlert>
+      </ConfirmDialog>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
   MANUAL_PAYMENT_METHODS, buildPayLinkMessage, buildTrackingShareMessage,
 } from '@/lib/orders/assisted/assistedOrderPolicy';
 import ShareLinkActions from '../../../../_components/ui/ShareLinkActions';
-import ConfirmActionModal from '../../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../../_components/ui/ConfirmDialog';
 import PreorderStatusBadge from '../../_assisted/PreorderStatusBadge';
 import { classifyPreorder } from '@/lib/orders/assisted/preorderQueue';
 import { formatOperationalDuration, formatSince } from '@/lib/orders/adminOrderOperations';
@@ -387,7 +387,7 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
         </div>
       </div>
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={cancelOpen}
         title="Annuler cette précommande ?"
         description="Le client ne pourra plus payer avec son lien. Aucune commande ne sera créée. Cette action est définitive."

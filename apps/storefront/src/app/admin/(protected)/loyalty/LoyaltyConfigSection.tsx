@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import type { ReferralAvailabilityMode, ReferralFraudAction, TenantReferralTier } from '@lepefy/types';
 import {
   MAX_REFERRAL_DEPTH,
@@ -346,7 +346,7 @@ export function LoyaltyConfigSection(props: LoyaltyConfigSectionProps) {
         </div>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={confirmDisable}
         title="Désactiver le programme de fidélité ?"
         description="Les clients ne gagneront plus de points, le scan en boutique et le parrainage s'arrêtent. Les soldes existants sont conservés."

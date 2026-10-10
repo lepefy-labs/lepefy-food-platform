@@ -15,6 +15,7 @@ import AdminSidebar from '../_components/AdminSidebar';
 import AdminHeader from '../_components/AdminHeader';
 import AdminThemeProvider from '../_components/AdminThemeProvider';
 import SubscriptionBanner from '../_components/SubscriptionBanner';
+import { AdminToaster } from '../_components/ui/Toaster';
 import { getTenantServiceState } from '@/lib/billing/tenantServiceState';
 import { SUSPENDED_ADMIN_PERMISSIONS, isAdminPathAllowedWhenSuspended } from '@/lib/billing/subscriptionRules';
 
@@ -95,11 +96,13 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
 
   return (
     <AdminThemeProvider>
+      <AdminToaster>
       <AdminHeader platformName={platform.platformName} platformLogoUrl={platform.logoUrl} tenantName={tenant.name} tenantLogoUrl={tenant.logo_url} categories={categories ?? []} workspace={workspace} shopAdminUrl={workspaceUrls.shopAdminUrl} eventsAdminUrl={workspaceUrls.eventsAdminUrl} isPlatformOwner={access.isPlatformOwner} permissions={navPermissions} adminEmail={user.email ?? ''} adminDisplayName={displayName} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} />
       <div className="flex min-h-[calc(100vh-57px)] bg-[var(--admin-page-bg)] dark:bg-gray-950">
         <aside className="sticky top-[57px] hidden h-[calc(100vh-57px)] w-64 shrink-0 self-start overflow-y-auto border-r border-[var(--admin-border)] bg-white px-2 py-3 dark:border-gray-800 dark:bg-gray-900 md:block"><Suspense fallback={<div className="h-full w-full" />}><AdminSidebar categories={categories ?? []} workspace={workspace} permissions={navPermissions} pendingPaymentsCount={pendingPaymentsCount} pendingEventRequestsCount={pendingEventRequestsCount} pendingRentalRequestsCount={pendingRentalRequestsCount} newInquiriesCount={newInquiriesCount} isPlatformOwner={access.isPlatformOwner} gestionEnabled={gestionEnabled} whatsappEnabled={whatsappEnabled} /></Suspense></aside>
         <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-6 xl:p-8"><SubscriptionBanner serviceState={serviceState} canViewBilling={canAdmin(access, 'billing.view')} />{children}</main>
       </div>
+      </AdminToaster>
     </AdminThemeProvider>
   );
 }

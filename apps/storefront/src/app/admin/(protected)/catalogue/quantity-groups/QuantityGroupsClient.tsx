@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { IconPlus, IconTrash, IconX } from '@tabler/icons-react';
-import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
 interface GroupProduct { id: string; name: string }
 interface Group {
@@ -173,7 +173,7 @@ export default function QuantityGroupsClient({ products }: { products: ProductOp
         ))
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingDelete !== null}
         title={`Supprimer « ${pendingDelete?.name ?? ''} » ?`}
         description="Le groupe et son association aux produits seront supprimés. La règle de quantité combinée cessera immédiatement de s'appliquer."

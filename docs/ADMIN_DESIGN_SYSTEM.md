@@ -59,18 +59,27 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - `Badge` (tono, `dot` per gli stati), `CountBadge`; `StatusBadge` per gli ordini (dal registry).
 - `AdminStatCard` — unica card KPI: superficie neutra, banda di tono a sinistra, valore zero attenuato, link opzionale con `aria-current`.
 - `AdminPageHeader` — breadcrumb, titolo, meta, azioni, slot tab.
+- `Dialog` / `Drawer` — elemento nativo `<dialog>` (`showModal()`: top layer, focus contenuto, sfondo inerte, Esc) in portal su `document.body`; bottom sheet su telefono, centrato da `sm`; `dismissible={false}` mentre un'azione è in corso; footer con azioni (impilate su telefono). Per i form nel dialog: `<form id>` nel corpo e `<Button type="submit" form={id}>` nel footer.
+- `ConfirmDialog` — unica conferma: conseguenze esplicite in `description`, `destructive`, `reason` (motivo facoltativo/obbligatorio), `confirmDisabled`, `error`. `useConfirm()` restituisce `ask(...) → Promise<boolean>` per gli handler async esistenti; `useUnsavedChangesGuard(dirty)` intercetta link e chiusura scheda con modifiche non salvate.
+- `AdminToaster` (montato nel layout protetto) + `useAdminToast()` — `success` / `error` / `info`, regione `aria-live`, errori più lunghi, azione opzionale con link.
+- `useAdminMutation()` — scrittura client: `run(url, { body | form, method, withKey, refresh, successMessage, errorToast })`, errore francese dall'API, chiave di richiesta stabile tra i retry (sostituisce `useGestionMutation`, ora alias).
+- `InlineAlert` (tono, titolo, azione; `role="alert"` per `danger`) ed `ErrorText`.
+- `Form`: `FormField` (label, hint, errore, `required`/`optional`, collega `aria-describedby`/`aria-invalid`), `Input`, `Select`, `Textarea`, `inputClasses`.
+- `BulkTrackingModal`, `BulkDocumentsDialog` (Commandes) già sul kit.
 
 ## 5. Controllo automatico
 
-`tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa) scansiona i percorsi in `MIGRATED` e rifiuta: testo < 12 px, palette Tailwind diretta, varianti `dark:`, `confirm()`, `var(--color-primary…)`, colori esadecimali. Ogni modulo migrato si aggiunge alla lista.
+`tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa):
+- sui percorsi in `MIGRATED` rifiuta testo < 12 px, palette Tailwind diretta, varianti `dark:`, `var(--color-primary…)`, colori esadecimali. Ogni modulo migrato si aggiunge alla lista;
+- su tutto `app/admin` rifiuta già `confirm()` nativo e overlay `fixed inset-0` scritti a mano. Eccezioni: il mirino fotocamera di `loyalty/scan/CameraScanButton.tsx` (vista a schermo intero, non un dialog) e `AdminMobileNav` fino a U3.
 
 ## 6. Stato di adozione
 
 | Unità | Contenuto | Stato |
 |---|---|---|
 | U0 | Font di piattaforma risolti su `<html>` | ✅ `49b1d3b7` |
-| U1 | Token, Tailwind `a-*`/`tone-*`, format, registry stati, Button, Badge, StatCard, PageHeader, guard | ✅ |
-| U2 | Dialog, ConfirmDialog, Drawer, Toaster, InlineAlert, useAdminMutation | — |
+| U1 | Token, Tailwind `a-*`/`tone-*`, format, registry stati, Button, Badge, StatCard, PageHeader, guard | ✅ `de70404a` |
+| U2 | Dialog, ConfirmDialog, Drawer, Toaster, InlineAlert, Form, useAdminMutation; 18 overlay e 10 `confirm()` migrati | ✅ |
 | U3 | Shell: registry navigazione, sidebar, workspace, palette comandi, barra mobile | — |
 | U4 | Kit dati: listParams, FilterBar, DataTable, Pagination, stati vuoto/errore | — |
 | U5–U11 | Commandes, Livraison, Clients, Catalogue, Gestion, Événementiel, altri moduli | — |

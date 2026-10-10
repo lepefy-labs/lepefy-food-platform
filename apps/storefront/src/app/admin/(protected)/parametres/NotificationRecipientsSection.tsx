@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import { IconChevronDown, IconPlus, IconTrash, IconUsers } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
 import type { NotificationTeamMember, TenantNotificationRecipient } from '@lepefy/types';
@@ -52,6 +53,7 @@ export function NotificationRecipientsSection({ initialRecipients, team, typeKey
   const teamById = useMemo(() => new Map(team.map((member) => [member.id, member])), [team]);
 
   const [recipients, setRecipients] = useState(initialRecipients);
+  const [ask, confirmDialog] = useConfirm();
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<string | null>(null);
   const { feedback, show: showToast } = useSettingsFeedback();
@@ -101,7 +103,7 @@ export function NotificationRecipientsSection({ initialRecipients, team, typeKey
   }
 
   async function handleDelete(r: TenantNotificationRecipient) {
-    if (!window.confirm(`Supprimer ${nameOf(r)} des destinataires ?`)) return;
+    if (!(await ask({ title: `Supprimer ${nameOf(r)} des destinataires ?`, description: 'Cette personne ne recevra plus aucune notification.', confirmLabel: 'Supprimer', destructive: true }))) return;
     markSaving([r.id], true);
     try {
       const res = await fetch(`/api/admin/notification-recipients/${r.id}`, { method: 'DELETE' });
@@ -194,6 +196,7 @@ export function NotificationRecipientsSection({ initialRecipients, team, typeKey
 
   return (
     <>
+      {confirmDialog}
       <SettingsPanel
         id="destinataires"
         title="Destinataires"

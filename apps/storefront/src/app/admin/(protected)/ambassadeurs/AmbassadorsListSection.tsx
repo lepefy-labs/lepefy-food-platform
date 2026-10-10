@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/utils/format';
 import { ambassadorDisplayName } from '@/lib/ambassador/ambassadorAdmin';
 import Button from '../../_components/ui/Button';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 
 export interface AmbassadorListRow {
   id: string;
@@ -104,7 +104,7 @@ export function AmbassadorsListSection({ ambassadors, currency }: { ambassadors:
         </div>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={target !== null}
         title="Retirer le statut d’ambassadeur ?"
         description={`${target ? ambassadorDisplayName(target) : 'Ce client'} ne générera plus de commission pour les prochaines commandes livrées de ses invités. Les commissions déjà créées${target && target.confirmedBalance > 0 ? ` (${formatPrice(target.confirmedBalance, currency)} à verser)` : ''} restent dues et visibles.`}

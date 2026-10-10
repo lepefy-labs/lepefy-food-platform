@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { IconCheck, IconPlayerPause, IconPlayerPlay, IconPencil, IconPlus, IconSparkles, IconTrash, IconX } from '@tabler/icons-react';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import type {
   KnowledgeBaseCategory,
   KnowledgeBaseEntry,
@@ -296,7 +296,7 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
         </ul>
       </section>
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={deleteTarget !== null}
         title="Supprimer cette connaissance ?"
         description="Nala ne pourra plus s’en servir et la suppression est définitive. Pour l’écarter temporairement, mettez-la plutôt en pause."

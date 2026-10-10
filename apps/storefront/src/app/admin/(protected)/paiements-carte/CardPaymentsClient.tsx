@@ -9,7 +9,7 @@ import {
   type CardNotificationState, type CardPaymentDisplayStatus, type CardPaymentPeriod, type CardPaymentsListState,
 } from '@/lib/card/cardPaymentsAdmin';
 import { formatOperationalDuration } from '@/lib/orders/adminOrderOperations';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import CopyableValue from '../../_components/ui/CopyableValue';
 
 interface NotificationInfo { state: CardNotificationState; acceptedAt: string | null }
@@ -349,7 +349,7 @@ export default function CardPaymentsClient({ canResend }: { canResend: boolean }
         </nav>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={resendTarget !== null}
         title="Renvoyer la confirmation ?"
         description={resendTarget ? `L’email de confirmation ${resendTarget.reference} (${formatPrice(resendTarget.amount, resendTarget.currency.toUpperCase())}) sera renvoyé à ${resendTarget.customerEmail}.` : ''}

@@ -1,18 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Badge from '@/app/admin/_components/ui/Badge';
+import { Drawer } from '@/app/admin/_components/ui/Dialog';
 import Link from 'next/link';
-import {
-  IconAlertTriangle,
-  IconChevronLeft,
-  IconChevronRight,
-  IconInfoCircle,
-  IconListSearch,
-  IconRefresh,
-  IconSearch,
-  IconStethoscope,
-  IconX,
-} from '@tabler/icons-react';
+import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconInfoCircle, IconListSearch, IconRefresh, IconSearch, IconStethoscope } from '@tabler/icons-react';
 import type {
   PacklinkListDiagnostics,
   PacklinkListedShipment,
@@ -93,39 +85,19 @@ function ShipmentDetail({
   const totalWeight = summary.totalWeightKg
     ?? (summary.packages.reduce((sum, pkg) => sum + (pkg.weightKg ?? 0), 0) || null);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end bg-black/40 sm:items-stretch" onClick={onClose}>
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Expédition ${summary.reference ?? ''}`}
-        onClick={(event) => event.stopPropagation()}
-        className="flex max-h-[88vh] w-full flex-col rounded-t-2xl bg-white shadow-xl dark:bg-gray-900 sm:max-h-none sm:max-w-md sm:rounded-none"
-      >
-        <header className="flex items-start justify-between gap-3 border-b border-[var(--admin-border)] px-5 py-4">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Expédition Packlink</p>
-            <p className="mt-1 break-all font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {summary.reference ?? 'Référence absente'}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <StatusPill status={summary.status} />
-              {summary.canceled && (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Annulée</span>
-              )}
-            </div>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">
-            <IconX size={18} />
-          </button>
-        </header>
-
+    <Drawer
+      open
+      onClose={onClose}
+      bodyClassName="p-0 flex flex-col"
+      title={<span className="break-all font-mono">{summary.reference ?? 'Référence absente'}</span>}
+      description={<span className="flex flex-wrap items-center gap-1.5">
+        <span>Expédition Packlink</span>
+        <StatusPill status={summary.status} />
+        {summary.canceled && <Badge tone="danger">Annulée</Badge>}
+      </span>}
+    >
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <dl>
             <DetailRow label="Destinataire">
@@ -204,8 +176,7 @@ function ShipmentDetail({
             </button>
           </footer>
         )}
-      </aside>
-    </div>
+    </Drawer>
   );
 }
 

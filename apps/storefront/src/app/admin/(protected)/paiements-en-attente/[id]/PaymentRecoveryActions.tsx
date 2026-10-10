@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconExternalLink, IconMailForward, IconX } from '@tabler/icons-react';
 import ConfirmPaymentButton from '../../../_components/ui/ConfirmPaymentButton';
-import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
 interface Props {
   sessionId: string;
@@ -150,7 +150,7 @@ export default function PaymentRecoveryActions({
         )}
       </div>
 
-      {canManageSession && <ConfirmActionModal open={cancelOpen} title="Annuler cette demande de paiement ?" description={`La demande de ${customerLabel} sera retirée de la file de vérification. Cette action n’annule ni ne rembourse un éventuel paiement déjà effectué sur le service externe.`} confirmLabel="Annuler la demande" cancelLabel="Conserver" destructive loading={cancelling} onCancel={() => { if (!cancelling) setCancelOpen(false); }} onConfirm={() => void cancelSession()} />}
+      {canManageSession && <ConfirmDialog open={cancelOpen} title="Annuler cette demande de paiement ?" description={`La demande de ${customerLabel} sera retirée de la file de vérification. Cette action n’annule ni ne rembourse un éventuel paiement déjà effectué sur le service externe.`} confirmLabel="Annuler la demande" cancelLabel="Conserver" destructive loading={cancelling} onCancel={() => { if (!cancelling) setCancelOpen(false); }} onConfirm={() => void cancelSession()} />}
     </>
   );
 }

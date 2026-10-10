@@ -14,7 +14,7 @@ import {
 } from '@/lib/ambassador/ambassadorAdmin';
 import { formatPrice } from '@/lib/utils/format';
 import Button from '../../_components/ui/Button';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import type { AmbassadorCommissionMode, AmbassadorDiscountType } from '@lepefy/types';
 
 const INPUT_CLS =
@@ -316,7 +316,7 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
         </div>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={confirmModeChange}
         title="Changer le mode de commission ?"
         description={`Les prochaines premières commandes livrées seront calculées en mode « ${isSplitPool ? 'pool partagé' : 'proportionnel'} ». Les commissions déjà créées ne changent pas.`}

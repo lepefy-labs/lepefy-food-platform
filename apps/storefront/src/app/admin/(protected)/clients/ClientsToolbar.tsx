@@ -3,18 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { IconDownload, IconPlus, IconSearch, IconX } from '@tabler/icons-react';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
+import { FormField, Input } from '@/app/admin/_components/ui/Form';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
 
 export function ClientsToolbar({ canManage }: { canManage: boolean }) {
   const router = useRouter(); const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [open, setOpen] = useState(canManage && searchParams.get('new') === '1'); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const initial = useRef(true);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
   useEffect(() => {
     if (initial.current) { initial.current = false; return; }
     const timer = window.setTimeout(() => {
@@ -40,6 +38,24 @@ export function ClientsToolbar({ canManage }: { canManage: boolean }) {
       <a href={`/api/admin/clients/export?${searchParams.toString()}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-4 text-sm font-semibold dark:bg-gray-900"><IconDownload size={18} />Exporter CSV</a>
       {canManage && <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white"><IconPlus size={18} aria-hidden="true" />Ajouter un client</button>}
     </div>
-    {open && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="presentation" onMouseDown={() => setOpen(false)}><div role="dialog" aria-modal="true" aria-labelledby="new-client-title" onMouseDown={(event) => event.stopPropagation()} className="w-full rounded-t-3xl bg-white p-5 shadow-xl dark:bg-gray-900 sm:max-w-md sm:rounded-2xl"><div className="flex items-center justify-between"><h2 id="new-client-title" className="text-lg font-semibold">Ajouter un client</h2><button onClick={() => setOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl" aria-label="Fermer"><IconX /></button></div><p className="mt-1 text-sm text-gray-500">Le profil CRM est créé sans compte de connexion.</p><form onSubmit={createCustomer} className="mt-5 space-y-3"><label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Nom complet<input name="fullName" maxLength={160} autoFocus className="mt-1 h-11 w-full rounded-xl border border-gray-200 px-3 text-sm dark:border-gray-700 dark:bg-gray-950" /></label><label className="block text-xs font-medium text-gray-600 dark:text-gray-300">E-mail<input name="email" type="email" maxLength={254} className="mt-1 h-11 w-full rounded-xl border border-gray-200 px-3 text-sm dark:border-gray-700 dark:bg-gray-950" /></label><label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Téléphone<input name="phone" maxLength={40} inputMode="tel" placeholder="+39 …" className="mt-1 h-11 w-full rounded-xl border border-gray-200 px-3 text-sm dark:border-gray-700 dark:bg-gray-950" /></label>{error && <p role="alert" className="text-sm text-red-600">{error}</p>}<button disabled={busy} className="min-h-11 w-full rounded-xl bg-[var(--admin-primary)] px-4 font-semibold text-white disabled:opacity-60">{busy ? 'Création…' : 'Créer le client'}</button></form></div></div>}
+    <Dialog
+      open={open}
+      onClose={() => setOpen(false)}
+      dismissible={!busy}
+      size="sm"
+      title="Ajouter un client"
+      description="Le profil CRM est créé sans compte de connexion."
+      footer={<>
+        <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>Annuler</Button>
+        <Button type="submit" form="new-client-form" loading={busy}>Créer le client</Button>
+      </>}
+    >
+      <form id="new-client-form" onSubmit={createCustomer} className="space-y-3">
+        <FormField label="Nom complet"><Input name="fullName" maxLength={160} autoFocus /></FormField>
+        <FormField label="E-mail"><Input name="email" type="email" maxLength={254} /></FormField>
+        <FormField label="Téléphone"><Input name="phone" maxLength={40} inputMode="tel" placeholder="+39 …" /></FormField>
+        <ErrorText message={error} />
+      </form>
+    </Dialog>
   </>;
 }

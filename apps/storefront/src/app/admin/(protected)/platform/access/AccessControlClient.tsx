@@ -1,6 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
+import { FormField, Input, Textarea } from '@/app/admin/_components/ui/Form';
 import { useRouter } from 'next/navigation';
 
 export interface AccessRole {
@@ -149,7 +152,23 @@ export default function AccessControlClient({ roles, permissions, users, tenants
         <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-gray-400"><th className="py-2">Utilisateur</th><th>Tenant</th><th>Rôle</th></tr></thead><tbody>{memberships.filter((membership) => membership.tenantId).map((membership) => { const user = users.find((item) => item.id === membership.userId); const tenant = tenants.find((item) => item.id === membership.tenantId); return <tr key={membership.id} className="border-b border-gray-100 last:border-0"><td className="py-3">{user?.displayName ?? user?.email ?? membership.userId}</td><td>{tenant?.name ?? 'Tenant'}</td><td>{membership.roleName}</td></tr>; })}</tbody></table></div>
       </section>
 
-      {creating && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"><h2 className="text-lg font-semibold">Créer un rôle tenant</h2><div className="mt-4 space-y-3"><label className="block text-xs font-semibold text-gray-500">Nom<input className={input} value={newRole.name} onChange={(e) => setNewRole({ ...newRole, name: e.target.value })} /></label><label className="block text-xs font-semibold text-gray-500">Code<input className={input} value={newRole.code} onChange={(e) => setNewRole({ ...newRole, code: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })} placeholder="admin_scanner" /></label><label className="block text-xs font-semibold text-gray-500">Description<textarea className={input} rows={3} value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} /></label></div><div className="mt-5 flex justify-end gap-2"><button onClick={() => setCreating(false)} className="rounded-xl border px-4 py-2 text-sm">Annuler</button><button disabled={busy || !newRole.name || !newRole.code} onClick={createRole} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Créer</button></div></div></div>}
+      <Dialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        dismissible={!busy}
+        size="sm"
+        title="Créer un rôle tenant"
+        footer={<>
+          <Button variant="secondary" onClick={() => setCreating(false)} disabled={busy}>Annuler</Button>
+          <Button onClick={createRole} loading={busy} disabled={!newRole.name || !newRole.code}>Créer</Button>
+        </>}
+      >
+        <div className="space-y-3">
+          <FormField label="Nom"><Input value={newRole.name} onChange={(e) => setNewRole({ ...newRole, name: e.target.value })} autoFocus /></FormField>
+          <FormField label="Code" hint="Lettres minuscules, chiffres et « _ »."><Input value={newRole.code} onChange={(e) => setNewRole({ ...newRole, code: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })} placeholder="admin_scanner" /></FormField>
+          <FormField label="Description" optional><Textarea rows={3} value={newRole.description} onChange={(e) => setNewRole({ ...newRole, description: e.target.value })} /></FormField>
+        </div>
+      </Dialog>
     </div>
   );
 }

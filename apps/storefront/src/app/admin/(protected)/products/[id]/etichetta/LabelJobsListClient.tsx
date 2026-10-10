@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -28,6 +29,7 @@ export default function LabelJobsListClient({ productId, productName, jobs }: La
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isCreating, setIsCreating] = useState(false);
+  const [ask, confirmDialog] = useConfirm();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -71,7 +73,7 @@ export default function LabelJobsListClient({ productId, productName, jobs }: La
   }
 
   async function discardDraft(jobId: string) {
-    if (!confirm('Abandonner ce brouillon ?')) return;
+    if (!(await ask({ title: 'Abandonner ce brouillon ?', description: 'L’étiquette en cours de préparation sera supprimée.', confirmLabel: 'Abandonner', destructive: true }))) return;
 
     setPendingId(jobId);
     try {
@@ -89,6 +91,7 @@ export default function LabelJobsListClient({ productId, productName, jobs }: La
 
   return (
     <div>
+      {confirmDialog}
       <div className="mb-6 flex items-start justify-between">
         <div>
           <Link

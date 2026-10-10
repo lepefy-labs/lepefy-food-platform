@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import type { FormEvent } from 'react';
 import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
@@ -16,6 +17,7 @@ interface Props {
 
 export default function RentalDeliveryZonesClient({ initialZones, currency, initialDeliveryEnabled, initialCountries }: Props) {
   const [deliveryEnabled, setDeliveryEnabled] = useState(initialDeliveryEnabled);
+  const [ask, confirmDialog] = useConfirm();
   const [countriesInput, setCountriesInput] = useState(initialCountries.join(', '));
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -108,7 +110,7 @@ export default function RentalDeliveryZonesClient({ initialZones, currency, init
 
   async function removeZone(id: string) {
     if (busy) return;
-    if (!confirm('Supprimer cette zone de livraison ?')) return;
+    if (!(await ask({ title: 'Supprimer cette zone de livraison ?', confirmLabel: 'Supprimer', destructive: true }))) return;
     setError(null); setRemovingId(id);
     try {
       const res = await fetch('/api/admin/evenementiel/rental-delivery-zones/' + id, { method: 'DELETE' });
@@ -125,6 +127,7 @@ export default function RentalDeliveryZonesClient({ initialZones, currency, init
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <section className="rounded-2xl border border-gray-100 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">Activation</h2>
         <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600">

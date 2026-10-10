@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { EventHighlight, EventReservationRequest, EventReservationStatus, EventRow, EventStatus, EventTicketType } from '@lepefy/types';
 import type { AdminEventReservation } from './page';
 import { HIGHLIGHT_ICON_OPTIONS } from '@/lib/events/highlightIcons';
-import ConfirmActionModal from '../../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../../_components/ui/ConfirmDialog';
 import { EventAdminHeader, type EventAdminTab } from './_components/EventAdminHeader';
 import EventSummaryTab from './_components/EventSummaryTab';
 import EventReservationsTab from './_components/EventReservationsTab';
@@ -398,7 +398,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         />
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={confirmCloseOpen}
         title="Clôturer cet événement ?"
         description="Les nouvelles réservations seront fermées. Les réservations et billets existants restent conservés dans l’historique."
@@ -409,7 +409,7 @@ export default function EventDetailAdminClient({ event: initialEvent, initialTic
         onConfirm={() => void closeEvent()}
       />
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingRemoveTicketId !== null}
         title="Retirer cette formule ?"
         description="Si cette formule est déjà utilisée par une réservation, elle sera désactivée afin de préserver l’historique. Sinon elle sera supprimée."

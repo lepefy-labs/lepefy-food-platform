@@ -18,7 +18,7 @@ import {
   normalizeProductImages,
 } from '@/lib/catalog/productImages';
 import Button from '../../../_components/ui/Button';
-import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
 const MAX_UPLOAD_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_UPLOAD_EDGE = 1600;
@@ -408,7 +408,7 @@ export default function ProductMediaManager({
         )}
       </section>
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={Boolean(pendingDelete)}
         title="Supprimer cette image ?"
         description={

@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconX } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import {
   ambassadorDisplayName,
@@ -11,6 +10,8 @@ import {
   type PayoutDestination,
 } from '@/lib/ambassador/ambassadorAdmin';
 import Button from '../../_components/ui/Button';
+import Dialog from '../../_components/ui/Dialog';
+import { ErrorText } from '../../_components/ui/InlineAlert';
 import CopyableValue from '../../_components/ui/CopyableValue';
 
 export interface PayoutCandidate {
@@ -31,7 +32,6 @@ function PayoutModal({ candidate, currency, onClose, onDone }: {
   onClose: () => void;
   onDone: (text: string) => void;
 }) {
-  const titleId = useId();
   const [note, setNote] = useState(() => defaultPayoutReference(candidate, new Date()));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,52 +67,35 @@ function PayoutModal({ candidate, currency, onClose, onDone }: {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onKeyDown={(e) => { if (e.key === 'Escape' && !isSaving) onClose(); }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget && !isSaving) onClose(); }}
+    <Dialog
+      open
+      onClose={onClose}
+      dismissible={!isSaving}
+      size="sm"
+      title={`Verser ${formatPrice(candidate.balance, currency)} à ${name}`}
+      description={`${candidate.commissionIds.length} commission${candidate.commissionIds.length > 1 ? 's' : ''} confirmée${candidate.commissionIds.length > 1 ? 's' : ''}`}
+      footer={<>
+        <Button variant="secondary" onClick={onClose} disabled={isSaving}>Annuler</Button>
+        <Button onClick={() => void confirm()} loading={isSaving}>J&apos;ai effectué le versement</Button>
+      </>}
     >
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <div>
-            <h2 id={titleId} className="text-base font-semibold text-gray-950 dark:text-gray-100">Verser {formatPrice(candidate.balance, currency)} à {name}</h2>
-            <p className="mt-0.5 text-xs text-gray-500">{candidate.commissionIds.length} commission{candidate.commissionIds.length > 1 ? 's' : ''} confirmée{candidate.commissionIds.length > 1 ? 's' : ''}</p>
-          </div>
-          <button type="button" onClick={onClose} disabled={isSaving} aria-label="Fermer" className="rounded-md p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
-            <IconX size={16} />
-          </button>
+      <div className="space-y-3 text-sm">
+        <ol className="list-decimal space-y-1 pl-4 text-a-text-2">
+          <li>Faites le virement depuis votre banque ou PayPal.</li>
+          <li>Revenez ici et confirmez : les commissions passent en « Versée ».</li>
+        </ol>
+        <div className="space-y-1 rounded-lg bg-a-surface-2 px-3 py-2 text-xs">
+          <CopyableValue label="Bénéficiaire" value={name} />
+          {candidate.destination && <CopyableValue label={candidate.destination.label} value={candidate.destination.value} />}
+          <CopyableValue label="Montant" value={candidate.balance.toFixed(2)} />
         </div>
-        <div className="space-y-3 px-5 py-4 text-sm">
-          <ol className="list-decimal space-y-1 pl-4 text-xs text-gray-600 dark:text-gray-300">
-            <li>Faites le virement depuis votre banque ou PayPal.</li>
-            <li>Revenez ici et confirmez : les commissions passent en « Versée ».</li>
-          </ol>
-          <div className="space-y-1 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-gray-800">
-            <CopyableValue label="Bénéficiaire" value={name} />
-            {candidate.destination && <CopyableValue label={candidate.destination.label} value={candidate.destination.value} />}
-            <CopyableValue label="Montant" value={candidate.balance.toFixed(2)} />
-          </div>
-          <div>
-            <label htmlFor="payout-note" className="mb-1 block text-xs font-medium text-gray-500">Référence du virement</label>
-            <input
-              id="payout-note"
-              value={note}
-              maxLength={200}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-            />
-          </div>
-          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+        <div>
+          <label htmlFor="payout-note" className="mb-1.5 block text-sm font-semibold text-a-text">Référence du virement</label>
+          <input id="payout-note" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} className="w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
         </div>
-        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3 dark:border-gray-800">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving}>Annuler</Button>
-          <Button size="sm" onClick={() => void confirm()} loading={isSaving}>J&apos;ai effectué le versement</Button>
-        </div>
+        <ErrorText message={error} />
       </div>
-    </div>
+    </Dialog>
   );
 }
 

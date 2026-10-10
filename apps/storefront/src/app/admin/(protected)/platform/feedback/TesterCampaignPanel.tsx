@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 
 type Campaign = { id: string; name: string; google_play_test_url: string | null };
 type InstallationStatus = 'unknown' | 'installed' | 'problem';
@@ -63,6 +64,7 @@ function installationRowClass(value: InstallationStatus) {
 
 export default function TesterCampaignPanel({ campaign, onRefresh }: { campaign: Campaign; onRefresh: () => Promise<void> }) {
   const [testers, setTesters] = useState<Tester[]>([]);
+  const [ask, confirmDialog] = useConfirm();
   const [emails, setEmails] = useState('');
   const [installationFilter, setInstallationFilter] = useState<InstallationFilter>('all');
   const [busy, setBusy] = useState('');
@@ -135,7 +137,7 @@ export default function TesterCampaignPanel({ campaign, onRefresh }: { campaign:
   }
 
   async function revoke(id: string) {
-    if (!window.confirm('Révoquer cette invitation ? Le lien et la session active seront invalidés. Les feedback existants seront conservés.')) return;
+    if (!(await ask({ title: 'Révoquer cette invitation ?', description: 'Le lien et la session active seront invalidés. Les feedback existants seront conservés.', confirmLabel: 'Révoquer', destructive: true }))) return;
     setBusy(id);
     setError('');
     setMessage('');
@@ -169,7 +171,7 @@ export default function TesterCampaignPanel({ campaign, onRefresh }: { campaign:
     { value: 'problem', label: 'Problème', count: installationCounts.problem },
   ];
 
-  return <section className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+  return <section className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">{confirmDialog}
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 p-5 dark:border-gray-800">
       <div>
         <h2 className="font-semibold">Testeurs · {campaign.name}</h2>

@@ -1,23 +1,65 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { IconEdit, IconNote, IconTag } from '@tabler/icons-react';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
+import { FormField, Input, Textarea } from '@/app/admin/_components/ui/Form';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+
+type Mode = 'edit' | 'note' | 'tag';
+
+const TITLES: Record<Mode, string> = { edit: 'Modifier le client', note: 'Ajouter une note', tag: 'Ajouter un tag' };
+const SUCCESS: Record<Mode, string> = { edit: 'Client mis à jour.', note: 'Note ajoutée.', tag: 'Tag ajouté.' };
 
 export function CustomerActions({ customerId, profile }: { customerId: string; profile: { full_name: string | null; email: string | null; phone: string | null } }) {
-  const router = useRouter(); const [mode,setMode]=useState<'edit'|'note'|'tag'|null>(null); const [error,setError]=useState(''); const [busy,setBusy]=useState(false);
-  useEffect(() => {
-    if (!mode) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMode(null); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [mode]);
+  const [mode, setMode] = useState<Mode | null>(null);
+  const { run, pending, error, setError } = useAdminMutation();
+
+  function open(next: Mode) { setError(null); setMode(next); }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError(''); const data=new FormData(event.currentTarget);
-    const endpoint=mode==='edit'?`/api/admin/clients/${customerId}`:mode==='note'?`/api/admin/clients/${customerId}/notes`:`/api/admin/clients/${customerId}/tags`;
-    const body=mode==='edit'?{fullName:data.get('fullName')||null,email:data.get('email')||null,phone:data.get('phone')||null}:mode==='note'?{body:data.get('body')}:{name:data.get('name')};
-    const response=await fetch(endpoint,{method:mode==='edit'?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const result=await response.json(); setBusy(false);
-    if(!response.ok){setError(result.error??'Action impossible.');return;} setMode(null); router.refresh();
+    event.preventDefault();
+    if (!mode) return;
+    const data = new FormData(event.currentTarget);
+    const endpoint = mode === 'edit' ? `/api/admin/clients/${customerId}` : mode === 'note' ? `/api/admin/clients/${customerId}/notes` : `/api/admin/clients/${customerId}/tags`;
+    const body = mode === 'edit'
+      ? { fullName: data.get('fullName') || null, email: data.get('email') || null, phone: data.get('phone') || null }
+      : mode === 'note' ? { body: data.get('body') } : { name: data.get('name') };
+    const result = await run(endpoint, { method: mode === 'edit' ? 'PATCH' : 'POST', body, successMessage: SUCCESS[mode] });
+    if (result) setMode(null);
   }
-  return <><div className="flex flex-wrap gap-2"><button onClick={()=>setMode('edit')} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-4 text-sm font-semibold dark:bg-gray-900"><IconEdit size={17}/>Modifier</button><button onClick={()=>setMode('note')} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-4 text-sm font-semibold dark:bg-gray-900"><IconNote size={17}/>Ajouter une note</button><button onClick={()=>setMode('tag')} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-4 text-sm font-semibold dark:bg-gray-900"><IconTag size={17}/>Ajouter un tag</button></div>{mode&&<div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onMouseDown={()=>setMode(null)}><form onSubmit={submit} onMouseDown={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="customer-action-title" className="w-full space-y-3 rounded-t-3xl bg-white p-5 dark:bg-gray-900 sm:max-w-md sm:rounded-2xl"><h2 id="customer-action-title" className="text-lg font-semibold">{mode==='edit'?'Modifier le client':mode==='note'?'Ajouter une note':'Ajouter un tag'}</h2>{mode==='edit'&&<><label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Nom<input name="fullName" defaultValue={profile.full_name??''} autoFocus className="mt-1 h-11 w-full rounded-xl border px-3 text-sm dark:bg-gray-950"/></label><label className="block text-xs font-medium text-gray-600 dark:text-gray-300">E-mail<input name="email" type="email" defaultValue={profile.email??''} className="mt-1 h-11 w-full rounded-xl border px-3 text-sm dark:bg-gray-950"/></label><label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Téléphone<input name="phone" inputMode="tel" defaultValue={profile.phone??''} className="mt-1 h-11 w-full rounded-xl border px-3 text-sm dark:bg-gray-950"/></label></>}{mode==='note'&&<label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Note interne<textarea name="body" required maxLength={4000} rows={5} autoFocus className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-gray-950"/></label>}{mode==='tag'&&<label className="block text-xs font-medium text-gray-600 dark:text-gray-300">Nom du tag<input name="name" required maxLength={60} placeholder="Ex. Grossiste" autoFocus className="mt-1 h-11 w-full rounded-xl border px-3 text-sm dark:bg-gray-950"/></label>}{error&&<p role="alert" className="text-sm text-red-600">{error}</p>}<div className="flex gap-2"><button type="button" onClick={()=>setMode(null)} className="min-h-11 flex-1 rounded-xl border px-4">Annuler</button><button disabled={busy} className="min-h-11 flex-1 rounded-xl bg-[var(--admin-primary)] px-4 font-semibold text-white disabled:opacity-50">{busy?'Enregistrement…':'Enregistrer'}</button></div></form></div>}</>;
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => open('edit')}><IconEdit size={17} aria-hidden="true" />Modifier</Button>
+        <Button variant="secondary" onClick={() => open('note')}><IconNote size={17} aria-hidden="true" />Ajouter une note</Button>
+        <Button variant="secondary" onClick={() => open('tag')}><IconTag size={17} aria-hidden="true" />Ajouter un tag</Button>
+      </div>
+      <Dialog
+        open={mode !== null}
+        onClose={() => setMode(null)}
+        dismissible={!pending}
+        size="sm"
+        title={mode ? TITLES[mode] : ''}
+        footer={<>
+          <Button variant="secondary" onClick={() => setMode(null)} disabled={pending}>Annuler</Button>
+          <Button type="submit" form="customer-action-form" loading={pending}>Enregistrer</Button>
+        </>}
+      >
+        <form id="customer-action-form" onSubmit={submit} className="space-y-3">
+          {mode === 'edit' && <>
+            <FormField label="Nom"><Input name="fullName" defaultValue={profile.full_name ?? ''} autoFocus /></FormField>
+            <FormField label="E-mail"><Input name="email" type="email" defaultValue={profile.email ?? ''} /></FormField>
+            <FormField label="Téléphone"><Input name="phone" inputMode="tel" defaultValue={profile.phone ?? ''} /></FormField>
+          </>}
+          {mode === 'note' && <FormField label="Note interne" required><Textarea name="body" maxLength={4000} rows={5} autoFocus /></FormField>}
+          {mode === 'tag' && <FormField label="Nom du tag" required><Input name="name" maxLength={60} placeholder="Ex. Grossiste" autoFocus /></FormField>}
+          <ErrorText message={error} />
+        </form>
+      </Dialog>
+    </>
+  );
 }

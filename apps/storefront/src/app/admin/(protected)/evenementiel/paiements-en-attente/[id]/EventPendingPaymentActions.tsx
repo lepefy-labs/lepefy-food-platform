@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconX } from '@tabler/icons-react';
 import ConfirmPaymentButton from '../../../../_components/ui/ConfirmPaymentButton';
-import ConfirmActionModal from '../../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../../_components/ui/ConfirmDialog';
 
 export default function EventPendingPaymentActions({
   requestId,
@@ -84,7 +84,7 @@ export default function EventPendingPaymentActions({
       )}
 
       {canCancel && (
-        <ConfirmActionModal
+        <ConfirmDialog
           open={cancelOpen}
           title="Annuler cette demande de paiement ?"
           description={`La demande de ${customerLabel} sera retirée de la file. Aucun remboursement n’est effectué chez le prestataire externe.`}

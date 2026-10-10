@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import { IconShieldLock } from '@tabler/icons-react';
 import Button from '../../../../_components/ui/Button';
 import CopyableValue from '../../../../_components/ui/CopyableValue';
@@ -40,11 +41,12 @@ export default function ChannelIdentityPanel({ initial, webhookUrl, isTestTenant
   const [testTo, setTestTo] = useState('');
   const [testing, setTesting] = useState(false);
   const { feedback, show } = useSettingsFeedback();
+  const [ask, confirmDialog] = useConfirm();
   const set = <K extends keyof Identity>(key: K, value: Identity[K]) => setForm((prev) => ({ ...prev, [key]: value }));
 
   async function save() {
     if (form.environment === 'production' && form.status === 'active'
-      && !window.confirm('Activer un numéro de PRODUCTION : les clients recevront des réponses automatiques. Continuer ?')) return;
+      && !(await ask({ title: 'Activer un numéro de production ?', description: 'Les clients recevront des réponses automatiques sur ce numéro.', confirmLabel: 'Activer', destructive: true }))) return;
     setSaving(true);
     try {
       const response = await fetch('/api/admin/whatsapp/channel', {
@@ -79,6 +81,7 @@ export default function ChannelIdentityPanel({ initial, webhookUrl, isTestTenant
 
   return (
     <section className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/40 p-5 dark:border-violet-900/60 dark:bg-violet-950/10">
+      {confirmDialog}
       <div className="mb-3 flex items-center gap-2">
         <IconShieldLock size={18} className="text-violet-700 dark:text-violet-300" aria-hidden="true" />
         <h2 className="text-base font-semibold text-gray-950 dark:text-white">Connexion Meta (plateforme)</h2>

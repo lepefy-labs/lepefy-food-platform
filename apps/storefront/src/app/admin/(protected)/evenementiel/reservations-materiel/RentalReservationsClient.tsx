@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import { useRouter } from 'next/navigation';
 import { IconReceiptRefund, IconCalendar, IconClock, IconTruckDelivery, IconBuildingStore } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
@@ -57,9 +58,10 @@ export default function RentalReservationsClient({
   const [reservations, setReservations] = useState(initialReservations);
   const [pendingRequests, setPendingRequests] = useState(initialPendingRequests);
   const [refunding, setRefunding] = useState<string | null>(null);
+  const [ask, confirmDialog] = useConfirm();
 
   async function refund(id: string) {
-    if (!confirm('Rembourser cette réservation et restaurer le stock ?')) return;
+    if (!(await ask({ title: 'Rembourser cette réservation ?', description: 'Le client est remboursé et le stock du matériel est restauré.', confirmLabel: 'Rembourser', destructive: true }))) return;
     setRefunding(id);
     try {
       const res = await fetch(`/api/admin/evenementiel/reservations/${id}/refund`, { method: 'POST' });
@@ -77,6 +79,7 @@ export default function RentalReservationsClient({
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       {/* Paiements en attente (Phase 3 — lien externe) — même structure
           visuelle que les bandeaux boutique/billetterie (Phase 1/2). */}
       {pendingRequests.length > 0 && (

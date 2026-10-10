@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { IconEye, IconMail, IconMapPin, IconPhone, IconTruck, IconUser, IconWallet, IconX } from '@tabler/icons-react';
+import { useState } from 'react';
+import Dialog from '@/app/admin/_components/ui/Dialog';
+import { IconEye, IconMail, IconMapPin, IconPhone, IconTruck, IconUser, IconWallet } from '@tabler/icons-react';
 
 interface Item {
   name: string;
@@ -55,21 +56,7 @@ export default function PaymentRecoveryDetails({
   currency,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    closeButtonRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [open]);
 
   const addressLines = shippingAddress
     ? [
@@ -91,37 +78,14 @@ export default function PaymentRecoveryDetails({
         <IconEye size={18} /> Voir le détail de l’achat
       </button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setOpen(false);
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="payment-detail-title"
-            className="max-h-[92vh] w-full overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:max-w-3xl sm:rounded-2xl"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--admin-border)] px-5 py-4 dark:border-gray-800 sm:px-6">
-              <div>
-                <h2 id="payment-detail-title" className="text-lg font-bold text-gray-950 dark:text-white">Détail de l’achat</h2>
-                <p className="mt-1 text-sm text-gray-500">{payment.reference} · {payment.method}</p>
-              </div>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Fermer"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:hover:bg-gray-800"
-              >
-                <IconX size={20} />
-              </button>
-            </div>
-
-            <div className="max-h-[calc(92vh-76px)] overflow-y-auto p-5 sm:p-6">
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        size="xl"
+        title="Détail de l’achat"
+        description={`${payment.reference} · ${payment.method}`}
+      >
+            <div>
               <div className="grid gap-4 md:grid-cols-2">
                 <section className="rounded-2xl border border-[var(--admin-border)] p-4 dark:border-gray-800">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={16} /> Client</div>
@@ -177,9 +141,7 @@ export default function PaymentRecoveryDetails({
                 </div>
               </section>
             </div>
-          </div>
-        </div>
-      )}
+      </Dialog>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { IconChevronUp, IconChevronDown, IconPhoto, IconTrash, IconPlus } from '
 import { VARIANT_BACKGROUND } from '@/components/home/HeroCarousel';
 import { moveId, safeSlideHref, SLIDE_LIMITS, slideIssues, VARIANT_LABELS, VALID_VARIANTS } from '@/lib/home/heroSlideRules';
 import type { TenantHeroSlide, HeroSlideBackgroundVariant } from '@lepefy/types';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -365,7 +365,7 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
         </button>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Supprimer cette slide ?"
         description="Cette slide sera supprimée définitivement de la page d’accueil. Pour la retirer temporairement, masquez-la plutôt."
@@ -376,7 +376,7 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
         onCancel={() => setPendingDeleteId(null)}
         onConfirm={() => { if (pendingDeleteId) void handleDelete(pendingDeleteId); }}
       />
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingLastDeactivate !== null}
         title="Masquer la dernière slide ?"
         description="Plus aucune slide ne sera active : la page d’accueil affichera la slide de secours générique."

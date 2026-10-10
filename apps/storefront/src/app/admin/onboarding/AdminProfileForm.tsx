@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import { useRouter } from 'next/navigation';
 
 interface AdminProfileFormProps {
@@ -19,6 +20,7 @@ type FieldErrors = Partial<Record<'firstName' | 'lastName' | 'nickname', string>
 
 export default function AdminProfileForm({ email, initial, nextPath, editing = false }: AdminProfileFormProps) {
   const router = useRouter();
+  const [ask, confirmDialog] = useConfirm();
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -71,9 +73,9 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
     }
   }
 
-  function onCancel() {
+  async function onCancel() {
     if (!editing || saving) return;
-    if (dirty && !window.confirm('Quitter sans enregistrer vos modifications ?')) return;
+    if (dirty && !(await ask({ title: 'Quitter sans enregistrer ?', description: 'Vos modifications seront perdues.', confirmLabel: 'Quitter', cancelLabel: 'Rester', destructive: true }))) return;
     router.push(nextPath);
   }
 
@@ -90,6 +92,7 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
 
   return (
     <form onSubmit={onSubmit} noValidate className="mt-6 space-y-5">
+      {confirmDialog}
       <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
         <span className="text-xs text-gray-400">Compte</span>
         <p className="mt-0.5 break-all font-medium text-gray-800">{email}</p>

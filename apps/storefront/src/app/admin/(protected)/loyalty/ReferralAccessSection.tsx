@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Button from '../../_components/ui/Button';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import { referralAccessReasonLabel } from '@/lib/loyalty/loyaltyAdmin';
 
 interface CustomerRow {
@@ -141,7 +141,7 @@ export function ReferralAccessSection() {
         </div>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={revokeTarget !== null}
         title="Révoquer l'accès au parrainage ?"
         description={`${revokeTarget?.full_name || revokeTarget?.email || 'Ce client'} ne pourra plus parrainer de nouveaux clients. Les points déjà gagnés sont conservés.`}

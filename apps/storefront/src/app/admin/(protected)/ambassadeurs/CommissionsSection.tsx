@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/utils/format';
@@ -10,6 +10,8 @@ import {
   COMMISSION_STATUS_LABELS,
 } from '@/lib/ambassador/ambassadorAdmin';
 import Button from '../../_components/ui/Button';
+import Dialog from '../../_components/ui/Dialog';
+import { ErrorText } from '../../_components/ui/InlineAlert';
 import type { AmbassadorCommissionMode, AmbassadorCommissionStatus } from '@lepefy/types';
 
 interface JoinedCustomer {
@@ -49,7 +51,6 @@ function CancelModal({ row, currency, onClose, onDone }: {
   onClose: () => void;
   onDone: (updated: CommissionRow) => void;
 }) {
-  const titleId = useId();
   const [reason, setReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,41 +79,26 @@ function CancelModal({ row, currency, onClose, onDone }: {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      onKeyDown={(e) => { if (e.key === 'Escape' && !isSaving) onClose(); }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget && !isSaving) onClose(); }}
+    <Dialog
+      open
+      onClose={onClose}
+      dismissible={!isSaving}
+      size="sm"
+      title={`Annuler la commission de ${formatPrice(row.commission_amount, currency)} ?`}
+      description={<>À utiliser si la commande de {row.referred?.full_name || row.referred?.email || 'ce client'} a été remboursée ou retournée. La commission ne sera pas versée et ce client ne pourra plus en générer une autre. Action définitive.</>}
+      footer={<>
+        <Button variant="secondary" onClick={onClose} disabled={isSaving}>Retour</Button>
+        <Button variant="danger" onClick={() => void confirm()} loading={isSaving} disabled={!valid}>Annuler la commission</Button>
+      </>}
     >
-      <div className="w-full max-w-md space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-        <h2 id={titleId} className="text-base font-semibold text-gray-950 dark:text-gray-100">
-          Annuler la commission de {formatPrice(row.commission_amount, currency)} ?
-        </h2>
-        <p className="text-xs text-gray-500">
-          À utiliser si la commande de {row.referred?.full_name || row.referred?.email || 'ce client'} a été remboursée ou retournée.
-          La commission ne sera pas versée et ce client ne pourra plus en générer une autre. Action définitive.
-        </p>
+      <div className="space-y-3">
         <div>
-          <label htmlFor="cancel-reason" className="mb-1 block text-xs font-medium text-gray-500">Motif (obligatoire)</label>
-          <textarea
-            id="cancel-reason"
-            rows={2}
-            maxLength={300}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Ex. commande remboursée le 12/10"
-            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-          />
+          <label htmlFor="cancel-reason" className="mb-1.5 block text-sm font-semibold text-a-text">Motif (obligatoire)</label>
+          <textarea id="cancel-reason" rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. commande remboursée le 12/10" className="w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
         </div>
-        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving}>Retour</Button>
-          <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" size="sm" onClick={() => void confirm()} loading={isSaving} disabled={!valid}>Annuler la commission</Button>
-        </div>
+        <ErrorText message={error} />
       </div>
-    </div>
+    </Dialog>
   );
 }
 

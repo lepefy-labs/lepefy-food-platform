@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import ConfirmDialog from '@/app/admin/_components/ui/ConfirmDialog';
+import { FormField, Textarea } from '@/app/admin/_components/ui/Form';
 import {
   IconAlertCircle,
   IconArrowBackUp,
@@ -534,9 +536,22 @@ export function ScanClient({ eventsEnabled, events, initialEventId }: { eventsEn
         <details className="rounded-2xl border border-gray-200 bg-white shadow-sm"><summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 text-sm font-bold text-gray-800"><IconHistory size={18} className="text-gray-500" /><span>Historique des formules servies</span><span className="ml-auto text-xs font-medium text-gray-400">{metrics.recent_deliveries.length} dernières</span><IconChevronDown size={16} className="text-gray-400" /></summary><div className="border-t border-gray-100 px-4 py-2">{metrics.recent_deliveries.map(delivery => <div key={delivery.id} className="flex items-start gap-3 border-b border-gray-100 py-3 last:border-0"><div className="w-12 shrink-0 text-xs font-bold text-gray-500">{formatTime(delivery.redeemed_at)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-gray-900">{delivery.customer_name}</p><p className="mt-0.5 text-xs text-gray-500">{delivery.ticket_type_name}</p></div><div className="shrink-0 rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-black text-emerald-800">× {delivery.quantity}</div></div>)}</div></details>
       )}
 
-      {voidTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-sm rounded-2xl bg-white shadow-xl"><div className="flex items-center justify-between border-b border-gray-100 px-5 py-3"><h2 className="text-sm font-bold">Annuler le dernier service</h2><button type="button" onClick={() => setVoidTarget(null)} disabled={voidLoading} aria-label="Fermer" className="flex h-11 w-11 items-center justify-center"><IconX size={17} /></button></div><div className="space-y-3 px-5 py-4"><p className="text-sm text-gray-600">Annuler le dernier service pour <strong>{voidTarget.ticketTypeName}</strong> ?</p>{voidTarget.requiresReason && <label className="block text-xs font-semibold text-gray-600">Motif<textarea value={voidReason} onChange={event => setVoidReason(event.target.value)} rows={3} className="mt-1 w-full rounded-xl border border-gray-200 p-3 text-sm" /></label>}<div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setVoidTarget(null)} disabled={voidLoading} className="min-h-11 rounded-xl border border-gray-200 text-sm font-bold text-gray-600">Retour</button><button type="button" onClick={handleVoidConfirm} disabled={voidLoading || !isOnline || (voidTarget.requiresReason && !voidReason.trim())} className="min-h-11 rounded-xl bg-red-600 text-sm font-bold text-white disabled:opacity-50">{voidLoading ? 'Annulation…' : 'Confirmer'}</button></div></div></div></div>
-      )}
+      <ConfirmDialog
+        open={Boolean(voidTarget)}
+        destructive
+        title="Annuler le dernier service"
+        description={voidTarget && <>Annuler le dernier service pour <strong className="text-a-text">{voidTarget.ticketTypeName}</strong> ?</>}
+        confirmLabel="Confirmer"
+        cancelLabel="Retour"
+        loading={voidLoading}
+        confirmDisabled={!isOnline || Boolean(voidTarget?.requiresReason && !voidReason.trim())}
+        onConfirm={() => void handleVoidConfirm()}
+        onCancel={() => setVoidTarget(null)}
+      >
+        {voidTarget?.requiresReason && (
+          <FormField label="Motif" required><Textarea value={voidReason} onChange={event => setVoidReason(event.target.value)} rows={3} /></FormField>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, Fragment } from 'react';
 import { IconTrash, IconPlus, IconAlertTriangle } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import type { ShippingCountryRuleRow, ShippingDiscountType } from '@lepefy/types';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import {
   findCountryRuleConflicts,
   overlapMessage,
@@ -402,7 +402,7 @@ export function ShippingCountryRulesSection({ initialRules, currency, canManage 
         <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter une règle</button>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingToggle !== null}
         title={pendingToggle?.active ? 'Désactiver cette règle de livraison ?' : 'Activer cette règle de livraison ?'}
         description="Les prochains devis de livraison des clients changeront immédiatement. Les commandes déjà payées ne sont pas modifiées."
@@ -413,7 +413,7 @@ export function ShippingCountryRulesSection({ initialRules, currency, canManage 
         onConfirm={() => { if (pendingToggle) void handleToggleActive(pendingToggle); }}
       />
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Supprimer cette règle de livraison ?"
         description="Cette règle sera supprimée définitivement. Les prochains devis de livraison utiliseront immédiatement les règles restantes ou le calcul standard."

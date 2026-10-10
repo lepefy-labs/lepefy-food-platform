@@ -1,2 +1,56 @@
-'use client'; import { useState } from 'react'; import { useRouter } from 'next/navigation'; import { IconPlus } from '@tabler/icons-react';
-export function CampaignComposer({segments}:{segments:Array<{id:string;name:string}>}){const router=useRouter();const[open,setOpen]=useState(false);const[error,setError]=useState('');const[busy,setBusy]=useState(false);async function save(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);const f=new FormData(e.currentTarget);const r=await fetch('/api/admin/clients/campaigns',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.get('name'),channel:'email',segmentId:f.get('segmentId')||null,subject:f.get('subject')||null,content:f.get('content')})});const j=await r.json();setBusy(false);if(!r.ok){setError(j.error);return;}router.push(`/admin/clients/campagnes/${j.id}`)}return <><button onClick={()=>setOpen(true)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white"><IconPlus size={18}/>Créer une campagne</button>{open&&<div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onMouseDown={()=>setOpen(false)}><form onSubmit={save} onMouseDown={e=>e.stopPropagation()} className="w-full space-y-3 rounded-t-3xl bg-white p-5 dark:bg-gray-900 sm:max-w-lg sm:rounded-2xl"><h2 className="text-lg font-semibold">Nouvelle campagne e-mail</h2><p className="text-xs text-gray-500">Les destinataires sans consentement marketing courant seront exclus par le serveur.</p><input required name="name" maxLength={120} placeholder="Nom interne" className="h-11 w-full rounded-xl border px-3 dark:bg-gray-950"/><select name="segmentId" className="h-11 w-full rounded-xl border bg-white px-3 dark:bg-gray-950"><option value="">Tous les clients autorisés</option>{segments.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select><input name="subject" maxLength={180} placeholder="Objet" className="h-11 w-full rounded-xl border px-3 dark:bg-gray-950"/><textarea required name="content" maxLength={20000} rows={8} placeholder="Contenu de la campagne" className="w-full rounded-xl border p-3 dark:bg-gray-950"/>{error&&<p className="text-sm text-red-600">{error}</p>}<div className="flex gap-2"><button type="button" onClick={()=>setOpen(false)} className="min-h-11 flex-1 rounded-xl border">Annuler</button><button disabled={busy} className="min-h-11 flex-1 rounded-xl bg-[var(--admin-primary)] font-semibold text-white disabled:opacity-50">{busy?'Création…':'Créer le brouillon'}</button></div></form></div>}</>}
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { IconPlus } from '@tabler/icons-react';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
+import { FormField, Input, Select, Textarea } from '@/app/admin/_components/ui/Form';
+import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
+import { useAdminMutation } from '@/app/admin/_components/ui/useAdminMutation';
+
+export function CampaignComposer({ segments }: { segments: Array<{ id: string; name: string }> }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const { run, pending, error, setError } = useAdminMutation();
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const result = await run<{ id: string }>('/api/admin/clients/campaigns', {
+      body: { name: form.get('name'), channel: 'email', segmentId: form.get('segmentId') || null, subject: form.get('subject') || null, content: form.get('content') },
+      refresh: false,
+    });
+    if (result) router.push(`/admin/clients/campagnes/${result.id}`);
+  }
+
+  return (
+    <>
+      <Button onClick={() => { setError(null); setOpen(true); }}><IconPlus size={18} aria-hidden="true" />Créer une campagne</Button>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        dismissible={!pending}
+        title="Nouvelle campagne e-mail"
+        description="Les destinataires sans consentement marketing courant seront exclus par le serveur."
+        footer={<>
+          <Button variant="secondary" onClick={() => setOpen(false)} disabled={pending}>Annuler</Button>
+          <Button type="submit" form="campaign-composer-form" loading={pending}>Créer le brouillon</Button>
+        </>}
+      >
+        <form id="campaign-composer-form" onSubmit={save} className="space-y-3">
+          <FormField label="Nom interne" required><Input name="name" maxLength={120} autoFocus /></FormField>
+          <FormField label="Destinataires">
+            <Select name="segmentId" defaultValue="">
+              <option value="">Tous les clients autorisés</option>
+              {segments.map((segment) => <option key={segment.id} value={segment.id}>{segment.name}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Objet" optional><Input name="subject" maxLength={180} /></FormField>
+          <FormField label="Contenu de la campagne" required><Textarea name="content" maxLength={20000} rows={8} /></FormField>
+          <ErrorText message={error} />
+        </form>
+      </Dialog>
+    </>
+  );
+}

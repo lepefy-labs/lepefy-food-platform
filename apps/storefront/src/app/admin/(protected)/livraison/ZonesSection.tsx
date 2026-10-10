@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { IconTrash, IconPlus, IconAlertTriangle, IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import type { ShippingZoneRow } from '@lepefy/types';
-import ConfirmActionModal from '../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import {
   countryName,
   duplicatePrefixes,
@@ -280,7 +280,7 @@ export function ZonesSection({ initialZones, canManage, tariffMode }: {
         <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter une zone</button>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Supprimer cette zone ?"
         description={tariffMode

@@ -16,7 +16,7 @@ import {
 import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption, ProductImage } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
-import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog, { useUnsavedChangesGuard } from '../../../_components/ui/ConfirmDialog';
 import ProductRelationshipsEditor from './ProductRelationshipsEditor';
 import ProductMediaManager from './ProductMediaManager';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
@@ -294,20 +294,7 @@ export default function ProductEditClient({
   }
 
   // Unsaved changes: confirm before leaving (browser navigation and in-app links).
-  useEffect(() => {
-    if (!dirty) return;
-    const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
-    const onClick = (event: MouseEvent) => {
-      const anchor = (event.target as HTMLElement | null)?.closest('a');
-      if (!anchor || anchor.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return;
-      const href = anchor.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('mailto:')) return;
-      if (!window.confirm('Quitter sans enregistrer ? Vos modifications seront perdues.')) { event.preventDefault(); event.stopPropagation(); }
-    };
-    window.addEventListener('beforeunload', beforeUnload);
-    document.addEventListener('click', onClick, true);
-    return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', onClick, true); };
-  }, [dirty]);
+  const unsavedGuard = useUnsavedChangesGuard(dirty, 'Vos modifications seront perdues.');
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -494,6 +481,7 @@ export default function ProductEditClient({
 
   return (
     <>
+      {unsavedGuard}
       <div className={canManage ? 'pb-24' : ''}>
         {!canManage && (
           <p role="status" className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
@@ -1292,7 +1280,7 @@ export default function ProductEditClient({
         </div>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={barcodeConfirmOpen}
         title="Régénérer le code-barres ?"
         description="Si des étiquettes ont déjà été imprimées avec le code actuel, les produits en rayon ne correspondront plus au nouveau code tant que les étiquettes ne seront pas réimprimées."

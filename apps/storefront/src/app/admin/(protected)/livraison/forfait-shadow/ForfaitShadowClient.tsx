@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
 import { IconAlertTriangle, IconCircleCheck, IconLock, IconRefresh } from '@tabler/icons-react';
 import type { ShippingTariffVersionRow } from '@lepefy/types';
 import type { ForfaitShadowAdminData } from '@/lib/shipping/tariff/adminData';
@@ -577,15 +579,23 @@ export function ForfaitShadowClient({
       )}
 
       {/* Confirmation d'activation */}
-      {activation && (
-        <div role="dialog" aria-modal="true" aria-labelledby="fs-activation-title" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white dark:bg-gray-900 p-5 shadow-xl">
-            <h2 id="fs-activation-title" className="text-base font-semibold">Activer la tarification {activation.country} v{activation.version} pour les clients</h2>
-            <p className="text-xs text-gray-500 mt-1 mb-4">
-              Dès la confirmation, les nouveaux devis et paiements vers {activation.country} utilisent ce tarif (prix calculé et vérifié par le serveur).
+      <Dialog
+        open={Boolean(activation)}
+        onClose={() => setActivation(null)}
+        dismissible={busy !== 'activate'}
+        size="xl"
+        title={activation ? `Activer la tarification ${activation.country} v${activation.version} pour les clients` : ''}
+        description={activation && <>
+          Dès la confirmation, les nouveaux devis et paiements vers {activation.country} utilisent ce tarif (prix calculé et vérifié par le serveur).
               {activeVersions.find((v) => v.country === activation.country) ? ` La version active actuelle (v${activeVersions.find((v) => v.country === activation.country)!.version}) sera retirée.` : ''}
               {' '}Les commandes passées ne changent pas ; les paiements en cours sur un autre tarif devront être recalculés et reconfirmés par le client.
-            </p>
+        </>}
+        footer={<>
+          <Button variant="secondary" onClick={() => setActivation(null)} disabled={busy === 'activate'}>Annuler</Button>
+          <Button onClick={() => void handleActivate()} loading={busy === 'activate'} disabled={busy !== null || blocking || !ackConfirm || (needsPerOrderAck && !ackPerOrder)}>Activer pour les clients</Button>
+        </>}
+      >
+        {activation && <>
             <VersionDetails version={activation} vatRate={vatRateFor(activation.country, data.vatRates)} />
             <ul className="mt-4 space-y-1.5">
               {checklist.map((item) => (
@@ -609,15 +619,8 @@ export function ForfaitShadowClient({
                 Je confirme que les clients paieront ce tarif sur leurs nouvelles commandes livrées en {activation.country}.
               </label>
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button onClick={() => void handleActivate()} disabled={busy !== null || blocking || !ackConfirm || (needsPerOrderAck && !ackPerOrder)} className={BTN}>
-                {busy === 'activate' ? 'Activation…' : 'Activer pour les clients'}
-              </button>
-              <button onClick={() => setActivation(null)} disabled={busy === 'activate'} className={BTN_GHOST}>Annuler</button>
-            </div>
-          </div>
-        </div>
-      )}
+        </>}
+      </Dialog>
 
       {/* Création */}
       <section className={CARD}>

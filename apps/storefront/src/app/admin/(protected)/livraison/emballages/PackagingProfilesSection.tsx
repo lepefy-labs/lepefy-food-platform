@@ -3,7 +3,7 @@
 import { useState, Fragment } from 'react';
 import { IconTrash, IconPlus } from '@tabler/icons-react';
 import type { ShippingPackagingProfileRow } from '@lepefy/types';
-import ConfirmActionModal from '../../../_components/ui/ConfirmActionModal';
+import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
 
 const INPUT_CLS =
   'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
@@ -262,7 +262,7 @@ export function PackagingProfilesSection({ initialProfiles }: { initialProfiles:
         <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Ajouter un profil</button>
       )}
 
-      <ConfirmActionModal
+      <ConfirmDialog
         open={pendingDeleteId !== null}
         title="Supprimer ce profil d'emballage ?"
         description="Ce profil sera supprimé définitivement. Les observations passées qui l'utilisaient sont conservées."

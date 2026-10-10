@@ -3,6 +3,8 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import TesterCampaignPanel from './TesterCampaignPanel';
+import Button from '@/app/admin/_components/ui/Button';
+import Dialog from '@/app/admin/_components/ui/Dialog';
 import {
   CATEGORY_LABELS,
   FEEDBACK_CATEGORIES,
@@ -282,21 +284,30 @@ export default function FeedbackAdminClient() {
         </div>
       )}
 
-      {detail ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="feedback-detail-title">
-          <form onSubmit={saveDetail} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl dark:bg-gray-900 sm:rounded-3xl">
-            <div className="flex items-start justify-between gap-4"><div><h2 id="feedback-detail-title" className="text-xl font-semibold">Détail du feedback</h2><p className="mt-1 text-xs text-gray-500">{detail.tenant_name} · {detail.campaign?.name}</p></div><button type="button" onClick={() => setDetail(null)} className={secondary}>Fermer</button></div>
-            <p className="mt-6 whitespace-pre-wrap rounded-2xl bg-gray-50 p-4 text-sm leading-6 dark:bg-gray-950">{detail.message}</p>
+      <Dialog
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        dismissible={!detail || busy !== detail.id}
+        size="lg"
+        title="Détail du feedback"
+        description={detail ? `${detail.tenant_name} · ${detail.campaign?.name ?? ''}` : undefined}
+        footer={detail && <>
+          <Button variant="secondary" onClick={() => setDetail(null)}>Fermer</Button>
+          <Button type="submit" form="feedback-detail-form" loading={busy === detail.id}>Enregistrer les modifications</Button>
+        </>}
+      >
+        {detail && (
+          <form id="feedback-detail-form" onSubmit={saveDetail}>
+            <p className="whitespace-pre-wrap rounded-2xl bg-gray-50 p-4 text-sm leading-6 dark:bg-gray-950">{detail.message}</p>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-gray-500">Source</dt><dd>{detail.tester_invite_id ? '✓ Testeur invité' : 'Feedback public'}</dd></div>{detail.tester_invite_email ? <div><dt className="text-gray-500">Invitation</dt><dd>{detail.tester_invite_email}</dd></div> : null}<div><dt className="text-gray-500">Réaction</dt><dd>{detail.reaction ? REACTION_LABELS[detail.reaction as keyof typeof REACTION_LABELS] : '—'}</dd></div><div><dt className="text-gray-500">Catégorie</dt><dd>{detail.category ? CATEGORY_LABELS[detail.category as keyof typeof CATEGORY_LABELS] : '—'}</dd></div><div><dt className="text-gray-500">Contact autorisé</dt><dd>{detail.contact_allowed ? detail.contact_email : 'Non'}</dd></div><div><dt className="text-gray-500">Contexte sûr</dt><dd className="break-all text-xs">{JSON.stringify(detail.context)}</dd></div></dl>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-medium">Statut<select name="status" defaultValue={detail.status} className={input + ' mt-1 w-full'}>{FEEDBACK_STATUSES.map(value => <option key={value} value={value}>{STATUS_LABELS[value]}</option>)}</select></label>
               <label className="text-sm font-medium">Priorité<select name="priority" defaultValue={detail.priority} className={input + ' mt-1 w-full'}>{FEEDBACK_PRIORITIES.map(value => <option key={value} value={value}>{PRIORITY_LABELS[value]}</option>)}</select></label>
             </div>
             <label className="mt-4 block text-sm font-medium">Note interne<textarea name="internalNote" maxLength={4000} rows={5} defaultValue={detail.internal_note ?? ''} className={input + ' mt-1 w-full'} /></label>
-            <button type="submit" disabled={busy === detail.id} className={button + ' mt-5 w-full'}>{busy === detail.id ? 'Enregistrement…' : 'Enregistrer les modifications'}</button>
           </form>
-        </div>
-      ) : null}
+        )}
+      </Dialog>
     </div>
   );
 }
