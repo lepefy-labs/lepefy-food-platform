@@ -62,7 +62,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const clientTenant = toPublicTenant(tenant);
 
   return (
-    <html lang={tenant.locale.split('-')[0]} suppressHydrationWarning>
+    // The next/font variable classes must sit on <html>: globals.css declares
+    // `--font-body: var(--font-inter), …` on :root, and a custom property that
+    // references an undefined variable is invalid at computed-value time. With
+    // the classes on <body>, --font-body was empty everywhere and every page
+    // (storefront and admin) fell back to the browser serif.
+    <html lang={tenant.locale.split('-')[0]} className={`${inter.variable} ${bricolage.variable}`} suppressHydrationWarning>
       <head>
         <style>{`
           :root {
@@ -74,7 +79,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="apple-touch-icon" href={buildPwaIconPath(180, undefined, appIconRevision)} />
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
-      <body className={`${inter.variable} ${bricolage.variable}`}>
+      <body>
         <TenantProvider tenant={clientTenant}>{children}</TenantProvider>
         <PWARegister />
       </body>
