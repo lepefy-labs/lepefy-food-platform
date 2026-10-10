@@ -40,27 +40,27 @@ export default function ShareLinkActions({
         value={url}
         onFocus={(event) => event.currentTarget.select()}
         aria-label="Lien"
-        className="h-11 w-full rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-3 font-mono text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200"
+        className="h-11 w-full rounded-xl border border-a-border bg-a-surface-2 px-3 font-mono text-xs text-a-text-2"
       />
       <div className="grid gap-2 sm:grid-cols-2">
         <button
           type="button"
           onClick={copy}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-3 text-sm font-semibold text-gray-800 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border bg-a-surface px-3 text-sm font-semibold text-a-text hover:bg-a-surface-2"
         >
-          {copied ? <IconCheck size={17} className="text-emerald-600" /> : <IconCopy size={17} />}
+          {copied ? <IconCheck size={17} className="text-tone-success-fg" /> : <IconCopy size={17} />}
           {copied ? 'Lien copié' : copyLabel}
         </button>
         <a
           href={buildWhatsAppShareUrl(phone, message)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-3 text-sm font-semibold text-white hover:bg-green-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-tone-success-solid px-3 text-sm font-semibold text-white hover:bg-tone-success-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tone-success-solid focus-visible:ring-offset-2"
         >
           <IconBrandWhatsapp size={18} /> Partager sur WhatsApp
         </a>
       </div>
-      {copyFailed && <p className="text-xs text-amber-700">Copie impossible : sélectionnez le lien ci-dessus et copiez-le manuellement.</p>}
+      {copyFailed && <p className="text-xs text-tone-warning-fg">Copie impossible : sélectionnez le lien ci-dessus et copiez-le manuellement.</p>}
     </div>
   );
 }

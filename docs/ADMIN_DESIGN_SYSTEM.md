@@ -70,7 +70,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 
 ### Liste e dati (`src/lib/admin/listParams.ts`, `src/app/admin/_components/data/`)
 - **`defineListParams(spec, { pageSizes, defaultPageSize })`**: stato URL tipizzato (`search`, `string`, `enum` con default, `date`, `int`, `bool`, `uuid`) + `page`/`size`. `parse(searchParams)` sul server, `href(path, current, patch)` (ogni cambio diverso dalla pagina torna a pagina 1, i default non finiscono nell'URL), `activeCount()`. `pageWindow(total, page, size)` dà limiti `.range()` e la pagina corretta; `pageNumbers()` le pagine con i salti.
-- **`FilterBar`** (client): viste rapide (link calcolati sul server, con contatore e tono), ricerca istantanea (debounce 350 ms, Esc svuota), pannello « Filtres » (`select`, `date-range`) in `Dialog`, chip dei filtri attivi + « Tout effacer », ordinamento, contatore risultati `aria-live`, barra di avanzamento durante la transizione. Ogni modifica sostituisce l'URL e la pagina server si ricarica: niente ordinamenti lato client su pagine parziali.
+- **`FilterBar`** (client): filtri `select`, `date-range`, `date`, `number`; viste rapide (link calcolati sul server, con contatore e tono), ricerca istantanea (debounce 350 ms, Esc svuota), pannello « Filtres » (`select`, `date-range`) in `Dialog`, chip dei filtri attivi + « Tout effacer », ordinamento, contatore risultati `aria-live`, barra di avanzamento durante la transizione. Ogni modifica sostituisce l'URL e la pagina server si ricarica: niente ordinamenti lato client su pagine parziali.
 - **`DataTable`** (compatibile server): colonne (`cell`, `align`, `hideBelow`, `sortKey` → intestazione link con `aria-sort`), gruppi di righe (`groups` con tono), banda di attenzione (`rowTone`), dettaglio sotto riga (`rowDetail`), card mobile (`mobileCard`, la tabella sparisce sotto `md`), densità `comfortable`/`compact`, `empty`.
 - **Selezione** (`RowSelection.tsx`, client): `RowSelectionProvider` (si azzera con le righe visibili), `RowCheckbox`, `SelectAllCheckbox` (stato indeterminato), `BulkBar` fluttuante con le azioni sugli id selezionati.
 - **`Pagination`** (server, solo link): « 1–50 sur 312 », pagine con salti, « Lignes par page 25 · 50 · 100 ».
@@ -116,5 +116,6 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U4 | Kit dati: listParams, FilterBar, DataTable, selezione e BulkBar, Pagination, stati, Panel, Tabs | ✅ |
 | U5 | Commandes: lista sul kit (FilterBar, DataTable a gruppi di priorità, BulkBar con conferma, Pagination 25/50/100), Contrôles cliccabili, export CSV della lista filtrata, `loading.tsx` del gruppo protetto | ✅ |
 | U6 | Livraison: classi legacy convertite ai token (codemod), token « inverse » | ✅ |
-| U7–U11 | Clients, Catalogue, Gestion, Événementiel, altri moduli | — |
+| U7 | Clients: lista sul kit (segmenti come viste, KPI con icone, pannello filtri con numeri/date, DataTable con card mobile, Pagination), export con lo stesso ordinamento della lista; componenti condivisi residui sui token | ✅ |
+| U8–U11 | Catalogue, Gestion, Événementiel, altri moduli | — |
 | U12 | Rimozione rete di sicurezza dark e `--color-primary` in admin | — |

@@ -23,6 +23,8 @@ export const SIDEBAR_STORAGE_KEY = 'lepefy-admin-sidebar';
  */
 export const SHELL_CSS = `
 .admin-nav-rail-only { display: none; }
+/* Page titles use the display face even on pages without AdminPageHeader. */
+#admin-main h1 { font-family: var(--font-display); letter-spacing: -0.01em; }
 @media (min-width: 768px) {
   html[data-admin-sidebar="collapsed"] .admin-sidebar { width: 4rem; }
   html[data-admin-sidebar="collapsed"] .admin-sidebar .admin-nav-label,

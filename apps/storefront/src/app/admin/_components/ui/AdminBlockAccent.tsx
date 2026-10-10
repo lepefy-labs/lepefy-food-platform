@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 type AdminBlockTone = 'primary' | 'info' | 'success' | 'warning' | 'neutral';
 
 const toneClasses: Record<AdminBlockTone, string> = {
-  primary: 'before:bg-[var(--admin-primary)]',
-  info: 'before:bg-blue-500',
-  success: 'before:bg-emerald-500',
-  warning: 'before:bg-amber-500',
-  neutral: 'before:bg-slate-300 dark:before:bg-slate-600',
+  primary: 'before:bg-a-brand',
+  info: 'before:bg-tone-info-solid',
+  success: 'before:bg-tone-success-solid',
+  warning: 'before:bg-tone-warning-solid',
+  neutral: 'before:bg-a-border-strong',
 };
 
 interface AdminBlockAccentProps {

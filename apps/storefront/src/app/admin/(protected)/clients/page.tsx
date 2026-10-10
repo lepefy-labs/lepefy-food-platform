@@ -1,49 +1,182 @@
 import Link from 'next/link';
-import { IconAlertTriangle, IconArrowLeft, IconArrowRight, IconUserCheck, IconUsers, IconUserPlus } from '@tabler/icons-react';
+import { Suspense } from 'react';
+import { IconAlertTriangle, IconSpeakerphone, IconUserCheck, IconUserPlus, IconUsers, IconUsersGroup } from '@tabler/icons-react';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getCrmKpis, getCustomers, RFM_LABELS, SYSTEM_SEGMENTS } from '@/lib/admin/crm';
 import { CUSTOMER_SORT_OPTIONS, CUSTOMER_SOURCE_OPTIONS, parseCustomerSort } from '@/lib/admin/crmLabels';
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
-import { formatSince } from '@/lib/orders/adminOrderOperations';
+import { defineListParams, pageWindow } from '@/lib/admin/listParams';
+import { formatDate, formatMoney, formatNumber, formatRelative, pluralize } from '@/lib/admin/format';
 import { createServiceClient } from '@/lib/supabase/server';
+import AdminPageHeader from '../../_components/ui/AdminPageHeader';
+import AdminStatCard from '../../_components/ui/AdminStatCard';
+import Badge from '../../_components/ui/Badge';
+import { ButtonLink, buttonClasses } from '../../_components/ui/Button';
+import { Card } from '../../_components/ui/Panel';
+import { EmptyState } from '../../_components/ui/States';
+import DataTable, { type DataColumn } from '../../_components/data/DataTable';
+import FilterBar, { type ActiveFilterChip } from '../../_components/data/FilterBar';
+import Pagination from '../../_components/data/Pagination';
 import { ClientsToolbar } from './ClientsToolbar';
-import { ClientsSortSelect } from './ClientsSortSelect';
 
 export const dynamic = 'force-dynamic'; export const fetchCache = 'force-no-store';
-type Params = Record<string, string | string[] | undefined>;
-function one(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] : value; }
-function money(value: number, currency: string) { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(value); }
-function date(value: string | null) { return value ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(value)) : 'Jamais'; }
-function qs(params: Params, patch: Record<string, string | null>) { const next = new URLSearchParams(); Object.entries(params).forEach(([key,value]) => { const item=one(value); if(item) next.set(key,item); }); Object.entries(patch).forEach(([key,value]) => value === null ? next.delete(key) : next.set(key,value)); return next.toString(); }
 
-export default async function ClientsPage({ searchParams = {} }: { searchParams?: Params }) {
+const QUICK_SEGMENTS = ['all', 'active', 'new', 'loyal', 'vip', 'at_risk', 'inactive', 'marketing'];
+
+const CLIENT_LIST = defineListParams({
+  q: { type: 'search' },
+  segment: { type: 'string', maxLength: 64 },
+  source: { type: 'enum', values: CUSTOMER_SOURCE_OPTIONS.map((option) => option.value) },
+  marketing: { type: 'bool' },
+  loyalty: { type: 'bool' },
+  minOrders: { type: 'int', min: 0, max: 100000 },
+  minLifetimeValue: { type: 'int', min: 0, max: 10000000 },
+  createdAfter: { type: 'date' },
+  createdBefore: { type: 'date' },
+  lastPurchaseBefore: { type: 'date' },
+  tagId: { type: 'uuid' },
+  sort: { type: 'enum', values: CUSTOMER_SORT_OPTIONS.map((option) => option.key), default: 'last_activity' },
+}, { pageSizes: [25, 50, 100], defaultPageSize: 25 });
+
+type Customer = Awaited<ReturnType<typeof getCustomers>>['customers'][number];
+
+const initials = (value: string) => value.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+const dateLabel = (value?: string) => (value ? formatDate(value) : '');
+
+export default async function ClientsPage({ searchParams = {} }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
-  const { sort, direction } = parseCustomerSort(one(searchParams.sort));
-  const filters = { q: one(searchParams.q), segment: one(searchParams.segment), source: one(searchParams.source), marketing: one(searchParams.marketing) === 'true' ? true : one(searchParams.marketing) === 'false' ? false : undefined, loyalty: one(searchParams.loyalty) === 'true' ? true : one(searchParams.loyalty) === 'false' ? false : undefined, minOrders: one(searchParams.minOrders) ? Number(one(searchParams.minOrders)) : undefined, minLifetimeValue: one(searchParams.minLifetimeValue) ? Number(one(searchParams.minLifetimeValue)) : undefined, createdAfter: one(searchParams.createdAfter), createdBefore: one(searchParams.createdBefore), lastPurchaseBefore: one(searchParams.lastPurchaseBefore), tagId: one(searchParams.tagId), page: Number(one(searchParams.page) ?? 1), sort, direction };
+  const values = CLIENT_LIST.parse(searchParams);
+  const { sort, direction } = parseCustomerSort(values.sort);
   const db = createServiceClient();
-  const [result, kpis, tagsResult, segmentsResult, access] = await Promise.all([getCustomers(tenant.id, filters), getCrmKpis(tenant.id), db.from('customer_tags').select('id,name').eq('tenant_id', tenant.id).order('name'), db.from('customer_segments').select('id,name').eq('tenant_id', tenant.id).eq('kind', 'custom').eq('active', true).order('name'), getCurrentAdminAccessContext(tenant.id)]);
+  const [result, kpis, tagsResult, segmentsResult, access] = await Promise.all([
+    getCustomers(tenant.id, {
+      q: values.q, segment: values.segment, source: values.source, marketing: values.marketing, loyalty: values.loyalty,
+      minOrders: values.minOrders, minLifetimeValue: values.minLifetimeValue, createdAfter: values.createdAfter,
+      createdBefore: values.createdBefore, lastPurchaseBefore: values.lastPurchaseBefore, tagId: values.tagId,
+      page: values.page, pageSize: values.pageSize, sort, direction,
+    }),
+    getCrmKpis(tenant.id),
+    db.from('customer_tags').select('id,name').eq('tenant_id', tenant.id).order('name'),
+    db.from('customer_segments').select('id,name').eq('tenant_id', tenant.id).eq('kind', 'custom').eq('active', true).order('name'),
+    getCurrentAdminAccessContext(tenant.id),
+  ]);
   // UI hint only: write routes re-check customers.manage.
   const canManage = Boolean(access && canAdmin(access, 'customers.manage'));
   const now = new Date();
-  const pages = Math.max(1, Math.ceil(result.count / result.pageSize)); const activeSegment = filters.segment ?? 'all';
-  const hasFilters = !!(filters.q || filters.segment || filters.source || filters.marketing !== undefined || filters.loyalty !== undefined || filters.minOrders !== undefined || filters.minLifetimeValue !== undefined || filters.createdAfter || filters.createdBefore || filters.lastPurchaseBefore || filters.tagId);
-  // Each KPI opens the matching segment (same definitions as the segment chips).
+  const href = (patch: Parameters<typeof CLIENT_LIST.href>[2]) => CLIENT_LIST.href('/admin/clients', values, patch);
+  const window = pageWindow(result.count, result.page, values.pageSize);
+  const activeSegment = values.segment ?? 'all';
+  const tags = (tagsResult.data ?? []) as { id: string; name: string }[];
+  const customSegments = (segmentsResult.data ?? []) as { id: string; name: string }[];
+  const hasFilters = CLIENT_LIST.activeCount(values, ['segment', 'source', 'marketing', 'loyalty', 'minOrders', 'minLifetimeValue', 'createdAfter', 'createdBefore', 'lastPurchaseBefore', 'tagId']) > 0 || Boolean(values.q);
+  const resetHref = CLIENT_LIST.href('/admin/clients', { ...CLIENT_LIST.parse({}), sort: values.sort, pageSize: values.pageSize }, {});
+  const segmentName = (key: string) => SYSTEM_SEGMENTS.find((segment) => segment.key === key)?.name ?? customSegments.find((segment) => segment.id === key)?.name ?? key;
+
+  // Each KPI opens the matching segment (same definitions as the segment views).
   const cards = [
-    { label: 'Clients', value: kpis.total, segment: 'all', icon: <IconUsers size={20} aria-hidden="true" /> },
-    { label: 'Clients actifs · 90 j', value: kpis.active, segment: 'active', icon: <IconUserCheck size={20} aria-hidden="true" /> },
-    { label: 'Nouveaux', value: kpis.new, segment: 'new', icon: <IconUserPlus size={20} aria-hidden="true" /> },
-    { label: 'À risque', value: kpis.atRisk, segment: 'at_risk', icon: <IconAlertTriangle size={20} aria-hidden="true" /> },
+    { label: 'Clients', value: kpis.total, segment: 'all', tone: 'neutral' as const, icon: IconUsers },
+    { label: 'Clients actifs · 90 j', value: kpis.active, segment: 'active', tone: 'success' as const, icon: IconUserCheck },
+    { label: 'Nouveaux', value: kpis.new, segment: 'new', tone: 'info' as const, icon: IconUserPlus },
+    { label: 'À risque', value: kpis.atRisk, segment: 'at_risk', tone: 'warning' as const, icon: IconAlertTriangle },
   ];
-  const segmentHref = (key: string) => `/admin/clients?${qs(searchParams, { segment: key === 'all' ? null : key, page: null })}`;
-  return <div className="mx-auto w-full max-w-[1500px] space-y-5">
-    <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-[var(--admin-primary-fg)]">CRM</p><h1 className="mt-1 text-2xl font-semibold text-gray-950 dark:text-white">Clients</h1><p className="mt-1 text-sm text-gray-500">Comprendre et fidéliser votre clientèle</p></div><ClientsToolbar canManage={canManage} /></header>
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{cards.map(card => { const active = activeSegment === card.segment; return <Link key={card.label} href={segmentHref(card.segment)} aria-current={active ? 'page' : undefined} className={`rounded-2xl border bg-white p-4 shadow-sm transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:bg-gray-900 dark:hover:bg-gray-800/60 ${active ? 'border-[var(--admin-primary)] ring-1 ring-[var(--admin-primary)]' : 'border-[var(--admin-border)]'}`}><div className="flex items-start justify-between"><div><p className="text-xs text-gray-500">{card.label}</p><p className="mt-1 text-2xl font-semibold">{card.value.toLocaleString('fr-FR')}</p></div><span className="rounded-xl bg-[var(--admin-primary-soft)] p-2.5 text-[var(--admin-primary-fg)]">{card.icon}</span></div><p className="mt-1 text-[11px] font-semibold text-[var(--admin-primary-fg)]">{active ? 'Filtre actif' : card.segment === 'all' ? 'Voir tous →' : 'Filtrer →'}</p></Link>; })}</div>
-    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-      <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Segments rapides">{SYSTEM_SEGMENTS.filter(s=>['all','active','new','loyal','vip','at_risk','inactive','marketing'].includes(s.key)).map(segment=><Link key={segment.key} href={segmentHref(segment.key)} aria-current={activeSegment===segment.key?'page':undefined} className={`inline-flex min-h-9 items-center whitespace-nowrap rounded-full px-3 text-xs font-semibold ${activeSegment===segment.key?'bg-[var(--admin-primary)] text-white':'border border-[var(--admin-border)] bg-white text-gray-600 dark:bg-gray-900 dark:text-gray-300'}`}>{segment.name}{segment.key==='marketing'?' ✓':''}</Link>)}<Link href="/admin/clients/segments" className="inline-flex min-h-9 items-center whitespace-nowrap rounded-full border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700">Gérer les segments</Link><Link href="/admin/clients/campagnes" className="inline-flex min-h-9 items-center whitespace-nowrap rounded-full border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700">Campagnes</Link></nav>
-      <ClientsSortSelect value={sort} options={CUSTOMER_SORT_OPTIONS.map(({ key, label }) => ({ key, label }))} />
+  const chips: ActiveFilterChip[] = [
+    ...(values.segment && !QUICK_SEGMENTS.includes(values.segment) ? [{ key: 'segment', label: `Segment : ${segmentName(values.segment)}`, href: href({ segment: undefined }) }] : []),
+    ...(values.source ? [{ key: 'source', label: `Source : ${CUSTOMER_SOURCE_OPTIONS.find((option) => option.value === values.source)?.label ?? values.source}`, href: href({ source: undefined }) }] : []),
+    ...(values.marketing !== undefined ? [{ key: 'marketing', label: values.marketing ? 'Marketing autorisé' : 'Marketing non autorisé', href: href({ marketing: undefined }) }] : []),
+    ...(values.loyalty !== undefined ? [{ key: 'loyalty', label: values.loyalty ? 'Avec solde fidélité' : 'Sans solde fidélité', href: href({ loyalty: undefined }) }] : []),
+    ...(values.minOrders !== undefined ? [{ key: 'minOrders', label: `≥ ${pluralize(values.minOrders, 'commande')}`, href: href({ minOrders: undefined }) }] : []),
+    ...(values.minLifetimeValue !== undefined ? [{ key: 'minLifetimeValue', label: `Dépensé ≥ ${formatMoney(values.minLifetimeValue, tenant.currency)}`, href: href({ minLifetimeValue: undefined }) }] : []),
+    ...(values.tagId ? [{ key: 'tagId', label: `Tag : ${tags.find((tag) => tag.id === values.tagId)?.name ?? '?'}`, href: href({ tagId: undefined }) }] : []),
+    ...(values.createdAfter ? [{ key: 'createdAfter', label: `Créé après le ${dateLabel(values.createdAfter)}`, href: href({ createdAfter: undefined }) }] : []),
+    ...(values.createdBefore ? [{ key: 'createdBefore', label: `Créé avant le ${dateLabel(values.createdBefore)}`, href: href({ createdBefore: undefined }) }] : []),
+    ...(values.lastPurchaseBefore ? [{ key: 'lastPurchaseBefore', label: `Dernier achat avant le ${dateLabel(values.lastPurchaseBefore)}`, href: href({ lastPurchaseBefore: undefined }) }] : []),
+  ];
+  const name = (c: Customer) => c.full_name ?? c.email ?? c.phone ?? 'Client';
+
+  const columns: DataColumn<Customer>[] = [
+    { key: 'client', header: 'Client', className: 'min-w-[220px]', cell: (c) => (
+      <Link href={`/admin/clients/${c.id}`} className="flex items-center gap-3 font-semibold hover:underline">
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-a-brand-soft text-xs font-semibold text-a-brand-fg">{initials(c.full_name ?? c.email ?? '?')}</span>
+        <span className="truncate">{name(c)}</span>
+      </Link>
+    ) },
+    { key: 'contact', header: 'Contact', cell: (c) => <div className="text-xs text-a-text-2"><p className="truncate">{c.email ?? 'E-mail absent'}</p>{c.phone && <p>{c.phone}</p>}</div> },
+    { key: 'segment', header: 'Segment', cell: (c) => <Badge tone="brand">{RFM_LABELS[c.rfm_segment]}</Badge> },
+    { key: 'orders', header: 'Commandes', align: 'right', cell: (c) => formatNumber(c.completed_orders_count) },
+    { key: 'spent', header: 'Dépensé', align: 'right', cell: (c) => <span className="font-semibold">{formatMoney(c.lifetime_value, tenant.currency)}</span> },
+    { key: 'aov', header: 'Panier moyen', align: 'right', hideBelow: 'xl', cell: (c) => formatMoney(c.average_order_value, tenant.currency) },
+    { key: 'last', header: 'Dernier achat', cell: (c) => (c.last_order_at ? <time dateTime={c.last_order_at} title={formatDate(c.last_order_at)}>{formatRelative(c.last_order_at, now)}</time> : <span className="text-a-text-3">Jamais</span>) },
+    { key: 'loyalty', header: 'Fidélité', align: 'right', hideBelow: 'lg', cell: (c) => `${formatNumber(c.loyalty_points_balance)} pts` },
+    { key: 'marketing', header: 'Marketing', cell: (c) => (c.marketing_consent ? <Badge tone="success">Autorisé</Badge> : <Badge tone="neutral">Non autorisé</Badge>) },
+  ];
+
+  return (
+    <div className="mx-auto w-full max-w-7xl">
+      <AdminPageHeader
+        title="Clients"
+        meta={pluralize(kpis.total, 'client')}
+        description="Comprendre et fidéliser votre clientèle."
+        actions={<>
+          <ButtonLink href="/admin/clients/segments"><IconUsersGroup size={17} aria-hidden="true" />Segments</ButtonLink>
+          <ButtonLink href="/admin/clients/campagnes"><IconSpeakerphone size={17} aria-hidden="true" />Campagnes</ButtonLink>
+          <Suspense fallback={null}><ClientsToolbar canManage={canManage} /></Suspense>
+        </>}
+      />
+      <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {cards.map((card) => (
+          <AdminStatCard key={card.label} title={card.label} value={formatNumber(card.value)} tone={card.tone} icon={card.icon}
+            href={href({ segment: card.segment === 'all' ? undefined : card.segment })} active={activeSegment === card.segment && card.segment !== 'all'} />
+        ))}
+      </div>
+      <Card as="section" className="overflow-hidden">
+        <h2 className="sr-only">Liste des clients</h2>
+        <Suspense fallback={<div className="h-14 border-b border-a-border" />}>
+          <FilterBar
+            viewsLabel="Segments rapides"
+            views={SYSTEM_SEGMENTS.filter((segment) => QUICK_SEGMENTS.includes(segment.key)).map((segment) => ({
+              key: segment.key, label: segment.name, active: activeSegment === segment.key,
+              href: href({ segment: segment.key === 'all' ? undefined : segment.key }),
+            }))}
+            search={{ label: 'Rechercher un client', placeholder: 'Nom, e-mail, téléphone, carte…' }}
+            filters={[
+              { type: 'select', key: 'segment', label: 'Segment', allLabel: 'Tous les segments', options: [...SYSTEM_SEGMENTS.filter((segment) => segment.key !== 'all').map((segment) => ({ value: segment.key, label: segment.name })), ...customSegments.map((segment) => ({ value: segment.id, label: segment.name }))] },
+              { type: 'select', key: 'source', label: 'Source', allLabel: 'Toutes les sources', options: CUSTOMER_SOURCE_OPTIONS.map((option) => ({ value: option.value, label: option.label })) },
+              { type: 'select', key: 'marketing', label: 'Consentement marketing', allLabel: 'Tout consentement', options: [{ value: 'true', label: 'Marketing autorisé' }, { value: 'false', label: 'Marketing non autorisé' }] },
+              { type: 'select', key: 'loyalty', label: 'Fidélité', allLabel: 'Toute fidélité', options: [{ value: 'true', label: 'Avec solde fidélité' }, { value: 'false', label: 'Sans solde fidélité' }] },
+              ...(tags.length > 0 ? [{ type: 'select' as const, key: 'tagId', label: 'Tag', allLabel: 'Tous les tags', options: tags.map((tag) => ({ value: tag.id, label: tag.name })) }] : []),
+              { type: 'number', key: 'minOrders', label: 'Commandes minimum', min: 0, step: 1 },
+              { type: 'number', key: 'minLifetimeValue', label: 'Montant dépensé minimum (€)', min: 0, step: 1 },
+              { type: 'date-range', label: 'Date de création', fromKey: 'createdAfter', toKey: 'createdBefore' },
+              { type: 'date', key: 'lastPurchaseBefore', label: 'Dernier achat avant le' },
+            ]}
+            activeChips={chips}
+            resetHref={resetHref}
+            sort={{ value: values.sort ?? 'last_activity', options: CUSTOMER_SORT_OPTIONS.map((option) => ({ value: option.key, label: option.label })) }}
+            resultLabel={pluralize(result.count, 'client')}
+          />
+        </Suspense>
+        <DataTable<Customer>
+          caption={`Clients, triés par ${CUSTOMER_SORT_OPTIONS.find((option) => option.key === sort)!.label.toLowerCase()}`}
+          columns={columns}
+          rowKey={(c) => c.id}
+          rows={result.customers}
+          mobileCard={(c) => (
+            <Link href={`/admin/clients/${c.id}`} className="block p-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <div className="min-w-0"><p className="truncate font-semibold">{name(c)}</p><p className="truncate text-xs text-a-text-2">{c.email ?? c.phone ?? 'Aucun contact'}</p></div>
+                <Badge tone="brand">{RFM_LABELS[c.rfm_segment]}</Badge>
+              </div>
+              <p className="mt-2 font-semibold">{formatMoney(c.lifetime_value, tenant.currency)} · {pluralize(c.completed_orders_count, 'commande')}</p>
+              <p className="mt-0.5 text-xs text-a-text-3">Dernier achat · {c.last_order_at ? formatRelative(c.last_order_at, now) : 'jamais'}</p>
+              <div className="mt-2 flex justify-between text-xs text-a-text-2"><span>{formatNumber(c.loyalty_points_balance)} pts</span><span>Marketing {c.marketing_consent ? 'autorisé' : 'non autorisé'}</span></div>
+            </Link>
+          )}
+          empty={hasFilters
+            ? <EmptyState variant="filtered" title="Aucun client ne correspond à ces filtres." description="Modifiez ou réinitialisez les filtres pour élargir la recherche." action={<Link href={resetHref} className={buttonClasses({ variant: 'secondary' })}>Réinitialiser les filtres</Link>} />
+            : <EmptyState title="Aucun client pour le moment" description="Les clients apparaîtront ici après une commande, une inscription ou un ajout manuel." action={canManage ? <Link href="/admin/clients?new=1" className={buttonClasses()}>Ajouter un client</Link> : undefined} />}
+        />
+        {result.count > 0 && <Pagination window={window} noun="clients" hrefForPage={(page) => href({ page })} hrefForPageSize={(pageSize) => href({ pageSize })} pageSizes={CLIENT_LIST.pageSizes} />}
+      </Card>
     </div>
-    <details className="rounded-2xl border border-[var(--admin-border)] bg-white dark:bg-gray-900"><summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">Filtres avancés</summary><form className="grid gap-3 border-t border-[var(--admin-border)] p-4 sm:grid-cols-2 lg:grid-cols-4"><input type="hidden" name="q" value={filters.q??''}/>{sort !== 'last_activity' && <input type="hidden" name="sort" value={sort}/>}<select name="source" aria-label="Source" defaultValue={filters.source??''} className="h-11 rounded-xl border border-gray-200 bg-white px-3 dark:bg-gray-950"><option value="">Toutes les sources</option>{CUSTOMER_SOURCE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select><select name="segment" aria-label="Segment" defaultValue={filters.segment??''} className="h-11 rounded-xl border border-gray-200 bg-white px-3 dark:bg-gray-950"><option value="">Tous les segments</option>{SYSTEM_SEGMENTS.filter(s=>s.key!=='all').map(s=><option key={s.key} value={s.key}>{s.name}</option>)}{(segmentsResult.data??[]).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select><select name="marketing" aria-label="Consentement marketing" defaultValue={filters.marketing===undefined?'':String(filters.marketing)} className="h-11 rounded-xl border border-gray-200 bg-white px-3 dark:bg-gray-950"><option value="">Tout consentement</option><option value="true">Marketing autorisé</option><option value="false">Marketing non autorisé</option></select><select name="loyalty" aria-label="Fidélité" defaultValue={filters.loyalty===undefined?'':String(filters.loyalty)} className="h-11 rounded-xl border border-gray-200 bg-white px-3 dark:bg-gray-950"><option value="">Toute fidélité</option><option value="true">Avec solde fidélité</option><option value="false">Sans solde fidélité</option></select><input name="minOrders" aria-label="Commandes minimum" type="number" min="0" defaultValue={filters.minOrders} placeholder="Commandes minimum" className="h-11 rounded-xl border border-gray-200 px-3 dark:bg-gray-950"/><input name="minLifetimeValue" aria-label="Valeur minimum" type="number" min="0" step="0.01" defaultValue={filters.minLifetimeValue} placeholder="Valeur minimum" className="h-11 rounded-xl border border-gray-200 px-3 dark:bg-gray-950"/><select name="tagId" aria-label="Tag" defaultValue={filters.tagId??''} className="h-11 rounded-xl border border-gray-200 bg-white px-3 dark:bg-gray-950"><option value="">Tous les tags</option>{(tagsResult.data??[]).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><label className="text-xs text-gray-500">Créé après<input name="createdAfter" type="date" defaultValue={filters.createdAfter} className="mt-1 h-11 w-full rounded-xl border border-gray-200 px-3 dark:bg-gray-950"/></label><label className="text-xs text-gray-500">Créé avant<input name="createdBefore" type="date" defaultValue={filters.createdBefore} className="mt-1 h-11 w-full rounded-xl border border-gray-200 px-3 dark:bg-gray-950"/></label><label className="text-xs text-gray-500">Dernier achat avant<input name="lastPurchaseBefore" type="date" defaultValue={filters.lastPurchaseBefore} className="mt-1 h-11 w-full rounded-xl border border-gray-200 px-3 dark:bg-gray-950"/></label><div className="flex items-end gap-2"><button className="min-h-11 flex-1 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white">Appliquer</button><Link href="/admin/clients" className="inline-flex min-h-11 items-center px-3 text-sm">Réinitialiser</Link></div></form></details>
-    <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:bg-gray-900">{result.customers.length===0?<div className="px-5 py-16 text-center"><h2 className="font-semibold">{hasFilters?'Aucun client ne correspond à ces filtres.':'Aucun client pour le moment'}</h2><p className="mx-auto mt-2 max-w-md text-sm text-gray-500">{hasFilters?'Modifiez ou réinitialisez les filtres pour élargir la recherche.':'Les clients apparaîtront ici après une commande, une inscription ou un ajout manuel.'}</p>{(hasFilters || canManage) && <Link href={hasFilters?'/admin/clients':'/admin/clients?new=1'} className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white">{hasFilters?'Réinitialiser les filtres':'Ajouter un client'}</Link>}</div>:<><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-left text-sm"><caption className="sr-only">Clients, triés par {CUSTOMER_SORT_OPTIONS.find(o => o.key === sort)!.label.toLowerCase()}</caption><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800"><tr>{['Client','Contact','Segment','Commandes','Dépensé','Panier moyen','Dernier achat','Fidélité','Marketing'].map(h=><th key={h} scope="col" className="px-4 py-3" aria-sort={(h==='Dépensé'&&sort==='spent')||(h==='Commandes'&&sort==='orders')?'descending':h==='Client'&&sort==='name'?'ascending':undefined}>{h}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{result.customers.map(c=><tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/60"><td className="px-4 py-3"><Link href={`/admin/clients/${c.id}`} className="flex items-center gap-3 font-semibold"><span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--admin-primary-soft)] text-xs text-[var(--admin-primary-fg)]">{(c.full_name??c.email??'?').split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase()}</span>{c.full_name??c.email??c.phone??'Client'}</Link></td><td className="px-4 py-3 text-xs text-gray-500"><p>{c.email??'E-mail absent'}</p>{c.phone&&<p>{c.phone}</p>}</td><td className="px-4 py-3"><span className="rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">{RFM_LABELS[c.rfm_segment]}</span></td><td className="px-4 py-3">{c.completed_orders_count}</td><td className="px-4 py-3 font-semibold">{money(c.lifetime_value,tenant.currency)}</td><td className="px-4 py-3">{money(c.average_order_value,tenant.currency)}</td><td className="px-4 py-3">{c.last_order_at ? <time dateTime={c.last_order_at} title={date(c.last_order_at)}>{formatSince(c.last_order_at, now)}</time> : 'Jamais'}</td><td className="px-4 py-3">{c.loyalty_points_balance.toLocaleString('fr-FR')} pts</td><td className="px-4 py-3">{c.marketing_consent?<span className="text-emerald-700">Autorisé ✓</span>:<span className="text-gray-400">Non autorisé</span>}</td></tr>)}</tbody></table></div><ul className="divide-y divide-gray-100 md:hidden">{result.customers.map(c=><li key={c.id}><Link href={`/admin/clients/${c.id}`} className="block min-h-11 p-4"><div className="flex justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold">{c.full_name??c.email??c.phone??'Client'}</p><p className="truncate text-xs text-gray-500">{c.email??c.phone??'Aucun contact'}</p></div><span className="h-fit rounded-full bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">{RFM_LABELS[c.rfm_segment]}</span></div><p className="mt-3 text-sm font-semibold">{money(c.lifetime_value,tenant.currency)} · {c.completed_orders_count} commande{c.completed_orders_count>1?'s':''}</p><p className="mt-1 text-xs text-gray-500">Dernier achat · {c.last_order_at ? formatSince(c.last_order_at, now) : 'jamais'}</p><div className="mt-3 flex justify-between text-xs"><span>{c.loyalty_points_balance.toLocaleString('fr-FR')} pts</span><span className={c.marketing_consent?'text-emerald-700':'text-gray-400'}>Marketing {c.marketing_consent?'✓':'non autorisé'}</span></div></Link></li>)}</ul></>}</section>
-    <footer className="flex items-center justify-between text-sm text-gray-500"><span>{result.count.toLocaleString('fr-FR')} client{result.count>1?'s':''}</span><nav aria-label="Pagination des clients" className="flex items-center gap-2"><Link aria-disabled={result.page<=1} aria-label="Page précédente" href={`/admin/clients?${qs(searchParams,{page:String(Math.max(1,result.page-1))})}`} className={`flex h-11 w-11 items-center justify-center rounded-xl border ${result.page<=1?'pointer-events-none opacity-40':''}`}><IconArrowLeft size={18} aria-hidden="true"/></Link><span>{result.page} / {pages}</span><Link aria-disabled={result.page>=pages} aria-label="Page suivante" href={`/admin/clients?${qs(searchParams,{page:String(Math.min(pages,result.page+1))})}`} className={`flex h-11 w-11 items-center justify-center rounded-xl border ${result.page>=pages?'pointer-events-none opacity-40':''}`}><IconArrowRight size={18} aria-hidden="true"/></Link></nav></footer>
-  </div>;
+  );
 }

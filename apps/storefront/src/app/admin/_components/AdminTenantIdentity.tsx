@@ -23,9 +23,9 @@ export default function AdminTenantIdentity({ align = 'center', compact = false 
 
   return (
     <div className={centered ? 'text-center' : 'text-left'}>
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-600">Lepefy Admin</p>
-      <div className={`mt-3 flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} ${centered ? 'justify-center text-left' : ''}`}>
-        <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-white ${compact ? 'h-11 w-14' : 'h-14 w-20'}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-a-brand-fg">Lepefy Admin</p>
+      <div className={`mt-3 flex items-center gap-3 rounded-2xl border border-a-border bg-a-surface-2 ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} ${centered ? 'justify-center text-left' : ''}`}>
+        <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-a-border bg-a-surface ${compact ? 'h-11 w-14' : 'h-14 w-20'}`}>
           {tenant.logo_url ? (
             <Image
               src={tenant.logo_url}
@@ -36,12 +36,12 @@ export default function AdminTenantIdentity({ align = 'center', compact = false 
               unoptimized
             />
           ) : (
-            <span className="text-sm font-bold text-gray-500">{initials(tenant.name)}</span>
+            <span className="text-sm font-bold text-a-text-3">{initials(tenant.name)}</span>
           )}
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">Espace administrateur</p>
-          <p className="mt-0.5 truncate text-base font-semibold text-gray-900">{tenant.name}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">Espace administrateur</p>
+          <p className="mt-0.5 truncate text-base font-semibold text-a-text">{tenant.name}</p>
         </div>
       </div>
     </div>

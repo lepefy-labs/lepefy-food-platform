@@ -21,7 +21,7 @@ export default function SubscriptionBanner({ serviceState, canViewBilling }: { s
 
   if (serviceState.suspended) {
     return (
-      <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+      <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">
         <IconPlayerPause size={18} stroke={1.8} className="mt-0.5 shrink-0" aria-hidden="true" />
         <p>
           <strong>Abonnement suspendu.</strong> Boutique, événementiel, carte digitale et paiements en ligne sont hors ligne ;
@@ -34,7 +34,7 @@ export default function SubscriptionBanner({ serviceState, canViewBilling }: { s
   const parts: React.ReactNode[] = [];
   if (shouldWarnTenant(state) && state.autoSuspendAt && state.daysUntilAutoSuspend !== null) {
     parts.push(
-      <div key="auto" role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+      <div key="auto" role="alert" className="mb-4 flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-4 py-3 text-sm text-tone-warning-fg">
         <IconAlertTriangle size={18} stroke={1.8} className="mt-0.5 shrink-0" aria-hidden="true" />
         <p>
           <strong>
@@ -49,7 +49,7 @@ export default function SubscriptionBanner({ serviceState, canViewBilling }: { s
   }
   if (serviceState.suspendedModules.length > 0) {
     parts.push(
-      <div key="modules" role="status" className="mb-4 flex items-start gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+      <div key="modules" role="status" className="mb-4 flex items-start gap-2 rounded-xl border border-a-border bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
         <IconPlayerPause size={18} stroke={1.8} className="mt-0.5 shrink-0" aria-hidden="true" />
         <p>
           Module{serviceState.suspendedModules.length > 1 ? 's' : ''} suspendu{serviceState.suspendedModules.length > 1 ? 's' : ''} par Lepefy :{' '}

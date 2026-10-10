@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import type { Icon as TablerIcon } from '@tabler/icons-react';
 import type { AdminTone } from '@/lib/admin/tokens';
 import { cn } from '@/lib/utils/cn';
 import { TONE_SOLID_BG_CLASS } from './Badge';
@@ -17,7 +18,7 @@ interface AdminStatCardProps {
   tone?: Tone;
   /** The filter this card represents is applied. */
   active?: boolean;
-  icon?: ComponentType<{ size?: string | number; stroke?: string | number; className?: string; 'aria-hidden'?: boolean }>;
+  icon?: TablerIcon;
   /** Variation in % (e.g. month over month). */
   delta?: number | null;
 }
@@ -37,7 +38,7 @@ export default function AdminStatCard({ title, value, description, href, tone = 
     <>
       <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-1', STRIPE[tone])} />
       <span className="flex items-center gap-1.5 text-sm font-semibold text-a-text-2">
-        {Icon && <Icon size={16} stroke={1.8} aria-hidden className="shrink-0" />}
+        {Icon && <Icon size={16} stroke={1.8} aria-hidden="true" className="shrink-0" />}
         <span className="truncate">{title}</span>
       </span>
       <span className="mt-0.5 flex items-baseline gap-2">

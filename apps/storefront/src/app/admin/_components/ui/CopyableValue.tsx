@@ -19,15 +19,15 @@ export default function CopyableValue({ label, value, className = '' }: { label:
 
   return (
     <span className={`flex min-w-0 items-center gap-1 ${className}`}>
-      <span className="shrink-0 text-gray-400">{label}</span>
-      <span className="truncate font-mono text-[11px] text-gray-700 dark:text-gray-300" title={value}>{value}</span>
+      <span className="shrink-0 text-a-text-3">{label}</span>
+      <span className="truncate font-mono text-xs text-a-text-2" title={value}>{value}</span>
       <button
         type="button"
         onClick={() => void copy()}
         aria-label={`Copier ${label.toLowerCase()} ${value}`}
-        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-[var(--admin-primary)] dark:hover:bg-gray-800"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-a-text-3 hover:bg-a-hover hover:text-a-text-2 focus-visible:outline-2 focus-visible:outline-a-focus"
       >
-        {state === 'copied' ? <IconCheck size={13} aria-hidden="true" className="text-emerald-600" /> : <IconCopy size={13} aria-hidden="true" />}
+        {state === 'copied' ? <IconCheck size={13} aria-hidden="true" className="text-tone-success-fg" /> : <IconCopy size={13} aria-hidden="true" />}
       </button>
       <span role="status" className="sr-only">{state === 'copied' ? `${label} copié` : state === 'failed' ? 'Copie impossible' : ''}</span>
     </span>

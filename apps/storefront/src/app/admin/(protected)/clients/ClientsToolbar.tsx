@@ -1,27 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { IconDownload, IconPlus, IconSearch, IconX } from '@tabler/icons-react';
-import Button from '@/app/admin/_components/ui/Button';
+import { IconDownload, IconPlus } from '@tabler/icons-react';
+import Button, { ButtonAnchor } from '@/app/admin/_components/ui/Button';
 import Dialog from '@/app/admin/_components/ui/Dialog';
 import { FormField, Input } from '@/app/admin/_components/ui/Form';
 import { ErrorText } from '@/app/admin/_components/ui/InlineAlert';
 
 export function ClientsToolbar({ canManage }: { canManage: boolean }) {
   const router = useRouter(); const searchParams = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [open, setOpen] = useState(canManage && searchParams.get('new') === '1'); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const initial = useRef(true);
-  useEffect(() => {
-    if (initial.current) { initial.current = false; return; }
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (query.trim()) params.set('q', query.trim()); else params.delete('q');
-      params.delete('page'); router.replace(`/admin/clients?${params.toString()}`);
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [query, router, searchParams]);
 
   async function createCustomer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
@@ -33,11 +22,9 @@ export function ClientsToolbar({ canManage }: { canManage: boolean }) {
   }
 
   return <>
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <label className="relative block min-w-0 flex-1 sm:w-72 sm:flex-none"><IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /><span className="sr-only">Rechercher un client</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, e-mail, téléphone, carte…" className="h-11 w-full rounded-xl border border-[var(--admin-border)] bg-white pl-10 pr-9 text-sm outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-900" />{query && <button type="button" onClick={() => setQuery('')} className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center" aria-label="Effacer"><IconX size={16} /></button>}</label>
-      <a href={`/api/admin/clients/export?${searchParams.toString()}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-4 text-sm font-semibold dark:bg-gray-900"><IconDownload size={18} />Exporter CSV</a>
-      {canManage && <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white"><IconPlus size={18} aria-hidden="true" />Ajouter un client</button>}
-    </div>
+    {/* Same filters as the list: the export follows what is on screen. */}
+    <ButtonAnchor href={`/api/admin/clients/export?${searchParams.toString()}`}><IconDownload size={17} aria-hidden="true" />Exporter CSV</ButtonAnchor>
+    {canManage && <Button onClick={() => setOpen(true)}><IconPlus size={17} aria-hidden="true" />Ajouter un client</Button>}
     <Dialog
       open={open}
       onClose={() => setOpen(false)}

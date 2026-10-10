@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { getCustomers } from '@/lib/admin/crm';
+import { parseCustomerSort } from '@/lib/admin/crmLabels';
 
 function csv(value: unknown) { return `"${String(value ?? '').replace(/"/g, '""')}"`; }
 
 export async function GET(req: NextRequest) {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood'); const denied = await requireAdmin(tenant.id); if (denied) return denied;
   const p = req.nextUrl.searchParams;
+  // Same sort (and direction) as the list on screen.
+  const { sort, direction } = parseCustomerSort(p.get('sort'));
   const rows: any[] = []; let page = 1; let total = 0;
   do {
     const result = await getCustomers(tenant.id, {
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest) {
       minLifetimeValue: p.has('minLifetimeValue') ? Number(p.get('minLifetimeValue')) : undefined,
       createdAfter: p.get('createdAfter') ?? undefined, createdBefore: p.get('createdBefore') ?? undefined,
       lastPurchaseBefore: p.get('lastPurchaseBefore') ?? undefined, tagId: p.get('tagId') ?? undefined,
-      sort: (p.get('sort') as any) ?? undefined, direction: p.get('direction') === 'asc' ? 'asc' : 'desc', page, pageSize: 100,
+      sort, direction, page, pageSize: 100,
     });
     rows.push(...result.customers); total = result.count; page += 1;
   } while (rows.length < total && rows.length < 10000);

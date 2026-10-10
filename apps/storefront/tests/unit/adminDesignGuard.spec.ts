@@ -25,10 +25,7 @@ const MIGRATED = [
   '_components/ui/useAdminMutation.tsx',
   '_components/ui/BulkTrackingModal.tsx',
   '(protected)/BulkDocumentsDialog.tsx',
-  '(protected)/clients/[id]/CustomerActions.tsx',
-  '(protected)/clients/campagnes/CampaignComposer.tsx',
-  '(protected)/clients/campagnes/[id]/DispatchButton.tsx',
-  '(protected)/clients/segments/SegmentBuilder.tsx',
+  '(protected)/clients',
   '_components/ui/Menu.tsx',
   '_components/ui/NotificationBell.tsx',
   '_components/ThemeToggleButton.tsx',
@@ -46,6 +43,9 @@ const MIGRATED = [
   '(protected)/OrdersTable.tsx',
   '(protected)/PendingPaymentsBanner.tsx',
   '_components/ui/ConfirmPaymentButton.tsx',
+  '_components/ui',
+  '_components/AdminTenantIdentity.tsx',
+  '_components/SubscriptionBanner.tsx',
 ];
 
 

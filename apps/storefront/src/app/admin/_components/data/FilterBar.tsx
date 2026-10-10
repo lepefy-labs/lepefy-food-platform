@@ -14,7 +14,9 @@ import { FormField, Input, Select } from '../ui/Form';
 export interface FilterView { key: string; label: string; href: string; active: boolean; count?: number; countTone?: AdminTone }
 export type FilterDef =
   | { type: 'select'; key: string; label: string; options: { value: string; label: string }[]; allLabel?: string }
-  | { type: 'date-range'; label: string; fromKey: string; toKey: string };
+  | { type: 'date-range'; label: string; fromKey: string; toKey: string }
+  | { type: 'date'; key: string; label: string }
+  | { type: 'number'; key: string; label: string; min?: number; step?: number; placeholder?: string };
 export interface ActiveFilterChip { key: string; label: string; href: string }
 
 interface FilterBarProps {
@@ -71,7 +73,7 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  const filterKeys = useMemo(() => (filters ?? []).flatMap((def) => (def.type === 'select' ? [def.key] : [def.fromKey, def.toKey])), [filters]);
+  const filterKeys = useMemo(() => (filters ?? []).flatMap((def) => (def.type === 'date-range' ? [def.fromKey, def.toKey] : [def.key])), [filters]);
   const [draft, setDraft] = useState<Record<string, string>>({});
   function openPanel() {
     setDraft(Object.fromEntries(filterKeys.map((key) => [key, searchParams.get(key) ?? ''])));
@@ -172,7 +174,13 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
           </>}
         >
           <div className="space-y-4">
-            {filters.map((def) => def.type === 'select' ? (
+            {filters.map((def) => def.type === 'number' || def.type === 'date' ? (
+              <FormField key={def.key} label={def.label}>
+                <Input type={def.type} inputMode={def.type === 'number' ? 'decimal' : undefined} min={def.type === 'number' ? def.min : undefined} step={def.type === 'number' ? def.step : undefined}
+                  placeholder={def.type === 'number' ? def.placeholder : undefined}
+                  value={draft[def.key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, [def.key]: event.target.value }))} />
+              </FormField>
+            ) : def.type === 'select' ? (
               <FormField key={def.key} label={def.label}>
                 <Select value={draft[def.key] ?? ''} onChange={(event) => setDraft((current) => ({ ...current, [def.key]: event.target.value }))}>
                   <option value="">{def.allLabel ?? 'Tous'}</option>
