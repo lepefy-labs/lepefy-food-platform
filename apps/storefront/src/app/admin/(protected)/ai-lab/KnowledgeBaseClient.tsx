@@ -11,8 +11,8 @@ import type {
 } from '@lepefy/types';
 
 const INPUT_CLS =
-  'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
-const LABEL_CLS = 'mb-1 block text-xs font-medium text-gray-500';
+  'w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-a-focus';
+const LABEL_CLS = 'mb-1 block text-xs font-medium text-a-text-3';
 const MAX_CONTENT = 2000;
 
 const CATEGORY_OPTIONS: { value: KnowledgeBaseCategory; label: string }[] = [
@@ -143,15 +143,15 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
   return (
     <div className="space-y-6">
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
-      <section className="overflow-hidden rounded-xl border border-violet-200 bg-white">
-        <div className="flex items-start gap-3 border-b border-violet-100 bg-violet-50/70 px-4 py-4 sm:px-5">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700"><IconSparkles size={18} stroke={1.7} /></span>
+      <section className="overflow-hidden rounded-xl border border-a-border bg-a-surface">
+        <div className="flex items-start gap-3 border-b border-a-border bg-a-brand-soft px-4 py-4 sm:px-5">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-a-brand-soft text-a-brand-fg"><IconSparkles size={18} stroke={1.7} /></span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-gray-800">Suggestions à valider ({suggestions.length})</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-600">
+            <h2 className="text-sm font-semibold text-a-text">Suggestions à valider ({suggestions.length})</h2>
+            <p className="mt-1 text-xs leading-5 text-a-text-2">
               Questions de clients auxquelles Nala a mal répondu (livraison, boutique, recettes, événements). Corrigez la réponse proposée puis validez,
               ou ignorez-la. Les demandes de produits introuvables se traitent dans le catalogue.
             </p>
@@ -159,17 +159,17 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
         </div>
 
         {suggestions.length > 0 ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-a-border">
             {suggestions.map((suggestion) => (
               <article key={suggestion.key} className="p-4 sm:p-5">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">{INTENT_LABELS[suggestion.intent] ?? suggestion.intent}</span>
-                  <span className="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-700">{suggestion.occurrenceCount} question{suggestion.occurrenceCount !== 1 ? 's' : ''}</span>
-                  {suggestion.signals.map((signal) => <span key={signal} className="rounded-full bg-amber-50 px-2 py-1 font-medium text-amber-700">{SIGNAL_LABELS[signal]}</span>)}
+                  <span className="rounded-full bg-a-hover px-2 py-1 font-medium text-a-text-2">{INTENT_LABELS[suggestion.intent] ?? suggestion.intent}</span>
+                  <span className="rounded-full bg-tone-info-bg px-2 py-1 font-medium text-tone-info-fg">{suggestion.occurrenceCount} question{suggestion.occurrenceCount !== 1 ? 's' : ''}</span>
+                  {suggestion.signals.map((signal) => <span key={signal} className="rounded-full bg-tone-warning-bg px-2 py-1 font-medium text-tone-warning-fg">{SIGNAL_LABELS[signal]}</span>)}
                 </div>
-                <div className="mb-4 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
-                  <p className="text-xs font-medium text-gray-400">Question du client</p>
-                  <p className="mt-1 text-sm leading-5 text-gray-700">« {suggestion.questionPreview} »</p>
+                <div className="mb-4 rounded-lg border border-a-border bg-a-surface-2 px-3 py-2.5">
+                  <p className="text-xs font-medium text-a-text-3">Question du client</p>
+                  <p className="mt-1 text-sm leading-5 text-a-text-2">« {suggestion.questionPreview} »</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
                   <div>
@@ -183,16 +183,16 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
                     <label htmlFor={`content-${suggestion.key}`} className={LABEL_CLS}>Réponse à enregistrer (à vérifier et corriger)</label>
                     <textarea id={`content-${suggestion.key}`} value={suggestion.draftContent} rows={4} maxLength={MAX_CONTENT} className={INPUT_CLS}
                       onChange={(event) => setSuggestions((prev) => prev.map((item) => item.key === suggestion.key ? { ...item, draftContent: event.target.value } : item))} />
-                    <div className="mt-1 text-right text-[11px] text-gray-400">{suggestion.draftContent.length}/{MAX_CONTENT}</div>
+                    <div className="mt-1 text-right text-xs text-a-text-3">{suggestion.draftContent.length}/{MAX_CONTENT}</div>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   <button type="button" onClick={() => void dismiss(suggestion)} disabled={busyKey !== null}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 disabled:opacity-50">
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-a-border px-4 py-2 text-sm font-medium text-a-text-2 disabled:opacity-50">
                     <IconX size={16} /> Ignorer
                   </button>
                   <button type="button" onClick={() => void approve(suggestion)} disabled={busyKey !== null || !suggestion.draftContent.trim()}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-a-brand px-4 py-2 text-sm font-medium text-a-on-brand disabled:opacity-50">
                     <IconCheck size={17} stroke={1.7} /> {busyKey === suggestion.key ? 'Validation…' : 'Valider et ajouter'}
                   </button>
                 </div>
@@ -201,15 +201,15 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
           </div>
         ) : (
           <div className="px-5 py-7 text-center">
-            <p className="text-sm font-medium text-gray-700">Aucune suggestion pour le moment.</p>
-            <p className="mt-1 text-xs text-gray-400">Elles apparaissent quand Nala manque d’informations sur la boutique, la livraison, une recette ou un événement.</p>
+            <p className="text-sm font-medium text-a-text-2">Aucune suggestion pour le moment.</p>
+            <p className="mt-1 text-xs text-a-text-3">Elles apparaissent quand Nala manque d’informations sur la boutique, la livraison, une recette ou un événement.</p>
           </div>
         )}
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
-        <h2 className="mb-1 text-sm font-semibold text-gray-700">Ajouter une connaissance</h2>
-        <p className="mb-4 text-xs leading-5 text-gray-400">Une information par entrée, écrite comme vous la diriez à un client (« La boutique est fermée le 1er mai »).</p>
+      <section className="rounded-xl border border-a-border bg-a-surface p-4 sm:p-5">
+        <h2 className="mb-1 text-sm font-semibold text-a-text-2">Ajouter une connaissance</h2>
+        <p className="mb-4 text-xs leading-5 text-a-text-3">Une information par entrée, écrite comme vous la diriez à un client (« La boutique est fermée le 1er mai »).</p>
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="kb-category" className={LABEL_CLS}>Catégorie</label>
@@ -224,38 +224,38 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
         </div>
         <label htmlFor="kb-content" className={LABEL_CLS}>Contenu</label>
         <textarea id="kb-content" value={content} onChange={(event) => setContent(event.target.value)} rows={4} maxLength={MAX_CONTENT} className={INPUT_CLS} />
-        <div className="mb-3 mt-1 text-right text-[11px] text-gray-400">{content.length}/{MAX_CONTENT}</div>
+        <div className="mb-3 mt-1 text-right text-xs text-a-text-3">{content.length}/{MAX_CONTENT}</div>
         <button type="button" onClick={() => void create()} disabled={busyKey !== null || !content.trim()}
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-a-brand px-4 py-2 text-sm font-medium text-a-on-brand disabled:opacity-50">
           <IconPlus size={16} stroke={1.7} /> {busyKey === 'create' ? 'Ajout…' : 'Ajouter'}
         </button>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <section className="overflow-hidden rounded-xl border border-a-border bg-a-surface">
         <div className="flex flex-col gap-3 px-4 pb-3 pt-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <h2 className="text-sm font-semibold text-gray-700">Connaissances ({entries.length})</h2>
+          <h2 className="text-sm font-semibold text-a-text-2">Connaissances ({entries.length})</h2>
           <div className="flex flex-wrap gap-2">
             <label htmlFor="kb-search" className="sr-only">Rechercher</label>
-            <input id="kb-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher…" className="min-h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+            <input id="kb-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher…" className="min-h-10 rounded-lg border border-a-border px-3 text-sm" />
             {(['all', 'active', 'paused'] as const).map((value) => (
               <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}
-                className={`min-h-10 rounded-lg px-3 text-xs font-medium ${filter === value ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'border border-gray-200 text-gray-600'}`}>
+                className={`min-h-10 rounded-lg px-3 text-xs font-medium ${filter === value ? 'bg-a-brand-soft text-a-brand-fg' : 'border border-a-border text-a-text-2'}`}>
                 {value === 'all' ? 'Toutes' : value === 'active' ? 'Actives' : 'En pause'}
               </button>
             ))}
           </div>
         </div>
 
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-a-border">
           {visibleEntries.map((entry) => {
             const isEditing = editing?.id === entry.id;
             const isOpen = expanded.has(entry.id);
             return (
-              <li key={entry.id} className={`px-4 py-4 sm:px-5 ${entry.active ? '' : 'bg-gray-50/70'}`}>
+              <li key={entry.id} className={`px-4 py-4 sm:px-5 ${entry.active ? '' : 'bg-a-surface-2'}`}>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">{categoryLabel(entry.category)}</span>
-                  {!entry.active && <span className="rounded-full bg-amber-50 px-2 py-1 font-medium text-amber-800">En pause — Nala ne l’utilise pas</span>}
-                  <span className="text-gray-400">{sourceLabel(entry.source)} · {new Date(entry.created_at).toLocaleDateString('fr-FR')}</span>
+                  <span className="rounded-full bg-a-hover px-2 py-1 font-medium text-a-text-2">{categoryLabel(entry.category)}</span>
+                  {!entry.active && <span className="rounded-full bg-tone-warning-bg px-2 py-1 font-medium text-tone-warning-fg">En pause — Nala ne l’utilise pas</span>}
+                  <span className="text-a-text-3">{sourceLabel(entry.source)} · {new Date(entry.created_at).toLocaleDateString('fr-FR')}</span>
                 </div>
                 {isEditing ? (
                   <div className="mt-3 space-y-2">
@@ -265,33 +265,33 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
                     <textarea aria-label="Contenu" rows={4} maxLength={MAX_CONTENT} value={editing.content} onChange={(event) => setEditing({ ...editing, content: event.target.value })} className={INPUT_CLS} />
                     <div className="flex gap-2">
                       <button type="button" disabled={busyKey !== null || !editing.content.trim()} onClick={() => void patch(entry.id, { content: editing.content.trim(), category: editing.category }, 'Connaissance modifiée.')}
-                        className="min-h-11 rounded-lg bg-[var(--color-primary)] px-4 text-sm font-medium text-white disabled:opacity-50">{busyKey === entry.id ? 'Enregistrement…' : 'Enregistrer'}</button>
-                      <button type="button" onClick={() => setEditing(null)} className="min-h-11 rounded-lg border border-gray-200 px-4 text-sm text-gray-600">Annuler</button>
+                        className="min-h-11 rounded-lg bg-a-brand px-4 text-sm font-medium text-a-on-brand disabled:opacity-50">{busyKey === entry.id ? 'Enregistrement…' : 'Enregistrer'}</button>
+                      <button type="button" onClick={() => setEditing(null)} className="min-h-11 rounded-lg border border-a-border px-4 text-sm text-a-text-2">Annuler</button>
                     </div>
                   </div>
                 ) : (
                   <button type="button" onClick={() => setExpanded((prev) => { const next = new Set(prev); if (next.has(entry.id)) next.delete(entry.id); else next.add(entry.id); return next; })}
-                    aria-expanded={isOpen} className={`mt-2 block w-full whitespace-pre-line text-left text-sm leading-5 text-gray-700 ${isOpen ? '' : 'line-clamp-2'}`}>
+                    aria-expanded={isOpen} className={`mt-2 block w-full whitespace-pre-line text-left text-sm leading-5 text-a-text-2 ${isOpen ? '' : 'line-clamp-2'}`}>
                     {entry.content}
                   </button>
                 )}
                 {!isEditing && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     <button type="button" onClick={() => setEditing({ id: entry.id, category: entry.category, content: entry.content })}
-                      className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-gray-600 hover:bg-gray-100"><IconPencil size={14} /> Modifier</button>
+                      className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-a-text-2 hover:bg-a-hover"><IconPencil size={14} /> Modifier</button>
                     <button type="button" disabled={busyKey === entry.id} onClick={() => void patch(entry.id, { active: !entry.active }, entry.active ? 'Connaissance mise en pause.' : 'Connaissance réactivée.')}
-                      className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50">
+                      className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-a-text-2 hover:bg-a-hover disabled:opacity-50">
                       {entry.active ? <><IconPlayerPause size={14} /> Mettre en pause</> : <><IconPlayerPlay size={14} /> Réactiver</>}
                     </button>
                     <button type="button" onClick={() => setDeleteTarget(entry)}
-                      className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-red-600 hover:bg-red-50"><IconTrash size={14} /> Supprimer…</button>
+                      className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-tone-danger-fg hover:bg-tone-danger-bg"><IconTrash size={14} /> Supprimer…</button>
                   </div>
                 )}
               </li>
             );
           })}
           {visibleEntries.length === 0 && (
-            <li className="px-5 py-7 text-center text-sm text-gray-400">{entries.length === 0 ? 'Aucune connaissance pour le moment.' : 'Aucune connaissance ne correspond.'}</li>
+            <li className="px-5 py-7 text-center text-sm text-a-text-3">{entries.length === 0 ? 'Aucune connaissance pour le moment.' : 'Aucune connaissance ne correspond.'}</li>
           )}
         </ul>
       </section>

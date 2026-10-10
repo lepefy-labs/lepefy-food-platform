@@ -50,15 +50,15 @@ export default async function LoyaltyScanPage() {
   const loyalty = await getLoyaltySettings(adminClient, tenant.id);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+    <div className="min-h-screen bg-a-surface-2">
+      <header className="bg-a-surface border-b border-a-border px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         {tenant.logo_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={tenant.logo_url} alt={tenant.name} className="h-8 w-auto object-contain" />
         )}
         <div>
-          <span className="font-bold text-gray-900 text-sm">{tenant.name}</span>
-          <span className="ml-2 text-xs text-gray-500 font-medium uppercase tracking-wide">
+          <span className="font-bold text-a-text text-sm">{tenant.name}</span>
+          <span className="ml-2 text-xs text-a-text-3 font-medium uppercase tracking-wide">
             Scan fidélité
           </span>
         </div>

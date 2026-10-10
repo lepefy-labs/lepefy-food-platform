@@ -21,12 +21,12 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 function Stat({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: 'green' | 'red' | 'amber' }) {
-  const toneCls = tone === 'green' ? 'text-green-600' : tone === 'red' ? 'text-red-600' : tone === 'amber' ? 'text-amber-600' : 'text-gray-900 dark:text-gray-100';
+  const toneCls = tone === 'green' ? 'text-tone-success-fg' : tone === 'red' ? 'text-tone-danger-fg' : tone === 'amber' ? 'text-tone-warning-fg' : 'text-a-text';
   return (
     <div className="min-w-0">
-      <p className="text-2xs uppercase text-gray-400">{label}</p>
+      <p className="text-xs uppercase text-a-text-3">{label}</p>
       <p className={`text-lg font-semibold ${toneCls}`}>{value}</p>
-      {hint && <p className="text-2xs text-gray-400">{hint}</p>}
+      {hint && <p className="text-xs text-a-text-3">{hint}</p>}
     </div>
   );
 }
@@ -57,15 +57,15 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   return (
     <div>
       <div className="mb-5">
-        <Link href="/admin/platform/livraison/laboratoire" className="text-xs font-medium text-gray-500 hover:underline">← Laboratoire</Link>
-        <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">Campagne « {typedCampaign.name} »</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <Link href="/admin/platform/livraison/laboratoire" className="text-xs font-medium text-a-text-3 hover:underline">← Laboratoire</Link>
+        <h2 className="mt-1 text-lg font-semibold text-a-text">Campagne « {typedCampaign.name} »</h2>
+        <p className="text-sm text-a-text-3">
           {STATUS_LABEL[typedCampaign.status] ?? typedCampaign.status}{matrix.samplingMode ? ` · ${MODE_LABEL[matrix.samplingMode] ?? matrix.samplingMode}` : ''}
         </p>
       </div>
 
-      <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Vue d&apos;ensemble</h2>
+      <section className="bg-a-surface rounded-xl border border-a-border p-5 mb-6">
+        <h2 className="text-sm font-semibold text-a-text mb-3">Vue d&apos;ensemble</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <Stat label="CAP prévus" value={summary.plannedPostalCodes} hint={`${summary.plannedScenarios} scénarios`} />
           <Stat label="CAP complets" value={`${summary.completePostalCodes}/${summary.plannedPostalCodes}`} tone="green" hint="tous les scénarios couverts" />
@@ -75,9 +75,9 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           <Stat label="À traiter" value={summary.remaining} hint={summary.running > 0 ? `${summary.running} en cours` : undefined} />
         </div>
 
-        <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pt-4">
-          <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-1">Diagnostic des erreurs</h3>
-          <p className="text-2xs text-gray-400 mb-2">
+        <div className="mt-5 border-t border-a-border pt-4">
+          <h3 className="text-xs font-semibold text-a-text mb-1">Diagnostic des erreurs</h3>
+          <p className="text-xs text-a-text-3 mb-2">
             Scénarios sans devis valide, par motif — à examiner avant toute remesure. Les données d&apos;origine ne sont ni supprimées ni modifiées.
           </p>
           <CampaignErrorDiagnostic breakdown={summary.errorBreakdown} />
@@ -91,17 +91,17 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             disabled={campaignActive}
           />
           {campaignActive && summary.resampleCandidates > 0 && (
-            <p className="text-2xs text-gray-400">Remesure disponible une fois la campagne terminée ou annulée.</p>
+            <p className="text-xs text-a-text-3">Remesure disponible une fois la campagne terminée ou annulée.</p>
           )}
         </div>
         {coverage.itemsTruncated && (
-          <p className="mt-3 text-xs text-red-600">Nombre d&apos;items inattendu : la couverture affichée est partielle.</p>
+          <p className="mt-3 text-xs text-tone-danger-fg">Nombre d&apos;items inattendu : la couverture affichée est partielle.</p>
         )}
       </section>
 
-      <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Couverture par CAP</h2>
-        <p className="text-xs text-gray-400 mb-3">
+      <section className="bg-a-surface rounded-xl border border-a-border p-5">
+        <h2 className="text-sm font-semibold text-a-text mb-1">Couverture par CAP</h2>
+        <p className="text-xs text-a-text-3 mb-3">
           Un CAP est couvert uniquement par un devis valide de ce CAP et de cette configuration de colis. Les coûts sont des devis Packlink (base + taxes du service éligible le moins cher), pas des factures.
         </p>
         <CampaignCoverageTable rows={coverage.rows} postalCodes={coverage.postalCodes} />

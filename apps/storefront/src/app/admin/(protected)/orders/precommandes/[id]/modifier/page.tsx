@@ -21,7 +21,7 @@ export default async function EditPreorderPage({ params }: { params: { id: strin
   const reference = preorderReference(session.id)
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <Link href={`/admin/orders/precommandes/${session.id}`} className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400">
+      <Link href={`/admin/orders/precommandes/${session.id}`} className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 hover:bg-a-surface-2 hover:text-a-text">
         <IconArrowLeft size={17} /> {reference}
       </Link>
       <AdminPageHeader title={`Modifier ${reference}`} description="Articles, prix et livraison sont revalidés par le serveur à l’enregistrement." compact />

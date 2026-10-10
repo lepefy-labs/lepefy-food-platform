@@ -86,16 +86,16 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
     }
   }
 
-  const inputClass = 'mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-200';
-  const labelClass = 'text-xs font-semibold text-gray-700';
-  const errorInputClass = 'border-red-300 focus:border-red-400 focus:ring-red-100';
+  const inputClass = 'mt-1.5 w-full rounded-xl border border-a-border bg-a-surface px-3 py-2.5 text-sm text-a-text outline-none transition placeholder:text-a-text-3 focus:border-a-brand focus:ring-2 focus:ring-a-border';
+  const labelClass = 'text-xs font-semibold text-a-text-2';
+  const errorInputClass = 'border-tone-danger-border focus:border-tone-danger-solid focus:ring-tone-danger-border';
 
   return (
     <form onSubmit={onSubmit} noValidate className="mt-6 space-y-5">
       {confirmDialog}
-      <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
-        <span className="text-xs text-gray-400">Compte</span>
-        <p className="mt-0.5 break-all font-medium text-gray-800">{email}</p>
+      <div className="rounded-xl bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
+        <span className="text-xs text-a-text-3">Compte</span>
+        <p className="mt-0.5 break-all font-medium text-a-text">{email}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -109,7 +109,7 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
             value={form.firstName}
             onChange={(event) => updateField('firstName', event.target.value)}
           />
-          {fieldErrors.firstName && <span id="first-name-error" className="mt-1.5 block text-[11px] font-medium text-red-600">{fieldErrors.firstName}</span>}
+          {fieldErrors.firstName && <span id="first-name-error" className="mt-1.5 block text-xs font-medium text-tone-danger-fg">{fieldErrors.firstName}</span>}
         </label>
 
         <label className={labelClass}>Nom <span aria-hidden="true">*</span>
@@ -122,11 +122,11 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
             value={form.lastName}
             onChange={(event) => updateField('lastName', event.target.value)}
           />
-          {fieldErrors.lastName && <span id="last-name-error" className="mt-1.5 block text-[11px] font-medium text-red-600">{fieldErrors.lastName}</span>}
+          {fieldErrors.lastName && <span id="last-name-error" className="mt-1.5 block text-xs font-medium text-tone-danger-fg">{fieldErrors.lastName}</span>}
         </label>
       </div>
 
-      <div className="border-t border-gray-100 pt-1">
+      <div className="border-t border-a-border pt-1">
         <label className={labelClass}>Nom affiché <span aria-hidden="true">*</span>
           <input
             maxLength={60}
@@ -137,12 +137,12 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
             onChange={(event) => updateField('nickname', event.target.value)}
             placeholder="Ex. Robertin, Marie, Équipe caisse"
           />
-          <span id="nickname-help" className="mt-1.5 block text-[11px] font-normal leading-4 text-gray-400">Visible dans l’interface et les historiques opérationnels.</span>
-          {fieldErrors.nickname && <span id="nickname-error" className="mt-1 block text-[11px] font-medium text-red-600">{fieldErrors.nickname}</span>}
+          <span id="nickname-help" className="mt-1.5 block text-xs font-normal leading-4 text-a-text-3">Visible dans l’interface et les historiques opérationnels.</span>
+          {fieldErrors.nickname && <span id="nickname-error" className="mt-1 block text-xs font-medium text-tone-danger-fg">{fieldErrors.nickname}</span>}
         </label>
       </div>
 
-      <label className={labelClass}>Téléphone <span className="font-normal text-gray-400">(optionnel)</span>
+      <label className={labelClass}>Téléphone <span className="font-normal text-a-text-3">(optionnel)</span>
         <input
           autoComplete="tel"
           inputMode="tel"
@@ -154,7 +154,7 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
         />
       </label>
 
-      {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">{error}</p>}
+      {error && <p className="rounded-xl bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg" role="alert">{error}</p>}
 
       {editing ? (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -162,16 +162,16 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
             type="button"
             disabled={saving}
             onClick={onCancel}
-            className="flex min-h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-h-11 items-center justify-center rounded-xl border border-a-border bg-a-surface px-4 text-sm font-semibold text-a-text-2 transition hover:bg-a-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Annuler
           </button>
-          <button type="submit" disabled={saving} className="flex min-h-11 items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={saving} className="flex min-h-11 items-center justify-center rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand transition hover:bg-a-brand disabled:cursor-not-allowed disabled:opacity-60">
             {saving ? 'Enregistrement…' : 'Enregistrer le profil'}
           </button>
         </div>
       ) : (
-        <button type="submit" disabled={saving} className="flex min-h-11 w-full items-center justify-center rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">
+        <button type="submit" disabled={saving} className="flex min-h-11 w-full items-center justify-center rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand transition hover:bg-a-brand disabled:cursor-not-allowed disabled:opacity-60">
           {saving ? 'Enregistrement…' : 'Terminer la configuration'}
         </button>
       )}

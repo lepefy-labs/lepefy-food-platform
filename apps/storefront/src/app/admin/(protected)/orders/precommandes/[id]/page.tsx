@@ -13,7 +13,7 @@ export default function PreorderDetailPage({
 }) {
   return (
     <div className="mx-auto w-full max-w-6xl pb-10">
-      <Link href="/admin/orders/precommandes" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400">
+      <Link href="/admin/orders/precommandes" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 hover:bg-a-surface-2 hover:text-a-text">
         <IconArrowLeft size={17} /> Précommandes
       </Link>
       <PreorderDetailClient

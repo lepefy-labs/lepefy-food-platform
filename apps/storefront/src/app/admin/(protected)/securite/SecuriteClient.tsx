@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createBrowserClient } from '@supabase/ssr';
 
 const INPUT_CLS =
-  'w-full text-sm px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
+  'w-full text-sm px-3 py-2 rounded-lg border border-a-border focus:outline-none focus:ring-2 focus:ring-a-focus';
 
 type Status = 'idle' | 'saving' | 'done' | 'session-error';
 
@@ -47,11 +47,11 @@ export default function SecuriteClient() {
 
   if (status === 'session-error') {
     return (
-      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-        <p className="text-sm text-red-500 mb-3">
+      <div className="rounded-xl border border-a-border bg-a-surface p-5">
+        <p className="text-sm text-tone-danger-fg mb-3">
           Erreur lors de la mise à jour du mot de passe. Votre session a peut-être expiré.
         </p>
-        <Link href="/admin/login" className="text-sm text-[var(--color-primary)] font-medium">
+        <Link href="/admin/login" className="text-sm text-a-brand-fg font-medium">
           Retour à la connexion
         </Link>
       </div>
@@ -59,10 +59,10 @@ export default function SecuriteClient() {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+    <div className="rounded-xl border border-a-border bg-a-surface p-5">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-400" htmlFor="password">
+          <label className="text-xs font-medium text-a-text-2" htmlFor="password">
             Nouveau mot de passe
           </label>
           <input
@@ -77,7 +77,7 @@ export default function SecuriteClient() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-400" htmlFor="confirmPassword">
+          <label className="text-xs font-medium text-a-text-2" htmlFor="confirmPassword">
             Confirmer le mot de passe
           </label>
           <input
@@ -91,16 +91,16 @@ export default function SecuriteClient() {
           />
         </div>
 
-        {errorMsg && <p className="text-xs text-red-500">{errorMsg}</p>}
+        {errorMsg && <p className="text-xs text-tone-danger-fg">{errorMsg}</p>}
         {status === 'done' && (
-          <p className="text-xs text-green-600">Mot de passe mis à jour avec succès.</p>
+          <p className="text-xs text-tone-success-fg">Mot de passe mis à jour avec succès.</p>
         )}
 
         <button
           type="submit"
           disabled={status === 'saving'}
           className="w-full py-2 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-          style={{ backgroundColor: 'var(--color-primary)' }}
+          style={{ backgroundColor: 'var(--admin-primary)' }}
         >
           {status === 'saving' ? 'Enregistrement…' : 'Mettre à jour le mot de passe'}
         </button>

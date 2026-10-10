@@ -6,9 +6,9 @@ import { IconDeviceDesktop, IconDeviceMobile, IconSend } from '@tabler/icons-rea
 import type { TemplatePreview } from '@/lib/notifications/templateCatalog';
 
 const AUDIENCE_CLS: Record<TemplatePreview['audience'], string> = {
-  Client: 'bg-sky-50 text-sky-700 ring-sky-200',
-  'Équipe du tenant': 'bg-amber-50 text-amber-700 ring-amber-200',
-  Plateforme: 'bg-violet-50 text-violet-700 ring-violet-200',
+  Client: 'bg-tone-info-bg text-tone-info-fg ring-tone-info-border',
+  'Équipe du tenant': 'bg-tone-warning-bg text-tone-warning-fg ring-tone-warning-border',
+  Plateforme: 'bg-a-brand-soft text-a-brand-fg ring-a-border',
 };
 
 export default function TemplatePreviewBrowser({ previews, tenantName }: { previews: TemplatePreview[]; tenantName: string }) {
@@ -24,22 +24,22 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
   if (!selected) return null;
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+    <section className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Modèles d’emails</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h2 className="text-xl font-semibold text-a-text">Modèles d’emails</h2>
+          <p className="mt-1 text-sm text-a-text-3">
             {previews.length} emails rendus avec les modèles de production et l’identité de {tenantName}, sur des données fictives. Aucun envoi.
           </p>
         </div>
-        <Link href="/admin/platform/notifications/tests" className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-[var(--admin-primary)] hover:opacity-80">
+        <Link href="/admin/platform/notifications/tests" className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-a-brand-fg hover:opacity-80">
           <IconSend size={17} />Envoyer un test réel
         </Link>
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="lg:hidden">
-          <select value={selected.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900" aria-label="Modèle">
+          <select value={selected.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm" aria-label="Modèle">
             {groups.map(([group, items]) => (
               <optgroup key={group} label={group}>
                 {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -48,19 +48,19 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
           </select>
         </div>
 
-        <nav className="hidden max-h-[760px] overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800 lg:block" aria-label="Modèles">
+        <nav className="hidden max-h-[760px] overflow-y-auto rounded-xl border border-a-border lg:block" aria-label="Modèles">
           {groups.map(([group, items]) => (
             <div key={group}>
-              <p className="sticky top-0 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:border-gray-800 dark:bg-gray-800">{group}</p>
+              <p className="sticky top-0 border-b border-a-border bg-a-surface-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">{group}</p>
               {items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedId(item.id)}
                   aria-current={item.id === selected.id ? 'true' : undefined}
-                  className={`block w-full border-b border-gray-100 px-3 py-2.5 text-left text-sm transition last:border-b-0 dark:border-gray-800 ${item.id === selected.id
-                    ? 'bg-[var(--admin-primary-soft)] font-semibold text-[var(--admin-primary-fg)] shadow-[inset_3px_0_0_var(--admin-primary)]'
-                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60'}`}
+                  className={`block w-full border-b border-a-border px-3 py-2.5 text-left text-sm transition last:border-b-0 ${item.id === selected.id
+                    ? 'bg-a-brand-soft font-semibold text-a-brand-fg shadow-[inset_3px_0_0_var(--admin-primary)]'
+                    : 'text-a-text-2 hover:bg-a-surface-2'}`}
                 >
                   {item.label}
                 </button>
@@ -70,16 +70,16 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
         </nav>
 
         <div className="min-w-0">
-          <div className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-xl border border-a-border p-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs text-gray-500">Objet</p>
-              <p className="break-words font-semibold text-gray-900 dark:text-gray-100">{selected.subject}</p>
+              <p className="text-xs text-a-text-3">Objet</p>
+              <p className="break-words font-semibold text-a-text">{selected.subject}</p>
               <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${AUDIENCE_CLS[selected.audience]}`}>Destinataire : {selected.audience}</span>
             </div>
-            <div className="flex shrink-0 rounded-lg border border-gray-200 p-0.5 dark:border-gray-700" role="group" aria-label="Largeur d’aperçu">
+            <div className="flex shrink-0 rounded-lg border border-a-border p-0.5" role="group" aria-label="Largeur d’aperçu">
               {(['desktop', 'mobile'] as const).map((value) => (
                 <button key={value} type="button" onClick={() => setDevice(value)} aria-pressed={device === value}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${device === value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-600 dark:text-gray-300'}`}>
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${device === value ? 'bg-a-inverse text-a-on-inverse' : 'text-a-text-2'}`}>
                   {value === 'desktop' ? <IconDeviceDesktop size={15} /> : <IconDeviceMobile size={15} />}
                   {value === 'desktop' ? 'Ordinateur' : 'Mobile'}
                 </button>
@@ -87,7 +87,7 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
             </div>
           </div>
           {/* mx-auto (not justify-center) so a preview wider than the panel scrolls instead of being clipped on the left. */}
-          <div className="mt-4 overflow-x-auto rounded-xl bg-gray-100 p-4 dark:bg-gray-950">
+          <div className="mt-4 overflow-x-auto rounded-xl bg-a-hover p-4">
             {/* No scripts, no same-origin access: the preview is inert HTML. */}
             <iframe
               key={`${selected.id}-${device}`}

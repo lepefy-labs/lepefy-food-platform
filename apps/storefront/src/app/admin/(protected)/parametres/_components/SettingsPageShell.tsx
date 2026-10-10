@@ -25,13 +25,13 @@ export function SettingsPageShell({ sectionKey, description, children }: Setting
         </aside>
 
         <div className="min-w-0">
-          <Link href="/admin/parametres" className="-ml-2 mb-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-gray-600 hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:text-gray-300 dark:hover:text-white lg:hidden">
+          <Link href="/admin/parametres" className="-ml-2 mb-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-a-text-2 hover:text-a-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus lg:hidden">
             <IconChevronLeft size={18} aria-hidden="true" />Paramètres
           </Link>
 
           <nav aria-label="Fil d’Ariane" className="mb-2 hidden lg:block">
-            <ol className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-              <li><Link href="/admin/parametres" className="rounded hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:hover:text-gray-100">Paramètres</Link></li>
+            <ol className="flex items-center gap-1.5 text-sm text-a-text-3">
+              <li><Link href="/admin/parametres" className="rounded hover:text-a-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus">Paramètres</Link></li>
               <li aria-hidden="true">/</li>
               <li>{group.label}</li>
             </ol>
@@ -40,8 +40,8 @@ export function SettingsPageShell({ sectionKey, description, children }: Setting
           <header className="mb-6 flex items-start gap-4">
             <SettingsIconTile icon={section.icon} accent={section.accent} size="lg" />
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight text-gray-950 dark:text-gray-100 sm:text-2xl">{section.title}</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">{description ?? section.description}</p>
+              <h1 className="text-xl font-semibold tracking-tight text-a-text sm:text-2xl">{section.title}</h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-a-text-3">{description ?? section.description}</p>
             </div>
           </header>
 

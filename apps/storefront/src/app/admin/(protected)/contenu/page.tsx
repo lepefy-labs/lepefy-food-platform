@@ -28,13 +28,13 @@ export default async function ContenuPage() {
         countries_served={tenant.countries_served}
       />
 
-      {canManageSlides && <Link href="/admin/accueil-slides" className="flex min-h-16 items-center gap-4 rounded-2xl border border-gray-200 bg-white px-5 py-4 hover:border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700">
+      {canManageSlides && <Link href="/admin/accueil-slides" className="flex min-h-16 items-center gap-4 rounded-2xl border border-a-border bg-a-surface px-5 py-4 hover:border-a-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus">
         <SettingsIconTile icon={IconPhoto} accent="fuchsia" />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-gray-950 dark:text-gray-100">Slides d’accueil</span>
-          <span className="block text-sm text-gray-500 dark:text-gray-400">Bannières du carrousel de la page d’accueil.</span>
+          <span className="block text-sm font-semibold text-a-text">Slides d’accueil</span>
+          <span className="block text-sm text-a-text-3">Bannières du carrousel de la page d’accueil.</span>
         </span>
-        <IconChevronRight size={18} aria-hidden="true" className="shrink-0 text-gray-300" />
+        <IconChevronRight size={18} aria-hidden="true" className="shrink-0 text-a-text-3" />
       </Link>}
     </div>
   );

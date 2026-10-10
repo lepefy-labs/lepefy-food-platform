@@ -34,7 +34,7 @@ export default function InquiryList({
               type="button"
               onClick={() => onSelect(inquiry.id)}
               aria-pressed={selected}
-              className={`grid w-full grid-cols-[minmax(180px,1.2fr)_minmax(150px,1fr)_110px_80px_100px_110px] items-center gap-3 px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-a-focus ${selected ? 'bg-[var(--admin-primary-soft)]/60' : 'hover:bg-a-surface-2'}`}
+              className={`grid w-full grid-cols-[minmax(180px,1.2fr)_minmax(150px,1fr)_110px_80px_100px_110px] items-center gap-3 px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-a-focus ${selected ? 'bg-a-brand-soft' : 'hover:bg-a-surface-2'}`}
             >
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold text-a-text">{inquiry.customer_name}</span>

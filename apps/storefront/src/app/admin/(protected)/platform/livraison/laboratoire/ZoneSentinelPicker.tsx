@@ -81,48 +81,48 @@ export function ZoneSentinelPicker({
   }
 
   if (zones.length === 0) {
-    return <p className="text-xs text-amber-700">Aucune zone active : configurez les zones dans « Tarification » pour utiliser la couverture par zone.</p>;
+    return <p className="text-xs text-tone-warning-fg">Aucune zone active : configurez les zones dans « Tarification » pour utiliser la couverture par zone.</p>;
   }
 
   const selectedCount = (plans ?? []).filter((p) => selected.has(p.zoneCode ?? UNZONED_KEY)).reduce((sum, p) => sum + p.sentinels.length, 0);
 
   return (
-    <div className="rounded-xl border border-gray-200 p-3 space-y-3">
-      <p className="text-xs text-gray-500">
+    <div className="rounded-xl border border-a-border p-3 space-y-3">
+      <p className="text-xs text-a-text-3">
         Les devis Packlink sont identiques pour tous les CAP d&apos;une même zone (le prix dépend du poids et des dimensions).
         On mesure donc quelques CAP témoins par zone, choisis automatiquement et répartis dans la zone.
       </p>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-xs text-gray-500">
+        <label className="text-xs text-a-text-3">
           Pays
-          <select value={country} onChange={(e) => setCountry(e.target.value)} className="mt-0.5 block border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-900">
+          <select value={country} onChange={(e) => setCountry(e.target.value)} className="mt-0.5 block border border-a-border rounded-lg px-2 py-1.5 text-sm bg-a-surface text-a-text">
             {countries.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <label className="text-xs text-gray-500">
+        <label className="text-xs text-a-text-3">
           CAP témoins par zone
-          <select value={perZone} onChange={(e) => setPerZone(Number(e.target.value))} className="mt-0.5 block border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-900">
+          <select value={perZone} onChange={(e) => setPerZone(Number(e.target.value))} className="mt-0.5 block border border-a-border rounded-lg px-2 py-1.5 text-sm bg-a-surface text-a-text">
             {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-600 pb-2">
+        <label className="flex items-center gap-1.5 text-xs text-a-text-2 pb-2">
           <input type="checkbox" checked={includeUnzoned} onChange={(e) => setIncludeUnzoned(e.target.checked)} />
           Inclure les CAP hors zone
         </label>
-        <button type="button" onClick={() => void loadPlan()} disabled={loading} className="min-h-10 px-3 py-1.5 text-xs rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50">
+        <button type="button" onClick={() => void loadPlan()} disabled={loading} className="min-h-10 px-3 py-1.5 text-xs rounded-lg border border-a-brand text-a-brand-fg disabled:opacity-50">
           {loading ? 'Préparation…' : plans ? 'Recalculer' : 'Proposer les CAP témoins'}
         </button>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-tone-danger-fg">{error}</p>}
 
       {plans && (
         <>
-          <p className="text-2xs text-gray-400">{selectedCount} CAP témoin(s) sélectionné(s). CAP génériques d&apos;avant réforme et CAP déjà refusés par Packlink exclus automatiquement.</p>
+          <p className="text-xs text-a-text-3">{selectedCount} CAP témoin(s) sélectionné(s). CAP génériques d&apos;avant réforme et CAP déjà refusés par Packlink exclus automatiquement.</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                <tr className="text-left text-xs font-medium text-a-text-3 uppercase tracking-wide border-b border-a-border">
                   <th className="py-1.5 pr-2" /><th className="py-1.5 pr-3">Zone</th><th className="py-1.5 pr-3">CAP témoins</th><th className="py-1.5 pr-3">CAP connus</th><th className="py-1.5 pr-3">Exclus</th>
                 </tr>
               </thead>
@@ -131,16 +131,16 @@ export function ZoneSentinelPicker({
                   const key = plan.zoneCode ?? UNZONED_KEY;
                   const disabled = plan.sentinels.length === 0;
                   return (
-                    <tr key={key} className={`border-b border-gray-50 align-top ${disabled ? 'opacity-50' : ''}`}>
+                    <tr key={key} className={`border-b border-a-border align-top ${disabled ? 'opacity-50' : ''}`}>
                       <td className="py-1.5 pr-2">
                         <input type="checkbox" aria-label={`Inclure ${plan.zoneCode ?? 'hors zone'}`} checked={selected.has(key)} disabled={disabled} onChange={() => toggle(key)} />
                       </td>
                       <td className="py-1.5 pr-3 font-medium">{plan.zoneCode ?? 'Hors zone'}</td>
-                      <td className="py-1.5 pr-3 text-gray-600">
+                      <td className="py-1.5 pr-3 text-a-text-2">
                         {plan.sentinels.length === 0 ? '—' : plan.sentinels.map((s) => `${s.postalCode} ${s.city}`).join(' · ')}
                       </td>
-                      <td className="py-1.5 pr-3 text-gray-400">{plan.candidates}</td>
-                      <td className="py-1.5 pr-3 text-2xs text-gray-400">
+                      <td className="py-1.5 pr-3 text-a-text-3">{plan.candidates}</td>
+                      <td className="py-1.5 pr-3 text-xs text-a-text-3">
                         {[plan.excludedGeneric > 0 ? `${plan.excludedGeneric} génériques` : null, plan.excludedRejected > 0 ? `${plan.excludedRejected} refusés` : null].filter(Boolean).join(' · ') || '—'}
                       </td>
                     </tr>

@@ -68,9 +68,9 @@ export function PromoteAmbassadorSection() {
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-200">Nommer un ambassadeur</h2>
-      <p className="mb-4 text-xs text-gray-400">
+    <section className="rounded-xl border border-a-border bg-a-surface p-5">
+      <h2 className="mb-1 text-sm font-semibold text-a-text-2">Nommer un ambassadeur</h2>
+      <p className="mb-4 text-xs text-a-text-3">
         Seul un administrateur peut nommer un ambassadeur. Le client doit déjà avoir un compte sur la boutique.
       </p>
 
@@ -82,27 +82,27 @@ export function PromoteAmbassadorSection() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Nom ou e-mail…"
-          className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="flex-1 rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
         />
         <Button type="submit" loading={isSearching}>Rechercher</Button>
       </form>
 
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
-      {results && results.length === 0 && <p className="text-sm text-gray-400">Aucun client trouvé.</p>}
+      {results && results.length === 0 && <p className="text-sm text-a-text-3">Aucun client trouvé.</p>}
 
       {results && results.length > 0 && (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        <ul className="divide-y divide-a-border">
           {results.map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-xs">
               <div className="min-w-0">
-                <div className="font-medium text-gray-800 dark:text-gray-100">{c.full_name ?? '—'}</div>
-                <div className="truncate text-gray-400">{c.email}</div>
+                <div className="font-medium text-a-text">{c.full_name ?? '—'}</div>
+                <div className="truncate text-a-text-3">{c.email}</div>
               </div>
               {c.is_ambassador
-                ? <span className="shrink-0 text-green-700">Déjà ambassadeur</span>
+                ? <span className="shrink-0 text-tone-success-fg">Déjà ambassadeur</span>
                 : <Button size="sm" onClick={() => void handlePromote(c)} loading={pendingId === c.id}>Nommer ambassadeur</Button>}
             </li>
           ))}

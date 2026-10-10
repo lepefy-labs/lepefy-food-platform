@@ -12,7 +12,7 @@ export default async function AdminPacklinkDiagnosticPage() {
 
   return (
     <div>
-      <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+      <p className="mb-5 text-sm text-a-text-3">
         Expéditions visibles avec la clé Packlink PRO du tenant, puis inspection d&apos;une expédition via les endpoints shipment, tracking et labels. Lecture seule.
       </p>
       <PacklinkWorkspace shippingProvider={tenant.shipping_provider} />

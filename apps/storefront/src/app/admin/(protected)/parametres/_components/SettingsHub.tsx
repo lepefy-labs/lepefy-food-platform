@@ -102,7 +102,7 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
       <div role="search" className="mb-8">
         <label htmlFor={inputId} className="sr-only">Rechercher un paramètre</label>
         <div className="relative">
-          <IconSearch size={19} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <IconSearch size={19} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-a-text-3" />
           <input
             ref={inputRef}
             id={inputId}
@@ -113,10 +113,10 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
             placeholder="Rechercher un paramètre…"
             autoComplete="off"
             aria-describedby={statusId}
-            className="min-h-12 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-12 text-sm text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-12 w-full rounded-xl border border-a-border bg-a-surface pl-11 pr-12 text-sm text-a-text shadow-sm outline-none transition placeholder:text-a-text-3 focus:border-transparent focus:ring-2 focus:ring-a-focus [&::-webkit-search-cancel-button]:hidden"
           />
           {searching && (
-            <button type="button" onClick={() => { setQuery(''); inputRef.current?.focus(); }} aria-label="Effacer la recherche" className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:hover:text-gray-200">
+            <button type="button" onClick={() => { setQuery(''); inputRef.current?.focus(); }} aria-label="Effacer la recherche" className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-a-text-3 hover:text-a-text-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus">
               <IconX size={17} />
             </button>
           )}
@@ -126,25 +126,25 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
         </p>
 
         {searching && (
-          <div className="mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="mt-2 overflow-hidden rounded-xl border border-a-border bg-a-surface shadow-sm">
             {results.length > 0 ? (
-              <ul ref={listRef} aria-label="Résultats de recherche" className="divide-y divide-gray-100 dark:divide-gray-800">
+              <ul ref={listRef} aria-label="Résultats de recherche" className="divide-y divide-a-border">
                 {results.map((result, index) => (
                   <li key={result.id}>
-                    <Link href={result.href} onKeyDown={(event) => onResultKeyDown(event, index)} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-primary)] dark:hover:bg-white/5 dark:focus-visible:bg-white/5">
+                    <Link href={result.href} onKeyDown={(event) => onResultKeyDown(event, index)} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-a-surface-2 focus-visible:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-a-focus">
                       <SettingsIconTile icon={result.icon} accent={result.accent} size="sm" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-gray-950 dark:text-gray-100">{result.title}</span>
-                        <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{result.category}</span>
+                        <span className="block truncate text-sm font-medium text-a-text">{result.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-a-text-3">{result.category}</span>
                       </span>
-                      <span className="hidden max-w-[45%] truncate text-xs text-gray-400 sm:block">{result.description}</span>
-                      <IconChevronRight size={16} aria-hidden="true" className="shrink-0 text-gray-300" />
+                      <span className="hidden max-w-[45%] truncate text-xs text-a-text-3 sm:block">{result.description}</span>
+                      <IconChevronRight size={16} aria-hidden="true" className="shrink-0 text-a-text-3" />
                     </Link>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="px-4 py-5 text-sm text-gray-500 dark:text-gray-400">Aucun paramètre ne correspond à « {query.trim()} ».</p>
+              <p className="px-4 py-5 text-sm text-a-text-3">Aucun paramètre ne correspond à « {query.trim()} ».</p>
             )}
           </div>
         )}
@@ -153,20 +153,20 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
       <div className="space-y-8" hidden={searching}>
         {SETTINGS_GROUPS.map((group) => (
           <section key={group.key} aria-labelledby={`settings-group-${group.key}`}>
-            <h2 id={`settings-group-${group.key}`} className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{group.label}</h2>
-            <ul className="overflow-hidden rounded-2xl border border-gray-200 bg-white max-md:divide-y max-md:divide-gray-100 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent dark:border-gray-800 dark:bg-gray-900 max-md:dark:divide-gray-800 md:dark:bg-transparent">
+            <h2 id={`settings-group-${group.key}`} className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">{group.label}</h2>
+            <ul className="overflow-hidden rounded-2xl border border-a-border bg-a-surface max-md:divide-y max-md:divide-a-border md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent">
               {group.sections.map((section) => {
                 const status = statuses[section.key];
                 return (
                   <li key={section.key}>
-                    <Link href={section.href} className="group flex h-full min-h-16 items-center gap-4 px-4 py-3.5 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-primary)] md:rounded-2xl md:border md:border-gray-200 md:bg-white md:p-5 md:hover:border-gray-300 md:hover:shadow-sm dark:hover:bg-white/5 md:dark:border-gray-800 md:dark:bg-gray-900 md:dark:hover:border-gray-700">
+                    <Link href={section.href} className="group flex h-full min-h-16 items-center gap-4 px-4 py-3.5 transition hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-a-focus md:rounded-2xl md:border md:border-a-border md:bg-a-surface md:p-5 md:hover:border-a-border-strong md:hover:shadow-sm">
                       <SettingsIconTile icon={section.icon} accent={section.accent} />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-gray-950 dark:text-gray-100">{section.title}</span>
-                        <span className="mt-0.5 hidden text-sm leading-5 text-gray-500 dark:text-gray-400 sm:block">{section.description}</span>
+                        <span className="block text-sm font-semibold text-a-text">{section.title}</span>
+                        <span className="mt-0.5 hidden text-sm leading-5 text-a-text-3 sm:block">{section.description}</span>
                         {status && <span className="mt-1.5 block"><SettingsStatusBadge status={status} /></span>}
                       </span>
-                      <IconChevronRight size={18} aria-hidden="true" className="shrink-0 text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-gray-500" />
+                      <IconChevronRight size={18} aria-hidden="true" className="shrink-0 text-a-text-3 transition group-hover:translate-x-0.5 group-hover:text-a-text-3" />
                     </Link>
                   </li>
                 );
@@ -175,17 +175,17 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
           </section>
         ))}
 
-        <section aria-labelledby="settings-related" className="border-t border-gray-200 pt-6 dark:border-gray-800">
-          <h2 id="settings-related" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">Ailleurs dans l’administration</h2>
+        <section aria-labelledby="settings-related" className="border-t border-a-border pt-6">
+          <h2 id="settings-related" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">Ailleurs dans l’administration</h2>
           <ul className="grid gap-2 sm:grid-cols-2">
             {RELATED_DESTINATIONS.map((item) => {
               const visual = RELATED_VISUALS[item.href] ?? { icon: IconFileText, accent: 'blue' as const };
               return (
                 <li key={item.href}>
-                  <Link href={item.href} className="flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-white hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white">
+                  <Link href={item.href} className="flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 text-sm text-a-text-2 hover:bg-a-surface hover:text-a-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus">
                     <SettingsIconTile icon={visual.icon} accent={visual.accent} size="sm" />
-                    <span className="min-w-0 flex-1"><span className="font-medium">{item.title}</span><span className="block truncate text-xs text-gray-500 dark:text-gray-400">{item.description}</span></span>
-                    <IconChevronRight size={16} aria-hidden="true" className="shrink-0 text-gray-300" />
+                    <span className="min-w-0 flex-1"><span className="font-medium">{item.title}</span><span className="block truncate text-xs text-a-text-3">{item.description}</span></span>
+                    <IconChevronRight size={16} aria-hidden="true" className="shrink-0 text-a-text-3" />
                   </Link>
                 </li>
               );

@@ -86,26 +86,26 @@ export default async function AdminReviewsPage({ searchParams }: { searchParams:
   return <div className="mx-auto w-full max-w-6xl pb-10">
     <AdminPageHeader title="Avis clients" description="Collectez des avis de service uniquement après une commande payée et terminée, puis modérez-les sans modifier le texte du client." meta={featureSetting?.enabled ? 'Collecte active' : 'Collecte désactivée'} />
     <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Note publiée</p><p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{stats?.average_rating ? Number(stats.average_rating).toFixed(1) : '—'}</p></div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Avis publiés</p><p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{Number(stats?.published_count ?? 0)}</p></div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">À modérer</p><p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{pendingResult.count ?? 0}</p></div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Conversion invitations</p><p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{sentCount ? `${Math.round((completedCount/sentCount)*100)}%` : '—'}</p><p className="mt-1 text-xs text-gray-400">{completedCount}/{sentCount} envoyées</p></div>
+      <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">Note publiée</p><p className="mt-2 text-2xl font-bold text-a-text">{stats?.average_rating ? Number(stats.average_rating).toFixed(1) : '—'}</p></div>
+      <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">Avis publiés</p><p className="mt-2 text-2xl font-bold text-a-text">{Number(stats?.published_count ?? 0)}</p></div>
+      <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">À modérer</p><p className="mt-2 text-2xl font-bold text-a-text">{pendingResult.count ?? 0}</p></div>
+      <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">Conversion invitations</p><p className="mt-2 text-2xl font-bold text-a-text">{sentCount ? `${Math.round((completedCount/sentCount)*100)}%` : '—'}</p><p className="mt-1 text-xs text-a-text-3">{completedCount}/{sentCount} envoyées</p></div>
     </div>
 
-    <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Statut</span>
-      {[['','Tous'],['pending_moderation','À modérer'],['published','Publiés'],['rejected','Rejetés'],['hidden','Masqués']].map(([value,label]) => <Link key={value} href={filterHref({ status: value, page: 1 })} aria-current={status === value ? 'page' : undefined} className={`rounded-lg px-3 py-2 text-sm font-medium ${status === value ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}>{label}{statusCounts[value ?? ''] != null && <span className={`ml-1.5 rounded-full px-1.5 text-xs ${value === 'pending_moderation' && (statusCounts[value] ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>{statusCounts[value ?? '']}</span>}</Link>)}
-      <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Note</span>
-      {[0,1,2,3,4,5].map((value) => <Link key={value} href={filterHref({ rating: value, page: 1 })} className={`rounded-lg px-2.5 py-2 text-sm font-medium ${rating === value ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'}`}>{value ? `${value}★` : 'Toutes'}</Link>)}
+    <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-a-border bg-a-surface p-3 shadow-sm">
+      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-a-text-3">Statut</span>
+      {[['','Tous'],['pending_moderation','À modérer'],['published','Publiés'],['rejected','Rejetés'],['hidden','Masqués']].map(([value,label]) => <Link key={value} href={filterHref({ status: value, page: 1 })} aria-current={status === value ? 'page' : undefined} className={`rounded-lg px-3 py-2 text-sm font-medium ${status === value ? 'bg-a-brand-soft text-a-brand-fg' : 'text-a-text-2 hover:bg-a-surface-2'}`}>{label}{statusCounts[value ?? ''] != null && <span className={`ml-1.5 rounded-full px-1.5 text-xs ${value === 'pending_moderation' && (statusCounts[value] ?? 0) > 0 ? 'bg-tone-warning-bg text-tone-warning-fg' : 'bg-a-hover text-a-text-3'}`}>{statusCounts[value ?? '']}</span>}</Link>)}
+      <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-a-text-3">Note</span>
+      {[0,1,2,3,4,5].map((value) => <Link key={value} href={filterHref({ rating: value, page: 1 })} className={`rounded-lg px-2.5 py-2 text-sm font-medium ${rating === value ? 'bg-a-brand-soft text-a-brand-fg' : 'text-a-text-2 hover:bg-a-surface-2'}`}>{value ? `${value}★` : 'Toutes'}</Link>)}
     </div>
 
     <ReviewAdminClient publishedCount={publishedCount} initialReviews={reviews} enabled={featureSetting?.enabled ?? false} publicDisplay={settings.publicDisplay} minPublicCount={settings.minPublicCount} blacklistTerms={settings.blacklistTerms} canModerate={canModerate} canManage={canManage} />
 
     {totalPages > 1 && <nav className="mt-6 flex items-center justify-between text-sm" aria-label="Pagination avis">
-      <span className="text-gray-500">Page {page} sur {totalPages} · {total} avis</span>
+      <span className="text-a-text-3">Page {page} sur {totalPages} · {total} avis</span>
       <div className="flex gap-2">
-        {page > 1 && <Link className="min-h-11 rounded-xl border border-gray-200 px-4 py-2.5 font-semibold text-gray-700" href={filterHref({ page: page - 1 })}>Précédent</Link>}
-        {page < totalPages && <Link className="min-h-11 rounded-xl bg-[var(--admin-primary)] px-4 py-2.5 font-semibold text-white" href={filterHref({ page: page + 1 })}>Suivant</Link>}
+        {page > 1 && <Link className="min-h-11 rounded-xl border border-a-border px-4 py-2.5 font-semibold text-a-text-2" href={filterHref({ page: page - 1 })}>Précédent</Link>}
+        {page < totalPages && <Link className="min-h-11 rounded-xl bg-a-brand px-4 py-2.5 font-semibold text-a-on-brand" href={filterHref({ page: page + 1 })}>Suivant</Link>}
       </div>
     </nav>}
   </div>;

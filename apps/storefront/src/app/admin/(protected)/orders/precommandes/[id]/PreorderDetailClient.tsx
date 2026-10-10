@@ -51,8 +51,8 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   failed: 'échec d’envoi',
 };
 
-const inputClass = 'min-h-11 w-full rounded-xl border border-[var(--admin-border)] bg-white px-3 text-base text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 sm:text-sm';
-const cardClass = 'rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5';
+const inputClass = 'min-h-11 w-full rounded-xl border border-a-border bg-a-surface px-3 text-base text-a-text outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
+const cardClass = 'rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5';
 
 function dateTime(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -129,10 +129,10 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
   }
 
   if (loadError) {
-    return <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{loadError}</p>;
+    return <p className="rounded-xl bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg" role="alert">{loadError}</p>;
   }
   if (!data) {
-    return <p className="flex items-center gap-2 py-12 text-sm text-gray-500"><IconLoader2 size={16} className="animate-spin" /> Chargement…</p>;
+    return <p className="flex items-center gap-2 py-12 text-sm text-a-text-3"><IconLoader2 size={16} className="animate-spin" /> Chargement…</p>;
   }
 
   const { preorder, actions, events, tenantName, currency, canManage } = data;
@@ -150,8 +150,8 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
     : preorder.status === 'expired' ? 'issue_link'
       : preorder.status === 'draft' ? (preorder.shippingPending ? 'edit' : 'issue_link') : null;
   const buttonTone = (key: 'confirm' | 'issue_link' | 'edit') => key === primary
-    ? 'bg-[var(--admin-primary)] text-white hover:opacity-90'
-    : 'border border-[var(--admin-border)] text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-200';
+    ? 'bg-a-brand text-a-on-brand hover:opacity-90'
+    : 'border border-a-border text-a-text-2 hover:bg-a-surface-2';
   const hoursLeft = preorder.status === 'open' ? (Date.parse(preorder.expiresAt) - now.getTime()) / 3_600_000 : null;
   const verifying = preorder.status === 'awaiting_verification';
   const payMessage = preorder.payUrl
@@ -187,32 +187,32 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
   return (
     <div className="space-y-4">
       {notice === 'created' && !info && (
-        <p className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+        <p className="flex items-center gap-2 rounded-xl border border-tone-success-border bg-tone-success-bg px-3 py-2.5 text-sm text-tone-success-fg">
           <IconCircleCheck size={18} /> Précommande enregistrée{preorder.payUrl ? ' — envoyez maintenant le lien au client.' : '.'}
         </p>
       )}
       {notice === 'updated' && !info && (
-        <p className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-800">
+        <p className="flex items-center gap-2 rounded-xl border border-tone-info-border bg-tone-info-bg px-3 py-2.5 text-sm text-tone-info-fg">
           <IconCheck size={18} /> Modifications enregistrées. La précommande est en brouillon : générez un nouveau lien pour la faire payer.
         </p>
       )}
-      {info && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" role="status">{info}</p>}
-      {error && <p className="flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700" role="alert"><IconAlertTriangle size={18} className="mt-0.5 shrink-0" />{error}</p>}
+      {info && <p className="rounded-xl border border-tone-success-border bg-tone-success-bg px-3 py-2.5 text-sm text-tone-success-fg" role="status">{info}</p>}
+      {error && <p className="flex items-start gap-2 rounded-xl bg-tone-danger-bg px-3 py-2.5 text-sm text-tone-danger-fg" role="alert"><IconAlertTriangle size={18} className="mt-0.5 shrink-0" />{error}</p>}
 
       <header className={`${cardClass} flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between`}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-mono text-xl font-semibold text-gray-950 dark:text-gray-100">{preorder.reference}</h1>
+            <h1 className="font-mono text-xl font-semibold text-a-text">{preorder.reference}</h1>
             <PreorderStatusBadge status={preorder.status} />
           </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-a-text-3">
             {preorder.salesChannel ? SALES_CHANNEL_LABELS[preorder.salesChannel] : '—'} · créée {formatSince(preorder.createdAt, now)}{preorder.createdBy ? ` par ${preorder.createdBy}` : ''}
           </p>
-          {preorder.status === 'open' && <p className="mt-1 text-xs text-gray-500">Lien valable jusqu’au {dateTime(preorder.expiresAt)}{hoursLeft !== null && hoursLeft > 0 ? ` (dans ${formatOperationalDuration(hoursLeft)})` : ''} · prix garantis jusqu’à cette date</p>}
+          {preorder.status === 'open' && <p className="mt-1 text-xs text-a-text-3">Lien valable jusqu’au {dateTime(preorder.expiresAt)}{hoursLeft !== null && hoursLeft > 0 ? ` (dans ${formatOperationalDuration(hoursLeft)})` : ''} · prix garantis jusqu’à cette date</p>}
         </div>
         <div className="text-left sm:text-right">
-          <p className="text-xs uppercase tracking-wide text-gray-400">Total</p>
-          <p className="text-2xl font-semibold text-gray-950 dark:text-gray-100">{formatPrice(preorder.totals.total, currency)}</p>
+          <p className="text-xs uppercase tracking-wide text-a-text-3">Total</p>
+          <p className="text-2xl font-semibold text-a-text">{formatPrice(preorder.totals.total, currency)}</p>
         </div>
       </header>
 
@@ -221,12 +221,12 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
           {/* Paiement / actions principales */}
           {preorder.order ? (
             <section className={cardClass}>
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300"><IconCircleCheck size={18} /> Commande {preorder.order.number}</h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Le paiement est confirmé : la commande suit le parcours normal (préparation, expédition, suivi).</p>
-              <Link href={`/admin/orders/${preorder.order.id}`} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white">Ouvrir la commande <IconExternalLink size={16} /></Link>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-tone-success-fg"><IconCircleCheck size={18} /> Commande {preorder.order.number}</h2>
+              <p className="mt-1 text-sm text-a-text-2">Le paiement est confirmé : la commande suit le parcours normal (préparation, expédition, suivi).</p>
+              <Link href={`/admin/orders/${preorder.order.id}`} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand">Ouvrir la commande <IconExternalLink size={16} /></Link>
               {preorder.order.trackingLink && (
                 <div className="mt-4">
-                  <p className="mb-2 text-xs text-gray-500">{preorder.email ? 'Lien de suivi client :' : 'Le client n’a pas d’e-mail : partagez-lui le lien de suivi.'}</p>
+                  <p className="mb-2 text-xs text-a-text-3">{preorder.email ? 'Lien de suivi client :' : 'Le client n’a pas d’e-mail : partagez-lui le lien de suivi.'}</p>
                   <ShareLinkActions
                     url={preorder.order.trackingLink} phone={preorder.phone} copyLabel="Copier le lien de suivi"
                     message={buildTrackingShareMessage({ customerName: preorder.fullName, orderNumber: preorder.order.number, url: preorder.order.trackingLink, tenantName })}
@@ -235,35 +235,35 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
               )}
             </section>
           ) : preorder.status === 'cancelled' ? (
-            <section className={cardClass}><p className="text-sm text-gray-600">Précommande annulée. Aucun paiement n’est possible.</p></section>
+            <section className={cardClass}><p className="text-sm text-a-text-2">Précommande annulée. Aucun paiement n’est possible.</p></section>
           ) : (
             <section className={cardClass}>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Prochaine action</p>
-              <h2 className="mt-1 text-base font-semibold text-gray-950 dark:text-gray-100">{operation.group === 'waiting' ? 'Attendre le paiement du client' : operation.action.label}</h2>
-              {operation.warning && <p className="mt-1 flex items-start gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.warning}</p>}
-              {operation.context && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{operation.context}</p>}
-              {!canManage && <p role="status" className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-950/40 dark:text-gray-300"><strong>Lecture seule.</strong> La gestion des précommandes nécessite le droit « commandes : gérer ».</p>}
+              <p className="text-xs font-bold uppercase tracking-wide text-a-brand-fg">Prochaine action</p>
+              <h2 className="mt-1 text-base font-semibold text-a-text">{operation.group === 'waiting' ? 'Attendre le paiement du client' : operation.action.label}</h2>
+              {operation.warning && <p className="mt-1 flex items-start gap-1.5 text-xs font-semibold text-tone-warning-fg"><IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />{operation.warning}</p>}
+              {operation.context && <p className="mt-1 text-xs text-a-text-3">{operation.context}</p>}
+              {!canManage && <p role="status" className="mt-3 rounded-xl bg-a-surface-2 px-3 py-2 text-xs text-a-text-2"><strong>Lecture seule.</strong> La gestion des précommandes nécessite le droit « commandes : gérer ».</p>}
 
               {verifying && preorder.declaredPayment && (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                <div className="mt-3 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-sm text-tone-warning-fg">
                   <p className="font-semibold">Paiement déclaré : {preorder.declaredPayment.label ?? preorder.declaredPayment.method}</p>
                   <p className="mt-1 text-xs">Déclaré le {dateTime(preorder.declaredPayment.declaredAt)}{preorder.declaredPayment.reference ? ` · réf. ${preorder.declaredPayment.reference}` : ''}. Vérifiez la réception sur votre compte avant de confirmer.</p>
                 </div>
               )}
 
               {preorder.shippingPending && (
-                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">Frais de livraison non calculés : modifiez la précommande avant d’envoyer un lien.</p>
+                <p className="mt-3 rounded-xl bg-tone-warning-bg px-3 py-2 text-sm text-tone-warning-fg">Frais de livraison non calculés : modifiez la précommande avant d’envoyer un lien.</p>
               )}
 
               {preorder.payUrl && actions.includes('share_link') && (
                 <div className="mt-3">
-                  <p className="mb-2 text-xs text-gray-500">Lien de paiement (version {preorder.payLinkVersion}) — à envoyer au client :</p>
+                  <p className="mb-2 text-xs text-a-text-3">Lien de paiement (version {preorder.payLinkVersion}) — à envoyer au client :</p>
                   <ShareLinkActions url={preorder.payUrl} phone={preorder.phone} message={payMessage} />
                 </div>
               )}
 
               {preorder.status === 'expired' && (
-                <p className="mt-3 rounded-xl bg-orange-50 px-3 py-2 text-sm text-orange-800">Le lien a expiré. Un nouveau lien revérifie disponibilité, prix et livraison.</p>
+                <p className="mt-3 rounded-xl bg-tone-urgent-bg px-3 py-2 text-sm text-tone-urgent-fg">Le lien a expiré. Un nouveau lien revérifie disponibilité, prix et livraison.</p>
               )}
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -279,7 +279,7 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
                   </button>
                 )}
                 {can('reopen') && (
-                  <button type="button" onClick={() => run('reopen', `/api/admin/assisted-orders/${preorderId}/reopen`)} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--admin-border)] px-4 text-sm font-semibold text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
+                  <button type="button" onClick={() => run('reopen', `/api/admin/assisted-orders/${preorderId}/reopen`)} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-a-border px-4 text-sm font-semibold text-a-text-2 disabled:opacity-50">
                     <IconArrowBackUp size={16} /> Paiement non reçu : remettre en attente
                   </button>
                 )}
@@ -291,39 +291,39 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
               </div>
 
               {paymentForm && (
-                <div className="mt-4 space-y-3 rounded-xl border border-emerald-200 p-3 dark:border-emerald-900">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                <div className="mt-4 space-y-3 rounded-xl border border-tone-success-border p-3">
+                  <p className="text-sm font-semibold text-a-text">
                     {verifying ? 'Confirmer l’encaissement déclaré' : 'Enregistrer un encaissement reçu'} · {formatPrice(preorder.totals.total, currency)}
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {!verifying && (
-                      <label className="text-xs text-gray-500">Moyen *
+                      <label className="text-xs text-a-text-3">Moyen *
                         <select value={paidMethod} onChange={(e) => setPaidMethod(e.target.value as ManualPaymentMethod)} className={`${inputClass} mt-1`}>
                           {MANUAL_PAYMENT_METHODS.map((method) => <option key={method} value={method}>{MANUAL_PAYMENT_METHOD_LABELS[method]}</option>)}
                         </select>
                       </label>
                     )}
-                    <label className="text-xs text-gray-500">Date de réception *<input type="datetime-local" value={paidAt} max={nowLocalInput()} onChange={(e) => setPaidAt(e.target.value)} className={`${inputClass} mt-1`} /></label>
-                    <label className="text-xs text-gray-500">Référence<input value={paidReference} onChange={(e) => setPaidReference(e.target.value)} className={`${inputClass} mt-1`} /></label>
-                    <label className="text-xs text-gray-500">Note<input value={paidNote} onChange={(e) => setPaidNote(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                    <label className="text-xs text-a-text-3">Date de réception *<input type="datetime-local" value={paidAt} max={nowLocalInput()} onChange={(e) => setPaidAt(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                    <label className="text-xs text-a-text-3">Référence<input value={paidReference} onChange={(e) => setPaidReference(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                    <label className="text-xs text-a-text-3">Note<input value={paidNote} onChange={(e) => setPaidNote(e.target.value)} className={`${inputClass} mt-1`} /></label>
                   </div>
-                  <label className={`flex min-h-11 items-center gap-2 text-sm ${preorder.email ? '' : 'text-gray-400'}`}>
+                  <label className={`flex min-h-11 items-center gap-2 text-sm ${preorder.email ? '' : 'text-a-text-3'}`}>
                     <input type="checkbox" className="h-5 w-5" checked={Boolean(preorder.email) && notifyCustomer} disabled={!preorder.email} onChange={(e) => setNotifyCustomer(e.target.checked)} />
                     {preorder.email ? 'Envoyer le récapitulatif de commande par e-mail' : 'Pas d’e-mail : lien de suivi à partager après confirmation'}
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={confirmPayment} disabled={Boolean(busy) || !paidAt} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+                    <button type="button" onClick={confirmPayment} disabled={Boolean(busy) || !paidAt} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-tone-success-solid px-4 text-sm font-semibold text-white disabled:opacity-50">
                       {busy === 'confirm' ? <IconLoader2 size={16} className="animate-spin" /> : <IconCheck size={16} />} Confirmer et créer la commande
                     </button>
-                    <button type="button" onClick={() => setPaymentForm(false)} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-gray-600">Fermer</button>
+                    <button type="button" onClick={() => setPaymentForm(false)} className="min-h-11 rounded-xl px-4 text-sm font-semibold text-a-text-2">Fermer</button>
                   </div>
-                  <p className="text-xs text-gray-500">Action tracée avec votre identité. Une seule commande peut être créée pour cette précommande.</p>
+                  <p className="text-xs text-a-text-3">Action tracée avec votre identité. Une seule commande peut être créée pour cette précommande.</p>
                 </div>
               )}
 
               {can('cancel') && (
-                <div className="mt-4 border-t border-[var(--admin-border)] pt-3 dark:border-gray-800">
-                  <button type="button" onClick={() => setCancelOpen(true)} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/30">
+                <div className="mt-4 border-t border-a-border pt-3">
+                  <button type="button" onClick={() => setCancelOpen(true)} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-tone-danger-fg hover:bg-tone-danger-bg focus-visible:outline-2 focus-visible:outline-tone-danger-solid disabled:opacity-50">
                     <IconX size={16} aria-hidden="true" /> Annuler la précommande
                   </button>
                 </div>
@@ -333,19 +333,19 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
 
           {/* Articles */}
           <section className={cardClass}>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Produits</h2>
-            <ul className="mt-2 divide-y divide-[var(--admin-border)] dark:divide-gray-800">
+            <h2 className="text-sm font-semibold text-a-text">Produits</h2>
+            <ul className="mt-2 divide-y divide-a-border">
               {preorder.items.map((item) => (
                 <li key={item.productId} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <span className="min-w-0"><span className="font-medium text-gray-900 dark:text-gray-100">{item.name}</span><span className="text-gray-500"> · {item.quantity} × {formatPrice(item.price, currency)}</span></span>
+                  <span className="min-w-0"><span className="font-medium text-a-text">{item.name}</span><span className="text-a-text-3"> · {item.quantity} × {formatPrice(item.price, currency)}</span></span>
                   <span className="font-semibold">{formatPrice(item.price * item.quantity, currency)}</span>
                 </li>
               ))}
             </ul>
-            <dl className="mt-2 space-y-1 border-t border-[var(--admin-border)] pt-2 text-sm dark:border-gray-800">
-              <div className="flex justify-between"><dt className="text-gray-500">Articles</dt><dd>{formatPrice(preorder.totals.subtotal, currency)}</dd></div>
-              {preorder.totals.discount > 0 && <div className="flex justify-between text-emerald-700"><dt>Remise</dt><dd>−{formatPrice(preorder.totals.discount, currency)}</dd></div>}
-              <div className="flex justify-between"><dt className="text-gray-500">{preorder.fulfillmentType === 'pickup' ? 'Retrait' : 'Livraison'}</dt><dd>{preorder.shippingPending ? 'À calculer' : formatPrice(preorder.totals.shippingTotal, currency)}</dd></div>
+            <dl className="mt-2 space-y-1 border-t border-a-border pt-2 text-sm">
+              <div className="flex justify-between"><dt className="text-a-text-3">Articles</dt><dd>{formatPrice(preorder.totals.subtotal, currency)}</dd></div>
+              {preorder.totals.discount > 0 && <div className="flex justify-between text-tone-success-fg"><dt>Remise</dt><dd>−{formatPrice(preorder.totals.discount, currency)}</dd></div>}
+              <div className="flex justify-between"><dt className="text-a-text-3">{preorder.fulfillmentType === 'pickup' ? 'Retrait' : 'Livraison'}</dt><dd>{preorder.shippingPending ? 'À calculer' : formatPrice(preorder.totals.shippingTotal, currency)}</dd></div>
               <div className="flex justify-between font-bold"><dt>Total</dt><dd>{formatPrice(preorder.totals.total, currency)}</dd></div>
             </dl>
           </section>
@@ -353,31 +353,31 @@ export default function PreorderDetailClient({ preorderId, notice }: { preorderI
 
         <div className="space-y-4">
           <section className={cardClass}>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Client</h2>
+            <h2 className="text-sm font-semibold text-a-text">Client</h2>
             <p className="mt-2 text-sm font-medium">{preorder.fullName ?? '—'}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-300">{preorder.phone ?? 'Téléphone absent'}</p>
-            <p className="break-all text-sm text-gray-600 dark:text-gray-300">{preorder.email ?? 'E-mail absent'}</p>
-            {preorder.customerId && <Link href={`/admin/clients/${preorder.customerId}`} className="mt-2 inline-flex min-h-9 items-center text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">Fiche client →</Link>}
-            <div className="mt-3 flex items-start gap-2 rounded-xl bg-[var(--admin-surface-subtle)] p-3 text-sm dark:bg-gray-950/40">
+            <p className="text-sm text-a-text-2">{preorder.phone ?? 'Téléphone absent'}</p>
+            <p className="break-all text-sm text-a-text-2">{preorder.email ?? 'E-mail absent'}</p>
+            {preorder.customerId && <Link href={`/admin/clients/${preorder.customerId}`} className="mt-2 inline-flex min-h-9 items-center text-xs font-semibold text-a-brand-fg hover:underline">Fiche client →</Link>}
+            <div className="mt-3 flex items-start gap-2 rounded-xl bg-a-surface-2 p-3 text-sm">
               {preorder.fulfillmentType === 'pickup' ? <IconBuildingStore size={17} className="mt-0.5 shrink-0" /> : <IconMapPin size={17} className="mt-0.5 shrink-0" />}
               {preorder.fulfillmentType === 'pickup' || !preorder.shippingAddress ? <span>Retrait en magasin</span> : (
                 <span>{preorder.shippingAddress.full_name}<br />{preorder.shippingAddress.line1}{preorder.shippingAddress.line2 ? `, ${preorder.shippingAddress.line2}` : ''}<br />{preorder.shippingAddress.postal_code} {preorder.shippingAddress.city} · {preorder.shippingAddress.country}</span>
               )}
             </div>
-            {preorder.adminNote && <p className="mt-3 whitespace-pre-wrap rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200"><strong className="block text-xs">Note interne</strong>{preorder.adminNote}</p>}
+            {preorder.adminNote && <p className="mt-3 whitespace-pre-wrap rounded-xl bg-tone-warning-bg p-3 text-sm text-tone-warning-fg"><strong className="block text-xs">Note interne</strong>{preorder.adminNote}</p>}
           </section>
 
           <section className={cardClass}>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Historique</h2>
-            {events.length === 0 ? <p className="mt-2 text-sm text-gray-400">Aucun événement.</p> : (
+            <h2 className="text-sm font-semibold text-a-text">Historique</h2>
+            {events.length === 0 ? <p className="mt-2 text-sm text-a-text-3">Aucun événement.</p> : (
               <ol className="mt-3 space-y-3">
                 {events.map((event) => {
                   const detail = eventDetail(event.event_type, event.detail ?? {}, currency);
                   return (
                     <li key={event.id} className="border-l-2 border-[var(--admin-primary-soft)] pl-3">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{EVENT_LABELS[event.event_type] ?? event.event_type}</p>
-                      {detail && <p className="text-xs text-gray-600 dark:text-gray-300">{detail}</p>}
-                      <p className="text-[11px] text-gray-400"><time dateTime={event.created_at} title={dateTime(event.created_at)}>{formatSince(event.created_at, now)}</time> · {event.actor_type === 'customer' ? 'client' : event.actor_type === 'system' ? 'automatique' : 'équipe'}</p>
+                      <p className="text-sm font-medium text-a-text">{EVENT_LABELS[event.event_type] ?? event.event_type}</p>
+                      {detail && <p className="text-xs text-a-text-2">{detail}</p>}
+                      <p className="text-xs text-a-text-3"><time dateTime={event.created_at} title={dateTime(event.created_at)}>{formatSince(event.created_at, now)}</time> · {event.actor_type === 'customer' ? 'client' : event.actor_type === 'system' ? 'automatique' : 'équipe'}</p>
                     </li>
                   );
                 })}

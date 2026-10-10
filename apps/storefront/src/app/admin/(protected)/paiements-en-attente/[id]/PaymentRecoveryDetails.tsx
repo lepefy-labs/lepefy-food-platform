@@ -73,7 +73,7 @@ export default function PaymentRecoveryDetails({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-[var(--admin-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border bg-a-surface px-4 text-sm font-semibold text-a-text-2 shadow-sm transition-colors hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus"
       >
         <IconEye size={18} /> Voir le détail de l’achat
       </button>
@@ -87,57 +87,57 @@ export default function PaymentRecoveryDetails({
       >
             <div>
               <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-2xl border border-[var(--admin-border)] p-4 dark:border-gray-800">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={16} /> Client</div>
-                  <p className="mt-3 font-bold text-gray-950 dark:text-white">{customer.name}</p>
-                  <a href={`mailto:${customer.email}`} className="mt-2 flex min-h-8 items-center gap-2 break-all text-sm text-[var(--admin-primary-fg)] hover:underline">
+                <section className="rounded-2xl border border-a-border p-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconUser size={16} /> Client</div>
+                  <p className="mt-3 font-bold text-a-text">{customer.name}</p>
+                  <a href={`mailto:${customer.email}`} className="mt-2 flex min-h-8 items-center gap-2 break-all text-sm text-a-brand-fg hover:underline">
                     <IconMail size={16} className="shrink-0" /> {customer.email}
                   </a>
                   {customer.phone ? (
-                    <a href={`tel:${customer.phone}`} className="mt-1 flex min-h-8 items-center gap-2 text-sm text-[var(--admin-primary-fg)] hover:underline">
+                    <a href={`tel:${customer.phone}`} className="mt-1 flex min-h-8 items-center gap-2 text-sm text-a-brand-fg hover:underline">
                       <IconPhone size={16} className="shrink-0" /> {customer.phone}
                     </a>
                   ) : (
-                    <p className="mt-1 text-sm text-gray-400">Téléphone non renseigné</p>
+                    <p className="mt-1 text-sm text-a-text-3">Téléphone non renseigné</p>
                   )}
                 </section>
 
-                <section className="rounded-2xl border border-[var(--admin-border)] p-4 dark:border-gray-800">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconTruck size={16} /> Remise</div>
-                  <p className="mt-3 font-bold text-gray-950 dark:text-white">{fulfillmentType === 'pickup' ? 'Click & Collect' : 'Livraison'}</p>
+                <section className="rounded-2xl border border-a-border p-4">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconTruck size={16} /> Remise</div>
+                  <p className="mt-3 font-bold text-a-text">{fulfillmentType === 'pickup' ? 'Click & Collect' : 'Livraison'}</p>
                   {fulfillmentType === 'delivery' ? (
                     addressLines.length > 0 ? (
-                      <div className="mt-2 flex items-start gap-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                      <div className="mt-2 flex items-start gap-2 text-sm leading-6 text-a-text-2">
                         <IconMapPin size={17} className="mt-1 shrink-0" />
                         <div>{addressLines.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)}</div>
                       </div>
-                    ) : <p className="mt-2 text-sm text-gray-400">Adresse non renseignée</p>
+                    ) : <p className="mt-2 text-sm text-a-text-3">Adresse non renseignée</p>
                   ) : (
-                    <p className="mt-2 text-sm text-gray-500">Retrait prévu en boutique.</p>
+                    <p className="mt-2 text-sm text-a-text-3">Retrait prévu en boutique.</p>
                   )}
                 </section>
               </div>
 
-              <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--admin-border)] dark:border-gray-800">
-                <div className="flex items-center gap-2 border-b border-[var(--admin-border)] bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-800 dark:bg-gray-950/50">
+              <section className="mt-4 overflow-hidden rounded-2xl border border-a-border">
+                <div className="flex items-center gap-2 border-b border-a-border bg-a-surface-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-a-text-3">
                   <IconWallet size={16} /> Articles et total
                 </div>
-                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                <div className="divide-y divide-a-border">
                   {items.map((item, index) => (
                     <div key={`${item.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-4 py-3 text-sm">
                       <div className="min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{item.name}</p>
-                        <p className="mt-0.5 text-xs text-gray-500">{item.quantity} × {formatMoney(item.price, currency)}</p>
+                        <p className="font-medium text-a-text">{item.name}</p>
+                        <p className="mt-0.5 text-xs text-a-text-3">{item.quantity} × {formatMoney(item.price, currency)}</p>
                       </div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">{formatMoney(item.price * item.quantity, currency)}</p>
+                      <p className="font-semibold text-a-text">{formatMoney(item.price * item.quantity, currency)}</p>
                     </div>
                   ))}
                 </div>
-                <div className="space-y-2 border-t border-[var(--admin-border)] bg-gray-50 px-4 py-4 text-sm dark:border-gray-800 dark:bg-gray-950/50">
-                  <div className="flex justify-between gap-4"><span className="text-gray-500">Sous-total</span><span>{formatMoney(subtotal, currency)}</span></div>
-                  <div className="flex justify-between gap-4"><span className="text-gray-500">Livraison</span><span>{formatMoney(shippingTotal, currency)}</span></div>
-                  {discountTotal > 0 && <div className="flex justify-between gap-4"><span className="text-gray-500">Réduction</span><span>− {formatMoney(discountTotal, currency)}</span></div>}
-                  <div className="flex justify-between gap-4 border-t border-gray-200 pt-3 text-base font-bold dark:border-gray-700"><span>Total</span><span>{formatMoney(total, currency)}</span></div>
+                <div className="space-y-2 border-t border-a-border bg-a-surface-2 px-4 py-4 text-sm">
+                  <div className="flex justify-between gap-4"><span className="text-a-text-3">Sous-total</span><span>{formatMoney(subtotal, currency)}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-a-text-3">Livraison</span><span>{formatMoney(shippingTotal, currency)}</span></div>
+                  {discountTotal > 0 && <div className="flex justify-between gap-4"><span className="text-a-text-3">Réduction</span><span>− {formatMoney(discountTotal, currency)}</span></div>}
+                  <div className="flex justify-between gap-4 border-t border-a-border pt-3 text-base font-bold"><span>Total</span><span>{formatMoney(total, currency)}</span></div>
                 </div>
               </section>
             </div>

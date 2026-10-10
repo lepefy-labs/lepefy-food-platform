@@ -33,12 +33,12 @@ export default async function ParametresPaiementsPage() {
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {moduleLegend.map(({ label, detail, icon: Icon }) => (
             <li key={label} className="flex items-start gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><Icon size={17} stroke={1.6} aria-hidden="true" /></span>
-              <span><span className="block text-sm font-medium text-gray-900 dark:text-gray-100">{label}</span><span className="mt-0.5 block text-xs leading-4 text-gray-500 dark:text-gray-400">{detail}</span></span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-a-hover text-a-text-2"><Icon size={17} stroke={1.6} aria-hidden="true" /></span>
+              <span><span className="block text-sm font-medium text-a-text">{label}</span><span className="mt-0.5 block text-xs leading-4 text-a-text-3">{detail}</span></span>
             </li>
           ))}
         </ul>
-        <p className="mt-4 border-t border-gray-100 pt-3 text-xs leading-5 text-gray-500 dark:border-gray-800 dark:text-gray-400">
+        <p className="mt-4 border-t border-a-border pt-3 text-xs leading-5 text-a-text-3">
           Cette configuration agit uniquement sur la disponibilité des moyens de paiement. Aucun checkout, webhook ou flux transactionnel n&apos;est modifié ici.
         </p>
       </SettingsPanel>

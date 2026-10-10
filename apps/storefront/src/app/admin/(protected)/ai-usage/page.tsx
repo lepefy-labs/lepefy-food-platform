@@ -73,20 +73,20 @@ export default async function TenantAiUsagePage() {
     <div className="mx-auto w-full max-w-5xl space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Abonnement</p>
-          <h1 className="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Utilisation IA</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-a-brand-fg">Abonnement</p>
+          <h1 className="mt-1 text-xl font-semibold text-a-text">Utilisation IA</h1>
+          <p className="mt-1 text-sm text-a-text-3">
             Suivez l’utilisation des fonctionnalités d’intelligence artificielle incluses pour {tenant.name}.
           </p>
         </div>
-        <span className="w-fit rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+        <span className="w-fit rounded-full bg-a-brand-soft px-3 py-1 text-xs font-semibold text-a-brand-fg">
           Incluse dans l’abonnement
         </span>
       </header>
 
       <TenantAiUsageHistory months={months} />
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-a-text-3">
         Les fournisseurs, modèles, tokens et coûts techniques restent gérés par Lepefy et ne sont pas exposés dans cet espace.
       </p>
     </div>

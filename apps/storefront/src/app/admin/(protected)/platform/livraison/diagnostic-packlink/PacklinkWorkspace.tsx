@@ -17,7 +17,7 @@ export function PacklinkWorkspace({ shippingProvider }: { shippingProvider: Ship
       )}
 
       <div className="space-y-3">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Diagnostic par référence</h2>
+        <h2 className="text-base font-semibold text-a-text">Diagnostic par référence</h2>
         <PacklinkDiagnostic shippingProvider={shippingProvider} request={request} />
       </div>
     </div>

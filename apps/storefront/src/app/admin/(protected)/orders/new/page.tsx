@@ -12,7 +12,7 @@ export default async function NewAssistedOrderPage({ searchParams = {} }: { sear
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <Link href="/admin" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400">
+      <Link href="/admin" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 hover:bg-a-surface-2 hover:text-a-text">
         <IconArrowLeft size={17} /> Commandes
       </Link>
       <AdminPageHeader

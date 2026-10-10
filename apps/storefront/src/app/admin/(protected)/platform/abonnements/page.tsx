@@ -21,7 +21,7 @@ export default async function PlatformSubscriptionsPage() {
         meta={data ? `${data.rows.length} tenant${data.rows.length !== 1 ? 's' : ''}` : undefined}
       />
       {!data ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Abonnements indisponibles. Réessayez.</p>
+        <p className="rounded-xl border border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">Abonnements indisponibles. Réessayez.</p>
       ) : (
         <AbonnementsClient initialRows={data.rows} schemaReady={data.schemaReady} />
       )}

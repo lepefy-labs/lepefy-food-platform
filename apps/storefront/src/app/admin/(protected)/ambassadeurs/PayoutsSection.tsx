@@ -110,36 +110,36 @@ export function PayoutsSection({ candidates, payoutThreshold, currency }: {
   const total = candidates.reduce((sum, c) => sum + c.balance, 0);
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
+    <section className="rounded-xl border border-a-border bg-a-surface p-5">
+      <h2 className="mb-1 text-sm font-semibold text-a-text-2">
         À verser{candidates.length > 0 ? ` · ${formatPrice(total, currency)}` : ''}
       </h2>
-      <p className="mb-4 text-xs text-gray-400">
+      <p className="mb-4 text-xs text-a-text-3">
         Aucun versement automatique : vous payez par virement ou PayPal, puis vous l&apos;enregistrez ici.
         Seuil conseillé : {formatPrice(payoutThreshold, currency)}.
       </p>
 
-      {message && <p role="status" className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">{message}</p>}
+      {message && <p role="status" className="mb-3 rounded-lg bg-tone-success-bg px-3 py-2 text-xs text-tone-success-fg">{message}</p>}
 
       {candidates.length === 0 ? (
-        <p className="text-sm text-gray-400">Aucune commission à verser.</p>
+        <p className="text-sm text-a-text-3">Aucune commission à verser.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        <ul className="divide-y divide-a-border">
           {candidates.map((c) => {
             const state = payoutState(c.balance, payoutThreshold, c.profileComplete);
             return (
               <li key={c.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 text-xs">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{ambassadorDisplayName(c)}</p>
-                  <p className="text-gray-500">
+                  <p className="text-sm font-medium text-a-text">{ambassadorDisplayName(c)}</p>
+                  <p className="text-a-text-3">
                     {formatPrice(c.balance, currency)} · {c.commissionIds.length} commission{c.commissionIds.length > 1 ? 's' : ''}
                     {c.destination && <> · {c.destination.label} {c.destination.masked}</>}
                   </p>
                   {state === 'profile_incomplete' && (
-                    <p className="text-amber-700">Profil incomplet : l&apos;ambassadeur doit renseigner nom, prénom et IBAN ou PayPal dans son compte.</p>
+                    <p className="text-tone-warning-fg">Profil incomplet : l&apos;ambassadeur doit renseigner nom, prénom et IBAN ou PayPal dans son compte.</p>
                   )}
-                  {state === 'below_threshold' && <p className="text-gray-400">Sous le seuil conseillé.</p>}
-                  {state === 'ready' && <p className="font-medium text-green-700">Prêt à verser</p>}
+                  {state === 'below_threshold' && <p className="text-a-text-3">Sous le seuil conseillé.</p>}
+                  {state === 'ready' && <p className="font-medium text-tone-success-fg">Prêt à verser</p>}
                 </div>
                 <Button
                   size="sm"

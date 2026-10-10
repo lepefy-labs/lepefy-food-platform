@@ -59,7 +59,7 @@ export default function EventTicketingTab({
   }
 
   const editor = (submit: (e: React.FormEvent) => void, submitLabel: string) => (
-    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-[var(--admin-primary-soft)] bg-[var(--admin-primary-soft)]/30 p-4 sm:grid-cols-2">
+    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-a-border bg-a-brand-soft p-4 sm:grid-cols-2">
       <label className="text-xs font-semibold text-a-text-2">Libellé<input value={draft.label} onChange={(e) => setDraft((prev) => ({ ...prev, label: e.target.value }))} className={`${inputClass} mt-1`} required /></label>
       <label className="text-xs font-semibold text-a-text-2">Prix<input value={draft.price} onChange={(e) => setDraft((prev) => ({ ...prev, price: e.target.value }))} className={`${inputClass} mt-1`} inputMode="decimal" required /></label>
       <label className="text-xs font-semibold text-a-text-2 sm:col-span-2">Description<input value={draft.description} onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))} className={`${inputClass} mt-1`} /></label>

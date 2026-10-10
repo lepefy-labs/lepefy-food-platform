@@ -103,17 +103,17 @@ export default async function PlatformAiUsagePage() {
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Plateforme</p>
-          <h1 className="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Coûts IA</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-a-brand-fg">Plateforme</p>
+          <h1 className="mt-1 text-xl font-semibold text-a-text">Coûts IA</h1>
+          <p className="mt-1 text-sm text-a-text-3">
             Suivi des coûts provider pour {tenant.name}. Cette vue est réservée à Lepefy.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+          <span className="rounded-xl border border-a-border bg-a-surface px-3 py-2 text-xs font-semibold text-a-text-2 shadow-sm">
             12 derniers mois
           </span>
-          <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <span className="rounded-xl border border-tone-success-border bg-tone-success-bg px-3 py-2 text-xs font-semibold text-tone-success-fg">
             IA incluse · $0 facturé au tenant
           </span>
         </div>
@@ -121,7 +121,7 @@ export default async function PlatformAiUsagePage() {
 
       <AiCostHistoryChart points={historyPoints} />
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-a-text-3">
         Les coûts restent des données internes de unit economics. Aucun quota, overage ou supplément IA n’est appliqué au tenant aujourd’hui.
       </p>
     </div>

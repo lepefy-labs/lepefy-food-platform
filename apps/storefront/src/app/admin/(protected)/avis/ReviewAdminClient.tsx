@@ -37,10 +37,10 @@ export interface AdminReviewRow {
 }
 
 const STATUS_TONE: Record<AdminReviewRow['status'], string> = {
-  pending_moderation: 'bg-amber-50 text-amber-800',
-  published: 'bg-emerald-50 text-emerald-800',
-  rejected: 'bg-red-50 text-red-700',
-  hidden: 'bg-gray-100 text-gray-600',
+  pending_moderation: 'bg-tone-warning-bg text-tone-warning-fg',
+  published: 'bg-tone-success-bg text-tone-success-fg',
+  rejected: 'bg-tone-danger-bg text-tone-danger-fg',
+  hidden: 'bg-a-hover text-a-text-2',
 };
 
 const ACTION_ICONS: Record<ModerationAction, typeof IconCheck> = { publish: IconCheck, restore: IconCheck, reject: IconX, hide: IconEyeOff };
@@ -166,54 +166,54 @@ export default function ReviewAdminClient({
   }
 
   return <div className="space-y-6">
-    {canManage && <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="font-semibold text-gray-950 dark:text-white">Configuration</h2>
-      <p className="mt-1 text-sm leading-6 text-gray-500">Après une commande payée et terminée, le client reçoit une invitation à +24 h, un rappel à +7 jours ; le lien reste valable 30 jours.</p>
+    {canManage && <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
+      <h2 className="font-semibold text-a-text">Configuration</h2>
+      <p className="mt-1 text-sm leading-6 text-a-text-3">Après une commande payée et terminée, le client reçoit une invitation à +24 h, un rappel à +7 jours ; le lien reste valable 30 jours.</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <label className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800"><input type="checkbox" checked={settings.enabled} onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Envoyer les invitations</span></label>
-        <label className="flex items-center gap-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-800"><input type="checkbox" checked={settings.publicDisplay} onChange={(e) => setSettings({ ...settings, publicDisplay: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Afficher les avis sur la boutique</span></label>
-        <label className="rounded-xl bg-gray-50 p-4 text-sm dark:bg-gray-800"><span className="font-medium">Avis minimum avant d’afficher la note</span><input type="number" min={1} max={50} value={settings.minPublicCount} onChange={(e) => setSettings({ ...settings, minPublicCount: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })} className="mt-2 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900" /></label>
+        <label className="flex items-center gap-3 rounded-xl bg-a-surface-2 p-4"><input type="checkbox" checked={settings.enabled} onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Envoyer les invitations</span></label>
+        <label className="flex items-center gap-3 rounded-xl bg-a-surface-2 p-4"><input type="checkbox" checked={settings.publicDisplay} onChange={(e) => setSettings({ ...settings, publicDisplay: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Afficher les avis sur la boutique</span></label>
+        <label className="rounded-xl bg-a-surface-2 p-4 text-sm"><span className="font-medium">Avis minimum avant d’afficher la note</span><input type="number" min={1} max={50} value={settings.minPublicCount} onChange={(e) => setSettings({ ...settings, minPublicCount: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })} className="mt-2 h-10 w-full rounded-lg border border-a-border bg-a-surface px-3" /></label>
       </div>
-      <p className={`mt-3 rounded-xl px-3 py-2 text-xs ${rating.visible ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}>{rating.text}</p>
-      <label className="mt-4 block text-sm"><span className="font-medium text-gray-900 dark:text-gray-100">Liste de vigilance</span><span className="ml-2 text-xs text-gray-400">un terme par ligne : l’avis est signalé pour vérification, jamais rejeté automatiquement</span>
-        <textarea value={settings.terms} onChange={(e) => setSettings({ ...settings, terms: e.target.value })} rows={4} className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-700 dark:bg-gray-950" placeholder={'numéro de téléphone\nnom d’un employé'} /></label>
-      {settingsMessage && <p role={settingsMessage.tone === 'error' ? 'alert' : 'status'} className={`mt-3 rounded-xl px-3 py-2 text-sm ${settingsMessage.tone === 'ok' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{settingsMessage.text}</p>}
+      <p className={`mt-3 rounded-xl px-3 py-2 text-xs ${rating.visible ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-a-surface-2 text-a-text-2'}`}>{rating.text}</p>
+      <label className="mt-4 block text-sm"><span className="font-medium text-a-text">Liste de vigilance</span><span className="ml-2 text-xs text-a-text-3">un terme par ligne : l’avis est signalé pour vérification, jamais rejeté automatiquement</span>
+        <textarea value={settings.terms} onChange={(e) => setSettings({ ...settings, terms: e.target.value })} rows={4} className="mt-2 w-full rounded-xl border border-a-border px-3 py-2" placeholder={'numéro de téléphone\nnom d’un employé'} /></label>
+      {settingsMessage && <p role={settingsMessage.tone === 'error' ? 'alert' : 'status'} className={`mt-3 rounded-xl px-3 py-2 text-sm ${settingsMessage.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{settingsMessage.text}</p>}
       {dirty && <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button onClick={() => void saveSettings()} disabled={saving} className="min-h-11 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
-        <button onClick={() => { setSettings(baseline); setSettingsMessage(null); }} disabled={saving} className="min-h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700">Annuler</button>
-        <span className="text-xs text-gray-500">Modifications non enregistrées</span>
+        <button onClick={() => void saveSettings()} disabled={saving} className="min-h-11 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+        <button onClick={() => { setSettings(baseline); setSettingsMessage(null); }} disabled={saving} className="min-h-11 rounded-xl border border-a-border px-4 text-sm font-semibold text-a-text-2">Annuler</button>
+        <span className="text-xs text-a-text-3">Modifications non enregistrées</span>
       </div>}
     </section>}
 
-    {notice && <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">{notice}</p>}
+    {notice && <p role="status" className="rounded-xl bg-tone-success-bg px-4 py-3 text-sm font-medium text-tone-success-fg">{notice}</p>}
 
     <section className="space-y-3">
-      {initialReviews.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 p-10 text-center text-sm text-gray-500">Aucun avis dans ce filtre.</div> : initialReviews.map((review) => {
+      {initialReviews.length === 0 ? <div className="rounded-2xl border border-dashed border-a-border-strong p-10 text-center text-sm text-a-text-3">Aucun avis dans ce filtre.</div> : initialReviews.map((review) => {
         const flagged = review.moderation_flags.length > 0;
-        return <article key={review.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        return <article key={review.id} className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2"><strong className="text-gray-950 dark:text-white">{review.reviewer_display_name || 'Client vérifié'}</strong><span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"><IconRosetteDiscountCheck size={14}/> achat vérifié</span></div>
-              <p className="mt-1 text-xs text-gray-400">
+              <div className="flex items-center gap-2"><strong className="text-a-text">{review.reviewer_display_name || 'Client vérifié'}</strong><span className="inline-flex items-center gap-1 text-xs font-medium text-tone-success-fg"><IconRosetteDiscountCheck size={14}/> achat vérifié</span></div>
+              <p className="mt-1 text-xs text-a-text-3">
                 <Link href={`/admin/orders/${review.order_id}`} className="hover:underline">Commande {review.orderNumber}</Link>
                 {review.orderDate ? ` · ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(review.orderDate))}` : ''}
                 {' · avis du '}{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(review.submitted_at))}
               </p>
             </div>
             <div className="text-right">
-              <span className="inline-flex" aria-label={`${review.rating} sur 5`}>{[1,2,3,4,5].map((value) => <IconStar key={value} size={17} fill={value <= review.rating ? 'currentColor':'none'} className={value <= review.rating ? 'text-amber-500':'text-gray-300'} />)}</span>
+              <span className="inline-flex" aria-label={`${review.rating} sur 5`}>{[1,2,3,4,5].map((value) => <IconStar key={value} size={17} fill={value <= review.rating ? 'currentColor':'none'} className={value <= review.rating ? 'text-tone-warning-fg':'text-a-text-3'} />)}</span>
               <p className="mt-1"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_TONE[review.status]}`}>{REVIEW_STATUS_LABELS[review.status]}</span></p>
-              {review.moderation_reason_code && review.status !== 'published' && <p className="mt-1 text-xs text-gray-400">Motif : {REASON_LABELS[review.moderation_reason_code as keyof typeof REASON_LABELS] ?? review.moderation_reason_code}</p>}
+              {review.moderation_reason_code && review.status !== 'published' && <p className="mt-1 text-xs text-a-text-3">Motif : {REASON_LABELS[review.moderation_reason_code as keyof typeof REASON_LABELS] ?? review.moderation_reason_code}</p>}
             </div>
           </div>
-          {review.body ? <p className="mt-4 whitespace-pre-line text-sm leading-6 text-gray-700 dark:text-gray-300">{review.body}</p> : <p className="mt-4 text-sm italic text-gray-400">Note sans commentaire</p>}
-          {flagged && <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800"><IconAlertTriangle size={16} className="mt-0.5 shrink-0"/><span>À vérifier : {review.moderation_flags.map(flagLabel).join(', ')}. Un signalement ne rejette jamais l’avis automatiquement.</span></div>}
-          {canModerate && <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+          {review.body ? <p className="mt-4 whitespace-pre-line text-sm leading-6 text-a-text-2">{review.body}</p> : <p className="mt-4 text-sm italic text-a-text-3">Note sans commentaire</p>}
+          {flagged && <div className="mt-4 flex items-start gap-2 rounded-xl bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg"><IconAlertTriangle size={16} className="mt-0.5 shrink-0"/><span>À vérifier : {review.moderation_flags.map(flagLabel).join(', ')}. Un signalement ne rejette jamais l’avis automatiquement.</span></div>}
+          {canModerate && <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-a-border pt-4">
             {actionsFor(review.status).map((action) => {
               const Icon = ACTION_ICONS[action];
               const positive = action === 'publish' || action === 'restore';
               return <button key={action} onClick={() => { setNotice(null); setPending({ review, action }); }}
-                className={`inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-semibold ${positive ? 'bg-emerald-600 text-white' : action === 'reject' ? 'border border-red-200 text-red-700' : 'border border-gray-200 text-gray-700'}`}>
+                className={`inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-semibold ${positive ? 'bg-tone-success-solid text-white' : action === 'reject' ? 'border border-tone-danger-border text-tone-danger-fg' : 'border border-a-border text-a-text-2'}`}>
                 <Icon size={16}/> {ACTION_LABELS[action]}{needsReason(action) ? '…' : ''}
               </button>;
             })}

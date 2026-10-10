@@ -18,9 +18,9 @@ import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import type { AmbassadorCommissionMode, AmbassadorDiscountType } from '@lepefy/types';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900 disabled:bg-gray-50 disabled:text-gray-500';
-const LABEL_CLS = 'text-gray-500 text-xs font-medium mb-1 block';
-const HINT_CLS = 'text-xs text-gray-400 mt-1';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
+const LABEL_CLS = 'text-a-text-3 text-xs font-medium mb-1 block';
+const HINT_CLS = 'text-xs text-a-text-3 mt-1';
 
 function NumberField({ id, label, hint, value, onChange, disabled, step = '0.01', max }: {
   id: string;
@@ -127,16 +127,16 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
   const disabled = !canEdit || isSaving;
 
   return (
-    <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+    <section className="space-y-4 rounded-xl border border-a-border bg-a-surface p-5">
       <div>
-        <h2 className="mb-1 text-sm font-semibold text-gray-700 dark:text-gray-200">Règles du programme</h2>
-        <p className="text-xs text-gray-400">
+        <h2 className="mb-1 text-sm font-semibold text-a-text-2">Règles du programme</h2>
+        <p className="text-xs text-a-text-3">
           Un ambassadeur gagne une commission en argent (pas de points) sur la <strong>première commande livrée</strong> de
           chaque client qu&apos;il a invité, si cette commande atteint l&apos;achat minimum. Le client invité peut recevoir une
           réduction sur cette première commande.
         </p>
         {!canEdit && (
-          <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-gray-800">
+          <p className="mt-2 rounded-lg bg-a-surface-2 px-3 py-2 text-xs text-a-text-3">
             Lecture seule : la modification des règles demande la permission « Paramètres de la boutique ».
           </p>
         )}
@@ -189,15 +189,15 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
               max={100}
             />
           </div>
-          <div className="rounded-lg bg-amber-50 px-3 py-3 text-xs text-gray-600 dark:bg-amber-950/30 dark:text-gray-300">
-            <p className="font-medium text-gray-700 dark:text-gray-200">
+          <div className="rounded-lg bg-tone-warning-bg px-3 py-3 text-xs text-a-text-2">
+            <p className="font-medium text-a-text-2">
               Pour une première commande d&apos;au moins {formatPrice(form.ambassador_min_purchase_amount, currency)} :
             </p>
             <ul className="mt-1 space-y-0.5">
               <li>Commission de l&apos;ambassadeur : <strong>{formatPrice(pool.ambassadorAmount, currency)}</strong></li>
               <li>Réduction du client invité : <strong>{formatPrice(pool.referredDiscount, currency)}</strong></li>
             </ul>
-            <p className="mt-1 text-gray-500">Montants fixes, quel que soit le total de la commande au-delà du minimum.</p>
+            <p className="mt-1 text-a-text-3">Montants fixes, quel que soit le total de la commande au-delà du minimum.</p>
           </div>
         </div>
       ) : (
@@ -245,8 +245,8 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
               />
             )}
           </div>
-          <div className="rounded-lg bg-amber-50 px-3 py-3 text-xs text-gray-600 dark:bg-amber-950/30 dark:text-gray-300">
-            <p className="font-medium text-gray-700 dark:text-gray-200">
+          <div className="rounded-lg bg-tone-warning-bg px-3 py-3 text-xs text-a-text-2">
+            <p className="font-medium text-a-text-2">
               Exemple, commande de {formatPrice(exampleSubtotal, currency)} :
             </p>
             <ul className="mt-1 space-y-0.5">
@@ -254,12 +254,12 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
               <li>Montant payé : {formatPrice(examplePaid, currency)}</li>
               <li>Commission de l&apos;ambassadeur : <strong>{formatPrice(exampleCommission, currency)}</strong></li>
             </ul>
-            <p className="mt-1 text-gray-500">La commission se calcule sur le montant payé après réduction : une réduction élevée la diminue aussi.</p>
+            <p className="mt-1 text-a-text-3">La commission se calcule sur le montant payé après réduction : une réduction élevée la diminue aussi.</p>
           </div>
         </div>
       )}
 
-      <hr className="border-gray-100 dark:border-gray-800" />
+      <hr className="border-a-border" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <NumberField
@@ -270,7 +270,7 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
           onChange={(v) => set('ambassador_payout_threshold_amount', v)}
           disabled={disabled}
         />
-        <label className="flex items-start gap-2 self-center text-sm text-gray-700 dark:text-gray-200">
+        <label className="flex items-start gap-2 self-center text-sm text-a-text-2">
           <input
             type="checkbox"
             className="mt-1"
@@ -280,27 +280,27 @@ export function AmbassadorConfigSection({ initialSettings, currency, canEdit }: 
           />
           <span>
             Le client invité gagne des points de fidélité à partir de sa 2ᵉ commande
-            <span className="block text-xs text-gray-400">Sinon, aucun point sur ses commandes suivantes. Sa 1ʳᵉ commande ne rapporte des points que si aucune réduction parrainage n&apos;a été appliquée ; l&apos;ambassadeur lui-même ne gagne jamais de points.</span>
+            <span className="block text-xs text-a-text-3">Sinon, aucun point sur ses commandes suivantes. Sa 1ʳᵉ commande ne rapporte des points que si aucune réduction parrainage n&apos;a été appliquée ; l&apos;ambassadeur lui-même ne gagne jamais de points.</span>
           </span>
         </label>
       </div>
 
       {issues.length > 0 && (
-        <ul role="alert" className="space-y-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">
+        <ul role="alert" className="space-y-1 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">
           {issues.map((issue) => <li key={issue}>{issue}</li>)}
         </ul>
       )}
 
       {message && !dirty && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
       {canEdit && dirty && (
-        <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-gray-700 dark:bg-gray-900/95 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 text-xs text-gray-600 dark:text-gray-300">
+        <div className="sticky bottom-3 z-10 flex flex-col gap-2 rounded-xl border border-a-border bg-a-surface p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-xs text-a-text-2">
             <strong>Modifications non enregistrées</strong>
             {modeChanged && <span className="block">Le mode de calcul change pour les prochaines commandes livrées.</span>}
-            {message && <span role="alert" className={`block ${message.tone === 'error' ? 'text-red-700' : 'text-green-700'}`}>{message.text}</span>}
+            {message && <span role="alert" className={`block ${message.tone === 'error' ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`}>{message.text}</span>}
           </div>
           <div className="flex shrink-0 gap-2">
             <Button variant="outline" size="sm" disabled={isSaving} onClick={() => { setForm(baseline); setMessage(null); }}>Annuler</Button>

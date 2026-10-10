@@ -23,13 +23,13 @@ export default async function AdminLaboratoirePage() {
 
   return (
     <div>
-      <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+      <p className="mb-5 text-sm text-a-text-3">
         Test rapide ponctuel, ou campagne de simulation bornée pour construire l&apos;historique de coûts utilisé par l&apos;assistant, l&apos;historique et l&apos;analyse tarifaire du tenant.
       </p>
 
-      <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Test rapide</h2>
-        <p className="text-xs text-gray-400 mb-4">Un devis Packlink ponctuel — alimente désormais l&apos;historique de coûts au lieu d&apos;être jeté.</p>
+      <section className="bg-a-surface rounded-xl border border-a-border p-5 mb-6">
+        <h2 className="text-sm font-semibold text-a-text mb-1">Test rapide</h2>
+        <p className="text-xs text-a-text-3 mb-4">Un devis Packlink ponctuel — alimente désormais l&apos;historique de coûts au lieu d&apos;être jeté.</p>
         <ShippingSimulator shippingProvider={tenant.shipping_provider} currency={tenant.currency} />
       </section>
 

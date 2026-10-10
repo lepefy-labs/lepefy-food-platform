@@ -109,43 +109,43 @@ export default function PaymentRecoveryActions({
   return (
     <>
       <div className="space-y-4">
-        <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="font-bold text-gray-950 dark:text-white">Relancer le client</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-gray-500 dark:text-gray-400">Le message reste prudent : si le client a déjà payé, il lui demande de ne pas payer une seconde fois. Sinon il peut reprendre l’achat et conserver ou changer le moyen de paiement.</p>
-              <div className="mt-3 text-xs text-gray-500"><span className="font-semibold">Rappels envoyés :</span> {reminderCount}/2{lastReminderAt && <span> · dernier {formatDateTime(lastReminderAt)}</span>}</div>
-              {!reminderEligibility.allowed && reminderEligibility.reason && <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{reminderEligibility.reason}</p>}
-              {reminderMessage && <p className={`mt-2 text-sm ${reminderError ? 'text-red-600' : 'text-emerald-700'}`} role="status">{reminderMessage}</p>}
+              <h2 className="font-bold text-a-text">Relancer le client</h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-a-text-3">Le message reste prudent : si le client a déjà payé, il lui demande de ne pas payer une seconde fois. Sinon il peut reprendre l’achat et conserver ou changer le moyen de paiement.</p>
+              <div className="mt-3 text-xs text-a-text-3"><span className="font-semibold">Rappels envoyés :</span> {reminderCount}/2{lastReminderAt && <span> · dernier {formatDateTime(lastReminderAt)}</span>}</div>
+              {!reminderEligibility.allowed && reminderEligibility.reason && <p className="mt-2 text-xs font-medium text-tone-warning-fg">{reminderEligibility.reason}</p>}
+              {reminderMessage && <p className={`mt-2 text-sm ${reminderError ? 'text-tone-danger-fg' : 'text-tone-success-fg'}`} role="status">{reminderMessage}</p>}
             </div>
             {canManageSession && (
-              <button type="button" onClick={() => void sendReminder()} disabled={sendingReminder || !reminderEligibility.allowed} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200"><IconMailForward size={18} /> {sendingReminder ? 'Envoi…' : 'Envoyer un rappel'}</button>
+              <button type="button" onClick={() => void sendReminder()} disabled={sendingReminder || !reminderEligibility.allowed} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-a-border bg-a-brand-soft px-4 text-sm font-semibold text-a-brand-fg transition-colors hover:bg-a-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-brand disabled:cursor-not-allowed disabled:opacity-50"><IconMailForward size={18} /> {sendingReminder ? 'Envoi…' : 'Envoyer un rappel'}</button>
             )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="font-bold text-gray-950 dark:text-white">Reprise client</h2>
-          <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">Le lien sécurisé permet au client de reprendre son achat. Il peut continuer avec le moyen actuel ou en choisir un autre, sans créer de commande tant que le paiement n’est pas confirmé.</p>
-          {resumeLink && canResume ? <a href={resumeLink} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-800">Ouvrir le lien de reprise client <IconExternalLink size={17} /></a> : <p className="mt-3 text-sm font-medium text-gray-500">Lien de reprise indisponible pour cette demande.</p>}
+        <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
+          <h2 className="font-bold text-a-text">Reprise client</h2>
+          <p className="mt-1 text-sm leading-6 text-a-text-3">Le lien sécurisé permet au client de reprendre son achat. Il peut continuer avec le moyen actuel ou en choisir un autre, sans créer de commande tant que le paiement n’est pas confirmé.</p>
+          {resumeLink && canResume ? <a href={resumeLink} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border-strong bg-a-surface px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-border-strong">Ouvrir le lien de reprise client <IconExternalLink size={17} /></a> : <p className="mt-3 text-sm font-medium text-a-text-3">Lien de reprise indisponible pour cette demande.</p>}
         </section>
 
         {canConfirmPayment ? (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900/60 dark:bg-amber-950/20">
-            <h2 className="font-bold text-gray-950 dark:text-white">Décision paiement</h2>
-            <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">Confirmez uniquement après avoir réellement constaté la réception du paiement externe.</p>
+          <section className="rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-5">
+            <h2 className="font-bold text-a-text">Décision paiement</h2>
+            <p className="mt-1 text-sm leading-6 text-a-text-2">Confirmez uniquement après avoir réellement constaté la réception du paiement externe.</p>
             <div className="mt-4 max-w-xs"><ConfirmPaymentButton endpoint={`/api/admin/checkout-sessions/${sessionId}/confirm-payment`} label="Confirmer réception" confirmingLabel="Confirmation…" style={{ backgroundColor: '#D97706' }} onSuccess={(warning) => { if (!warning) { router.push('/admin'); router.refresh(); } }} /></div>
           </section>
         ) : (
-          <section className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Votre rôle permet de consulter cette demande, mais pas de confirmer manuellement un paiement externe.</section>
+          <section className="rounded-2xl border border-a-border bg-a-surface p-5 text-sm text-a-text-3">Votre rôle permet de consulter cette demande, mais pas de confirmer manuellement un paiement externe.</section>
         )}
 
         {canManageSession && (
-          <section className="rounded-2xl border border-red-200 bg-white p-5 dark:border-red-900/60 dark:bg-gray-900">
-            <h2 className="font-bold text-gray-950 dark:text-white">Zone sensible</h2>
-            <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">Annuler retire la demande de la file. Cela n’annule ni ne rembourse un éventuel paiement déjà effectué chez le prestataire externe.</p>
-            {cancelError && <p className="mt-2 text-sm text-red-600" role="alert">{cancelError}</p>}
-            <button type="button" onClick={() => setCancelOpen(true)} className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"><IconX size={17} /> Annuler la demande</button>
+          <section className="rounded-2xl border border-tone-danger-border bg-a-surface p-5">
+            <h2 className="font-bold text-a-text">Zone sensible</h2>
+            <p className="mt-1 text-sm leading-6 text-a-text-3">Annuler retire la demande de la file. Cela n’annule ni ne rembourse un éventuel paiement déjà effectué chez le prestataire externe.</p>
+            {cancelError && <p className="mt-2 text-sm text-tone-danger-fg" role="alert">{cancelError}</p>}
+            <button type="button" onClick={() => setCancelOpen(true)} className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-tone-danger-border px-4 text-sm font-semibold text-tone-danger-fg hover:bg-tone-danger-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tone-danger-solid"><IconX size={17} /> Annuler la demande</button>
           </section>
         )}
       </div>

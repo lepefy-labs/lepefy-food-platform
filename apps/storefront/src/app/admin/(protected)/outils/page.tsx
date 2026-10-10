@@ -7,7 +7,7 @@ import { SettingsIconTile } from '../parametres/_components/SettingsUi';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-const ACTION_CLS = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800';
+const ACTION_CLS = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-a-border bg-a-surface px-3 text-sm font-medium text-a-text-2 hover:bg-a-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus';
 
 const QR_TOOLS = [
   {
@@ -49,15 +49,15 @@ export default async function OutilsPage() {
       <AdminPageHeader title="Outils du tenant" description="QR codes, affiches et liens à partager avec vos clients." />
 
       <section aria-labelledby="outils-qr">
-        <h2 id="outils-qr" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">QR codes</h2>
+        <h2 id="outils-qr" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">QR codes</h2>
         <ul className="grid gap-4 md:grid-cols-2">
           {QR_TOOLS.map((tool) => (
-            <li key={tool.key} id={tool.key} className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <li key={tool.key} id={tool.key} className="flex gap-4 rounded-2xl border border-a-border bg-a-surface p-5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={tool.preview} alt={`${tool.title} — aperçu`} width={96} height={96} className="h-24 w-24 shrink-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-white" />
+              <img src={tool.preview} alt={`${tool.title} — aperçu`} width={96} height={96} className="h-24 w-24 shrink-0 rounded-lg border border-a-border bg-a-surface" />
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100">{tool.title}</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{tool.description}</p>
+                <h3 className="text-base font-semibold text-a-text">{tool.title}</h3>
+                <p className="mt-1 text-sm text-a-text-3">{tool.description}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {tool.downloads.map((download) => (
                     <a key={download.label} href={download.href} className={ACTION_CLS} aria-label={`Télécharger ${tool.title} en ${download.label}`}>
@@ -72,30 +72,30 @@ export default async function OutilsPage() {
       </section>
 
       <section aria-labelledby="outils-affiches">
-        <h2 id="outils-affiches" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">Affiches</h2>
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+        <h2 id="outils-affiches" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">Affiches</h2>
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-a-border bg-a-surface p-5">
           <SettingsIconTile icon={IconFileTypePdf} accent="red" />
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-semibold text-gray-950 dark:text-gray-100">Affiche carte digitale</h3>
-            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">PDF prêt à imprimer avec le QR de votre carte.</p>
+            <h3 className="text-base font-semibold text-a-text">Affiche carte digitale</h3>
+            <p className="mt-0.5 text-sm text-a-text-3">PDF prêt à imprimer avec le QR de votre carte.</p>
           </div>
           <a href="/api/admin/card/poster" className={ACTION_CLS}><IconDownload size={16} aria-hidden="true" />Affiche PDF</a>
         </div>
       </section>
 
       <section aria-labelledby="outils-liens">
-        <h2 id="outils-liens" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">Liens partageables</h2>
+        <h2 id="outils-liens" className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">Liens partageables</h2>
         {shareLinks.length > 0 ? (
           <ul className="grid gap-4 md:grid-cols-2">
             {shareLinks.map((link) => (
-              <li key={link.key} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-                <h3 className="mb-3 text-base font-semibold text-gray-950 dark:text-gray-100">{link.title}</h3>
+              <li key={link.key} className="rounded-2xl border border-a-border bg-a-surface p-5">
+                <h3 className="mb-3 text-base font-semibold text-a-text">{link.title}</h3>
                 <ShareLinkActions url={link.url} message={link.message} />
               </li>
             ))}
           </ul>
         ) : (
-          <p className="rounded-2xl border border-dashed border-gray-200 p-5 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">Renseignez l’URL de la boutique dans Paramètres › Profil pour obtenir des liens partageables.</p>
+          <p className="rounded-2xl border border-dashed border-a-border p-5 text-sm text-a-text-3">Renseignez l’URL de la boutique dans Paramètres › Profil pour obtenir des liens partageables.</p>
         )}
       </section>
     </div>

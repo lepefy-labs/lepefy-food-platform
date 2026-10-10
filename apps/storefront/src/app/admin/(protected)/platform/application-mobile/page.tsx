@@ -13,7 +13,7 @@ export default async function PlatformMobileAppPage() {
     .eq('slug', slug)
     .maybeSingle();
   if (!data) {
-    return <p className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">Tenant introuvable ({slug}).</p>;
+    return <p className="rounded-2xl border border-tone-danger-border bg-tone-danger-bg p-5 text-sm text-tone-danger-fg">Tenant introuvable ({slug}).</p>;
   }
   const row = data as AndroidAppRow & { storefront_url: string | null };
   return <MobileAppClient initial={serializeAndroidApp(row)} storefrontUrl={row.storefront_url} />;

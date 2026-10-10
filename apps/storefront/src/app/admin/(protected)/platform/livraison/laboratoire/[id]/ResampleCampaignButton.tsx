@@ -31,7 +31,7 @@ export function ResampleCampaignButton({
   const [created, setCreated] = useState<{ id: string; scenarios: number; deferred: number; profileMissing: number } | null>(null);
 
   if (candidates === 0) {
-    return <p className="text-xs text-green-700">Aucun scénario à remesurer.</p>;
+    return <p className="text-xs text-tone-success-fg">Aucun scénario à remesurer.</p>;
   }
 
   async function submit() {
@@ -56,7 +56,7 @@ export function ResampleCampaignButton({
 
   if (created) {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
+      <div className="rounded-lg border border-tone-success-border bg-tone-success-bg px-3 py-2 text-xs text-tone-success-fg">
         Campagne de remesure créée : {created.scenarios} scénario(s) en file.
         {created.deferred > 0 && <> {created.deferred} scénario(s) au-delà de la limite restent à remesurer ensuite.</>}
         {created.profileMissing > 0 && <> {created.profileMissing} scénario(s) ignoré(s) : profil d&apos;emballage supprimé.</>}
@@ -72,37 +72,37 @@ export function ResampleCampaignButton({
           type="button"
           onClick={() => setConfirming(true)}
           disabled={disabled}
-          className="min-h-10 inline-flex items-center gap-1.5 self-start px-3 py-1.5 text-xs rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50"
+          className="min-h-10 inline-flex items-center gap-1.5 self-start px-3 py-1.5 text-xs rounded-lg border border-a-brand text-a-brand-fg disabled:opacity-50"
         >
           <IconRefreshDot size={14} stroke={1.5} />
           Remesurer {candidates} scénario(s)
         </button>
       ) : (
-        <div className="rounded-lg border border-gray-200 p-3 text-xs space-y-2">
-          <p className="text-gray-700">
+        <div className="rounded-lg border border-a-border p-3 text-xs space-y-2">
+          <p className="text-a-text-2">
             Créer une campagne de remesure pour {Math.min(candidates, MAX_CAMPAIGN_SCENARIOS)} scénario(s).
             Jusqu&apos;à {Math.min(candidates, MAX_CAMPAIGN_SCENARIOS)} appel(s) Packlink ; un devis identique encore frais sera réemployé sans appel, et un CAP refusé par Packlink est arrêté après deux poids.
           </p>
           <ul className="space-y-0.5">
             {included.map((e) => (
-              <li key={e.code} className="text-gray-700">✓ {ERROR_REASONS[e.code].label} — {e.scenarios} scénario(s), {e.postalCodes.length} CAP</li>
+              <li key={e.code} className="text-a-text-2">✓ {ERROR_REASONS[e.code].label} — {e.scenarios} scénario(s), {e.postalCodes.length} CAP</li>
             ))}
             {excluded.map((e) => (
-              <li key={e.code} className="text-gray-400">✕ {ERROR_REASONS[e.code].label} — {e.scenarios} scénario(s) exclus (refus déterministe)</li>
+              <li key={e.code} className="text-a-text-3">✕ {ERROR_REASONS[e.code].label} — {e.scenarios} scénario(s) exclus (refus déterministe)</li>
             ))}
           </ul>
           {candidates > MAX_CAMPAIGN_SCENARIOS && (
-            <p className="text-amber-700">Au-delà de {MAX_CAMPAIGN_SCENARIOS}, les scénarios restants (ordre déterministe) resteront à remesurer ensuite.</p>
+            <p className="text-tone-warning-fg">Au-delà de {MAX_CAMPAIGN_SCENARIOS}, les scénarios restants (ordre déterministe) resteront à remesurer ensuite.</p>
           )}
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void submit()} disabled={submitting} className="min-h-10 px-3 py-1.5 rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">
+            <button type="button" onClick={() => void submit()} disabled={submitting} className="min-h-10 px-3 py-1.5 rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50">
               {submitting ? 'Création…' : 'Confirmer la remesure'}
             </button>
-            <button type="button" onClick={() => setConfirming(false)} disabled={submitting} className="min-h-10 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500">Annuler</button>
+            <button type="button" onClick={() => setConfirming(false)} disabled={submitting} className="min-h-10 px-3 py-1.5 rounded-lg border border-a-border text-a-text-3">Annuler</button>
           </div>
         </div>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-tone-danger-fg">{error}</p>}
     </div>
   );
 }

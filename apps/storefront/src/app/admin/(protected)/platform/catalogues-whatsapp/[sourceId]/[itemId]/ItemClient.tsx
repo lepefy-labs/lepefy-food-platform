@@ -211,8 +211,8 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
     void load();
   }
 
-  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
-  if (!detail) return <p className="text-sm text-gray-500">Chargement…</p>;
+  if (error) return <p className="rounded-xl border border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">{error}</p>;
+  if (!detail) return <p className="text-sm text-a-text-3">Chargement…</p>;
 
   const { item, source } = detail;
   const n = item.normalized;
@@ -242,7 +242,7 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-a-text-3 hover:text-a-text">
           <IconArrowLeft size={16} aria-hidden /> {source.label}
         </Link>
         {nav && nav.total > 1 && (
@@ -250,7 +250,7 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
             {nav.prev
               ? <Link href={itemHref(nav.prev)} className={`${SECONDARY} min-h-8 px-2.5 py-1`}><IconChevronLeft size={16} aria-hidden /> Précédent</Link>
               : <span className={`${SECONDARY} min-h-8 cursor-not-allowed px-2.5 py-1 opacity-40`} aria-disabled><IconChevronLeft size={16} aria-hidden /> Précédent</span>}
-            <span className="px-2 text-xs tabular-nums text-gray-500">{nav.index + 1} / {nav.total}</span>
+            <span className="px-2 text-xs tabular-nums text-a-text-3">{nav.index + 1} / {nav.total}</span>
             {nav.next
               ? <Link href={itemHref(nav.next)} className={`${SECONDARY} min-h-8 px-2.5 py-1`}>Suivant <IconChevronRight size={16} aria-hidden /></Link>
               : <span className={`${SECONDARY} min-h-8 cursor-not-allowed px-2.5 py-1 opacity-40`} aria-disabled>Suivant <IconChevronRight size={16} aria-hidden /></span>}
@@ -260,8 +260,8 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">{n.original_name ?? '(sans nom)'}</h1>
-          <p className="mt-1 text-sm text-gray-500">vers {source.tenants?.name} ({source.tenants?.slug}) · vu le {dateTime(item.last_seen_at)}</p>
+          <h1 className="text-2xl font-semibold text-a-text">{n.original_name ?? '(sans nom)'}</h1>
+          <p className="mt-1 text-sm text-a-text-3">vers {source.tenants?.name} ({source.tenants?.slug}) · vu le {dateTime(item.last_seen_at)}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}>{st.label}</span>
@@ -272,28 +272,28 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
       </header>
 
       {notice && (
-        <p role="status" className={`rounded-xl px-4 py-3 text-sm ${notice.tone === 'ok' ? 'border border-green-200 bg-green-50 text-green-800' : 'border border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</p>
+        <p role="status" className={`rounded-xl px-4 py-3 text-sm ${notice.tone === 'ok' ? 'border border-tone-success-border bg-tone-success-bg text-tone-success-fg' : 'border border-tone-danger-border bg-tone-danger-bg text-tone-danger-fg'}`}>{notice.text}</p>
       )}
 
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
         <section className={`${CARD} space-y-3 self-start`}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Source WhatsApp</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">Source WhatsApp</p>
           {preview
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={preview} alt="" referrerPolicy="no-referrer" className="aspect-square w-full rounded-xl border border-gray-200 bg-white object-contain dark:border-gray-800" />
-            : <div className="grid aspect-square place-items-center rounded-xl border border-dashed border-gray-200 text-sm text-gray-400">Aucune photo</div>}
-          <p className="text-xs text-gray-500">{n.images.length} photo(s) originale(s). Les liens WhatsApp expirent : actualisez la source si l’aperçu ne s’affiche plus.</p>
+            ? <img src={preview} alt="" referrerPolicy="no-referrer" className="aspect-square w-full rounded-xl border border-a-border bg-a-surface object-contain" />
+            : <div className="grid aspect-square place-items-center rounded-xl border border-dashed border-a-border text-sm text-a-text-3">Aucune photo</div>}
+          <p className="text-xs text-a-text-3">{n.images.length} photo(s) originale(s). Les liens WhatsApp expirent : actualisez la source si l’aperçu ne s’affiche plus.</p>
           <dl className="space-y-2 text-sm">
-            <div><dt className="text-xs text-gray-500">Description</dt><dd className="whitespace-pre-wrap">{n.original_description ?? '—'}</dd></div>
-            <div><dt className="text-xs text-gray-500">Prix affiché (lot)</dt><dd className="font-semibold">{euro(item.displayed_price, currency)}
-              {item.previous_price !== null && item.previous_price !== item.displayed_price && <span className="ml-2 text-xs font-normal text-red-600">était {euro(item.previous_price, currency)}</span>}
-              {item.sale_price !== null && <span className="ml-2 text-xs font-normal text-gray-500">promo {euro(item.sale_price, currency)}</span>}</dd></div>
-            <div><dt className="text-xs text-gray-500">Interprétation</dt><dd>
+            <div><dt className="text-xs text-a-text-3">Description</dt><dd className="whitespace-pre-wrap">{n.original_description ?? '—'}</dd></div>
+            <div><dt className="text-xs text-a-text-3">Prix affiché (lot)</dt><dd className="font-semibold">{euro(item.displayed_price, currency)}
+              {item.previous_price !== null && item.previous_price !== item.displayed_price && <span className="ml-2 text-xs font-normal text-tone-danger-fg">était {euro(item.previous_price, currency)}</span>}
+              {item.sale_price !== null && <span className="ml-2 text-xs font-normal text-a-text-3">promo {euro(item.sale_price, currency)}</span>}</dd></div>
+            <div><dt className="text-xs text-a-text-3">Interprétation</dt><dd>
               min {n.suggested_min_quantity ?? '—'}{n.suggested_min_quantity !== null && !n.inference.min_is_explicit ? ' (inféré)' : ''} · contenu {n.package_count ?? '—'} · format {n.unit_format ? `${n.unit_format.value ?? ''} ${n.unit_format.unit}` : '—'}
             </dd></div>
-            <div><dt className="text-xs text-gray-500">Disponibilité</dt><dd>{n.product_availability ?? '—'}</dd></div>
+            <div><dt className="text-xs text-a-text-3">Disponibilité</dt><dd>{n.product_availability ?? '—'}</dd></div>
           </dl>
-          <details className="text-xs text-gray-600 dark:text-gray-300">
+          <details className="text-xs text-a-text-2">
             <summary className="cursor-pointer font-semibold">Pourquoi ces propositions</summary>
             <ul className="mt-2 list-disc space-y-1 pl-4">{n.review_reasons.map((r) => <li key={r.code + r.message}>{r.message}</li>)}</ul>
           </details>
@@ -301,37 +301,37 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
 
         <section className={`${CARD} space-y-5`}>
           <div className="flex flex-wrap items-center gap-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Produit Lepefy</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">Produit Lepefy</p>
             <label className="flex items-center gap-2 text-sm"><input type="radio" name="mode" checked={mode === 'create'} onChange={() => setMode('create')} disabled={Boolean(item.linked_product_id)} /> Créer un nouveau produit</label>
             <label className="flex items-center gap-2 text-sm"><input type="radio" name="mode" checked={mode === 'update'} onChange={() => setMode('update')} /> Mettre à jour un produit existant</label>
           </div>
 
           {mode === 'update' && (
             target ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-4 py-3 text-sm dark:bg-gray-800/60">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-a-surface-2 px-4 py-3 text-sm">
                 <span><strong className="font-semibold">{target.name}</strong> · {euro(target.price)} · min {target.min_order_quantity}{!target.active && ' · inactif'}</span>
                 <span className="flex items-center gap-3">
-                  {storefront && <a className="inline-flex items-center gap-1 text-xs text-[var(--admin-primary-fg)] hover:underline" href={`${storefront}/admin/catalogue/${target.id}`} target="_blank" rel="noreferrer">Ouvrir dans l’admin du tenant <IconExternalLink size={14} aria-hidden /></a>}
-                  {!item.linked_product_id && <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => setTarget(null)}>Changer</button>}
+                  {storefront && <a className="inline-flex items-center gap-1 text-xs text-a-brand-fg hover:underline" href={`${storefront}/admin/catalogue/${target.id}`} target="_blank" rel="noreferrer">Ouvrir dans l’admin du tenant <IconExternalLink size={14} aria-hidden /></a>}
+                  {!item.linked_product_id && <button type="button" className="text-xs text-a-text-3 hover:underline" onClick={() => setTarget(null)}>Changer</button>}
                 </span>
               </div>
             ) : (
               <div className="space-y-2">
                 <label htmlFor="search" className={LABEL}>Rechercher le produit du tenant</label>
                 <input id="search" className={INPUT} value={search} onChange={(e) => void searchProducts(e.target.value)} placeholder="Arachide…" />
-                <ul className="max-h-56 divide-y divide-gray-100 overflow-auto rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+                <ul className="max-h-56 divide-y divide-a-border overflow-auto rounded-xl border border-a-border">
                   {results.map((p) => (
-                    <li key={p.id}><button type="button" className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800" onClick={() => { setTarget(p); setResults([]); }}>
-                      {p.name} <span className="text-xs text-gray-500">· {euro(p.price)} · min {p.min_order_quantity}{!p.active && ' · inactif'}</span>
+                    <li key={p.id}><button type="button" className="w-full px-3 py-2 text-left text-sm hover:bg-a-surface-2" onClick={() => { setTarget(p); setResults([]); }}>
+                      {p.name} <span className="text-xs text-a-text-3">· {euro(p.price)} · min {p.min_order_quantity}{!p.active && ' · inactif'}</span>
                     </button></li>
                   ))}
-                  {results.length === 0 && <li className="px-3 py-2 text-xs text-gray-500">Tapez un nom pour rechercher.</li>}
+                  {results.length === 0 && <li className="px-3 py-2 text-xs text-a-text-3">Tapez un nom pour rechercher.</li>}
                 </ul>
               </div>
             )
           )}
 
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <div className="rounded-xl border border-a-border p-4">
             <p className="mb-3 text-sm font-semibold">Calcul du prix unitaire</p>
             <div className="grid gap-3 sm:grid-cols-4">
               <div>
@@ -361,26 +361,26 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
             <p className="mt-3 text-sm">
               {pricing
                 ? <>= <strong className="font-semibold">{euro(pricing.unitPrice)}</strong> / unité · lot de {minQty} = {euro(pricing.lotTotal)}
-                    {pricing.roundingDelta !== 0 && <span className="ml-1 text-amber-700 dark:text-amber-300">(écart {pricing.roundingDelta > 0 ? '+' : ''}{euro(pricing.roundingDelta)} dû à l’arrondi)</span>}</>
-                : <span className="text-red-600">Calcul impossible : vérifiez le prix WhatsApp, le minimum et la remise (0 à 90 %).</span>}
+                    {pricing.roundingDelta !== 0 && <span className="ml-1 text-tone-warning-fg">(écart {pricing.roundingDelta > 0 ? '+' : ''}{euro(pricing.roundingDelta)} dû à l’arrondi)</span>}</>
+                : <span className="text-tone-danger-fg">Calcul impossible : vérifiez le prix WhatsApp, le minimum et la remise (0 à 90 %).</span>}
             </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
-              <thead><tr className="text-left text-xs text-gray-500">
+              <thead><tr className="text-left text-xs text-a-text-3">
                 <th className="w-10 pb-2 font-medium">Appl.</th><th className="pb-2 font-medium">Champ</th>
                 {mode === 'update' && <th className="pb-2 font-medium">Actuel</th>}
                 <th className="pb-2 font-medium">Nouvelle valeur</th>
               </tr></thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              <tbody className="divide-y divide-a-border">
                 {(Object.keys(FIELD_LABEL) as FieldKey[]).map((key) => {
                   const forced = mode === 'create' && (key === 'name' || key === 'price' || key === 'category_id');
                   return (
                     <tr key={key} className="align-top">
                       <td className="py-2"><input type="checkbox" aria-label={`Appliquer ${FIELD_LABEL[key]}`} checked={forced || apply[key]} disabled={forced} onChange={(e) => setApply({ ...apply, [key]: e.target.checked })} /></td>
                       <td className="py-2 pr-3 font-medium">{FIELD_LABEL[key]}</td>
-                      {mode === 'update' && <td className="py-2 pr-3 text-gray-500">{currentValue(key)}</td>}
+                      {mode === 'update' && <td className="py-2 pr-3 text-a-text-3">{currentValue(key)}</td>}
                       <td className="py-2">
                         {key === 'description' ? (
                           <textarea className={INPUT} rows={2} maxLength={4000} value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} aria-label="Description" />
@@ -394,8 +394,8 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
                             <input className={INPUT} aria-label={FIELD_LABEL[key]} value={values[key]}
                               inputMode={key === 'name' || key === 'net_quantity_display' ? 'text' : key === 'price' ? 'decimal' : 'numeric'}
                               onChange={(e) => { if (key === 'price') setPriceEdited(true); setValues({ ...values, [key]: e.target.value }); }} />
-                            {key === 'price' && priceEdited && <button type="button" className="mt-1 text-xs text-[var(--admin-primary-fg)] hover:underline" onClick={() => setPriceEdited(false)}>Revenir au prix calculé</button>}
-                            {key === 'min_order_quantity' && n.suggested_min_quantity === null && <p className="mt-1 text-xs text-gray-500">Aucun minimum déduit du texte : vérifiez avec le vendeur.</p>}
+                            {key === 'price' && priceEdited && <button type="button" className="mt-1 text-xs text-a-brand-fg hover:underline" onClick={() => setPriceEdited(false)}>Revenir au prix calculé</button>}
+                            {key === 'min_order_quantity' && n.suggested_min_quantity === null && <p className="mt-1 text-xs text-a-text-3">Aucun minimum déduit du texte : vérifiez avec le vendeur.</p>}
                           </div>
                         )}
                       </td>
@@ -405,17 +405,17 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
                 <tr>
                   <td className="py-2"><input type="checkbox" aria-label="Appliquer les photos" checked={withImages} onChange={(e) => setWithImages(e.target.checked)} /></td>
                   <td className="py-2 pr-3 font-medium">Photos</td>
-                  {mode === 'update' && <td className="py-2 pr-3 text-gray-500">{current?.images?.length ?? 0} photo(s)</td>}
-                  <td className="py-2 text-gray-600 dark:text-gray-300">Copier {n.images.length} photo(s) originale(s) dans le stockage du tenant (ajoutées à la galerie, 8 max).</td>
+                  {mode === 'update' && <td className="py-2 pr-3 text-a-text-3">{current?.images?.length ?? 0} photo(s)</td>}
+                  <td className="py-2 text-a-text-2">Copier {n.images.length} photo(s) originale(s) dans le stockage du tenant (ajoutées à la galerie, 8 max).</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
-            {formError && <p role="alert" className="mr-auto text-sm text-red-600">{formError}</p>}
-            {!formError && blockedReason && <p className="mr-auto text-sm text-amber-700 dark:text-amber-300">{blockedReason}</p>}
-            {!formError && !blockedReason && mode === 'create' && <p className="mr-auto text-xs text-gray-500">Le produit sera créé inactif, stock 0 : à activer depuis l’admin du tenant après contrôle.</p>}
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-a-border pt-4">
+            {formError && <p role="alert" className="mr-auto text-sm text-tone-danger-fg">{formError}</p>}
+            {!formError && blockedReason && <p className="mr-auto text-sm text-tone-warning-fg">{blockedReason}</p>}
+            {!formError && !blockedReason && mode === 'create' && <p className="mr-auto text-xs text-a-text-3">Le produit sera créé inactif, stock 0 : à activer depuis l’admin du tenant après contrôle.</p>}
             <button type="button" className={PRIMARY} onClick={submit} disabled={busy !== null || Boolean(blockedReason)}>
               {busy === 'apply' ? 'Application…' : mode === 'create' ? 'Créer le produit' : 'Appliquer les champs cochés'}
             </button>
@@ -429,17 +429,17 @@ export default function ItemClient({ sourceId, itemId }: { sourceId: string; ite
           <ul className="space-y-2 text-sm">
             {detail.events.map((e, i) => (
               <li key={i} className="flex flex-wrap gap-2">
-                <span className="text-gray-500">{dateTime(e.created_at)}</span>
+                <span className="text-a-text-3">{dateTime(e.created_at)}</span>
                 <span className="font-medium">{EVENT_LABEL[e.action] ?? e.action}</span>
                 {(e.action === 'created' || e.action === 'updated') && (
-                  <span className="text-gray-500">{Object.keys(e.fields).map((k) => FIELD_LABEL[k as FieldKey] ?? k).join(', ')}</span>
+                  <span className="text-a-text-3">{Object.keys(e.fields).map((k) => FIELD_LABEL[k as FieldKey] ?? k).join(', ')}</span>
                 )}
               </li>
             ))}
           </ul>
         </section>
       )}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-a-text-3">
         <span className={`mr-2 rounded-full px-2 py-0.5 font-semibold ${(CONSENT[source.consent_status] ?? CONSENT.missing!).cls}`}>{(CONSENT[source.consent_status] ?? CONSENT.missing!).label}</span>
         Dernière application : {dateTime(item.applied_at)}
       </p>

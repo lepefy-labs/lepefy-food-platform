@@ -110,7 +110,7 @@ function Thumb({ item }: { item: Item }) {
   const src = img?.preview_url ?? img?.url ?? null;
   if (!src || failed) {
     return (
-      <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-dashed border-gray-200 text-gray-300 dark:border-gray-700 dark:text-gray-600">
+      <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-dashed border-a-border text-a-text-3">
         <IconPhotoOff size={18} aria-hidden />
       </span>
     );
@@ -118,16 +118,16 @@ function Thumb({ item }: { item: Item }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)}
-      className="size-12 shrink-0 rounded-lg border border-gray-200 bg-white object-cover dark:border-gray-800" />
+      className="size-12 shrink-0 rounded-lg border border-a-border bg-a-surface object-cover" />
   );
 }
 
 function QuantityHint({ n }: { n: NormalizedExternalProduct }) {
   if (n.suggested_min_quantity === null) {
-    return <span className="block text-xs text-amber-700 dark:text-amber-300">minimum à confirmer</span>;
+    return <span className="block text-xs text-tone-warning-fg">minimum à confirmer</span>;
   }
   if (!n.inference.min_is_explicit) {
-    return <span className="block text-xs text-gray-500">minimum déduit, à vérifier</span>;
+    return <span className="block text-xs text-a-text-3">minimum déduit, à vérifier</span>;
   }
   return null;
 }
@@ -135,14 +135,14 @@ function QuantityHint({ n }: { n: NormalizedExternalProduct }) {
 function Stat({ label, value, hint, onClick, active }: { label: string; value: number | string; hint?: string; onClick?: () => void; active?: boolean }) {
   const body = (
     <>
-      <span className="block text-xs font-medium text-gray-500">{label}</span>
-      <span className="mt-1 block text-2xl font-semibold text-gray-950 dark:text-white">{value}</span>
-      {hint && <span className="mt-0.5 block text-xs text-gray-500">{hint}</span>}
+      <span className="block text-xs font-medium text-a-text-3">{label}</span>
+      <span className="mt-1 block text-2xl font-semibold text-a-text">{value}</span>
+      {hint && <span className="mt-0.5 block text-xs text-a-text-3">{hint}</span>}
     </>
   );
-  const cls = `rounded-2xl border bg-white p-4 text-left dark:bg-gray-900 ${active ? 'border-[var(--admin-primary)] ring-1 ring-[var(--admin-primary)]' : 'border-gray-200 dark:border-gray-800'}`;
+  const cls = `rounded-2xl border bg-a-surface p-4 text-left ${active ? 'border-a-brand ring-1 ring-a-focus' : 'border-a-border'}`;
   return onClick
-    ? <button type="button" onClick={onClick} className={`${cls} hover:bg-gray-50 dark:hover:bg-gray-800/50`}>{body}</button>
+    ? <button type="button" onClick={onClick} className={`${cls} hover:bg-a-surface-2`}>{body}</button>
     : <div className={cls}>{body}</div>;
 }
 
@@ -299,40 +299,40 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
     if (res.ok) void load();
   }
 
-  if (error) return <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
-  if (!source) return <p className="text-sm text-gray-500">Chargement…</p>;
+  if (error) return <p className="rounded-xl border border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">{error}</p>;
+  if (!source) return <p className="text-sm text-a-text-3">Chargement…</p>;
 
   const consent = CONSENT[source.consent_status] ?? CONSENT.missing!;
   const discount = Number(source.default_discount_pct) || 0;
 
   return (
     <div className="space-y-5">
-      <Link href="/admin/platform/catalogues-whatsapp" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+      <Link href="/admin/platform/catalogues-whatsapp" className="inline-flex items-center gap-1 text-sm text-a-text-3 hover:text-a-text">
         <IconArrowLeft size={16} aria-hidden /> Catalogues WhatsApp
       </Link>
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-gray-950 dark:text-white">{source.label}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {phoneFromChatId(source.seller_chat_id)} · vers <strong className="font-semibold text-gray-700 dark:text-gray-200">{source.tenants?.name}</strong> ({source.tenants?.slug})
+          <h1 className="text-2xl font-semibold text-a-text">{source.label}</h1>
+          <p className="mt-1 text-sm text-a-text-3">
+            {phoneFromChatId(source.seller_chat_id)} · vers <strong className="font-semibold text-a-text-2">{source.tenants?.name}</strong> ({source.tenants?.slug})
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <button type="button" className={PRIMARY} onClick={refresh} disabled={busy !== null || source.status !== 'active'}>
             <IconRefresh size={16} aria-hidden className={busy === 'refresh' ? 'animate-spin' : ''} /> {busy === 'refresh' ? 'Lecture…' : 'Actualiser'}
           </button>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-a-text-3">
             Dernière lecture : {dateTime(source.last_fetched_at)}{source.last_fetched_at && (source.last_fetch_truncated ? ' · partielle' : ' · complète')}
           </span>
         </div>
       </header>
 
       {notice && (
-        <p role="status" className={`rounded-xl px-4 py-3 text-sm ${notice.tone === 'ok' ? 'border border-green-200 bg-green-50 text-green-800' : 'border border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</p>
+        <p role="status" className={`rounded-xl px-4 py-3 text-sm ${notice.tone === 'ok' ? 'border border-tone-success-border bg-tone-success-bg text-tone-success-fg' : 'border border-tone-danger-border bg-tone-danger-bg text-tone-danger-fg'}`}>{notice.text}</p>
       )}
       {source.last_fetch_status === 'failed' && source.last_fetch_error && !notice && (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Dernière lecture en échec : {source.last_fetch_error}</p>
+        <p className="rounded-xl border border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">Dernière lecture en échec : {source.last_fetch_error}</p>
       )}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -344,14 +344,14 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
 
       <details className={`${CARD} group p-0`} open={source.consent_status !== 'granted'}>
         <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm [&::-webkit-details-marker]:hidden">
-          <span className="font-semibold text-gray-900 dark:text-gray-100">Réglages de la source</span>
-          <span className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <span className="font-semibold text-a-text">Réglages de la source</span>
+          <span className="flex flex-wrap items-center gap-2 text-xs text-a-text-3">
             Remise par défaut {discount.toLocaleString('fr-FR')} %
             <span className={`rounded-full px-2 py-0.5 font-semibold ${consent.cls}`}>{consent.label}</span>
             <IconChevronDown size={16} aria-hidden className="transition-transform group-open:rotate-180" />
           </span>
         </summary>
-        <div className="grid gap-4 border-t border-gray-100 px-5 py-4 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end dark:border-gray-800">
+        <div className="grid gap-4 border-t border-a-border px-5 py-4 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
           <div>
             <label htmlFor="discount" className={LABEL}>Remise par défaut (%)</label>
             <input id="discount" className={INPUT} inputMode="decimal" value={settings.discountPct} onChange={(e) => setSettings({ ...settings, discountPct: e.target.value })} />
@@ -369,7 +369,7 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
             <input id="consent-note" className={INPUT} maxLength={2000} value={settings.consentNote} onChange={(e) => setSettings({ ...settings, consentNote: e.target.value })} placeholder="Accord écrit WhatsApp du 08/10/2026 pour textes et photos" />
           </div>
           <button type="button" className={SECONDARY} onClick={saveSettings} disabled={busy !== null}>Enregistrer</button>
-          <p className="text-xs text-gray-500 sm:col-span-4">
+          <p className="text-xs text-a-text-3 sm:col-span-4">
             La remise sert au calcul du prix unitaire estimé ci-dessous. Sans consentement enregistré, la lecture reste possible mais l’application aux produits est bloquée.
           </p>
         </div>
@@ -378,15 +378,15 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
       {items.length === 0 ? (
         <div className={`${CARD} text-center`}>
           <p className="text-sm font-semibold">Aucun produit lu</p>
-          <p className="mt-1 text-sm text-gray-500">Cliquez sur « Actualiser » pour lire le catalogue du vendeur.</p>
+          <p className="mt-1 text-sm text-a-text-3">Cliquez sur « Actualiser » pour lire le catalogue du vendeur.</p>
         </div>
       ) : (
         <section className={`${CARD} p-0`}>
-          <div className="space-y-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+          <div className="space-y-3 border-b border-a-border px-5 py-4">
             <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
               <div className="relative">
                 <label htmlFor="search" className="sr-only">Rechercher</label>
-                <IconSearch size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <IconSearch size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
                 <input id="search" type="search" className={`${INPUT} pl-9`} placeholder="Rechercher un produit (nom, description, produit Lepefy)" value={query} onChange={(e) => setQuery(e.target.value)} />
               </div>
               <div>
@@ -408,20 +408,20 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
               <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par statut">
                 {FILTERS.map((f) => (
                   <button key={f.key} type="button" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${filter === f.key ? 'border-[var(--admin-primary)] bg-[var(--admin-primary)] text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'}`}>
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${filter === f.key ? 'border-a-brand bg-a-brand text-a-on-brand' : 'border-a-border text-a-text-2 hover:bg-a-surface-2'}`}>
                     {f.label} {counts[f.key] ?? 0}
                   </button>
                 ))}
               </div>
-              <label className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-                <input type="checkbox" checked={reviewOnly} onChange={(e) => setReviewOnly(e.target.checked)} className="size-4 rounded border-gray-300" />
+              <label className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-a-text-2">
+                <input type="checkbox" checked={reviewOnly} onChange={(e) => setReviewOnly(e.target.checked)} className="size-4 rounded border-a-border-strong" />
                 À vérifier seulement
               </label>
             </div>
-            <p className="flex flex-wrap items-center gap-2 text-xs text-gray-500" aria-live="polite">
+            <p className="flex flex-wrap items-center gap-2 text-xs text-a-text-3" aria-live="polite">
               {visible.length} produit(s) affiché(s) sur {items.length}
               {hasFilters && (
-                <button type="button" onClick={resetFilters} className="inline-flex items-center gap-0.5 font-semibold text-[var(--admin-primary)] hover:underline">
+                <button type="button" onClick={resetFilters} className="inline-flex items-center gap-0.5 font-semibold text-a-brand-fg hover:underline">
                   <IconX size={12} aria-hidden /> Effacer les filtres
                 </button>
               )}
@@ -435,10 +435,10 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
             </div>
           ) : (
             <>
-              <div className="hidden grid-cols-[3fr_1fr_1.3fr_1.5fr_0.9fr] gap-3 border-b border-gray-100 px-5 py-2 text-xs font-medium text-gray-500 md:grid dark:border-gray-800">
+              <div className="hidden grid-cols-[3fr_1fr_1.3fr_1.5fr_0.9fr] gap-3 border-b border-a-border px-5 py-2 text-xs font-medium text-a-text-3 md:grid">
                 <span>Produit WhatsApp</span><span>Prix du lot</span><span>Prix unitaire estimé</span><span>Produit Lepefy</span><span>Statut</span>
               </div>
-              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              <ul className="divide-y divide-a-border">
                 {visible.map((it) => {
                   const n = it.normalized;
                   const min = n.suggested_min_quantity ?? 1;
@@ -449,42 +449,42 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
                   return (
                     <li key={it.id}>
                       <Link href={`/admin/platform/catalogues-whatsapp/${sourceId}/${it.id}`}
-                        className={`grid gap-x-3 gap-y-2 px-5 py-3 text-sm hover:bg-gray-50 md:grid-cols-[3fr_1fr_1.3fr_1.5fr_0.9fr] md:items-center dark:hover:bg-gray-800/50 ${it.status === 'dismissed' || it.status === 'unavailable' ? 'opacity-60' : ''}`}>
+                        className={`grid gap-x-3 gap-y-2 px-5 py-3 text-sm hover:bg-a-surface-2 md:grid-cols-[3fr_1fr_1.3fr_1.5fr_0.9fr] md:items-center ${it.status === 'dismissed' || it.status === 'unavailable' ? 'opacity-60' : ''}`}>
                         <div className="flex min-w-0 items-center gap-3">
                           <Thumb item={it} />
                           <div className="min-w-0">
                             <p className="flex items-center gap-1.5 font-semibold">
                               <span className="truncate">{n.original_name ?? '(sans nom)'}</span>
                               {n.requires_review && it.status !== 'dismissed' && (
-                                <IconAlertTriangle size={14} className="shrink-0 text-amber-500" aria-label="À vérifier" />
+                                <IconAlertTriangle size={14} className="shrink-0 text-tone-warning-fg" aria-label="À vérifier" />
                               )}
                             </p>
-                            <p className="truncate text-xs text-gray-500">{n.original_description ?? 'Sans description'}</p>
+                            <p className="truncate text-xs text-a-text-3">{n.original_description ?? 'Sans description'}</p>
                             {cols.length > 0 && (
                               <p className="mt-1 flex flex-wrap gap-1">
                                 {cols.slice(0, 2).map((c) => (
-                                  <span key={c.id} className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">{c.name?.trim() || `Collection ${c.id}`}</span>
+                                  <span key={c.id} className="rounded bg-a-hover px-1.5 py-0.5 text-xs text-a-text-2">{c.name?.trim() || `Collection ${c.id}`}</span>
                                 ))}
-                                {cols.length > 2 && <span className="text-[11px] text-gray-400">+{cols.length - 2}</span>}
+                                {cols.length > 2 && <span className="text-xs text-a-text-3">+{cols.length - 2}</span>}
                               </p>
                             )}
                           </div>
                         </div>
                         <p className="pl-[3.75rem] md:pl-0">
-                          <span className="text-xs text-gray-500 md:hidden">Lot : </span>
+                          <span className="text-xs text-a-text-3 md:hidden">Lot : </span>
                           {euro(it.displayed_price, currency)}
-                          {it.previous_price !== null && it.previous_price !== it.displayed_price && <span className="block text-xs text-red-600">était {euro(it.previous_price, currency)}</span>}
-                          {it.sale_price !== null && <span className="block text-xs text-gray-500">promo {euro(it.sale_price, currency)}</span>}
+                          {it.previous_price !== null && it.previous_price !== it.displayed_price && <span className="block text-xs text-tone-danger-fg">était {euro(it.previous_price, currency)}</span>}
+                          {it.sale_price !== null && <span className="block text-xs text-a-text-3">promo {euro(it.sale_price, currency)}</span>}
                         </p>
                         <p className="pl-[3.75rem] md:pl-0">
-                          <span className="text-xs text-gray-500 md:hidden">Unitaire : </span>
-                          {unit ? <><strong className="font-semibold">{euro(unit.unitPrice)}</strong> <span className="text-xs text-gray-500">× {min} min.</span></> : '—'}
+                          <span className="text-xs text-a-text-3 md:hidden">Unitaire : </span>
+                          {unit ? <><strong className="font-semibold">{euro(unit.unitPrice)}</strong> <span className="text-xs text-a-text-3">× {min} min.</span></> : '—'}
                           <QuantityHint n={n} />
                         </p>
                         <p className="truncate pl-[3.75rem] md:pl-0">
                           {it.products
-                            ? <>{it.products.name}<span className="block text-xs text-gray-500">{euro(it.products.price)}{!it.products.active && ' · inactif'}</span></>
-                            : <span className="text-gray-400">Non lié</span>}
+                            ? <>{it.products.name}<span className="block text-xs text-a-text-3">{euro(it.products.price)}{!it.products.active && ' · inactif'}</span></>
+                            : <span className="text-a-text-3">Non lié</span>}
                         </p>
                         <span className={`ml-[3.75rem] w-fit rounded-full px-2 py-0.5 text-xs font-semibold md:ml-0 ${st.cls}`}>{st.label}</span>
                       </Link>
@@ -497,7 +497,7 @@ export default function SourceClient({ sourceId }: { sourceId: string }) {
         </section>
       )}
       {source.last_fetch_truncated && (
-        <p className="text-xs text-gray-500">La dernière lecture n’était pas complète (catalogue au-delà des 10 premiers produits lu via les collections, ou lecture interrompue) : aucun produit n’est marqué « retiré » tant que la lecture n’est pas complète.</p>
+        <p className="text-xs text-a-text-3">La dernière lecture n’était pas complète (catalogue au-delà des 10 premiers produits lu via les collections, ou lecture interrompue) : aucun produit n’est marqué « retiré » tant que la lecture n’est pas complète.</p>
       )}
     </div>
   );

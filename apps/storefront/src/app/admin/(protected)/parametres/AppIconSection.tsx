@@ -73,18 +73,18 @@ export function AppIconSection({ initialAppIconUrl, hasLogoFallback }: Props) {
     >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div>
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{appIconUrl ? 'Icône dédiée configurée' : hasLogoFallback ? 'Le logo de la boutique est utilisé actuellement' : 'Aucune icône disponible'}</p>
-          <ul className="mt-3 space-y-1 text-sm leading-6 text-gray-500 dark:text-gray-400"><li>PNG carré, exactement 512 × 512 px</li><li>1 Mo maximum</li><li>Éléments importants centrés dans la zone sûre maskable</li></ul>
-          {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} className={`mt-4 text-sm font-medium ${feedback.type === 'success' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>{feedback.message}</p>}
+          <p className="text-sm font-medium text-a-text">{appIconUrl ? 'Icône dédiée configurée' : hasLogoFallback ? 'Le logo de la boutique est utilisé actuellement' : 'Aucune icône disponible'}</p>
+          <ul className="mt-3 space-y-1 text-sm leading-6 text-a-text-3"><li>PNG carré, exactement 512 × 512 px</li><li>1 Mo maximum</li><li>Éléments importants centrés dans la zone sûre maskable</li></ul>
+          {feedback && <p role={feedback.type === 'error' ? 'alert' : 'status'} className={`mt-4 text-sm font-medium ${feedback.type === 'success' ? 'text-tone-success-fg' : 'text-tone-danger-fg'}`}>{feedback.message}</p>}
           <input ref={inputRef} type="file" accept="image/png" onChange={handleFileChange} className="sr-only" aria-label="Choisir une icône PNG 512 par 512 pixels" />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" loading={isUploading} disabled={isRemoving} onClick={() => inputRef.current?.click()} className="min-h-11"><IconPhotoUp size={17} />{appIconUrl ? 'Remplacer' : 'Importer'}</Button>
             {appIconUrl && <Button type="button" variant="outline" loading={isRemoving} disabled={isUploading} onClick={() => void remove()} className={`min-h-11 ${SETTINGS_OUTLINE_DARK_CLS}`}><IconTrash size={17} />Revenir au logo</Button>}
           </div>
         </div>
-        {canPreview && <div className="flex items-end gap-4 self-start rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/30">
-          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(192, 'any', revision)} alt="Aperçu de l’icône standard" width={96} height={96} className="h-24 w-24 rounded-2xl object-contain shadow-sm" /><figcaption className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Standard</figcaption></figure>
-          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(512, 'maskable', revision)} alt="Aperçu de l’icône maskable" width={96} height={96} className="h-24 w-24 rounded-full object-contain shadow-sm" /><figcaption className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Maskable</figcaption></figure>
+        {canPreview && <div className="flex items-end gap-4 self-start rounded-xl border border-a-border bg-a-surface-2 p-4">
+          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(192, 'any', revision)} alt="Aperçu de l’icône standard" width={96} height={96} className="h-24 w-24 rounded-2xl object-contain shadow-sm" /><figcaption className="mt-2 text-xs text-a-text-3">Standard</figcaption></figure>
+          <figure className="text-center">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={buildPwaIconPath(512, 'maskable', revision)} alt="Aperçu de l’icône maskable" width={96} height={96} className="h-24 w-24 rounded-full object-contain shadow-sm" /><figcaption className="mt-2 text-xs text-a-text-3">Maskable</figcaption></figure>
         </div>}
       </div>
     </SettingsPanel>

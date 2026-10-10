@@ -43,11 +43,11 @@ export default async function AdminOnboardingPage({ searchParams }: { searchPara
 
   if (error) {
     return (
-      <main className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="mx-auto max-w-lg rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+      <main className="min-h-screen bg-a-surface-2 px-4 py-12">
+        <div className="mx-auto max-w-lg rounded-2xl border border-tone-warning-border bg-a-surface p-6 shadow-sm">
           <AdminTenantIdentity align="left" compact />
-          <h1 className="mt-5 text-xl font-semibold text-gray-950">Profil administrateur</h1>
-          <p className="mt-3 text-sm text-amber-700">Le nouveau profil administrateur nécessite la migration RBAC 085 avant de pouvoir être configuré.</p>
+          <h1 className="mt-5 text-xl font-semibold text-a-text">Profil administrateur</h1>
+          <p className="mt-3 text-sm text-tone-warning-fg">Le nouveau profil administrateur nécessite la migration RBAC 085 avant de pouvoir être configuré.</p>
         </div>
       </main>
     );
@@ -58,11 +58,11 @@ export default async function AdminOnboardingPage({ searchParams }: { searchPara
   if (profile?.profile_completed_at && !editing) redirect(nextPath);
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-10 sm:py-14">
-      <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7">
+    <main className="min-h-screen bg-a-surface-2 px-4 py-10 sm:py-14">
+      <div className="mx-auto max-w-lg rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm sm:p-7">
         <AdminTenantIdentity align="left" compact />
-        <h1 className="mt-5 text-2xl font-semibold text-gray-950">{editing ? 'Mon profil' : 'Bienvenue dans votre espace admin'}</h1>
-        <p className="mt-2 text-sm leading-6 text-gray-500">
+        <h1 className="mt-5 text-2xl font-semibold text-a-text">{editing ? 'Mon profil' : 'Bienvenue dans votre espace admin'}</h1>
+        <p className="mt-2 text-sm leading-6 text-a-text-3">
           {editing ? 'Mettez à jour vos informations de profil.' : 'Avant de commencer, renseignez vos informations.'}
         </p>
         <AdminProfileForm

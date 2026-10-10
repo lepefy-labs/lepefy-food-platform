@@ -29,23 +29,23 @@ export default function RunPanel({run,onChange}:{run:Run;onChange:(run:Run)=>voi
       <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">{Object.entries({
         website_discovered:'Sites découverts',website_crawled:'Sites analysés',website_unresolved:'Sites non résolus',
         complete:'Complets',partial:'Partiels',failed:'Échecs',
-      }).map(([key,label])=><div key={key}><dt className="text-gray-500">{label}</dt><dd>{run.cursor.metrics?.[key] ?? 0}</dd></div>)}</dl>
+      }).map(([key,label])=><div key={key}><dt className="text-a-text-3">{label}</dt><dd>{run.cursor.metrics?.[key] ?? 0}</dd></div>)}</dl>
       <details><summary className="min-h-11 cursor-pointer text-sm font-medium">Diagnostic des sources</summary>
         <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">{Object.entries({
           osm_matches:'OSM · correspondances',osm_not_found:'OSM · sans correspondance',osm_ambiguous:'OSM · ambigus',osm_failed:'OSM · indisponible',osm_skipped:'OSM · ignoré',
           website_partial:'Sites · analyse partielle',website_blocked:'Sites · bloqués',website_failed:'Sites · échecs',
           google_fallback_used:'Google · recherches',google_disabled:'Google · désactivé',google_not_found:'Google · sans résultat',
           google_ambiguous:'Google · ambigus',google_failed:'Google · échecs',google_quota_skipped:'Google · quota/cap',
-        }).map(([key,label])=><div key={key}><dt className="text-gray-500">{label}</dt><dd>{run.cursor.metrics?.[key] ?? 0}</dd></div>)}</dl>
+        }).map(([key,label])=><div key={key}><dt className="text-a-text-3">{label}</dt><dd>{run.cursor.metrics?.[key] ?? 0}</dd></div>)}</dl>
       </details>
     </>}
-    {run.error && <p className="text-sm text-amber-700">{run.error}</p>}
+    {run.error && <p className="text-sm text-tone-warning-fg">{run.error}</p>}
     {run.next_attempt_at && <p className="text-sm">Nouvelle tentative après {dateLabel(run.next_attempt_at)}</p>}
-    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {error && <p role="alert" className="text-sm text-tone-danger-fg">{error}</p>}
     {['pending','running','blocked','failed'].includes(run.status) && <div className="flex flex-wrap items-center gap-3">
       <button className={secondary} disabled={busy || Boolean(run.next_attempt_at && Date.parse(run.next_attempt_at)>Date.now())} onClick={() => void resume()}>{busy ? 'Traitement…' : 'Exécuter / reprendre'}</button>
       {busy && <button className={secondary} onClick={() => {stopped.current = true;}}>Pause après ce lot</button>}
-      <span className="text-xs text-gray-500">Gardez cette page ouverte. La progression est conservée.</span>
+      <span className="text-xs text-a-text-3">Gardez cette page ouverte. La progression est conservée.</span>
     </div>}
   </section>;
 }

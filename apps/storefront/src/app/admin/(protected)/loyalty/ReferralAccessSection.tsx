@@ -77,9 +77,9 @@ export function ReferralAccessSection() {
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Accès parrainage</h2>
-      <p className="text-xs text-gray-400 mb-4">
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
+      <h2 className="text-sm font-semibold text-a-text-2 mb-1">Accès parrainage</h2>
+      <p className="text-xs text-a-text-3 mb-4">
         Recherche par nom ou e-mail — pour accorder l&apos;accès manuellement (influenceurs, partenaires), notamment en mode
         « Seulement les clients autorisés manuellement ».
       </p>
@@ -92,22 +92,22 @@ export function ReferralAccessSection() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Nom ou e-mail…"
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="flex-1 border border-a-border rounded-lg px-3 py-2 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
         />
         <Button type="submit" loading={isSearching}>Rechercher</Button>
       </form>
 
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
-      {results && results.length === 0 && <p className="text-sm text-gray-400">Aucun client trouvé.</p>}
+      {results && results.length === 0 && <p className="text-sm text-a-text-3">Aucun client trouvé.</p>}
 
       {results && results.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400">
+              <tr className="text-left text-a-text-3">
                 <th className="py-1.5 font-medium">Client</th>
                 <th className="py-1.5 font-medium">Statut</th>
                 <th className="py-1.5 font-medium">Action</th>
@@ -115,17 +115,17 @@ export function ReferralAccessSection() {
             </thead>
             <tbody>
               {results.map((c) => (
-                <tr key={c.id} className="border-t border-gray-100 dark:border-gray-800">
+                <tr key={c.id} className="border-t border-a-border">
                   <td className="py-2">
-                    <div className="font-medium text-gray-800 dark:text-gray-100">{c.full_name ?? '—'}</div>
-                    <div className="text-gray-400">{c.email}</div>
+                    <div className="font-medium text-a-text">{c.full_name ?? '—'}</div>
+                    <div className="text-a-text-3">{c.email}</div>
                   </td>
                   <td className="py-2">
-                    {c.referral_suspended && <span className="text-red-600">Suspendu (anti-fraude)</span>}
+                    {c.referral_suspended && <span className="text-tone-danger-fg">Suspendu (anti-fraude)</span>}
                     {!c.referral_suspended && c.referral_access_granted && (
-                      <span className="text-green-600">{referralAccessReasonLabel(c.referral_access_reason)}</span>
+                      <span className="text-tone-success-fg">{referralAccessReasonLabel(c.referral_access_reason)}</span>
                     )}
-                    {!c.referral_suspended && !c.referral_access_granted && <span className="text-gray-400">Non accordé</span>}
+                    {!c.referral_suspended && !c.referral_access_granted && <span className="text-a-text-3">Non accordé</span>}
                   </td>
                   <td className="py-2">
                     {c.referral_access_granted ? (

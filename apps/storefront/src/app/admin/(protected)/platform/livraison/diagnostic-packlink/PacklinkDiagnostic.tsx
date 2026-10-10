@@ -45,7 +45,7 @@ const PROBE_LABELS: Record<ProbeName, string> = {
 };
 
 const INPUT_CLS =
-  'w-full rounded-xl border border-[var(--admin-border)] bg-white px-3.5 py-3 font-mono text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100';
+  'w-full rounded-xl border border-a-border bg-a-surface px-3.5 py-3 font-mono text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
 
 const INTERESTING_PATH =
   /(track|parcel|barcode|label|carrier|reference|shipment|awb|code|number|numero|collo)/i;
@@ -117,14 +117,14 @@ function prettyJson(value: unknown): string {
 function StatusBadge({ probe }: { probe: ProbeResult }) {
   if (probe.ok) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-tone-success-bg px-2 py-1 text-xs font-semibold text-tone-success-fg">
         <IconCheck size={13} /> HTTP {probe.status}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+    <span className="inline-flex items-center gap-1 rounded-full bg-tone-danger-bg px-2 py-1 text-xs font-semibold text-tone-danger-fg">
       <IconX size={13} /> {probe.status ? `HTTP ${probe.status}` : 'Erreur réseau'}
     </span>
   );
@@ -165,8 +165,8 @@ export function PacklinkDiagnostic({
 
   if (shippingProvider !== 'packlink') {
     return (
-      <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 dark:bg-gray-900">
-        <p className="text-sm text-gray-600 dark:text-gray-300">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-5">
+        <p className="text-sm text-a-text-2">
           Ce tenant n&apos;utilise pas Packlink comme provider de livraison. Le diagnostic Packlink
           ne s&apos;applique donc pas.
         </p>
@@ -217,12 +217,12 @@ export function PacklinkDiagnostic({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+      <section className="rounded-2xl border border-tone-info-border bg-tone-info-bg p-4">
         <div className="flex gap-3">
-          <IconInfoCircle size={20} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-300" />
+          <IconInfoCircle size={20} className="mt-0.5 shrink-0 text-tone-info-fg" />
           <div>
-            <p className="text-sm font-semibold text-blue-950 dark:text-blue-100">Diagnostic en lecture seule</p>
-            <p className="mt-1 text-sm leading-6 text-blue-800 dark:text-blue-200">
+            <p className="text-sm font-semibold text-tone-info-fg">Diagnostic en lecture seule</p>
+            <p className="mt-1 text-sm leading-6 text-tone-info-fg">
               L&apos;outil appelle Packlink côté serveur avec la clé API du tenant. Il ne modifie
               ni la commande, ni la livraison, ni la base de données, et la clé API n&apos;est jamais
               envoyée au navigateur.
@@ -234,9 +234,9 @@ export function PacklinkDiagnostic({
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:bg-gray-900"
+        className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm"
       >
-        <label htmlFor="packlink-reference" className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <label htmlFor="packlink-reference" className="mb-2 block text-sm font-semibold text-a-text">
           Référence Packlink
         </label>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -252,17 +252,17 @@ export function PacklinkDiagnostic({
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-a-brand px-5 py-2.5 text-sm font-semibold text-a-on-brand transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
           >
             <IconSearch size={17} />
             {loading ? 'Interrogation…' : 'Interroger Packlink'}
           </button>
         </div>
-        <p className="mt-2 text-xs text-gray-400">
+        <p className="mt-2 text-xs text-a-text-3">
           Utilisez le « Numéro de référence de la livraison » affiché dans Packlink PRO.
         </p>
         {error && (
-          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mt-3 rounded-xl border border-tone-danger-border bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">
             {error}
           </div>
         )}
@@ -270,37 +270,37 @@ export function PacklinkDiagnostic({
 
       {result && (
         <>
-          <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:bg-gray-900">
+          <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Référence interrogée</p>
-                <p className="mt-1 break-all font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">
+                <p className="text-xs font-semibold uppercase tracking-wide text-a-text-3">Référence interrogée</p>
+                <p className="mt-1 break-all font-mono text-sm font-semibold text-a-text">
                   {result.reference}
                 </p>
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-a-text-3">
                 {new Date(result.queriedAt).toLocaleString('fr-FR')}
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               {(Object.entries(result.probes) as Array<[ProbeName, ProbeResult]>).map(([name, probe]) => (
-                <div key={name} className="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950">
+                <div key={name} className="rounded-xl border border-a-border bg-a-surface-2 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{PROBE_LABELS[name]}</p>
+                    <p className="text-sm font-semibold text-a-text">{PROBE_LABELS[name]}</p>
                     <StatusBadge probe={probe} />
                   </div>
-                  <p className="mt-2 break-all font-mono text-[11px] leading-5 text-gray-500">{probe.endpoint}</p>
-                  <p className="mt-1 text-[11px] text-gray-400">{probe.durationMs} ms</p>
+                  <p className="mt-2 break-all font-mono text-xs leading-5 text-a-text-3">{probe.endpoint}</p>
+                  <p className="mt-1 text-xs text-a-text-3">{probe.durationMs} ms</p>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:bg-gray-900">
+          <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Champs pertinents détectés</h2>
-              <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+              <h2 className="text-sm font-semibold text-a-text">Champs pertinents détectés</h2>
+              <p className="mt-1 text-xs leading-5 text-a-text-3">
                 Détection automatique des chemins contenant tracking, parcel, barcode, carrier,
                 label, reference, code ou termes proches. Le JSON brut reste la source de vérité.
               </p>
@@ -310,7 +310,7 @@ export function PacklinkDiagnostic({
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-400 dark:border-gray-800">
+                    <tr className="border-b border-a-border text-xs uppercase tracking-wide text-a-text-3">
                       <th className="py-2 pr-3">Source</th>
                       <th className="py-2 pr-3">Chemin JSON</th>
                       <th className="py-2">Valeur</th>
@@ -318,12 +318,12 @@ export function PacklinkDiagnostic({
                   </thead>
                   <tbody>
                     {candidates.map((field, index) => (
-                      <tr key={`${field.source}-${field.path}-${index}`} className="border-b border-gray-50 dark:border-gray-800/60">
-                        <td className="py-2.5 pr-3 font-medium text-gray-700 dark:text-gray-300">
+                      <tr key={`${field.source}-${field.path}-${index}`} className="border-b border-a-border">
+                        <td className="py-2.5 pr-3 font-medium text-a-text-2">
                           {PROBE_LABELS[field.source]}
                         </td>
-                        <td className="py-2.5 pr-3 font-mono text-xs text-gray-500">{field.path}</td>
-                        <td className="break-all py-2.5 font-mono text-xs font-semibold text-gray-900 dark:text-gray-100">
+                        <td className="py-2.5 pr-3 font-mono text-xs text-a-text-3">{field.path}</td>
+                        <td className="break-all py-2.5 font-mono text-xs font-semibold text-a-text">
                           {field.value}
                         </td>
                       </tr>
@@ -332,7 +332,7 @@ export function PacklinkDiagnostic({
                 </table>
               </div>
             ) : (
-              <p className="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-500 dark:bg-gray-950 dark:text-gray-400">
+              <p className="rounded-xl bg-a-surface-2 px-3 py-3 text-sm text-a-text-3">
                 Aucun champ évident n&apos;a été détecté automatiquement. Inspectez les réponses brutes ci-dessous.
               </p>
             )}
@@ -340,8 +340,8 @@ export function PacklinkDiagnostic({
 
           <section className="space-y-3">
             <div>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Réponses brutes Packlink</h2>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <h2 className="text-sm font-semibold text-a-text">Réponses brutes Packlink</h2>
+              <p className="mt-1 text-xs text-a-text-3">
                 Les réponses sont affichées sans hypothèse sur le schéma afin d&apos;identifier les vrais champs disponibles.
               </p>
             </div>
@@ -349,27 +349,27 @@ export function PacklinkDiagnostic({
             {(Object.entries(result.probes) as Array<[ProbeName, ProbeResult]>).map(([name, probe]) => (
               <details
                 key={name}
-                className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white dark:bg-gray-900"
+                className="overflow-hidden rounded-2xl border border-a-border bg-a-surface"
               >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--admin-surface-subtle)]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-a-surface-2">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{PROBE_LABELS[name]}</p>
-                    <p className="mt-0.5 font-mono text-[11px] text-gray-400">{probe.contentType ?? 'content-type inconnu'}</p>
+                    <p className="text-sm font-semibold text-a-text">{PROBE_LABELS[name]}</p>
+                    <p className="mt-0.5 font-mono text-xs text-a-text-3">{probe.contentType ?? 'content-type inconnu'}</p>
                   </div>
                   <StatusBadge probe={probe} />
                 </summary>
-                <div className="border-t border-[var(--admin-border)]">
+                <div className="border-t border-a-border">
                   {probe.error && (
-                    <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="border-b border-tone-danger-border bg-tone-danger-bg px-4 py-3 text-sm text-tone-danger-fg">
                       {probe.error}
                     </div>
                   )}
                   {probe.truncated && (
-                    <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+                    <div className="border-b border-tone-warning-border bg-tone-warning-bg px-4 py-2 text-xs text-tone-warning-fg">
                       Réponse tronquée à 200 000 caractères pour protéger l&apos;interface d&apos;administration.
                     </div>
                   )}
-                  <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap break-words bg-gray-950 p-4 text-xs leading-5 text-gray-100">
+                  <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap break-words bg-a-inverse p-4 text-xs leading-5 text-a-text-3">
                     {prettyJson(probe.data)}
                   </pre>
                 </div>

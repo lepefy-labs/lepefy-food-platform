@@ -56,22 +56,22 @@ export default function ProspectDetail({id}:{id:string}) {
 
   if (!p || !form) return <div className="mx-auto max-w-6xl space-y-5">
     <Link className={secondary} href="/admin/platform/prospects">← Prospects</Link>
-    {error ? <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}<button className={secondary+' ml-3'} onClick={() => void load()}>Réessayer</button></div>
-      : <p role="status" className="text-sm text-gray-500">Chargement…</p>}
+    {error ? <div role="alert" className="rounded-xl bg-tone-danger-bg p-4 text-tone-danger-fg">{error}<button className={secondary+' ml-3'} onClick={() => void load()}>Réessayer</button></div>
+      : <p role="status" className="text-sm text-a-text-3">Chargement…</p>}
   </div>;
 
   const assessment = assessProspect(p), links = contactLinks(p), closed = CLOSED_STATUSES.includes(form.status);
-  return <div className="mx-auto max-w-6xl space-y-5 text-gray-950 dark:text-gray-100">
+  return <div className="mx-auto max-w-6xl space-y-5 text-a-text">
     <Link className={secondary} href="/admin/platform/prospects">← Prospects</Link>
-    {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
-    {notice && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-emerald-800">{notice}</p>}
+    {error && <p role="alert" className="rounded-xl bg-tone-danger-bg p-4 text-tone-danger-fg">{error}</p>}
+    {notice && <p role="status" className="rounded-xl bg-tone-success-bg p-4 text-tone-success-fg">{notice}</p>}
 
     <header className="flex flex-wrap items-start justify-between gap-4"><div>
-      <p className="text-xs font-semibold uppercase text-violet-600">Plateforme · Prospect</p>
+      <p className="text-xs font-semibold uppercase text-a-brand-fg">Plateforme · Prospect</p>
       <h1 className="mt-1 text-2xl font-semibold">{p.business_name}</h1>
-      <p className="mt-1 text-sm text-gray-500">{p.business_category ?? 'Catégorie non renseignée'} · {p.address ?? [p.postal_code,p.city].filter(Boolean).join(' ')}</p>
+      <p className="mt-1 text-sm text-a-text-3">{p.business_category ?? 'Catégorie non renseignée'} · {p.address ?? [p.postal_code,p.city].filter(Boolean).join(' ')}</p>
       <div className="mt-3 flex flex-wrap items-center gap-3"><Badge value={p.status} /><FollowUp p={p} /><Fit p={p} /><Qualification p={p} />
-        {p.do_not_contact && <span className="text-sm font-semibold text-red-700">Ne pas contacter</span>}</div>
+        {p.do_not_contact && <span className="text-sm font-semibold text-tone-danger-fg">Ne pas contacter</span>}</div>
       {links.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{links.map(link => <a key={link.key} href={link.href} className={secondary}
         {...(link.href.startsWith('http') ? {target:'_blank',rel:'noopener noreferrer'} : {})}>{link.label}</a>)}</div>}
     </div>
@@ -87,33 +87,33 @@ export default function ProspectDetail({id}:{id:string}) {
           <div className="text-sm">
             <label htmlFor="next-action">Prochaine action</label>
             <input id="next-action" className={field} type="datetime-local" disabled={closed} value={closed ? '' : form.next_action_at} onChange={e => set('next_action_at',e.target.value)} />
-            {closed ? <p className="mt-1 text-xs text-gray-500">Aucune relance pour un prospect {STATUS_LABELS[form.status]?.toLowerCase()}.</p>
+            {closed ? <p className="mt-1 text-xs text-a-text-3">Aucune relance pour un prospect {STATUS_LABELS[form.status]?.toLowerCase()}.</p>
               : <div className="mt-2 flex flex-wrap gap-2">{([['Demain',1],['Dans 3 jours',3],['Dans 1 semaine',7]] as const).map(([label,days]) =>
                 <button key={label} type="button" className={secondary} onClick={() => set('next_action_at',toLocal(presetFollowUp(days)))}>{label}</button>)}
                 {form.next_action_at && <button type="button" className={secondary} onClick={() => set('next_action_at','')}>Aucune</button>}</div>}
           </div>
           <label className="block text-sm">Dernier contact<input className={field} type="datetime-local" value={form.last_contact_at} onChange={e => set('last_contact_at',e.target.value)} />
-            <span className="mt-1 block text-xs text-gray-500">Rempli automatiquement en passant à « Contacté », « Réponse », « Démo » ou « Pilote ».</span></label>
+            <span className="mt-1 block text-xs text-a-text-3">Rempli automatiquement en passant à « Contacté », « Réponse », « Démo » ou « Pilote ».</span></label>
         </div>
         <div className="space-y-3">
           <label className="block text-sm">Ajouter une note<textarea className={field} rows={3} maxLength={NOTE_MAX} value={form.append_note} onChange={e => set('append_note',e.target.value)} placeholder="Appel, réponse, objection, prochaine étape…" />
-            <span className="mt-1 block text-xs text-gray-500">Datée automatiquement et ajoutée en haut de l’historique.</span></label>
-          <div className="text-sm"><p className="text-gray-500">Historique</p>
-            {p.notes ? <pre className="mt-1 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 font-sans text-sm dark:bg-gray-800">{p.notes}</pre>
-              : <p className="mt-1 text-gray-400">Aucune note.</p>}
-            <details className="mt-2"><summary className="min-h-11 cursor-pointer text-xs text-gray-500">Corriger l’historique</summary>
+            <span className="mt-1 block text-xs text-a-text-3">Datée automatiquement et ajoutée en haut de l’historique.</span></label>
+          <div className="text-sm"><p className="text-a-text-3">Historique</p>
+            {p.notes ? <pre className="mt-1 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl bg-a-surface-2 p-3 font-sans text-sm">{p.notes}</pre>
+              : <p className="mt-1 text-a-text-3">Aucune note.</p>}
+            <details className="mt-2"><summary className="min-h-11 cursor-pointer text-xs text-a-text-3">Corriger l’historique</summary>
               <textarea className={field} rows={6} maxLength={10000} value={form.notes} onChange={e => set('notes',e.target.value)} /></details>
           </div>
         </div>
-        <div className="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700 lg:col-span-2">
+        <div className="space-y-3 rounded-xl border border-a-border p-3 lg:col-span-2">
           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={form.do_not_contact} onChange={e => set('do_not_contact',e.target.checked)} />
             Ne pas contacter (opposition) — exclut ce commerce des relances et des enrichissements</label>
           {form.do_not_contact && <label className="block text-sm">Motif de l’opposition (obligatoire)<input className={field} maxLength={1000} value={form.suppression_reason} onChange={e => set('suppression_reason',e.target.value)} placeholder="Ex. demande du gérant par téléphone le 05/10" /></label>}
           <details><summary className="min-h-11 cursor-pointer text-sm">Site professionnel (correction manuelle)</summary>
             <input className={field} type="url" maxLength={2048} value={form.website_url} onChange={e => set('website_url',e.target.value)} placeholder="https://…" />
-            <p className="mt-1 text-xs text-gray-500">Changer le site efface les observations issues de l’ancien site ; relancez ensuite l’actualisation.</p></details>
+            <p className="mt-1 text-xs text-a-text-3">Changer le site efface les observations issues de l’ancien site ; relancez ensuite l’actualisation.</p></details>
         </div>
-        {issues.length > 0 && <ul role="alert" className="space-y-1 rounded-xl bg-red-50 p-3 text-sm text-red-800 lg:col-span-2">{issues.map(i => <li key={i}>{i}</li>)}</ul>}
+        {issues.length > 0 && <ul role="alert" className="space-y-1 rounded-xl bg-tone-danger-bg p-3 text-sm text-tone-danger-fg lg:col-span-2">{issues.map(i => <li key={i}>{i}</li>)}</ul>}
         <div className="flex flex-wrap items-center gap-2 lg:col-span-2">
           <button className={button} disabled={busy || !dirty || issues.length > 0}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
           {dirty && <button type="button" className={secondary} disabled={busy} onClick={() => { setForm(formOf(p)); setNotice(''); }}>Annuler les modifications</button>}
@@ -124,27 +124,27 @@ export default function ProspectDetail({id}:{id:string}) {
     <div className="grid gap-4 lg:grid-cols-2">
       <section className={card+' space-y-3 lg:col-span-2'}><h2 className="font-semibold">Pourquoi ce prospect</h2>
         <div className="grid gap-5 md:grid-cols-3">
-          <div><h3 className="mb-2 text-sm font-medium">Observations</h3>{p.detected_problems.length ? <ul className="list-inside list-disc space-y-2 text-sm">{p.detected_problems.map(v => <li key={v}>{v}</li>)}</ul> : <p className="text-sm text-gray-500">Preuves insuffisantes : actualisez les données.</p>}</div>
-          <div><h3 className="mb-2 text-sm font-medium">Modules Lepefy à proposer</h3>{p.recommended_modules.length ? <ul className="space-y-2 text-sm">{p.recommended_modules.map(v => <li key={v}>{v}</li>)}</ul> : <p className="text-sm text-gray-500">—</p>}</div>
-          <div><h3 className="mb-2 text-sm font-medium">Détail du Fit Score</h3><ul className="space-y-1 text-sm">{p.score_breakdown.map(r => <li key={r.rule}>{r.rule} : +{r.points}</li>)}</ul><p className="mt-2 text-xs text-gray-500">Plafonné à 100.</p></div>
+          <div><h3 className="mb-2 text-sm font-medium">Observations</h3>{p.detected_problems.length ? <ul className="list-inside list-disc space-y-2 text-sm">{p.detected_problems.map(v => <li key={v}>{v}</li>)}</ul> : <p className="text-sm text-a-text-3">Preuves insuffisantes : actualisez les données.</p>}</div>
+          <div><h3 className="mb-2 text-sm font-medium">Modules Lepefy à proposer</h3>{p.recommended_modules.length ? <ul className="space-y-2 text-sm">{p.recommended_modules.map(v => <li key={v}>{v}</li>)}</ul> : <p className="text-sm text-a-text-3">—</p>}</div>
+          <div><h3 className="mb-2 text-sm font-medium">Détail du Fit Score</h3><ul className="space-y-1 text-sm">{p.score_breakdown.map(r => <li key={r.rule}>{r.rule} : +{r.points}</li>)}</ul><p className="mt-2 text-xs text-a-text-3">Plafonné à 100.</p></div>
         </div>
-        {p.qualification_reason && <p className="text-xs text-gray-500">{p.qualification_reason}</p>}
+        {p.qualification_reason && <p className="text-xs text-a-text-3">{p.qualification_reason}</p>}
       </section>
       <section className={card+' space-y-3'}><h2 className="font-semibold">Présence digitale</h2>
-        <p className="text-sm text-gray-500">« Non détecté » décrit uniquement les pages inspectées. Un accès bloqué reste non vérifiable.</p>
+        <p className="text-sm text-a-text-3">« Non détecté » décrit uniquement les pages inspectées. Un accès bloqué reste non vérifiable.</p>
         <dl className="grid grid-cols-2 gap-3 text-sm">
-          {([['has_ecommerce','Ecommerce'],['has_online_ordering','Commande en ligne'],['has_delivery','Livraison'],['has_whatsapp_ordering','Commande WhatsApp'],['has_events','Événements'],['has_catering','Traiteur'],['has_loyalty','Fidélité'],['has_multiple_locations','Plusieurs établissements']] as const).map(([key,label]) => <div key={key}><dt className="text-gray-500">{label}</dt><dd>{p[key] === true ? 'Détecté' : p[key] === false ? 'Non détecté' : 'Non vérifié'}</dd></div>)}
+          {([['has_ecommerce','Ecommerce'],['has_online_ordering','Commande en ligne'],['has_delivery','Livraison'],['has_whatsapp_ordering','Commande WhatsApp'],['has_events','Événements'],['has_catering','Traiteur'],['has_loyalty','Fidélité'],['has_multiple_locations','Plusieurs établissements']] as const).map(([key,label]) => <div key={key}><dt className="text-a-text-3">{label}</dt><dd>{p[key] === true ? 'Détecté' : p[key] === false ? 'Non détecté' : 'Non vérifié'}</dd></div>)}
         </dl>
         <p className="text-sm">Maturité digitale : <strong>{QUALITY_LABELS[assessment.digital_maturity]}</strong> · Commande : <strong>{QUALITY_LABELS[assessment.ordering_maturity]}</strong></p>
-        {p.website_title && <p className="text-sm">{p.website_title}</p>}{p.website_description && <p className="text-sm text-gray-500">{p.website_description}</p>}
+        {p.website_title && <p className="text-sm">{p.website_title}</p>}{p.website_description && <p className="text-sm text-a-text-3">{p.website_description}</p>}
       </section>
       <section className={card+' space-y-3'}><h2 className="font-semibold">Identité et contacts publics</h2>
         <p className="text-sm">{p.legal_name ?? p.business_name}<br />{p.address ?? 'Adresse non renseignée'}</p>
         <dl className="grid gap-3 text-sm">
-          <div><dt className="text-gray-500">Site</dt><dd><ExternalLink href={p.website_url}>{p.website_url}</ExternalLink></dd></div>
-          <div><dt className="text-gray-500">Téléphone professionnel</dt><dd>{p.phone ?? '—'}</dd></div>
-          <div><dt className="text-gray-500">E-mail professionnel public</dt><dd>{p.public_email ?? '—'}</dd></div>
-          {(['instagram_url','facebook_url','tiktok_url','whatsapp_url'] as const).map(key => <div key={key}><dt className="capitalize text-gray-500">{key.replace('_url','')}</dt><dd><ExternalLink href={p[key]}>{p[key]}</ExternalLink></dd></div>)}
+          <div><dt className="text-a-text-3">Site</dt><dd><ExternalLink href={p.website_url}>{p.website_url}</ExternalLink></dd></div>
+          <div><dt className="text-a-text-3">Téléphone professionnel</dt><dd>{p.phone ?? '—'}</dd></div>
+          <div><dt className="text-a-text-3">E-mail professionnel public</dt><dd>{p.public_email ?? '—'}</dd></div>
+          {(['instagram_url','facebook_url','tiktok_url','whatsapp_url'] as const).map(key => <div key={key}><dt className="capitalize text-a-text-3">{key.replace('_url','')}</dt><dd><ExternalLink href={p[key]}>{p[key]}</ExternalLink></dd></div>)}
         </dl>
       </section>
     </div>
@@ -156,20 +156,20 @@ export default function ProspectDetail({id}:{id:string}) {
           ['Source',p.discovery_source],['SIRET',p.siret],['SIREN',p.siren],['APE',p.naf_ape_code],
           ['Découverte',dateLabel(p.discovered_at)],['Dernier enrichissement',dateLabel(p.last_enriched_at)],
           ['Dernier site complet',dateLabel(p.website_checked_at)],['Dernier OSM',dateLabel(p.osm_checked_at)],['Opposition',dateLabel(p.suppressed_at)],
-        ].map(([k,v]) => <div key={k}><dt className="text-gray-500">{k}</dt><dd>{v || '—'}</dd></div>)}</dl>
+        ].map(([k,v]) => <div key={k}><dt className="text-a-text-3">{k}</dt><dd>{v || '—'}</dd></div>)}</dl>
         <p className="text-sm">Dernière analyse complète : <Badge value={p.crawl_status} /> HTTP {p.crawl_http_status ?? '—'} {p.crawl_error ?? ''}</p>
         <p className="text-sm">Technologies : {p.technologies.join(', ') || 'Non identifiées'}</p>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><dt className="text-gray-500">Source du site</dt><dd>{p.evidence.find(e=>e.signal==='website_source')?.source ?? (p.website_url ? 'Source antérieure / saisie' : 'Non résolu')}</dd></div>
-          <div><dt className="text-gray-500">Dernière tentative site</dt><dd>{PROVIDER_LABELS[collection(p,'website').status ?? ''] ?? 'Non commencée'} · {dateLabel(collection(p,'website').checked_at)} · HTTP {collection(p,'website').http_status ?? '—'} · {collection(p,'website').error ?? ''}</dd></div>
-          <div><dt className="text-gray-500">OSM · dernière recherche</dt><dd>{PROVIDER_LABELS[collection(p,'osm').status ?? ''] ?? 'Non vérifié'} · {collection(p,'osm').confidence ?? (typeof p.osm_metadata.confidence==='number' ? p.osm_metadata.confidence : '—')}%<p>{(collection(p,'osm').reasons ?? []).join(' · ')}</p></dd></div>
-          <div><dt className="text-gray-500"><span translate="no">Google Maps</span> · recherche facultative</dt><dd>{PROVIDER_LABELS[collection(p,'google').status ?? ''] ?? 'Non utilisé'} · {dateLabel(collection(p,'google').checked_at)}{collection(p,'google').place_id && <p>Place ID : {collection(p,'google').place_id}</p>}<p>{(collection(p,'google').reasons ?? []).join(' · ')}</p></dd></div>
+          <div><dt className="text-a-text-3">Source du site</dt><dd>{p.evidence.find(e=>e.signal==='website_source')?.source ?? (p.website_url ? 'Source antérieure / saisie' : 'Non résolu')}</dd></div>
+          <div><dt className="text-a-text-3">Dernière tentative site</dt><dd>{PROVIDER_LABELS[collection(p,'website').status ?? ''] ?? 'Non commencée'} · {dateLabel(collection(p,'website').checked_at)} · HTTP {collection(p,'website').http_status ?? '—'} · {collection(p,'website').error ?? ''}</dd></div>
+          <div><dt className="text-a-text-3">OSM · dernière recherche</dt><dd>{PROVIDER_LABELS[collection(p,'osm').status ?? ''] ?? 'Non vérifié'} · {collection(p,'osm').confidence ?? (typeof p.osm_metadata.confidence==='number' ? p.osm_metadata.confidence : '—')}%<p>{(collection(p,'osm').reasons ?? []).join(' · ')}</p></dd></div>
+          <div><dt className="text-a-text-3"><span translate="no">Google Maps</span> · recherche facultative</dt><dd>{PROVIDER_LABELS[collection(p,'google').status ?? ''] ?? 'Non utilisé'} · {dateLabel(collection(p,'google').checked_at)}{collection(p,'google').place_id && <p>Place ID : {collection(p,'google').place_id}</p>}<p>{(collection(p,'google').reasons ?? []).join(' · ')}</p></dd></div>
         </dl>
         <details><summary className="min-h-11 cursor-pointer text-sm">Calcul de complétude : {assessment.data_completeness}%</summary>
           <ul className="space-y-1 text-sm">{assessment.completeness_breakdown.map(r=><li key={r.label}>{r.label} : {r.known ? r.points : 0}/{r.points}</li>)}</ul>
         </details>
         <details><summary className="min-h-11 cursor-pointer text-sm">Preuves et sources inspectées ({p.evidence.length})</summary><ul className="space-y-2 text-sm">{p.evidence.map((e,i) => <li key={i}>{e.signal} · {e.value} · <ExternalLink href={e.source}>Source</ExternalLink></li>)}</ul></details>
-        {Object.keys(p.osm_metadata).length > 0 && <p className="text-xs text-gray-500">OpenStreetMap contributors · ODbL · {String(p.osm_metadata.id ?? p.osm_metadata.result ?? '')}</p>}
+        {Object.keys(p.osm_metadata).length > 0 && <p className="text-xs text-a-text-3">OpenStreetMap contributors · ODbL · {String(p.osm_metadata.id ?? p.osm_metadata.result ?? '')}</p>}
       </div>
     </details>
   </div>;

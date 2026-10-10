@@ -14,7 +14,7 @@ import type {
 type LinkFilter = 'all' | 'linked' | 'unlinked';
 
 const INPUT_CLS =
-  'w-full rounded-xl border border-[var(--admin-border)] bg-white px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100';
+  'w-full rounded-xl border border-a-border bg-a-surface px-3.5 py-2.5 text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
 
 const DASH = '—';
 
@@ -32,16 +32,16 @@ function destination(summary: PacklinkListedShipment['summary']): string {
 // Tone only; the label is always Packlink's raw status value.
 function statusTone(status: string | null): string {
   const value = status?.toUpperCase() ?? '';
-  if (!value) return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
-  if (value.includes('DELIVERED')) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
-  if (/INCIDENT|RETURN|CANCEL|ERROR/.test(value)) return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300';
-  if (/TRANSIT|DELIVERY|TRACKING|SHIPPING|PROCESSING|COLLECT/.test(value)) return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
-  return 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
+  if (!value) return 'bg-a-hover text-a-text-2';
+  if (value.includes('DELIVERED')) return 'bg-tone-success-bg text-tone-success-fg';
+  if (/INCIDENT|RETURN|CANCEL|ERROR/.test(value)) return 'bg-tone-danger-bg text-tone-danger-fg';
+  if (/TRANSIT|DELIVERY|TRACKING|SHIPPING|PROCESSING|COLLECT/.test(value)) return 'bg-tone-info-bg text-tone-info-fg';
+  return 'bg-tone-warning-bg text-tone-warning-fg';
 }
 
 function StatusPill({ status }: { status: string | null }) {
   return (
-    <span className={`inline-flex max-w-full items-center truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusTone(status)}`}>
+    <span className={`inline-flex max-w-full items-center truncate rounded-full px-2 py-0.5 text-xs font-semibold ${statusTone(status)}`}>
       {status ?? 'Statut inconnu'}
     </span>
   );
@@ -49,13 +49,13 @@ function StatusPill({ status }: { status: string | null }) {
 
 function OrderPill({ shipment }: { shipment: PacklinkListedShipment }) {
   if (!shipment.lepefyOrder) {
-    return <span className="text-xs text-gray-400">Non associée</span>;
+    return <span className="text-xs text-a-text-3">Non associée</span>;
   }
   return (
     <Link
       href={`/admin/orders/${shipment.lepefyOrder.id}`}
       onClick={(event) => event.stopPropagation()}
-      className="inline-flex items-center rounded-full bg-[var(--admin-primary)]/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-[var(--admin-primary)] hover:underline"
+      className="inline-flex items-center rounded-full bg-a-brand-soft px-2 py-0.5 font-mono text-xs font-semibold text-a-brand-fg hover:underline"
     >
       {shipment.lepefyOrder.label}
     </Link>
@@ -64,9 +64,9 @@ function OrderPill({ shipment }: { shipment: PacklinkListedShipment }) {
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 border-b border-gray-50 py-2 text-sm last:border-0 dark:border-gray-800/60">
-      <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="break-words text-gray-900 dark:text-gray-100">{children}</dd>
+    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 border-b border-a-border py-2 text-sm last:border-0">
+      <dt className="text-a-text-3">{label}</dt>
+      <dd className="break-words text-a-text">{children}</dd>
     </div>
   );
 }
@@ -133,10 +133,10 @@ function ShipmentDetail({
               {summary.trackingCodes.length ? (
                 <span className="font-mono text-xs">{summary.trackingCodes.join(', ')}</span>
               ) : (
-                <span className="text-gray-500">Non fourni par la liste. Utilisez le diagnostic complet.</span>
+                <span className="text-a-text-3">Non fourni par la liste. Utilisez le diagnostic complet.</span>
               )}
               {summary.trackingUrl && /^https:\/\//i.test(summary.trackingUrl) && (
-                <a href={summary.trackingUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-[var(--admin-primary)] hover:underline">
+                <a href={summary.trackingUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-a-brand-fg hover:underline">
                   Ouvrir
                 </a>
               )}
@@ -151,26 +151,26 @@ function ShipmentDetail({
             </DetailRow>
           </dl>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-a-text-3">
             « {DASH} » : champ absent de la réponse Packlink pour cet enregistrement.
           </p>
 
-          <details className="overflow-hidden rounded-xl border border-[var(--admin-border)]">
-            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
+          <details className="overflow-hidden rounded-xl border border-a-border">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-a-text-2">
               Enregistrement JSON (données sensibles masquées)
             </summary>
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-gray-950 p-3 text-[11px] leading-5 text-gray-100">
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-a-inverse p-3 text-xs leading-5 text-a-text-3">
               {JSON.stringify(shipment.raw, null, 2)}
             </pre>
           </details>
         </div>
 
         {summary.reference && /^[A-Z0-9]{6,40}$/i.test(summary.reference) && (
-          <footer className="border-t border-[var(--admin-border)] px-5 py-4">
+          <footer className="border-t border-a-border px-5 py-4">
             <button
               type="button"
               onClick={() => onInspect(summary.reference!.toUpperCase())}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-[var(--admin-surface-subtle)] dark:text-gray-100"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-a-border px-4 py-2.5 text-sm font-semibold text-a-text hover:bg-a-surface-2"
             >
               <IconStethoscope size={17} /> Diagnostic complet (shipment, tracking, labels)
             </button>
@@ -183,11 +183,11 @@ function ShipmentDetail({
 function TechnicalDiagnostics({ diagnostics }: { diagnostics: PacklinkListDiagnostics }) {
   const hints = Object.keys(diagnostics.pagination.hints);
   return (
-    <details className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white dark:bg-gray-900">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-[var(--admin-surface-subtle)] dark:text-gray-100">
+    <details className="overflow-hidden rounded-2xl border border-a-border bg-a-surface">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-a-text hover:bg-a-surface-2">
         Diagnostic technique
       </summary>
-      <div className="space-y-3 border-t border-[var(--admin-border)] px-4 py-3">
+      <div className="space-y-3 border-t border-a-border px-4 py-3">
         <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
           {[
             ['Endpoint interrogé', diagnostics.endpoint],
@@ -203,23 +203,23 @@ function TechnicalDiagnostics({ diagnostics }: { diagnostics: PacklinkListDiagno
               : hints.length ? `non vérifiée · clés : ${hints.join(', ')}` : 'aucune information de pagination dans la réponse'],
           ].map(([label, value]) => (
             <div key={String(label)} className="flex gap-2 py-0.5">
-              <dt className="shrink-0 text-gray-500">{label} :</dt>
-              <dd className="break-all font-mono text-gray-900 dark:text-gray-100">{String(value)}</dd>
+              <dt className="shrink-0 text-a-text-3">{label} :</dt>
+              <dd className="break-all font-mono text-a-text">{String(value)}</dd>
             </div>
           ))}
         </dl>
         {diagnostics.shipmentFields.length > 0 && (
           <div>
-            <p className="mb-1 text-xs font-semibold text-gray-500">Champs du premier enregistrement</p>
+            <p className="mb-1 text-xs font-semibold text-a-text-3">Champs du premier enregistrement</p>
             <div className="flex flex-wrap gap-1">
               {diagnostics.shipmentFields.map(field => (
-                <span key={field} className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-700 dark:bg-gray-800 dark:text-gray-300">{field}</span>
+                <span key={field} className="rounded bg-a-hover px-1.5 py-0.5 font-mono text-xs text-a-text-2">{field}</span>
               ))}
             </div>
           </div>
         )}
         {(hints.length > 0 || diagnostics.unknownShapeSample !== undefined) && (
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-950 p-3 text-[11px] leading-5 text-gray-100">
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-a-inverse p-3 text-xs leading-5 text-a-text-3">
             {JSON.stringify(diagnostics.unknownShapeSample ?? diagnostics.pagination.hints, null, 2)}
           </pre>
         )}
@@ -243,7 +243,7 @@ function Pager({
   useEffect(() => setDraft(String(page)), [page]);
   const target = Number(draft);
   const valid = Number.isInteger(target) && target >= 1 && target <= totalPages;
-  const BTN = 'inline-flex min-h-10 items-center gap-1 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2 text-sm font-semibold text-gray-900 transition hover:bg-[var(--admin-surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-900 dark:text-gray-100';
+  const BTN = 'inline-flex min-h-10 items-center gap-1 rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm font-semibold text-a-text transition hover:bg-a-surface-2 disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <nav aria-label="Pagination des expéditions" className="flex flex-wrap items-center justify-between gap-3">
@@ -256,7 +256,7 @@ function Pager({
         </button>
       </div>
       <form
-        className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+        className="flex items-center gap-2 text-sm text-a-text-2"
         onSubmit={(event) => { event.preventDefault(); if (valid && target !== page) onPage(target); }}
       >
         <label htmlFor="packlink-page">Page</label>
@@ -265,7 +265,7 @@ function Pager({
           inputMode="numeric"
           value={draft}
           onChange={(event) => setDraft(event.target.value.replace(/\D/g, '').slice(0, 5))}
-          className="w-20 rounded-xl border border-[var(--admin-border)] bg-white px-2.5 py-2 text-center text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:bg-gray-950 dark:text-gray-100"
+          className="w-20 rounded-xl border border-a-border bg-a-surface px-2.5 py-2 text-center text-sm text-a-text outline-none focus:ring-2 focus:ring-a-focus"
         />
         <span>sur {totalPages.toLocaleString('fr-FR')}</span>
         <button type="submit" className={BTN} disabled={loading || !valid || target === page}>Aller</button>
@@ -344,11 +344,11 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:bg-gray-900">
+      <div className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Expéditions Packlink PRO</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+            <h2 className="text-base font-semibold text-a-text">Expéditions Packlink PRO</h2>
+            <p className="mt-1 text-xs leading-5 text-a-text-3">
               {result
                 ? <>Mis à jour le {new Date(result.queriedAt).toLocaleString('fr-FR')}
                     {result.available && pagination?.verified && <> · page {pagination.currentPage} sur {pagination.totalPages?.toLocaleString('fr-FR')}</>}
@@ -363,8 +363,8 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
             onClick={() => load()}
             disabled={loading}
             className={result
-              ? 'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-gray-900 transition hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:text-gray-100'
-              : 'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50'}
+              ? 'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-a-border px-4 py-2 text-sm font-semibold text-a-text transition hover:bg-a-surface-2 disabled:opacity-50'
+              : 'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-a-brand px-5 py-2.5 text-sm font-semibold text-a-on-brand transition-opacity disabled:cursor-not-allowed disabled:opacity-50'}
           >
             {result ? <IconRefresh size={17} className={loading ? 'animate-spin' : ''} /> : <IconListSearch size={17} />}
             {loading ? 'Chargement…' : result ? 'Actualiser' : 'Charger les expéditions'}
@@ -372,11 +372,11 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
         </div>
 
         {networkError && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{networkError}</div>
+          <div className="mt-4 rounded-xl border border-tone-danger-border bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">{networkError}</div>
         )}
 
         {result && !result.available && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-tone-danger-border bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">
             {result.message}
             {result.reason === 'list_endpoint_not_available' && (
               <span className="mt-1 block text-xs">Cela ne signifie pas que le compte n’a aucune expédition. Utilisez le diagnostic par référence ci-dessous.</span>
@@ -385,14 +385,14 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
         )}
 
         {pageFailure && (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-tone-danger-border bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">
             {pageFailure.message}
             <span className="mt-1 block text-xs">La page {currentPage} reste affichée. Détails dans le diagnostic technique.</span>
           </div>
         )}
 
         {result?.available && pagination?.verified && (
-          <div className="mt-4 flex gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-xs leading-5 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+          <div className="mt-4 flex gap-2.5 rounded-xl border border-tone-info-border bg-tone-info-bg px-3 py-2.5 text-xs leading-5 text-tone-info-fg">
             <IconInfoCircle size={16} className="mt-0.5 shrink-0" />
             <p>
               Pagination Packlink vérifiée : la page renvoyée correspond à la page demandée. Le total est celui annoncé par Packlink (liste non documentée officiellement).
@@ -405,7 +405,7 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
 
         {result?.available && (
           <>
-            {!pagination?.verified && <div className="mt-4 flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            {!pagination?.verified && <div className="mt-4 flex gap-2.5 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-xs leading-5 text-tone-warning-fg">
               <IconAlertTriangle size={16} className="mt-0.5 shrink-0" />
               <p>
                 Liste potentiellement incomplète : Packlink ne documente officiellement ni cette liste ni sa pagination.
@@ -419,7 +419,7 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
               <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <label className="relative block">
                   <span className="sr-only">Rechercher</span>
-                  <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
@@ -445,20 +445,20 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
       </div>
 
       {result?.available && shipments.length === 0 && (
-        <p className="rounded-2xl border border-[var(--admin-border)] bg-white px-5 py-6 text-center text-sm text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+        <p className="rounded-2xl border border-a-border bg-a-surface px-5 py-6 text-center text-sm text-a-text-3">
           Packlink a renvoyé une liste vide pour cette clé. Vérifiez dans Packlink PRO si des expéditions existent : la liste n’étant pas documentée, une réponse vide n’est pas une preuve d’absence.
         </p>
       )}
 
       {result?.available && shipments.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:bg-gray-900">
+        <div className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
           {filtered.length === 0 ? (
-            <p className="px-5 py-6 text-center text-sm text-gray-500">Aucune expédition ne correspond aux filtres.</p>
+            <p className="px-5 py-6 text-center text-sm text-a-text-3">Aucune expédition ne correspond aux filtres.</p>
           ) : (
             <>
               <table className="hidden w-full table-fixed text-left text-sm lg:table">
                 <thead>
-                  <tr className="border-b border-[var(--admin-border)] text-[11px] uppercase tracking-wide text-gray-400">
+                  <tr className="border-b border-a-border text-xs uppercase tracking-wide text-a-text-3">
                     <th className="w-[19%] px-4 py-2.5 font-semibold">Référence Packlink</th>
                     <th className="w-[13%] px-2 py-2.5 font-semibold">Statut</th>
                     <th className="w-[14%] px-2 py-2.5 font-semibold">Destinataire</th>
@@ -478,15 +478,15 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
                         onClick={() => setSelected(shipment)}
                         onKeyDown={(event) => { if (event.key === 'Enter') setSelected(shipment); }}
                         tabIndex={0}
-                        className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-[var(--admin-surface-subtle)] focus:bg-[var(--admin-surface-subtle)] focus:outline-none dark:border-gray-800/60"
+                        className="cursor-pointer border-b border-a-border last:border-0 hover:bg-a-surface-2 focus:bg-a-surface-2 focus:outline-none"
                       >
-                        <td className="truncate px-4 py-2.5 font-mono text-xs font-semibold text-gray-900 dark:text-gray-100">{summary.reference ?? DASH}</td>
+                        <td className="truncate px-4 py-2.5 font-mono text-xs font-semibold text-a-text">{summary.reference ?? DASH}</td>
                         <td className="px-2 py-2.5"><StatusPill status={summary.status} /></td>
-                        <td className="truncate px-2 py-2.5 text-gray-700 dark:text-gray-300">{summary.recipientName ?? summary.recipientCompany ?? DASH}</td>
-                        <td className="truncate px-2 py-2.5 text-gray-700 dark:text-gray-300">{destination(summary)}</td>
-                        <td className="truncate px-2 py-2.5 text-gray-700 dark:text-gray-300">{summary.carrier ?? DASH}</td>
-                        {hasTracking && <td className="truncate px-2 py-2.5 font-mono text-xs text-gray-600 dark:text-gray-400">{summary.trackingCodes[0] ?? DASH}</td>}
-                        <td className="truncate px-2 py-2.5 text-xs text-gray-600 dark:text-gray-400">{formatDate(summary.createdAt)}</td>
+                        <td className="truncate px-2 py-2.5 text-a-text-2">{summary.recipientName ?? summary.recipientCompany ?? DASH}</td>
+                        <td className="truncate px-2 py-2.5 text-a-text-2">{destination(summary)}</td>
+                        <td className="truncate px-2 py-2.5 text-a-text-2">{summary.carrier ?? DASH}</td>
+                        {hasTracking && <td className="truncate px-2 py-2.5 font-mono text-xs text-a-text-2">{summary.trackingCodes[0] ?? DASH}</td>}
+                        <td className="truncate px-2 py-2.5 text-xs text-a-text-2">{formatDate(summary.createdAt)}</td>
                         <td className="truncate px-2 py-2.5"><OrderPill shipment={shipment} /></td>
                       </tr>
                     );
@@ -494,27 +494,27 @@ export function PacklinkShipmentList({ onInspect }: { onInspect: (reference: str
                 </tbody>
               </table>
 
-              <ul className="divide-y divide-gray-100 lg:hidden dark:divide-gray-800">
+              <ul className="divide-y divide-a-border lg:hidden">
                 {filtered.map((shipment, index) => {
                   const { summary } = shipment;
                   return (
                     <li key={`${summary.reference ?? 'row'}-${index}`}>
-                      <button type="button" onClick={() => setSelected(shipment)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-[var(--admin-surface-subtle)]">
+                      <button type="button" onClick={() => setSelected(shipment)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-a-surface-2">
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-mono text-xs font-semibold text-gray-900 dark:text-gray-100">{summary.reference ?? DASH}</span>
+                            <span className="truncate font-mono text-xs font-semibold text-a-text">{summary.reference ?? DASH}</span>
                             <StatusPill status={summary.status} />
                           </div>
-                          <p className="truncate text-sm text-gray-700 dark:text-gray-300">
+                          <p className="truncate text-sm text-a-text-2">
                             {[summary.recipientName ?? summary.recipientCompany, destination(summary)].filter(v => v && v !== DASH).join(' · ') || DASH}
                           </p>
-                          <p className="flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
+                          <p className="flex flex-wrap items-center gap-x-2 text-xs text-a-text-3">
                             <span>{summary.carrier ?? DASH}</span>
                             <span>· {formatDate(summary.createdAt)}</span>
                             <span>·</span><OrderPill shipment={shipment} />
                           </p>
                         </div>
-                        <IconChevronRight size={16} className="shrink-0 text-gray-300" />
+                        <IconChevronRight size={16} className="shrink-0 text-a-text-3" />
                       </button>
                     </li>
                   );

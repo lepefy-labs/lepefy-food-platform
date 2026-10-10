@@ -116,9 +116,9 @@ const SECTION_HINTS: Partial<Record<OrderActionSection, string>> = {
 }
 
 const TRANSPORT_TONES = {
-  danger: 'bg-red-50 text-red-800 ring-red-200 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-900',
-  success: 'bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900',
-  neutral: 'bg-gray-50 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700',
+  danger: 'bg-tone-danger-bg text-tone-danger-fg ring-tone-danger-border',
+  success: 'bg-tone-success-bg text-tone-success-fg ring-tone-success-border',
+  neutral: 'bg-a-surface-2 text-a-text-2 ring-a-border',
 }
 
 export default async function AdminOrderPage({ params }: PageProps) {
@@ -253,52 +253,52 @@ export default async function AdminOrderPage({ params }: PageProps) {
     <div className="mx-auto w-full max-w-7xl pb-10">
       <Link
         href="/admin"
-        className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 transition hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+        className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 transition hover:bg-a-surface-2 hover:text-a-text"
       >
         <IconArrowLeft size={17} aria-hidden="true" />
         Retour aux commandes
       </Link>
 
-      <header className="mb-4 flex flex-col gap-4 rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+      <header className="mb-4 flex flex-col gap-4 rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h1 className="font-mono text-xl font-semibold tracking-tight text-gray-950 dark:text-gray-100 sm:text-2xl">{reference}</h1>
+            <h1 className="font-mono text-xl font-semibold tracking-tight text-a-text sm:text-2xl">{reference}</h1>
             <StatusBadge status={order.status} fulfillmentType={order.fulfillment_type} />
             {transport && !terminal && <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${TRANSPORT_TONES[transport.tone]}`}>Transport : {transport.label}</span>}
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <span className="inline-flex items-center gap-1 rounded-full bg-a-hover px-2 py-0.5 text-xs font-medium text-a-text-2">
               {isPickup ? <IconBuildingStore size={13} aria-hidden="true" /> : <IconTruck size={13} aria-hidden="true" />}{isPickup ? 'Retrait magasin' : 'Livraison'}
             </span>
             {hasColdChain && !terminal && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-tone-info-bg px-2 py-0.5 text-xs font-medium text-tone-info-fg">
                 <IconSnowflake size={13} aria-hidden="true" /> Chaîne du froid
               </span>
             )}
             {order.status === 'preparing' && (
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${pickingComplete
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                : 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                ? 'bg-tone-success-bg text-tone-success-fg'
+                : 'bg-tone-warning-bg text-tone-warning-fg'
               }`}>
                 {pickingComplete && <IconCheck size={13} aria-hidden="true" />}
                 Préparation {pickedCount}/{items.length}
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-a-text-3">
             {formatDate(order.created_at, 'fr')} · {order.full_name ?? order.email ?? 'Client'}
             {!terminal && <> · {formatSince(order.created_at, now)}</>}
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between lg:justify-end lg:gap-5">
           {showCta && ctaHref && (
-            <a href={ctaHref} className={`inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--admin-primary)] sm:w-auto ${operation.action.primary ? 'bg-[var(--admin-primary)] text-white hover:opacity-90' : 'border border-[var(--admin-border)] bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200'}`}>
+            <a href={ctaHref} className={`inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-a-focus sm:w-auto ${operation.action.primary ? 'bg-a-brand text-a-on-brand hover:opacity-90' : 'border border-a-border bg-a-surface text-a-text-2 hover:bg-a-surface-2'}`}>
               {operation.action.label}
             </a>
           )}
           <div className="text-left sm:text-right">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</p>
-            <p className="text-2xl font-semibold text-gray-950 dark:text-gray-100">{formatPrice(order.total, tenant.currency)}</p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {paymentLabel(order.payment_method)} · <span className={order.payment_status === 'paid' ? 'font-medium text-emerald-700 dark:text-emerald-300' : 'font-medium text-amber-700 dark:text-amber-300'}>{order.payment_status === 'paid' ? 'Payé' : 'Paiement en attente'}</span>
+            <p className="text-xs font-medium uppercase tracking-wide text-a-text-3">Total</p>
+            <p className="text-2xl font-semibold text-a-text">{formatPrice(order.total, tenant.currency)}</p>
+            <p className="mt-1 text-xs text-a-text-3">
+              {paymentLabel(order.payment_method)} · <span className={order.payment_status === 'paid' ? 'font-medium text-tone-success-fg' : 'font-medium text-tone-warning-fg'}>{order.payment_status === 'paid' ? 'Payé' : 'Paiement en attente'}</span>
             </p>
           </div>
         </div>
@@ -307,25 +307,25 @@ export default async function AdminOrderPage({ params }: PageProps) {
       {(operation.anomaly || operation.urgency || operation.notice || pickingNeedsAttention) && (
         <div className="mb-4 space-y-2">
           {operation.anomaly && (
-            <p role="alert" className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs ${alertTone === 'danger' ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'}`}>
+            <p role="alert" className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs ${alertTone === 'danger' ? 'border-tone-danger-border bg-tone-danger-bg text-tone-danger-fg' : 'border-tone-warning-border bg-tone-warning-bg text-tone-warning-fg'}`}>
               <IconAlertTriangle size={15} aria-hidden="true" className="mt-px shrink-0" />
               <span><strong>{PRIORITY_GROUP_LABELS.action_required} · {operation.anomaly.label}.</strong> {ANOMALY_HINTS[operation.anomaly.code]}</span>
             </p>
           )}
           {operation.urgency && (
-            <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-xs text-tone-warning-fg">
               <IconAlertTriangle size={15} aria-hidden="true" className="mt-px shrink-0" />
               <span><strong>{PRIORITY_GROUP_LABELS[operation.group]} · {operation.urgency}.</strong> Seuil configuré dans Paramètres → Automatisations.</span>
             </p>
           )}
           {operation.notice && (
-            <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-xs text-tone-warning-fg">
               <IconAlertTriangle size={15} aria-hidden="true" className="mt-px shrink-0" />
               <span><strong>{operation.notice}.</strong> Les colis sont prêts : associez l’expédition {managedProvider?.displayName ?? 'transporteur'}.</span>
             </p>
           )}
           {pickingNeedsAttention && (
-            <a href="#picking-checklist" className="block rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 transition hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:hover:bg-amber-950/50">
+            <a href="#picking-checklist" className="block rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-xs text-tone-warning-fg transition hover:bg-tone-warning-bg">
               <strong>Préparation incomplète :</strong> {pickedCount}/{items.length} lignes prélevées{coldItems.length > 0 ? ` · froid ${coldChecked}/${coldItems.length}` : ''}.
             </a>
           )}
@@ -333,11 +333,11 @@ export default async function AdminOrderPage({ params }: PageProps) {
       )}
 
       {order.status === 'cancelled' ? (
-        <p className="mb-5 rounded-2xl border border-[var(--admin-border)] bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-300">
+        <p className="mb-5 rounded-2xl border border-a-border bg-a-surface-2 px-4 py-3 text-sm text-a-text-2">
           Commande annulée {formatSince(order.updated_at, now)}.
         </p>
       ) : (
-        <section aria-labelledby="order-progress-title" className="mb-5 rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+        <section aria-labelledby="order-progress-title" className="mb-5 rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5">
           <h2 id="order-progress-title" className="sr-only">Avancement de la commande</h2>
           <ol className="grid grid-cols-4 gap-1">
             {steps.map((step, index) => {
@@ -345,17 +345,17 @@ export default async function AdminOrderPage({ params }: PageProps) {
               return (
                 <li key={step.key} className="relative text-center" aria-current={currentStep === index ? 'step' : undefined}>
                   <div className="relative mb-2 flex items-center justify-center">
-                    {index > 0 && <span aria-hidden="true" className={`absolute right-1/2 h-0.5 w-full ${complete ? 'bg-[var(--admin-primary)]' : 'bg-gray-200 dark:bg-gray-700'}`} />}
-                    <span aria-hidden="true" className={`relative z-10 h-3.5 w-3.5 rounded-full border-2 ${complete ? 'border-[var(--admin-primary)] bg-[var(--admin-primary)]' : 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900'}`} />
+                    {index > 0 && <span aria-hidden="true" className={`absolute right-1/2 h-0.5 w-full ${complete ? 'bg-a-brand' : 'bg-a-border'}`} />}
+                    <span aria-hidden="true" className={`relative z-10 h-3.5 w-3.5 rounded-full border-2 ${complete ? 'border-a-brand bg-a-brand' : 'border-a-border-strong bg-a-surface'}`} />
                   </div>
-                  <span className={`text-[11px] font-medium sm:text-xs ${complete ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400'}`}>{step.label}</span>
+                  <span className={`text-xs font-medium sm:text-xs ${complete ? 'text-a-text' : 'text-a-text-3'}`}>{step.label}</span>
                 </li>
               )
             })}
           </ol>
-          {order.status === 'stock_conflict' && <p className="mt-3 text-center text-xs font-medium text-red-700 dark:text-red-300">Workflow suspendu : conflit de stock.</p>}
-          {order.status === 'shipped' && order.shipped_at && <p className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">Expédiée {formatSince(order.shipped_at, now)}</p>}
-          {order.status === 'delivered' && <p className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{isPickup ? 'Retirée' : 'Livrée'} · dernière mise à jour {formatSince(order.updated_at, now)}</p>}
+          {order.status === 'stock_conflict' && <p className="mt-3 text-center text-xs font-medium text-tone-danger-fg">Workflow suspendu : conflit de stock.</p>}
+          {order.status === 'shipped' && order.shipped_at && <p className="mt-3 text-center text-xs text-a-text-3">Expédiée {formatSince(order.shipped_at, now)}</p>}
+          {order.status === 'delivered' && <p className="mt-3 text-center text-xs text-a-text-3">{isPickup ? 'Retirée' : 'Livrée'} · dernière mise à jour {formatSince(order.updated_at, now)}</p>}
         </section>
       )}
 
@@ -379,28 +379,28 @@ export default async function AdminOrderPage({ params }: PageProps) {
           </div>
 
           <AdminBlockAccent tone="info">
-            <section aria-labelledby="order-customer-title" className="rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-              <header className="flex items-center gap-3 border-b border-[var(--admin-border)] px-4 py-3.5 dark:border-gray-800">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
+            <section aria-labelledby="order-customer-title" className="rounded-2xl border border-a-border bg-a-surface shadow-sm">
+              <header className="flex items-center gap-3 border-b border-a-border px-4 py-3.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-tone-info-bg text-tone-info-fg">
                   <IconMail size={18} aria-hidden="true" />
                 </span>
                 <div>
-                  <h2 id="order-customer-title" className="text-sm font-semibold text-gray-900 dark:text-gray-100">{isPickup ? 'Client & retrait' : 'Client & livraison'}</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Informations utiles au traitement</p>
+                  <h2 id="order-customer-title" className="text-sm font-semibold text-a-text">{isPickup ? 'Client & retrait' : 'Client & livraison'}</h2>
+                  <p className="text-xs text-a-text-3">Informations utiles au traitement</p>
                 </div>
               </header>
               <div className="grid gap-3 p-4 sm:grid-cols-2">
-                <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{order.full_name ?? '—'}</p>
+                <div className="rounded-xl bg-a-surface-2 p-3">
+                  <p className="text-sm font-semibold text-a-text">{order.full_name ?? '—'}</p>
                   {order.email
-                    ? <a href={`mailto:${order.email}`} className="mt-1 block break-all text-sm text-[var(--admin-primary-fg)] hover:underline">{order.email}</a>
-                    : <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Pas d’e-mail{assistedSession?.phone ? ` · ${assistedSession.phone}` : ''}</p>}
+                    ? <a href={`mailto:${order.email}`} className="mt-1 block break-all text-sm text-a-brand-fg hover:underline">{order.email}</a>
+                    : <p className="mt-1 text-sm text-a-text-3">Pas d’e-mail{assistedSession?.phone ? ` · ${assistedSession.phone}` : ''}</p>}
                 </div>
-                <div className="rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/30">
+                <div className="rounded-xl bg-a-surface-2 p-3">
                   <div className="flex items-start gap-2">
-                    {isPickup ? <IconBuildingStore aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--admin-primary-fg)]" size={17} /> : <IconMapPin aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--admin-primary-fg)]" size={17} />}
-                    <div className="min-w-0 text-sm text-gray-600 dark:text-gray-300">
-                      <p className="font-medium text-gray-800 dark:text-gray-100">{isPickup ? 'Retrait magasin' : 'Livraison'}</p>
+                    {isPickup ? <IconBuildingStore aria-hidden="true" className="mt-0.5 shrink-0 text-a-brand-fg" size={17} /> : <IconMapPin aria-hidden="true" className="mt-0.5 shrink-0 text-a-brand-fg" size={17} />}
+                    <div className="min-w-0 text-sm text-a-text-2">
+                      <p className="font-medium text-a-text">{isPickup ? 'Retrait magasin' : 'Livraison'}</p>
                       {!isPickup && address && (
                         <>
                           {address.line1 && <p className="mt-1">{address.line1}</p>}
@@ -410,7 +410,7 @@ export default async function AdminOrderPage({ params }: PageProps) {
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline"
+                              className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-a-brand-fg hover:underline"
                             >
                               Ouvrir dans Maps <IconExternalLink size={12} aria-hidden="true" /><span className="sr-only"> (nouvel onglet)</span>
                             </a>
@@ -425,41 +425,41 @@ export default async function AdminOrderPage({ params }: PageProps) {
           </AdminBlockAccent>
 
           {showPaymentAudit && (
-            <section id="order-origin" className="scroll-mt-24 rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5" aria-labelledby="order-origin-title">
-              <h2 id="order-origin-title" className="text-sm font-semibold text-gray-900 dark:text-gray-100">Origine & encaissement</h2>
+            <section id="order-origin" className="scroll-mt-24 rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5" aria-labelledby="order-origin-title">
+              <h2 id="order-origin-title" className="text-sm font-semibold text-a-text">Origine & encaissement</h2>
               <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="text-xs text-gray-500 dark:text-gray-400">Origine</dt>
-                  <dd className="font-medium text-gray-900 dark:text-gray-100">
+                  <dt className="text-xs text-a-text-3">Origine</dt>
+                  <dd className="font-medium text-a-text">
                     {isAssisted ? `Saisie par l’équipe${order.sales_channel ? ` · ${SALES_CHANNEL_LABELS[order.sales_channel]}` : ''}` : 'Boutique en ligne'}
                   </dd>
                   {assistedSession && (
-                    <Link href={`/admin/orders/precommandes/${assistedSession.id}`} className="mt-1 inline-flex min-h-8 items-center text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">
+                    <Link href={`/admin/orders/precommandes/${assistedSession.id}`} className="mt-1 inline-flex min-h-8 items-center text-xs font-semibold text-a-brand-fg hover:underline">
                       Précommande {preorderReference(assistedSession.id)} →
                     </Link>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-gray-500 dark:text-gray-400">Paiement</dt>
-                  <dd className="font-medium text-gray-900 dark:text-gray-100">{order.external_payment_label ?? paymentLabel(order.payment_method)}</dd>
-                  {order.payment_confirmation_source && <dd className="text-xs text-gray-500 dark:text-gray-400">{CONFIRMATION_SOURCE_LABELS[order.payment_confirmation_source]}</dd>}
+                  <dt className="text-xs text-a-text-3">Paiement</dt>
+                  <dd className="font-medium text-a-text">{order.external_payment_label ?? paymentLabel(order.payment_method)}</dd>
+                  {order.payment_confirmation_source && <dd className="text-xs text-a-text-3">{CONFIRMATION_SOURCE_LABELS[order.payment_confirmation_source]}</dd>}
                 </div>
                 {order.payment_received_at && (
-                  <div><dt className="text-xs text-gray-500 dark:text-gray-400">Reçu le</dt><dd className="text-gray-900 dark:text-gray-100">{formatDate(order.payment_received_at, 'fr')}</dd></div>
+                  <div><dt className="text-xs text-a-text-3">Reçu le</dt><dd className="text-a-text">{formatDate(order.payment_received_at, 'fr')}</dd></div>
                 )}
                 {order.payment_reference && (
-                  <div><dt className="text-xs text-gray-500 dark:text-gray-400">Référence</dt><dd className="break-all font-mono text-gray-900 dark:text-gray-100">{order.payment_reference}</dd></div>
+                  <div><dt className="text-xs text-a-text-3">Référence</dt><dd className="break-all font-mono text-a-text">{order.payment_reference}</dd></div>
                 )}
                 {confirmedByEmail && (
-                  <div><dt className="text-xs text-gray-500 dark:text-gray-400">Confirmé par</dt><dd className="break-all text-gray-900 dark:text-gray-100">{confirmedByEmail}</dd></div>
+                  <div><dt className="text-xs text-a-text-3">Confirmé par</dt><dd className="break-all text-a-text">{confirmedByEmail}</dd></div>
                 )}
                 {order.payment_note && (
-                  <div className="sm:col-span-2"><dt className="text-xs text-gray-500 dark:text-gray-400">Note d’encaissement</dt><dd className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">{order.payment_note}</dd></div>
+                  <div className="sm:col-span-2"><dt className="text-xs text-a-text-3">Note d’encaissement</dt><dd className="whitespace-pre-wrap text-a-text">{order.payment_note}</dd></div>
                 )}
               </dl>
               {trackingLink && (
-                <div className="mt-4 border-t border-[var(--admin-border)] pt-4 dark:border-gray-800">
-                  <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="mt-4 border-t border-a-border pt-4">
+                  <p className="mb-2 text-xs text-a-text-3">
                     {order.email
                       ? 'Lien de suivi client (également envoyé par e-mail aux étapes clés).'
                       : 'Le client n’a pas d’e-mail : aucune notification e-mail n’est envoyée. Partagez-lui ce lien de suivi.'}
@@ -475,21 +475,21 @@ export default async function AdminOrderPage({ params }: PageProps) {
             </section>
           )}
 
-          <section aria-labelledby="order-summary-title" className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5">
+          <section aria-labelledby="order-summary-title" className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5">
             <div className="mb-4 flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><IconReceipt size={18} aria-hidden="true" /></span>
-              <h2 id="order-summary-title" className="text-sm font-semibold text-gray-900 dark:text-gray-100">Récapitulatif</h2>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-a-hover text-a-text-2"><IconReceipt size={18} aria-hidden="true" /></span>
+              <h2 id="order-summary-title" className="text-sm font-semibold text-a-text">Récapitulatif</h2>
             </div>
             <div className="ml-auto max-w-sm space-y-2 text-sm">
-              <div className="flex justify-between gap-4 text-gray-500 dark:text-gray-400"><span>Sous-total</span><span>{formatPrice(order.subtotal, tenant.currency)}</span></div>
-              {!isPickup && <div className="flex justify-between gap-4 text-gray-500 dark:text-gray-400"><span>Livraison</span><span>{order.shipping_cost === 0 ? 'Gratuite' : formatPrice(order.shipping_cost, tenant.currency)}</span></div>}
-              <div className="flex justify-between gap-4 border-t border-gray-100 pt-2 text-base font-semibold text-gray-950 dark:border-gray-800 dark:text-gray-100"><span>Total</span><span>{formatPrice(order.total, tenant.currency)}</span></div>
+              <div className="flex justify-between gap-4 text-a-text-3"><span>Sous-total</span><span>{formatPrice(order.subtotal, tenant.currency)}</span></div>
+              {!isPickup && <div className="flex justify-between gap-4 text-a-text-3"><span>Livraison</span><span>{order.shipping_cost === 0 ? 'Gratuite' : formatPrice(order.shipping_cost, tenant.currency)}</span></div>}
+              <div className="flex justify-between gap-4 border-t border-a-border pt-2 text-base font-semibold text-a-text"><span>Total</span><span>{formatPrice(order.total, tenant.currency)}</span></div>
             </div>
           </section>
         </div>
 
         <aside id="order-actions" aria-label="Actions et logistique" className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-24">
-          <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <div className="flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-a-text-3">
             <IconTruck size={15} aria-hidden="true" />
             Actions & logistique
           </div>

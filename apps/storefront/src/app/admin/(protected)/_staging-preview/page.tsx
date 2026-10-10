@@ -23,9 +23,9 @@ export default function StagingPreviewPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-warning-300 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-800 dark:bg-warning-950 dark:text-warning-200">
+      <div className="rounded-xl border border-warning-300 bg-warning-50 p-4 text-sm text-warning-800">
         Aperçu du portage TailAdmin v2.3.0 — composants isolés dans{' '}
-        <code className="rounded bg-black/5 px-1 py-0.5 dark:bg-white/10">src/_tailadmin-staging/</code>, données factices,
+        <code className="rounded bg-black/5 px-1 py-0.5">src/_tailadmin-staging/</code>, données factices,
         pas encore connectés aux vraies données. À retirer une fois le portage intégré aux vraies routes admin.
       </div>
 

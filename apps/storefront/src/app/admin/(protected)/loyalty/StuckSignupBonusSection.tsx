@@ -35,27 +35,27 @@ export function StuckSignupBonusSection({ initialItems }: { initialItems: StuckS
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
+      <h2 className="text-sm font-semibold text-a-text-2 mb-1">
         Bonus de bienvenue en attente
       </h2>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-a-text-3 mb-4">
         Bonus d’inscription par parrainage restés en attente plus de 7 jours. Une ligne en rouge signifie
         que le client a déjà une commande livrée — le bonus aurait dû se confirmer automatiquement et
         ne l&apos;a pas fait ; à confirmer manuellement après vérification.
       </p>
 
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400">Aucun bonus bloqué.</p>
+        <p className="text-sm text-a-text-3">Aucun bonus bloqué.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400 uppercase tracking-wide">
+              <tr className="text-left text-a-text-3 uppercase tracking-wide">
                 <th className="py-1.5 font-medium">Client</th>
                 <th className="py-1.5 font-medium">Date bonus</th>
                 <th className="py-1.5 font-medium">Montant</th>
@@ -67,19 +67,19 @@ export function StuckSignupBonusSection({ initialItems }: { initialItems: StuckS
               {items.map((item) => (
                 <tr
                   key={item.ledgerEntryId}
-                  className={`border-t border-gray-100 dark:border-gray-800 ${item.hasDeliveredOrder ? 'bg-red-50 dark:bg-red-950/30' : ''}`}
+                  className={`border-t border-a-border ${item.hasDeliveredOrder ? 'bg-tone-danger-bg' : ''}`}
                 >
                   <td className="py-2">
-                    <div className="font-medium text-gray-800 dark:text-gray-100">{item.customerFullName ?? '—'}</div>
-                    <div className="text-gray-400">{item.customerEmail}</div>
+                    <div className="font-medium text-a-text">{item.customerFullName ?? '—'}</div>
+                    <div className="text-a-text-3">{item.customerEmail}</div>
                   </td>
-                  <td className="py-2 text-gray-500">{new Date(item.createdAt).toLocaleDateString('fr-FR')}</td>
+                  <td className="py-2 text-a-text-3">{new Date(item.createdAt).toLocaleDateString('fr-FR')}</td>
                   <td className="py-2 font-medium">{item.amount} pts</td>
                   <td className="py-2">
                     {item.hasDeliveredOrder ? (
-                      <span className="text-red-600 font-semibold">Oui — anomalie</span>
+                      <span className="text-tone-danger-fg font-semibold">Oui — anomalie</span>
                     ) : (
-                      <span className="text-gray-400">Pas encore</span>
+                      <span className="text-a-text-3">Pas encore</span>
                     )}
                   </td>
                   <td className="py-2">

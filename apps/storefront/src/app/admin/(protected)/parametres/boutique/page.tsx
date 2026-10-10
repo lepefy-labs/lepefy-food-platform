@@ -14,7 +14,7 @@ export default async function ParametresBoutiquePage() {
       <TenantFieldsForm
         id="profil"
         title="Informations publiques"
-        description={<>Affichées à vos clients sous le nom <strong className="font-semibold text-gray-700 dark:text-gray-200">{tenant.name}</strong>.</>}
+        description={<>Affichées à vos clients sous le nom <strong className="font-semibold text-a-text-2">{tenant.name}</strong>.</>}
         initialValues={{ tagline: tenant.tagline, storefront_url: tenant.storefront_url, whatsapp_number: tenant.whatsapp_number }}
         fields={[
           { name: 'tagline', label: 'Slogan', placeholder: 'ex : Les saveurs de chez nous', wide: true },

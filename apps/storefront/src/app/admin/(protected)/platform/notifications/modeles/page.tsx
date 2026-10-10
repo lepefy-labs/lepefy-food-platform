@@ -10,7 +10,7 @@ export default async function PlatformNotificationTemplatesPage() {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood');
   const context = await getTenantNotificationContext(tenant.id);
   if (!context) {
-    return <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Contexte de notification du tenant indisponible.</p>;
+    return <p className="rounded-xl border border-tone-danger-border bg-tone-danger-bg p-4 text-sm text-tone-danger-fg">Contexte de notification du tenant indisponible.</p>;
   }
   return <TemplatePreviewBrowser previews={buildTemplatePreviews(context)} tenantName={context.tenantName} />;
 }

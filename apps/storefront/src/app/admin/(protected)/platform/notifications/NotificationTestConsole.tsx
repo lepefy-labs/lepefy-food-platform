@@ -138,59 +138,59 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-violet-700 dark:text-violet-300">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-a-brand-fg">
             <IconShieldLock size={16} /> Platform owner
           </div>
-          <h2 className="text-xl font-semibold text-gray-950 dark:text-white">Tests des modèles</h2>
-          <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+          <h2 className="text-xl font-semibold text-a-text">Tests des modèles</h2>
+          <p className="mt-1 max-w-2xl text-sm text-a-text-2">
             Envoie un email de test réel, rendu avec le modèle de production et transmis par le transport actif, sans créer de commande, réservation, invitation d’avis ou invitation testeur, ni modifier le stock, la capacité, la fidélité ou un paiement.
           </p>
         </div>
-        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+        <div className="rounded-xl border border-a-border bg-a-brand-soft px-4 py-3 text-sm text-a-brand-fg">
           <div className="font-semibold">Tenant courant</div>
-          <div>{tenantName} <span className="text-violet-600 dark:text-violet-400">({tenantSlug})</span></div>
+          <div>{tenantName} <span className="text-a-brand-fg">({tenantSlug})</span></div>
         </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
-        <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
           <div className="mb-5 flex items-center gap-2">
-            <IconBell size={20} className="text-violet-600" />
-            <h2 className="font-semibold text-gray-950 dark:text-white">Préparer le test</h2>
+            <IconBell size={20} className="text-a-brand-fg" />
+            <h2 className="font-semibold text-a-text">Préparer le test</h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
               Événement
-              <select value={event} onChange={e => setEvent(e.target.value as TestEvent)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-950">
+              <select value={event} onChange={e => setEvent(e.target.value as TestEvent)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3 text-sm">
                 {EVENTS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
-              <span className="mt-1 block text-xs font-normal text-gray-500">{eventDescription}</span>
+              <span className="mt-1 block text-xs font-normal text-a-text-3">{eventDescription}</span>
             </label>
 
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-sm font-medium text-a-text-2">
               {isTesterFeedbackInvite ? 'Destinataire testeur de test' : isTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
             </label>
 
             {!isTesterFeedbackInvite && (
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-a-text-2">
                 Nom client
-                <input value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                <input value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
               </label>
             )}
 
             {isTesterFeedbackInvite && (
-              <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                 URL du test fermé Google Play
-                <input type="url" value={googlePlayTestUrl} onChange={e => setGooglePlayTestUrl(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                <input type="url" value={googlePlayTestUrl} onChange={e => setGooglePlayTestUrl(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
               </label>
             )}
 
             {isReviewInvite && (
-              <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                 Type d’invitation
-                <select value={reviewInviteKind} onChange={e => setReviewInviteKind(e.target.value as ReviewInviteKind)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-950">
+                <select value={reviewInviteKind} onChange={e => setReviewInviteKind(e.target.value as ReviewInviteKind)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3">
                   <option value="initial">Invitation initiale</option>
                   <option value="reminder">Rappel</option>
                 </select>
@@ -198,9 +198,9 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             )}
 
             {needsFulfillment && (
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-a-text-2">
                 Remise
-                <select value={fulfillmentType} onChange={e => setFulfillmentType(e.target.value as FulfillmentType)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-950">
+                <select value={fulfillmentType} onChange={e => setFulfillmentType(e.target.value as FulfillmentType)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3">
                   <option value="delivery">Livraison</option>
                   <option value="pickup">Click & Collect</option>
                 </select>
@@ -208,125 +208,125 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             )}
 
             {(isConfirmed || isPaymentReminder || isShopExternalPaymentTenantAlert || isEventTest || event === 'order-stock-conflict') && (
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-a-text-2">
                 Total
-                <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
               </label>
             )}
 
             {isConfirmed && fulfillmentType === 'delivery' && (
               <>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Frais de livraison
-                  <input inputMode="decimal" value={shippingTotal} onChange={e => setShippingTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input inputMode="decimal" value={shippingTotal} onChange={e => setShippingTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                   Adresse
-                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Code postal
-                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Ville
-                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Pays
-                  <input value={country} onChange={e => setCountry(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={country} onChange={e => setCountry(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
               </>
             )}
 
             {isShopExternalPaymentTenantAlert && fulfillmentType === 'delivery' && (
               <>
-                <label className="sm:col-span-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                   Adresse client
-                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Code postal
-                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Ville
-                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
               </>
             )}
 
             {isShipped && (
               <>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Transporteur
-                  <input value={trackingCarrier} onChange={e => setTrackingCarrier(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={trackingCarrier} onChange={e => setTrackingCarrier(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Tracking
-                  <input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
+                  <input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
                 </label>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label className="text-sm font-medium text-a-text-2">
                   Livraison estimée
-                  <input type="date" value={estimatedDeliveryDate} onChange={e => setEstimatedDeliveryDate(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-950" />
-                  <span className="mt-1 block text-xs font-normal text-gray-500">Laisser vide pour tester l’e-mail sans date estimée.</span>
+                  <input type="date" value={estimatedDeliveryDate} onChange={e => setEstimatedDeliveryDate(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <span className="mt-1 block text-xs font-normal text-a-text-3">Laisser vide pour tester l’e-mail sans date estimée.</span>
                 </label>
               </>
             )}
 
             {isPaymentReminder && (
-              <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <div className="sm:col-span-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-xs leading-5 text-tone-warning-fg">
                 Le test simule un paiement PayPal déjà transmis au prestataire. Le vrai lien de reprise n’est pas utilisé : le payload reçoit un token factice de test.
               </div>
             )}
 
             {isShopExternalPaymentTenantAlert && (
-              <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+              <div className="sm:col-span-2 rounded-xl border border-tone-info-border bg-tone-info-bg p-3 text-xs leading-5 text-tone-info-fg">
                 Ce test simule l’alerte interne envoyée au tenant. L’adresse de test remplace temporairement la liste réelle <code>tenant_notification_recipients</code> et aucune checkout session n’est créée.
               </div>
             )}
 
             {isEventExternalPaymentTenantAlert && (
-              <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+              <div className="sm:col-span-2 rounded-xl border border-tone-info-border bg-tone-info-bg p-3 text-xs leading-5 text-tone-info-fg">
                 Ce test envoie uniquement le webhook Événementiel. Aucune demande de paiement, réservation ou capacité événement n’est créée ou modifiée.
               </div>
             )}
 
             {isEventReservationConfirmed && (
-              <div className="sm:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+              <div className="sm:col-span-2 rounded-xl border border-tone-success-border bg-tone-success-bg p-3 text-xs leading-5 text-tone-success-fg">
                 Le payload reprend le contrat réel de confirmation Événementiel avec billet factice. Aucune réservation n’est enregistrée et aucune capacité n’est consommée.
               </div>
             )}
 
             {isReviewInvite && (
-              <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+              <div className="sm:col-span-2 rounded-xl border border-a-border bg-a-brand-soft p-3 text-xs leading-5 text-a-brand-fg">
                 L’email est rendu avec le template réel de l’invitation (envoi via <code>send-email</code>), avec commande et token entièrement synthétiques. Aucun <code>review_invite</code>, token ou avis n’est créé ou modifié.
               </div>
             )}
 
             {isTesterFeedbackInvite && (
-              <div className="sm:col-span-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-200">
+              <div className="sm:col-span-2 rounded-xl border border-a-border bg-a-brand-soft p-3 text-xs leading-5 text-a-brand-fg">
                 L’e-mail réutilise le template réel avec une campagne et un lien feedback non autorisant entièrement synthétiques. Aucun invite, token, feedback ou état de campagne n’est créé ou modifié.
               </div>
             )}
           </div>
 
-          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="mt-6 rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-xs leading-5 text-tone-warning-fg">
             Le payload est marqué <strong>testMode=true</strong>. Le webhook, le branding et les coordonnées du tenant sont résolus côté serveur et ne peuvent pas être remplacés depuis ce formulaire.
           </div>
 
-          <button type="button" onClick={sendTest} disabled={sending || !email.trim() || (isTesterFeedbackInvite && !googlePlayTestUrl.trim())} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={sendTest} disabled={sending || !email.trim() || (isTesterFeedbackInvite && !googlePlayTestUrl.trim())} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-a-brand px-5 text-sm font-semibold text-a-on-brand transition-opacity disabled:cursor-not-allowed disabled:opacity-50">
             <IconSend size={18} /> {sending ? 'Envoi…' : 'Envoyer le test'}
           </button>
         </section>
 
-        <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="font-semibold text-gray-950 dark:text-white">Résultat</h2>
+        <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
+          <h2 className="font-semibold text-a-text">Résultat</h2>
           {!result ? (
-            <p className="mt-3 text-sm text-gray-500">Le statut n8n et le payload réellement envoyé apparaîtront ici.</p>
+            <p className="mt-3 text-sm text-a-text-3">Le statut n8n et le payload réellement envoyé apparaîtront ici.</p>
           ) : (
             <div className="mt-4 space-y-4">
-              <div className={`rounded-xl border p-3 text-sm ${result.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200' : 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200'}`}>
+              <div className={`rounded-xl border p-3 text-sm ${result.ok ? 'border-tone-success-border bg-tone-success-bg text-tone-success-fg' : 'border-tone-danger-border bg-tone-danger-bg text-tone-danger-fg'}`}>
                 <div className="font-semibold">{result.ok ? 'Test transmis à n8n' : 'Échec du test'}</div>
                 {result.status && <div>HTTP {result.status}</div>}
                 {result.webhookPath && <div className="break-all">{result.webhookPath}</div>}
@@ -335,8 +335,8 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
 
               {result.payload && (
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Payload envoyé</div>
-                  <pre className="max-h-[560px] overflow-auto rounded-xl bg-gray-950 p-3 text-xs leading-5 text-gray-100">{JSON.stringify(result.payload, null, 2)}</pre>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-a-text-3">Payload envoyé</div>
+                  <pre className="max-h-[560px] overflow-auto rounded-xl bg-a-inverse p-3 text-xs leading-5 text-a-text-3">{JSON.stringify(result.payload, null, 2)}</pre>
                 </div>
               )}
             </div>

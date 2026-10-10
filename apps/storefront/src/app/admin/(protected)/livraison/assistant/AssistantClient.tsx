@@ -118,7 +118,7 @@ export function AssistantClient() {
               {r.byCarrier.length > 0 ? (
                 <div className="space-y-1.5">
                   {r.byCarrier.map((c, i) => (
-                    <div key={c.carrier} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-[var(--admin-primary-soft)]/40' : 'bg-a-surface-2'}`}>
+                    <div key={c.carrier} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-a-brand-soft' : 'bg-a-surface-2'}`}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs font-semibold text-a-text-3 w-4 shrink-0">#{i + 1}</span>
                         <span className="truncate text-a-text-2">{c.carrier}</span>

@@ -66,40 +66,40 @@ export default function PickingChecklist({ orderId, orderStatus, items, canManag
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <header className="border-b border-[var(--admin-border)] px-4 py-4 dark:border-gray-800">
+    <section className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+      <header className="border-b border-a-border px-4 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Checklist de préparation</h2>
+              <h2 className="text-sm font-semibold text-a-text">Checklist de préparation</h2>
               {progress.complete && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-tone-success-bg px-2 py-1 text-xs font-bold text-tone-success-fg">
                   <IconCircleCheck size={13} /> Préparation terminée
                 </span>
               )}
             </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-a-text-3">
               {progress.picked}/{progress.total} lignes prélevées
               {progress.coldRequired > 0 ? ` · ${progress.coldChecked}/${progress.coldRequired} contrôles froid` : ''}
             </p>
           </div>
-          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{percent}%</span>
+          <span className="text-sm font-bold text-a-text">{percent}%</span>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-a-hover">
           <div
-            className={`h-full rounded-full transition-[width] ${progress.complete ? 'bg-emerald-500' : 'bg-[var(--admin-primary)]'}`}
+            className={`h-full rounded-full transition-[width] ${progress.complete ? 'bg-tone-success-solid' : 'bg-a-brand'}`}
             style={{ width: `${percent}%` }}
           />
         </div>
         {orderStatus !== 'preparing' && canManage && !progress.complete && (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="mt-3 rounded-lg bg-tone-warning-bg px-3 py-2 text-xs font-medium text-tone-warning-fg">
             Démarrez la préparation de la commande pour utiliser la checklist.
           </p>
         )}
-        {error && <p className="mt-3 text-xs font-medium text-red-600" role="alert">{error}</p>}
+        {error && <p className="mt-3 text-xs font-medium text-tone-danger-fg" role="alert">{error}</p>}
       </header>
 
-      <div className="divide-y divide-gray-100 dark:divide-gray-800">
+      <div className="divide-y divide-a-border">
         {items.map(item => {
           const isCold = item.storage_type === 'fresh' || item.storage_type === 'frozen';
           const picked = Boolean(item.picked_at);
@@ -111,35 +111,35 @@ export default function PickingChecklist({ orderId, orderStatus, items, canManag
           return (
             <div
               key={item.id}
-              className={`px-4 py-4 ${picked ? 'bg-emerald-50/30 dark:bg-emerald-950/10' : frozen ? 'bg-blue-50/40 dark:bg-blue-950/10' : fresh ? 'bg-cyan-50/30 dark:bg-cyan-950/10' : ''}`}
+              className={`px-4 py-4 ${picked ? 'bg-tone-success-bg' : frozen ? 'bg-tone-info-bg' : fresh ? 'bg-tone-info-bg' : ''}`}
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <span className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-base font-bold ${picked ? 'bg-emerald-600 text-white' : 'bg-gray-950 text-white dark:bg-white dark:text-gray-950'}`}>
+                  <span className={`flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-base font-bold ${picked ? 'bg-tone-success-solid text-a-on-inverse' : 'bg-a-inverse text-a-on-inverse'}`}>
                     ×{item.quantity}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className={`text-sm font-semibold ${picked ? 'text-gray-500 line-through dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>{item.name}</p>
-                      {item.name_alt && <span className="text-xs text-gray-400">{item.name_alt}</span>}
+                      <p className={`text-sm font-semibold ${picked ? 'text-a-text-3 line-through' : 'text-a-text'}`}>{item.name}</p>
+                      {item.name_alt && <span className="text-xs text-a-text-3">{item.name_alt}</span>}
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
                       {item.warehouse_location && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-a-hover px-2 py-1 font-semibold text-a-text-2">
                           <IconMapPin size={12} /> {item.warehouse_location}
                         </span>
                       )}
                       {frozen && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-tone-info-bg px-2 py-1 font-semibold text-tone-info-fg">
                           <IconSnowflake size={12} /> Surgelé
                         </span>
                       )}
                       {fresh && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-1 font-semibold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-tone-info-bg px-2 py-1 font-semibold text-tone-info-fg">
                           <IconTemperature size={12} /> Frais
                         </span>
                       )}
-                      {!isCold && <span className="text-gray-400">{storageLabel(item.storage_type)}</span>}
+                      {!isCold && <span className="text-a-text-3">{storageLabel(item.storage_type)}</span>}
                     </div>
                   </div>
                 </div>
@@ -150,8 +150,8 @@ export default function PickingChecklist({ orderId, orderStatus, items, canManag
                     disabled={!editable || busy}
                     onClick={() => void updateItem(item.id, { picked: !picked })}
                     className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${picked
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300'
-                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'
+                      ? 'border-tone-success-border bg-tone-success-bg text-tone-success-fg hover:bg-tone-success-bg'
+                      : 'border-a-border-strong bg-a-surface text-a-text-2 hover:bg-a-surface-2'
                     }`}
                   >
                     <IconCheck size={14} /> {picked ? 'Prélevé' : 'Marquer prélevé'}
@@ -163,8 +163,8 @@ export default function PickingChecklist({ orderId, orderStatus, items, canManag
                       disabled={!editable || busy || !picked}
                       onClick={() => void updateItem(item.id, { coldChainChecked: !coldChecked })}
                       className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${coldChecked
-                        ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300'
-                        : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50 dark:border-sky-900 dark:bg-gray-900 dark:text-sky-300'
+                        ? 'border-tone-info-border bg-tone-info-bg text-tone-info-fg hover:bg-tone-info-bg'
+                        : 'border-tone-info-border bg-a-surface text-tone-info-fg hover:bg-tone-info-bg'
                       }`}
                     >
                       {frozen ? <IconSnowflake size={14} /> : <IconTemperature size={14} />}

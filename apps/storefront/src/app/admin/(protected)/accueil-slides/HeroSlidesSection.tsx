@@ -9,8 +9,8 @@ import type { TenantHeroSlide, HeroSlideBackgroundVariant } from '@lepefy/types'
 import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-500 text-xs font-medium mb-1 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs font-medium mb-1 block';
 
 interface SlideFormState {
   badge_text: string;
@@ -53,12 +53,12 @@ function SlidePreview({ form }: { form: SlideFormState }) {
     <div className="relative overflow-hidden rounded-xl" style={{ backgroundImage: VARIANT_BACKGROUND[form.background_variant] }} aria-label="Aperçu de la slide">
       <div className="grid min-h-[150px] grid-cols-[1fr_auto] items-center gap-3 p-4">
         <div className="min-w-0">
-          {form.badge_text.trim() && <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: 'var(--color-secondary)', color: '#1a1a1a' }}>{form.badge_text}</span>}
+          {form.badge_text.trim() && <span className="mb-2 inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ backgroundColor: 'var(--color-secondary)', color: '#1a1a1a' }}>{form.badge_text}</span>}
           <p className="text-lg font-bold leading-tight text-white">{form.title.trim() || 'Titre de la slide'}</p>
           {form.subtitle.trim() && <p className="mt-1 line-clamp-2 text-xs text-white/90">{form.subtitle}</p>}
           {(primary || secondary) && <div className="mt-3 flex flex-wrap gap-1.5">
-            {primary && <span className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[var(--color-primary-dark)]">{form.cta_primary_label}</span>}
-            {secondary && <span className="rounded-full border border-white/60 px-3 py-1 text-[11px] font-semibold text-white">{form.cta_secondary_label}</span>}
+            {primary && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[var(--tenant-primary)]">{form.cta_primary_label}</span>}
+            {secondary && <span className="rounded-full border border-white/60 px-3 py-1 text-xs font-semibold text-white">{form.cta_secondary_label}</span>}
           </div>}
         </div>
         {form.image_url && <div className="h-24 w-24 rounded-lg bg-cover bg-center sm:h-28 sm:w-40" style={{ backgroundImage: `url(${form.image_url})` }} />}
@@ -134,14 +134,14 @@ function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Slide
           {field('cta_secondary_label', 'Bouton secondaire — texte', SLIDE_LIMITS.ctaLabel)}
           {field('cta_secondary_url', 'Bouton secondaire — lien', SLIDE_LIMITS.url, '/evenements')}
         </div>
-        <p className="text-xs text-gray-400">Lien : une page de la boutique commençant par « / » ou une adresse « https:// ».</p>
+        <p className="text-xs text-a-text-3">Lien : une page de la boutique commençant par « / » ou une adresse « https:// ».</p>
         <div>
           <label htmlFor={`variant-${id}`} className={LABEL_CLS}>Fond</label>
           <select id={`variant-${id}`} value={form.background_variant} onChange={(e) => set('background_variant', e.target.value as HeroSlideBackgroundVariant)} className={INPUT_CLS}>
             {VALID_VARIANTS.map((variant) => <option key={variant} value={variant}>{VARIANT_LABELS[variant]}</option>)}
           </select>
         </div>
-        <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600">
+        <label className="flex min-h-11 items-center gap-2 text-sm text-a-text-2">
           <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)} className="h-5 w-5" />
           Afficher sur la page d’accueil
         </label>
@@ -151,7 +151,7 @@ function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Slide
         <p className={LABEL_CLS}>Aperçu</p>
         <SlidePreview form={form} />
         <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-a-border bg-a-surface px-3 py-2 text-xs font-medium">
             <IconPhoto size={14} />
             {uploading ? 'Téléversement…' : form.image_url ? 'Remplacer l’image' : 'Ajouter une image (optionnelle)'}
             <input
@@ -166,23 +166,23 @@ function SlideForm({ initial, submitLabel, isSaving, onSubmit, onCancel }: Slide
               }}
             />
           </label>
-          {form.image_url && <button type="button" onClick={() => set('image_url', '')} className="min-h-11 px-3 py-2 text-xs text-red-600">Retirer l’image</button>}
+          {form.image_url && <button type="button" onClick={() => set('image_url', '')} className="min-h-11 px-3 py-2 text-xs text-tone-danger-fg">Retirer l’image</button>}
         </div>
-        {uploadError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{uploadError}</p>}
+        {uploadError && <p role="alert" className="rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{uploadError}</p>}
       </div>
 
       {showIssues && issues.length > 0 && (
-        <ul role="alert" className="space-y-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 lg:col-span-2">
+        <ul role="alert" className="space-y-1 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg lg:col-span-2">
           {issues.map((issue) => <li key={issue}>{issue}</li>)}
         </ul>
       )}
 
       <div className="flex items-center gap-2 lg:col-span-2">
-        <button onClick={handleSubmit} disabled={isSaving || uploading} className="min-h-11 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs text-white disabled:opacity-50">
+        <button onClick={handleSubmit} disabled={isSaving || uploading} className="min-h-11 rounded-lg bg-a-brand px-4 py-2 text-xs text-a-on-brand disabled:opacity-50">
           {isSaving ? 'Enregistrement…' : submitLabel}
         </button>
         {onCancel && (
-          <button onClick={onCancel} disabled={isSaving} className="min-h-11 rounded-lg border border-gray-200 px-4 py-2 text-xs text-gray-500 disabled:opacity-50">
+          <button onClick={onCancel} disabled={isSaving} className="min-h-11 rounded-lg border border-a-border px-4 py-2 text-xs text-a-text-3 disabled:opacity-50">
             Annuler
           </button>
         )}
@@ -302,42 +302,42 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5">
-      <p className="mb-4 text-xs text-gray-500">
+    <section className="rounded-xl border border-a-border bg-a-surface p-5">
+      <p className="mb-4 text-xs text-a-text-3">
         {activeCount > 0
           ? `${activeCount} slide${activeCount > 1 ? 's' : ''} affichée${activeCount > 1 ? 's' : ''} sur la page d’accueil, dans cet ordre. Les modifications sont visibles immédiatement.`
           : 'Aucune slide active : la page d’accueil affiche la slide de secours générique.'}
       </p>
 
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-4 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-4 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
       <div className="mb-6 space-y-4">
         {slides.map((slide, index) => (
-          <div key={slide.id} className={`rounded-lg border p-4 ${slide.active ? 'border-gray-100' : 'border-dashed border-gray-200 bg-gray-50/60'}`}>
+          <div key={slide.id} className={`rounded-lg border p-4 ${slide.active ? 'border-a-border' : 'border-dashed border-a-border bg-a-surface-2'}`}>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <div className={slide.active ? '' : 'opacity-60'}><SlidePreview form={toFormState(slide)} /></div>
               <div className="flex items-start gap-1 sm:flex-col">
-                <button onClick={() => void handleMove(index, -1)} disabled={index === 0 || savingId !== null} aria-label={`Monter « ${slide.title} »`} className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 disabled:opacity-30">
+                <button onClick={() => void handleMove(index, -1)} disabled={index === 0 || savingId !== null} aria-label={`Monter « ${slide.title} »`} className="flex h-11 w-11 items-center justify-center rounded-lg border border-a-border disabled:opacity-30">
                   <IconChevronUp size={16} stroke={1.5} />
                 </button>
-                <button onClick={() => void handleMove(index, 1)} disabled={index === slides.length - 1 || savingId !== null} aria-label={`Descendre « ${slide.title} »`} className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 disabled:opacity-30">
+                <button onClick={() => void handleMove(index, 1)} disabled={index === slides.length - 1 || savingId !== null} aria-label={`Descendre « ${slide.title} »`} className="flex h-11 w-11 items-center justify-center rounded-lg border border-a-border disabled:opacity-30">
                   <IconChevronDown size={16} stroke={1.5} />
                 </button>
               </div>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600">
+              <label className="flex min-h-11 items-center gap-2 text-sm text-a-text-2">
                 <input type="checkbox" checked={slide.active} onChange={() => handleToggleActive(slide)} disabled={savingId === slide.id} className="h-5 w-5" />
                 {slide.active ? 'Affichée' : 'Masquée'}
               </label>
               <div className="flex items-center gap-2">
-                <button onClick={() => setEditingId(editingId === slide.id ? null : slide.id)} className="min-h-11 rounded-lg border border-gray-200 px-3 py-2 text-xs">
+                <button onClick={() => setEditingId(editingId === slide.id ? null : slide.id)} className="min-h-11 rounded-lg border border-a-border px-3 py-2 text-xs">
                   {editingId === slide.id ? 'Fermer' : 'Modifier'}
                 </button>
-                <button onClick={() => setPendingDeleteId(slide.id)} disabled={savingId === slide.id} className="flex min-h-11 items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-xs text-red-600 disabled:opacity-50">
+                <button onClick={() => setPendingDeleteId(slide.id)} disabled={savingId === slide.id} className="flex min-h-11 items-center gap-1 rounded-lg border border-a-border px-3 py-2 text-xs text-tone-danger-fg disabled:opacity-50">
                   <IconTrash size={14} stroke={1.5} />
                   Supprimer
                 </button>
@@ -345,7 +345,7 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
             </div>
 
             {editingId === slide.id && (
-              <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="mt-4 border-t border-a-border pt-4">
                 <SlideForm initial={slide} submitLabel="Enregistrer" isSaving={savingId === slide.id} onSubmit={(form) => void handleUpdate(slide.id, form)} onCancel={() => setEditingId(null)} />
               </div>
             )}
@@ -354,12 +354,12 @@ export function HeroSlidesSection({ initialSlides }: HeroSlidesSectionProps) {
       </div>
 
       {creating ? (
-        <div className="rounded-lg border border-dashed border-gray-200 p-4">
-          <p className="mb-3 text-xs font-medium text-gray-500">Nouvelle slide</p>
+        <div className="rounded-lg border border-dashed border-a-border p-4">
+          <p className="mb-3 text-xs font-medium text-a-text-3">Nouvelle slide</p>
           <SlideForm submitLabel="Ajouter la slide" isSaving={savingId === 'new'} onSubmit={(form) => void handleCreate(form)} onCancel={() => setCreating(false)} />
         </div>
       ) : (
-        <button onClick={() => setCreating(true)} className="flex min-h-11 items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs text-white">
+        <button onClick={() => setCreating(true)} className="flex min-h-11 items-center gap-1.5 rounded-lg bg-a-brand px-3 py-2 text-xs text-a-on-brand">
           <IconPlus size={14} stroke={1.5} />
           Ajouter une slide
         </button>

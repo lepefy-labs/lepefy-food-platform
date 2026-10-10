@@ -21,31 +21,31 @@ export default function CartonSuggestionCard({ suggestion, missingWeightLines }:
   ).values());
 
   return (
-    <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <section className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-a-brand-soft text-a-brand-fg">
           <IconBox size={18} />
         </span>
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-primary-fg)]">Suggestion</p>
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Carton à utiliser</h2>
+          <p className="text-xs font-bold uppercase tracking-wide text-a-brand-fg">Suggestion</p>
+          <h2 className="text-sm font-semibold text-a-text">Carton à utiliser</h2>
         </div>
       </div>
 
       <ul className="space-y-2">
         {groups.map((group) => (
-          <li key={group.carton?.id ?? 'none'} className="rounded-xl bg-[var(--admin-surface-subtle)] px-3 py-2.5 dark:bg-gray-950/30">
+          <li key={group.carton?.id ?? 'none'} className="rounded-xl bg-a-surface-2 px-3 py-2.5">
             {group.carton ? (
               <>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                <p className="text-sm font-semibold text-a-text">
                   {group.count} × {group.carton.name}
                 </p>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-0.5 text-xs text-a-text-3">
                   {dims(group.carton)} · {group.weightsG.map(kg).join(' + ')}
                 </p>
               </>
             ) : (
-              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              <p className="text-xs font-medium text-tone-warning-fg">
                 {group.count} colis ({group.weightsG.map(kg).join(' + ')}) : aucun carton configuré pour ce poids.
               </p>
             )}
@@ -54,19 +54,19 @@ export default function CartonSuggestionCard({ suggestion, missingWeightLines }:
       </ul>
 
       {alternatives.length > 0 && (
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-a-text-3">
           Si la marchandise est volumineuse : {alternatives.map((carton) => `${carton.name} (${dims(carton)})`).join(', ')}.
         </p>
       )}
 
       {missingWeightLines > 0 && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-tone-warning-fg">
           <IconAlertTriangle size={14} className="mt-0.5 shrink-0" />
           {missingWeightLines} ligne{missingWeightLines > 1 ? 's' : ''} sans poids produit : suggestion à vérifier.
         </p>
       )}
 
-      <p className="mt-3 text-[11px] text-gray-400">
+      <p className="mt-3 text-xs text-a-text-3">
         Poids total {kg(suggestion.totalWeightG)} · suggestion indicative, sans effet sur le prix facturé.
       </p>
     </section>

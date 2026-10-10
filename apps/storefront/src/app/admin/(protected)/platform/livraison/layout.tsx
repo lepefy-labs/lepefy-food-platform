@@ -8,9 +8,9 @@ export default async function PlatformLivraisonLayout({ children }: { children: 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5 pb-10">
       <header>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Livraison technique</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Simulations Packlink et diagnostics du provider. Tenant interrogé : <span className="font-semibold text-gray-700 dark:text-gray-200">{tenant.name}</span>.
+        <h1 className="text-2xl font-semibold text-a-text">Livraison technique</h1>
+        <p className="mt-1 text-sm text-a-text-3">
+          Simulations Packlink et diagnostics du provider. Tenant interrogé : <span className="font-semibold text-a-text-2">{tenant.name}</span>.
         </p>
         <PlatformSectionTabs groupId="shipping" />
       </header>

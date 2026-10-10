@@ -9,9 +9,9 @@ interface PolicyModel {
   timeout_ms: number; min_confidence: number | null;
 }
 interface Snapshot { providers: AiProvider[]; models: AiModel[]; policies: Policy[]; policyModels: PolicyModel[] }
-const field = 'min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 dark:border-gray-700 dark:bg-gray-900 dark:text-white';
-const button = 'min-h-11 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50';
-const card = 'space-y-4 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900';
+const field = 'min-h-11 w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text';
+const button = 'min-h-11 rounded-lg bg-a-brand px-4 py-2 text-sm font-semibold text-a-on-brand hover:bg-a-brand disabled:opacity-50';
+const card = 'space-y-4 rounded-2xl border border-a-border bg-a-surface p-4';
 const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
 const nullable = (form: FormData, key: string) => text(form, key) || null;
 const number = (form: FormData, key: string) => text(form, key) ? Number(text(form, key)) : null;
@@ -105,16 +105,16 @@ export default function AiRoutingClient() {
       <button disabled={busy} className={button}>Enregistrer le modèle</button>
     </form>;
   }
-  return <div className="mx-auto max-w-6xl space-y-6 text-gray-900 dark:text-gray-100">
-    <header><p className="text-xs font-semibold uppercase text-violet-600">Plateforme</p>
+  return <div className="mx-auto max-w-6xl space-y-6 text-a-text">
+    <header><p className="text-xs font-semibold uppercase text-a-brand-fg">Plateforme</p>
       <h1 className="text-2xl font-semibold">Routage IA</h1>
-      <p className="mt-2 text-sm text-gray-500">Providers, modèles et ordre de fallback. Priorité la plus basse en premier.</p>
+      <p className="mt-2 text-sm text-a-text-3">Providers, modèles et ordre de fallback. Priorité la plus basse en premier.</p>
     </header>
-    {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{error}</p>}
-    {notice && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-800">{notice}</p>}
+    {error && <p role="alert" className="rounded-lg bg-tone-danger-bg p-3 text-tone-danger-fg">{error}</p>}
+    {notice && <p role="status" className="rounded-lg bg-tone-success-bg p-3 text-tone-success-fg">{notice}</p>}
     {!data ? <button className={button} onClick={() => void load()}>Charger la configuration</button> : <>
       <section className="space-y-3"><h2 className="text-lg font-semibold">Providers</h2>
-        <p className="text-sm text-gray-500">Aucun secret n’est affiché ou enregistré ici. OpenAI, Anthropic et Lepefy restent désactivés en V1.</p>
+        <p className="text-sm text-a-text-3">Aucun secret n’est affiché ou enregistré ici. OpenAI, Anthropic et Lepefy restent désactivés en V1.</p>
         {data.providers.map(p => <details key={p.id} className={card}>
           <summary className="min-h-11 cursor-pointer font-medium">{p.name} · {p.provider_type} · {p.enabled ? 'actif' : 'désactivé'} · santé: {p.health_status}</summary>
           {providerForm(p)}</details>)}
@@ -149,7 +149,7 @@ export default function AiRoutingClient() {
             values: { consumer: p.consumer, capability: p.capability, enabled: !p.enabled, config: {} } })}>
             {p.enabled ? 'Désactiver la policy' : 'Activer la policy'}</button>
           {data.policyModels.filter(pm => pm.policy_id === p.id).sort((a,b) => a.priority-b.priority || a.model_id.localeCompare(b.model_id)).map(pm =>
-            <form key={pm.model_id} className="grid items-end gap-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-800 sm:grid-cols-5" onSubmit={e => {
+            <form key={pm.model_id} className="grid items-end gap-3 rounded-xl bg-a-surface-2 p-3 sm:grid-cols-5" onSubmit={e => {
               e.preventDefault(); const f = new FormData(e.currentTarget);
               void save({ kind: 'policyModel', values: { policy_id: p.id, model_id: pm.model_id,
                 priority: Number(f.get('priority')), timeout_ms: Number(f.get('timeout_ms')),

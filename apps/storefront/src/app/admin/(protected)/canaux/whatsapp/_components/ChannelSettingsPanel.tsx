@@ -60,21 +60,21 @@ export default function ChannelSettingsPanel({ initial, canManage }: { initial: 
   }
 
   return (
-    <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <h2 className="mb-1 text-base font-semibold text-gray-950 dark:text-white">Fonctionnement</h2>
+    <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
+      <h2 className="mb-1 text-base font-semibold text-a-text">Fonctionnement</h2>
       {notActive && <p className={SETTINGS_HINT_CLS}>Canal en test : les messages sont enregistrés mais aucune réponse automatique n’est envoyée tant qu’il n’est pas actif.</p>}
       <div className="mt-3 space-y-3">
         {TOGGLES.map((toggle) => (
           <label key={toggle.key} className="flex items-start gap-3">
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 rounded border-gray-300"
+              className="mt-1 h-4 w-4 rounded border-a-border-strong"
               checked={form[toggle.key]}
               disabled={disabled || (toggle.key === 'ai_enabled' && !form.automation_enabled)}
               onChange={(event) => setForm((prev) => ({ ...prev, [toggle.key]: event.target.checked }))}
             />
             <span>
-              <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">{toggle.label}</span>
+              <span className="block text-sm font-medium text-a-text">{toggle.label}</span>
               <span className={SETTINGS_HINT_CLS}>{toggle.hint}</span>
             </span>
           </label>

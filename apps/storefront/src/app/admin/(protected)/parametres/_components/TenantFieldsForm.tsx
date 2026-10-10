@@ -70,7 +70,7 @@ export function TenantFieldsForm({ id, title, description, aside, fields, initia
         aside={aside}
         footer={<>
           <SettingsFeedback feedback={feedback} />
-          {dirty && !feedback && <span className="text-xs text-gray-500 dark:text-gray-400">Modifications non enregistrées</span>}
+          {dirty && !feedback && <span className="text-xs text-a-text-3">Modifications non enregistrées</span>}
           <Button type="submit" loading={isSaving} disabled={!dirty} className="min-h-11">Enregistrer</Button>
         </>}
       >

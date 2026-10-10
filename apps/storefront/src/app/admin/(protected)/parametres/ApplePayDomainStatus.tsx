@@ -60,14 +60,14 @@ export function ApplePayDomainStatus() {
   const label = status ? statusLabel(status) : null;
 
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950/30">
-      <div className="flex items-start gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+    <div className="mb-4 overflow-hidden rounded-2xl border border-a-border bg-a-surface">
+      <div className="flex items-start gap-3 border-b border-a-border px-4 py-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-white">
           <IconBrandApple size={18} />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Apple Pay : domaine Stripe</p>
-          <p className="mt-0.5 text-xs leading-5 text-gray-500 dark:text-gray-400">
+          <p className="text-sm font-semibold text-a-text">Apple Pay : domaine Stripe</p>
+          <p className="mt-0.5 text-xs leading-5 text-a-text-3">
             Apple Pay ne s’affiche dans /card que si le domaine de la boutique est enregistré sur le compte Stripe du module Carte.
           </p>
         </div>
@@ -75,22 +75,22 @@ export function ApplePayDomainStatus() {
 
       <div className="space-y-3 p-4">
         {loading ? (
-          <p className="text-xs text-gray-400">Chargement du statut…</p>
+          <p className="text-xs text-a-text-3">Chargement du statut…</p>
         ) : status && (
           <>
             {status.domain && (
-              <p className="break-all text-sm text-gray-700 dark:text-gray-300">
+              <p className="break-all text-sm text-a-text-2">
                 Domaine : <span className="font-mono font-semibold">{status.domain}</span>
               </p>
             )}
             {label && !status.error && (
-              <p className={`flex items-center gap-1.5 text-sm font-medium ${label.ok ? 'text-emerald-700' : 'text-amber-700'}`}>
+              <p className={`flex items-center gap-1.5 text-sm font-medium ${label.ok ? 'text-tone-success-fg' : 'text-tone-warning-fg'}`}>
                 {label.ok ? <IconCircleCheck size={16} /> : <IconAlertTriangle size={16} />}
                 {label.text}
               </p>
             )}
-            {status.applePayError && <p className="text-xs text-amber-700">{status.applePayError}</p>}
-            {status.error && <p className="text-xs font-medium text-red-600">{status.error}</p>}
+            {status.applePayError && <p className="text-xs text-tone-warning-fg">{status.applePayError}</p>}
+            {status.error && <p className="text-xs font-medium text-tone-danger-fg">{status.error}</p>}
           </>
         )}
 
@@ -102,14 +102,14 @@ export function ApplePayDomainStatus() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-a-border bg-a-surface px-3 text-xs font-medium text-a-text-2 transition hover:bg-a-surface-2 disabled:opacity-50"
           >
             <IconRefresh size={14} />
             Actualiser
           </button>
         </div>
 
-        <p className="rounded-xl bg-[var(--admin-surface-subtle)] px-3 py-2.5 text-xs leading-5 text-gray-600 dark:bg-gray-900 dark:text-gray-400">
+        <p className="rounded-xl bg-a-surface-2 px-3 py-2.5 text-xs leading-5 text-a-text-2">
           À faire aussi : activer Apple Pay dans le Dashboard Stripe (Réglages → Moyens de paiement → Apple Pay) sur chaque compte Stripe utilisé par le module Carte.
         </p>
       </div>

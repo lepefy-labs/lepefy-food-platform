@@ -108,19 +108,19 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-2xl border border-a-border bg-a-surface shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-a-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-950 dark:text-white">Évolution des coûts IA</h2>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Coût provider estimé · 12 derniers mois · cliquez sur un mois pour l’inspecter</p>
+            <h2 className="text-sm font-semibold text-a-text">Évolution des coûts IA</h2>
+            <p className="mt-1 text-xs text-a-text-3">Coût provider estimé · 12 derniers mois · cliquez sur un mois pour l’inspecter</p>
           </div>
-          <div className="inline-flex w-fit rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-950/60" aria-label="Affichage du graphique">
+          <div className="inline-flex w-fit rounded-xl border border-a-border bg-a-surface-2 p-1" aria-label="Affichage du graphique">
             {(['line', 'area'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setView(mode)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === mode ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-800 dark:text-violet-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === mode ? 'bg-a-surface text-a-brand-fg shadow-sm' : 'text-a-text-3 hover:text-a-text'}`}
               >
                 {mode === 'line' ? 'Ligne' : 'Aire'}
               </button>
@@ -208,37 +208,37 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 dark:border-violet-900 dark:bg-violet-950/20">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-violet-700 dark:text-violet-300">Ce mois</p>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{formatUsd(current?.cost ?? 0)}</p>
-          <p className="mt-1 text-xs text-gray-500">{current?.calls ?? 0} appels</p>
+        <div className="rounded-2xl border border-a-border bg-a-brand-soft p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-a-brand-fg">Ce mois</p>
+          <p className="mt-2 text-2xl font-bold text-a-text">{formatUsd(current?.cost ?? 0)}</p>
+          <p className="mt-1 text-xs text-a-text-3">{current?.calls ?? 0} appels</p>
         </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-300">Tendance vs mois précédent</p>
-          <p className={`mt-2 text-lg font-bold ${currentVariation !== null && currentVariation > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{variationLabel(currentVariation)}</p>
-          <p className="mt-1 text-xs text-gray-500">{currentVariation !== null && currentVariation < 0 ? 'Moins de coûts' : currentVariation !== null && currentVariation > 0 ? 'Coût en hausse' : 'Évolution mensuelle'}</p>
+        <div className="rounded-2xl border border-tone-success-border bg-tone-success-bg p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-tone-success-fg">Tendance vs mois précédent</p>
+          <p className={`mt-2 text-lg font-bold ${currentVariation !== null && currentVariation > 0 ? 'text-tone-urgent-fg' : 'text-tone-success-fg'}`}>{variationLabel(currentVariation)}</p>
+          <p className="mt-1 text-xs text-a-text-3">{currentVariation !== null && currentVariation < 0 ? 'Moins de coûts' : currentVariation !== null && currentVariation > 0 ? 'Coût en hausse' : 'Évolution mensuelle'}</p>
         </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900 dark:bg-amber-950/20">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-amber-700 dark:text-amber-300">Cumul 12 mois</p>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{formatUsd(totalCost)}</p>
-          <p className="mt-1 text-xs text-gray-500">{totalCalls} appels</p>
+        <div className="rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-tone-warning-fg">Cumul 12 mois</p>
+          <p className="mt-2 text-2xl font-bold text-a-text">{formatUsd(totalCost)}</p>
+          <p className="mt-1 text-xs text-a-text-3">{totalCalls} appels</p>
         </div>
-        <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-900 dark:bg-sky-950/20">
-          <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-sky-700 dark:text-sky-300">Coût moyen / mois</p>
-          <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{formatUsd(averageCost)}</p>
-          <p className="mt-1 text-xs text-gray-500">Sur 12 mois</p>
+        <div className="rounded-2xl border border-tone-info-border bg-tone-info-bg p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-tone-info-fg">Coût moyen / mois</p>
+          <p className="mt-2 text-2xl font-bold text-a-text">{formatUsd(averageCost)}</p>
+          <p className="mt-1 text-xs text-a-text-3">Sur 12 mois</p>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-950 dark:text-white">Détail des coûts par mois</h2>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Sélectionnez un mois pour consulter provider, endpoint, appels et coût estimé.</p>
+      <section className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+        <div className="border-b border-a-border px-5 py-4">
+          <h2 className="text-sm font-semibold text-a-text">Détail des coûts par mois</h2>
+          <p className="mt-1 text-xs text-a-text-3">Sélectionnez un mois pour consulter provider, endpoint, appels et coût estimé.</p>
         </div>
 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-          <div className="border-b border-gray-100 dark:border-gray-800 lg:border-b-0 lg:border-r">
-            <div className="hidden grid-cols-[1.2fr_0.8fr_0.65fr_0.9fr_32px] gap-3 border-b border-gray-100 bg-gray-50/70 px-4 py-2.5 text-[11px] font-medium text-gray-400 dark:border-gray-800 dark:bg-gray-950/40 sm:grid">
+          <div className="border-b border-a-border lg:border-b-0 lg:border-r">
+            <div className="hidden grid-cols-[1.2fr_0.8fr_0.65fr_0.9fr_32px] gap-3 border-b border-a-border bg-a-surface-2 px-4 py-2.5 text-xs font-medium text-a-text-3 sm:grid">
               <span>Mois</span><span>Coût total</span><span>Appels</span><span>Variation</span><span />
             </div>
             <div className="max-h-[530px] overflow-y-auto">
@@ -253,16 +253,16 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                     key={point.key}
                     type="button"
                     onClick={() => setSelectedKey(point.key)}
-                    className={`grid w-full grid-cols-[1fr_auto] items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition last:border-0 dark:border-gray-800 sm:grid-cols-[1.2fr_0.8fr_0.65fr_0.9fr_32px] ${active ? 'bg-violet-50/80 ring-1 ring-inset ring-violet-300 dark:bg-violet-950/25 dark:ring-violet-800' : 'hover:bg-gray-50 dark:hover:bg-gray-950/40'}`}
+                    className={`grid w-full grid-cols-[1fr_auto] items-center gap-3 border-b border-a-border px-4 py-3 text-left transition last:border-0 sm:grid-cols-[1.2fr_0.8fr_0.65fr_0.9fr_32px] ${active ? 'bg-a-brand-soft ring-1 ring-inset ring-a-border' : 'hover:bg-a-surface-2'}`}
                   >
                     <span className="min-w-0">
-                      <span className="font-semibold text-gray-900 dark:text-white">{point.fullLabel}</span>
-                      {isCurrent && <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:bg-violet-950 dark:text-violet-300">Actuel</span>}
+                      <span className="font-semibold text-a-text">{point.fullLabel}</span>
+                      {isCurrent && <span className="ml-2 rounded-full bg-a-brand-soft px-2 py-0.5 text-xs font-bold text-a-brand-fg">Actuel</span>}
                     </span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{formatUsd(point.cost)}</span>
-                    <span className="hidden text-gray-600 dark:text-gray-300 sm:block">{point.calls}</span>
-                    <span className={`hidden text-xs font-semibold sm:block ${value !== null && value > 0 ? 'text-orange-600' : value !== null && value < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{variationLabel(value)}</span>
-                    <span className="hidden text-center text-gray-400 sm:block">{active ? '⌃' : '⌄'}</span>
+                    <span className="font-semibold text-a-text">{formatUsd(point.cost)}</span>
+                    <span className="hidden text-a-text-2 sm:block">{point.calls}</span>
+                    <span className={`hidden text-xs font-semibold sm:block ${value !== null && value > 0 ? 'text-tone-urgent-fg' : value !== null && value < 0 ? 'text-tone-success-fg' : 'text-a-text-3'}`}>{variationLabel(value)}</span>
+                    <span className="hidden text-center text-a-text-3 sm:block">{active ? '⌃' : '⌄'}</span>
                   </button>
                 );
               })}
@@ -272,21 +272,21 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
           <div className="p-4 sm:p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-violet-600 dark:text-violet-300">Détail technique</p>
-                <h3 className="mt-1 text-base font-semibold text-gray-950 dark:text-white">{selected?.fullLabel ?? 'Mois sélectionné'}</h3>
+                <p className="text-xs font-bold uppercase tracking-[0.1em] text-a-brand-fg">Détail technique</p>
+                <h3 className="mt-1 text-base font-semibold text-a-text">{selected?.fullLabel ?? 'Mois sélectionné'}</h3>
               </div>
               {selected && selected.details.length > 0 && (
-                <button type="button" onClick={() => downloadCsv(selected)} className="rounded-xl border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/30">Exporter CSV</button>
+                <button type="button" onClick={() => downloadCsv(selected)} className="rounded-xl border border-a-border px-3 py-2 text-xs font-semibold text-a-brand-fg transition hover:bg-a-brand-soft">Exporter CSV</button>
               )}
             </div>
 
             {!selected || selected.details.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 p-5 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-950/30 dark:text-gray-400">Aucune utilisation IA enregistrée pour ce mois.</div>
+              <div className="rounded-xl border border-dashed border-a-border bg-a-surface-2 p-5 text-sm text-a-text-3">Aucune utilisation IA enregistrée pour ce mois.</div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
+              <div className="overflow-x-auto rounded-xl border border-a-border">
                 <table className="w-full min-w-[500px] text-xs">
                   <thead>
-                    <tr className="bg-gray-50/80 text-left text-[10px] uppercase tracking-[0.08em] text-gray-400 dark:bg-gray-950/50">
+                    <tr className="bg-a-surface-2 text-left text-xs uppercase tracking-[0.08em] text-a-text-3">
                       <th className="px-3 py-2.5 font-medium">Fonction / Endpoint</th>
                       <th className="px-3 py-2.5 font-medium">Provider</th>
                       <th className="px-3 py-2.5 text-right font-medium">Appels</th>
@@ -295,25 +295,25 @@ export default function AiCostHistoryChart({ points }: AiCostHistoryChartProps) 
                   </thead>
                   <tbody>
                     {selected.details.map((row) => (
-                      <tr key={`${row.provider}-${row.endpoint}`} className="border-t border-gray-100 dark:border-gray-800">
-                        <td className="px-3 py-3"><p className="font-semibold text-gray-800 dark:text-gray-200">{row.feature}</p><p className="mt-0.5 font-mono text-[10px] text-gray-400">{row.endpoint}</p></td>
-                        <td className="px-3 py-3 text-gray-600 dark:text-gray-300">{row.provider}</td>
-                        <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-white">{row.calls}</td>
-                        <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-white">{formatUsd(row.cost)}</td>
+                      <tr key={`${row.provider}-${row.endpoint}`} className="border-t border-a-border">
+                        <td className="px-3 py-3"><p className="font-semibold text-a-text">{row.feature}</p><p className="mt-0.5 font-mono text-xs text-a-text-3">{row.endpoint}</p></td>
+                        <td className="px-3 py-3 text-a-text-2">{row.provider}</td>
+                        <td className="px-3 py-3 text-right font-semibold text-a-text">{row.calls}</td>
+                        <td className="px-3 py-3 text-right font-semibold text-a-text">{formatUsd(row.cost)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t border-gray-200 bg-gray-50/60 dark:border-gray-700 dark:bg-gray-950/40">
-                      <td colSpan={2} className="px-3 py-3 font-semibold text-gray-700 dark:text-gray-200">Total</td>
-                      <td className="px-3 py-3 text-right font-bold text-gray-950 dark:text-white">{selected.calls}</td>
-                      <td className="px-3 py-3 text-right font-bold text-gray-950 dark:text-white">{formatUsd(selected.cost)}</td>
+                    <tr className="border-t border-a-border bg-a-surface-2">
+                      <td colSpan={2} className="px-3 py-3 font-semibold text-a-text-2">Total</td>
+                      <td className="px-3 py-3 text-right font-bold text-a-text">{selected.calls}</td>
+                      <td className="px-3 py-3 text-right font-bold text-a-text">{formatUsd(selected.cost)}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             )}
-            <p className="mt-3 text-[11px] text-gray-400">Coûts estimés à partir des tarifs provider enregistrés pour chaque appel.</p>
+            <p className="mt-3 text-xs text-a-text-3">Coûts estimés à partir des tarifs provider enregistrés pour chaque appel.</p>
           </div>
         </div>
       </section>

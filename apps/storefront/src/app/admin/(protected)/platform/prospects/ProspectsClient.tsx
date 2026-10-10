@@ -64,30 +64,30 @@ export default function ProspectsClient() {
     ['all','Tous',data?.counts[0]],
   ];
 
-  return <div className="mx-auto max-w-7xl space-y-5 text-gray-950 dark:text-gray-100">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-widest text-violet-600">Plateforme</p>
-      <h1 className="mt-1 text-2xl font-semibold">Prospects</h1><p className="mt-1 text-sm text-gray-500">Trouver les futurs clients Lepefy, les qualifier et suivre chaque contact.</p></div>
+  return <div className="mx-auto max-w-7xl space-y-5 text-a-text">
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-widest text-a-brand-fg">Plateforme</p>
+      <h1 className="mt-1 text-2xl font-semibold">Prospects</h1><p className="mt-1 text-sm text-a-text-3">Trouver les futurs clients Lepefy, les qualifier et suivre chaque contact.</p></div>
       <Link href="/admin/platform" className={secondary}>Console Lepefy</Link></header>
 
     <nav aria-label="Vues" className="flex flex-wrap gap-2">
       {tabs.map(([key,label,count]) => <button key={key} type="button" aria-current={tab === key ? 'page' : undefined} onClick={() => setQuery(TAB_QUERIES[key])}
-        className={'inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold '+(tab === key ? 'bg-violet-600 text-white' : 'border border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800')}>
-        {label}{typeof count === 'number' && <span className={'rounded-full px-2 text-xs '+(tab === key ? 'bg-white/20' : 'bg-gray-100 dark:bg-gray-800')}>{count}</span>}
-        {key === 'follow_up' && (data?.followUp.overdue ?? 0) > 0 && <span className="rounded-full bg-red-100 px-2 text-xs text-red-800">{data?.followUp.overdue} en retard</span>}
+        className={'inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold '+(tab === key ? 'bg-a-brand text-a-on-brand' : 'border border-a-border-strong hover:bg-a-surface-2')}>
+        {label}{typeof count === 'number' && <span className={'rounded-full px-2 text-xs '+(tab === key ? 'bg-a-surface text-a-brand-fg' : 'bg-a-hover')}>{count}</span>}
+        {key === 'follow_up' && (data?.followUp.overdue ?? 0) > 0 && <span className="rounded-full bg-tone-danger-bg px-2 text-xs text-tone-danger-fg">{data?.followUp.overdue} en retard</span>}
       </button>)}
     </nav>
 
     {tab === 'pipeline' && <div className="flex flex-wrap gap-2" aria-label="Étapes du pipeline">
       {PIPELINE_STAGES.map((stage,index) => <button key={stage} type="button" onClick={() => setQuery('status='+stage)} aria-pressed={params.get('status') === stage}
-        className={'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm '+(params.get('status') === stage ? 'bg-violet-100 font-semibold text-violet-900' : 'bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200')}>
-        {index > 0 && <span aria-hidden="true" className="text-gray-400">→</span>}{STATUS_LABELS[stage]} <strong>{data?.pipeline[stage] ?? '—'}</strong>
+        className={'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm '+(params.get('status') === stage ? 'bg-a-brand-soft font-semibold text-a-brand-fg' : 'bg-a-surface-2 text-a-text-2 hover:bg-a-hover')}>
+        {index > 0 && <span aria-hidden="true" className="text-a-text-3">→</span>}{STATUS_LABELS[stage]} <strong>{data?.pipeline[stage] ?? '—'}</strong>
       </button>)}
     </div>}
 
     <details className={card} open={tab === 'enrich' || tab === 'all'}>
       <summary className="min-h-11 cursor-pointer font-semibold">Découverte et enrichissement</summary>
       <div className="mt-3 space-y-4">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{(['Total','À enrichir','Qualifiés','Prioritaires'] as const).map((label,i) => <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800" key={label}><p className="text-xs text-gray-500">{label}</p><p className="mt-1 text-xl font-semibold">{data?.counts[i] ?? '—'}</p></div>)}</div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{(['Total','À enrichir','Qualifiés','Prioritaires'] as const).map((label,i) => <div className="rounded-xl bg-a-surface-2 p-3" key={label}><p className="text-xs text-a-text-3">{label}</p><p className="mt-1 text-xl font-semibold">{data?.counts[i] ?? '—'}</p></div>)}</div>
         {data?.google.enabled && <p role="status" className="text-sm">Google Places : {data.google.available ? String(data.google.used)+' / '+data.google.limit+' requêtes réservées ce mois' : 'Quota indisponible — fournisseur suspendu'}{data.google.available && (data.google.used ?? 0)>=data.google.limit ? ' · Limite atteinte' : ''}</p>}
         <DiscoveryForm onRun={changeRun} />
         {data?.runs.length ? <details><summary className="min-h-11 cursor-pointer text-sm font-medium">Traitements récents</summary>
@@ -128,7 +128,7 @@ export default function ProspectsClient() {
       </div>
     </form>
 
-    {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}<button className={secondary+' ml-3'} onClick={() => void load()}>Réessayer</button></div>}
+    {error && <div role="alert" className="rounded-xl bg-tone-danger-bg p-4 text-tone-danger-fg">{error}<button className={secondary+' ml-3'} onClick={() => void load()}>Réessayer</button></div>}
     <section className={card+' space-y-4'} aria-busy={loading}>
       <div className="flex flex-wrap items-center gap-3"><h2 className="mr-auto font-semibold">{data?.total ?? '—'} prospect{(data?.total ?? 0) > 1 ? 's' : ''}</h2>
         {tab !== 'follow_up' && <>
@@ -136,29 +136,29 @@ export default function ProspectsClient() {
           <button className={button} disabled={busy} onClick={() => void enrich(true)}>Enrichir les non vérifiés (max. {CONFIG.enrichmentBatch})</button>
         </>}
       </div>
-      {loading && <p role="status" className="text-sm text-gray-500">Chargement…</p>}
-      {!loading && data?.prospects.length === 0 && <p className="py-8 text-center text-sm text-gray-500">
+      {loading && <p role="status" className="text-sm text-a-text-3">Chargement…</p>}
+      {!loading && data?.prospects.length === 0 && <p className="py-8 text-center text-sm text-a-text-3">
         {tab === 'follow_up' ? 'Aucune relance prévue aujourd’hui. Planifiez la prochaine action depuis la fiche d’un prospect du pipeline.' : 'Aucun prospect pour ces filtres. Lancez une découverte ou ajustez la recherche.'}
       </p>}
-      <div className="hidden overflow-x-auto md:block"><table className="w-full text-left text-sm"><thead><tr className="border-b border-gray-200 text-xs text-gray-500 dark:border-gray-700">
+      <div className="hidden overflow-x-auto md:block"><table className="w-full text-left text-sm"><thead><tr className="border-b border-a-border text-xs text-a-text-3">
         <th className="px-2 py-3 font-medium"><span className="sr-only">Sélection</span></th>
         {['Commerce','Localisation','Statut','Prochaine action','Fit Score','Données','Qualification','Collecte'].map(c => <th className="px-2 py-3 font-medium" key={c}>{c}</th>)}</tr></thead>
-        <tbody>{data?.prospects.map(p => <tr key={p.id} className="border-b border-gray-100 dark:border-gray-800">
+        <tbody>{data?.prospects.map(p => <tr key={p.id} className="border-b border-a-border">
           <td className="px-2 py-3"><input aria-label={'Sélectionner '+p.business_name} type="checkbox" disabled={p.do_not_contact || (!selected.includes(p.id) && selected.length>=CONFIG.enrichmentBatch)} checked={selected.includes(p.id)} onChange={() => toggle(p.id)} /></td>
-          <td className="min-w-40 px-2 py-3 font-medium"><Link className="text-violet-700 dark:text-violet-300" href={'/admin/platform/prospects/'+p.id}>{p.business_name}</Link>
-            <p className="text-xs font-normal text-gray-500">{p.business_category ?? '—'}{p.domain ? ' · ' : ''}{p.domain && <ExternalLink href={p.website_url}>{p.domain}</ExternalLink>}</p>
-            {p.do_not_contact && <p className="text-xs text-red-700">Ne pas contacter</p>}</td>
-          <td className="px-2 py-3">{p.city ?? '—'}<p className="text-xs text-gray-500">{p.postal_code}</p></td>
+          <td className="min-w-40 px-2 py-3 font-medium"><Link className="text-a-brand-fg" href={'/admin/platform/prospects/'+p.id}>{p.business_name}</Link>
+            <p className="text-xs font-normal text-a-text-3">{p.business_category ?? '—'}{p.domain ? ' · ' : ''}{p.domain && <ExternalLink href={p.website_url}>{p.domain}</ExternalLink>}</p>
+            {p.do_not_contact && <p className="text-xs text-tone-danger-fg">Ne pas contacter</p>}</td>
+          <td className="px-2 py-3">{p.city ?? '—'}<p className="text-xs text-a-text-3">{p.postal_code}</p></td>
           <td className="px-2 py-3"><Badge value={p.status} /></td>
           <td className="px-2 py-3"><FollowUp p={p} /></td>
           <td className="px-2 py-3"><Fit p={p} /></td><td className="px-2 py-3"><Completeness p={p} /></td><td className="px-2 py-3"><Qualification p={p} /></td>
-          <td className="px-2 py-3 text-xs"><CollectionStatus p={p} /><p className="text-gray-500">{dateLabel(p.last_enriched_at)}</p></td>
+          <td className="px-2 py-3 text-xs"><CollectionStatus p={p} /><p className="text-a-text-3">{dateLabel(p.last_enriched_at)}</p></td>
         </tr>)}</tbody></table></div>
-      <div className="space-y-3 md:hidden">{data?.prospects.map(p => <article className="space-y-2 rounded-xl border border-gray-200 p-3 dark:border-gray-700" key={p.id}>
-        <div className="flex items-center gap-3"><input type="checkbox" aria-label={'Sélectionner '+p.business_name} checked={selected.includes(p.id)} disabled={p.do_not_contact || (!selected.includes(p.id) && selected.length>=CONFIG.enrichmentBatch)} onChange={() => toggle(p.id)} /><Link className="font-semibold text-violet-700 dark:text-violet-300" href={'/admin/platform/prospects/'+p.id}>{p.business_name}</Link></div>
+      <div className="space-y-3 md:hidden">{data?.prospects.map(p => <article className="space-y-2 rounded-xl border border-a-border p-3" key={p.id}>
+        <div className="flex items-center gap-3"><input type="checkbox" aria-label={'Sélectionner '+p.business_name} checked={selected.includes(p.id)} disabled={p.do_not_contact || (!selected.includes(p.id) && selected.length>=CONFIG.enrichmentBatch)} onChange={() => toggle(p.id)} /><Link className="font-semibold text-a-brand-fg" href={'/admin/platform/prospects/'+p.id}>{p.business_name}</Link></div>
         <p className="text-sm">{p.business_category} · {p.city}</p>
         <div className="flex flex-wrap items-center gap-3"><Badge value={p.status} /><FollowUp p={p} /><Fit p={p} /><Qualification p={p} /></div>
-        {p.do_not_contact && <p className="text-sm text-red-700">Ne pas contacter</p>}
+        {p.do_not_contact && <p className="text-sm text-tone-danger-fg">Ne pas contacter</p>}
       </article>)}</div>
       {data && <div className="flex items-center justify-between gap-3"><button className={secondary} disabled={loading || data.page<=1} onClick={() => page(data.page-1)}>Précédent</button>
         <span className="text-sm">Page {data.page} / {Math.max(1,Math.ceil(data.total/data.pageSize))}</span><button className={secondary} disabled={loading || data.page*data.pageSize>=data.total} onClick={() => page(data.page+1)}>Suivant</button></div>}

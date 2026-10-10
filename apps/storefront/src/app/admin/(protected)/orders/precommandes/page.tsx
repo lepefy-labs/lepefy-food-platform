@@ -11,7 +11,7 @@ export default async function PreordersPage() {
   const tenant = await getTenant(process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood')
   return (
     <div className="mx-auto w-full max-w-6xl pb-8">
-      <Link href="/admin" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-gray-500 hover:bg-[var(--admin-surface-subtle)] hover:text-gray-900 dark:text-gray-400">
+      <Link href="/admin" className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-a-text-3 hover:bg-a-surface-2 hover:text-a-text">
         <IconArrowLeft size={17} /> Commandes
       </Link>
       <AdminPageHeader
@@ -19,12 +19,12 @@ export default async function PreordersPage() {
         description="Achats saisis par l’équipe, jusqu’au paiement. Traitez d’abord les paiements à vérifier ; ils ne comptent dans le chiffre d’affaires qu’une fois payés."
         compact
         actions={(
-          <Link href="/admin/orders/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white hover:opacity-90">
+          <Link href="/admin/orders/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand hover:opacity-90">
             <IconPlus size={17} /> Nouvelle commande
           </Link>
         )}
       />
-      <Suspense fallback={<p className="py-12 text-center text-sm text-gray-500">Chargement…</p>}>
+      <Suspense fallback={<p className="py-12 text-center text-sm text-a-text-3">Chargement…</p>}>
         <PreordersListClient currency={tenant.currency ?? 'EUR'} />
       </Suspense>
     </div>

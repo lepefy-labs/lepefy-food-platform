@@ -86,9 +86,9 @@ export function CameraScanButton({
         type="button"
         onClick={() => { setScanError(null); setOpen(true); }}
         className={primary
-          ? 'w-full min-h-16 rounded-2xl px-5 py-4 text-base font-extrabold text-white shadow-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)]'
-          : 'w-full py-3 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 flex items-center justify-center gap-2'}
-        style={primary ? { backgroundColor: 'var(--color-primary)' } : undefined}
+          ? 'w-full min-h-16 rounded-2xl px-5 py-4 text-base font-extrabold text-a-on-brand shadow-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-a-focus'
+          : 'w-full py-3 rounded-xl text-sm font-semibold text-a-text-2 border border-a-border flex items-center justify-center gap-2'}
+        style={primary ? { backgroundColor: 'var(--admin-primary)' } : undefined}
       >
         <span className={primary ? 'flex h-10 w-10 items-center justify-center rounded-full bg-white/15' : undefined}>
           <IconCamera size={primary ? 24 : 18} stroke={1.8} />

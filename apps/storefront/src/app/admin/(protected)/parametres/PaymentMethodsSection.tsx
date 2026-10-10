@@ -8,8 +8,8 @@ import { SettingsIconTile } from './_components/SettingsUi';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType, type PaymentModule } from '@lepefy/types';
 
 const INPUT_CLS =
-  'w-full min-h-10 rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
-const LABEL_CLS = 'mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400';
+  'w-full min-h-10 rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
+const LABEL_CLS = 'mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-a-text-3';
 
 const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card', 'apple_pay'];
 
@@ -121,8 +121,8 @@ function ModulesCheckboxGroup({
               htmlFor={checkboxId}
               className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3 text-sm transition ${
                 isSelected
-                  ? 'border-[#D9D3FF] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)] dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-200'
-                  : 'border-[var(--admin-border)] bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-gray-900'
+                  ? 'border-a-border bg-a-brand-soft text-a-brand-fg'
+                  : 'border-a-border bg-a-surface text-a-text-2 hover:bg-a-surface-2'
               }`}
             >
               <input
@@ -138,7 +138,7 @@ function ModulesCheckboxGroup({
         })}
       </div>
       {selected.length === 0 && (
-        <p className="mt-2 text-xs font-medium text-red-600">Sélectionnez au moins un module.</p>
+        <p className="mt-2 text-xs font-medium text-tone-danger-fg">Sélectionnez au moins un module.</p>
       )}
     </div>
   );
@@ -233,12 +233,12 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
   }
 
   return (
-    <section id="moyens-de-paiement" aria-labelledby="moyens-de-paiement-title" className="scroll-mt-24 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <header className="flex items-start gap-3 border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+    <section id="moyens-de-paiement" aria-labelledby="moyens-de-paiement-title" className="scroll-mt-24 overflow-hidden rounded-2xl border border-a-border bg-a-surface">
+      <header className="flex items-start gap-3 border-b border-a-border px-4 py-4 sm:px-6">
         <SettingsIconTile icon={IconCreditCard} accent="orange" />
         <div>
-          <h2 id="moyens-de-paiement-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Moyens de paiement</h2>
-          <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
+          <h2 id="moyens-de-paiement-title" className="text-base font-semibold text-a-text">Moyens de paiement</h2>
+          <p className="mt-1 text-sm leading-6 text-a-text-3">
             Configurez les moyens visibles par vos clients et les services où ils sont disponibles.
           </p>
         </div>
@@ -248,7 +248,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
         {methods.some((m) => m.method === 'apple_pay' && m.active) && <ApplePayDomainStatus />}
 
         {toast && (
-          <div className={`mb-4 rounded-xl border px-3 py-2.5 text-xs font-medium ${toast.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+          <div className={`mb-4 rounded-xl border px-3 py-2.5 text-xs font-medium ${toast.type === 'success' ? 'border-tone-success-border bg-tone-success-bg text-tone-success-fg' : 'border-tone-danger-border bg-tone-danger-bg text-tone-danger-fg'}`}>
             {toast.msg}
           </div>
         )}
@@ -257,22 +257,22 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           {methods.map((pm, index) => {
             const form = toForm(pm);
             return (
-              <article key={pm.id} className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white dark:border-gray-800 dark:bg-gray-950/30">
-                <div className="flex flex-col gap-3 border-b border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800 dark:bg-gray-900/70">
+              <article key={pm.id} className="overflow-hidden rounded-2xl border border-a-border bg-a-surface">
+                <div className="flex flex-col gap-3 border-b border-a-border bg-a-surface-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800 dark:text-violet-300">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-a-surface text-a-brand-fg shadow-sm">
                       <span className="text-xs font-bold">{index + 1}</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <p className="text-sm font-semibold text-a-text">
                         {form.label || PAYMENT_METHOD_REGISTRY[form.method].label}
                       </p>
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 text-xs text-a-text-3">
                         {PAYMENT_METHOD_REGISTRY[form.method].label}
                       </p>
                     </div>
                   </div>
-                  <label className="inline-flex min-h-9 items-center gap-2 self-start rounded-full border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 sm:self-auto">
+                  <label className="inline-flex min-h-9 items-center gap-2 self-start rounded-full border border-a-border bg-a-surface px-3 text-xs font-semibold text-a-text-2 sm:self-auto">
                     <input
                       type="checkbox"
                       checked={form.active}
@@ -295,7 +295,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                       >
                         {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{PAYMENT_METHOD_REGISTRY[m].label}</option>)}
                       </select>
-                      {METHOD_HINTS[form.method] && <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{METHOD_HINTS[form.method]}</p>}
+                      {METHOD_HINTS[form.method] && <p className="mt-1.5 text-xs text-a-text-3">{METHOD_HINTS[form.method]}</p>}
                     </div>
                     <div>
                       <label className={LABEL_CLS}>Étiquette (optionnel)</label>
@@ -358,13 +358,13 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
                   </div>
                 </div>
 
-                <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--admin-border)] bg-gray-50/60 px-4 py-3 dark:border-gray-800 dark:bg-gray-900/70 sm:px-5">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Les modifications s’appliquent aux services sélectionnés après enregistrement.</p>
+                <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-a-border bg-a-surface-2 px-4 py-3 sm:px-5">
+                  <p className="text-xs text-a-text-3">Les modifications s’appliquent aux services sélectionnés après enregistrement.</p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleDelete(pm.id)}
                       disabled={isSaving === pm.id}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-a-border bg-a-surface px-3 text-xs font-medium text-a-text-3 transition hover:border-tone-danger-border hover:bg-tone-danger-bg hover:text-tone-danger-fg disabled:opacity-50"
                     >
                       <IconTrash size={14} stroke={1.5} />
                       Supprimer
@@ -379,25 +379,25 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
           })}
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-950/20">
-          <div className="flex items-start gap-3 border-b border-gray-100 px-4 py-3.5 dark:border-gray-800 sm:px-5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--admin-primary-fg)] shadow-sm dark:bg-gray-800">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-dashed border-a-border-strong bg-a-surface">
+          <div className="flex items-start gap-3 border-b border-a-border px-4 py-3.5 sm:px-5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-a-surface text-a-brand-fg shadow-sm">
               <IconPlus size={18} stroke={1.7} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Ajouter un moyen de paiement</p>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Ajoutez une nouvelle méthode et choisissez immédiatement sa portée.</p>
+              <p className="text-sm font-semibold text-a-text">Ajouter un moyen de paiement</p>
+              <p className="mt-0.5 text-xs text-a-text-3">Ajoutez une nouvelle méthode et choisissez immédiatement sa portée.</p>
             </div>
           </div>
 
-          <div className="space-y-4 bg-white/70 p-4 dark:bg-gray-900/60 sm:p-5">
+          <div className="space-y-4 bg-a-surface p-4 sm:p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className={LABEL_CLS}>Méthode</label>
                 <select value={newForm.method} onChange={(e) => setNewForm(withMethod(newForm, e.target.value as PaymentMethodType))} className={INPUT_CLS}>
                   {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{PAYMENT_METHOD_REGISTRY[m].label}</option>)}
                 </select>
-                {METHOD_HINTS[newForm.method] && <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{METHOD_HINTS[newForm.method]}</p>}
+                {METHOD_HINTS[newForm.method] && <p className="mt-1.5 text-xs text-a-text-3">{METHOD_HINTS[newForm.method]}</p>}
               </div>
               <div>
                 <label className={LABEL_CLS}>Étiquette (optionnel)</label>
@@ -433,7 +433,7 @@ export function PaymentMethodsSection({ initialMethods }: PaymentMethodsSectionP
 
             <ModulesCheckboxGroup idPrefix="new" selected={newForm.enabled_modules} onChange={(next) => setNewForm({ ...newForm, enabled_modules: next })} />
 
-            <div className="flex justify-end border-t border-gray-100 pt-4 dark:border-gray-800">
+            <div className="flex justify-end border-t border-a-border pt-4">
               <Button onClick={handleCreate} loading={isSaving === 'new'} disabled={newForm.enabled_modules.length === 0}>
                 {isSaving !== 'new' && <IconPlus size={14} stroke={1.5} />}
                 Ajouter

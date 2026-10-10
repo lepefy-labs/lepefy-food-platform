@@ -3,9 +3,9 @@ import type { ErrorBreakdownEntry } from '@/lib/shipping/intelligence/campaignCo
 
 const KIND_LABEL = { incident: 'Incident', data: 'Donnée', history: 'Historique' } as const;
 const KIND_CLS = {
-  incident: 'bg-red-50 text-red-700',
-  data: 'bg-gray-100 text-gray-700',
-  history: 'bg-amber-50 text-amber-800',
+  incident: 'bg-tone-danger-bg text-tone-danger-fg',
+  data: 'bg-a-hover text-a-text-2',
+  history: 'bg-tone-warning-bg text-tone-warning-fg',
 } as const;
 
 const MAX_POSTAL_SHOWN = 12;
@@ -21,7 +21,7 @@ function formatKg(value: number): string {
  */
 export function CampaignErrorDiagnostic({ breakdown }: { breakdown: ErrorBreakdownEntry[] }) {
   if (breakdown.length === 0) {
-    return <p className="text-xs text-green-700">Aucune erreur ni donnée incompatible dans cette campagne.</p>;
+    return <p className="text-xs text-tone-success-fg">Aucune erreur ni donnée incompatible dans cette campagne.</p>;
   }
 
   return (
@@ -30,26 +30,26 @@ export function CampaignErrorDiagnostic({ breakdown }: { breakdown: ErrorBreakdo
         const info = ERROR_REASONS[entry.code];
         const shown = entry.postalCodes.slice(0, MAX_POSTAL_SHOWN);
         return (
-          <details key={entry.code} className="rounded-lg border border-gray-200 dark:border-gray-800 px-3 py-2 group">
+          <details key={entry.code} className="rounded-lg border border-a-border px-3 py-2 group">
             <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 text-sm">
-              <span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${KIND_CLS[info.kind]}`}>{KIND_LABEL[info.kind]}</span>
-              <span className="font-medium text-gray-900 dark:text-gray-100">{info.label}</span>
-              <span className="text-xs text-gray-500">
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${KIND_CLS[info.kind]}`}>{KIND_LABEL[info.kind]}</span>
+              <span className="font-medium text-a-text">{info.label}</span>
+              <span className="text-xs text-a-text-3">
                 {entry.scenarios} scénario(s) · {entry.postalCodes.length} CAP
               </span>
-              <span className={`ml-auto text-2xs font-semibold px-1.5 py-0.5 rounded ${entry.resample ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`ml-auto text-xs font-semibold px-1.5 py-0.5 rounded ${entry.resample ? 'bg-tone-info-bg text-tone-info-fg' : 'bg-a-hover text-a-text-3'}`}>
                 {entry.resample ? 'Inclus dans la remesure' : 'Exclu de la remesure'}
               </span>
             </summary>
-            <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+            <div className="mt-2 space-y-1 text-xs text-a-text-2">
               <p>{info.explanation}</p>
               <p>
-                <span className="text-gray-400">CAP : </span>
+                <span className="text-a-text-3">CAP : </span>
                 <span className="tabular-nums">{shown.join(', ')}{entry.postalCodes.length > shown.length ? ` +${entry.postalCodes.length - shown.length}` : ''}</span>
               </p>
-              <p><span className="text-gray-400">Poids : </span>{entry.weightsKg.map(formatKg).join(' · ')} kg</p>
+              <p><span className="text-a-text-3">Poids : </span>{entry.weightsKg.map(formatKg).join(' · ')} kg</p>
               {entry.sampleMessage && (
-                <p><span className="text-gray-400">Message d&apos;exemple : </span><code className="break-all">{entry.sampleMessage}</code></p>
+                <p><span className="text-a-text-3">Message d&apos;exemple : </span><code className="break-all">{entry.sampleMessage}</code></p>
               )}
             </div>
           </details>

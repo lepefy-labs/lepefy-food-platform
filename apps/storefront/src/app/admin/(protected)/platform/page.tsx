@@ -15,40 +15,40 @@ export default async function PlatformConsolePage() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Plateforme</p>
-        <h1 className="mt-1 text-2xl font-semibold text-gray-950 dark:text-white">Console Lepefy</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Configuration et opérations strictement internes à la plateforme.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-a-brand-fg">Plateforme</p>
+        <h1 className="mt-1 text-2xl font-semibold text-a-text">Console Lepefy</h1>
+        <p className="mt-1 text-sm text-a-text-3">Configuration et opérations strictement internes à la plateforme.</p>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"><p className="text-xs text-gray-500">Tenants</p><p className="mt-1 text-2xl font-semibold">{tenantCount ?? 0}</p></div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"><p className="text-xs text-gray-500">Admins actifs</p><p className="mt-1 text-2xl font-semibold">{adminCount ?? 0}</p></div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"><p className="text-xs text-gray-500">Plans actifs</p><p className="mt-1 text-2xl font-semibold">{(plans ?? []).filter((plan: { active: boolean }) => plan.active).length}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4"><p className="text-xs text-a-text-3">Tenants</p><p className="mt-1 text-2xl font-semibold">{tenantCount ?? 0}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4"><p className="text-xs text-a-text-3">Admins actifs</p><p className="mt-1 text-2xl font-semibold">{adminCount ?? 0}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4"><p className="text-xs text-a-text-3">Plans actifs</p><p className="mt-1 text-2xl font-semibold">{(plans ?? []).filter((plan: { active: boolean }) => plan.active).length}</p></div>
       </div>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-5">
         <h2 className="text-sm font-semibold">Accès &amp; outils plateforme</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Link href="/admin/platform/feedback" className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm font-semibold text-violet-800 hover:bg-violet-50 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200">Feedback testeurs</Link>
-          <Link href="/admin/platform/catalogues-whatsapp" className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm font-semibold text-violet-800 hover:bg-violet-50 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200">Catalogues WhatsApp</Link>
-          <Link href="/admin/platform/prospects" className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm font-semibold text-violet-800 hover:bg-violet-50 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200">Prospects</Link>
-          <Link href="/admin/team" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Utilisateurs</Link>
-          <Link href="/admin/platform/access" className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 text-sm font-semibold text-violet-800 hover:bg-violet-50 dark:border-violet-900 dark:bg-violet-950/20 dark:text-violet-200">Rôles &amp; permissions</Link>
-          <Link href="/admin/platform/ai-usage" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Coûts IA</Link>
-          <Link href="/admin/platform/application-mobile" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Application mobile</Link>
-          <Link href="/admin/platform/notifications/historique" className="rounded-xl border border-gray-200 p-4 text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">Notifications</Link>
+          <Link href="/admin/platform/feedback" className="rounded-xl border border-a-border bg-a-brand-soft p-4 text-sm font-semibold text-a-brand-fg hover:bg-a-brand-soft">Feedback testeurs</Link>
+          <Link href="/admin/platform/catalogues-whatsapp" className="rounded-xl border border-a-border bg-a-brand-soft p-4 text-sm font-semibold text-a-brand-fg hover:bg-a-brand-soft">Catalogues WhatsApp</Link>
+          <Link href="/admin/platform/prospects" className="rounded-xl border border-a-border bg-a-brand-soft p-4 text-sm font-semibold text-a-brand-fg hover:bg-a-brand-soft">Prospects</Link>
+          <Link href="/admin/team" className="rounded-xl border border-a-border p-4 text-sm font-semibold hover:bg-a-surface-2">Utilisateurs</Link>
+          <Link href="/admin/platform/access" className="rounded-xl border border-a-border bg-a-brand-soft p-4 text-sm font-semibold text-a-brand-fg hover:bg-a-brand-soft">Rôles &amp; permissions</Link>
+          <Link href="/admin/platform/ai-usage" className="rounded-xl border border-a-border p-4 text-sm font-semibold hover:bg-a-surface-2">Coûts IA</Link>
+          <Link href="/admin/platform/application-mobile" className="rounded-xl border border-a-border p-4 text-sm font-semibold hover:bg-a-surface-2">Application mobile</Link>
+          <Link href="/admin/platform/notifications/historique" className="rounded-xl border border-a-border p-4 text-sm font-semibold hover:bg-a-surface-2">Notifications</Link>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center justify-between gap-4"><h2 className="text-sm font-semibold">Plans SaaS</h2><span className="text-xs text-gray-400">Source de vérité plateforme</span></div>
-        <div className="mt-4 divide-y divide-gray-100 dark:divide-gray-800">
+      <section className="rounded-2xl border border-a-border bg-a-surface p-5">
+        <div className="flex items-center justify-between gap-4"><h2 className="text-sm font-semibold">Plans SaaS</h2><span className="text-xs text-a-text-3">Source de vérité plateforme</span></div>
+        <div className="mt-4 divide-y divide-a-border">
           {(plans ?? []).length === 0 ? (
-            <p className="py-4 text-sm text-amber-600">Migration billing plateforme non encore appliquée.</p>
+            <p className="py-4 text-sm text-tone-warning-fg">Migration billing plateforme non encore appliquée.</p>
           ) : (plans ?? []).map((plan: { id: string; name: string; code: string; monthly_price_cents: number; currency: string; active: boolean }) => (
             <div key={plan.id} className="flex items-center justify-between gap-4 py-3 text-sm">
-              <div><p className="font-semibold">{plan.name}</p><p className="text-xs text-gray-400">{plan.code}</p></div>
-              <div className="text-right"><p className="font-semibold">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: plan.currency }).format(plan.monthly_price_cents / 100)}/mois</p><p className="text-xs text-gray-400">{plan.active ? 'Actif' : 'Inactif'}</p></div>
+              <div><p className="font-semibold">{plan.name}</p><p className="text-xs text-a-text-3">{plan.code}</p></div>
+              <div className="text-right"><p className="font-semibold">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: plan.currency }).format(plan.monthly_price_cents / 100)}/mois</p><p className="text-xs text-a-text-3">{plan.active ? 'Actif' : 'Inactif'}</p></div>
             </div>
           ))}
         </div>

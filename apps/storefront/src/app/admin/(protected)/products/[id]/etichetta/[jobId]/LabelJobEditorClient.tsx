@@ -348,7 +348,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                   <label
                     key={opt.key}
                     className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors flex items-center gap-3 ${
-                      templateKey === opt.key ? 'border-a-brand bg-[var(--admin-primary)]/5' : 'border-a-border hover:border-a-border-strong'
+                      templateKey === opt.key ? 'border-a-brand bg-a-brand-soft' : 'border-a-border hover:border-a-border-strong'
                     }`}
                   >
                     <input
@@ -408,7 +408,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                     <label
                       key={key}
                       className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors flex items-center gap-3 ${
-                        palette === key ? 'border-a-brand bg-[var(--admin-primary)]/5' : 'border-a-border hover:border-a-border-strong'
+                        palette === key ? 'border-a-brand bg-a-brand-soft' : 'border-a-border hover:border-a-border-strong'
                       }`}
                     >
                       <input
@@ -471,7 +471,7 @@ export default function LabelJobEditorClient({ job, product, tenantId, tenantHas
                   <label
                     key={opt.key}
                     className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
-                      originStyle === opt.key ? 'border-a-brand bg-[var(--admin-primary)]/5' : 'border-a-border hover:border-a-border-strong'
+                      originStyle === opt.key ? 'border-a-brand bg-a-brand-soft' : 'border-a-border hover:border-a-border-strong'
                     }`}
                   >
                     <input

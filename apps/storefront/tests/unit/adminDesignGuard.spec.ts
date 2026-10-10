@@ -4,60 +4,21 @@ import { join, relative } from 'node:path';
 
 /**
  * Admin Design System V2 guard (stands in for lint, which this repo does not
- * run). Every path in MIGRATED must use the shared kit and tokens only. A
- * module joins the list when it is migrated; the list grows until it covers
- * all of app/admin (docs: docs/ADMIN_DESIGN_SYSTEM.md).
+ * run). Every admin file uses the shared kit and the a-* / tone-* tokens only
+ * (docs: docs/ADMIN_DESIGN_SYSTEM.md). LEGACY lists the files still allowed to
+ * reference the old palette; it only shrinks.
  */
 const ADMIN_ROOT = join(__dirname, '../../src/app/admin');
 
-const MIGRATED = [
-  'layout.tsx',
-  '_components/ui/Button.tsx',
-  '_components/ui/Badge.tsx',
-  '_components/ui/StatusBadge.tsx',
-  '_components/ui/AdminStatCard.tsx',
-  '_components/ui/AdminPageHeader.tsx',
-  '_components/ui/Dialog.tsx',
-  '_components/ui/ConfirmDialog.tsx',
-  '_components/ui/Toaster.tsx',
-  '_components/ui/InlineAlert.tsx',
-  '_components/ui/Form.tsx',
-  '_components/ui/useAdminMutation.tsx',
-  '_components/ui/BulkTrackingModal.tsx',
-  '(protected)/BulkDocumentsDialog.tsx',
-  '(protected)/clients',
-  '(protected)/catalogue',
-  '(protected)/products',
-  '(protected)/gestion',
-  '(protected)/evenementiel',
-  'evenementiel',
-  '_components/ui/Menu.tsx',
-  '_components/ui/NotificationBell.tsx',
-  '_components/ThemeToggleButton.tsx',
-  '_components/AdminHeader.tsx',
-  '_components/shell',
-  '_components/data',
-  '_components/ui/States.tsx',
-  '_components/ui/Panel.tsx',
-  '_components/ui/Tabs.tsx',
-  '_components/PlatformSectionTabs.tsx',
-  '(protected)/livraison',
-  '(protected)/canaux/whatsapp/_components/WhatsAppTabs.tsx',
-  '(protected)/page.tsx',
-  '(protected)/loading.tsx',
-  '(protected)/OrdersTable.tsx',
-  '(protected)/PendingPaymentsBanner.tsx',
-  '_components/ui/ConfirmPaymentButton.tsx',
-  '_components/ui',
-  '_components/AdminTenantIdentity.tsx',
-  '_components/SubscriptionBanner.tsx',
+const LEGACY = [
+  // Dark safety net for the pre-token pages, removed with the --color-primary remap (U12).
+  '_components/adminDarkTheme.ts',
 ];
-
 
 const RULES: { name: string; pattern: RegExp }[] = [
   { name: 'text under 12px', pattern: /\btext-(?:\[(?:[0-9]|1[01])(?:\.\d+)?px\]|2xs)\b/ },
   { name: 'raw Tailwind palette colour (use a-* / tone-* tokens)', pattern: /\b(?:bg|text|border|ring|divide|outline|from|to|fill|stroke|placeholder)-(?:gray|slate|zinc|neutral|stone|violet|purple|indigo|blue|sky|cyan|teal|emerald|green|lime|yellow|amber|orange|red|rose|pink)-\d{2,3}\b/ },
-  { name: 'dark: variant (tokens already switch theme)', pattern: /(?<![\w-])dark:/ },
+  { name: 'dark: variant (tokens already switch theme)', pattern: /(?<![\w-])dark:(?=[\w[!-])/ },
   { name: 'legacy --color-primary token in admin', pattern: /var\(--color-primary/ },
   { name: 'hard-coded hex colour', pattern: /(?:bg|text|border|ring)-\[#[0-9a-fA-F]{3,8}\]/ },
 ];
@@ -78,9 +39,9 @@ function filesUnder(path: string): string[] {
 
 const rel = (file: string) => relative(ADMIN_ROOT, file).split('\\').join('/');
 
-test('migrated admin files follow the design system rules', () => {
+test('admin files follow the design system rules', () => {
   const violations: string[] = [];
-  for (const file of MIGRATED.flatMap(filesUnder)) {
+  for (const file of filesUnder('.').filter((file) => !LEGACY.includes(rel(file)))) {
     readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
       for (const rule of RULES) {
         if (rule.pattern.test(line)) violations.push(`${rel(file)}:${index + 1} ${rule.name}: ${line.trim().slice(0, 120)}`);

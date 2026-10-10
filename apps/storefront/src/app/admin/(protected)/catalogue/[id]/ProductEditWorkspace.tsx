@@ -123,7 +123,7 @@ export default function ProductEditWorkspace({
       </nav>
 
       {isNew && (
-        <div className="rounded-xl border border-[var(--admin-primary)]/20 bg-a-brand-soft px-4 py-3 text-sm text-a-text-2">
+        <div className="rounded-xl border border-a-border bg-a-brand-soft px-4 py-3 text-sm text-a-text-2">
           <span className="font-semibold text-a-text">Priorité recommandée :</span>{' '}
           nom, catégorie, prix, stock et statut d’abord. Les sections avancées restent disponibles immédiatement mais ne bloquent pas le premier passage.
         </div>

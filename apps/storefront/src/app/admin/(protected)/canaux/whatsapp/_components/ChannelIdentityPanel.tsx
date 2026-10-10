@@ -80,11 +80,11 @@ export default function ChannelIdentityPanel({ initial, webhookUrl, isTestTenant
   }
 
   return (
-    <section className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/40 p-5 dark:border-violet-900/60 dark:bg-violet-950/10">
+    <section className="mt-5 rounded-2xl border border-a-border bg-a-brand-soft p-5">
       {confirmDialog}
       <div className="mb-3 flex items-center gap-2">
-        <IconShieldLock size={18} className="text-violet-700 dark:text-violet-300" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-gray-950 dark:text-white">Connexion Meta (plateforme)</h2>
+        <IconShieldLock size={18} className="text-a-brand-fg" aria-hidden="true" />
+        <h2 className="text-base font-semibold text-a-text">Connexion Meta (plateforme)</h2>
       </div>
       <p className={SETTINGS_HINT_CLS}>
         Le tenant est résolu uniquement par le <strong>phone_number_id</strong>. Le jeton reste dans une variable serveur
@@ -136,7 +136,7 @@ export default function ChannelIdentityPanel({ initial, webhookUrl, isTestTenant
         <SettingsFeedback feedback={feedback} />
       </div>
       {initial && (
-        <div className="mt-5 border-t border-violet-200 pt-4 dark:border-violet-900/60">
+        <div className="mt-5 border-t border-a-border pt-4">
           <label htmlFor="wa-test-to" className={SETTINGS_LABEL_CLS}>Envoyer le modèle de test hello_world</label>
           <div className="flex flex-wrap gap-2">
             <input id="wa-test-to" className={`${SETTINGS_INPUT_CLS} max-w-xs`} placeholder="393331234567" inputMode="tel" value={testTo} onChange={(e) => setTestTo(e.target.value)} />

@@ -16,12 +16,12 @@ const FILTERS: ReadonlyArray<{ key: InboxFilter; label: string }> = [
 ];
 
 const STATE_META: Record<InboxState, { label: string; cls: string }> = {
-  nala: { label: 'Nala', cls: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200' },
-  automation: { label: 'Automatisation', cls: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200' },
-  needs_human: { label: 'Opérateur demandé', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' },
-  human: { label: 'Opérateur', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' },
-  closed: { label: 'Fermée', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' },
-  open: { label: 'Nouvelle', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200' },
+  nala: { label: 'Nala', cls: 'bg-a-brand-soft text-a-brand-fg' },
+  automation: { label: 'Automatisation', cls: 'bg-tone-info-bg text-tone-info-fg' },
+  needs_human: { label: 'Opérateur demandé', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
+  human: { label: 'Opérateur', cls: 'bg-tone-success-bg text-tone-success-fg' },
+  closed: { label: 'Fermée', cls: 'bg-a-hover text-a-text-2' },
+  open: { label: 'Nouvelle', cls: 'bg-tone-info-bg text-tone-info-fg' },
 };
 
 const AUTHOR_LABEL: Record<string, string> = { customer: 'Client', automation: 'Automatisation', nala: 'Nala', agent: 'Équipe', system: 'Système' };
@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<string, string> = { pending: 'Envoi…', sent: 'Envoy
 
 function StateBadge({ state }: { state: InboxState }) {
   const meta = STATE_META[state];
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.cls}`}>{meta.label}</span>;
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${meta.cls}`}>{meta.label}</span>;
 }
 
 function relative(iso: string): string {
@@ -145,33 +145,33 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
   const paused = conversation?.automation_status === 'paused';
 
   return (
-    <div className="grid min-h-[60vh] overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 md:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid min-h-[60vh] overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm md:grid-cols-[320px_minmax(0,1fr)]">
       {/* Liste */}
-      <aside className={`${selectedId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col border-r border-[var(--admin-border)] dark:border-gray-800`}>
-        <div className="flex gap-1 overflow-x-auto border-b border-[var(--admin-border)] p-2 dark:border-gray-800">
+      <aside className={`${selectedId ? 'hidden md:flex' : 'flex'} min-h-0 flex-col border-r border-a-border`}>
+        <div className="flex gap-1 overflow-x-auto border-b border-a-border p-2">
           {FILTERS.map((option) => (
             <button key={option.key} type="button" onClick={() => void changeFilter(option.key)}
-              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium ${filter === option.key ? 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'}`}>
+              className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium ${filter === option.key ? 'bg-a-brand-soft text-a-brand-fg' : 'text-a-text-2 hover:bg-a-hover'}`}>
               {option.label}
             </button>
           ))}
         </div>
         <ul className="min-h-0 flex-1 overflow-y-auto">
-          {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-gray-400">Aucune conversation.</li>}
+          {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-a-text-3">Aucune conversation.</li>}
           {items.map((item) => (
             <li key={item.id}>
               <button type="button" onClick={() => setSelectedId(item.id)}
-                className={`w-full border-b border-gray-100 px-4 py-3 text-left transition-colors dark:border-gray-800 ${selectedId === item.id ? 'bg-[var(--admin-primary-soft)]/60' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'}`}>
+                className={`w-full border-b border-a-border px-4 py-3 text-left transition-colors ${selectedId === item.id ? 'bg-a-brand-soft' : 'hover:bg-a-surface-2'}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{item.customerName ?? item.customerPhone ?? 'Client WhatsApp'}</span>
-                  <span className="shrink-0 text-[11px] text-gray-400">{relative(item.lastMessageAt)}</span>
+                  <span className="truncate text-sm font-semibold text-a-text">{item.customerName ?? item.customerPhone ?? 'Client WhatsApp'}</span>
+                  <span className="shrink-0 text-xs text-a-text-3">{relative(item.lastMessageAt)}</span>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-0.5 truncate text-xs text-a-text-3">
                   {item.preview ? `${item.preview.direction === 'outbound' ? `${AUTHOR_LABEL[item.preview.author] ?? ''} : ` : ''}${item.preview.text}` : '—'}
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
                   <StateBadge state={item.state} />
-                  {item.unreadCount > 0 && <span className="rounded-full bg-emerald-600 px-1.5 text-[11px] font-semibold text-white">{item.unreadCount}</span>}
+                  {item.unreadCount > 0 && <span className="rounded-full bg-tone-success-solid px-1.5 text-xs font-semibold text-white">{item.unreadCount}</span>}
                 </div>
               </button>
             </li>
@@ -181,18 +181,18 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
 
       {/* Fil */}
       <section className={`${selectedId ? 'flex' : 'hidden md:flex'} min-h-0 flex-col`}>
-        {!selectedId && <div className="m-auto p-8 text-sm text-gray-400">Sélectionnez une conversation.</div>}
-        {selectedId && detailError && <div className="m-auto p-8 text-sm text-gray-500">{detailError}</div>}
+        {!selectedId && <div className="m-auto p-8 text-sm text-a-text-3">Sélectionnez une conversation.</div>}
+        {selectedId && detailError && <div className="m-auto p-8 text-sm text-a-text-3">{detailError}</div>}
         {selectedId && conversation && detail && (
           <>
-            <header className="flex flex-wrap items-center gap-3 border-b border-[var(--admin-border)] px-4 py-3 dark:border-gray-800">
+            <header className="flex flex-wrap items-center gap-3 border-b border-a-border px-4 py-3">
               <button type="button" className="md:hidden" aria-label="Retour à la liste" onClick={() => setSelectedId(null)}><IconArrowLeft size={18} /></button>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 className="truncate text-sm font-semibold text-gray-950 dark:text-white">{conversation.customer_name ?? conversation.customer_phone ?? 'Client WhatsApp'}</h2>
+                  <h2 className="truncate text-sm font-semibold text-a-text">{conversation.customer_name ?? conversation.customer_phone ?? 'Client WhatsApp'}</h2>
                   <StateBadge state={detail.state} />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-a-text-3">
                   {conversation.customer_phone ?? 'Numéro masqué (username WhatsApp)'}
                   {detail.customer ? <> · <a className="underline" href={`/admin/clients/${detail.customer.id}`}>fiche client</a></> : ' · client non reconnu'}
                   {detail.openHandoff ? ` · opérateur demandé (${detail.openHandoff.reason})` : ''}
@@ -213,21 +213,21 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
               )}
             </header>
 
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-gray-50 px-4 py-4 dark:bg-gray-950/40" aria-live="polite">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-a-surface-2 px-4 py-4" aria-live="polite">
               {detail.messages.map((message) => {
                 const outbound = message.direction === 'outbound';
                 const AuthorIcon = message.author_type === 'nala' ? IconSparkles : message.author_type === 'automation' ? IconRobot : IconUser;
                 return (
                   <div key={message.id} className={`flex ${outbound ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm ${outbound
-                      ? message.author_type === 'agent' ? 'bg-emerald-600 text-white' : 'bg-violet-50 text-gray-900 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-gray-100 dark:ring-violet-500/30'
-                      : 'bg-white text-gray-900 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-800'}`}>
-                      <div className={`mb-0.5 flex items-center gap-1 text-[11px] ${outbound && message.author_type === 'agent' ? 'text-emerald-50' : 'text-gray-500 dark:text-gray-400'}`}>
+                      ? message.author_type === 'agent' ? 'bg-tone-success-solid text-white' : 'bg-a-brand-soft text-a-text ring-1 ring-a-border'
+                      : 'bg-a-surface text-a-text ring-1 ring-a-border'}`}>
+                      <div className={`mb-0.5 flex items-center gap-1 text-xs ${outbound && message.author_type === 'agent' ? 'text-tone-success-fg' : 'text-a-text-3'}`}>
                         <AuthorIcon size={12} aria-hidden="true" /> {AUTHOR_LABEL[message.author_type] ?? message.author_type} · {time(message.created_at)}
                         {outbound && <> · {STATUS_LABEL[message.status] ?? message.status}</>}
                       </div>
                       <p className="whitespace-pre-wrap break-words">{message.body ?? <em className="opacity-70">[{message.message_type}]</em>}</p>
-                      {message.status === 'failed' && message.error_title && <p className="mt-1 text-[11px] text-red-600 dark:text-red-300">{message.error_title}</p>}
+                      {message.status === 'failed' && message.error_title && <p className="mt-1 text-xs text-tone-danger-fg">{message.error_title}</p>}
                     </div>
                   </div>
                 );
@@ -236,12 +236,12 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
             </div>
 
             {canReply && (
-              <footer className="border-t border-[var(--admin-border)] p-3 dark:border-gray-800">
-                {actionError && <p className="mb-2 text-xs text-red-600 dark:text-red-300" role="alert">{actionError}</p>}
+              <footer className="border-t border-a-border p-3">
+                {actionError && <p className="mb-2 text-xs text-tone-danger-fg" role="alert">{actionError}</p>}
                 {/* Rappel au point d'action : après une réponse, l'automatisation reste en pause jusqu'à la reprise. */}
                 {paused && (
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2">
+                    <p className="text-xs text-tone-warning-fg">
                       Automatisation en pause : les réponses automatiques et Nala ne répondent plus à ce client.
                     </p>
                     <Button variant="outline" size="md" onClick={() => void runAction('resume')} loading={busy === 'resume'}>
@@ -250,21 +250,21 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
                   </div>
                 )}
                 {channelDisabled ? (
-                  <p className="text-xs text-gray-500">Canal désactivé : envoi impossible.</p>
+                  <p className="text-xs text-a-text-3">Canal désactivé : envoi impossible.</p>
                 ) : !detail.withinServiceWindow ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">Plus de 24 h depuis le dernier message du client : WhatsApp exige un modèle approuvé (non disponible dans cette version).</p>
+                  <p className="text-xs text-tone-warning-fg">Plus de 24 h depuis le dernier message du client : WhatsApp exige un modèle approuvé (non disponible dans cette version).</p>
                 ) : (
                   <div className="flex items-end gap-2">
                     <textarea
                       rows={2} maxLength={4096} value={draft} onChange={(event) => setDraft(event.target.value)}
                       onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) void sendMessage(); }}
                       placeholder="Écrire un message… (Ctrl+Entrée pour envoyer)"
-                      className="min-h-[44px] flex-1 resize-y rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                      className="min-h-[44px] flex-1 resize-y rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm"
                     />
                     <Button onClick={() => void sendMessage()} loading={busy === 'send'} disabled={!draft.trim()} aria-label="Envoyer"><IconSend size={16} /></Button>
                   </div>
                 )}
-                {!paused && !channelDisabled && detail.withinServiceWindow && <p className="mt-1.5 text-[11px] text-gray-400">Envoyer un message met l’automatisation en pause pour ce client.</p>}
+                {!paused && !channelDisabled && detail.withinServiceWindow && <p className="mt-1.5 text-xs text-a-text-3">Envoyer un message met l’automatisation en pause pour ce client.</p>}
               </footer>
             )}
           </>

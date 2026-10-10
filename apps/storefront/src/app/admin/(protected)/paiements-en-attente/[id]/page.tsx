@@ -50,20 +50,20 @@ function statusPresentation(status: string) {
     return {
       label: 'Réception à vérifier',
       description: 'Le client a été redirigé vers un paiement externe. Sa réception n’est pas encore confirmée.',
-      tone: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200',
+      tone: 'border-tone-warning-border bg-tone-warning-bg text-tone-warning-fg',
     };
   }
   if (status === 'open') {
     return {
       label: 'Achat non finalisé',
       description: 'La session est encore récupérable et aucun paiement n’est confirmé.',
-      tone: 'border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200',
+      tone: 'border-tone-info-border bg-tone-info-bg text-tone-info-fg',
     };
   }
   return {
     label: 'Session expirée',
     description: 'Le paiement externe peut toujours nécessiter une vérification manuelle, mais la reprise client n’est plus disponible.',
-    tone: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300',
+    tone: 'border-a-border bg-a-surface-2 text-a-text-2',
   };
 }
 
@@ -153,7 +153,7 @@ export default async function PendingPaymentManagementPage({ params }: { params:
 
   return (
     <div className="mx-auto w-full max-w-5xl pb-10">
-      <Link href="/admin" className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 dark:hover:text-white">
+      <Link href="/admin" className="mb-3 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-a-text-3 hover:text-a-text">
         <IconArrowLeft size={16} /> Commandes
       </Link>
 
@@ -178,10 +178,10 @@ export default async function PendingPaymentManagementPage({ params }: { params:
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconUser size={15} /> Client</div><p className="mt-2 truncate text-sm font-bold text-gray-950 dark:text-white">{customerLabel}</p><p className="mt-1 truncate text-xs text-gray-500">{session.email}</p>{session.phone && <p className="mt-1 truncate text-xs text-gray-500">{session.phone}</p>}</div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconWallet size={15} /> Paiement</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{paymentLabel}</p><p className="mt-1 text-xl font-bold text-gray-950 dark:text-white">{formatPrice(total, tenant.currency)}</p></div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconClock size={15} /> Ancienneté</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{elapsedLabel(session.created_at)}</p><p className="mt-1 text-xs text-gray-500">Créé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(session.created_at))}</p></div>
-        <div className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500"><IconPackage size={15} /> Articles</div><p className="mt-2 text-sm font-bold text-gray-950 dark:text-white">{session.items.reduce((sum, item) => sum + item.quantity, 0)} unité(s)</p><p className="mt-1 line-clamp-2 text-xs text-gray-500">{session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ')}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconUser size={15} /> Client</div><p className="mt-2 truncate text-sm font-bold text-a-text">{customerLabel}</p><p className="mt-1 truncate text-xs text-a-text-3">{session.email}</p>{session.phone && <p className="mt-1 truncate text-xs text-a-text-3">{session.phone}</p>}</div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconWallet size={15} /> Paiement</div><p className="mt-2 text-sm font-bold text-a-text">{paymentLabel}</p><p className="mt-1 text-xl font-bold text-a-text">{formatPrice(total, tenant.currency)}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconClock size={15} /> Ancienneté</div><p className="mt-2 text-sm font-bold text-a-text">{elapsedLabel(session.created_at)}</p><p className="mt-1 text-xs text-a-text-3">Créé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(session.created_at))}</p></div>
+        <div className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm"><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-a-text-3"><IconPackage size={15} /> Articles</div><p className="mt-2 text-sm font-bold text-a-text">{session.items.reduce((sum, item) => sum + item.quantity, 0)} unité(s)</p><p className="mt-1 line-clamp-2 text-xs text-a-text-3">{session.items.map((item) => `${item.quantity}× ${item.name}`).join(', ')}</p></div>
       </div>
 
       <div className={`mb-5 rounded-2xl border p-4 ${status.tone}`}>

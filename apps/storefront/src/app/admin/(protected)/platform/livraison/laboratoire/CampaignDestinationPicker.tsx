@@ -5,7 +5,7 @@ import { IconMapPin, IconSearch, IconX } from '@tabler/icons-react';
 import type { ShippingZoneRow } from '@lepefy/types';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
 
 const COUNTRIES = [
   { value: 'IT', label: 'Italie' },
@@ -214,7 +214,7 @@ export function CampaignDestinationPicker({
   const selectedCity = value.mode === 'city' && value.city && value.postalCodes.length > 0;
 
   return (
-    <div className="rounded-xl border border-gray-200 p-3">
+    <div className="rounded-xl border border-a-border p-3">
       <div className="grid gap-2 md:grid-cols-[8rem_minmax(0,1fr)_11rem_auto] md:items-start">
         <select value={value.country} onChange={(e) => changeCountry(e.target.value)} className={INPUT_CLS} aria-label="Pays">
           {COUNTRIES.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
@@ -223,20 +223,20 @@ export function CampaignDestinationPicker({
         <div className="min-w-0">
           {value.mode === 'city' ? (
             selectedCity && !editing ? (
-              <div className="rounded-lg border border-green-100 bg-green-50 px-3 py-2">
+              <div className="rounded-lg border border-tone-success-border bg-tone-success-bg px-3 py-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1 text-sm font-semibold text-gray-900">
+                    <p className="flex items-center gap-1 text-sm font-semibold text-a-text">
                       <IconMapPin size={15} stroke={1.6} />
                       {value.city}{value.stateName ? ` · ${value.stateName}` : ''}
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-600">{value.postalCodes.length} code(s) postal(aux) connu(s) pour cette commune — exhaustivité non garantie</p>
-                    <p className="mt-1 truncate text-2xs text-gray-400" title={value.postalCodes.join(', ')}>
+                    <p className="mt-0.5 text-xs text-a-text-2">{value.postalCodes.length} code(s) postal(aux) connu(s) pour cette commune — exhaustivité non garantie</p>
+                    <p className="mt-1 truncate text-xs text-a-text-3" title={value.postalCodes.join(', ')}>
                       {value.postalCodes.slice(0, 10).join(', ')}
                       {value.postalCodes.length > 10 ? ` +${value.postalCodes.length - 10}` : ''}
                     </p>
                   </div>
-                  <button type="button" onClick={() => setEditing(true)} className="shrink-0 text-xs font-medium text-[var(--color-primary-dark)]">
+                  <button type="button" onClick={() => setEditing(true)} className="shrink-0 text-xs font-medium text-a-brand-fg">
                     Modifier
                   </button>
                 </div>
@@ -244,7 +244,7 @@ export function CampaignDestinationPicker({
             ) : (
               <div className="relative">
                 <div className="relative">
-                  <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <IconSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
                   <input
                     type="text"
                     value={query}
@@ -254,10 +254,10 @@ export function CampaignDestinationPicker({
                     autoComplete="off"
                   />
                 </div>
-                {(searching || resolving) && <p className="mt-1 text-xs text-gray-400">{resolving ? 'Récupération des codes postaux de la commune…' : 'Recherche…'}</p>}
+                {(searching || resolving) && <p className="mt-1 text-xs text-a-text-3">{resolving ? 'Récupération des codes postaux de la commune…' : 'Recherche…'}</p>}
                 {ambiguous.length > 0 && (
-                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
-                    <p className="text-xs text-amber-800 mb-1.5">
+                  <div className="mt-2 rounded-lg border border-tone-warning-border bg-tone-warning-bg p-2">
+                    <p className="text-xs text-tone-warning-fg mb-1.5">
                       Plusieurs communes portent ce nom et leur rattachement administratif ne peut pas être déduit. Choisissez la bonne commune, ou saisissez le code postal manuellement.
                     </p>
                     <div className="space-y-1">
@@ -266,22 +266,22 @@ export function CampaignDestinationPicker({
                           key={`${option.adminCode1 ?? ''}-${option.adminCode2 ?? ''}-${option.city}`}
                           type="button"
                           onClick={() => void resolveCity(value.country, option.city, { exact: true, adminCode1: option.adminCode1, adminCode2: option.adminCode2 }, option.adminName2 ?? option.adminName1 ?? '')}
-                          className="block w-full min-h-10 rounded-md border border-amber-200 bg-white px-2.5 py-1.5 text-left text-sm hover:bg-amber-100"
+                          className="block w-full min-h-10 rounded-md border border-tone-warning-border bg-a-surface px-2.5 py-1.5 text-left text-sm hover:bg-tone-warning-bg"
                         >
-                          {option.label} <span className="text-2xs text-gray-500">· {option.postalCodeCount} CAP</span>
+                          {option.label} <span className="text-xs text-a-text-3">· {option.postalCodeCount} CAP</span>
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
                 {candidates.length > 0 && (
-                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-a-border bg-a-surface shadow-lg">
                     {candidates.map((candidate) => (
                       <button
                         key={`${candidate.country}-${candidate.city}-${candidate.stateCodes.join('-')}`}
                         type="button"
                         onClick={() => void selectCity(candidate)}
-                        className="block w-full border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50 last:border-b-0"
+                        className="block w-full border-b border-a-border px-3 py-2 text-left text-sm hover:bg-a-surface-2 last:border-b-0"
                       >
                         {candidate.label}
                       </button>
@@ -300,11 +300,11 @@ export function CampaignDestinationPicker({
             />
           )}
 
-          {error && <p className="mt-1 text-xs text-amber-700">{error}</p>}
+          {error && <p className="mt-1 text-xs text-tone-warning-fg">{error}</p>}
           <button
             type="button"
             onClick={() => switchMode(value.mode === 'city' ? 'postal' : 'city')}
-            className="mt-1.5 text-xs text-[var(--color-primary-dark)] underline"
+            className="mt-1.5 text-xs text-a-brand-fg underline"
           >
             {value.mode === 'city' ? 'Saisir un code postal manuellement' : 'Choisir une ville et inclure tous ses codes postaux'}
           </button>
@@ -315,22 +315,22 @@ export function CampaignDestinationPicker({
             <option value="">Zone automatique</option>
             {matchingZones.map((zone) => <option key={zone.id} value={zone.code}>{zone.code}</option>)}
           </select>
-          <p className="mt-1 text-2xs text-gray-400">Auto = résolution par CAP au lancement.</p>
+          <p className="mt-1 text-xs text-a-text-3">Auto = résolution par CAP au lancement.</p>
         </div>
 
         {onRemove ? (
-          <button type="button" onClick={onRemove} className="min-h-10 rounded-lg border border-gray-200 px-2 text-gray-400 hover:text-red-600" aria-label="Retirer la destination">
+          <button type="button" onClick={onRemove} className="min-h-10 rounded-lg border border-a-border px-2 text-a-text-3 hover:text-tone-danger-fg" aria-label="Retirer la destination">
             <IconX size={16} />
           </button>
         ) : <span />}
       </div>
 
       {value.mode === 'city' && selectedCity && (
-        <p className="mt-2 text-2xs text-gray-400">
+        <p className="mt-2 text-xs text-a-text-3">
           Chaque CAP devient une destination distincte ; les poids et profils sélectionnés sont testés pour chacun.
         </p>
       )}
-      <p className="mt-2 text-[10px] text-gray-400">Communes et codes postaux : index GeoNames interne, repli OpenStreetMap / Zippopotam.us / GeoNames. La liste des CAP reflète ces jeux de données, sans garantie d&apos;exhaustivité officielle.</p>
+      <p className="mt-2 text-xs text-a-text-3">Communes et codes postaux : index GeoNames interne, repli OpenStreetMap / Zippopotam.us / GeoNames. La liste des CAP reflète ces jeux de données, sans garantie d&apos;exhaustivité officielle.</p>
     </div>
   );
 }

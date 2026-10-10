@@ -13,8 +13,8 @@ export default function DiscoveryForm({onRun}:{onRun:(run:Run)=>void}) {
       onRun(data.run); setSummary(null);
     } catch (e) { setError(e instanceof Error ? e.message : 'Découverte indisponible.'); } finally { setBusy(false); }
   }
-  return <details className={card} id="discovery"><summary className="min-h-11 cursor-pointer font-semibold text-violet-700 dark:text-violet-300">Découvrir des prospects</summary>
-    <p className="mb-4 text-sm text-gray-500">France · données publiques SIRENE. Les catégories ne prouvent ni indépendance, ni spécialité africaine, antillaise ou halal.</p>
+  return <details className={card} id="discovery"><summary className="min-h-11 cursor-pointer font-semibold text-a-brand-fg">Découvrir des prospects</summary>
+    <p className="mb-4 text-sm text-a-text-3">France · données publiques SIRENE. Les catégories ne prouvent ni indépendance, ni spécialité africaine, antillaise ou halal.</p>
     <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" onSubmit={e => {
       e.preventDefault(); const f = new FormData(e.currentTarget); setError('');
       setSummary({country:'FR',region:String(f.get('region') ?? ''),department:String(f.get('department') ?? '').toUpperCase(),
@@ -31,12 +31,12 @@ export default function DiscoveryForm({onRun}:{onRun:(run:Run)=>void}) {
       </div></fieldset>
       <button className={secondary} disabled={busy}>Vérifier la sélection</button>
     </form>
-    {summary && <div className="mt-4 space-y-3 rounded-xl bg-violet-50 p-4 text-violet-950">
+    {summary && <div className="mt-4 space-y-3 rounded-xl bg-a-brand-soft p-4 text-a-brand-fg">
       <p className="font-medium">Confirmer la découverte</p>
       <p className="text-sm">France · {REGIONS[summary.region] ?? 'Toutes régions'} · {summary.department || 'Tous départements'} · {summary.city || 'Toutes villes'} · {summary.codes.length} activités · maximum {summary.limit} établissements · {summary.activeOnly ? 'actifs' : 'tous états'}.</p>
       <p className="text-xs">Les doublons sont conservés comme tels, sans remplacer les notes. Une recherche récente identique réutilise son résultat.</p>
       <button className={button} disabled={busy || summary.codes.length === 0} onClick={() => void launch()}>{busy ? 'Préparation…' : 'Confirmer et préparer les lots'}</button>
     </div>}
-    {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+    {error && <p role="alert" className="mt-3 text-sm text-tone-danger-fg">{error}</p>}
   </details>;
 }

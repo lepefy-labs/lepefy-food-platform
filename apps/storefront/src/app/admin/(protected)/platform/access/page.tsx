@@ -25,9 +25,9 @@ export default async function PlatformAccessPage() {
   if (!schemaReady) {
     return (
       <div className="mx-auto max-w-4xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Plateforme · Accès &amp; sécurité</p>
-        <h1 className="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Rôles &amp; permissions</h1>
-        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-a-brand-fg">Plateforme · Accès &amp; sécurité</p>
+        <h1 className="mt-1 text-xl font-semibold text-a-text">Rôles &amp; permissions</h1>
+        <div className="mt-6 rounded-2xl border border-tone-warning-border bg-tone-warning-bg p-5 text-sm text-tone-warning-fg">
           Le modèle RBAC nécessite la migration <strong>085_admin_rbac_permissions.sql</strong> avant d’être administrable.
         </div>
       </div>
@@ -84,11 +84,11 @@ export default async function PlatformAccessPage() {
     <div className="mx-auto w-full max-w-6xl pb-12">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--admin-primary-fg)]">Plateforme · Accès &amp; sécurité</p>
-          <h1 className="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Rôles &amp; permissions</h1>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">Composez des rôles tenant à partir des fonctionnalités réellement protégées par Lepefy. Les rôles système restent verrouillés.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-a-brand-fg">Plateforme · Accès &amp; sécurité</p>
+          <h1 className="mt-1 text-xl font-semibold text-a-text">Rôles &amp; permissions</h1>
+          <p className="mt-1 max-w-2xl text-sm text-a-text-3">Composez des rôles tenant à partir des fonctionnalités réellement protégées par Lepefy. Les rôles système restent verrouillés.</p>
         </div>
-        <span className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">{permissions.length} permissions cataloguées</span>
+        <span className="rounded-xl border border-a-border bg-a-surface px-3 py-2 text-xs font-semibold text-a-text-2 shadow-sm">{permissions.length} permissions cataloguées</span>
       </div>
       <AccessControlClient roles={roles} permissions={permissions} users={users} tenants={tenants} memberships={memberships} />
     </div>

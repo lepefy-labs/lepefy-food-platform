@@ -23,13 +23,13 @@ interface TenantAiUsageHistoryProps {
 }
 
 function variationLabel(current: number, previous: number): { text: string; tone: string } {
-  if (previous <= 0 && current <= 0) return { text: 'Stable', tone: 'text-gray-500' };
-  if (previous <= 0) return { text: 'Nouveau ce mois', tone: 'text-violet-700 dark:text-violet-300' };
+  if (previous <= 0 && current <= 0) return { text: 'Stable', tone: 'text-a-text-3' };
+  if (previous <= 0) return { text: 'Nouveau ce mois', tone: 'text-a-brand-fg' };
   const variation = ((current - previous) / previous) * 100;
-  if (Math.abs(variation) < 0.05) return { text: 'Stable', tone: 'text-gray-500' };
+  if (Math.abs(variation) < 0.05) return { text: 'Stable', tone: 'text-a-text-3' };
   return {
     text: `${variation > 0 ? '+' : ''}${variation.toFixed(1)} %`,
-    tone: variation > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300',
+    tone: variation > 0 ? 'text-tone-warning-fg' : 'text-tone-success-fg',
   };
 }
 
@@ -66,17 +66,17 @@ export default function TenantAiUsageHistory({ months }: TenantAiUsageHistoryPro
 
   return (
     <>
-      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+        <div className="flex flex-col gap-2 border-b border-a-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-950 dark:text-white">Évolution de l’utilisation IA</h2>
-            <p className="mt-1 text-xs text-gray-400">12 derniers mois · toutes fonctionnalités incluses</p>
+            <h2 className="text-sm font-semibold text-a-text">Évolution de l’utilisation IA</h2>
+            <p className="mt-1 text-xs text-a-text-3">12 derniers mois · toutes fonctionnalités incluses</p>
           </div>
-          <span className="w-fit rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300">12 mois</span>
+          <span className="w-fit rounded-full border border-a-border bg-a-brand-soft px-2.5 py-1 text-xs font-semibold text-a-brand-fg">12 mois</span>
         </div>
 
         <div className="p-4 sm:p-5">
-          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-gradient-to-b from-white to-violet-50/50 dark:border-gray-800 dark:from-gray-950 dark:to-violet-950/10">
+          <div className="overflow-x-auto rounded-2xl border border-a-border bg-gradient-to-b from-a-surface to-a-brand-soft">
             <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-auto w-full min-w-[680px]" role="img" aria-label="Historique mensuel de l'utilisation des fonctionnalités IA">
               <defs>
                 <linearGradient id="tenantAiLine" x1="0" y1="0" x2="1" y2="0">
@@ -132,59 +132,59 @@ export default function TenantAiUsageHistory({ months }: TenantAiUsageHistoryPro
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-violet-700 dark:text-violet-300">Ce mois</p>
-              <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{current}</p>
-              <p className="mt-1 text-xs text-gray-400">utilisations</p>
+            <div className="rounded-xl border border-a-border bg-a-brand-soft p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-a-brand-fg">Ce mois</p>
+              <p className="mt-2 text-2xl font-bold text-a-text">{current}</p>
+              <p className="mt-1 text-xs text-a-text-3">utilisations</p>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-950/30">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">Tendance</p>
+            <div className="rounded-xl border border-a-border bg-a-surface-2 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-a-text-3">Tendance</p>
               <p className={`mt-2 text-sm font-bold ${trend.tone}`}>{trend.text}</p>
-              <p className="mt-1 text-xs text-gray-400">vs mois précédent</p>
+              <p className="mt-1 text-xs text-a-text-3">vs mois précédent</p>
             </div>
-            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900/50 dark:bg-blue-950/20">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:text-blue-300">Moyenne / mois</p>
-              <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{average}</p>
-              <p className="mt-1 text-xs text-gray-400">sur 12 mois</p>
+            <div className="rounded-xl border border-tone-info-border bg-tone-info-bg p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-tone-info-fg">Moyenne / mois</p>
+              <p className="mt-2 text-2xl font-bold text-a-text">{average}</p>
+              <p className="mt-1 text-xs text-a-text-3">sur 12 mois</p>
             </div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">Cumul 12 mois</p>
-              <p className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">{cumulative}</p>
-              <p className="mt-1 text-xs text-gray-400">utilisations</p>
+            <div className="rounded-xl border border-tone-success-border bg-tone-success-bg p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-tone-success-fg">Cumul 12 mois</p>
+              <p className="mt-2 text-2xl font-bold text-a-text">{cumulative}</p>
+              <p className="mt-1 text-xs text-a-text-3">utilisations</p>
             </div>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-            <h2 className="text-sm font-semibold text-gray-950 dark:text-white">Historique mensuel</h2>
-            <p className="mt-1 text-xs text-gray-400">Sélectionnez un mois pour afficher le détail.</p>
+        <div className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+          <div className="border-b border-a-border px-5 py-4">
+            <h2 className="text-sm font-semibold text-a-text">Historique mensuel</h2>
+            <p className="mt-1 text-xs text-a-text-3">Sélectionnez un mois pour afficher le détail.</p>
           </div>
-          <div className="max-h-[520px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="max-h-[520px] overflow-y-auto divide-y divide-a-border">
             {[...months].reverse().map((month, reverseIndex, reversed) => {
               const originalIndex = months.findIndex((candidate) => candidate.key === month.key);
               const previousMonth = originalIndex > 0 ? months[originalIndex - 1] : undefined;
-              const variation = previousMonth ? variationLabel(month.total, previousMonth.total) : { text: '—', tone: 'text-gray-400' };
+              const variation = previousMonth ? variationLabel(month.total, previousMonth.total) : { text: '—', tone: 'text-a-text-3' };
               const active = month.key === selectedMonth?.key;
               return (
                 <button
                   key={month.key}
                   type="button"
                   onClick={() => setSelectedKey(month.key)}
-                  className={`flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-violet-50/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-violet-500 dark:hover:bg-violet-950/20 ${active ? 'bg-violet-50/80 dark:bg-violet-950/25' : ''}`}
+                  className={`flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-a-brand-soft focus:outline-none focus:ring-2 focus:ring-inset focus:ring-a-brand ${active ? 'bg-a-brand-soft' : ''}`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{month.fullLabel}</p>
-                      {reverseIndex === 0 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">Actuel</span>}
+                      <p className="truncate text-sm font-semibold text-a-text">{month.fullLabel}</p>
+                      {reverseIndex === 0 && <span className="rounded-full bg-a-brand-soft px-2 py-0.5 text-xs font-semibold text-a-brand-fg">Actuel</span>}
                     </div>
                     <p className={`mt-0.5 text-xs font-medium ${variation.tone}`}>{variation.text}{variation.text !== '—' ? ' vs mois précédent' : ''}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-lg font-bold text-gray-950 dark:text-white">{month.total}</p>
-                    <p className="text-[11px] text-gray-400">utilisations</p>
+                    <p className="text-lg font-bold text-a-text">{month.total}</p>
+                    <p className="text-xs text-a-text-3">utilisations</p>
                   </div>
                 </button>
               );
@@ -192,25 +192,25 @@ export default function TenantAiUsageHistory({ months }: TenantAiUsageHistoryPro
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-            <h2 className="text-sm font-semibold text-gray-950 dark:text-white">Détail · {selectedMonth?.fullLabel ?? '—'}</h2>
-            <p className="mt-1 text-xs text-gray-400">Utilisation regroupée par fonctionnalité Lepefy.</p>
+        <div className="overflow-hidden rounded-2xl border border-a-border bg-a-surface shadow-sm">
+          <div className="border-b border-a-border px-5 py-4">
+            <h2 className="text-sm font-semibold text-a-text">Détail · {selectedMonth?.fullLabel ?? '—'}</h2>
+            <p className="mt-1 text-xs text-a-text-3">Utilisation regroupée par fonctionnalité Lepefy.</p>
           </div>
 
           {!selectedMonth || selectedMonth.features.length === 0 ? (
-            <p className="p-5 text-sm text-gray-400">Aucune utilisation IA enregistrée pour ce mois.</p>
+            <p className="p-5 text-sm text-a-text-3">Aucune utilisation IA enregistrée pour ce mois.</p>
           ) : (
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            <div className="divide-y divide-a-border">
               {selectedMonth.features.map((feature) => (
                 <div key={feature.key} className="flex items-center justify-between gap-4 px-5 py-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{feature.label}</p>
-                    <p className="mt-0.5 text-xs text-gray-400">{feature.description}</p>
+                    <p className="text-sm font-semibold text-a-text">{feature.label}</p>
+                    <p className="mt-0.5 text-xs text-a-text-3">{feature.description}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-lg font-bold text-gray-950 dark:text-white">{feature.usageCount}</p>
-                    <p className="text-[11px] text-gray-400">{feature.unitLabel}</p>
+                    <p className="text-lg font-bold text-a-text">{feature.usageCount}</p>
+                    <p className="text-xs text-a-text-3">{feature.unitLabel}</p>
                   </div>
                 </div>
               ))}

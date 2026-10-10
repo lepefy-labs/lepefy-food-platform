@@ -40,9 +40,9 @@ export interface CommissionRow {
 type Filter = AmbassadorCommissionStatus | 'ALL';
 
 const STATUS_TONE: Record<AmbassadorCommissionStatus, string> = {
-  CONFIRMED: 'text-amber-700',
-  PAID: 'text-green-700',
-  CANCELLED: 'text-gray-400 line-through',
+  CONFIRMED: 'text-tone-warning-fg',
+  PAID: 'text-tone-success-fg',
+  CANCELLED: 'text-a-text-3 line-through',
 };
 
 function CancelModal({ row, currency, onClose, onDone }: {
@@ -134,15 +134,15 @@ export function CommissionsSection({ initialCommissions, currency, canManagePayo
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+    <section className="rounded-xl border border-a-border bg-a-surface p-5">
       <div className="mb-1 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Commissions</h2>
+        <h2 className="text-sm font-semibold text-a-text-2">Commissions</h2>
         <label htmlFor="commission-filter" className="sr-only">Filtrer par statut</label>
         <select
           id="commission-filter"
           value={filter}
           onChange={(e) => void changeFilter(e.target.value as Filter)}
-          className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+          className="rounded-lg border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text-2"
         >
           <option value="CONFIRMED">À verser</option>
           <option value="PAID">Versées</option>
@@ -150,24 +150,24 @@ export function CommissionsSection({ initialCommissions, currency, canManagePayo
           <option value="ALL">Toutes</option>
         </select>
       </div>
-      <p className="mb-4 text-xs text-gray-400">
+      <p className="mb-4 text-xs text-a-text-3">
         Une commission par client invité, créée quand sa première commande passe en « Livrée ». Elle se verse depuis « À verser »
         ; annulez-la si la commande est remboursée.
       </p>
 
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
       {isLoading ? (
-        <p className="text-sm text-gray-400">Chargement…</p>
+        <p className="text-sm text-a-text-3">Chargement…</p>
       ) : commissions.length === 0 ? (
-        <p className="text-sm text-gray-400">Aucune commission dans ce filtre.</p>
+        <p className="text-sm text-a-text-3">Aucune commission dans ce filtre.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400">
+              <tr className="text-left text-a-text-3">
                 <th className="py-1.5 font-medium">Date</th>
                 <th className="py-1.5 font-medium">Ambassadeur</th>
                 <th className="py-1.5 font-medium">Client invité · commande</th>
@@ -179,27 +179,27 @@ export function CommissionsSection({ initialCommissions, currency, canManagePayo
             </thead>
             <tbody>
               {commissions.map((c) => (
-                <tr key={c.id} className="border-t border-gray-100 align-top dark:border-gray-800">
-                  <td className="py-2 text-gray-500">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
-                  <td className="py-2 font-medium text-gray-800 dark:text-gray-100">{c.ambassador ? ambassadorDisplayName(c.ambassador) : 'Compte supprimé'}</td>
-                  <td className="py-2 text-gray-600 dark:text-gray-300">
+                <tr key={c.id} className="border-t border-a-border align-top">
+                  <td className="py-2 text-a-text-3">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+                  <td className="py-2 font-medium text-a-text">{c.ambassador ? ambassadorDisplayName(c.ambassador) : 'Compte supprimé'}</td>
+                  <td className="py-2 text-a-text-2">
                     {c.referred?.full_name || c.referred?.email || 'Compte supprimé'}
-                    <Link href={`/admin/orders/${c.order_id}`} className="block text-gray-400 hover:underline">
+                    <Link href={`/admin/orders/${c.order_id}`} className="block text-a-text-3 hover:underline">
                       #{c.order_id.slice(0, 8).toUpperCase()}
                     </Link>
                   </td>
-                  <td className="py-2 text-gray-500">
+                  <td className="py-2 text-a-text-3">
                     {formatPrice(c.order_amount_paid, currency)}
-                    {Number(c.discount_applied) > 0 && <span className="text-amber-700"> (−{formatPrice(c.discount_applied, currency)})</span>}
+                    {Number(c.discount_applied) > 0 && <span className="text-tone-warning-fg"> (−{formatPrice(c.discount_applied, currency)})</span>}
                   </td>
-                  <td className="py-2 font-semibold text-gray-800 dark:text-gray-100">
+                  <td className="py-2 font-semibold text-a-text">
                     {formatPrice(c.commission_amount, currency)}
-                    {c.commission_mode === 'SPLIT_POOL' && <span className="block font-normal text-gray-400">pool</span>}
+                    {c.commission_mode === 'SPLIT_POOL' && <span className="block font-normal text-a-text-3">pool</span>}
                   </td>
                   <td className="py-2">
                     <span className={STATUS_TONE[c.status]}>{COMMISSION_STATUS_LABELS[c.status]}</span>
-                    {c.status === 'PAID' && c.paid_at && <div className="text-gray-400">le {new Date(c.paid_at).toLocaleDateString('fr-FR')}</div>}
-                    {c.payment_note && c.status !== 'CONFIRMED' && <div className="max-w-[16rem] text-gray-400">{c.payment_note}</div>}
+                    {c.status === 'PAID' && c.paid_at && <div className="text-a-text-3">le {new Date(c.paid_at).toLocaleDateString('fr-FR')}</div>}
+                    {c.payment_note && c.status !== 'CONFIRMED' && <div className="max-w-[16rem] text-a-text-3">{c.payment_note}</div>}
                   </td>
                   {canManagePayouts && (
                     <td className="py-2 text-right">

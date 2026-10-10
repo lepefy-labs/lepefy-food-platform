@@ -45,8 +45,8 @@ const MODE_OPTIONS: Array<{ key: Mode; title: string; helper: string; icon: Reac
   { key: 'paid', title: 'Déjà payé', helper: 'L’encaissement est déjà reçu : la commande est créée immédiatement.', icon: <IconCash size={18} /> },
 ];
 
-const inputClass = 'min-h-11 w-full rounded-xl border border-[var(--admin-border)] bg-white px-3 text-base text-gray-900 outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 sm:text-sm';
-const sectionClass = 'rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-5';
+const inputClass = 'min-h-11 w-full rounded-xl border border-a-border bg-a-surface px-3 text-base text-a-text outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
+const sectionClass = 'rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5';
 
 function nowLocalInput(): string {
   const now = new Date();
@@ -65,12 +65,12 @@ const stepAnchor = (key: AssistedStepKey) => `assisted-step-${key}`;
 function SectionTitle({ step, title, helper, done = false, summary = null }: { step: number; title: string; helper?: string; done?: boolean; summary?: string | null }) {
   return (
     <div className="mb-3 flex items-start gap-3">
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]'}`}>
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-a-brand-soft text-a-brand-fg'}`}>
         {done ? <IconCheck size={14} aria-label="Étape complète" /> : step}
       </span>
       <div>
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}{done && summary && <span className="font-normal text-gray-500 dark:text-gray-400"> · {summary}</span>}</h2>
-        {helper && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{helper}</p>}
+        <h2 className="text-sm font-semibold text-a-text">{title}{done && summary && <span className="font-normal text-a-text-3"> · {summary}</span>}</h2>
+        {helper && <p className="mt-0.5 text-xs text-a-text-3">{helper}</p>}
       </div>
     </div>
   );
@@ -516,7 +516,7 @@ export default function AssistedOrderForm({
   const primaryLabel = assistedPrimaryLabel(mode, isEdit);
   const remaining = mainIssues.length;
   const issuesList = submitIssues && submitIssues.length > 0 && (
-    <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300" role="alert">
+    <div className="rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg" role="alert">
       <p className="font-semibold">{submitIssues.length > 1 ? `${submitIssues.length} points à compléter :` : 'À compléter :'}</p>
       <ul className="mt-1 space-y-0.5">
         {submitIssues.map((issue) => <li key={`${issue.step}-${issue.message}`}><button type="button" onClick={() => goToStep(issue.step)} className="text-left underline">{issue.message}</button></li>)}
@@ -527,26 +527,26 @@ export default function AssistedOrderForm({
   const summary = (
     <div className="space-y-3">
       <dl className="space-y-1.5 text-sm">
-        <div className="flex justify-between gap-3"><dt className="text-gray-500 dark:text-gray-400">Articles ({lines.reduce((sum, line) => sum + line.quantity, 0)})</dt><dd className="font-medium">{formatPrice(subtotal, currency)}</dd></div>
+        <div className="flex justify-between gap-3"><dt className="text-a-text-3">Articles ({lines.reduce((sum, line) => sum + line.quantity, 0)})</dt><dd className="font-medium">{formatPrice(subtotal, currency)}</dd></div>
         <div className="flex justify-between gap-3">
-          <dt className="text-gray-500 dark:text-gray-400">{fulfillment === 'pickup' ? 'Retrait en magasin' : 'Livraison'}</dt>
+          <dt className="text-a-text-3">{fulfillment === 'pickup' ? 'Retrait en magasin' : 'Livraison'}</dt>
           <dd className="font-medium">{shippingTotal === null ? '—' : shippingTotal === 0 ? 'Offert' : formatPrice(shippingTotal, currency)}</dd>
         </div>
-        <div className="flex justify-between gap-3 border-t border-[var(--admin-border)] pt-2 text-base font-bold dark:border-gray-800">
+        <div className="flex justify-between gap-3 border-t border-a-border pt-2 text-base font-bold">
           <dt>Total</dt><dd>{estimatedTotal === null ? '—' : formatPrice(estimatedTotal, currency)}</dd>
         </div>
       </dl>
       {fulfillment === 'delivery' && !validQuote && lines.length > 0 && addressComplete && (
-        <button type="button" onClick={requestQuote} disabled={quoteLoading} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] px-3 text-sm font-semibold text-[var(--admin-primary-fg)] hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:border-gray-700">
+        <button type="button" onClick={requestQuote} disabled={quoteLoading} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-a-border px-3 text-sm font-semibold text-a-brand-fg hover:bg-a-surface-2 disabled:opacity-50">
           {quoteLoading ? <IconLoader2 size={16} className="animate-spin" aria-hidden="true" /> : <IconTruck size={16} aria-hidden="true" />} {quote ? 'Recalculer les frais' : 'Calculer les frais'}
         </button>
       )}
-      <div className="border-t border-[var(--admin-border)] pt-2 dark:border-gray-800">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{remaining === 0 ? 'Prêt à enregistrer' : `À compléter (${remaining})`}</p>
+      <div className="border-t border-a-border pt-2">
+        <p className="text-xs font-semibold text-a-text-3">{remaining === 0 ? 'Prêt à enregistrer' : `À compléter (${remaining})`}</p>
         <ul className="mt-1 space-y-0.5 text-xs">
           {steps.map((step) => (
             <li key={step.key}>
-              <button type="button" onClick={() => goToStep(step.key)} className={`flex min-h-7 w-full items-start gap-1.5 text-left ${step.done ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'}`}>
+              <button type="button" onClick={() => goToStep(step.key)} className={`flex min-h-7 w-full items-start gap-1.5 text-left ${step.done ? 'text-tone-success-fg' : 'text-tone-warning-fg'}`}>
                 {step.done ? <IconCheck size={13} aria-hidden="true" className="mt-0.5 shrink-0" /> : <span aria-hidden="true" className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border border-current" />}
                 <span>{step.label}{!step.done && step.issues[0] ? ` — ${step.issues[0]}` : ''}</span>
               </button>
@@ -554,7 +554,7 @@ export default function AssistedOrderForm({
           ))}
         </ul>
       </div>
-      <p className="text-[11px] leading-4 text-gray-400">Montants recalculés par le serveur (prix catalogue, règles, livraison) à l’enregistrement.</p>
+      <p className="text-xs leading-4 text-a-text-3">Montants recalculés par le serveur (prix catalogue, règles, livraison) à l’enregistrement.</p>
     </div>
   );
 
@@ -564,7 +564,7 @@ export default function AssistedOrderForm({
       <div className="space-y-4">
         {issuesList && <div className="lg:hidden">{issuesList}</div>}
         {isEdit && initial?.hadActiveLink && (
-          <p className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="flex items-start gap-2 rounded-xl border border-tone-warning-border bg-tone-warning-bg px-3 py-2.5 text-sm text-tone-warning-fg">
             <IconAlertTriangle size={18} className="mt-0.5 shrink-0" />
             Le lien de paiement déjà envoyé sera désactivé. La précommande repassera en brouillon : générez ensuite un nouveau lien.
           </p>
@@ -579,7 +579,7 @@ export default function AssistedOrderForm({
               return (
                 <button
                   key={channel} type="button" role="radio" aria-checked={active} onClick={() => setSalesChannel(channel)}
-                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors ${active ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'border-[var(--admin-border)] text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-200'}`}
+                  className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors ${active ? 'border-a-brand bg-a-brand-soft text-a-brand-fg' : 'border-a-border text-a-text-2 hover:bg-a-surface-2'}`}
                 >
                   {CHANNEL_ICONS[channel]} {SALES_CHANNEL_LABELS[channel]}
                 </button>
@@ -592,66 +592,66 @@ export default function AssistedOrderForm({
         <section id={stepAnchor('customer')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
           <SectionTitle step={2} title="Client" helper="Aucun compte requis. Un téléphone suffit pour partager le lien par WhatsApp." done={stepOf('customer')?.done} summary={stepOf('customer')?.summary} />
           {customerId ? (
-            <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-subtle)] p-3 dark:border-gray-700 dark:bg-gray-950/40">
+            <div className="rounded-xl border border-a-border bg-a-surface-2 p-3">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Client existant</p>
-                <button type="button" onClick={clearCustomer} className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-gray-600 hover:bg-white dark:text-gray-300">
+                <p className="text-xs font-semibold uppercase tracking-wide text-tone-success-fg">Client existant</p>
+                <button type="button" onClick={clearCustomer} className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-a-text-2 hover:bg-a-surface">
                   <IconX size={14} /> Changer
                 </button>
               </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                <label className="text-xs text-gray-500">Nom<input value={fullName} onChange={(e) => setFullName(e.target.value)} className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">E-mail<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Nom<input value={fullName} onChange={(e) => setFullName(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">E-mail<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" className={`${inputClass} mt-1`} /></label>
               </div>
               {!isEdit && lastOrder && (
-                <div className="mt-3 rounded-xl border border-[#D9D3FF] bg-[var(--admin-primary-soft)] p-3">
-                  <p className="text-sm font-semibold text-[var(--admin-primary-fg)]">
+                <div className="mt-3 rounded-xl border border-a-border bg-a-brand-soft p-3">
+                  <p className="text-sm font-semibold text-a-brand-fg">
                     Dernière commande · {new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(lastOrder.createdAt))} · {lastOrder.items.reduce((sum, item) => sum + item.quantity, 0)} articles · {formatPrice(lastOrder.total, currency)}
                   </p>
-                  <p className="mt-0.5 truncate text-xs text-gray-600 dark:text-gray-300">{lastOrder.items.map((item) => `×${item.quantity} ${item.name}`).join(' · ')}</p>
-                  <button type="button" onClick={() => void reorderLastOrder()} disabled={reordering} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                  <p className="mt-0.5 truncate text-xs text-a-text-2">{lastOrder.items.map((item) => `×${item.quantity} ${item.name}`).join(' · ')}</p>
+                  <button type="button" onClick={() => void reorderLastOrder()} disabled={reordering} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-a-brand px-3 text-sm font-semibold text-a-on-brand hover:opacity-90 disabled:opacity-50">
                     {reordering ? <IconLoader2 size={16} className="animate-spin" aria-hidden="true" /> : <IconRepeat size={16} aria-hidden="true" />} Reprendre ces articles
                   </button>
-                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Prix, stock et règles actuels ; les articles indisponibles sont ignorés.</p>
-                  {reorderInfo && <p role="status" className="mt-1 text-xs font-medium text-gray-700 dark:text-gray-200">{reorderInfo}</p>}
+                  <p className="mt-1 text-xs text-a-text-3">Prix, stock et règles actuels ; les articles indisponibles sont ignorés.</p>
+                  {reorderInfo && <p role="status" className="mt-1 text-xs font-medium text-a-text-2">{reorderInfo}</p>}
                 </div>
               )}
             </div>
           ) : newCustomer ? (
             <div className="space-y-3">
               <div className="grid gap-2 sm:grid-cols-3">
-                <label className="text-xs text-gray-500">Nom *<input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+39 …" autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">E-mail<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Nom *<input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+39 …" autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">E-mail<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" className={`${inputClass} mt-1`} /></label>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Si ce téléphone ou cet e-mail existe déjà, la fiche client existante est réutilisée (aucun doublon). Aucun consentement marketing n’est enregistré.</p>
-              <button type="button" onClick={() => setNewCustomer(false)} className="text-xs font-semibold text-[var(--admin-primary-fg)] hover:underline">← Rechercher un client existant</button>
+              <p className="text-xs text-a-text-3">Si ce téléphone ou cet e-mail existe déjà, la fiche client existante est réutilisée (aucun doublon). Aucun consentement marketing n’est enregistré.</p>
+              <button type="button" onClick={() => setNewCustomer(false)} className="text-xs font-semibold text-a-brand-fg hover:underline">← Rechercher un client existant</button>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="relative">
-                <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
                 <input
                   value={customerQuery} onChange={(e) => setCustomerQuery(e.target.value)} type="search"
                   placeholder="Nom, téléphone ou e-mail…" aria-label="Rechercher un client" className={`${inputClass} pl-9`}
                 />
-                {customerSearching && <IconLoader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" />}
+                {customerSearching && <IconLoader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-a-text-3" />}
               </div>
               {customerResults.length > 0 && (
-                <ul className="divide-y divide-[var(--admin-border)] overflow-hidden rounded-xl border border-[var(--admin-border)] dark:divide-gray-800 dark:border-gray-700">
+                <ul className="divide-y divide-a-border overflow-hidden rounded-xl border border-a-border">
                   {customerResults.map((customer) => (
                     <li key={customer.id}>
-                      <button type="button" onClick={() => selectCustomer(customer)} className="flex min-h-12 w-full flex-col items-start px-3 py-2 text-left hover:bg-[var(--admin-surface-subtle)] dark:hover:bg-gray-800">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{customer.full_name ?? customer.email ?? customer.phone}</span>
-                        <span className="text-xs text-gray-500">{[customer.phone, customer.email].filter(Boolean).join(' · ') || 'Aucun contact'}</span>
+                      <button type="button" onClick={() => selectCustomer(customer)} className="flex min-h-12 w-full flex-col items-start px-3 py-2 text-left hover:bg-a-surface-2">
+                        <span className="text-sm font-semibold text-a-text">{customer.full_name ?? customer.email ?? customer.phone}</span>
+                        <span className="text-xs text-a-text-3">{[customer.phone, customer.email].filter(Boolean).join(' · ') || 'Aucun contact'}</span>
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
               {customerQuery.trim().length >= 2 && !customerSearching && customerResults.length === 0 && (
-                <p className="text-xs text-gray-500">Aucun client trouvé.</p>
+                <p className="text-xs text-a-text-3">Aucun client trouvé.</p>
               )}
               <button
                 type="button"
@@ -662,7 +662,7 @@ export default function AssistedOrderForm({
                   else if (q.includes('@')) setEmail(q);
                   else if (q) setFullName(q);
                 }}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-[var(--admin-border)] px-3 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700 dark:text-gray-200"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-a-border px-3 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2"
               >
                 <IconUserPlus size={17} /> Nouveau client
               </button>
@@ -674,15 +674,15 @@ export default function AssistedOrderForm({
         <section id={stepAnchor('products')} tabIndex={-1} className={`${sectionClass} scroll-mt-4 outline-none`}>
           <SectionTitle step={3} title="Produits" helper="Catalogue réel du tenant — minimums, pas et groupes appliqués automatiquement." done={stepOf('products')?.done} summary={stepOf('products')?.summary} />
           <div className="relative">
-            <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
             <input
               value={productQuery} onChange={(e) => setProductQuery(e.target.value)} type="search"
               placeholder="Rechercher un produit…" aria-label="Rechercher un produit" className={`${inputClass} pl-9`}
             />
-            {productSearching && <IconLoader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" />}
+            {productSearching && <IconLoader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-a-text-3" />}
           </div>
           {productResults.length > 0 && (
-            <ul className="mt-2 max-h-80 divide-y divide-[var(--admin-border)] overflow-y-auto rounded-xl border border-[var(--admin-border)] dark:divide-gray-800 dark:border-gray-700">
+            <ul className="mt-2 max-h-80 divide-y divide-a-border overflow-y-auto rounded-xl border border-a-border">
               {productResults.map((product) => {
                 const purchasable = hasPurchasableQuantity(product.stock, product.min_order_quantity, product.order_quantity_step);
                 const inCart = lines.find((line) => line.product.id === product.id);
@@ -690,18 +690,18 @@ export default function AssistedOrderForm({
                   <li key={product.id} className="flex items-center gap-3 px-3 py-2">
                     {product.image_url
                       // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={product.image_url} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-gray-50 object-cover" loading="lazy" />
-                      : <span className="h-11 w-11 shrink-0 rounded-lg bg-gray-100 dark:bg-gray-800" aria-hidden="true" />}
+                      ? <img src={product.image_url} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-a-surface-2 object-cover" loading="lazy" />
+                      : <span className="h-11 w-11 shrink-0 rounded-lg bg-a-hover" aria-hidden="true" />}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{product.name}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="truncate text-sm font-semibold text-a-text">{product.name}</p>
+                      <p className="text-xs text-a-text-3">
                         {formatPrice(product.price, currency)} · {purchasable ? `Stock ${product.stock}` : 'Indisponible'}
                         {(product.min_order_quantity > 1 || product.order_quantity_step > 1) && ` · Min ${product.min_order_quantity}, par ${product.order_quantity_step}`}
                       </p>
                     </div>
                     <button
                       type="button" disabled={!purchasable} onClick={() => addProduct(product)}
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl bg-[var(--admin-primary)] px-3 text-sm font-semibold text-white disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-800"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl bg-a-brand px-3 text-sm font-semibold text-a-on-brand disabled:bg-a-border disabled:text-a-text-3"
                       aria-label={`Ajouter ${product.name}`}
                     >
                       <IconPlus size={16} /> {inCart ? inCart.quantity : ''}
@@ -714,11 +714,11 @@ export default function AssistedOrderForm({
 
           <div className="mt-4">
             {initialLoading ? (
-              <p className="flex items-center gap-2 text-sm text-gray-500"><IconLoader2 size={16} className="animate-spin" /> Chargement des articles…</p>
+              <p className="flex items-center gap-2 text-sm text-a-text-3"><IconLoader2 size={16} className="animate-spin" /> Chargement des articles…</p>
             ) : lines.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-[var(--admin-border)] px-3 py-6 text-center text-sm text-gray-400 dark:border-gray-700">Aucun produit ajouté.</p>
+              <p className="rounded-xl border border-dashed border-a-border px-3 py-6 text-center text-sm text-a-text-3">Aucun produit ajouté.</p>
             ) : (
-              <ul className="divide-y divide-[var(--admin-border)] dark:divide-gray-800" aria-label="Panier">
+              <ul className="divide-y divide-a-border" aria-label="Panier">
                 {lines.map((line) => {
                   const { product } = line;
                   const canIncrease = getNextValidQuantity(line.quantity, product.min_order_quantity, product.order_quantity_step, product.stock) !== null;
@@ -726,21 +726,21 @@ export default function AssistedOrderForm({
                   return (
                     <li key={product.id} className="flex flex-wrap items-center gap-3 py-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{product.name}</p>
-                        <p className="text-xs text-gray-500">{formatPrice(product.price, currency)} / unité{line.quantity > product.stock ? ' · stock insuffisant' : ''}</p>
+                        <p className="text-sm font-semibold text-a-text">{product.name}</p>
+                        <p className="text-xs text-a-text-3">{formatPrice(product.price, currency)} / unité{line.quantity > product.stock ? ' · stock insuffisant' : ''}</p>
                       </div>
                       <div className="flex items-center gap-1" role="group" aria-label={`Quantité ${product.name}`}>
-                        <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label={atMinimum ? `Retirer ${product.name}` : `Diminuer ${product.name}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--admin-border)] dark:border-gray-700">
+                        <button type="button" onClick={() => changeQuantity(product.id, -1)} aria-label={atMinimum ? `Retirer ${product.name}` : `Diminuer ${product.name}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-a-border">
                           {atMinimum ? <IconTrash size={16} /> : <IconMinus size={16} />}
                         </button>
                         <span className="min-w-10 text-center text-sm font-bold tabular-nums" aria-live="polite">{line.quantity}</span>
-                        <button type="button" onClick={() => changeQuantity(product.id, 1)} disabled={!canIncrease} aria-label={`Augmenter ${product.name}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--admin-border)] disabled:opacity-40 dark:border-gray-700">
+                        <button type="button" onClick={() => changeQuantity(product.id, 1)} disabled={!canIncrease} aria-label={`Augmenter ${product.name}`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-a-border disabled:opacity-40">
                           <IconPlus size={16} />
                         </button>
                       </div>
                       <p className="w-20 text-right text-sm font-semibold">{formatPrice(product.price * line.quantity, currency)}</p>
                       {!atMinimum && (
-                        <button type="button" onClick={() => removeLine(product.id)} aria-label={`Retirer ${product.name}`} className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-600">
+                        <button type="button" onClick={() => removeLine(product.id)} aria-label={`Retirer ${product.name}`} className="flex h-11 w-11 items-center justify-center rounded-xl text-a-text-3 hover:bg-tone-danger-bg hover:text-tone-danger-fg">
                           <IconX size={16} />
                         </button>
                       )}
@@ -752,7 +752,7 @@ export default function AssistedOrderForm({
             {violations.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {violations.map((violation, index) => (
-                  <li key={index} className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                  <li key={index} className="flex items-start gap-2 rounded-lg bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg">
                     <IconAlertTriangle size={14} className="mt-0.5 shrink-0" /> {formatQuantityViolationMessage(violation)}
                   </li>
                 ))}
@@ -768,7 +768,7 @@ export default function AssistedOrderForm({
             {([['delivery', 'Livraison à domicile', <IconTruck key="t" size={18} />], ['pickup', 'Retrait en magasin', <IconBuildingStore key="s" size={18} />]] as const).map(([key, label, icon]) => (
               <button
                 key={key} type="button" role="radio" aria-checked={fulfillment === key} onClick={() => setFulfillment(key)}
-                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${fulfillment === key ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)] text-[var(--admin-primary-fg)]' : 'border-[var(--admin-border)] text-gray-700 dark:border-gray-700 dark:text-gray-200'}`}
+                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${fulfillment === key ? 'border-a-brand bg-a-brand-soft text-a-brand-fg' : 'border-a-border text-a-text-2'}`}
               >
                 {icon} {label}
               </button>
@@ -778,7 +778,7 @@ export default function AssistedOrderForm({
           {fulfillment === 'delivery' && (
             <div className="mt-4 space-y-3">
               {savedAddresses.length > 0 && (
-                <label className="block text-xs text-gray-500">
+                <label className="block text-xs text-a-text-3">
                   Adresse enregistrée
                   <select value={selectedAddressId} onChange={(e) => chooseSavedAddress(e.target.value)} className={`${inputClass} mt-1`}>
                     <option value="new">Nouvelle adresse</option>
@@ -789,23 +789,23 @@ export default function AssistedOrderForm({
                 </label>
               )}
               <div className="grid gap-2 sm:grid-cols-2">
-                <label className="text-xs text-gray-500 sm:col-span-2">Destinataire *<input value={address.full_name} onChange={(e) => setAddress({ ...address, full_name: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500 sm:col-span-2">Adresse *<input value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500 sm:col-span-2">Complément<input value={address.line2} onChange={(e) => setAddress({ ...address, line2: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Code postal *<input value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} inputMode="numeric" autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Ville *<input value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Pays (ISO) *<input value={address.country} onChange={(e) => setAddress({ ...address, country: e.target.value.toUpperCase().slice(0, 2) })} maxLength={2} autoComplete="off" className={`${inputClass} mt-1 uppercase`} /></label>
+                <label className="text-xs text-a-text-3 sm:col-span-2">Destinataire *<input value={address.full_name} onChange={(e) => setAddress({ ...address, full_name: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3 sm:col-span-2">Adresse *<input value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3 sm:col-span-2">Complément<input value={address.line2} onChange={(e) => setAddress({ ...address, line2: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Code postal *<input value={address.postal_code} onChange={(e) => setAddress({ ...address, postal_code: e.target.value })} inputMode="numeric" autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Ville *<input value={address.city} onChange={(e) => setAddress({ ...address, city: e.target.value })} autoComplete="off" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Pays (ISO) *<input value={address.country} onChange={(e) => setAddress({ ...address, country: e.target.value.toUpperCase().slice(0, 2) })} maxLength={2} autoComplete="off" className={`${inputClass} mt-1 uppercase`} /></label>
               </div>
-              <div className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--admin-surface-subtle)] p-3 dark:bg-gray-950/40">
-                <button type="button" onClick={requestQuote} disabled={quoteLoading} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
+              <div className="flex flex-wrap items-center gap-3 rounded-xl bg-a-surface-2 p-3">
+                <button type="button" onClick={requestQuote} disabled={quoteLoading} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-a-inverse px-4 text-sm font-semibold text-a-on-inverse disabled:opacity-50">
                   {quoteLoading ? <IconLoader2 size={16} className="animate-spin" /> : <IconTruck size={16} />} {validQuote ? 'Recalculer' : 'Calculer les frais'}
                 </button>
-                <p className="text-sm text-gray-700 dark:text-gray-200">
+                <p className="text-sm text-a-text-2">
                   {validQuote ? <>Frais : <strong>{validQuote.total === 0 ? 'Offerts' : formatPrice(validQuote.total, currency)}</strong> · selon la configuration de livraison du magasin</>
                     : quote && !validQuote ? 'Panier ou adresse modifié : recalculez les frais.'
                       : 'Tarifs, zones et promotions du tenant appliqués.'}
                 </p>
-                {quoteMessage && <p className="w-full text-xs text-amber-700 dark:text-amber-300" role="alert">{quoteMessage}</p>}
+                {quoteMessage && <p className="w-full text-xs text-tone-warning-fg" role="alert">{quoteMessage}</p>}
               </div>
             </div>
           )}
@@ -819,48 +819,48 @@ export default function AssistedOrderForm({
               {MODE_OPTIONS.map((option) => (
                 <button
                   key={option.key} type="button" role="radio" aria-checked={mode === option.key} onClick={() => setMode(option.key)}
-                  className={`rounded-xl border p-3 text-left transition-colors ${mode === option.key ? 'border-[var(--admin-primary)] bg-[var(--admin-primary-soft)]' : 'border-[var(--admin-border)] hover:bg-[var(--admin-surface-subtle)] dark:border-gray-700'}`}
+                  className={`rounded-xl border p-3 text-left transition-colors ${mode === option.key ? 'border-a-brand bg-a-brand-soft' : 'border-a-border hover:bg-a-surface-2'}`}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{option.icon} {option.title}</span>
-                  <span className="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-a-text">{option.icon} {option.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-a-text-3">{option.helper}</span>
                 </button>
               ))}
             </div>
 
             {mode === 'to_verify' && (
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <label className="text-xs text-gray-500">Moyen déclaré par le client
+                <label className="text-xs text-a-text-3">Moyen déclaré par le client
                   <select value={declaredMethod} onChange={(e) => setDeclaredMethod(e.target.value as ManualPaymentMethod)} className={`${inputClass} mt-1`}>
                     {MANUAL_PAYMENT_METHODS.filter((m) => m !== 'cash').map((m) => <option key={m} value={m}>{MANUAL_PAYMENT_METHOD_LABELS[m]}</option>)}
                   </select>
                 </label>
-                <label className="text-xs text-gray-500">Référence communiquée (facultatif)<input value={declaredReference} onChange={(e) => setDeclaredReference(e.target.value)} className={`${inputClass} mt-1`} /></label>
-                <p className="text-xs text-gray-500 sm:col-span-2">Aucune commande n’est créée tant que la réception n’est pas confirmée dans la fiche précommande.</p>
+                <label className="text-xs text-a-text-3">Référence communiquée (facultatif)<input value={declaredReference} onChange={(e) => setDeclaredReference(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                <p className="text-xs text-a-text-3 sm:col-span-2">Aucune commande n’est créée tant que la réception n’est pas confirmée dans la fiche précommande.</p>
               </div>
             )}
 
             {mode === 'paid' && (
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <label className="text-xs text-gray-500">Moyen d’encaissement *
+                <label className="text-xs text-a-text-3">Moyen d’encaissement *
                   <select value={paidMethod} onChange={(e) => setPaidMethod(e.target.value as ManualPaymentMethod)} className={`${inputClass} mt-1`}>
                     {MANUAL_PAYMENT_METHODS.map((m) => <option key={m} value={m}>{MANUAL_PAYMENT_METHOD_LABELS[m]}</option>)}
                   </select>
                 </label>
-                <label className="text-xs text-gray-500">Date d’encaissement *<input type="datetime-local" value={paidAt} max={nowLocalInput()} onChange={(e) => setPaidAt(e.target.value)} className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Référence (facultatif)<input value={paidReference} onChange={(e) => setPaidReference(e.target.value)} placeholder="N° de virement, reçu…" className={`${inputClass} mt-1`} /></label>
-                <label className="text-xs text-gray-500">Note d’encaissement<input value={paidNote} onChange={(e) => setPaidNote(e.target.value)} className={`${inputClass} mt-1`} /></label>
-                <label className={`flex min-h-11 items-center gap-2 text-sm sm:col-span-2 ${email.trim() ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400'}`}>
+                <label className="text-xs text-a-text-3">Date d’encaissement *<input type="datetime-local" value={paidAt} max={nowLocalInput()} onChange={(e) => setPaidAt(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Référence (facultatif)<input value={paidReference} onChange={(e) => setPaidReference(e.target.value)} placeholder="N° de virement, reçu…" className={`${inputClass} mt-1`} /></label>
+                <label className="text-xs text-a-text-3">Note d’encaissement<input value={paidNote} onChange={(e) => setPaidNote(e.target.value)} className={`${inputClass} mt-1`} /></label>
+                <label className={`flex min-h-11 items-center gap-2 text-sm sm:col-span-2 ${email.trim() ? 'text-a-text-2' : 'text-a-text-3'}`}>
                   <input type="checkbox" checked={Boolean(email.trim()) && notifyCustomer} disabled={!email.trim()} onChange={(e) => setNotifyCustomer(e.target.checked)} className="h-5 w-5" />
                   {email.trim() ? 'Envoyer le récapitulatif de commande au client par e-mail' : 'Pas d’e-mail : le lien de suivi sera à partager manuellement'}
                 </label>
-                <p className="text-xs text-gray-500 sm:col-span-2">Enregistrement tracé avec votre identité. Le stock est décrémenté une seule fois à la création.</p>
+                <p className="text-xs text-a-text-3 sm:col-span-2">Enregistrement tracé avec votre identité. Le stock est décrémenté une seule fois à la création.</p>
               </div>
             )}
           </section>
         )}
 
         <section className={sectionClass}>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+          <label className="block text-xs font-semibold text-a-text-2">
             Note interne (jamais visible par le client)
             <textarea value={adminNote} onChange={(e) => setAdminNote(e.target.value.slice(0, 1000))} rows={2} className={`${inputClass} mt-1 py-2`} />
           </label>
@@ -870,38 +870,38 @@ export default function AssistedOrderForm({
       {/* Récapitulatif */}
       <aside className="hidden lg:sticky lg:top-4 lg:block">
         <div className={sectionClass}>
-          <h2 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Récapitulatif</h2>
+          <h2 className="mb-3 text-sm font-semibold text-a-text">Récapitulatif</h2>
           {summary}
-          {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300" role="alert">{error}</p>}
+          {error && <p className="mt-3 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg" role="alert">{error}</p>}
           {issuesList && <div className="mt-3">{issuesList}</div>}
-          <button type="button" onClick={() => submit('main')} disabled={Boolean(submitting)} className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+          <button type="button" onClick={() => submit('main')} disabled={Boolean(submitting)} className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand hover:opacity-90 disabled:opacity-50">
             {submitting === 'main' ? <IconLoader2 size={16} className="animate-spin" /> : <IconCheck size={16} />} {primaryLabel}
           </button>
           {!isEdit && (
-            <button type="button" onClick={() => submit('draft')} disabled={Boolean(submitting)} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--admin-border)] px-4 text-sm font-semibold text-gray-700 hover:bg-[var(--admin-surface-subtle)] disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
+            <button type="button" onClick={() => submit('draft')} disabled={Boolean(submitting)} className="mt-2 min-h-11 w-full rounded-xl border border-a-border px-4 text-sm font-semibold text-a-text-2 hover:bg-a-surface-2 disabled:opacity-50">
               {submitting === 'draft' ? 'Enregistrement…' : 'Enregistrer comme brouillon'}
             </button>
           )}
-          <Link href={isEdit && initial ? `/admin/orders/precommandes/${initial.preorderId}` : '/admin'} className="mt-2 flex min-h-11 items-center justify-center text-sm font-semibold text-gray-500 hover:text-gray-800">Annuler</Link>
+          <Link href={isEdit && initial ? `/admin/orders/precommandes/${initial.preorderId}` : '/admin'} className="mt-2 flex min-h-11 items-center justify-center text-sm font-semibold text-a-text-3 hover:text-a-text">Annuler</Link>
         </div>
       </aside>
 
       {/* Barre mobile */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--admin-border)] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 lg:hidden">
-        {error && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300" role="alert">{error}</p>}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-a-border bg-a-surface px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur lg:hidden">
+        {error && <p className="mb-2 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg" role="alert">{error}</p>}
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-lg font-bold">{estimatedTotal === null ? formatPrice(subtotal, currency) + ' + livr.' : formatPrice(estimatedTotal, currency)}</p>
             {remaining > 0
-              ? <button type="button" onClick={() => goToStep(mainIssues[0]!.step)} className="text-left text-xs font-semibold text-amber-800 underline dark:text-amber-300">{remaining} étape{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}</button>
-              : <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Prêt à enregistrer</p>}
+              ? <button type="button" onClick={() => goToStep(mainIssues[0]!.step)} className="text-left text-xs font-semibold text-tone-warning-fg underline">{remaining} étape{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''}</button>
+              : <p className="text-xs font-semibold text-tone-success-fg">Prêt à enregistrer</p>}
           </div>
           {!isEdit && (
-            <button type="button" onClick={() => submit('draft')} disabled={Boolean(submitting)} aria-label="Enregistrer comme brouillon" className="min-h-12 rounded-xl border border-[var(--admin-border)] px-3 text-sm font-semibold text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
+            <button type="button" onClick={() => submit('draft')} disabled={Boolean(submitting)} aria-label="Enregistrer comme brouillon" className="min-h-12 rounded-xl border border-a-border px-3 text-sm font-semibold text-a-text-2 disabled:opacity-50">
               Brouillon
             </button>
           )}
-          <button type="button" onClick={() => submit('main')} disabled={Boolean(submitting)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[var(--admin-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={() => submit('main')} disabled={Boolean(submitting)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand disabled:opacity-50">
             {submitting === 'main' ? <IconLoader2 size={16} className="animate-spin" /> : <IconCheck size={16} />}
             {assistedPrimaryLabel(mode, isEdit, true)}
           </button>

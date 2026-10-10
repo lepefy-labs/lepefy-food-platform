@@ -58,18 +58,18 @@ export default function RulesEditor({ initial, canManage }: { initial: EditableR
         const field = TEXT_FIELDS[rule.code];
         const value = field ? String(rule.configuration[field.key] ?? '') : '';
         return (
-          <article key={rule.code} className="rounded-2xl border border-[var(--admin-border)] bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <article key={rule.code} className="rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <label className="flex min-w-0 flex-1 items-start gap-3">
-                <input type="checkbox" className="mt-1 h-4 w-4 rounded border-gray-300" checked={rule.enabled} disabled={!canManage}
+                <input type="checkbox" className="mt-1 h-4 w-4 rounded border-a-border-strong" checked={rule.enabled} disabled={!canManage}
                   onChange={(event) => update(rule.code, { enabled: event.target.checked })} />
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">{rule.label}</span>
+                  <span className="block text-sm font-semibold text-a-text">{rule.label}</span>
                   <span className={SETTINGS_HINT_CLS}>{rule.description}</span>
                 </span>
               </label>
               <div className="flex items-center gap-2">
-                <label htmlFor={`priority-${rule.code}`} className="text-xs text-gray-500 dark:text-gray-400">Priorité</label>
+                <label htmlFor={`priority-${rule.code}`} className="text-xs text-a-text-3">Priorité</label>
                 <input id={`priority-${rule.code}`} type="number" min={0} max={1000} className={`${SETTINGS_INPUT_CLS} w-20`} value={rule.priority} disabled={!canManage}
                   onChange={(event) => update(rule.code, { priority: Math.max(0, Math.min(1000, Number(event.target.value) || 0)) })} />
               </div>

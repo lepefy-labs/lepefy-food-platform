@@ -18,15 +18,15 @@ const STATUS_LABEL = { pending: 'En test (sans automatisation)', active: 'Actif'
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-gray-100 py-2.5 last:border-0 dark:border-gray-800">
-      <dt className="text-sm text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="text-right text-sm font-medium text-gray-900 dark:text-gray-100">{children}</dd>
+    <div className="flex items-center justify-between gap-4 border-b border-a-border py-2.5 last:border-0">
+      <dt className="text-sm text-a-text-3">{label}</dt>
+      <dd className="text-right text-sm font-medium text-a-text">{children}</dd>
     </div>
   );
 }
 
 function OnOff({ value }: { value: boolean }) {
-  return <span className={value ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-400'}>{value ? 'Activé' : 'Désactivé'}</span>;
+  return <span className={value ? 'text-tone-success-fg' : 'text-a-text-3'}>{value ? 'Activé' : 'Désactivé'}</span>;
 }
 
 export default async function WhatsAppOverviewPage() {
@@ -44,10 +44,10 @@ export default async function WhatsAppOverviewPage() {
       <WhatsAppTabs active="overview" needsHumanCount={needsHuman} />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="rounded-2xl border border-[var(--admin-border)] bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <section className="rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
-            <IconBrandWhatsapp size={20} className="text-emerald-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-gray-950 dark:text-white">Canal</h2>
+            <IconBrandWhatsapp size={20} className="text-tone-success-fg" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-a-text">Canal</h2>
           </div>
           {view ? (
             <dl>
@@ -57,18 +57,18 @@ export default async function WhatsAppOverviewPage() {
               <Row label="Automatisations"><OnOff value={view.automationEnabled} /></Row>
               <Row label="Nala"><OnOff value={view.aiEnabled} /></Row>
               <Row label="Passage à un opérateur"><OnOff value={view.humanHandoffEnabled} /></Row>
-              <Row label="Connexion Meta">{view.tokenConfigured ? 'Jeton serveur configuré' : <span className="text-amber-700 dark:text-amber-300">Jeton serveur manquant</span>}</Row>
+              <Row label="Connexion Meta">{view.tokenConfigured ? 'Jeton serveur configuré' : <span className="text-tone-warning-fg">Jeton serveur manquant</span>}</Row>
             </dl>
           ) : (
-            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-800">
+            <div className="rounded-xl border border-dashed border-a-border px-4 py-6 text-center text-sm text-a-text-3">
               Non configuré. La connexion d’un numéro est réalisée par l’équipe Lepefy.
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/admin/canaux/whatsapp/conversations" className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+            <Link href="/admin/canaux/whatsapp/conversations" className="inline-flex items-center gap-2 rounded-lg border border-a-border px-3 py-2 text-sm font-medium text-a-text-2 hover:bg-a-surface-2">
               <IconMessages size={16} aria-hidden="true" /> Conversations{needsHuman > 0 ? ` (${needsHuman} en attente)` : ''}
             </Link>
-            <Link href="/admin/canaux/whatsapp/automatisations" className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+            <Link href="/admin/canaux/whatsapp/automatisations" className="inline-flex items-center gap-2 rounded-lg border border-a-border px-3 py-2 text-sm font-medium text-a-text-2 hover:bg-a-surface-2">
               <IconRobot size={16} aria-hidden="true" /> Automatisations
             </Link>
           </div>

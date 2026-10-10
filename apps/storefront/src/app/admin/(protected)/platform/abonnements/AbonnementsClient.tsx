@@ -17,19 +17,19 @@ import {
   type SubscriptionStateKind,
 } from '@/lib/billing/subscriptionRules';
 
-const INPUT = 'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)] dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
-const LABEL = 'mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400';
+const INPUT = 'w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus';
+const LABEL = 'mb-1 block text-xs font-medium text-a-text-3';
 const BUTTON = 'inline-flex min-h-10 items-center justify-center rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-50';
-const PRIMARY = `${BUTTON} bg-[var(--admin-primary)] text-white hover:opacity-90`;
-const SECONDARY = `${BUTTON} border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800`;
-const DANGER = `${BUTTON} border border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300`;
+const PRIMARY = `${BUTTON} bg-a-brand text-a-on-brand hover:opacity-90`;
+const SECONDARY = `${BUTTON} border border-a-border text-a-text-2 hover:bg-a-surface-2`;
+const DANGER = `${BUTTON} border border-tone-danger-border text-tone-danger-fg hover:bg-tone-danger-bg`;
 
 const STATE_BADGE: Record<SubscriptionStateKind, { label: string; cls: string }> = {
-  suspended: { label: 'Suspendu', cls: 'bg-red-100 text-red-700' },
-  overdue: { label: 'En retard', cls: 'bg-amber-100 text-amber-800' },
-  due_soon: { label: 'À renouveler', cls: 'bg-amber-50 text-amber-700' },
-  active: { label: 'Actif', cls: 'bg-green-100 text-green-700' },
-  undefined: { label: 'Échéance non définie', cls: 'bg-gray-100 text-gray-600' },
+  suspended: { label: 'Suspendu', cls: 'bg-tone-danger-bg text-tone-danger-fg' },
+  overdue: { label: 'En retard', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
+  due_soon: { label: 'À renouveler', cls: 'bg-tone-warning-bg text-tone-warning-fg' },
+  active: { label: 'Actif', cls: 'bg-tone-success-bg text-tone-success-fg' },
+  undefined: { label: 'Échéance non définie', cls: 'bg-a-hover text-a-text-2' },
 };
 
 const AUDIT_LABEL: Record<string, string> = {
@@ -123,7 +123,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
   }
 
   if (!schemaReady) {
-    return <p className="text-sm text-amber-700">Migration 144 non appliquée : la gestion des abonnements est en lecture seule.</p>;
+    return <p className="text-sm text-tone-warning-fg">Migration 144 non appliquée : la gestion des abonnements est en lecture seule.</p>;
   }
 
   const subscription = toRow(row);
@@ -139,18 +139,18 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
   return (
     <div className="space-y-5">
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-sm ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-sm ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>
           {message.text}
         </p>
       )}
 
       {!row.hasSubscription && (
-        <p className="text-sm text-gray-500">Aucun abonnement (tenant_subscriptions) pour ce tenant : seuls les modules peuvent être suspendus.</p>
+        <p className="text-sm text-a-text-3">Aucun abonnement (tenant_subscriptions) pour ce tenant : seuls les modules peuvent être suspendus.</p>
       )}
 
       {row.hasSubscription && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="rounded-xl border border-a-border p-4">
             <h3 className="mb-3 text-sm font-semibold">Enregistrer un virement</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -167,7 +167,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
               <input id={`note-${row.tenantId}`} type="text" value={note} onChange={(e) => setNote(e.target.value)} className={INPUT} />
             </div>
             {transferPreview && (
-              <p className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+              <p className="mt-2 text-xs text-a-text-2">
                 → Nouvelle échéance : <strong>{formatBillingDate(transferPreview)}</strong>
                 {isSuspendedAt(subscription, transferDate).suspended && row.paidUntil && new Date(row.paidUntil) < transferDate && ' (tenant suspendu : les mois sans service ne sont pas facturés)'}
               </p>
@@ -182,9 +182,9 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
             </button>
           </section>
 
-          <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="rounded-xl border border-a-border p-4">
             <h3 className="mb-1 text-sm font-semibold">Statut</h3>
-            <p className="mb-3 text-xs text-gray-500">
+            <p className="mb-3 text-xs text-a-text-3">
               Une suspension met hors ligne boutique, événementiel, carte digitale, paiements en ligne, Nala et avis ; l&apos;admin du tenant
               est limitée à l&apos;abonnement et aux commandes en lecture. Les paiements déjà engagés restent traités.
             </p>
@@ -199,9 +199,9 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
             </button>
           </section>
 
-          <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="rounded-xl border border-a-border p-4">
             <h3 className="mb-1 text-sm font-semibold">Suspension automatique</h3>
-            <p className="mb-3 text-xs text-gray-500">En mode automatique, le tenant est suspendu N jours après l&apos;échéance s&apos;il n&apos;a pas payé (avertissements 7 jours avant).</p>
+            <p className="mb-3 text-xs text-a-text-3">En mode automatique, le tenant est suspendu N jours après l&apos;échéance s&apos;il n&apos;a pas payé (avertissements 7 jours avant).</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor={`mode-${row.tenantId}`} className={LABEL}>Mode</label>
@@ -216,7 +216,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
               </div>
             </div>
             {policyPreview && (
-              <p className={`mt-2 text-xs ${policyPreview.getTime() < Date.now() ? 'text-red-700' : 'text-gray-600 dark:text-gray-300'}`}>
+              <p className={`mt-2 text-xs ${policyPreview.getTime() < Date.now() ? 'text-tone-danger-fg' : 'text-a-text-2'}`}>
                 → Suspension automatique {policyPreview.getTime() < Date.now() ? 'immédiate (échéance déjà dépassée)' : `le ${formatBillingDate(policyPreview)}`}
               </p>
             )}
@@ -231,7 +231,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
             </button>
           </section>
 
-          <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="rounded-xl border border-a-border p-4">
             <h3 className="mb-3 text-sm font-semibold">Échéance et lien de paiement</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -248,7 +248,7 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
             >
               Corriger l&apos;échéance
             </button>
-            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-a-border pt-4">
               <div>
                 <label htmlFor={`link-${row.tenantId}`} className={LABEL}>Lien Stripe (vide = aucun)</label>
                 <input id={`link-${row.tenantId}`} type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://buy.stripe.com/…" className={INPUT} />
@@ -267,11 +267,11 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
         </div>
       )}
 
-      <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+      <section className="rounded-xl border border-a-border p-4">
         <h3 className="mb-1 text-sm font-semibold">Modules</h3>
-        <p className="mb-3 text-xs text-gray-500">Suspendre un seul module, indépendamment de l&apos;échéance (ex. événementiel hors ligne, boutique active).</p>
+        <p className="mb-3 text-xs text-a-text-3">Suspendre un seul module, indépendamment de l&apos;échéance (ex. événementiel hors ligne, boutique active).</p>
         <div className="mb-3 max-w-md"><ReasonInput id={`module-reason-${row.tenantId}`} value={moduleReason} onChange={setModuleReason} /></div>
-        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        <ul className="divide-y divide-a-border">
           {MODULE_KEYS.map((module) => {
             const suspension = row.suspendedModules.find((item) => item.module === module);
             return (
@@ -279,8 +279,8 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
                 <span>
                   {MODULE_LABELS[module]}{' '}
                   {suspension
-                    ? <span className="text-xs text-red-700">· suspendu depuis le {formatBillingDate(suspension.since)} ({suspension.reason})</span>
-                    : <span className="text-xs text-gray-400">· actif</span>}
+                    ? <span className="text-xs text-tone-danger-fg">· suspendu depuis le {formatBillingDate(suspension.since)} ({suspension.reason})</span>
+                    : <span className="text-xs text-a-text-3">· actif</span>}
                 </span>
                 <button
                   type="button"
@@ -298,29 +298,29 @@ function ManagePanel({ row, schemaReady }: { row: PlatformSubscriptionRow; schem
 
       {history && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="rounded-xl border border-a-border p-4">
             <h3 className="mb-2 text-sm font-semibold">Paiements</h3>
-            {history.payments.length === 0 ? <p className="text-xs text-gray-400">Aucun paiement enregistré.</p> : (
+            {history.payments.length === 0 ? <p className="text-xs text-a-text-3">Aucun paiement enregistré.</p> : (
               <ul className="space-y-1.5 text-xs">
                 {history.payments.map((payment) => (
                   <li key={payment.id} className="flex flex-wrap justify-between gap-2">
                     <span>{formatBillingDate(payment.paidAt)} · {payment.source === 'stripe' ? 'Carte' : 'Virement'} · {euro(payment.amountCents, payment.currency)}</span>
-                    <span className="text-gray-500">→ {formatBillingDate(payment.paidUntilAfter)}{payment.wasSuspended ? ' (après suspension)' : ''}</span>
+                    <span className="text-a-text-3">→ {formatBillingDate(payment.paidUntilAfter)}{payment.wasSuspended ? ' (après suspension)' : ''}</span>
                   </li>
                 ))}
               </ul>
             )}
           </section>
-          <section className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <section className="rounded-xl border border-a-border p-4">
             <h3 className="mb-2 text-sm font-semibold">Journal</h3>
-            {history.audit.length === 0 ? <p className="text-xs text-gray-400">Aucune action.</p> : (
+            {history.audit.length === 0 ? <p className="text-xs text-a-text-3">Aucune action.</p> : (
               <ul className="space-y-1.5 text-xs">
                 {history.audit.map((entry) => (
                   <li key={entry.id}>
-                    <span className="text-gray-400">{new Date(entry.createdAt).toLocaleString('fr-FR')}</span>{' '}
+                    <span className="text-a-text-3">{new Date(entry.createdAt).toLocaleString('fr-FR')}</span>{' '}
                     · {AUDIT_LABEL[entry.action] ?? entry.action}
                     {entry.moduleKey ? ` (${MODULE_LABELS[entry.moduleKey as keyof typeof MODULE_LABELS] ?? entry.moduleKey})` : ''}
-                    {entry.reason ? <span className="text-gray-500"> — {entry.reason}</span> : null}
+                    {entry.reason ? <span className="text-a-text-3"> — {entry.reason}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -338,7 +338,7 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
   return (
     <div className="space-y-3">
       {!schemaReady && (
-        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p role="status" className="rounded-xl border border-tone-warning-border bg-tone-warning-bg px-4 py-3 text-sm text-tone-warning-fg">
           Migration 144 non appliquée : suspension, paiements et journal sont indisponibles. Les tenants sont considérés actifs.
         </p>
       )}
@@ -347,7 +347,7 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
         const badge = STATE_BADGE[state.kind];
         const open = openId === row.tenantId;
         return (
-          <div key={row.tenantId} className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div key={row.tenantId} className="rounded-2xl border border-a-border bg-a-surface">
             <button
               type="button"
               aria-expanded={open}
@@ -357,26 +357,26 @@ export default function AbonnementsClient({ initialRows, schemaReady }: { initia
               <span className="flex min-w-0 items-center gap-2">
                 {open ? <IconChevronDown size={16} aria-hidden="true" /> : <IconChevronRight size={16} aria-hidden="true" />}
                 <span className="min-w-0">
-                  <span className="block truncate font-semibold text-gray-900 dark:text-gray-100">{row.name}</span>
-                  <span className="block truncate text-xs text-gray-400">{row.slug}{row.planName ? ` · ${row.planName}` : ''}{row.monthlyPriceCents !== null ? ` · ${euro(row.monthlyPriceCents, row.currency)}/mois` : ''}</span>
+                  <span className="block truncate font-semibold text-a-text">{row.name}</span>
+                  <span className="block truncate text-xs text-a-text-3">{row.slug}{row.planName ? ` · ${row.planName}` : ''}{row.monthlyPriceCents !== null ? ` · ${euro(row.monthlyPriceCents, row.currency)}/mois` : ''}</span>
                 </span>
               </span>
               <span><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}>{badge.label}{state.kind === 'suspended' && state.suspendedBy === 'automatic' ? ' (auto)' : ''}</span></span>
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-a-text-2">
                 {formatBillingDate(row.paidUntil)}
-                {state.kind === 'overdue' && <span className="block text-xs text-amber-700">retard {plural(state.daysOverdue, 'jour')}</span>}
+                {state.kind === 'overdue' && <span className="block text-xs text-tone-warning-fg">retard {plural(state.daysOverdue, 'jour')}</span>}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-a-text-3">
                 {row.suspensionMode === 'automatic' ? `Auto, ${plural(row.graceDays, 'jour')} après l’échéance` : 'Suspension manuelle'}
                 {state.autoSuspendAt && state.kind !== 'suspended' && <span className="block">prévue le {formatBillingDate(state.autoSuspendAt)}</span>}
-                {row.suspendedModules.length > 0 && <span className="block text-red-700">{plural(row.suspendedModules.length, 'module suspendu', 'modules suspendus')}</span>}
+                {row.suspendedModules.length > 0 && <span className="block text-tone-danger-fg">{plural(row.suspendedModules.length, 'module suspendu', 'modules suspendus')}</span>}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-a-text-3">
                 {row.lastPayment ? `Dernier paiement ${formatBillingDate(row.lastPayment.paidAt)}` : 'Aucun paiement'}
               </span>
             </button>
             {open && (
-              <div className="border-t border-gray-100 px-4 py-4 dark:border-gray-800">
+              <div className="border-t border-a-border px-4 py-4">
                 <ManagePanel row={row} schemaReady={schemaReady} />
               </div>
             )}

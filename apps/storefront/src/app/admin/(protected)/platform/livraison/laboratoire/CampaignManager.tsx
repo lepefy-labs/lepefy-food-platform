@@ -20,8 +20,8 @@ import { MAX_CAMPAIGN_SCENARIOS, splitDestinationsForLimit } from '@/lib/shippin
 import { parseManualWeights, weightsForProfile } from '@/lib/shipping/intelligence/weightPresets';
 
 const INPUT_CLS =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
 
 type UiSamplingMode = 'initial' | 'deep' | 'manual';
 
@@ -52,8 +52,8 @@ const STATUS_LABEL: Record<string, string> = {
   completed: 'Terminée', completed_with_errors: 'Terminée avec erreurs', cancelled: 'Annulée',
 };
 const STATUS_CLS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-500', queued: 'bg-amber-50 text-amber-700', running: 'bg-blue-50 text-blue-700',
-  completed: 'bg-green-50 text-green-700', completed_with_errors: 'bg-amber-50 text-amber-700', cancelled: 'bg-gray-100 text-gray-400',
+  draft: 'bg-a-hover text-a-text-3', queued: 'bg-tone-warning-bg text-tone-warning-fg', running: 'bg-tone-info-bg text-tone-info-fg',
+  completed: 'bg-tone-success-bg text-tone-success-fg', completed_with_errors: 'bg-tone-warning-bg text-tone-warning-fg', cancelled: 'bg-a-hover text-a-text-3',
 };
 type CampaignNotice = { tone: 'success' | 'warning'; text: string };
 
@@ -260,25 +260,25 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
     .join(' + ');
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Campagnes de simulation</h2>
-        <button onClick={() => void loadCampaigns()} className="min-h-8 px-2 py-1.5 text-xs rounded-lg border border-gray-200 flex items-center gap-1 text-gray-500"><IconRefresh size={14} stroke={1.5} />Actualiser</button>
+        <h2 className="text-sm font-semibold text-a-text">Campagnes de simulation</h2>
+        <button onClick={() => void loadCampaigns()} className="min-h-8 px-2 py-1.5 text-xs rounded-lg border border-a-border flex items-center gap-1 text-a-text-3"><IconRefresh size={14} stroke={1.5} />Actualiser</button>
       </div>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-a-text-3 mb-4">
         Chaque CAP est une destination distincte. Un scénario n&apos;est couvert que par un devis de SON CAP et de sa configuration de colis exacte — nouvel appel Packlink, ou réemploi d&apos;un devis strictement identique encore frais.
       </p>
 
-      {notice && <div className={`mb-4 px-3 py-2 rounded-lg text-xs border ${notice.tone === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>{notice.text}</div>}
+      {notice && <div className={`mb-4 px-3 py-2 rounded-lg text-xs border ${notice.tone === 'success' ? 'bg-tone-success-bg text-tone-success-fg border-tone-success-border' : 'bg-tone-warning-bg text-tone-warning-fg border-tone-warning-border'}`}>{notice.text}</div>}
 
       {loadingList ? (
-        <p className="text-sm text-gray-400 mb-4">Chargement…</p>
+        <p className="text-sm text-a-text-3 mb-4">Chargement…</p>
       ) : campaigns.length === 0 ? (
-        <p className="text-sm text-gray-400 mb-4">Aucune campagne encore lancée.</p>
+        <p className="text-sm text-a-text-3 mb-4">Aucune campagne encore lancée.</p>
       ) : (
         <div className="overflow-x-auto mb-6">
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-2xs font-medium text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
+            <thead><tr className="text-left text-xs font-medium text-a-text-3 uppercase tracking-wide border-b border-a-border">
               <th className="py-2 pr-3">Nom</th><th className="py-2 pr-3">Statut</th><th className="py-2 pr-3">Traités</th><th className="py-2 pr-3">Créée</th><th className="py-2 pr-3 text-right">Actions</th>
             </tr></thead>
             <tbody>
@@ -286,23 +286,23 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                 const matrix = c.scenario_matrix as ShippingScenarioMatrix | null;
                 const mode = matrix?.samplingMode;
                 return (
-                  <tr key={c.id} className="border-b border-gray-50 dark:border-gray-800/60">
+                  <tr key={c.id} className="border-b border-a-border">
                     <td className="py-2.5 pr-3">
-                      <Link href={`/admin/platform/livraison/laboratoire/${c.id}`} className="text-[var(--color-primary-dark)] hover:underline">{c.name}</Link>
-                      {mode && <span className="block text-2xs text-gray-400">{MODE_LABEL[mode] ?? mode}{matrix?.destinationMode === 'zone_sentinels' ? ' · CAP témoins par zone' : ''}</span>}
+                      <Link href={`/admin/platform/livraison/laboratoire/${c.id}`} className="text-a-brand-fg hover:underline">{c.name}</Link>
+                      {mode && <span className="block text-xs text-a-text-3">{MODE_LABEL[mode] ?? mode}{matrix?.destinationMode === 'zone_sentinels' ? ' · CAP témoins par zone' : ''}</span>}
                     </td>
-                    <td className="py-2.5 pr-3"><span className={`text-2xs font-semibold px-1.5 py-0.5 rounded ${STATUS_CLS[c.status] ?? 'bg-gray-100 text-gray-500'}`}>{STATUS_LABEL[c.status] ?? c.status}</span></td>
-                    <td className="py-2.5 pr-3 text-gray-600 dark:text-gray-300" title="Scénarios traités (nouveaux devis + réemplois) / total. La couverture vérifiée par CAP est dans le détail.">
-                      {c.completed_scenarios}/{c.total_scenarios}{c.failed_scenarios > 0 && <span className="text-red-500"> · {c.failed_scenarios} échec(s)</span>}
+                    <td className="py-2.5 pr-3"><span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${STATUS_CLS[c.status] ?? 'bg-a-hover text-a-text-3'}`}>{STATUS_LABEL[c.status] ?? c.status}</span></td>
+                    <td className="py-2.5 pr-3 text-a-text-2" title="Scénarios traités (nouveaux devis + réemplois) / total. La couverture vérifiée par CAP est dans le détail.">
+                      {c.completed_scenarios}/{c.total_scenarios}{c.failed_scenarios > 0 && <span className="text-tone-danger-fg"> · {c.failed_scenarios} échec(s)</span>}
                     </td>
-                    <td className="py-2.5 pr-3 text-gray-400">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+                    <td className="py-2.5 pr-3 text-a-text-3">{new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
                     <td className="py-2.5 pr-3 text-right">
                       {(c.status === 'queued' || c.status === 'running') && (
                         <div className="flex flex-wrap justify-end gap-2">
-                          <button onClick={() => void processCampaign(c.id)} disabled={processingId !== null} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50">
+                          <button onClick={() => void processCampaign(c.id)} disabled={processingId !== null} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-brand text-a-brand-fg disabled:opacity-50">
                             {processingId === c.id ? 'Traitement…' : 'Traiter maintenant'}
                           </button>
-                          <button onClick={() => void handleCancel(c.id)} disabled={processingId === c.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-red-600 disabled:opacity-50">Annuler</button>
+                          <button onClick={() => void handleCancel(c.id)} disabled={processingId === c.id} className="min-h-8 px-3 py-1.5 text-xs rounded-lg border border-a-border text-tone-danger-fg disabled:opacity-50">Annuler</button>
                         </div>
                       )}
                     </td>
@@ -315,8 +315,8 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
       )}
 
       {creating ? (
-        <div className="border border-dashed border-gray-200 rounded-lg p-4 space-y-4">
-          {error && <div className="px-3 py-2 rounded-lg text-xs bg-red-50 text-red-700">{error}</div>}
+        <div className="border border-dashed border-a-border rounded-lg p-4 space-y-4">
+          {error && <div className="px-3 py-2 rounded-lg text-xs bg-tone-danger-bg text-tone-danger-fg">{error}</div>}
           <div>
             <label className={LABEL_CLS}>Nom (optionnel)</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} placeholder="Ex. Couverture Italie — villes principales" />
@@ -325,13 +325,13 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
           <div>
             <label className={LABEL_CLS}>Profils d&apos;emballage</label>
             {profiles.length === 0 ? (
-              <p className="text-xs text-amber-600">Aucun profil actif — configurez-en dans « Emballages ».</p>
+              <p className="text-xs text-tone-warning-fg">Aucun profil actif — configurez-en dans « Emballages ».</p>
             ) : (
               <div className="flex flex-wrap gap-3">
                 {profiles.map((p) => (
-                  <label key={p.id} className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <label key={p.id} className="flex items-center gap-1.5 text-sm text-a-text-2">
                     <input type="checkbox" checked={selectedProfiles.includes(p.id)} onChange={() => setSelectedProfiles((prev) => prev.includes(p.id) ? prev.filter((id) => id !== p.id) : [...prev, p.id])} />
-                    {p.name} <span className="text-2xs text-gray-400">({formatKg(p.max_weight_g / 1000)} kg max)</span>
+                    {p.name} <span className="text-xs text-a-text-3">({formatKg(p.max_weight_g / 1000)} kg max)</span>
                   </label>
                 ))}
               </div>
@@ -348,10 +348,10 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                   role="radio"
                   aria-checked={samplingMode === mode.value}
                   onClick={() => changeMode(mode.value)}
-                  className={`rounded-lg border p-3 text-left transition-colors ${samplingMode === mode.value ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                  className={`rounded-lg border p-3 text-left transition-colors ${samplingMode === mode.value ? 'border-a-brand bg-a-brand-soft' : 'border-a-border hover:border-a-border-strong'}`}
                 >
-                  <span className="block text-sm font-semibold text-gray-900">{mode.title}</span>
-                  <span className="mt-0.5 block text-2xs text-gray-500">{mode.description}</span>
+                  <span className="block text-sm font-semibold text-a-text">{mode.title}</span>
+                  <span className="mt-0.5 block text-xs text-a-text-3">{mode.description}</span>
                 </button>
               ))}
             </div>
@@ -359,12 +359,12 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
             {samplingMode === 'manual' ? (
               <div className="mt-2">
                 <input type="text" value={weightsInput} onChange={(e) => setWeightsInput(e.target.value)} className={INPUT_CLS} placeholder="Ex. 1, 3, 7.5, 14.5, 15.5, 30" aria-label="Poids manuels (kg)" />
-                <p className="text-xs text-gray-400 mt-1">Poids en kg séparés par des virgules (point décimal), testés pour chaque profil et chaque CAP.</p>
+                <p className="text-xs text-a-text-3 mt-1">Poids en kg séparés par des virgules (point décimal), testés pour chaque profil et chaque CAP.</p>
               </div>
             ) : (
               <ul className="mt-2 space-y-1">
                 {weightsByProfile.map((entry) => (
-                  <li key={entry.profile.id} className="text-xs text-gray-600">
+                  <li key={entry.profile.id} className="text-xs text-a-text-2">
                     <span className="font-medium">{entry.profile.name}</span> — {entry.weights.length} poids : {entry.weights.map(formatKg).join(' · ')} kg
                   </li>
                 ))}
@@ -374,7 +374,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
 
           <div>
             <label className={LABEL_CLS}>Destinations</label>
-            <div className="mb-2 inline-flex rounded-lg border border-gray-200 p-0.5" role="tablist" aria-label="Type de destinations">
+            <div className="mb-2 inline-flex rounded-lg border border-a-border p-0.5" role="tablist" aria-label="Type de destinations">
               {([['postal', 'Par ville ou CAP'], ['zone_sentinels', 'Par zone (CAP témoins)']] as const).map(([value, label]) => (
                 <button
                   key={value}
@@ -382,7 +382,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                   role="tab"
                   aria-selected={destinationMode === value}
                   onClick={() => setDestinationMode(value)}
-                  className={`min-h-9 px-3 py-1 text-xs rounded-md ${destinationMode === value ? 'bg-[var(--color-primary)] text-white' : 'text-gray-600'}`}
+                  className={`min-h-9 px-3 py-1 text-xs rounded-md ${destinationMode === value ? 'bg-a-brand text-a-on-brand' : 'text-a-text-2'}`}
                 >
                   {label}
                 </button>
@@ -402,39 +402,39 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                 />
               ))}
             </div>
-            <button type="button" onClick={() => setDestinations((prev) => [...prev, emptyCampaignDestination()])} className="mt-2 text-xs text-[var(--color-primary-dark)] flex items-center gap-1">
+            <button type="button" onClick={() => setDestinations((prev) => [...prev, emptyCampaignDestination()])} className="mt-2 text-xs text-a-brand-fg flex items-center gap-1">
               <IconPlus size={13} stroke={1.5} />Ajouter une ville
             </button>
             </>)}
           </div>
 
-          <div className={`rounded-lg px-3 py-2 text-xs ${overLimit ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-600'}`}>
+          <div className={`rounded-lg px-3 py-2 text-xs ${overLimit ? 'bg-tone-danger-bg text-tone-danger-fg' : 'bg-a-surface-2 text-a-text-2'}`}>
             <strong>{expandedDestinations.length} CAP</strong> × <strong>{scenariosPerPostalCode} scénario(s) par CAP</strong>
             {weightsByProfile.length > 0 && <> ({overflowExplanation})</>} = <strong>{scenarioCount} scénario(s)</strong>
-            <span className="block mt-0.5 text-2xs opacity-80">Au plus {scenarioCount} appel(s) Packlink : un devis identique encore frais est réemployé sans nouvel appel.</span>
+            <span className="block mt-0.5 text-xs opacity-80">Au plus {scenarioCount} appel(s) Packlink : un devis identique encore frais est réemployé sans nouvel appel.</span>
           </div>
 
           {overLimit && (
-            <div className="rounded-lg border border-red-200 p-3 space-y-2">
-              <p className="text-xs text-red-700">
+            <div className="rounded-lg border border-tone-danger-border p-3 space-y-2">
+              <p className="text-xs text-tone-danger-fg">
                 Limite d&apos;une campagne : {MAX_CAMPAIGN_SCENARIOS} scénarios. Le dépassement vient de {expandedDestinations.length} CAP × {scenariosPerPostalCode} scénarios par CAP. Aucun CAP ni profil n&apos;est retiré automatiquement.
               </p>
               <div className="flex flex-wrap gap-2">
                 {samplingMode !== 'initial' && (
-                  <button type="button" onClick={() => changeMode('initial')} className="min-h-10 px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-700">
+                  <button type="button" onClick={() => changeMode('initial')} className="min-h-10 px-3 py-1.5 text-xs rounded-lg border border-a-border text-a-text-2">
                     Passer en Couverture initiale ({initialPreviewCount} scénarios)
                   </button>
                 )}
               </div>
               {parts.length > 0 ? (
                 <div>
-                  <p className="text-xs text-gray-600 mb-1.5">Découpage déterministe par CAP (triés), en {parts.length} campagnes à lancer une par une :</p>
+                  <p className="text-xs text-a-text-2 mb-1.5">Découpage déterministe par CAP (triés), en {parts.length} campagnes à lancer une par une :</p>
                   <ul className="space-y-1.5">
                     {parts.map((part, i) => {
                       const partIndex = i + 1;
                       const launched = launchedParts.includes(partIndex);
                       return (
-                        <li key={partIndex} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-xs">
+                        <li key={partIndex} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-a-surface-2 px-2.5 py-1.5 text-xs">
                           <span>
                             Partie {partIndex}/{parts.length} — {part.length} CAP ({part[0]?.postalCode} → {part[part.length - 1]?.postalCode}) · {part.length * scenariosPerPostalCode} scénarios
                           </span>
@@ -442,7 +442,7 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                             type="button"
                             disabled={submitting || launched}
                             onClick={() => void createCampaign(part, { index: partIndex, count: parts.length })}
-                            className="min-h-9 px-3 py-1 rounded-lg border border-[var(--color-primary)] text-[var(--color-primary-dark)] disabled:opacity-50"
+                            className="min-h-9 px-3 py-1 rounded-lg border border-a-brand text-a-brand-fg disabled:opacity-50"
                           >
                             {launched ? 'Lancée' : `Lancer la partie ${partIndex}`}
                           </button>
@@ -452,27 +452,27 @@ export function CampaignManager({ profiles, zones }: { profiles: ShippingPackagi
                   </ul>
                 </div>
               ) : (
-                <p className="text-xs text-gray-600">Un seul CAP dépasse déjà la limite : réduisez les poids ou les profils.</p>
+                <p className="text-xs text-a-text-2">Un seul CAP dépasse déjà la limite : réduisez les poids ou les profils.</p>
               )}
             </div>
           )}
 
           {samplingMode === 'deep' && (
-            <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <label className="flex items-start gap-2 rounded-lg border border-tone-warning-border bg-tone-warning-bg px-3 py-2 text-xs text-tone-warning-fg">
               <input type="checkbox" checked={confirmDeep} onChange={(e) => setConfirmDeep(e.target.checked)} className="mt-0.5" />
               <span>Je confirme lancer une analyse approfondie : jusqu&apos;à {Math.min(scenarioCount, MAX_CAMPAIGN_SCENARIOS)} appel(s) Packlink par campagne.</span>
             </label>
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button onClick={() => void createCampaign(expandedDestinations)} disabled={submitting || scenarioCount === 0 || overLimit || (samplingMode === 'deep' && !confirmDeep)} className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50">
+            <button onClick={() => void createCampaign(expandedDestinations)} disabled={submitting || scenarioCount === 0 || overLimit || (samplingMode === 'deep' && !confirmDeep)} className="min-h-11 px-4 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50">
               {submitting ? 'Lancement…' : 'Lancer la campagne'}
             </button>
-            <button onClick={() => setCreating(false)} disabled={submitting} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-gray-200 text-gray-500 disabled:opacity-50">Fermer</button>
+            <button onClick={() => setCreating(false)} disabled={submitting} className="min-h-11 px-4 py-2 text-xs rounded-lg border border-a-border text-a-text-3 disabled:opacity-50">Fermer</button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)]"><IconPlus size={14} stroke={1.5} />Nouvelle campagne</button>
+        <button onClick={() => setCreating(true)} className="min-h-11 flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand"><IconPlus size={14} stroke={1.5} />Nouvelle campagne</button>
       )}
     </section>
   );

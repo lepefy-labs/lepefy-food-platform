@@ -62,40 +62,40 @@ export function OrderDocumentsSettingsSection({ initial, available, invalid, can
 
   return (
     <div className="space-y-4">
-      {!available && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">La migration 145 doit être appliquée pour enregistrer ces préférences. Les valeurs par défaut ci-dessous s’appliquent en attendant.</p>}
-      {available && invalid && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">Les préférences enregistrées sont invalides : les valeurs par défaut s’appliquent. Vérifiez puis enregistrez.</p>}
-      {available && !canManage && <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800/60 dark:text-gray-300">Lecture seule : la modification demande la gestion des paramètres.</p>}
+      {!available && <p role="alert" className="rounded-xl border border-tone-warning-border bg-tone-warning-bg p-3 text-sm text-tone-warning-fg">La migration 145 doit être appliquée pour enregistrer ces préférences. Les valeurs par défaut ci-dessous s’appliquent en attendant.</p>}
+      {available && invalid && <p role="alert" className="rounded-xl border border-tone-danger-border bg-tone-danger-bg p-3 text-sm text-tone-danger-fg">Les préférences enregistrées sont invalides : les valeurs par défaut s’appliquent. Vérifiez puis enregistrez.</p>}
+      {available && !canManage && <p className="rounded-xl bg-a-surface-2 p-3 text-sm text-a-text-2">Lecture seule : la modification demande la gestion des paramètres.</p>}
 
-      <article id="liste-preparation" aria-labelledby="liste-preparation-title" className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <header className="flex items-start gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-800">
+      <article id="liste-preparation" aria-labelledby="liste-preparation-title" className="scroll-mt-24 rounded-2xl border border-a-border bg-a-surface">
+        <header className="flex items-start gap-4 border-b border-a-border px-4 py-4 sm:px-6">
           <SettingsIconTile icon={IconFileText} accent="blue" />
           <div className="min-w-0">
-            <h2 id="liste-preparation-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Liste de préparation</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Document interne : articles, emplacements, chaîne du froid et emballage suggéré.</p>
+            <h2 id="liste-preparation-title" className="text-base font-semibold text-a-text">Liste de préparation</h2>
+            <p className="mt-1 text-sm text-a-text-3">Document interne : articles, emplacements, chaîne du froid et emballage suggéré.</p>
           </div>
         </header>
         <div className="px-4 py-5 sm:px-6">
           <label htmlFor="doc-picking-format" className={SETTINGS_LABEL_CLS}>Format par défaut</label>
           <FormatSelect id="doc-picking-format" value={form.picking_list_format} onChange={(v) => set('picking_list_format', v)} disabled={disabled} />
           <p className={SETTINGS_HINT_CLS}>{ORDER_DOCUMENT_FORMATS[form.picking_list_format].description} Modifiable à chaque impression.</p>
-          <label className="mt-4 flex min-h-11 items-start gap-2.5 py-1 text-sm text-gray-800 dark:text-gray-200">
+          <label className="mt-4 flex min-h-11 items-start gap-2.5 py-1 text-sm text-a-text">
             <input type="checkbox" disabled={disabled} checked={form.picking_list_show_delivery_address} onChange={(e) => set('picking_list_show_delivery_address', e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--admin-primary)]" />
-            <span>Adresse de livraison complète<span className="block text-xs text-gray-500 dark:text-gray-400">Par défaut, seuls le code postal et la ville sont imprimés. Livraisons uniquement.</span></span>
+            <span>Adresse de livraison complète<span className="block text-xs text-a-text-3">Par défaut, seuls le code postal et la ville sont imprimés. Livraisons uniquement.</span></span>
           </label>
         </div>
       </article>
 
-      <article id="bon-de-colis" aria-labelledby="bon-de-colis-title" className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <header className="flex items-start gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-gray-800">
+      <article id="bon-de-colis" aria-labelledby="bon-de-colis-title" className="scroll-mt-24 rounded-2xl border border-a-border bg-a-surface">
+        <header className="flex items-start gap-4 border-b border-a-border px-4 py-4 sm:px-6">
           <SettingsIconTile icon={IconPackage} accent="emerald" />
           <div className="min-w-0 flex-1">
-            <h2 id="bon-de-colis-title" className="text-base font-semibold text-gray-950 dark:text-gray-100">Bon de colis</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Récapitulatif client à glisser dans le colis, sans aucune donnée interne.</p>
+            <h2 id="bon-de-colis-title" className="text-base font-semibold text-a-text">Bon de colis</h2>
+            <p className="mt-1 text-sm text-a-text-3">Récapitulatif client à glisser dans le colis, sans aucune donnée interne.</p>
           </div>
         </header>
         <div className="space-y-5 px-4 py-5 sm:px-6">
-          <label className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-800">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Inclure le bon dans le colis</span>
+          <label className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-a-border px-4 py-3">
+            <span className="text-sm font-medium text-a-text">Inclure le bon dans le colis</span>
             <input type="checkbox" disabled={disabled} checked={form.packing_slip_enabled} onChange={(e) => set('packing_slip_enabled', e.target.checked)} className="h-5 w-5 shrink-0 accent-[var(--admin-primary)]" />
           </label>
           <fieldset disabled={disabled || !form.packing_slip_enabled} className="space-y-5 disabled:opacity-60">
@@ -105,16 +105,16 @@ export function OrderDocumentsSettingsSection({ initial, available, invalid, can
               <FormatSelect id="doc-packing-format" value={form.packing_slip_format} onChange={(v) => set('packing_slip_format', v)} disabled={disabled || !form.packing_slip_enabled} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Contenu</p>
+              <p className="text-sm font-semibold text-a-text">Contenu</p>
               <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-                <li className="flex min-h-11 items-center gap-2.5 text-sm text-gray-500 dark:text-gray-400">
+                <li className="flex min-h-11 items-center gap-2.5 text-sm text-a-text-3">
                   <input type="checkbox" checked readOnly disabled aria-label="Articles (toujours inclus)" className="h-5 w-5 shrink-0" /> <span>Articles (toujours inclus)</span>
                 </li>
                 {CONTENT.map(({ key, label, hint }) => (
                   <li key={key}>
-                    <label className="flex min-h-11 items-start gap-2.5 py-1 text-sm text-gray-800 dark:text-gray-200">
+                    <label className="flex min-h-11 items-start gap-2.5 py-1 text-sm text-a-text">
                       <input type="checkbox" checked={form[key]} onChange={(e) => set(key, e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--admin-primary)]" />
-                      <span>{label}{hint && <span className="block text-xs text-gray-500 dark:text-gray-400">{hint}</span>}</span>
+                      <span>{label}{hint && <span className="block text-xs text-a-text-3">{hint}</span>}</span>
                     </label>
                   </li>
                 ))}
@@ -125,8 +125,8 @@ export function OrderDocumentsSettingsSection({ initial, available, invalid, can
       </article>
 
       {canManage && available && (
-        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
-          {dirty && <span className="mr-auto text-sm font-medium text-amber-800 dark:text-amber-300">Modifications non enregistrées</span>}
+        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-a-border bg-a-surface px-4 py-3 shadow-sm backdrop-blur">
+          {dirty && <span className="mr-auto text-sm font-medium text-tone-warning-fg">Modifications non enregistrées</span>}
           <SettingsFeedback feedback={feedback} />
           <Button type="button" variant="outline" onClick={() => setForm(saved)} disabled={!dirty || saving} className="min-h-11">Annuler</Button>
           <Button type="button" onClick={() => void save()} disabled={disabled || !dirty} loading={saving} className="min-h-11">Enregistrer</Button>

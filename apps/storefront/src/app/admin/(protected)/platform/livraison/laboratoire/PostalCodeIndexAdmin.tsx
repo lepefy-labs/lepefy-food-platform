@@ -53,31 +53,31 @@ export function PostalCodeIndexAdmin() {
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Base de données des codes postaux</h2>
-      <p className="text-xs text-gray-400 mb-4">
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
+      <h2 className="text-sm font-semibold text-a-text mb-1">Base de données des codes postaux</h2>
+      <p className="text-xs text-a-text-3 mb-4">
         Importe les codes postaux depuis GeoNames pour que la recherche de ville dans les campagnes fonctionne sans appel externe à chaque utilisation.
         À relancer occasionnellement pour rafraîchir les données ; sans effet sur les campagnes déjà lancées.
       </p>
 
-      <label className="text-gray-400 text-xs uppercase tracking-wide mb-1 block">Pays à importer</label>
+      <label className="text-a-text-3 text-xs uppercase tracking-wide mb-1 block">Pays à importer</label>
       <select
         multiple
         disabled={importing}
         value={selected}
         onChange={(e) => setSelected(Array.from(e.target.selectedOptions, (o) => o.value))}
-        className="w-full sm:w-64 h-32 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-50"
+        className="w-full sm:w-64 h-32 border border-a-border rounded-lg px-2 py-1 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-50"
       >
         {COUNTRIES.map((c) => (
           <option key={c.value} value={c.value}>{c.label}</option>
         ))}
       </select>
-      <p className="text-2xs text-gray-400 mt-1 mb-3">Ctrl/Cmd + clic pour sélectionner plusieurs pays.</p>
+      <p className="text-xs text-a-text-3 mt-1 mb-3">Ctrl/Cmd + clic pour sélectionner plusieurs pays.</p>
 
       <button
         onClick={() => void handleImport()}
         disabled={importing || selected.length === 0}
-        className="min-h-11 px-4 py-2 text-xs rounded-lg text-white bg-[var(--color-primary)] disabled:opacity-50"
+        className="min-h-11 px-4 py-2 text-xs rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50"
       >
         {importing ? 'Import en cours…' : `Importer ${selected.length || ''} pays`.trim()}
       </button>
@@ -86,11 +86,11 @@ export function PostalCodeIndexAdmin() {
         <div className="mt-4 space-y-1.5">
           {Object.entries(results).map(([country, result]) => (
             <div key={country} className="flex items-center gap-2 text-sm">
-              <span className="w-10 font-medium text-gray-700 dark:text-gray-200">{country}</span>
-              {result.status === 'pending' && <span className="text-gray-400">En attente…</span>}
-              {result.status === 'running' && <span className="text-blue-600">Import en cours…</span>}
-              {result.status === 'done' && <span className="text-green-600">{result.rowCount?.toLocaleString('fr-FR')} codes postaux importés</span>}
-              {result.status === 'error' && <span className="text-red-600">Échec — {result.error}</span>}
+              <span className="w-10 font-medium text-a-text-2">{country}</span>
+              {result.status === 'pending' && <span className="text-a-text-3">En attente…</span>}
+              {result.status === 'running' && <span className="text-tone-info-fg">Import en cours…</span>}
+              {result.status === 'done' && <span className="text-tone-success-fg">{result.rowCount?.toLocaleString('fr-FR')} codes postaux importés</span>}
+              {result.status === 'error' && <span className="text-tone-danger-fg">Échec — {result.error}</span>}
             </div>
           ))}
         </div>

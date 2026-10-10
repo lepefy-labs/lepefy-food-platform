@@ -39,23 +39,23 @@ export function PendingReviewSection({ initialEntries, customerNames }: {
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">En révision{entries.length > 0 ? ` (${entries.length})` : ''}</h2>
-      <p className="text-xs text-gray-400 mb-4">
+    <section className="bg-a-surface rounded-xl border border-a-border p-5">
+      <h2 className="text-sm font-semibold text-a-text-2 mb-1">En révision{entries.length > 0 ? ` (${entries.length})` : ''}</h2>
+      <p className="text-xs text-a-text-3 mb-4">
         Points signalés par l&apos;anti-fraude (mode « Signaler pour revue manuelle ») : ils restent en attente tant qu&apos;ils ne sont pas confirmés ici.
       </p>
 
       {message && (
-        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</p>
+        <p role={message.tone === 'error' ? 'alert' : 'status'} className={`mb-3 rounded-lg px-3 py-2 text-xs ${message.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{message.text}</p>
       )}
 
       {entries.length === 0 ? (
-        <p className="text-sm text-gray-400">Aucune ligne en attente de revue.</p>
+        <p className="text-sm text-a-text-3">Aucune ligne en attente de revue.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400">
+              <tr className="text-left text-a-text-3">
                 <th className="py-1.5 font-medium">Date</th>
                 <th className="py-1.5 font-medium">Bénéficiaire</th>
                 <th className="py-1.5 font-medium">Origine</th>
@@ -65,18 +65,18 @@ export function PendingReviewSection({ initialEntries, customerNames }: {
             </thead>
             <tbody>
               {entries.map((e) => (
-                <tr key={e.id} className="border-t border-gray-100 dark:border-gray-800">
-                  <td className="py-2 text-gray-500">{new Date(e.created_at).toLocaleDateString('fr-FR')}</td>
+                <tr key={e.id} className="border-t border-a-border">
+                  <td className="py-2 text-a-text-3">{new Date(e.created_at).toLocaleDateString('fr-FR')}</td>
                   <td className="py-2">
-                    <Link href={`/admin/clients/${e.customer_id}`} className="font-medium text-gray-800 hover:underline dark:text-gray-100">
+                    <Link href={`/admin/clients/${e.customer_id}`} className="font-medium text-a-text hover:underline">
                       {customerNames[e.customer_id] ?? 'Client'}
                     </Link>
                   </td>
-                  <td className="py-2 text-gray-600 dark:text-gray-300">
+                  <td className="py-2 text-a-text-2">
                     {pointTypeLabel(e.transaction_type)}{e.referral_level ? ` · niveau ${e.referral_level}` : ''}
-                    {e.reference_customer_id && <span className="block text-gray-400">filleul : {customerNames[e.reference_customer_id] ?? 'client'}</span>}
+                    {e.reference_customer_id && <span className="block text-a-text-3">filleul : {customerNames[e.reference_customer_id] ?? 'client'}</span>}
                     {e.reference_order_id && (
-                      <Link href={`/admin/orders/${e.reference_order_id}`} className="block text-gray-400 hover:underline">
+                      <Link href={`/admin/orders/${e.reference_order_id}`} className="block text-a-text-3 hover:underline">
                         commande #{e.reference_order_id.slice(0, 8).toUpperCase()}
                       </Link>
                     )}

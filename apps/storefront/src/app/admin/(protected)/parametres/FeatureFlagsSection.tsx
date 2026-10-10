@@ -47,26 +47,26 @@ export function FeatureFlagsSection({ initialFlags, isTestTenant }: Props) {
       footer={feedback ? <SettingsFeedback feedback={feedback} /> : undefined}
     >
       {flags === null ? (
-        <p className="text-sm text-red-700 dark:text-red-300" role="alert">
+        <p className="text-sm text-tone-danger-fg" role="alert">
           Les fonctionnalités ne peuvent pas être chargées pour le moment.
         </p>
       ) : flags.length === 0 ? (
-        <div className="flex items-start gap-3 text-sm text-gray-600 dark:text-gray-300">
-          <IconInfoCircle size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-gray-400" />
+        <div className="flex items-start gap-3 text-sm text-a-text-2">
+          <IconInfoCircle size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-a-text-3" />
           <p>Aucune fonctionnalité en cours de déploiement.</p>
         </div>
       ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        <ul className="divide-y divide-a-border">
           {flags.map((flag) => {
             const busy = pendingKey === flag.key;
             return (
               <li key={flag.key} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
-                  <IconFlask size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-gray-400" />
+                  <IconFlask size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-a-text-3" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-950 dark:text-gray-100">{flag.label}</p>
-                    <p className="mt-0.5 text-sm leading-6 text-gray-500 dark:text-gray-400">{flag.description}</p>
-                    <p className="mt-1 break-all font-mono text-xs text-gray-400">{flag.key}</p>
+                    <p className="text-sm font-medium text-a-text">{flag.label}</p>
+                    <p className="mt-0.5 text-sm leading-6 text-a-text-3">{flag.description}</p>
+                    <p className="mt-1 break-all font-mono text-xs text-a-text-3">{flag.key}</p>
                   </div>
                 </div>
                 <button
@@ -76,13 +76,13 @@ export function FeatureFlagsSection({ initialFlags, isTestTenant }: Props) {
                   aria-label={`${flag.enabled ? 'Désactiver' : 'Activer'} ${flag.label}`}
                   disabled={busy}
                   onClick={() => toggle(flag)}
-                  className="inline-flex min-h-11 shrink-0 items-center gap-3 self-start rounded-lg px-2 text-sm font-medium text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-primary)] disabled:opacity-60 sm:self-auto dark:text-gray-200"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-3 self-start rounded-lg px-2 text-sm font-medium text-a-text-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus disabled:opacity-60 sm:self-auto"
                 >
                   <span
                     aria-hidden="true"
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${flag.enabled ? 'bg-[var(--color-primary-dark)]' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${flag.enabled ? 'bg-a-brand' : 'bg-a-border-strong'}`}
                   >
-                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${flag.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    <span className={`inline-block h-5 w-5 rounded-full bg-a-surface shadow transition-transform ${flag.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </span>
                   {busy ? 'Enregistrement…' : flag.enabled ? 'Activée' : 'Désactivée'}
                 </button>
