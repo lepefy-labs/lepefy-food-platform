@@ -16,7 +16,7 @@ import { ProductTabs } from './ProductTabs';
 import { TrustBadges } from './TrustBadges';
 import { formatPrice } from '@/lib/utils/format';
 import { computeQuantityRuleState, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
-import { contentLabel, formatCount, quantityNoun, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { contentLabel, formatCount, pickSellingFormatFields, quantityNoun, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { groupHeadline, groupProgressCopy, minimumHeadline, nextQuantitiesList, stepLine } from '@/lib/storefrontCopy/quantityRuleCopy';
 import { AVAILABILITY_COPY, belowMinimumDetail, deriveAvailability } from '@/lib/storefrontCopy/availability';
 import { ProductPrice } from '@/components/catalog/ProductPrice';
@@ -77,7 +77,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       storage_type: product.storage_type ?? null,
       min_order_quantity:  product.min_order_quantity,
       order_quantity_step: product.order_quantity_step,
-      net_quantity_display: product.net_quantity_display ?? null,
+      ...pickSellingFormatFields(product),
     }, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);

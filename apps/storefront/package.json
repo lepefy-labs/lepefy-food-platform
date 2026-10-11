@@ -12,7 +12,8 @@
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "test:e2e:report": "playwright show-report ../../playwright-report",
     "catalog:whatsapp:test": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/catalog-whatsapp-test.ts",
-    "catalog:whatsapp:review": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/catalog-whatsapp-review.ts"
+    "catalog:whatsapp:review": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/catalog-whatsapp-review.ts",
+    "catalog:selling-format:report": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/selling-format-report.ts"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

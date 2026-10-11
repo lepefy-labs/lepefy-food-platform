@@ -49,6 +49,12 @@ export interface Product {
   conservation_after_opening: string | null;
   country_of_origin: string | null;
   net_quantity_display: string | null;
+  // Format de vente affiché au client (migration 154) — lib/storefrontCopy/sellingFormat.ts.
+  // NULL = repli sur net_quantity_display. Jamais dérivé de weight_grams.
+  sale_unit: string | null;
+  net_content_value: number | null;
+  net_content_unit: string | null; // g | kg | ml | cl | l (CHECK en base)
+  pack_count: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +72,8 @@ export interface CartItem {
   // Les champs de format de vente sont facultatifs : un panier enregistré
   // avant leur ajout reste valide et s'affiche avec le libellé de repli.
   product: Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'image_url' | 'weight_grams' | 'stock' | 'storage_type'>
-    & Partial<Pick<Product, 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'>>;
+    & Partial<Pick<Product, 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'
+      | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count'>>;
   quantity: number;
 }
 

@@ -75,5 +75,11 @@ export interface SemanticMatch {
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
   min_order_quantity: number;
   order_quantity_step: number;
+  // Format de vente (migration 154) ; absents tant que la 154 n'est pas appliquée.
+  net_quantity_display?: string | null;
+  sale_unit?: string | null;
+  net_content_value?: number | null;
+  net_content_unit?: string | null;
+  pack_count?: number | null;
   similarity: number;
 }

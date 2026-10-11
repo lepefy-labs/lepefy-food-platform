@@ -1,3 +1,4 @@
+import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -68,6 +69,9 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ error: 'Le minimum et l’incrément doivent être des entiers positifs.' }, { status: 400 });
   }
 
+  const sellingFormat = parseSellingFormatInput(body);
+  if (!sellingFormat.ok) return NextResponse.json({ error: sellingFormat.error }, { status: 400 });
+
   const slugProd = (body.name as string)
     .toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -118,6 +122,7 @@ async function handlePOST(req: NextRequest) {
       quid_percentage: body.quid_percentage !== '' && body.quid_percentage != null ? parseFloat(body.quid_percentage) : null,
       alcohol_pct: body.alcohol_pct !== '' && body.alcohol_pct != null ? parseFloat(body.alcohol_pct) : null,
       net_quantity_display: body.net_quantity_display ? String(body.net_quantity_display).trim() : null,
+      ...sellingFormat.values,
       packaging_material: body.packaging_material ? String(body.packaging_material).trim() : null,
       recycling_note: body.recycling_note ? String(body.recycling_note).trim() : null,
       nutrition_basis: body.nutrition_basis === '100ml' ? '100ml' : '100g',

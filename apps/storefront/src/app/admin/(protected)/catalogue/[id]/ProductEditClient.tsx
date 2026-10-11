@@ -21,6 +21,9 @@ import ProductRelationshipsEditor from './ProductRelationshipsEditor';
 import ProductMediaManager from './ProductMediaManager';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { changedFieldLabels, changedProductKeys, productPatchPayload, type ProductBody } from '@/lib/catalog/productFormDiff';
+import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
+import { listSaleUnits } from '@/lib/storefrontCopy/saleUnits';
+import { CONTENT_UNITS, describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 
 interface ProductEditProps {
   product: {
@@ -59,6 +62,10 @@ interface ProductEditProps {
     quid_percentage: number | null;
     alcohol_pct: number | null;
     net_quantity_display: string | null;
+    sale_unit: string | null;
+    net_content_value: number | null;
+    net_content_unit: string | null;
+    pack_count: number | null;
     packaging_material: string | null;
     recycling_note: string | null;
     nutrition_basis: '100g' | '100ml';
@@ -115,6 +122,10 @@ interface FormState {
   quid_percentage: string;
   alcohol_pct: string;
   net_quantity_display: string;
+  sale_unit: string;
+  net_content_value: string;
+  net_content_unit: string;
+  pack_count: string;
   packaging_material: string;
   recycling_note: string;
   nutrition_basis: '100g' | '100ml';
@@ -183,6 +194,10 @@ function buildBody(formData: FormState): ProductBody {
     quid_percentage:             formData.quid_percentage,
     alcohol_pct:                 formData.alcohol_pct,
     net_quantity_display:        formData.net_quantity_display,
+    sale_unit:                   formData.sale_unit,
+    net_content_value:           formData.net_content_value,
+    net_content_unit:            formData.net_content_unit,
+    pack_count:                  formData.pack_count,
     packaging_material:          formData.packaging_material,
     recycling_note:              formData.recycling_note,
     nutrition_basis:             formData.nutrition_basis,
@@ -236,6 +251,10 @@ function initFormState(product: ProductEditProps['product'], tenantLocales: stri
     quid_percentage:             product.quid_percentage != null ? String(product.quid_percentage) : '',
     alcohol_pct:                 product.alcohol_pct != null ? String(product.alcohol_pct) : '',
     net_quantity_display:        product.net_quantity_display ?? '',
+    sale_unit:                   product.sale_unit ?? '',
+    net_content_value:           product.net_content_value != null ? String(product.net_content_value) : '',
+    net_content_unit:            product.net_content_unit ?? '',
+    pack_count:                  product.pack_count != null ? String(product.pack_count) : '',
     packaging_material:          product.packaging_material ?? '',
     recycling_note:              product.recycling_note ?? '',
     nutrition_basis:             product.nutrition_basis ?? '100g',
@@ -253,6 +272,7 @@ export default function ProductEditClient({
   aiEnabled,
   tenantLocales,
   aiDescriptionsEnabled,
+  tenantCurrency,
   isNew = false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fromCategory,
@@ -268,6 +288,19 @@ export default function ProductEditClient({
   const changedKeys  = useMemo(() => isNew ? [] : changedProductKeys(baselineBody, currentBody), [isNew, baselineBody, currentBody]);
   const dirty = canManage && (isNew ? false : changedKeys.length > 0);
   const missingWeight = !(Number(formData.weight_grams) > 0);
+  const sellingFormatParse = parseSellingFormatInput({
+    sale_unit: formData.sale_unit,
+    net_content_value: formData.net_content_value,
+    net_content_unit: formData.net_content_unit,
+    pack_count: formData.pack_count,
+  });
+  const sellingFormatCheck = sellingFormatParse.ok ? null : sellingFormatParse.error;
+  const customerPricePreview = sellingFormatParse.ok
+    ? describePrice(Number(formData.price) || 0, resolveSellingFormat({
+      ...sellingFormatParse.values,
+      net_quantity_display: formData.net_quantity_display,
+    }), tenantCurrency).sentence
+    : null;
   const [isGeneratingDescriptions, setIsGeneratingDescriptions] = useState(false);
   const [isSaving, setIsSaving]         = useState(false);
   const [isDraggingLabelBg, setIsDraggingLabelBg]   = useState(false);
@@ -318,6 +351,10 @@ export default function ProductEditClient({
     if (![Number(formData.min_order_quantity), Number(formData.order_quantity_step)]
       .every((value) => Number.isInteger(value) && value >= 1)) {
       showToast('Le minimum et l’incrément doivent être des entiers positifs.', 'error');
+      return;
+    }
+    if (sellingFormatCheck) {
+      showToast(sellingFormatCheck, 'error');
       return;
     }
     // Creation sends everything; an edit sends only the changed fields so a
@@ -852,6 +889,76 @@ export default function ProductEditClient({
                 }
                 return null;
               })()}
+            </section>
+
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className={SECTION_TITLE_CLS}>Format de vente</h2>
+              <p className="-mt-2 mb-4 text-xs text-a-text-3">
+                Ce que le client achète pour ce prix. Le poids d’expédition n’est jamais utilisé ici.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="product-sale-unit" className={LABEL_CLS}>Vendu à l’unité de</label>
+                  <select
+                    id="product-sale-unit"
+                    value={formData.sale_unit}
+                    onChange={(e) => setField('sale_unit', e.target.value)}
+                    className={INPUT_CLS}
+                  >
+                    <option value="">Non précisé</option>
+                    {listSaleUnits().map((unit) => (
+                      <option key={unit.key} value={unit.key}>{unit.byWeight ? 'Au kilo (vente au poids)' : unit.singular}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="product-pack-count" className={LABEL_CLS}>Éléments par lot</label>
+                  <input
+                    id="product-pack-count"
+                    type="number"
+                    min={2}
+                    max={999}
+                    placeholder="ex. 12"
+                    value={formData.pack_count}
+                    onChange={(e) => setField('pack_count', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="product-net-content" className={LABEL_CLS}>Contenu net</label>
+                  <input
+                    id="product-net-content"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="ex. 500"
+                    value={formData.net_content_value}
+                    onChange={(e) => setField('net_content_value', e.target.value)}
+                    className={INPUT_CLS}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="product-net-content-unit" className={LABEL_CLS}>Unité du contenu</label>
+                  <select
+                    id="product-net-content-unit"
+                    value={formData.net_content_unit}
+                    onChange={(e) => setField('net_content_unit', e.target.value)}
+                    className={INPUT_CLS}
+                  >
+                    <option value="">—</option>
+                    {CONTENT_UNITS.map((unit) => <option key={unit} value={unit}>{unit === 'l' ? 'L' : unit}</option>)}
+                  </select>
+                </div>
+              </div>
+              {sellingFormatCheck ? (
+                <p role="alert" className="mt-3 text-xs font-semibold text-tone-danger-fg">{sellingFormatCheck}</p>
+              ) : (
+                <p className="mt-3 text-sm text-a-text-2">
+                  Le client verra : <span className="font-semibold text-a-text">{customerPricePreview}</span>
+                </p>
+              )}
+              <p className="mt-1 text-xs text-a-text-3">
+                Sans unité de vente, le site utilise la quantité nette de l’étiquette si elle est simple (« 500 g »), sinon « l’article ».
+              </p>
             </section>
           </div>
         </div>

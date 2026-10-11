@@ -85,6 +85,11 @@ export async function getRelatedProducts(
             category:     p.category_name ? { name: p.category_name } : null,
             min_order_quantity:  p.min_order_quantity,
             order_quantity_step: p.order_quantity_step,
+            net_quantity_display: p.net_quantity_display ?? null,
+            sale_unit:           p.sale_unit ?? null,
+            net_content_value:   p.net_content_value ?? null,
+            net_content_unit:    p.net_content_unit ?? null,
+            pack_count:          p.pack_count ?? null,
           }));
       }
     }

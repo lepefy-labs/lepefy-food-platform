@@ -20,6 +20,7 @@ import {
 } from '../../src/lib/storefrontCopy/quantityRuleCopy';
 import { belowMinimumDetail, cartLineIssue, deriveAvailability, insufficientStockMessage } from '../../src/lib/storefrontCopy/availability';
 import { totalWithPendingShipping } from '../../src/lib/storefrontCopy/copy';
+import { parseSellingFormatInput } from '../../src/lib/catalog/sellingFormatInput';
 import { formatQuantityViolationMessage, validatePurchaseQuantityRules } from '../../src/lib/purchaseQuantityRules';
 
 /** Intl fr-FR uses (narrow) no-break spaces around amounts. */
@@ -211,3 +212,30 @@ test.describe('garde-fous du storefront', () => {
   }
 });
 
+test.describe('format de vente : saisie admin (migration 154)', () => {
+  test('ne lit que les champs présents, vide = null', () => {
+    expect(parseSellingFormatInput({ name: 'x' })).toEqual({ ok: true, values: {} });
+    expect(parseSellingFormatInput({ sale_unit: '', pack_count: '' })).toEqual({ ok: true, values: { sale_unit: null, pack_count: null } });
+    expect(parseSellingFormatInput({ sale_unit: 'Paquet', net_content_value: '1,5', net_content_unit: 'KG', pack_count: '12' }))
+      .toEqual({ ok: true, values: { sale_unit: 'paquet', net_content_value: 1.5, net_content_unit: 'kg', pack_count: 12 } });
+    expect(parseSellingFormatInput({ net_content_value: '1.005', net_content_unit: 'kg' })).toEqual({ ok: true, values: { net_content_value: 1.005, net_content_unit: 'kg' } });
+    expect(parseSellingFormatInput({ net_content_value: 33 })).toEqual({ ok: true, values: { net_content_value: 33 } });
+  });
+
+  test('refuse les valeurs que la base refuserait', () => {
+    for (const body of [
+      { sale_unit: 'bidule' },
+      { net_content_value: '0' },
+      { net_content_value: '-2' },
+      { net_content_value: '1.2345' },
+      { net_content_unit: 'oz' },
+      { pack_count: '1' },
+      { pack_count: '2.5' },
+      { pack_count: '1000' },
+      { net_content_value: '500', net_content_unit: '' },
+      { net_content_value: '', net_content_unit: 'g' },
+    ]) {
+      expect(parseSellingFormatInput(body).ok, JSON.stringify(body)).toBe(false);
+    }
+  });
+});

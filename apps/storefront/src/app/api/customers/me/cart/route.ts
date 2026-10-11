@@ -70,7 +70,7 @@ async function rehydrateItems(
     .select(`id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`)
     .eq('tenant_id', tenantId)
     .in('id', productIds) as {
-      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'>> | null;
+      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display' | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count'>> | null;
       error: unknown;
     };
 
@@ -95,6 +95,10 @@ async function rehydrateItems(
         min_order_quantity:   p.min_order_quantity,
         order_quantity_step:  p.order_quantity_step,
         net_quantity_display: p.net_quantity_display,
+        sale_unit:            p.sale_unit,
+        net_content_value:    p.net_content_value,
+        net_content_unit:     p.net_content_unit,
+        pack_count:           p.pack_count,
       },
       // Do not clamp to raw stock: 12 -> 10 would invent an off-step quantity
       // for min=4/step=4. Preserve the customer's stored intent, expose the

@@ -22,5 +22,10 @@ export function semanticMatchToProductCardProduct(match: SemanticMatch): Product
     category: match.category_name ? { name: match.category_name } : null,
     min_order_quantity: match.min_order_quantity,
     order_quantity_step: match.order_quantity_step,
+    net_quantity_display: match.net_quantity_display ?? null,
+    sale_unit: match.sale_unit ?? null,
+    net_content_value: match.net_content_value ?? null,
+    net_content_unit: match.net_content_unit ?? null,
+    pack_count: match.pack_count ?? null,
   };
 }

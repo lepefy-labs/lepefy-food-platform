@@ -1,3 +1,4 @@
+import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -61,6 +62,10 @@ async function handlePATCH(
       return NextResponse.json({ error: 'Le minimum et l’incrément doivent être des entiers positifs.' }, { status: 400 });
     }
   }
+
+  const sellingFormat = parseSellingFormatInput(body);
+  if (!sellingFormat.ok) return NextResponse.json({ error: sellingFormat.error }, { status: 400 });
+  Object.assign(updatePayload, sellingFormat.values);
 
   if ('name'               in body) updatePayload.name               = String(body.name).trim();
   if ('name_alt'           in body) updatePayload.name_alt           = body.name_alt ? String(body.name_alt).trim() : null;

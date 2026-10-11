@@ -65,7 +65,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       description, descriptions,
       ingredients_text, allergens_text, gluten_free_certified,
       usage_instructions, conservation_instructions, conservation_after_opening,
-      country_of_origin, net_quantity_display,
+      country_of_origin, net_quantity_display, sale_unit, net_content_value, net_content_unit, pack_count,
       category:categories(name, slug, catalog_scope)
     `)
     .eq('slug', params.slug).eq('tenant_id', tenant.id).eq('active', true).single();

@@ -9,11 +9,11 @@
  * liste : toute card doit pouvoir afficher la règle de quantité minimale,
  * jamais la découvrir seulement à l'ajout au panier.
  */
+/** Colonnes du format de vente affiché au client (lib/storefrontCopy/sellingFormat.ts, migration 154). */
+export const PRODUCT_SELLING_FORMAT_COLUMNS = 'net_quantity_display, sale_unit, net_content_value, net_content_unit, pack_count';
+
 /** Colonnes scalaires communes, sans la relation `category` (jointure dont la
  *  forme — `left join` ou `!inner` — varie selon l'appelant, cf. gadgets). */
-/** Colonnes du format de vente affiché au client (lib/storefrontCopy/sellingFormat.ts). */
-export const PRODUCT_SELLING_FORMAT_COLUMNS = 'net_quantity_display';
-
 export const PRODUCT_CARD_BASE_COLUMNS =
   `id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`;
 

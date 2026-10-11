@@ -87,8 +87,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const compactGrid = variant === 'grid' && compactMobile;
   const hasDiscount = product.compare_at_price != null && product.compare_at_price > product.price;
   const savings = hasDiscount ? (product.compare_at_price as number) - product.price : 0;
-  // Pack quantities come only from the explicit product name, never inferred from weight.
-  const cartonMatch = !merchandise
+  const sellingFormat = resolveSellingFormat(product);
+  // Legacy: pack quantities from the explicit product name, only while the
+  // structured selling format (migration 154) is not filled in. Never from weight.
+  const cartonMatch = !merchandise && sellingFormat.source !== 'structured'
     ? product.name.match(/carton de (\d+) paquets\s*\((\d+) bâtons\)/i)
     : null;
   const cartonDetail = cartonMatch ? `${cartonMatch[1]} paquets · ${cartonMatch[2]} bâtons` : null;
@@ -99,7 +101,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const hasMinRule = !merchandise && minOrderQuantity > 1;
   const unavailable = availability === 'sold_out' || availability === 'below_minimum';
-  const shelfPrice = describePrice(product.price, resolveSellingFormat(product), currency);
+  const shelfPrice = describePrice(product.price, sellingFormat, currency);
   const ctaLabel = added
     ? 'Ajouté ✓'
     : unavailable
