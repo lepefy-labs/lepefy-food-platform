@@ -243,13 +243,13 @@ export function CatalogClient({
       <h1 className="sr-only">Catalogue</h1>
       {/* Search bar */}
       <div className="sticky top-24 z-30 -mx-4 bg-white/95 px-4 py-2 backdrop-blur">
-        <div className="flex h-[52px] max-w-2xl items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 shadow-sm transition-shadow focus-within:border-gray-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)]/20">
+        <div className="flex h-[52px] max-w-2xl items-center gap-3 rounded-xl border-[1.5px] border-[color:var(--field-border)] bg-[color:var(--field-bg)] px-4 transition-shadow focus-within:border-[var(--color-primary)] focus-within:bg-white focus-within:shadow-[0_0_0_1px_var(--color-primary),0_0_0_5px_var(--field-ring)]">
         {isPending ? (
           <svg
             className="shrink-0 animate-spin"
             xmlns="http://www.w3.org/2000/svg"
             width="20" height="20" viewBox="0 0 24 24"
-            fill="none" stroke="#9ca3af" strokeWidth="2"
+            fill="none" stroke="#4B5563" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
             aria-hidden="true"
           >
@@ -261,7 +261,7 @@ export function CatalogClient({
             className="shrink-0"
             xmlns="http://www.w3.org/2000/svg"
             width="20" height="20" viewBox="0 0 24 24"
-            fill="none" stroke="#9ca3af" strokeWidth="2"
+            fill="none" stroke="#4B5563" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
             aria-hidden="true"
           >
@@ -275,8 +275,8 @@ export function CatalogClient({
           value={query}
           onChange={e => handleQueryChange(e.target.value)}
           placeholder="Rechercher un produit..."
-          className="min-w-0 flex-1 bg-transparent text-base text-gray-700
-                     placeholder:text-gray-400 outline-none border-none"
+          className="min-w-0 flex-1 bg-transparent text-base text-gray-950
+                     placeholder:text-[color:var(--field-placeholder)] outline-none border-none focus-visible:outline-none"
           aria-label="Rechercher un produit"
           onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
         />
@@ -333,7 +333,7 @@ export function CatalogClient({
           <select
             value={sort}
             onChange={e => startTransition(() => router.replace(buildUrl({ sort: e.target.value as CatalogSort })))}
-            className="min-h-11 max-w-[155px] rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:max-w-none"
+            className="min-h-11 max-w-[155px] rounded-lg border-[1.5px] border-[color:var(--field-border)] bg-white px-2 text-sm text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:max-w-none"
             aria-label="Trier les produits"
           >
             <option value="recommended">Recommandés</option>
@@ -383,7 +383,7 @@ export function CatalogClient({
       {/* Résultats similaires — recherche sémantique, cascade uniquement si peu de résultats textuels */}
       {isSemanticLoading && (
         <div className="mt-8 flex items-center gap-2 text-sm text-gray-400">
-          <svg className="animate-spin shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg className="animate-spin shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4B5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
             <path d="M12 3a9 9 0 1 0 9 9" />
           </svg>

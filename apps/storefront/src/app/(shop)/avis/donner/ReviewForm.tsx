@@ -90,7 +90,7 @@ export default function ReviewForm({ orderId, token }: { orderId: string; token:
       </fieldset>
 
       <div className="mt-6">
-        <label htmlFor={id + '-body'} className="text-sm font-semibold text-slate-950">Votre expérience <span className="font-normal text-slate-600">(facultatif)</span></label>
+        <label htmlFor={id + '-body'} className="sf-label">Votre expérience <span className="text-[13px] font-normal text-[color:var(--field-hint)]">(facultatif)</span></label>
         <textarea
           id={id + '-body'}
           value={body}
@@ -100,7 +100,7 @@ export default function ReviewForm({ orderId, token }: { orderId: string; token:
           rows={4}
           aria-describedby={id + '-body-help ' + id + '-body-count'}
           placeholder="Qu’avez-vous apprécié ? Que pouvons-nous améliorer ?"
-          className="mt-2 block w-full resize-y rounded-xl border border-slate-300 px-3 py-3 text-base leading-6 text-slate-950 placeholder:text-slate-500 focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)] disabled:opacity-60"
+          className="sf-control mt-2 leading-6"
         />
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
           <span id={id + '-body-help'}>Une note seule suffit.</span>

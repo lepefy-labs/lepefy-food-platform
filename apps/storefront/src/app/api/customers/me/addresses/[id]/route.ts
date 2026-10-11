@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
+import { normalizeShippingAddress } from '@/lib/address/addressRules';
 
 interface AddressBody {
   fullName?:   string;
@@ -33,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const { data: existing } = await supabase
     .from('addresses')
-    .select('id')
+    .select('id, full_name, line1, line2, city, postal_code, country')
     .eq('id', params.id)
     .eq('customer_id', sessionCustomer.id)
     .eq('tenant_id', tenant.id)
@@ -44,38 +45,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json() as AddressBody;
-  const update: Record<string, string | boolean | null> = {};
 
-  if (body.fullName !== undefined) {
-    if (body.fullName.trim().length === 0) {
-      return NextResponse.json({ error: 'Le nom du destinataire ne peut pas être vide.' }, { status: 400 });
+  const update: Record<string, string | boolean | null> = {};
+  const touchesAddress = [body.fullName, body.line1, body.line2, body.city, body.postalCode, body.country]
+    .some((value) => value !== undefined);
+
+  // Champs absents du corps = valeurs actuelles ; l'adresse résultante passe
+  // le même contrôle que la création et le checkout. Un simple changement
+  // d'adresse par défaut ne revalide pas une ancienne adresse.
+  if (touchesAddress) {
+    const normalized = normalizeShippingAddress({
+      full_name:   body.fullName   !== undefined ? body.fullName   : existing.full_name,
+      line1:       body.line1      !== undefined ? body.line1      : existing.line1,
+      line2:       body.line2      !== undefined ? body.line2      : existing.line2,
+      city:        body.city       !== undefined ? body.city       : existing.city,
+      postal_code: body.postalCode !== undefined ? body.postalCode : existing.postal_code,
+      country:     body.country    !== undefined ? body.country    : existing.country,
+    });
+    if (!normalized.ok) {
+      return NextResponse.json({ error: normalized.error, code: 'ADDRESS_INVALID', field: normalized.field }, { status: 400 });
     }
-    update.full_name = body.fullName.trim();
-  }
-  if (body.line1 !== undefined) {
-    if (body.line1.trim().length === 0) {
-      return NextResponse.json({ error: 'La rue ne peut pas être vide.' }, { status: 400 });
-    }
-    update.line1 = body.line1.trim();
-  }
-  if (body.line2 !== undefined) update.line2 = body.line2?.trim() || null;
-  if (body.city !== undefined) {
-    if (body.city.trim().length === 0) {
-      return NextResponse.json({ error: 'La ville ne peut pas être vide.' }, { status: 400 });
-    }
-    update.city = body.city.trim();
-  }
-  if (body.postalCode !== undefined) {
-    if (body.postalCode.trim().length === 0) {
-      return NextResponse.json({ error: 'Le code postal ne peut pas être vide.' }, { status: 400 });
-    }
-    update.postal_code = body.postalCode.trim();
-  }
-  if (body.country !== undefined) {
-    if (body.country.trim().length === 0) {
-      return NextResponse.json({ error: 'Le pays ne peut pas être vide.' }, { status: 400 });
-    }
-    update.country = body.country.trim();
+    Object.assign(update, {
+      full_name:   normalized.address.full_name,
+      line1:       normalized.address.line1,
+      line2:       normalized.address.line2 ?? null,
+      city:        normalized.address.city,
+      postal_code: normalized.address.postal_code,
+      country:     normalized.address.country,
+    });
   }
 
   if (body.isDefault === true) {

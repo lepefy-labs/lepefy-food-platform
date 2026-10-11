@@ -31,7 +31,7 @@ function CopyValue({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">{label}</p>
         <p className="break-all font-mono text-sm text-gray-900">{value}</p>
       </div>
       <button
@@ -369,11 +369,11 @@ export default function PayPreorderClient({
                 {choice.method.value && <CopyValue label="IBAN" value={choice.method.value} />}
                 {choice.method.bic && <CopyValue label="BIC" value={choice.method.bic} />}
                 <CopyValue label="Référence (motif)" value={view.reference} />
-                <label className="block pt-1 text-sm">
-                  <span className="text-gray-700">Référence de votre virement (facultatif)</span>
+                <label className="block pt-1">
+                  <span className="sf-label">Référence de votre virement <span className="text-[13px] font-normal text-[color:var(--field-hint)]">(facultatif)</span></span>
                   <input
                     value={transferReference} onChange={(event) => setTransferReference(event.target.value.slice(0, 120))}
-                    className="mt-1 min-h-11 w-full rounded-xl border border-gray-300 px-3 text-base" autoComplete="off"
+                    className="sf-control sf-control--md mt-1.5" autoComplete="off"
                   />
                 </label>
                 <button

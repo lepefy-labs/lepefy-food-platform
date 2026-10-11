@@ -69,15 +69,15 @@ function SearchBar({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-2 bg-white rounded-full
-                    border border-gray-200 shadow-sm px-4 py-2.5">
+    <div className="flex min-h-12 items-center gap-2 rounded-full border-[1.5px] border-[color:var(--field-border)]
+                    bg-[color:var(--field-bg)] px-4 py-2.5 focus-within:border-[var(--color-primary)] focus-within:bg-white">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="16"
         height="16"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#9ca3af"
+        stroke="#4B5563"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -93,8 +93,8 @@ function SearchBar({
         value={query}
         onChange={e => onChange(e.target.value)}
         placeholder="Rechercher un produit..."
-        className="flex-1 bg-transparent text-sm text-gray-700
-                   placeholder:text-gray-400 outline-none border-none"
+        className="flex-1 bg-transparent text-base text-gray-950
+                   placeholder:text-[color:var(--field-placeholder)] outline-none border-none"
         aria-label="Rechercher un produit"
       />
       {query && (

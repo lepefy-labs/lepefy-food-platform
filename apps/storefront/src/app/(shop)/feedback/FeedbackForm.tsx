@@ -134,28 +134,28 @@ export default function FeedbackForm({ campaign, accentColor, invitedTester }: P
 
         <label className="block">
           <span className="text-base font-semibold text-gray-950">Dites-nous tout</span>
-          <span className="mt-1 block text-sm text-gray-500">Ce qui vous a plu, ce qui vous a bloqué, ou ce que vous aimeriez voir.</span>
+          <span className="mt-1 block text-sm text-gray-700">Ce qui vous a plu, ce qui vous a bloqué, ou ce que vous aimeriez voir.</span>
           <textarea
             required
             maxLength={4000}
             rows={7}
             value={message}
             onChange={event => setMessage(event.target.value)}
-            className="mt-3 w-full resize-y rounded-2xl border border-gray-300 px-4 py-3 text-base text-gray-950 outline-none focus:ring-2"
+            className="sf-control mt-3"
             placeholder="Écrivez votre retour ici…"
           />
-          <span className="mt-1 block text-right text-xs text-gray-400">{message.length}/4000</span>
+          <span className="mt-1 block text-right text-xs tabular-nums text-gray-600">{message.length}/4000</span>
         </label>
 
         <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-50 p-4">
-          <input type="checkbox" checked={contactAllowed} onChange={event => setContactAllowed(event.target.checked)} className="mt-0.5 h-4 w-4" />
-          <span className="text-sm text-gray-700">J’accepte d’être recontacté à propos de ce retour.</span>
+          <input type="checkbox" checked={contactAllowed} onChange={event => setContactAllowed(event.target.checked)} className="sf-checkbox" />
+          <span className="text-sm text-gray-800">J’accepte d’être recontacté à propos de ce retour.</span>
         </label>
 
         {contactAllowed ? (
           <label className="block">
-            <span className="text-sm font-semibold text-gray-900">Votre adresse e-mail</span>
-            <input required type="email" maxLength={254} autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-base" />
+            <span className="sf-label">Votre adresse e-mail</span>
+            <input required type="email" inputMode="email" maxLength={254} autoComplete="email" placeholder="Ex. : nom@gmail.com" value={email} onChange={event => setEmail(event.target.value)} className="sf-control mt-2" />
           </label>
         ) : null}
 

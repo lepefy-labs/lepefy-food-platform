@@ -19,8 +19,10 @@ import {
   IconUser,
   IconPhone,
 } from '@tabler/icons-react';
-import AddressAutocomplete from '@/components/AddressAutocomplete';
+import { CustomerAddressForm, addressFieldId } from '@/components/address/CustomerAddressForm';
+import { NEW_ADDRESS, SavedAddressPicker, type SavedAddress } from '@/components/address/SavedAddressPicker';
 import { OtpLoginForm } from '@/components/auth/OtpLoginForm';
+import { ErrorSummary, TextField } from '@/components/ui/form';
 import {
   PaymentOptionList,
   buildExternalPaymentOptions,
@@ -41,15 +43,24 @@ import { useCartStore } from '@/stores/cartStore';
 import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
 import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 import { ACTION_COPY, ERROR_COPY, FORM_COPY, SUMMARY_COPY, productsPriceLabel, totalWithPendingShipping } from '@/lib/storefrontCopy/copy';
+import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
+import {
+  ADDRESS_FIELD_LABELS,
+  ADDRESS_FIELD_ORDER,
+  countryLabel,
+  defaultDeliveryCountry,
+  draftToShippingAddress,
+  emptyAddressDraft,
+  isValidPostalCode,
+  normalizePostalCode,
+  shippingAddressToDraft,
+  validateAddressDraft,
+  type AddressDraft,
+  type AddressField,
+} from '@/lib/address/addressRules';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
 
-const COUNTRIES = [
-  { value: 'IT', label: 'Italie' },
-  { value: 'FR', label: 'France' },
-  { value: 'BE', label: 'Belgique' },
-  { value: 'DE', label: 'Allemagne' },
-  { value: 'CH', label: 'Suisse' },
-];
+const ADDRESS_ID_PREFIX = 'checkout-adresse';
 
 type Step = 'shipping' | 'select-payment' | 'payment';
 type FulfillmentType = 'delivery' | 'pickup';
@@ -75,6 +86,7 @@ interface CheckoutDraft {
   street: string;
   houseNumber: string;
   city: string;
+  line2: string;
   firstName?: string;
   lastName?: string;
   email?: string;
@@ -99,6 +111,7 @@ function readDraft(): CheckoutDraft | null {
       street: typeof parsed.street === 'string' ? parsed.street : '',
       houseNumber: typeof parsed.houseNumber === 'string' ? parsed.houseNumber : '',
       city: typeof parsed.city === 'string' ? parsed.city : '',
+      line2: typeof parsed.line2 === 'string' ? parsed.line2 : '',
       firstName: typeof parsed.firstName === 'string' ? parsed.firstName : (fullName[0] ?? ''),
       lastName: typeof parsed.lastName === 'string' ? parsed.lastName : fullName.slice(1).join(' '),
       email: typeof parsed.email === 'string' ? parsed.email : '',
@@ -109,12 +122,15 @@ function readDraft(): CheckoutDraft | null {
   }
 }
 
-function splitLine1(line1: string): { street: string; houseNumber: string } {
-  const parts = line1.trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return { street: line1.trim(), houseNumber: '' };
-  const last = parts[parts.length - 1] ?? '';
-  if (/\d/.test(last) || /^s\.?\s?n\.?$/i.test(last)) return { street: parts.slice(0, -1).join(' '), houseNumber: last };
-  return { street: parts.join(' '), houseNumber: '' };
+function savedToDraft(saved: SavedAddress): AddressDraft {
+  const draft = shippingAddressToDraft(saved);
+  delete draft.fullName;
+  return draft;
+}
+
+function isTextEntry(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.matches('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])') || target.tagName === 'TEXTAREA');
 }
 
 export default function CheckoutFlow({
@@ -144,14 +160,22 @@ export default function CheckoutFlow({
   const [step, setStep] = useState<Step>('shipping');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(initialDraft?.fulfillmentType ?? 'delivery');
   // Pays proposé par défaut : celui de la boutique s'il est livré, sinon le premier de la liste.
-  const defaultCountry = COUNTRIES.some((entry) => entry.value === tenant.country) ? tenant.country : COUNTRIES[0]!.value;
-  const [country, setCountry] = useState(initialDraft?.country || defaultCountry);
-  const [postalCode, setPostalCode] = useState(initialDraft?.postalCode ?? '');
-  const [street, setStreet] = useState(initialDraft?.street ?? '');
-  const [houseNumber, setHouseNumber] = useState(initialDraft?.houseNumber ?? '');
-  const [city, setCity] = useState(initialDraft?.city ?? '');
-  const [manualMode, setManualMode] = useState(false);
-  const [addressLocked, setAddressLocked] = useState(Boolean(initialDraft?.quoteToken && initialDraft.street));
+  const defaultCountry = defaultDeliveryCountry(tenant.country);
+  const [address, setAddress] = useState<AddressDraft>(() => (initialDraft && initialDraft.fulfillmentType === 'delivery' && initialDraft.street
+    ? {
+      country: initialDraft.country || defaultCountry, street: initialDraft.street, houseNumber: initialDraft.houseNumber,
+      postalCode: initialDraft.postalCode, city: initialDraft.city, line2: initialDraft.line2,
+    }
+    : emptyAddressDraft(defaultCountry)));
+  const { country, postalCode } = address;
+  // Adresse déjà confirmée (retour du paiement, rechargement) : résumé compact + « Modifier ».
+  const [addressCollapsed, setAddressCollapsed] = useState(Boolean(initialDraft?.quoteToken && initialDraft.street));
+  const [addressSubmitted, setAddressSubmitted] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [savedSelection, setSavedSelection] = useState<string>(NEW_ADDRESS);
+  const [editingSaved, setEditingSaved] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const addressSummaryRef = useRef<HTMLDivElement>(null);
   const [shippingTotal, setShippingTotal] = useState(initialDraft?.shippingTotal ?? 0);
   const [shippingDetails, setShippingDetails] = useState<Record<string, unknown> | null>(initialDraft?.shippingDetails ?? null);
   const [freeShipping, setFreeShipping] = useState<FreeShippingInfo>(initialDraft?.freeShipping ?? null);
@@ -174,6 +198,8 @@ export default function CheckoutFlow({
   const stripeSessionIdRef = useRef<string | null>(null);
   const stripeSessionSnapshotRef = useRef<string | null>(null);
   const prefilledForCustomerRef = useRef<string | null>(null);
+  const addressRef = useRef(address);
+  addressRef.current = address;
   const addressSectionRef = useRef<HTMLElement | null>(null);
 
   const { register, handleSubmit, setValue, getValues, setFocus, watch, formState: { errors } } = useForm<ContactValues>({
@@ -222,21 +248,39 @@ export default function CheckoutFlow({
         if (!getValues('lastName')) setValue('lastName', parts.slice(1).join(' '));
         if (!getValues('email')) setValue('email', profile.email ?? '');
         if (!getValues('phone')) setValue('phone', profile.phone ?? '');
-        if (profile.defaultAddress && !postalCode && !street) {
-          const line = splitLine1(profile.defaultAddress.line1);
-          setCountry(profile.defaultAddress.country || defaultCountry);
-          setPostalCode(profile.defaultAddress.postalCode);
-          setStreet(line.street);
-          setHouseNumber(line.houseNumber);
-          setCity(profile.defaultAddress.city);
-          setManualMode(true);
+
+        // Adresses enregistrées : choix d'un toucher, l'adresse par défaut
+        // présélectionnée. Jamais d'écrasement d'une adresse déjà écrite.
+        let saved: SavedAddress[] = [];
+        try {
+          const addressesResponse = await fetch('/api/customers/me/addresses');
+          if (addressesResponse.ok) {
+            const data = await addressesResponse.json() as { addresses?: SavedAddress[] };
+            saved = Array.isArray(data.addresses) ? data.addresses : [];
+          }
+        } catch {
+          // Liste facultative : le formulaire reste disponible.
+        }
+        if (saved.length === 0 && profile.defaultAddress) {
+          saved = [{
+            id: 'default', full_name: profile.defaultAddress.fullName, line1: profile.defaultAddress.line1,
+            line2: profile.defaultAddress.line2, city: profile.defaultAddress.city,
+            postal_code: profile.defaultAddress.postalCode, country: profile.defaultAddress.country, is_default: true,
+          }];
+        }
+        if (cancelled || saved.length === 0) return;
+        setSavedAddresses(saved);
+        if (!addressRef.current.street && !addressRef.current.postalCode) {
+          const preferred = saved.find((entry) => entry.is_default) ?? saved[0]!;
+          setSavedSelection(preferred.id);
+          setAddress(savedToDraft(preferred));
         }
       } catch {
         // Profile prefill is optional.
       }
     })();
     return () => { cancelled = true; };
-  }, [sessionCustomer, getValues, setValue, postalCode, street, defaultCountry]);
+  }, [sessionCustomer, getValues, setValue]);
 
   const subtotal = totalPrice();
   const isPickup = fulfillmentType === 'pickup';
@@ -247,7 +291,9 @@ export default function CheckoutFlow({
     ? SUMMARY_COPY.shippingAfterAddress
     : effectiveShippingTotal === 0 ? SUMMARY_COPY.shippingFree : formatPrice(effectiveShippingTotal, tenant.currency);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const hasCompleteAddress = Boolean(country.trim() && postalCode.trim() && street.trim() && houseNumber.trim() && city.trim());
+  const addressErrors = validateAddressDraft(address);
+  const hasCompleteAddress = Object.keys(addressErrors).length === 0;
+  const quotePostalCode = normalizePostalCode(country, postalCode);
   const recipientComplete = Boolean(firstName?.trim() && lastName?.trim());
   const contactComplete = Boolean(email?.trim() && phone?.trim().length >= 6);
 
@@ -279,40 +325,43 @@ export default function CheckoutFlow({
       shippingDetails: isPickup ? null : shippingDetails,
       freeShipping: isPickup ? null : freeShipping,
       quoteToken: isPickup ? null : quoteToken,
-      country: isPickup ? null : country,
-      postalCode: isPickup ? null : postalCode,
-      street: isPickup ? null : street,
-      houseNumber: isPickup ? null : houseNumber,
-      city: isPickup ? null : city,
+      country: isPickup ? null : address.country,
+      postalCode: isPickup ? null : address.postalCode,
+      street: isPickup ? null : address.street,
+      houseNumber: isPickup ? null : address.houseNumber,
+      city: isPickup ? null : address.city,
+      line2: isPickup ? null : address.line2,
       fullName: `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim(),
       firstName: contact.firstName ?? '',
       lastName: contact.lastName ?? '',
       email: contact.email ?? '',
       phone: contact.phone ?? '',
     }));
-  }, [city, country, freeShipping, fulfillmentType, getValues, houseNumber, isPickup, postalCode, quoteToken, shippingDetails, shippingTotal, street]);
+  }, [address, freeShipping, fulfillmentType, getValues, isPickup, quoteToken, shippingDetails, shippingTotal]);
 
+  // Le devis dépend seulement du pays et du code postal (le jeton serveur y est
+  // lié) : il n'est demandé qu'avec un code postal complet pour ce pays.
   const quoteShipping = useCallback(async (destinationCountry: string, zip: string) => {
-    if (zip.trim().length < 4) return;
+    if (!isValidPostalCode(destinationCountry, zip)) return;
     setShippingLoading(true);
     setShippingError(null);
     try {
       const response = await fetch('/api/shipping/quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: shippingPayload(), to: { country: destinationCountry, zip_code: zip.trim() } }),
+        body: JSON.stringify({ items: shippingPayload(), to: { country: destinationCountry, zip_code: zip } }),
       });
       const data = await response.json();
       if (!response.ok || !data.available) {
         setQuoteToken(null);
-        setShippingError(data.message ?? "La livraison n'est pas possible à cette adresse. Vérifiez le code postal.");
+        setShippingError(data.message ?? ADDRESS_COPY.deliveryUnavailable);
         return;
       }
       setShippingTotal(data.shippingTotal);
       setShippingDetails(data.shippingDetails ?? null);
       setFreeShipping(data.freeShipping ?? null);
       setQuoteToken(data.quoteToken ?? null);
-      setQuotedFor({ country: destinationCountry, postalCode: zip.trim() });
+      setQuotedFor({ country: destinationCountry, postalCode: zip });
     } catch {
       setQuoteToken(null);
       setShippingError(ERROR_COPY.shippingQuoteFailed);
@@ -322,12 +371,12 @@ export default function CheckoutFlow({
   }, [shippingPayload]);
 
   useEffect(() => {
-    if (fulfillmentType !== 'delivery' || postalCode.trim().length < 4) return;
-    if (quotedFor?.country === country && quotedFor.postalCode === postalCode.trim()) return;
+    if (fulfillmentType !== 'delivery' || !isValidPostalCode(country, quotePostalCode)) return;
+    if (quotedFor?.country === country && quotedFor.postalCode === quotePostalCode) return;
     if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current);
-    recalcDebounceRef.current = setTimeout(() => { void quoteShipping(country, postalCode); }, 700);
+    recalcDebounceRef.current = setTimeout(() => { void quoteShipping(country, quotePostalCode); }, 500);
     return () => { if (recalcDebounceRef.current) clearTimeout(recalcDebounceRef.current); };
-  }, [country, fulfillmentType, postalCode, quoteShipping, quotedFor]);
+  }, [country, fulfillmentType, quotePostalCode, quoteShipping, quotedFor]);
 
   function invalidateQuote() {
     setQuoteToken(null);
@@ -346,20 +395,43 @@ export default function CheckoutFlow({
     invalidateQuote();
     setStep('shipping');
     setSubmitError(result.error ?? 'Le prix de livraison a changé. Vérifiez le nouveau montant avant de payer.');
-    if (!isPickup) void quoteShipping(country, postalCode);
+    if (!isPickup) void quoteShipping(country, quotePostalCode);
     return true;
   }
 
+  /** Change l'adresse ; le devis n'est invalidé que si le pays ou le code postal change. */
+  function changeAddress(next: AddressDraft, changed: AddressField[]) {
+    setSubmitError(null);
+    if (changed.includes('country') || changed.includes('postalCode')) {
+      const before = `${address.country}|${normalizePostalCode(address.country, address.postalCode)}`;
+      const after = `${next.country}|${normalizePostalCode(next.country, next.postalCode)}`;
+      if (before !== after) invalidateQuote();
+    }
+    setAddress(next);
+  }
+
+  function selectSavedAddress(id: string) {
+    setSavedSelection(id);
+    setEditingSaved(false);
+    setAddressSubmitted(false);
+    setSubmitError(null);
+    const saved = savedAddresses.find((entry) => entry.id === id);
+    changeAddress(saved ? savedToDraft(saved) : emptyAddressDraft(address.country), ['country', 'postalCode', 'street', 'houseNumber', 'city', 'line2']);
+  }
+
+  /** Ouvre les champs de l'adresse et amène le client au résumé d'erreurs ou au premier champ. */
   function focusAddressSection(message?: string) {
     if (message) setSubmitError(message);
-    setAddressLocked(false);
-    requestAnimationFrame(() => {
-      addressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      window.setTimeout(() => {
-        const input = addressSectionRef.current?.querySelector<HTMLInputElement>('input');
-        input?.focus({ preventScroll: true });
-      }, 350);
-    });
+    setAddressCollapsed(false);
+    if (savedSelection !== NEW_ADDRESS && !hasCompleteAddress) setEditingSaved(true);
+    // Après le rendu (résumé d'erreurs ou champs rouverts) : on centre la cible
+    // elle-même, pour qu'elle ne passe pas sous l'en-tête fixe.
+    window.setTimeout(() => {
+      const target: HTMLElement | null = addressSummaryRef.current
+        ?? addressSectionRef.current?.querySelector<HTMLElement>('input, select') ?? null;
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target?.focus({ preventScroll: true });
+    }, 60);
   }
 
   function changeFulfillment(next: FulfillmentType) {
@@ -384,20 +456,28 @@ export default function CheckoutFlow({
       return;
     }
     if (!isPickup && !hasCompleteAddress) {
-      focusAddressSection('Écrivez votre adresse complète (rue, numéro, code postal, ville) pour calculer la livraison.');
+      setAddressSubmitted(true);
+      focusAddressSection();
       return;
     }
     if (!isPickup && !quoteToken) {
-      focusAddressSection(shippingError ?? 'Nous calculons le prix de livraison. Patientez un instant.');
+      focusAddressSection(shippingError ?? ADDRESS_COPY.quoteLoading);
       return;
     }
     if (!data.firstName || !data.lastName || !data.email || !data.phone) return;
     saveDraft();
     setSubmitError(null);
+    setAddressCollapsed(!isPickup);
     setStep('select-payment');
   };
 
   function focusFirstContactError() {
+    // L'adresse est avant le contact dans la page : ses erreurs d'abord.
+    if (!isPickup && !hasCompleteAddress) {
+      setAddressSubmitted(true);
+      focusAddressSection();
+      return;
+    }
     if (!firstName?.trim()) setFocus('firstName');
     else if (!lastName?.trim()) setFocus('lastName');
     else if (!email?.trim()) setFocus('email');
@@ -415,13 +495,7 @@ export default function CheckoutFlow({
         storage_type: item.product.storage_type ?? 'dry',
       })),
       nalaAttributions: buildNalaCheckoutAttributions(items),
-      shippingAddress: isPickup ? null : {
-        full_name: `${data.firstName} ${data.lastName}`,
-        line1: `${street} ${houseNumber}`.trim(),
-        city,
-        postal_code: postalCode,
-        country,
-      },
+      shippingAddress: isPickup ? null : draftToShippingAddress(address, `${data.firstName} ${data.lastName}`),
       fulfillmentType,
       email: data.email,
       phone: data.phone,
@@ -571,10 +645,22 @@ export default function CheckoutFlow({
     : paymentMode === 'in_store' ? ACTION_COPY.orderPayAtPickup : 'Payer par carte';
   const paymentCtaColor = selectedExternalMethod ? externalPaymentCtaColor(selectedExternalMethod) : paymentMode === 'in_store' ? '#8a8578' : 'var(--color-primary)';
 
+  const addressSummaryItems = addressSubmitted && !isPickup
+    ? ADDRESS_FIELD_ORDER.filter((field) => addressErrors[field])
+      .map((field) => ({ fieldId: addressFieldId(ADDRESS_ID_PREFIX, field), label: ADDRESS_FIELD_LABELS[field] }))
+    : [];
+  const showAddressForm = savedAddresses.length === 0 || savedSelection === NEW_ADDRESS || editingSaved;
+  const showAddressSummary = addressCollapsed && hasCompleteAddress && Boolean(quoteToken);
+
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-4 pb-10 sm:px-6 sm:py-7">
+    <div
+      data-typing={typing ? 'true' : undefined}
+      onFocusCapture={(event) => setTyping(isTextEntry(event.target))}
+      onBlurCapture={() => setTyping(false)}
+      className={`mx-auto w-full px-4 py-4 pb-10 sm:px-6 sm:py-7 ${step === 'shipping' ? 'max-w-2xl lg:max-w-5xl' : 'max-w-2xl'}`}
+    >
       <CheckoutProgressIndicator currentStep={step} />
-      <div className="mb-5">{compactSummary}</div>
+      <div data-checkout-sticky="summary" className={`mb-5 ${step === 'shipping' ? 'lg:hidden' : ''}`}>{compactSummary}</div>
 
       {!purchaseGate.checking && (purchaseGate.error || purchaseGate.issues.length > 0) && (
         <div ref={cartIssuesRef} tabIndex={-1} role="alert" className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
@@ -597,6 +683,7 @@ export default function CheckoutFlow({
       )}
 
       {step === 'shipping' && (
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
         <div className="space-y-5">
           <section className="rounded-2xl bg-[color-mix(in_srgb,var(--color-primary)_6%,white)] px-4 py-3.5">
             <p className="text-sm font-bold text-gray-950">{isPickup ? 'Retrait en boutique' : 'Livraison chez vous'}</p>
@@ -611,11 +698,11 @@ export default function CheckoutFlow({
               {(['delivery', 'pickup'] as const).filter((type) => type === 'delivery' || tenant.click_collect_enabled).map((type) => {
                 const active = fulfillmentType === type;
                 return (
-                  <button key={type} type="button" onClick={() => changeFulfillment(type)} className={`relative min-h-[92px] rounded-2xl border p-4 text-left transition-colors ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)]' : 'border-gray-200 bg-white'}`}>
-                    <span className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl ${active ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-100 text-gray-500'}`}>{type === 'delivery' ? <IconTruck size={18} /> : <IconBuildingStore size={18} />}</span>
+                  <button key={type} type="button" aria-pressed={active} onClick={() => changeFulfillment(type)} className={`relative min-h-[92px] rounded-2xl border-[1.5px] p-4 text-left transition-colors ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)]' : 'border-[color:var(--field-border)] bg-white'}`}>
+                    <span className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl ${active ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-100 text-gray-600'}`}>{type === 'delivery' ? <IconTruck size={18} aria-hidden="true" /> : <IconBuildingStore size={18} aria-hidden="true" />}</span>
                     <span className="block text-sm font-bold text-gray-950">{type === 'delivery' ? 'Livraison' : 'Retrait en boutique'}</span>
-                    <span className="mt-0.5 block text-xs leading-snug text-gray-600">{type === 'delivery' ? 'Chez vous, à votre adresse' : 'Vous venez la chercher, sans prix de livraison'}</span>
-                    {active && <IconCheck size={16} className="absolute right-3 top-3 text-[var(--color-primary)]" />}
+                    <span className="mt-0.5 block text-xs leading-snug text-gray-700">{type === 'delivery' ? 'Chez vous, à votre adresse' : 'Vous venez la chercher, sans prix de livraison'}</span>
+                    {active && <IconCheck size={16} className="absolute right-3 top-3 text-[var(--color-primary)]" aria-hidden="true" />}
                   </button>
                 );
               })}
@@ -624,121 +711,140 @@ export default function CheckoutFlow({
 
           <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${recipientComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{recipientComplete ? <IconCheck size={15} /> : '1'}</span>
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${recipientComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`} aria-hidden="true">{recipientComplete ? <IconCheck size={15} /> : '1'}</span>
               <div>
-                <h2 className="text-sm font-bold text-gray-950">{isPickup ? 'Qui vient chercher la commande ?' : 'À quel nom livrer ?'}</h2>
-                <p className="mt-0.5 text-xs text-gray-600">Prénom et nom de la personne qui reçoit la commande.</p>
+                <h2 className="text-base font-bold text-gray-950">{isPickup ? 'Qui vient chercher la commande ?' : 'À quel nom livrer ?'}</h2>
+                <p className="mt-0.5 text-sm text-gray-700">Prénom et nom de la personne qui reçoit la commande.</p>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div><input {...register('firstName')} autoComplete="given-name" placeholder="Prénom" aria-label="Prénom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.firstName && <p className="mt-1 text-xs font-medium text-red-600">{errors.firstName.message}</p>}</div>
-              <div><input {...register('lastName')} autoComplete="family-name" placeholder="Nom" aria-label="Nom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.lastName && <p className="mt-1 text-xs font-medium text-red-600">{errors.lastName.message}</p>}</div>
+            <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+              <TextField {...register('firstName')} label="Prénom" autoComplete="given-name" placeholder="Ex. : Marie" enterKeyHint="next" error={errors.firstName?.message} />
+              <TextField {...register('lastName')} label="Nom" autoComplete="family-name" placeholder="Ex. : Kamga" enterKeyHint="next" error={errors.lastName?.message} />
             </div>
           </section>
 
           {isPickup ? (
             <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
               <div className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-600 text-white"><IconCheck size={15} /></span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-600 text-white" aria-hidden="true"><IconCheck size={15} /></span>
                 <div>
-                  <p className="flex items-center gap-2 text-sm font-bold text-blue-900"><IconMapPin size={17} /> Retrait chez {tenant.name}</p>
+                  <p className="flex items-center gap-2 text-sm font-bold text-blue-900"><IconMapPin size={17} aria-hidden="true" /> Retrait chez {tenant.name}</p>
                   {tenant.click_collect_address && <p className="mt-2 text-sm text-blue-800">{tenant.click_collect_address}</p>}
-                  <p className="mt-2 text-xs font-semibold text-green-700">Pas de prix de livraison.</p>
+                  <p className="mt-2 text-sm font-semibold text-green-800">Pas de prix de livraison.</p>
                 </div>
               </div>
             </section>
           ) : (
-            <section ref={addressSectionRef} className="scroll-mb-48 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <section ref={addressSectionRef} aria-labelledby="checkout-address-title" className="scroll-mt-24 scroll-mb-48 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
               <div className="flex items-start gap-3">
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${quoteToken && hasCompleteAddress ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{quoteToken && hasCompleteAddress ? <IconCheck size={15} /> : '2'}</span>
+                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${quoteToken && hasCompleteAddress ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`} aria-hidden="true">{quoteToken && hasCompleteAddress ? <IconCheck size={15} /> : '2'}</span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-bold text-gray-950">Adresse de livraison</h2>
-                  <p className="mt-0.5 text-xs leading-relaxed text-gray-600">Elle sert à calculer le prix de livraison avant le paiement.</p>
+                  <h2 id="checkout-address-title" className="text-base font-bold text-gray-950">{ADDRESS_COPY.title}</h2>
+                  <p className="mt-0.5 text-sm leading-relaxed text-gray-700">
+                    {savedAddresses.length > 0 && !showAddressSummary ? ADDRESS_COPY.chooseSaved : ADDRESS_COPY.allRequired}
+                  </p>
                 </div>
               </div>
 
-              {addressLocked && hasCompleteAddress ? (
-                <div className="mt-4 rounded-xl bg-green-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-xs font-bold text-green-800"><IconCheck size={15} aria-hidden="true" /> Adresse trouvée</p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">{street} {houseNumber}</p>
-                      <p className="text-xs text-gray-600">{postalCode} {city} · {COUNTRIES.find((entry) => entry.value === country)?.label ?? country}</p>
+              <div className="mt-4 flex flex-col gap-4">
+                {showAddressSummary ? (
+                  <div className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 p-3.5">
+                    <div className="min-w-0 text-[15px] leading-snug text-gray-950">
+                      <p className="font-semibold">{draftToShippingAddress(address, '').line1}</p>
+                      {address.line2.trim() && <p className="text-sm text-gray-700">{address.line2}</p>}
+                      <p className="text-sm text-gray-700">{quotePostalCode} {address.city} · {countryLabel(address.country)}</p>
                     </div>
-                    <button type="button" onClick={() => { setAddressLocked(false); setSubmitError(null); }} className="shrink-0 text-xs font-semibold text-[var(--color-primary)]">Modifier</button>
+                    <button type="button" onClick={() => { setAddressCollapsed(false); setSubmitError(null); }}
+                      className="min-h-11 shrink-0 px-1 text-sm font-bold text-[color:var(--color-primary-dark)] underline underline-offset-4">
+                      {ADDRESS_COPY.edit}
+                    </button>
                   </div>
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  <select aria-label="Pays de livraison" value={country} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
-                    {COUNTRIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
-                  </select>
-                  {manualMode ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <input value={street} onChange={(event) => { setSubmitError(null); invalidateQuote(); setStreet(event.target.value); }} placeholder="Rue" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                      <input value={houseNumber} onChange={(event) => { setSubmitError(null); invalidateQuote(); setHouseNumber(event.target.value); }} placeholder="Numéro" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                      <input value={postalCode} onChange={(event) => { setSubmitError(null); invalidateQuote(); setPostalCode(event.target.value); }} placeholder="Code postal" className="rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                      <input value={city} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCity(event.target.value); }} placeholder="Ville" className="col-span-2 rounded-xl border border-gray-200 px-3 py-3 text-sm" />
-                    </div>
-                  ) : (
-                    <AddressAutocomplete
-                      country={country}
-                      placeholder="Votre adresse (rue, numéro, ville)"
-                      onSelect={(result) => {
-                        setSubmitError(null);
-                        invalidateQuote();
-                        setPostalCode(result.postalCode);
-                        setStreet(result.street);
-                        setHouseNumber(result.houseNumber);
-                        setCity(result.city);
-                        if (result.postalCode && result.street && result.houseNumber && result.city) setAddressLocked(true);
-                      }}
-                      onManualFallback={() => { setSubmitError(null); setManualMode(true); }}
-                    />
+                ) : (
+                  <>
+                    {savedAddresses.length > 0 && (
+                      <SavedAddressPicker
+                        name="checkout-saved-address"
+                        addresses={savedAddresses}
+                        selected={savedSelection}
+                        onSelect={selectSavedAddress}
+                        onEdit={() => setEditingSaved(true)}
+                      />
+                    )}
+                    {showAddressForm && (
+                      <>
+                        <ErrorSummary ref={addressSummaryRef} items={addressSummaryItems} />
+                        <CustomerAddressForm
+                          idPrefix={ADDRESS_ID_PREFIX}
+                          value={address}
+                          onChange={changeAddress}
+                          showAllErrors={addressSubmitted}
+                          searchMode={editingSaved ? 'collapsed' : 'open'}
+                          autofillSection="shipping"
+                        />
+                      </>
+                    )}
+                  </>
+                )}
+
+                <div className="space-y-2" aria-live="polite">
+                  {submitError && <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">{submitError}</p>}
+                  {shippingLoading && (
+                    <p className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-sm font-semibold text-gray-800" role="status">
+                      <span className="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300 motion-safe:animate-spin" style={{ borderTopColor: 'var(--color-primary)' }} aria-hidden="true" />
+                      {ADDRESS_COPY.quoteLoading}
+                    </p>
+                  )}
+                  {!shippingLoading && shippingError && (
+                    <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">
+                      <IconAlertTriangle size={18} className="mt-px shrink-0" aria-hidden="true" />{shippingError}
+                    </p>
+                  )}
+                  {!shippingLoading && quoteToken && (
+                    <p className="flex items-start gap-2 rounded-xl border border-green-200 bg-green-50 px-3.5 py-2.5 text-sm text-green-900">
+                      <IconCheck size={18} className="mt-px shrink-0" aria-hidden="true" />
+                      <span><span className="font-bold">{hasCompleteAddress ? ADDRESS_COPY.deliveryAvailable : ADDRESS_COPY.deliveryAvailablePostalCode}</span>{' '}{ADDRESS_COPY.deliveryPriceLabel} {shippingTotal === 0 ? SUMMARY_COPY.shippingFree.toLowerCase() : formatPrice(shippingTotal, tenant.currency)}</span>
+                    </p>
                   )}
                 </div>
-              )}
-
-              <div className="mt-3 space-y-2">
-                {submitError && <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700" role="alert">{submitError}</p>}
-                {shippingLoading && <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700" role="status">Calcul du prix de livraison…</p>}
-                {!shippingLoading && shippingError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" role="alert">{shippingError}</p>}
-                {!shippingLoading && quoteToken && <p className="rounded-xl border border-green-100 bg-green-50 px-3 py-2.5 text-xs font-semibold text-green-800">✓ Prix de livraison : {shippingTotal === 0 ? SUMMARY_COPY.shippingFree.toLowerCase() : formatPrice(shippingTotal, tenant.currency)}</p>}
               </div>
             </section>
           )}
 
           <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${contactComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{contactComplete ? <IconCheck size={15} /> : '3'}</span>
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${contactComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`} aria-hidden="true">{contactComplete ? <IconCheck size={15} /> : isPickup ? '2' : '3'}</span>
               <div>
-                <h2 className="text-sm font-bold text-gray-950">Contact</h2>
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-600">Le téléphone est obligatoire : le livreur ou la boutique peut vous appeler pour la remise.</p>
+                <h2 className="text-base font-bold text-gray-950">Contact</h2>
+                <p className="mt-0.5 text-sm leading-relaxed text-gray-700">Le téléphone est obligatoire : le livreur ou la boutique peut vous appeler pour la remise.</p>
               </div>
             </div>
-            <div className="mt-4 space-y-3">
-              <div><input {...register('email')} type="email" inputMode="email" autoComplete="email" placeholder="E-mail" aria-label="E-mail" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.email && <p className="mt-1 text-xs font-medium text-red-600">{errors.email.message}</p>}</div>
-              <div className="relative"><IconPhone size={16} className="pointer-events-none absolute left-3 top-3.5 text-gray-400" /><input {...register('phone')} type="tel" inputMode="tel" autoComplete="tel" placeholder="Téléphone" aria-label="Téléphone" className="w-full rounded-xl border border-gray-200 py-3 pl-9 pr-3 text-sm" />{errors.phone && <p className="mt-1 text-xs font-medium text-red-600">{errors.phone.message}</p>}</div>
+            <div className="mt-4 space-y-4">
+              <TextField {...register('email')} label="E-mail" type="email" inputMode="email" autoComplete="email" placeholder="Ex. : nom@gmail.com" enterKeyHint="next" error={errors.email?.message} />
+              <TextField {...register('phone')} label="Téléphone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Ex. : +39 351 234 5678" hint="Avec l'indicatif du pays." enterKeyHint="done"
+                leading={<IconPhone size={18} />} error={errors.phone?.message} />
             </div>
 
-            <div className="mt-3">
+            <div className="mt-4">
               {sessionCustomer ? (
-                <p className="rounded-xl bg-green-50 px-3 py-2 text-xs font-medium text-green-800">Connecté(e) en tant que {sessionCustomer.email}. Les informations de cette commande restent modifiables.</p>
+                <p className="rounded-xl bg-green-50 px-3.5 py-2.5 text-sm font-medium text-green-900">Connecté(e) en tant que {sessionCustomer.email}. Les informations de cette commande restent modifiables.</p>
               ) : showLoginForm ? (
                 <OtpLoginForm onAuthenticated={() => { void refreshSessionCustomer(); setShowLoginForm(false); }} />
               ) : (
-                <button type="button" onClick={() => setShowLoginForm(true)} className="flex min-h-11 w-full items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-left text-xs font-medium text-gray-600">
-                  <span className="flex items-center gap-2"><IconUser size={15} /> Déjà client ? Se connecter</span><IconChevronDown size={16} />
+                <button type="button" onClick={() => setShowLoginForm(true)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-800">
+                  <span className="flex items-center gap-2"><IconUser size={17} aria-hidden="true" /> Déjà client ? Se connecter</span><IconChevronDown size={17} aria-hidden="true" />
                 </button>
               )}
             </div>
           </section>
+        </div>
 
+        <aside className="mt-5 space-y-4 lg:sticky lg:top-24 lg:mt-0">
           {fullSummary}
 
-          <button type="button" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading || !purchaseGate.canProceed} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
+          <button type="button" data-checkout-sticky="cta" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading || !purchaseGate.canProceed} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
             {shippingLoading ? 'Calcul du prix de livraison…' : ACTION_COPY.choosePayment}
           </button>
+        </aside>
         </div>
       )}
 
@@ -767,15 +873,15 @@ export default function CheckoutFlow({
 
           {(consentState.showTermsCheckbox || consentState.showMarketingCheckbox) && (
             <section className="space-y-3 border-t border-gray-100 pt-4">
-              {consentState.showTermsCheckbox && <label className="flex items-start gap-2 text-xs text-gray-600"><input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="mt-0.5 h-4 w-4" /><span>J’accepte les <Link href="/conditions-generales-vente" target="_blank" className="underline">Conditions Générales de Vente</Link> et la <Link href="/politique-confidentialite" target="_blank" className="underline">Politique de confidentialité</Link>.</span></label>}
-              {consentState.showMarketingCheckbox && <label className="flex items-start gap-2 text-xs text-gray-600"><input type="checkbox" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} className="mt-0.5 h-4 w-4" /><span>{marketingConsentLabel(tenant.name)}</span></label>}
+              {consentState.showTermsCheckbox && <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800"><input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="sf-checkbox mt-0.5" /><span>J’accepte les <Link href="/conditions-generales-vente" target="_blank" className="underline">Conditions Générales de Vente</Link> et la <Link href="/politique-confidentialite" target="_blank" className="underline">Politique de confidentialité</Link>.</span></label>}
+              {consentState.showMarketingCheckbox && <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800"><input type="checkbox" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} className="sf-checkbox mt-0.5" /><span>{marketingConsentLabel(tenant.name)}</span></label>}
             </section>
           )}
 
           {fullSummary}
 
           {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">{submitError}</p>}
-          <button type="button" onClick={confirmPaymentChoice} disabled={isSubmitting || !purchaseGate.canProceed || (consentState.showTermsCheckbox && !termsAccepted)} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: paymentCtaColor }}>
+          <button type="button" data-checkout-sticky="cta" onClick={confirmPaymentChoice} disabled={isSubmitting || !purchaseGate.canProceed || (consentState.showTermsCheckbox && !termsAccepted)} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: paymentCtaColor }}>
             {isSubmitting ? ACTION_COPY.processing : `${paymentCtaLabel} · ${formatPrice(total, tenant.currency)}`}
           </button>
         </div>

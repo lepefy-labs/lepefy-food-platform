@@ -14,6 +14,7 @@ import { upsertActiveCheckoutSession } from '@/lib/checkout/activeCheckoutSessio
 import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
+import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 import { requestShipmentDraft } from '@/lib/shipping/shipmentDraft/shipmentDraftService';
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     const isTestRequest = isE2ERequest();
     const body: CheckoutBody = await req.json();
     const {
-      items: rawItems, shippingAddress, fulfillmentType, email,
+      items: rawItems, shippingAddress: rawShippingAddress, fulfillmentType, email,
       phone, fullName, shippingDetails, quoteToken,
       paymentMethod = 'stripe', termsAccepted, marketingOptIn, nalaAttributions,
     } = body;
@@ -78,6 +79,20 @@ export async function POST(req: NextRequest) {
         { error: ERROR_COPY.termsRequired },
         { status: 400 },
       );
+    }
+
+    // Adresse : seuls les champs connus sont conservés (texte nettoyé, longueurs
+    // et code postal contrôlés). Le devis reste l'autorité sur la livraison.
+    let shippingAddress: NormalizedShippingAddress | null = null;
+    if (fulfillmentType !== 'pickup') {
+      const normalizedAddress = normalizeShippingAddress(rawShippingAddress);
+      if (!normalizedAddress.ok) {
+        return NextResponse.json(
+          { error: normalizedAddress.error, code: 'ADDRESS_INVALID', field: normalizedAddress.field },
+          { status: 400 },
+        );
+      }
+      shippingAddress = normalizedAddress.address;
     }
 
     // All payment entry points, including recovery, share this DB-backed gate.

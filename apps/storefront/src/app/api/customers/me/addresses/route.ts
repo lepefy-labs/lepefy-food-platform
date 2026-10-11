@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getSessionCustomer } from '@/lib/auth/getSessionCustomer';
 import { createServiceClient } from '@/lib/supabase/server';
+import { normalizeShippingAddress } from '@/lib/address/addressRules';
 
 interface AddressBody {
   fullName?:   string;
@@ -13,13 +14,31 @@ interface AddressBody {
   isDefault?:  boolean;
 }
 
-function validate(body: AddressBody): string | null {
-  if (typeof body.fullName !== 'string' || body.fullName.trim().length === 0) return 'Le nom du destinataire est obligatoire.';
-  if (typeof body.line1 !== 'string' || body.line1.trim().length === 0) return 'La rue est obligatoire.';
-  if (typeof body.city !== 'string' || body.city.trim().length === 0) return 'La ville est obligatoire.';
-  if (typeof body.postalCode !== 'string' || body.postalCode.trim().length === 0) return 'Le code postal est obligatoire.';
-  if (typeof body.country !== 'string' || body.country.trim().length === 0) return 'Le pays est obligatoire.';
-  return null;
+// GET /api/customers/me/addresses — adresses du client connecté (sélection
+// au checkout). Défaut d'abord, puis la plus récente. Scopé tenant + client.
+export async function GET() {
+  const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
+  const tenant     = await getTenant(tenantSlug);
+
+  const sessionCustomer = await getSessionCustomer(tenant.id);
+  if (!sessionCustomer) {
+    return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+  }
+
+  const { data, error } = await createServiceClient()
+    .from('addresses')
+    .select('id, full_name, line1, line2, city, postal_code, country, is_default')
+    .eq('customer_id', sessionCustomer.id)
+    .eq('tenant_id', tenant.id)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('[customers/me/addresses][GET] read failed:', error.message);
+    return NextResponse.json({ error: 'Vos adresses ne sont pas disponibles pour le moment.' }, { status: 500 });
+  }
+  return NextResponse.json({ addresses: data ?? [] }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 // POST /api/customers/me/addresses — ajout d'une adresse depuis /compte.
@@ -36,10 +55,16 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json() as AddressBody;
-  const validationError = validate(body);
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 });
+  // Même contrôle que le checkout : champs connus seulement, texte nettoyé,
+  // longueurs et format du code postal.
+  const normalized = normalizeShippingAddress({
+    full_name: body.fullName, line1: body.line1, line2: body.line2,
+    city: body.city, postal_code: body.postalCode, country: body.country,
+  });
+  if (!normalized.ok) {
+    return NextResponse.json({ error: normalized.error, code: 'ADDRESS_INVALID', field: normalized.field }, { status: 400 });
   }
+  const address = normalized.address;
 
   const supabase = createServiceClient();
 
@@ -72,12 +97,12 @@ export async function POST(req: NextRequest) {
     .insert({
       customer_id: sessionCustomer.id,
       tenant_id:   tenant.id,
-      full_name:   body.fullName!.trim(),
-      line1:       body.line1!.trim(),
-      line2:       body.line2?.trim() || null,
-      city:        body.city!.trim(),
-      postal_code: body.postalCode!.trim(),
-      country:     body.country!.trim(),
+      full_name:   address.full_name,
+      line1:       address.line1,
+      line2:       address.line2 ?? null,
+      city:        address.city,
+      postal_code: address.postal_code,
+      country:     address.country,
       is_default:  makeDefault,
     })
     .select()

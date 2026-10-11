@@ -16,25 +16,21 @@ import {
   PaymentOptionList, buildExternalPaymentOptions, ExternalPaymentNote,
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import ConfirmActionModal from '@/components/ui/ConfirmActionModal';
+import { CustomerAddressForm } from '@/components/address/CustomerAddressForm';
+import {
+  countryLabel,
+  draftToShippingAddress,
+  emptyAddressDraft,
+  isValidPostalCode,
+  normalizePostalCode,
+  shippingAddressToDraft,
+  validateAddressDraft,
+  type AddressDraft,
+  type AddressField,
+} from '@/lib/address/addressRules';
+import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
+import { missingFieldsTitle } from '@/lib/storefrontCopy/copy';
 import type { PublicTenant, TenantPaymentMethod, ShippingAddress } from '@lepefy/types';
-
-const COUNTRIES = [
-  { value: 'IT', label: 'Italie' },
-  { value: 'FR', label: 'France' },
-  { value: 'BE', label: 'Belgique' },
-  { value: 'DE', label: 'Allemagne' },
-  { value: 'CH', label: 'Suisse' },
-];
-
-function splitLine1(line1: string): { street: string; houseNumber: string } {
-  const parts = line1.trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return { street: line1.trim(), houseNumber: '' };
-  const last = parts[parts.length - 1] ?? '';
-  if (/\d/.test(last) || /^s\.?\s?n\.?$/i.test(last)) {
-    return { street: parts.slice(0, -1).join(' '), houseNumber: last };
-  }
-  return { street: parts.join(' '), houseNumber: '' };
-}
 
 interface SessionItem {
   productId:    string;
@@ -94,11 +90,8 @@ export function CheckoutSessionEditor({
   const [editPaymentMethod, setEditPaymentMethod] = useState<'stripe' | 'external_link'>('stripe');
   const [editExternalMethodId, setEditExternalMethodId] = useState<string | null>(null);
   const [editFulfillmentType, setEditFulfillmentType]   = useState<'delivery' | 'pickup'>('delivery');
-  const [editStreet, setEditStreet]         = useState('');
-  const [editHouseNumber, setEditHouseNumber] = useState('');
-  const [editCity, setEditCity]             = useState('');
-  const [editPostalCode, setEditPostalCode] = useState('');
-  const [editCountry, setEditCountry]       = useState('IT');
+  const [editAddress, setEditAddress]       = useState<AddressDraft>(() => emptyAddressDraft('IT'));
+  const [addressSubmitted, setAddressSubmitted] = useState(false);
   const [editQuoteToken, setEditQuoteToken] = useState<string | null>(null);
   const [editShippingTotal, setEditShippingTotal] = useState(0);
   const [requoting, setRequoting]           = useState(false);
@@ -130,12 +123,9 @@ export function CheckoutSessionEditor({
         setEditExternalMethodId(matchingMethod?.id ?? null);
 
         if (json.shippingAddress) {
-          const { street, houseNumber } = splitLine1(json.shippingAddress.line1);
-          setEditStreet(street);
-          setEditHouseNumber(houseNumber);
-          setEditCity(json.shippingAddress.city);
-          setEditPostalCode(json.shippingAddress.postal_code);
-          setEditCountry(json.shippingAddress.country);
+          const draft = shippingAddressToDraft(json.shippingAddress);
+          delete draft.fullName;
+          setEditAddress(draft);
         }
 
         setLoadState('ready');
@@ -168,8 +158,11 @@ export function CheckoutSessionEditor({
   const editSubtotal = editItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const editTotal = editSubtotal + (editFulfillmentType === 'pickup' ? 0 : editShippingTotal);
 
+  const editPostalCode = normalizePostalCode(editAddress.country, editAddress.postalCode);
+
+  // Devis lié au pays et au code postal seulement : demandé avec un code complet.
   const requoteShipping = useCallback(async (country: string, zip: string) => {
-    if (zip.trim().length < 4 || !country) return;
+    if (!isValidPostalCode(country, zip)) return;
     setRequoting(true);
     setRequoteError(null);
     try {
@@ -186,7 +179,7 @@ export function CheckoutSessionEditor({
         setEditShippingTotal(json.shippingTotal);
         setEditQuoteToken(json.quoteToken ?? null);
       } else {
-        setRequoteError(json.message ?? 'Livraison non disponible pour cette adresse.');
+        setRequoteError(json.message ?? ADDRESS_COPY.deliveryUnavailable);
         setEditQuoteToken(null);
       }
     } catch {
@@ -197,6 +190,25 @@ export function CheckoutSessionEditor({
     }
   }, [editItems]);
 
+  // Modification ouverte en livraison sans devis valide : nouveau devis dès que
+  // le pays et le code postal sont complets (jamais à chaque touche).
+  useEffect(() => {
+    if (!expanded || editFulfillmentType !== 'delivery' || editQuoteToken) return;
+    if (!isValidPostalCode(editAddress.country, editPostalCode)) return;
+    const timer = window.setTimeout(() => { void requoteShipping(editAddress.country, editPostalCode); }, 500);
+    return () => window.clearTimeout(timer);
+  }, [expanded, editFulfillmentType, editQuoteToken, editAddress.country, editPostalCode, requoteShipping]);
+
+  function changeEditAddress(next: AddressDraft, changed: AddressField[]) {
+    const keyBefore = `${editAddress.country}|${editPostalCode}`;
+    const keyAfter = `${next.country}|${normalizePostalCode(next.country, next.postalCode)}`;
+    if ((changed.includes('country') || changed.includes('postalCode')) && keyBefore !== keyAfter) {
+      setEditQuoteToken(null);
+      setRequoteError(null);
+    }
+    setEditAddress(next);
+  }
+
   // Tarif remplacé, panier ou adresse modifiés depuis le devis : le serveur
   // refuse le montant enregistré. Nouveau devis + nouvelle confirmation.
   function handleShippingRequote(json: { code?: string; error?: string }): boolean {
@@ -205,7 +217,7 @@ export function CheckoutSessionEditor({
     setExpanded(true);
     setEditQuoteToken(null);
     setSaveError(json.error ?? 'Les frais de livraison doivent être recalculés. Vérifiez le nouveau montant avant de payer.');
-    if (editFulfillmentType === 'delivery') void requoteShipping(editCountry, editPostalCode);
+    if (editFulfillmentType === 'delivery') void requoteShipping(editAddress.country, editPostalCode);
     return true;
   }
 
@@ -240,21 +252,24 @@ export function CheckoutSessionEditor({
       setSaveError('Veuillez choisir un moyen de paiement.');
       return;
     }
-    if (editFulfillmentType === 'delivery' && !editQuoteToken) {
-      setSaveError('Veuillez renseigner une adresse de livraison valide pour recalculer les frais.');
-      return;
+    if (editFulfillmentType === 'delivery') {
+      const addressErrors = validateAddressDraft(editAddress);
+      const missing = Object.keys(addressErrors).length;
+      if (missing > 0) {
+        setAddressSubmitted(true);
+        setSaveError(`${missingFieldsTitle(missing)} Complétez les champs en rouge.`);
+        return;
+      }
+      if (!editQuoteToken) {
+        setSaveError(requoteError ?? ADDRESS_COPY.quoteLoading);
+        return;
+      }
     }
 
     setIsSaving(true);
     try {
       const shippingAddress: ShippingAddress | null = editFulfillmentType === 'delivery'
-        ? {
-            full_name:   data?.fullName ?? '',
-            line1:       `${editStreet} ${editHouseNumber}`.trim(),
-            city:        editCity,
-            postal_code: editPostalCode,
-            country:     editCountry,
-          }
+        ? draftToShippingAddress(editAddress, data?.shippingAddress?.full_name || data?.fullName || '')
         : null;
 
       const res = await fetch(`/api/checkout-sessions/${sessionId}`, {
@@ -390,7 +405,7 @@ export function CheckoutSessionEditor({
               {data.fulfillmentType === 'pickup'
                 ? 'En boutique'
                 : data.shippingAddress
-                  ? `${data.shippingAddress.city}, ${data.shippingAddress.country}`
+                  ? `${data.shippingAddress.city}, ${countryLabel(data.shippingAddress.country)}`
                   : 'Non renseignée'}
             </span>
           </div>
@@ -520,69 +535,28 @@ export function CheckoutSessionEditor({
             )}
 
             {editFulfillmentType === 'delivery' && (
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-3">Adresse de livraison</p>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <input
-                      value={editStreet}
-                      onChange={(e) => setEditStreet(e.target.value)}
-                      placeholder="Rue"
-                      className="col-span-2 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                    <input
-                      value={editHouseNumber}
-                      onChange={(e) => setEditHouseNumber(e.target.value)}
-                      placeholder="Numéro"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      value={editPostalCode}
-                      onChange={(e) => {
-                        const zip = e.target.value;
-                        setEditPostalCode(zip);
-                        setEditQuoteToken(null);
-                        if (zip.trim().length >= 4) requoteShipping(editCountry, zip);
-                      }}
-                      placeholder="Code postal"
-                      inputMode="numeric"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                    <input
-                      value={editCity}
-                      onChange={(e) => setEditCity(e.target.value)}
-                      placeholder="Ville"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                    />
-                  </div>
-                  <select
-                    value={editCountry}
-                    onChange={(e) => {
-                      const c = e.target.value;
-                      setEditCountry(c);
-                      setEditQuoteToken(null);
-                      if (editPostalCode.trim().length >= 4) requoteShipping(c, editPostalCode);
-                    }}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                  <div className="flex justify-between items-center text-sm px-1">
-                    <span className="text-gray-500">Frais de livraison</span>
-                    {requoting ? (
-                      <span className="text-gray-400 text-xs animate-pulse">Calcul…</span>
-                    ) : requoteError ? (
-                      <span className="text-red-500 text-xs">{requoteError}</span>
-                    ) : (
-                      <span className="font-semibold">{formatPrice(editShippingTotal, tenant.currency)}</span>
-                    )}
-                  </div>
+              <section aria-labelledby="session-address-title" className="flex flex-col gap-4">
+                <h2 id="session-address-title" className="text-base font-bold text-gray-950">{ADDRESS_COPY.title}</h2>
+                <CustomerAddressForm
+                  idPrefix="reprise-adresse"
+                  value={editAddress}
+                  onChange={changeEditAddress}
+                  showAllErrors={addressSubmitted}
+                  searchMode="collapsed"
+                  autofillSection="shipping"
+                />
+                <div aria-live="polite">
+                  {requoting ? (
+                    <p className="rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-sm font-semibold text-gray-800" role="status">{ADDRESS_COPY.quoteLoading}</p>
+                  ) : requoteError ? (
+                    <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">{requoteError}</p>
+                  ) : editQuoteToken ? (
+                    <p className="rounded-xl border border-green-200 bg-green-50 px-3.5 py-2.5 text-sm text-green-900">
+                      <span className="font-bold">{ADDRESS_COPY.deliveryAvailable}</span>{' '}{ADDRESS_COPY.deliveryPriceLabel} {formatPrice(editShippingTotal, tenant.currency)}
+                    </p>
+                  ) : null}
                 </div>
-              </div>
+              </section>
             )}
 
             <div>

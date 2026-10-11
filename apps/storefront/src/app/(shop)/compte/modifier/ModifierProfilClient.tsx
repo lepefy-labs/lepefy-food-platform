@@ -6,10 +6,8 @@ import { useRouter } from 'next/navigation';
 import { IconArrowLeft } from '@tabler/icons-react';
 import type { CountryCode } from 'libphonenumber-js';
 import { formatPhoneLive, toE164 } from '@/lib/utils/phone';
+import { TextField } from '@/components/ui/form';
 
-const INPUT_CLS =
-  'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent bg-white text-gray-900';
-const LABEL_CLS = 'text-gray-400 text-xs uppercase tracking-wide mb-1 block';
 
 // Nombre minimal de chiffres saisis avant d'afficher un état invalide — évite
 // que le champ passe en rouge dès la première touche pressée.
@@ -97,53 +95,45 @@ export function ModifierProfilClient({ fullName, phone, defaultCountry }: Modifi
   return (
     <div className="min-h-screen flex justify-center px-4 py-8 sm:py-10" style={{ backgroundColor: '#f7f8f6' }}>
       <div className="w-full flex flex-col gap-4" style={{ maxWidth: 430 }}>
-        <Link href="/compte" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500">
+        <Link href="/compte" className="inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-semibold text-gray-700">
           <IconArrowLeft size={16} stroke={1.8} />
           Mon compte
         </Link>
 
         <div
-          className="w-full flex flex-col overflow-hidden rounded-[20px]"
-          style={{ boxShadow: '0 8px 30px rgba(20, 40, 30, 0.12)', backgroundColor: 'white' }}
+          className="w-full flex flex-col overflow-hidden rounded-[20px] border border-gray-200 bg-white"
         >
           <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-            <h1 className="font-bold text-gray-900" style={{ fontSize: 16 }}>Informations personnelles</h1>
+            <h1 className="font-display text-lg font-bold text-gray-950">Informations personnelles</h1>
           </div>
 
-          <form onSubmit={handleSubmit} className="px-5 pt-4 pb-6 space-y-3">
-            <div>
-              <label className={LABEL_CLS}>Nom</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={INPUT_CLS}
-                placeholder="Votre nom"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className={LABEL_CLS}>Téléphone</label>
-              <input
-                value={phoneValue}
-                onChange={handlePhoneChange}
-                type="tel"
-                inputMode="tel"
-                className={INPUT_CLS}
-                placeholder={COUNTRY_PLACEHOLDER[defaultCountry] ?? FALLBACK_PLACEHOLDER}
-              />
-              {phoneValidity === 'invalid' && (
-                <p className="text-red-500 mt-1" style={{ fontSize: 11 }}>Numéro de téléphone invalide.</p>
-              )}
-              {phoneValidity === 'valid' && (
-                <p className="text-green-600 mt-1" style={{ fontSize: 11 }}>Numéro valide.</p>
-              )}
-            </div>
-            {error && <p className="text-red-500 text-xs">{error}</p>}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-5 pt-5 pb-6">
+            <TextField
+              label="Nom et prénom"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              placeholder="Ex. : Marie Kamga"
+              autoFocus
+            />
+            <TextField
+              label="Téléphone"
+              value={phoneValue}
+              onChange={handlePhoneChange}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder={`Ex. : ${COUNTRY_PLACEHOLDER[defaultCountry] ?? FALLBACK_PLACEHOLDER}`}
+              hint="Avec l'indicatif du pays. Le livreur peut vous appeler."
+              error={phoneValidity === 'invalid' ? "Vérifiez le numéro de téléphone, avec l'indicatif du pays." : null}
+              message={phoneValidity === 'valid' ? { tone: 'success', text: 'Numéro valide.' } : null}
+            />
+            {error && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800" role="alert">{error}</p>}
 
             <button
               type="submit"
               disabled={isSaving}
-              className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50"
+              className="min-h-[52px] w-full rounded-2xl text-base font-bold text-white disabled:opacity-60"
               style={{ backgroundColor: 'var(--color-primary)' }}
             >
               {isSaving ? 'Enregistrement…' : 'Enregistrer'}

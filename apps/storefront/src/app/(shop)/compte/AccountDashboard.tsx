@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  IconAlertCircle, IconChevronDown, IconChevronRight, IconGift, IconLogout,
+  IconAlertCircle, IconChevronDown, IconCircleCheck, IconChevronRight, IconGift, IconLogout,
   IconMapPin, IconPencil, IconPlus, IconReceipt, IconStar, IconTrash, IconUser, IconUserCircle,
 } from '@tabler/icons-react';
 import type { Icon as TablerIcon } from '@tabler/icons-react';
@@ -14,6 +14,8 @@ import { referralDescription, type AccountOrderSummary, type AccountReferralSumm
 import { getCustomerOrderPresentation } from '@/lib/orders/orderStatus';
 import { formatDate, formatPrice } from '@/lib/utils/format';
 import { LoyaltyCardWidget } from './LoyaltyCardWidget';
+import { countryLabel } from '@/lib/address/addressRules';
+import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
 
 export interface AccountDashboardProps {
   tenant: { name: string; loyaltyEnabled: boolean; currency: string };
@@ -108,8 +110,25 @@ function LatestOrder({ order, error, currency, retry }: {
   );
 }
 
+/** Confirmation « Adresse enregistrée » au retour du formulaire (?adresse=…), lue une fois puis retirée de l'URL. */
+function useAddressSavedNotice(): boolean {
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('adresse')) return;
+    setSaved(true);
+    params.delete('adresse');
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+    const timer = window.setTimeout(() => setSaved(false), 6000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return saved;
+}
+
 function AddressesSection({ addresses, error, retry }: { addresses: Address[]; error: boolean; retry: () => void }) {
   const [primaryAddress, ...otherAddresses] = addresses;
+  const saved = useAddressSavedNotice();
   function addressRow(address: Address) {
     return (
       <Link key={address.id} href={`/compte/adresses/${address.id}`}
@@ -122,7 +141,7 @@ function AddressesSection({ addresses, error, retry }: { addresses: Address[]; e
           </span>
           <span className="mt-1 block break-words text-xs leading-5 text-gray-500">
             {address.line1}{address.line2 ? ', ' + address.line2 : ''}<br />
-            {address.postal_code} {address.city}, {address.country}
+            {address.postal_code} {address.city}, {countryLabel(address.country)}
           </span>
         </span>
         <IconChevronRight size={18} stroke={1.7} aria-hidden="true" className="mt-1 shrink-0 text-gray-400" />
@@ -137,6 +156,9 @@ function AddressesSection({ addresses, error, retry }: { addresses: Address[]; e
           <IconPlus size={18} stroke={1.8} aria-hidden="true" /> Ajouter
         </Link>
       </div>
+      <p role="status" className={saved ? 'mb-2 flex items-center gap-2 rounded-xl bg-green-50 px-3.5 py-2.5 text-sm font-semibold text-green-800' : 'sr-only'}>
+        {saved && <><IconCircleCheck size={18} aria-hidden="true" /> {ADDRESS_COPY.saved}</>}
+      </p>
       {error ? <SectionError message="Vos adresses n’ont pas pu être chargées." retry={retry} /> : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card">
           {primaryAddress ? (

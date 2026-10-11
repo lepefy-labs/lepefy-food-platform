@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { TextField } from '@/components/ui/form';
 import Link from 'next/link';
 import {
   IconAlertTriangle,
@@ -137,21 +138,18 @@ export function AccountDeletionClient({
               pour vérifier votre identité, sans créer de nouveau compte.
             </p>
             <form onSubmit={requestOtp} className="mt-6 space-y-4">
-              <label className="block text-sm font-semibold text-gray-800" htmlFor="deletion-email">
-                Adresse email
-              </label>
-              <div className="relative">
-                <IconMail size={19} aria-hidden="true" className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  id="deletion-email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                />
-              </div>
+              <TextField
+                id="deletion-email"
+                label="Adresse e-mail"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="Ex. : nom@gmail.com"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                leading={<IconMail size={19} />}
+              />
               <button disabled={busy} className="min-h-11 w-full rounded-lg bg-gray-900 px-4 py-2.5 font-semibold text-white disabled:opacity-50">
                 {busy ? 'Envoi…' : 'Recevoir le code'}
               </button>
@@ -166,11 +164,9 @@ export function AccountDeletionClient({
               supprimée à cette étape.
             </p>
             <form onSubmit={verifyOtp} className="mt-6 space-y-4">
-              <label className="block text-sm font-semibold text-gray-800" htmlFor="deletion-token">
-                Code de vérification
-              </label>
-              <input
+              <TextField
                 id="deletion-token"
+                label="Code de vérification"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 pattern="[0-9]{6}"
@@ -178,7 +174,7 @@ export function AccountDeletionClient({
                 required
                 value={token}
                 onChange={(event) => setToken(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-center text-xl tracking-[0.35em] focus:border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                inputClassName="text-center text-xl tracking-[0.35em]"
               />
               <button disabled={busy || token.length !== 6} className="min-h-11 w-full rounded-lg bg-gray-900 px-4 py-2.5 font-semibold text-white disabled:opacity-50">
                 {busy ? 'Vérification…' : 'Vérifier mon identité'}
@@ -205,7 +201,7 @@ export function AccountDeletionClient({
                 type="checkbox"
                 checked={confirmed}
                 onChange={(event) => setConfirmed(event.target.checked)}
-                className="mt-1 h-5 w-5 rounded border-gray-300 text-red-700 focus:ring-red-600"
+                className="sf-checkbox mt-0.5"
               />
               Je comprends que la suppression est définitive et je confirme vouloir supprimer mon compte.
             </label>

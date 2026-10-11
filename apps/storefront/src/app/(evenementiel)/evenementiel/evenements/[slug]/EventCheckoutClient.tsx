@@ -181,7 +181,8 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
     }
   }
 
-  const inputClass = 'min-h-11 w-full rounded-xl border border-black/10 bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_18%,transparent)]';
+  // Champs : apparence commune du storefront (globals.css, Form Readability V2).
+  const inputClass = 'sf-control sf-control--md';
 
   if (soldOut) {
     return <div className="rounded-3xl border border-red-100 bg-white p-7 text-center shadow-sm"><p className="font-display text-2xl font-semibold text-gray-900">Cet événement est complet.</p><p className="mt-2 text-sm text-gray-500">Aucune réservation supplémentaire n’est disponible pour le moment.</p></div>;
@@ -229,10 +230,10 @@ export default function EventCheckoutClient({ event, ticketTypes, tenant, soldOu
           <div className="rounded-[22px] border border-black/[0.06] bg-white p-4 shadow-sm sm:p-6">
             <h2 className="font-display text-2xl font-semibold">Vos coordonnées</h2>
             <div className="mt-4 space-y-2.5 sm:space-y-3">
-              <label className="block text-xs font-medium text-gray-600">Nom complet *<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
-              <label className="block text-xs font-medium text-gray-600">Email *<input value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} type="email" autoComplete="email" className={`${inputClass} mt-1.5 ${emailInvalid ? 'border-red-300' : ''}`} /></label>
+              <label className="block text-sm font-semibold text-gray-900">Nom complet *<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-sm font-semibold text-gray-900">Email *<input value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} type="email" autoComplete="email" className={`${inputClass} mt-1.5 ${emailInvalid ? 'border-red-300' : ''}`} /></label>
               {emailInvalid ? <p className="text-xs text-red-600">Adresse email invalide : vérifiez le format.</p> : <p className="flex items-center gap-1.5 text-[12px] text-gray-500"><IconInfoCircle size={14} />Votre billet sera envoyé à cette adresse.</p>}
-              <label className="block text-xs font-medium text-gray-600">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-sm font-semibold text-gray-900">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
             </div>
             {error && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
             <button onClick={handleContinueToPayment} className="mt-4 hidden min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white lg:block">Continuer</button>

@@ -231,7 +231,8 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
     }
   }
 
-  const inputClass = 'min-h-11 w-full rounded-xl border border-black/10 bg-[#fffdf9] px-3.5 py-2.5 text-sm outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--color-primary)_18%,transparent)]';
+  // Champs : apparence commune du storefront (globals.css, Form Readability V2).
+  const inputClass = 'sf-control sf-control--md';
 
   if (rentalItems.length === 0) {
     return <div className="rounded-3xl border border-black/[0.06] bg-white p-8 text-center text-sm text-gray-500">Aucun article disponible pour le moment.</div>;
@@ -340,12 +341,14 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           {(categories.length > 1 || rentalItems.length > 6) && (
             <div className="mb-4 space-y-3">
               <div className="relative">
-                <IconSearch size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <IconSearch size={18} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input
+                  type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Rechercher un article…"
-                  className="min-h-11 w-full rounded-xl border border-black/10 bg-white py-2.5 pl-10 pr-3.5 text-sm outline-none focus:border-[var(--color-primary)]"
+                  aria-label="Rechercher un article"
+                  className="sf-control sf-control--md sf-control--leading"
                 />
               </div>
               {categories.length > 1 && (
@@ -415,18 +418,18 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-medium text-gray-600 sm:col-span-2">Date de retrait souhaitée<input value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} type="date" className={`${inputClass} mt-1.5`} /></label>
-              <label className="text-xs font-medium text-gray-600">Nom complet<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
-              <label className="text-xs font-medium text-gray-600">Email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" className={`${inputClass} mt-1.5`} /></label>
-              <label className="text-xs font-medium text-gray-600 sm:col-span-2">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-sm font-semibold text-gray-900 sm:col-span-2">Date de retrait souhaitée<input value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} type="date" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-sm font-semibold text-gray-900">Nom complet<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-sm font-semibold text-gray-900">Email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" className={`${inputClass} mt-1.5`} /></label>
+              <label className="block text-sm font-semibold text-gray-900 sm:col-span-2">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
 
               {fulfillmentType === 'delivery' && (
                 <>
-                  <label className="text-xs font-medium text-gray-600">Rue<input value={street} onChange={(e) => setStreet(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="text-xs font-medium text-gray-600">Numéro<input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="text-xs font-medium text-gray-600">Code postal<input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="text-xs font-medium text-gray-600">Ville<input value={city} onChange={(e) => setCity(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="text-xs font-medium text-gray-600 sm:col-span-2">Pays<input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Ex. IT, FR" className={`${inputClass} mt-1.5`} /></label>
+                  <label className="block text-sm font-semibold text-gray-900">Rue<input value={street} onChange={(e) => setStreet(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="block text-sm font-semibold text-gray-900">Numéro<input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="block text-sm font-semibold text-gray-900">Code postal<input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="block text-sm font-semibold text-gray-900">Ville<input value={city} onChange={(e) => setCity(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
+                  <label className="block text-sm font-semibold text-gray-900 sm:col-span-2">Pays<input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Ex. IT, FR" className={`${inputClass} mt-1.5`} /></label>
 
                   <div className="sm:col-span-2">
                     {deliveryQuote.status === 'loading' && <p className="text-xs text-gray-500">Vérification de la disponibilité…</p>}

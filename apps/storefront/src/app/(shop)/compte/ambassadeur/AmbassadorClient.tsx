@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { TextField } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 import { IconCopy, IconShare2, IconCheck, IconAlertCircle } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
@@ -87,22 +88,20 @@ function ProfileForm({ onSaved }: { onSaved: (p: AmbassadorProfile) => void }) {
     }
   }
 
-  const inputClass =
-    'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]';
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Prénom" className={inputClass} required />
-        <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Nom" className={inputClass} required />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+        <TextField label="Prénom" size="md" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ex. : Marie" required />
+        <TextField label="Nom" size="md" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Ex. : Kamga" required />
       </div>
 
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => setPaymentMethod('IBAN')}
-          className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${
-            paymentMethod === 'IBAN' ? 'border-[var(--color-primary)] text-[var(--color-primary)]' : 'border-gray-200 text-gray-600'
+          aria-pressed={paymentMethod === 'IBAN'}
+          className={`min-h-12 flex-1 rounded-xl border-[1.5px] text-sm font-semibold ${
+            paymentMethod === 'IBAN' ? 'border-[var(--color-primary)] text-[color:var(--color-primary-dark)] bg-[color-mix(in_srgb,var(--color-primary)_6%,white)]' : 'border-[color:var(--field-border)] text-gray-800'
           }`}
         >
           Virement (IBAN)
@@ -110,8 +109,9 @@ function ProfileForm({ onSaved }: { onSaved: (p: AmbassadorProfile) => void }) {
         <button
           type="button"
           onClick={() => setPaymentMethod('PAYPAL')}
-          className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${
-            paymentMethod === 'PAYPAL' ? 'border-[var(--color-primary)] text-[var(--color-primary)]' : 'border-gray-200 text-gray-600'
+          aria-pressed={paymentMethod === 'PAYPAL'}
+          className={`min-h-12 flex-1 rounded-xl border-[1.5px] text-sm font-semibold ${
+            paymentMethod === 'PAYPAL' ? 'border-[var(--color-primary)] text-[color:var(--color-primary-dark)] bg-[color-mix(in_srgb,var(--color-primary)_6%,white)]' : 'border-[color:var(--field-border)] text-gray-800'
           }`}
         >
           PayPal
@@ -119,25 +119,32 @@ function ProfileForm({ onSaved }: { onSaved: (p: AmbassadorProfile) => void }) {
       </div>
 
       {paymentMethod === 'IBAN' ? (
-        <input
+        <TextField
+          label="IBAN"
+          size="md"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
           value={iban}
           onChange={(e) => setIban(e.target.value)}
-          placeholder="IBAN"
-          className={inputClass}
+          placeholder="Ex. : IT60 X054 2811 1010 0000 0123 456"
           required
         />
       ) : (
-        <input
+        <TextField
+          label="E-mail PayPal"
+          size="md"
           type="email"
+          inputMode="email"
+          autoComplete="email"
           value={paypalEmail}
           onChange={(e) => setPaypalEmail(e.target.value)}
-          placeholder="Email PayPal"
-          className={inputClass}
+          placeholder="Ex. : nom@gmail.com"
           required
         />
       )}
 
-      {error && <p className="text-red-500 text-xs">{error}</p>}
+      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">{error}</p>}
 
       <button
         type="submit"

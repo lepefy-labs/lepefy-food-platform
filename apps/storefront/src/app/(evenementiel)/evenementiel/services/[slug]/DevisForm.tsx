@@ -32,7 +32,8 @@ export default function DevisForm({ serviceSlug, selectedFormat, selectionVersio
     if (error) errorRef.current?.focus();
   }, [error]);
 
-  const inputClass = 'mt-1.5 w-full min-h-11 rounded-xl border border-black/10 bg-[#fffdf9] px-3.5 py-2.5 text-base text-gray-900 outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)] disabled:opacity-60';
+  // Champs : apparence commune du storefront (globals.css, Form Readability V2).
+  const inputClass = 'sf-control sf-control--md mt-1.5';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,19 +90,19 @@ export default function DevisForm({ serviceSlug, selectedFormat, selectionVersio
       {selectedFormat && <p className="mt-3 rounded-xl bg-[#f7f3eb] px-3 py-2 text-sm font-medium">{selectedFormat}</p>}
 
       <div className="mt-4 grid gap-3">
-        <label htmlFor="catering-name" className="text-xs font-medium text-gray-700">Nom complet *
+        <label htmlFor="catering-name" className="block text-sm font-semibold text-gray-900">Nom complet *
           <input id="catering-name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" disabled={isSubmitting} className={inputClass} />
         </label>
-        <label htmlFor="catering-email" className="text-xs font-medium text-gray-700">Email *
+        <label htmlFor="catering-email" className="block text-sm font-semibold text-gray-900">Email *
           <input id="catering-email" value={email} onChange={(e) => setEmail(e.target.value)} required type="email" autoComplete="email" disabled={isSubmitting} className={inputClass} />
         </label>
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label htmlFor="catering-date" className="min-w-0 text-xs font-medium text-gray-700">Date souhaitée <span className="font-normal text-gray-500">(facultatif)</span>
+        <label htmlFor="catering-date" className="block min-w-0 text-sm font-semibold text-gray-900">Date souhaitée <span className="font-normal text-gray-700">(facultatif)</span>
           <input id="catering-date" value={date} onChange={(e) => setDate(e.target.value)} type="date" disabled={isSubmitting} className={inputClass} />
         </label>
-        <label htmlFor="catering-guests" className="min-w-0 text-xs font-medium text-gray-700">Nombre d’invités <span className="font-normal text-gray-500">(facultatif)</span>
+        <label htmlFor="catering-guests" className="block min-w-0 text-sm font-semibold text-gray-900">Nombre d’invités <span className="font-normal text-gray-700">(facultatif)</span>
           <input id="catering-guests" value={guests} onChange={(e) => setGuests(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Ex. 30" disabled={isSubmitting} className={inputClass} />
         </label>
       </div>
@@ -111,10 +112,10 @@ export default function DevisForm({ serviceSlug, selectedFormat, selectionVersio
         <IconChevronDown size={18} className={detailsOpen ? 'rotate-180' : ''} />
       </button>
       <div id="catering-details" hidden={!detailsOpen} className="space-y-3">
-        <label htmlFor="catering-phone" className="block text-xs font-medium text-gray-700">Téléphone <span className="font-normal text-gray-500">(facultatif)</span>
+        <label htmlFor="catering-phone" className="block text-sm font-semibold text-gray-900">Téléphone <span className="font-normal text-gray-700">(facultatif)</span>
           <input id="catering-phone" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" disabled={isSubmitting} className={inputClass} />
         </label>
-        <label htmlFor="catering-message" className="block text-xs font-medium text-gray-700">Votre projet <span className="font-normal text-gray-500">(facultatif)</span>
+        <label htmlFor="catering-message" className="block text-sm font-semibold text-gray-900">Votre projet <span className="font-normal text-gray-700">(facultatif)</span>
           <textarea id="catering-message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Type de réception, préférences culinaires, besoins particuliers…" rows={3} disabled={isSubmitting} className={inputClass + ' resize-y'} />
         </label>
       </div>

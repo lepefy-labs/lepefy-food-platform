@@ -12,6 +12,7 @@ import { revalidateSessionShipping, verifyCheckoutShipping } from '@/lib/shippin
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
+import { normalizeShippingAddress } from '@/lib/address/addressRules';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
 export const dynamic = 'force-dynamic';
@@ -254,7 +255,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const items: CartItemPayload[] = body.items ? validated.items : session.items;
 
     const fulfillmentType = body.fulfillmentType ?? session.fulfillment_type;
-    const shippingAddress = body.shippingAddress !== undefined ? body.shippingAddress : session.shipping_address;
+    let shippingAddress: ShippingAddress | null = session.shipping_address;
+    if (body.shippingAddress !== undefined) {
+      // Nouvelle adresse envoyée : même contrôle que /api/checkout.
+      if (fulfillmentType === 'pickup' || body.shippingAddress === null) {
+        shippingAddress = null;
+      } else {
+        const normalizedAddress = normalizeShippingAddress(body.shippingAddress);
+        if (!normalizedAddress.ok) {
+          return NextResponse.json(
+            { error: normalizedAddress.error, code: 'ADDRESS_INVALID', field: normalizedAddress.field },
+            { status: 400 },
+          );
+        }
+        shippingAddress = normalizedAddress.address;
+      }
+    }
     const shippingDetails = body.shippingDetails !== undefined ? body.shippingDetails : session.shipping_details;
     const subtotal = parseFloat(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
     let shippingTotal = session.shipping_total;

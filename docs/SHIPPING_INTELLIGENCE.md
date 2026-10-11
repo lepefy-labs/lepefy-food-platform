@@ -2,8 +2,8 @@
 
 > **Modulo:** Admin → Livraison / Shipping Intelligence
 > **Repository:** `lepefy-labs/lepefy-food-platform`
-> **Base codice verificata:** `main@72f06d0e3f69fd55bdbfc4cb2cf8b9ab72e86ce9`
-> **Ultima verifica:** 10 ottobre 2026
+> **Base codice verificata:** `main@4d4391467f03d0ab5f6b2b01e9bc65f8be6f377a`
+> **Ultima verifica:** 11 ottobre 2026
 > **Schema di base:** `supabase/migrations/119_shipping_intelligence_foundation.sql` + `120_shipping_postal_code_index.sql` (V1E senza migration) + `123_packaging_profile_carton_suggestion.sql` + `124_shipping_tariff_versions.sql` (V1F: versioni tariffarie, shadow mode) + `125_shipping_tariff_activation.sql` (V1G: tariffazione commerciale) + `151_shipping_shipment_creation.sql` + `152_shipping_automation_content.sql` (brouillons d'expédition, §2.4)
 >
 > Dossier per il futuro forfait nel checkout (dati, griglia, design): `docs/SHIPPING_FLAT_RATE_CHECKOUT.md`.
@@ -596,6 +596,10 @@ L'interfaccia mostra «N code(s) postal(aux) connu(s) pour cette commune — exh
 
 In caso di mancata risoluzione l'utente continua con il CAP manuale. Non considerare il servizio geografico autorevole per pricing o checkout. Le città GeoNames suddivise per arrondissement (es. `Lyon 01`…`Lyon 09`, `Paris 01`…) sono communes distinte nell'indice e non vengono raggruppate automaticamente.
 
+### 7.5 Lettore pubblico: suggerimenti CAP ↔ città del form indirizzo cliente
+
+`GET /api/address/postal-lookup` (storefront, senza login) legge lo stesso indice **in sola lettura** per il form indirizzo cliente (`components/address/CustomerAddressForm.tsx`): `?country=&city=` (prefisso ≥ 3 caratteri, max 1 000 righe, ultima commune scartata se il limite è raggiunto) → città + provincia + CAP; `?country=&postalCode=` → città. Pure function `lib/address/postalLookup.ts`, che riusa `groupByAdministration` (homonimi mai fusi) e `isGenericItalianPostalCode` (CAP generici pre-riforma esclusi); oltre 30 CAP la lista è vuota e il cliente scrive il proprio. Paesi limitati a `DELIVERY_COUNTRIES` (IT/FR/BE/DE/CH), cache CDN 24 h (risposta identica per tutti i tenant), errore o indice vuoto ⇒ `cities: []` e il form resta utilizzabile. Risponde solo con dati geografici pubblici (nessuna zona tenant, nessun costo, nessuna regola di consegna): una città conosciuta non è una destinazione servita, la disponibilità resta decisa da `/api/shipping/quote`. Nessuna scrittura, nessun nuovo grant: lettura via service role server-side come il Laboratoire.
+
 ---
 
 ## 8. Risoluzione zone automatica
@@ -1110,6 +1114,7 @@ Regole obbligatorie:
 - mutazioni del tenant (tariffe, imballaggi, zone, forfait) usano `shipping.manage`;
 - Laboratoire, campagne, test rapido, import CAP e diagnostica Packlink sono riservati al `platform_owner` (`requirePlatformOwner()`), non figurano nella mappa `adminApiPermissions.ts` e sono verificati da `tests/unit/shippingPlatformTools.spec.ts`;
 - il worker interno usa service-role bearer;
+- unico lettore pubblico: `GET /api/address/postal-lookup` (§7.5), solo l'indice GeoNames (città, provincia, CAP), mai tabelle con costi, zone o osservazioni;
 - non loggare secret, URL sensibili o payload provider raw;
 - non indebolire RLS/grant esistenti;
 - brouillons d'expédition: creazione sotto `orders.manage`, réglage sotto `shipping.view`/`shipping.manage`; chiave Packlink solo server-side (mai al browser, nei log, nelle risposte o in `shipping_creation_error`); ogni operazione filtra l'ordine per `tenant_id` del deploy e il tick usa il `tenant_id` della riga (§2.4);
@@ -1134,11 +1139,11 @@ Packlink rimane la fonte autorevole per il prezzo operativo corrente.
 
 ### Indice GeoNames interno (`shipping_postal_code_index`)
 
-Fonte primaria per ricerca commune e risoluzione CAP (import statico CC BY 4.0, §7). Questo modulo lo legge soltanto: nessun reimport o sovrascrittura massiva.
+Fonte primaria per ricerca commune e risoluzione CAP (import statico CC BY 4.0, §7). Questo modulo lo legge soltanto: nessun reimport o sovrascrittura massiva. Letto anche dal form indirizzo cliente tramite `GET /api/address/postal-lookup` (§7.5).
 
 ### Nominatim / OpenStreetMap
 
-Repli per la ricerca città quando l'indice non contiene il paese/nome; fornisce codici ISO 3166-2 riconciliati con GeoNames secondo §7.1.
+Repli per la ricerca città quando l'indice non contiene il paese/nome; fornisce codici ISO 3166-2 riconciliati con GeoNames secondo §7.1. Solo ricerche puntuali dell'admin: la «Recherche rapide» del checkout usa Photon (`/api/geocode/search`), perché la policy di Nominatim vieta l'autocompletamento.
 
 Non viene usato come fonte del prezzo.
 
@@ -1347,6 +1352,8 @@ La V1E non introduce migration: i nuovi campi vivono nel JSON `scenario_matrix` 
 ### Shipping core correlato
 
 ```text
+apps/storefront/src/app/api/address/postal-lookup/route.ts  (lettore pubblico dell'indice GeoNames per il form indirizzo cliente, §7.5)
+apps/storefront/src/lib/address/postalLookup.ts             (raggruppamento puro: groupByAdministration + esclusione CAP generici IT)
 apps/storefront/src/lib/shipping/calculateShipping.ts
 apps/storefront/src/lib/shipping/resolveCountryRule.ts
 apps/storefront/src/lib/shipping/packlinkShipmentList.ts   (elenco Packlink read-only: fetch limitato, riepilogo, redazione, esiti)

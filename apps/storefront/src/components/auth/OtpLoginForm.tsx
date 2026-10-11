@@ -4,9 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useTenant } from '@/providers/TenantProvider';
 import { marketingConsentLabel } from '@/lib/legal/consentCopy';
-
-const INPUT_CLS =
-  'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent';
+import { FieldMessage, TextField } from '@/components/ui/form';
 
 const RESEND_DELAY_S = 60;
 
@@ -127,16 +125,19 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
+    <div className="rounded-2xl border border-gray-200 bg-white p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
       {step === 'email' ? (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-700">Connectez-vous pour gagner des points</p>
-          <input
+          <p className="text-sm font-semibold text-gray-800">Connectez-vous pour gagner des points</p>
+          <TextField
+            label="Votre e-mail"
+            hint="Nous vous envoyons un code à 6 chiffres."
+            error={error}
             type="email"
             inputMode="email"
             autoComplete="email"
-            placeholder="Votre e-mail"
-            aria-label="Votre e-mail"
+            enterKeyHint="send"
+            placeholder="Ex. : nom@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => {
@@ -145,15 +146,13 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
               e.stopPropagation();
               void sendCode();
             }}
-            className={INPUT_CLS}
             required
           />
-          {error && <p className="text-red-500 text-xs">{error}</p>}
           <button
             type="button"
             onClick={() => void sendCode()}
             disabled={isSending || !email}
-            className="w-full py-2.5 rounded-xl font-semibold text-white text-sm disabled:opacity-50 transition-opacity"
+            className="min-h-12 w-full rounded-xl text-base font-bold text-white disabled:opacity-60 transition-opacity"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
             {isSending ? 'Envoi…' : 'Recevoir mon code'}
@@ -161,17 +160,17 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-gray-600">
-            Code envoyé à <span className="font-medium text-gray-800">{email}</span>
+          <p className="text-sm text-gray-700" id="otp-code-help">
+            Code envoyé à <span className="font-semibold text-gray-950">{email}</span>. Écrivez les 6 chiffres.
           </p>
           {isNewCustomer && (
             <div className="space-y-2 border-t border-gray-100 pt-3">
-              <label className="flex items-start gap-2 text-xs text-gray-600">
+              <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800">
                 <input
                   type="checkbox"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0"
+                  className="sf-checkbox mt-0.5"
                 />
                 <span>
                   J&apos;accepte les{' '}
@@ -185,41 +184,43 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
                   .
                 </span>
               </label>
-              <label className="flex items-start gap-2 text-xs text-gray-600">
+              <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800">
                 <input
                   type="checkbox"
                   checked={marketingOptIn}
                   onChange={(e) => setMarketingOptIn(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0"
+                  className="sf-checkbox mt-0.5"
                 />
                 <span>{marketingConsentLabel(tenant.name)}</span>
               </label>
             </div>
           )}
 
-          <div className="flex gap-2 justify-between" onPaste={handlePaste}>
+          <div className="grid grid-cols-6 gap-2" onPaste={handlePaste} role="group" aria-labelledby="otp-code-help">
             {code.map((digit, i) => (
               <input
                 key={i}
                 ref={(el) => { cellRefs.current[i] = el; }}
                 type="text"
                 inputMode="numeric"
+                autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                aria-label={`Chiffre ${i + 1} sur 6`}
                 maxLength={1}
                 value={digit}
                 onChange={(e) => handleCellChange(i, e.target.value)}
                 onKeyDown={(e) => handleCellKeyDown(i, e)}
-                className="w-10 h-12 text-center text-lg font-semibold border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent disabled:opacity-50"
+                className="sf-control px-0 text-center text-xl font-semibold"
                 disabled={isVerifying || (isNewCustomer && !termsAccepted)}
               />
             ))}
           </div>
-          {error && <p className="text-red-500 text-xs">{error}</p>}
+          {error && <FieldMessage tone="error">{error}</FieldMessage>}
           <button
             type="button"
             onClick={() => void sendCode()}
             disabled={resendIn > 0 || isSending}
-            className="text-xs text-gray-400 disabled:opacity-60"
-            style={resendIn === 0 ? { color: 'var(--color-primary)' } : undefined}
+            className="min-h-11 text-sm font-semibold text-gray-700 disabled:opacity-80"
+            style={resendIn === 0 ? { color: 'var(--color-primary-dark)' } : undefined}
           >
             {resendIn > 0 ? `Renvoyer le code (${resendIn}s)` : 'Renvoyer le code'}
           </button>

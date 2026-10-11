@@ -42,6 +42,26 @@
      (H1/H2, eyebrow, cartellino signature). */
   --font-body: var(--font-inter), system-ui, sans-serif;
   --font-display: var(--font-bricolage), var(--font-body);
+
+  /* Champs de formulaire du storefront (Form Readability V2) — contrastes
+     WCAG 2.2 AA sur blanc : bordure 3,97:1, placeholder 4,49:1 sur le fond du
+     champ, libellé 17:1, erreur 6,5:1. Seuls le focus et l'anneau dérivent du
+     tenant ; les états restent des couleurs de plateforme. */
+  --field-bg: #F6F7F9;
+  --field-bg-focus: #FFFFFF;
+  --field-border: #7A808C;
+  --field-border-hover: #5F6673;
+  --field-ink: #111827;
+  --field-placeholder: #6B7280;
+  --field-label: #111827;
+  --field-hint: #4B5563;
+  --field-danger: #B42318;
+  --field-danger-bg: #FEF3F2;
+  --field-success: #15803D;
+  --field-info: #1F3B5C;
+  --field-disabled-bg: #EEF0F3;
+  --field-disabled-ink: #6B7280;
+  --field-ring: color-mix(in srgb, var(--color-primary) 22%, transparent);
 }
 
 /* ── Admin dark mode ──────────────────────────────────────────────────────────
@@ -74,6 +94,61 @@
     outline-offset: 2px;
     border-radius: 4px;
   }
+}
+
+/* ── Champs de formulaire du storefront (components/ui/form) ──────────────────
+   Une seule apparence pour tous les formulaires clients. 16 px minimum : en
+   dessous, Safari iOS zoome sur le champ au focus. L'état n'est jamais porté
+   par la seule couleur : bordure plus épaisse + message avec icône. */
+@layer components {
+  .sf-control {
+    display: block;
+    width: 100%;
+    min-height: 52px;
+    border: 1.5px solid var(--field-border);
+    border-radius: var(--radius-md);
+    background-color: var(--field-bg);
+    color: var(--field-ink);
+    font-size: 16px;
+    line-height: 1.4;
+    padding: 0.75rem 0.875rem;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  }
+  .sf-control--md { min-height: 48px; padding-block: 0.625rem; }
+  .sf-control::placeholder { color: var(--field-placeholder); opacity: 1; }
+  .sf-control:hover:not(:disabled):not(:focus) { border-color: var(--field-border-hover); }
+  .sf-control:focus,
+  .sf-control:focus-visible {
+    outline: none;
+    border-radius: var(--radius-md);
+    background-color: var(--field-bg-focus);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary), 0 0 0 5px var(--field-ring);
+  }
+  .sf-control[aria-invalid='true'] {
+    border-color: var(--field-danger);
+    background-color: var(--field-danger-bg);
+    box-shadow: 0 0 0 1px var(--field-danger);
+  }
+  .sf-control[aria-invalid='true']:focus {
+    background-color: var(--field-bg-focus);
+    box-shadow: 0 0 0 1px var(--field-danger), 0 0 0 5px color-mix(in srgb, var(--field-danger) 18%, transparent);
+  }
+  .sf-control:disabled,
+  .sf-control[readonly] {
+    background-color: var(--field-disabled-bg);
+    border-style: dashed;
+    color: var(--field-disabled-ink);
+    cursor: not-allowed;
+  }
+  .sf-control:disabled { -webkit-text-fill-color: var(--field-disabled-ink); }
+  select.sf-control { appearance: none; padding-right: 2.75rem; }
+  textarea.sf-control { min-height: 7rem; resize: vertical; }
+  .sf-control--leading { padding-left: 2.75rem; }
+  .sf-control--trailing { padding-right: 2.75rem; }
+  .sf-label { display: block; font-size: 15px; font-weight: 600; line-height: 1.35; color: var(--field-label); }
+  .sf-hint { font-size: 13px; line-height: 1.45; color: var(--field-hint); }
+  .sf-checkbox { width: 22px; height: 22px; flex: none; accent-color: var(--color-primary); }
 }
 
 /* ── Impression navigateur (pages publiques imprimables, ex. confirmation Événementiel).

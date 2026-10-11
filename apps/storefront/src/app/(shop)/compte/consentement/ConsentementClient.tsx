@@ -57,12 +57,12 @@ export function ConsentementClient({ tenantName, showMarketingCheckbox, returnPa
       </div>
 
       {showMarketingCheckbox && (
-        <label className="flex items-start gap-2 text-xs text-gray-600">
+        <label className="flex min-h-11 items-start gap-3 text-sm text-gray-800">
           <input
             type="checkbox"
             checked={marketingOptIn}
             onChange={(e) => setMarketingOptIn(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0"
+            className="sf-checkbox mt-0.5"
           />
           <span>{marketingConsentLabel(tenantName)}</span>
         </label>

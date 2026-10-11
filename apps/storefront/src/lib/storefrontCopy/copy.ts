@@ -61,3 +61,10 @@ export const FORM_COPY = {
   emailInvalid: 'Vérifiez votre e-mail. Exemple : nom@gmail.com',
   phoneRequired: "Écrivez votre numéro de téléphone, avec l'indicatif (ex. +33).",
 } as const;
+
+/** « Il manque 2 informations. » */
+export function missingFieldsTitle(count: number): string {
+  return count > 1 ? `Il manque ${count} informations.` : 'Il manque une information.';
+}
+
+export const ERROR_SUMMARY_LEAD = 'Complétez les champs en rouge :';
