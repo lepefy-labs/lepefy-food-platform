@@ -60,6 +60,10 @@ test.describe('format de vente', () => {
     const kilo = resolveSellingFormat({ net_quantity_display: '1 kg' });
     expect(unitPhrase(kilo)).toBe('le kilo');
 
+    expect(unitPhrase(resolveSellingFormat({ net_quantity_display: '1000 g' }))).toBe('le kilo');
+    expect(unitPhrase(resolveSellingFormat({ net_quantity_display: '100 cl' }))).toBe('le litre');
+    expect(unitPhrase(resolveSellingFormat({ net_quantity_display: '1500 g' }))).toBe('les 1,5 kg');
+    expect(unitPhrase(resolveSellingFormat({ net_quantity_display: '2 L' }))).toBe('les 2 L');
     const can = resolveSellingFormat({ net_quantity_display: '33 cl' });
     expect(norm(referencePriceLine(1.4, can))).toBe('soit 4,24 € le litre');
 
@@ -206,3 +210,4 @@ test.describe('garde-fous du storefront', () => {
     });
   }
 });
+

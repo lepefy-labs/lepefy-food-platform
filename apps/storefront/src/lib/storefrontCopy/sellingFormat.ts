@@ -62,6 +62,24 @@ function validPackCount(raw: number | null | undefined): number | null {
   return typeof raw === 'number' && Number.isInteger(raw) && raw >= 2 ? raw : null;
 }
 
+/** Copie des seuls champs de format (ajout au panier, adaptateurs de cartes). */
+export function pickSellingFormatFields(source: SellingFormatSource): {
+  net_quantity_display: string | null;
+  sale_unit: string | null;
+  net_content_value: number | null;
+  net_content_unit: string | null;
+  pack_count: number | null;
+} {
+  const value = source.net_content_value == null ? null : Number(source.net_content_value);
+  return {
+    net_quantity_display: source.net_quantity_display ?? null,
+    sale_unit: source.sale_unit ?? null,
+    net_content_value: value != null && Number.isFinite(value) ? value : null,
+    net_content_unit: source.net_content_unit ?? null,
+    pack_count: source.pack_count ?? null,
+  };
+}
+
 export function resolveSellingFormat(source: SellingFormatSource | null | undefined): SellingFormat {
   if (!source) return { source: 'none', unit: null, content: null, packCount: null };
   const unit = getSaleUnit(source.sale_unit);
@@ -82,13 +100,23 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 3 }).format(value);
 }
 
+/** 1000 g → 1 kg, 1500 ml → 1,5 L, 100 cl → 1 L : unité la plus lisible, même quantité. */
+function readableContent(content: NetContent): NetContent {
+  if (content.unit === 'g' && content.value >= 1000) return { value: content.value / 1000, unit: 'kg' };
+  if (content.unit === 'ml' && content.value >= 1000) return { value: content.value / 1000, unit: 'l' };
+  if (content.unit === 'cl' && content.value >= 100) return { value: content.value / 100, unit: 'l' };
+  return content;
+}
+
 /** « 500 g », « 1,5 kg », « 33 cl », « 1 L ». */
 export function formatContent(content: NetContent): string {
-  return `${formatNumber(content.value)} ${content.unit === 'l' ? 'L' : content.unit}`;
+  const readable = readableContent(content);
+  return `${formatNumber(readable.value)} ${readable.unit === 'l' ? 'L' : readable.unit}`;
 }
 
 function isExactlyOneBaseUnit(content: NetContent): boolean {
-  return content.value === 1 && (content.unit === 'kg' || content.unit === 'l');
+  const readable = readableContent(content);
+  return readable.value === 1 && (readable.unit === 'kg' || readable.unit === 'l');
 }
 
 /** Complément du prix : « le paquet de 500 g », « les 500 g », « le kilo », « l'article ». */
@@ -103,7 +131,7 @@ export function unitPhrase(format: SellingFormat): string {
     return base;
   }
   if (content) {
-    if (isExactlyOneBaseUnit(content)) return content.unit === 'kg' ? 'le kilo' : 'le litre';
+    if (isExactlyOneBaseUnit(content)) return readableContent(content).unit === 'kg' ? 'le kilo' : 'le litre';
     return `les ${formatContent(content)}`;
   }
   return "l'article";

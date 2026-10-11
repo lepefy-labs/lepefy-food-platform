@@ -160,7 +160,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
             <TenantLogo variant="header" priority className="!max-w-[40vw] md:!max-w-none" />
           </Link>
 
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex min-w-0 items-center gap-4">
             {reviewsAvailable && (
               <Link href="/avis" aria-label="Voir les avis clients" aria-current={pathname === '/avis' ? 'page' : undefined}
                 className="absolute right-16 flex h-11 w-11 flex-col items-center justify-center rounded-lg text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] md:hidden">
@@ -183,7 +183,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
               )}
             </Link>
 
-            <nav className="hidden items-center gap-6 md:flex" aria-label="Navigation principale">
+            <nav className="hidden items-center gap-4 md:flex lg:gap-6" aria-label="Navigation principale">
               <Link href="/" aria-current={isActive('/') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Catalogue</Link>
               <Link href="/accueil" aria-current={isActive('/accueil') ? 'page' : undefined} className={`text-sm font-medium transition-colors ${isActive('/accueil') ? 'text-[var(--color-primary)]' : 'text-gray-700 hover:text-gray-900'}`}>Découvrir</Link>
               {reviewsAvailable && <Link href="/avis" aria-current={pathname === '/avis' ? 'page' : undefined} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"><IconStar size={19} stroke={2} className="text-amber-500" aria-hidden="true" />Avis</Link>}
