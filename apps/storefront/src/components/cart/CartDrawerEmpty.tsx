@@ -4,7 +4,7 @@ interface CartDrawerEmptyProps {
   onNavigate: () => void;
 }
 
-// Copie identique à l'état vide de /cart (CartClient.tsx, non touché) —
+// Même état vide que la page /cart (CartPurchaseClient.tsx, via CartEmpty) —
 // réutilisation volontaire du texte déjà validé plutôt qu'une nouvelle
 // formulation : cohérence entre le drawer et la page panier complète.
 export function CartDrawerEmpty({ onNavigate }: CartDrawerEmptyProps) {

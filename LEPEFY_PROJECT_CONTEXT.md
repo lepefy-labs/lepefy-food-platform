@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 11 ottobre 2026 — **v7.23 Current-State Snapshot** (Storefront in francese semplice: formato di vendita, regole di quantità e disponibilità da un modulo condiviso `lib/storefrontCopy/`, formato di vendita strutturato (migration 154, sezione «Format de vente» dell'editor), nessun cambio di prezzi, regole o checkout; base `main` @ `4e53d5db`. Precedente v7.22: Journal d'activité, migration 153 applicata il 10/10/2026)
+> **Aggiornato:** 11 ottobre 2026 — **v7.24 Current-State Snapshot** (Francese semplice anche fuori dallo storefront: email «Commande confirmée» con elenco articoli e formato, card e prompt di Nala con prezzo + formato e senza peso logistico né stock chiffré, stato ordine WhatsApp nella lingua del cliente, pre-controllo quantità anche in `CheckoutFlow`, rimossi `CartClient.tsx`/`CheckoutForm.tsx`/`CheckoutOrderSummary.tsx`; base `main` @ `4e43986f`. Precedente v7.23: storefront in francese semplice, migration 154)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -360,7 +360,13 @@ Testi e formati visti dal cliente vengono da un solo modulo puro, condiviso da c
 
 **Format de vente (admin)**: sezione dell'editor prodotto (unità di vente, contenuto netto + unità, elementi per lotto) con anteprima della frase cliente; validazione unica `lib/catalog/sellingFormatInput.ts` per editor e API create/PATCH, più i CHECK della 154. Con il formato strutturato la vecchia regex sul nome («carton de N paquets (M bâtons)») non è più usata dalla card. `pnpm catalog:selling-format:report [--tenant]` (sola lettura) elenca per tenant i prodotti senza formato strutturato e la frase mostrata oggi (11/10/2026, Chloe Food: 157 attivi, 47 con quantità netta leggibile, 110 «l'article»).
 
-`ProductPrice` (`components/catalog/`) è il rendering unico del prezzo su card, scheda e conferma. La proiezione card (`PRODUCT_CARD_BASE_COLUMNS` via `PRODUCT_SELLING_FORMAT_COLUMNS`) e il carrello server includono i campi di formato; nel tipo `CartItem.product` sono facoltativi (i carrelli salvati prima restano validi e mostrano il ripiego). Storefront: testo minimo 12 px nel percorso d'acquisto, «vous» ovunque (login e account inclusi); `tests/unit/storefrontCopy.spec.ts` blocca «/ unité», testo sotto 12 px e le vecchie etichette tecniche nei componenti del percorso. Paese preselezionato nel checkout = `tenant.country` se servito.
+**Fuori dallo storefront (stesso modulo)**:
+- **Email «Commande confirmée»** (`orderConfirmedEmail`): elenco articoli «3 sachets de 150 g · 3,00 € le sachet» (`orderLineDetail`) e riepilogo con le parole del checkout (Prix des produits, Avantage ambassadeur se presente, Prix de livraison, Total payé, TVA incluse). Nome, quantità e prezzo vengono dalla sessione/ordine; il formato è letto dai prodotti del tenant al momento dell'invio (`lib/notifications/orderEmailItems.ts`, mai bloccante: senza formato → «l'article»). Il totale arriva dall'ordine, mai ricalcolato. Le stesse righe sono nell'anteprima admin dei template.
+- **Nala** (sito e WhatsApp): le righe prodotto del prompt sono costruite da `lib/ai/nalaPromptProducts.ts` + `promptProductLine` (`chatbox.ts`): prezzo + formato, «disponible / pas disponible (pour le moment)», minimo e gruppo da mescolare; mai `weight_grams` né lo stock in cifre, con regole esplicite contro pesi/volumi inventati. Le card Nala (prodotto e Cart Builder) usano `describePrice`, `orderLineDetail` e i testi di gruppo del carrello; il formato (`sellingFormat`) viaggia nei contratti Nala fino alla riga del carrello.
+- **WhatsApp**: `orderStageLabel` traduce lo stato ordine in it/en (il francese resta quello del portale).
+- **Pre-controllo acquisto**: `lib/cart/useCartPurchaseGate.ts`, condiviso da `/cart` e `CheckoutFlow` (il checkout attivo); il server resta l'autorità.
+
+`ProductPrice` (`components/catalog/`) è il rendering unico del prezzo su card, scheda e conferma. La proiezione card (`PRODUCT_CARD_BASE_COLUMNS` via `PRODUCT_SELLING_FORMAT_COLUMNS`) e il carrello server includono i campi di formato; nel tipo `CartItem.product` sono facoltativi (i carrelli salvati prima restano validi e mostrano il ripiego). Storefront: testo minimo 12 px nel percorso d'acquisto, «vous» ovunque (login e account inclusi); `tests/unit/storefrontCopy.spec.ts` blocca «/ unité», testo sotto 12 px e le vecchie etichette tecniche nei componenti del percorso; `storefrontCopyChannels.spec.ts` copre email, prompt e card Nala, WhatsApp e il pre-controllo del checkout. Paese preselezionato nel checkout = `tenant.country` se servito.
 
 ### Storefront routing, Catalogue, navigation e PWA
 
@@ -1272,7 +1278,6 @@ supabase/migrations/*
 
 - collisione storica prefisso migration `071`: non rinominare retroattivamente;
 - telefono checkout non uniformemente server-enforced;
-- legacy `CheckoutForm.tsx`: verificare caller prima della rimozione;
 - il webhook Stripe storefront (`payment_intent.succeeded` senza `metadata.type`) crea ancora l'ordine inline invece di usare la RPC `convert_checkout_session_to_order`: due implementazioni di scrittura ordine restano (idempotenza garantita dall'indice unico sul PaymentIntent);
 - ordini assistiti: nessuna riserva di stock durante la validità del link (per design) e indirizzi inseriti dall'operatore non salvati nella rubrica cliente;
 - abandoned-checkout outbound automatico non abilitato senza policy consenso/timing;

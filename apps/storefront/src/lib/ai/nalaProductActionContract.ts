@@ -1,4 +1,5 @@
 import type { ProductRelationshipType } from '@/lib/catalog/productRelationships';
+import { pickSellingFormatFields, type SellingFormatFields, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
 
 export const NALA_PRODUCT_ACTION_MAX = 1;
 export const NALA_PRODUCT_ACTION_MIN_SIMILARITY = 0.4;
@@ -32,6 +33,8 @@ export interface NalaProductAction {
     storageType: 'dry' | 'fresh' | 'frozen' | null;
     minOrderQuantity: number;
     orderQuantityStep: number;
+    /** Format de vente (migration 154) ; absent des anciens tours persistés. */
+    sellingFormat?: SellingFormatFields;
   };
   /** Groupe combinable actif, résolu côté serveur; facultatif pour anciens tours persistés. */
   quantityGroup?: { id: string; name: string; minQuantity: number; quantityStep: number };
@@ -48,7 +51,7 @@ export interface NalaProductActionCandidate {
   relationshipType: NalaActionRelationshipType;
 }
 
-export interface NalaCanonicalProduct {
+export interface NalaCanonicalProduct extends SellingFormatSource {
   id: string;
   tenant_id: string;
   name: string;
@@ -237,6 +240,7 @@ export function buildValidatedNalaProductActions(params: {
         storageType: product.storage_type,
         minOrderQuantity,
         orderQuantityStep,
+        sellingFormat: pickSellingFormatFields(product),
       },
       quantity,
       quantityGroup: activeGroup ? {
@@ -264,6 +268,7 @@ export function toNalaCartProduct(action: NalaProductAction) {
     storage_type: action.product.storageType,
     min_order_quantity: action.product.minOrderQuantity,
     order_quantity_step: action.product.orderQuantityStep,
+    ...action.product.sellingFormat,
   };
 }
 

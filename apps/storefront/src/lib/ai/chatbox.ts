@@ -1,5 +1,8 @@
 import type { ProductRelationshipType } from '@/lib/catalog/productRelationships';
 import type { NalaCartPlan } from '@/lib/ai/nalaCartPlanContract';
+import { deriveAvailability } from '@/lib/storefrontCopy/availability';
+import { groupHeadline, minimumHeadline } from '@/lib/storefrontCopy/quantityRuleCopy';
+import { describePrice, quantityNoun, resolveSellingFormat, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -7,14 +10,50 @@ export interface ChatTurn {
   cartPlan?: NalaCartPlan | null;
 }
 
+/**
+ * Produit transmis au prompt. Jamais de `weight_grams` (poids logistique) ni
+ * de stock chiffré : seulement ce que le client voit sur la fiche.
+ */
 export interface MatchedProductContext {
   name: string;
   price: number;
+  currency?: string;
   stock: number | null;
-  weightGrams: number | null;
+  minOrderQuantity?: number | null;
+  orderQuantityStep?: number | null;
+  sellingFormat?: SellingFormatSource | null;
+  quantityGroup?: { name: string; minimum: number } | null;
   storageType: string | null;
   categoryName: string | null;
 }
+
+const PROMPT_AVAILABILITY = {
+  available: 'disponible',
+  at_limit: 'disponible',
+  sold_out: 'pas disponible',
+  below_minimum: 'pas disponible pour le moment',
+} as const;
+
+/** « - Kaolin (Épicerie) — 3,00 € le sachet de 150 g — disponible — Achetez 2 sachets minimum » */
+export function promptProductLine(p: MatchedProductContext): string {
+  const format = resolveSellingFormat(p.sellingFormat);
+  const price = describePrice(p.price, format, p.currency ?? 'EUR');
+  const minimum = Math.max(1, Math.trunc(p.minOrderQuantity ?? 1) || 1);
+  const parts = [
+    `${p.name} (${p.categoryName ?? 'catégorie N/A'})`,
+    `${price.amount} ${price.unitPhrase}`,
+    PROMPT_AVAILABILITY[deriveAvailability({ stock: p.stock ?? 0, minimum, step: p.orderQuantityStep ?? 1 })],
+  ];
+  if (minimum > 1) parts.push(minimumHeadline(minimum, quantityNoun(format, minimum)).replace(/\.$/, ''));
+  if (p.quantityGroup) parts.push(groupHeadline(p.quantityGroup.name, p.quantityGroup.minimum).replace(/\.$/, ''));
+  return `- ${parts.join(' — ')}`;
+}
+
+const PRODUCT_FACT_RULES = `Règles pour les produits listés :
+- donne le prix exactement comme il est écrit, avec son format (par exemple « 3,00 € le sachet de 150 g ») ;
+- n'invente jamais un poids, un volume ou une quantité qui n'est pas écrit dans la liste ;
+- ne donne jamais le nombre d'articles en stock : dis seulement si le produit est disponible ou non ;
+- si un minimum d'achat ou un groupe à mélanger est indiqué, mentionne-le simplement.`;
 
 export interface KnowledgeSnippet {
   category: string;
@@ -69,13 +108,7 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): string {
   } = params;
 
   const productsBlock = matchedProducts.length
-    ? matchedProducts
-        .map(p =>
-          `- ${p.name} (${p.categoryName ?? 'catégorie N/A'}) — ${p.price} EUR — ` +
-          `${p.stock !== null && p.stock > 0 ? `en stock (${p.stock})` : 'rupture de stock'}` +
-          `${p.weightGrams ? `, ${p.weightGrams}g` : ''}`
-        )
-        .join('\n')
+    ? `${matchedProducts.map(promptProductLine).join('\n')}\n\n${PRODUCT_FACT_RULES}`
     : 'Aucun produit du catalogue ne correspond directement à cette question.';
 
   const whatsappLine = whatsappNumber

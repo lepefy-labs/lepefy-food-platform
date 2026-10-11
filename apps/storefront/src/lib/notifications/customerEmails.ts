@@ -1,6 +1,8 @@
 import type { TenantNotificationContext } from '@/lib/notifications/getTenantNotificationContext';
 import type { RenderedEmail } from '@/lib/notifications/sendEmail';
 import { cardPaymentReference } from '@/lib/card/cardPaymentOutcome';
+import { orderLineDetail, resolveSellingFormat, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
+import { SUMMARY_COPY } from '@/lib/storefrontCopy/copy';
 
 export { cardPaymentReference };
 
@@ -75,6 +77,13 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f5f6f8;margin:0;padding:
 .item{padding:8px 0;border-top:1px solid #f0f2f4;font-size:14px;line-height:1.5}
 .item:first-of-type{border-top:none}
 .muted{color:#777777}
+.lines{width:100%;border-collapse:collapse;font-size:14px;line-height:1.5}
+.lines td{padding:9px 0;border-top:1px solid #f0f2f4;vertical-align:top}
+.lines tr:first-child td{border-top:none}
+.lines .amount{text-align:right;white-space:nowrap;padding-left:12px;font-weight:700}
+.lines .sum td{border-top:none;padding:3px 0}
+.lines .sum-first td{border-top:1px solid #e3e6ea;padding-top:10px}
+.lines .grand td{font-size:16px;font-weight:700;padding-top:6px}
 .notice-box{background:#f8fafc;padding:16px 18px;border-radius:6px;margin:20px 0;font-size:14px;line-height:1.6;color:#555555}
 .cta-wrap{text-align:center;margin:30px 0 18px}
 .cta{display:inline-block;background:${primary};color:#ffffff !important;text-decoration:none;padding:15px 24px;border-radius:8px;font-weight:700;font-size:15px}
@@ -154,8 +163,40 @@ export interface ShippingAddressLike {
   line1?: string | null; line2?: string | null; postal_code?: string | null; city?: string | null; country?: string | null;
 }
 
+/** Ligne de commande telle qu'enregistrée (prix unitaire payé) + format de vente du produit, s'il est connu. */
+export interface OrderEmailItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  format?: SellingFormatSource | null;
+}
+
+/**
+ * Articles + récapitulatif, mêmes mots que le checkout. Les montants viennent
+ * de la commande : le total n'est jamais recalculé ici.
+ */
+function orderLinesBox(context: TenantNotificationContext, input: {
+  items: OrderEmailItem[]; delivery: boolean; shippingTotal: number | null; discount: number | null; total: number;
+}) {
+  const currency = context.currency || 'EUR';
+  const productsTotal = input.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const lines = input.items.map(item =>
+    `<tr><td><strong>${esc(item.name)}</strong><br><span class="muted">${esc(orderLineDetail(item.unitPrice, item.quantity, resolveSellingFormat(item.format), currency))}</span></td><td class="amount">${esc(formatMoney(context, item.unitPrice * item.quantity))}</td></tr>`).join('');
+  const sums: Array<[string, string]> = [];
+  if (input.items.length) sums.push([SUMMARY_COPY.productsPrice, formatMoney(context, productsTotal)]);
+  if (input.discount && input.discount > 0) sums.push([SUMMARY_COPY.ambassadorAdvantage, `-${formatMoney(context, input.discount)}`]);
+  if (input.delivery) sums.push([SUMMARY_COPY.shippingPrice, formatMoney(context, input.shippingTotal)]);
+  const sumRows = sums.map(([label, value], index) =>
+    `<tr class="sum${index === 0 && input.items.length ? ' sum-first' : ''}"><td>${esc(label)}</td><td class="amount">${esc(value)}</td></tr>`).join('');
+  return `<div class="items-box"><div class="items-title">Votre commande</div><table class="lines" role="presentation" cellpadding="0" cellspacing="0">${lines}${sumRows}<tr class="sum grand${sums.length || !input.items.length ? '' : ' sum-first'}"><td>${esc(SUMMARY_COPY.totalPaid)}</td><td class="amount">${esc(formatMoney(context, input.total))}</td></tr><tr class="sum"><td class="muted">${esc(SUMMARY_COPY.taxIncluded)}</td><td></td></tr></table></div>`;
+}
+
 export function orderConfirmedEmail(context: TenantNotificationContext, input: OrderBase & {
   fulfillmentType: string | null; total: number; shippingTotal: number | null; shippingAddress: ShippingAddressLike | null;
+  /** Lignes de la commande ; absentes = récapitulatif sans détail des articles. */
+  items?: OrderEmailItem[];
+  /** Avantage ambassadeur déjà déduit du total. */
+  discount?: number | null;
 }): RenderedEmail {
   const delivery = input.fulfillmentType === 'delivery';
   const address = delivery && input.shippingAddress
@@ -173,10 +214,9 @@ export function orderConfirmedEmail(context: TenantNotificationContext, input: O
 <p>Merci pour votre commande chez <strong>${esc(context.tenantName)}</strong>. Votre paiement a bien été reçu et votre commande est maintenant en préparation. 🌍</p>
 ${infoBox([
     ['📦 Commande', input.orderNumber],
-    ['💰 Total', formatMoney(context, input.total)],
-    delivery ? ['🚚 Frais de livraison', formatMoney(context, input.shippingTotal)] : ['🏪 Mode de remise', 'Click & Collect'],
-    ['📍 Adresse de livraison', address, { raw: true }],
+    delivery ? ['📍 Adresse de livraison', address, { raw: true }] : ['🏪 Mode de remise', 'Click & Collect'],
   ])}
+${orderLinesBox(context, { items: input.items ?? [], delivery, shippingTotal: input.shippingTotal, discount: input.discount ?? null, total: input.total })}
 <p>${delivery
     ? '🚚 Nous vous préviendrons dès que votre commande sera expédiée. Vous recevrez alors les informations nécessaires pour suivre votre colis.'
     : '🏪 Nous vous préviendrons dès que votre commande sera prête à être retirée.'}</p>

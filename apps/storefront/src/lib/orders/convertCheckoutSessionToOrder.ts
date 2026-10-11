@@ -9,6 +9,7 @@ import { getNotificationRecipients } from '@/lib/notifications/getNotificationRe
 import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
 import { emailRequest } from '@/lib/notifications/sendEmail';
 import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
+import { loadOrderEmailItems } from '@/lib/notifications/orderEmailItems';
 import { recordNalaPurchaseAttribution } from '@/lib/ai/nalaConversionAttribution';
 import { recordOrderCustomerEvents } from '@/lib/customers/recordCustomerEvents';
 import { recordAssistedOrderEvent } from '@/lib/orders/assisted/assistedOrderEvents';
@@ -134,6 +135,8 @@ export interface ConversionSideEffectDependencies {
   refundPaymentIntent: (paymentIntentId: string) => Promise<{ id: string }>;
   /** Defaults to the shipment-draft queue (trigger « order_created »); never throws. */
   requestShipmentDraft?: (supabase: SupabaseClient, tenantId: string, orderId: string) => Promise<unknown>;
+  /** Defaults to the products selling-format lookup; never throws. */
+  loadOrderEmailItems?: typeof loadOrderEmailItems;
 }
 
 const defaultDependencies: ConversionSideEffectDependencies = {
@@ -313,6 +316,7 @@ export async function convertCheckoutSessionToOrder(
     console.error('[convertCheckoutSessionToOrder] order-confirmed not sent — tenant notification context unavailable — order:', order.id);
     customerNotification = 'failed';
   } else {
+    const emailItems = await (deps.loadOrderEmailItems ?? loadOrderEmailItems)(supabase, input.tenantId, items);
     const accepted = await deps.notifyN8n(...emailRequest(tenantContext, {
       ...orderConfirmedEmail(tenantContext, {
         orderNumber: orderNumberFor(order.id),
@@ -322,6 +326,8 @@ export async function convertCheckoutSessionToOrder(
         total: order.total,
         shippingTotal: order.shipping_cost ?? 0,
         shippingAddress: (order.shipping_address as ShippingAddressLike | null) ?? null,
+        items: emailItems,
+        discount: order.ambassador_discount_amount ?? 0,
       }),
       notificationType: 'order_confirmed',
       idempotencyKey: `order-confirmed:${order.id}`,

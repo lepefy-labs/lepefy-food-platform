@@ -7,6 +7,8 @@ import { IconLoader2, IconPhoto, IconShoppingCart } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import type { PublicQuantityGroup } from '@/app/api/quantity-groups/route';
 import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
+import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { groupHeadline, groupProgressCopy, stepLine } from '@/lib/storefrontCopy/quantityRuleCopy';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import {
@@ -41,6 +43,11 @@ export function NalaProductActionCard({
   const inFlightRef = useRef(new Set<string>());
   const hasDiscount = action.product.compareAtPrice != null
     && action.product.compareAtPrice > action.product.price;
+  const price = describePrice(action.product.price, resolveSellingFormat(action.product.sellingFormat), action.product.currency);
+  const groupProgress = activeGroup && groupState
+    ? groupProgressCopy(activeGroup.name, groupState.currentQuantity, groupState.nextValidQuantity, groupMinimum)
+    : null;
+  const groupSteps = stepLine(groupMinimum, groupStep);
 
   async function handleAdd() {
     if (status === 'adding' || status === 'added') return;
@@ -87,10 +94,9 @@ export function NalaProductActionCard({
           >
             {action.product.name}
           </Link>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-            <span className="text-sm font-bold text-[#5947E8]">
-              {formatPrice(action.product.price, action.product.currency)}
-            </span>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5" aria-label={`${price.amount} ${price.unitPhrase}`}>
+            <span aria-hidden="true" className="text-sm font-bold text-[#5947E8]">{price.amount}</span>
+            <span aria-hidden="true" className="text-xs font-semibold text-gray-700">{price.unitPhrase}</span>
             {hasDiscount && (
               <span className="text-xs text-gray-400 line-through">
                 {formatPrice(action.product.compareAtPrice as number, action.product.currency)}
@@ -119,18 +125,9 @@ export function NalaProductActionCard({
 
         {activeGroup && (
           <div className="rounded-lg border border-[#DDD8FF] bg-[#F7F5FF] p-2 text-xs text-[#4B3CC4]">
-            <p className="font-semibold">
-              Groupe « {activeGroup.name} » : minimum {groupMinimum}
-              {groupStep > 1 ? ` · par ${groupStep}` : ''}
-            </p>
-            <p className="mt-1">Vous pouvez mélanger les produits du groupe.</p>
-            {groupState && (
-              <p className="mt-1">
-                {groupState.isValid
-                  ? `Sélection complète : ${groupState.currentQuantity} unités.`
-                  : `${groupState.currentQuantity} / ${groupState.nextValidQuantity} · encore ${groupState.missingQuantity} unité(s).`}
-              </p>
-            )}
+            <p className="font-semibold">{groupProgress ? groupProgress.title : groupHeadline(activeGroup.name, groupMinimum)}</p>
+            {groupProgress && !groupProgress.done && <p className="mt-1">{groupProgress.detail}</p>}
+            {!groupProgress && groupSteps && <p className="mt-1">{groupSteps}</p>}
             <Link href={`/?quantityGroup=${encodeURIComponent(activeGroup.id)}`}
               className="mt-1 inline-flex min-h-11 items-center font-bold underline">Compléter ma sélection</Link>
           </div>

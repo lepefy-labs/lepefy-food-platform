@@ -9,7 +9,7 @@ import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 // Écran affiché après une demande de paiement via lien externe
 // (PayPal/Revolut/autre) — Phase 1, devenu point d'entrée A de l'édition en
 // place (checkout_sessions modifiables). sessionStorage ('lepefy-pending-payment',
-// écrit par CheckoutForm juste avant la redirection) ne sert plus qu'à
+// écrit par CheckoutFlow juste avant la redirection) ne sert plus qu'à
 // résoudre sessionId/accessToken sans attendre un aller-retour réseau : tout
 // le rendu (montant, moyen de paiement, édition) vient désormais de
 // CheckoutSessionEditor, qui relit toujours l'état réel côté serveur

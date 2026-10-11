@@ -14,6 +14,8 @@ import {
 import { formatPrice } from '@/lib/utils/format';
 import type { PublicQuantityGroup } from '@/app/api/quantity-groups/route';
 import { computeQuantityRuleState } from '@/lib/purchaseQuantityRules';
+import { orderLineDetail, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { groupProgressCopy } from '@/lib/storefrontCopy/quantityRuleCopy';
 import { useCartStore } from '@/stores/cartStore';
 import { useCartUiStore } from '@/stores/cartUiStore';
 import {
@@ -182,18 +184,18 @@ export function NalaCartPlanCard({
                   {item.product?.name ?? item.ingredientName}
                 </span>
                 {item.status === 'substitute' && (
-                  <span className="mt-0.5 block text-[10px] font-medium text-amber-700">
+                  <span className="mt-0.5 block text-xs font-medium text-amber-700">
                     {plan.labels.substitute}
                   </span>
                 )}
                 {unavailable && (
-                  <span className="mt-0.5 block text-[10px] text-gray-500">
+                  <span className="mt-0.5 block text-xs text-gray-500">
                     {plan.labels.unavailable}
                   </span>
                 )}
-                {!unavailable && item.quantity > 1 && (
-                  <span className="mt-0.5 block text-[10px] font-medium text-gray-500">
-                    Minimum {item.quantity}
+                {!unavailable && item.product && (
+                  <span className="mt-0.5 block text-xs text-gray-600">
+                    {orderLineDetail(item.product.price, item.quantity, resolveSellingFormat(item.product.sellingFormat), item.product.currency)}
                   </span>
                 )}
               </span>
@@ -214,14 +216,12 @@ export function NalaCartPlanCard({
           </strong>
         </div>
 
-        {affectedGroups.map(({ group, state }) => (
+        {affectedGroups.map(({ group, state }) => {
+          const progress = groupProgressCopy(group.name, state.currentQuantity, state.nextValidQuantity, group.min_quantity);
+          return (
           <div key={group.id} className="mb-2 rounded-lg bg-[#F7F5FF] p-2 text-xs text-[#4B3CC4]">
-            <strong>Groupe « {group.name} »</strong>
-            <p className="mt-1">
-              {state.isValid
-                ? `Sélection complète : ${state.currentQuantity} unités.`
-                : `${state.currentQuantity} / ${state.nextValidQuantity} · encore ${state.missingQuantity} unité(s). Vous pouvez mélanger les produits.`}
-            </p>
+            <strong>{progress.title}</strong>
+            {!progress.done && <p className="mt-1">{progress.detail}</p>}
             {!state.isValid && (
               <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`}
                 className="mt-1 inline-flex min-h-11 items-center font-bold underline">
@@ -229,7 +229,8 @@ export function NalaCartPlanCard({
               </Link>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {status !== 'complete' && (
           <button

@@ -2,7 +2,7 @@
 
 > Stato al **7 ottobre 2026**: **attivo in test end-to-end sul numero di test Meta** (tenant `lepefy-test`, deployment `test.lepefy.com`). Migration `147_whatsapp_business_platform.sql` **applicata** sul progetto Supabase condiviso. Flag `whatsapp_business` attivo **solo** su `lepefy-test`. Nessun numero reale collegato; Chloe Food non configurato (vedi §14).
 >
-> Base del codice: `main` @ `560ccbb8`. Esito dei test reali: §11.1.
+> Base del codice: `main` @ `4e43986f` (11 ottobre 2026: righe prodotto di Nala e stato ordine it/en). Esito dei test reali: §11.1.
 
 ## 1. Obiettivo e principi
 
@@ -142,11 +142,13 @@ Ordine: intent sensibili → regole per priorità (configurabile) → Nala → o
 | `catalog` | `tenants.storefront_url` (+ `path`, default `/products`) | mai l'URL del deployment che elabora |
 | `greeting` | testo opzionale per tenant (`{boutique}`) | al primo messaggio di una nuova conversazione |
 
-Lingua: rilevata dal messaggio (fr/it/en), poi lingua della conversazione, poi `default_language` del canale.
+Lingua: rilevata dal messaggio (fr/it/en), poi lingua della conversazione, poi `default_language` del canale. Lo stato ordine (`order_status` / `tracking`) usa `orderStageLabel` (`replies.ts`): in francese il libellé del portale, in italiano e inglese una traduzione per fase (conflitto di stock → «Da verificare» / «Needs checking»).
 
 ## 6. Nala
 
 WhatsApp è un **canale** di Nala, non un secondo assistente. `runNalaChannelTurn` riusa: `buildSystemPrompt`, contratto di decisione `nalaResponseSchema`, routing AI Core (`consumer = nala`, `capability = structured_chat`), Response Memory, small talk, retrieval `match_products` / `match_knowledge_base`, contesto privato `getNalaExtraContext`, entitlement `canUseNala`, rate limit (`endpoint = nala_whatsapp`). Differenze: storico AI Core separato (`consumer` di conversazione `nala_whatsapp`), istruzioni di formato canale, nessuna card prodotto/carrello.
+
+Contesto prodotti: `buildMatchedProductContexts` (`lib/ai/nalaPromptProducts.ts`, condiviso con `/api/chat`) → righe «3,00 € le sachet de 150 g — disponible — Achetez 2 sachets minimum». Mai `weight_grams` (peso logistico) né lo stock in cifre; il prompt vieta di inventare pesi, volumi o quantità. I gruppi da mescolare sono aggiunti se leggibili (lettura non bloccante).
 
 Guardrail (`evaluateNalaGuardrails`): intent `payment_help` → handoff; `order_help` → regola `order_status`; `delivery` → regola `shipping`; `unknown` o confidenza < 0,55 → handoff. Errore provider AI → handoff `automation_error`. Analytics `nala_interactions` non alimentate dal canale WhatsApp in questa versione (l'uso AI è comunque loggato in `ai_usage_logs`).
 

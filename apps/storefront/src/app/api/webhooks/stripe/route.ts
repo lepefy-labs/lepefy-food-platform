@@ -11,6 +11,7 @@ import { getTenantNotificationContext } from '@/lib/notifications/getTenantNotif
 import { buildOrderStockConflictNotification, ORDER_STOCK_CONFLICT_WEBHOOK } from '@/lib/notifications/orderStockConflictEmail';
 import { emailRequest } from '@/lib/notifications/sendEmail';
 import { orderConfirmedEmail, type ShippingAddressLike } from '@/lib/notifications/customerEmails';
+import { loadOrderEmailItems } from '@/lib/notifications/orderEmailItems';
 import { notifyCardQuickPaymentPaid } from '@/lib/notifications/notifyCardQuickPayment';
 import { createEventReservationFromRequest } from '@/lib/events/createEventReservationFromRequest';
 import { createRentalReservationFromRequest } from '@/lib/rental/createRentalReservationFromRequest';
@@ -538,6 +539,7 @@ export async function POST(req: NextRequest) {
       if (!tenantContext) {
         console.error('[webhook] order-confirmed not sent — tenant notification context unavailable — order:', order.id);
       } else {
+        const emailItems = await loadOrderEmailItems(supabase as unknown as Parameters<typeof loadOrderEmailItems>[0], resolvedTenantId, items);
         await notifyN8n(...emailRequest(tenantContext, {
           ...orderConfirmedEmail(tenantContext, {
             orderNumber:       `#${order.id.slice(0, 8).toUpperCase()}`,
@@ -547,6 +549,8 @@ export async function POST(req: NextRequest) {
             total,
             shippingTotal:     checkoutSession.shipping_total ?? 0,
             shippingAddress:   (checkoutSession.shipping_address as ShippingAddressLike | null) ?? null,
+            items:             emailItems,
+            discount:          ambassadorDiscount,
           }),
           notificationType: 'order_confirmed',
           idempotencyKey:   `order-confirmed:${order.id}`,

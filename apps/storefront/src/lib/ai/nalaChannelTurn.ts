@@ -5,6 +5,7 @@ import { finishConversation, openConversation, releaseConversation, type Convers
 import { boundedContext, memoryFromDecision } from '@/lib/ai/core/contextPackage';
 import { nalaResponseSchema, nalaResponseValidator, NALA_DECISION_INSTRUCTIONS } from '@/lib/ai/core/nalaDecision';
 import { buildSystemPrompt, type KnowledgeSnippet, type MatchedProductContext } from '@/lib/ai/chatbox';
+import { buildMatchedProductContexts, type MatchProductsPromptRow } from '@/lib/ai/nalaPromptProducts';
 import { embedText, logNalaEmbeddingUsage } from '@/lib/ai/embeddings';
 import { matchSmallTalk } from '@/lib/ai/smallTalk';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
@@ -52,10 +53,7 @@ ces informations sont données par l'équipe ou par les réponses automatiques d
 Si tu n'es pas sûr, dis-le et propose de transmettre la demande à l'équipe.`,
 };
 
-interface MatchProductsRow {
-  id: string; name: string; price: number; stock: number | null; weight_grams: number | null;
-  storage_type: string | null; category_name: string | null;
-}
+type MatchProductsRow = MatchProductsPromptRow;
 
 export async function runNalaChannelTurn(params: {
   tenant: Tenant;
@@ -119,10 +117,9 @@ export async function runNalaChannelTurn(params: {
     ]) : [{ data: [] }, { data: [] }];
     const productRows = (products ?? []) as MatchProductsRow[];
     const knowledgeRows = (knowledge ?? []) as Array<{ id: string; category: string; content: string }>;
-    const matchedProducts: MatchedProductContext[] = productRows.map((row) => ({
-      name: row.name.slice(0, 150), price: row.price, stock: row.stock, weightGrams: row.weight_grams,
-      storageType: row.storage_type, categoryName: row.category_name,
-    }));
+    const matchedProducts: MatchedProductContext[] = await buildMatchedProductContexts(
+      supabase, tenant.id, tenant.currency ?? 'EUR', productRows,
+    );
     const knowledgeSnippets: KnowledgeSnippet[] = knowledgeRows.map((row) => ({ category: row.category, content: row.content.slice(0, 1000) }));
     const extraContext = await getNalaExtraContext(supabase, tenant.id, tenant.chatbox_extra_context);
 

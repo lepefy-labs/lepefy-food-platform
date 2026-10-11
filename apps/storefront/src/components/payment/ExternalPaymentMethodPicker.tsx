@@ -4,7 +4,7 @@ import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod } from '@lepefy/types';
 
-// Composant partagé entre le checkout boutique ((shop)/checkout/CheckoutForm.tsx)
+// Composant partagé entre le checkout boutique ((shop)/checkout/CheckoutFlow.tsx)
 // et le checkout billetterie événementiel (EventCheckoutClient.tsx) — extrait
 // en Phase 2 pour ne pas dupliquer le pattern "liste de cartes radio + note
 // dynamique + CTA colorée" introduit en Phase 1. Même registre d'icônes que

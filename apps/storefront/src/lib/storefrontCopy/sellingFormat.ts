@@ -62,14 +62,17 @@ function validPackCount(raw: number | null | undefined): number | null {
   return typeof raw === 'number' && Number.isInteger(raw) && raw >= 2 ? raw : null;
 }
 
-/** Copie des seuls champs de format (ajout au panier, adaptateurs de cartes). */
-export function pickSellingFormatFields(source: SellingFormatSource): {
+/** Champs de format normalisés, transportables tels quels (panier, Nala, email). */
+export interface SellingFormatFields {
   net_quantity_display: string | null;
   sale_unit: string | null;
   net_content_value: number | null;
   net_content_unit: string | null;
   pack_count: number | null;
-} {
+}
+
+/** Copie des seuls champs de format (ajout au panier, adaptateurs de cartes). */
+export function pickSellingFormatFields(source: SellingFormatSource): SellingFormatFields {
   const value = source.net_content_value == null ? null : Number(source.net_content_value);
   return {
     net_quantity_display: source.net_quantity_display ?? null,
@@ -195,4 +198,19 @@ export function describePrice(price: number, format: SellingFormat, currency = '
     reference,
     sentence: `${amount} ${phrase}${reference ? `, ${reference}` : ''}`,
   };
+}
+
+/**
+ * Détail d'une ligne de commande : « 3 sachets de 150 g · 3,00 € le sachet »,
+ * « 2 × 1,80 € l'article ». `price` est le prix unitaire enregistré, jamais recalculé.
+ */
+export function orderLineDetail(price: number, quantity: number, format: SellingFormat, currency = 'EUR'): string {
+  const amount = formatPrice(price, currency);
+  const { unit } = format;
+  if (unit && !unit.byWeight) {
+    const content = contentLabel(format);
+    const counted = formatCount(format, quantity);
+    return `${counted}${content ? ` de ${content}` : ''} · ${amount} ${definiteArticle(unit.singular, unit.feminine)}`;
+  }
+  return `${quantity} × ${amount} ${unitPhrase(format)}`;
 }

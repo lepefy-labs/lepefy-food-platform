@@ -361,7 +361,7 @@ export function ChatWidget({ enabled, tenantName, tenantLocales, tenantLocale, w
                 <IconSend size={18} aria-hidden="true" />
               </button>
             </div>
-            <p className="mt-2 text-center text-[10px] leading-tight text-gray-400">Réponses générées par IA. Vérifiez les informations.</p>
+            <p className="mt-2 text-center text-xs leading-tight text-gray-500">Réponses générées par IA. Vérifiez les informations.</p>
           </div>
         </section>
       )}

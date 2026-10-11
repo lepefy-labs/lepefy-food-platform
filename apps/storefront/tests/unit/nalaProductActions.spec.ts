@@ -91,8 +91,21 @@ test('la mappatura usa il contratto cart reale e mantiene l’interaction', asyn
     storage_type: 'fresh',
     min_order_quantity: 1,
     order_quantity_step: 1,
+    net_quantity_display: null,
+    sale_unit: null,
+    net_content_value: null,
+    net_content_unit: null,
+    pack_count: null,
   });
   expect(action!.interactionId).toBe(INTERACTION);
+});
+
+test('le format de vente arrive jusqu’au panier (plus de « l’article » après un ajout par Nala)', async () => {
+  const [action] = build([product({ sale_unit: 'sachet', net_content_value: '150.000', net_content_unit: 'g' })]);
+  expect(action!.product.sellingFormat).toEqual({
+    net_quantity_display: null, sale_unit: 'sachet', net_content_value: 150, net_content_unit: 'g', pack_count: null,
+  });
+  expect(toNalaCartProduct(action!)).toMatchObject({ sale_unit: 'sachet', net_content_value: 150, net_content_unit: 'g' });
 });
 
 test('un prodotto con minimo di vendita propone e aggiunge direttamente questa quantità', async () => {

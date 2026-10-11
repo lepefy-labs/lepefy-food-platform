@@ -5,7 +5,7 @@ import { IconInfoCircle, IconCheck, IconX } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
 import type { ShippingProvider } from '@lepefy/types';
 
-// Mêmes pays que le sélecteur d'adresse du panier (CartClient.tsx) et que
+// Mêmes pays que le sélecteur d'adresse du checkout (CheckoutFlow.tsx) et que
 // ShippingCountryRulesSection.tsx — seuls pays pour lesquels un devis de
 // livraison a un sens sur cette plateforme.
 const COUNTRIES = [

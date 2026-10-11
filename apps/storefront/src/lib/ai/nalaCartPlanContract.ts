@@ -1,4 +1,5 @@
 import type { NalaCanonicalProduct } from '@/lib/ai/nalaProductActionContract';
+import { pickSellingFormatFields, type SellingFormatFields } from '@/lib/storefrontCopy/sellingFormat';
 
 export const NALA_CART_PLAN_MAX_ITEMS = 8;
 export const NALA_CART_PLAN_MIN_DIRECT_SIMILARITY = 0.55;
@@ -55,6 +56,8 @@ export interface NalaCartPlanItem {
     storageType: 'dry' | 'fresh' | 'frozen' | null;
     minOrderQuantity: number;
     orderQuantityStep: number;
+    /** Format de vente (migration 154) ; absent des anciens tours persistés. */
+    sellingFormat?: SellingFormatFields;
   };
   /** Respecte le minimum de vente du produit choisi (cf. purchaseQuantityRules.ts) — jamais 1 littéral. */
   quantity: number;
@@ -94,6 +97,7 @@ export interface CartIngredientSubstitute {
     storageType: 'dry' | 'fresh' | 'frozen' | null;
     minOrderQuantity: number;
     orderQuantityStep: number;
+    sellingFormat?: SellingFormatFields;
   };
   source: 'manual' | 'system' | 'semantic';
   similarity: number | null;
@@ -252,6 +256,7 @@ function productPayload(
     storageType: product.storage_type,
     minOrderQuantity: Math.max(1, Math.trunc(product.min_order_quantity ?? 1) || 1),
     orderQuantityStep: Math.max(1, Math.trunc(product.order_quantity_step ?? 1) || 1),
+    sellingFormat: pickSellingFormatFields(product),
   };
 }
 
@@ -316,6 +321,7 @@ export function selectNalaCartPlanItem(params: {
         storageType: substitute.product.storageType,
         minOrderQuantity: substituteMinOrderQuantity,
         orderQuantityStep: Math.max(1, Math.trunc(substitute.product.orderQuantityStep ?? 1) || 1),
+        sellingFormat: substitute.product.sellingFormat,
       },
       quantity: substituteMinOrderQuantity,
     };
@@ -371,6 +377,7 @@ export function toNalaCartPlanProduct(item: NalaCartPlanItem) {
     storage_type: item.product.storageType,
     min_order_quantity: item.product.minOrderQuantity,
     order_quantity_step: item.product.orderQuantityStep,
+    ...item.product.sellingFormat,
   };
 }
 

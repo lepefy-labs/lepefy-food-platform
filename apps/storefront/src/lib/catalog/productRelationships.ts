@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { PRODUCT_SELLING_FORMAT_COLUMNS } from '@/lib/catalog/productCardSelect';
+import { pickSellingFormatFields, type SellingFormatFields, type SellingFormatSource } from '@/lib/storefrontCopy/sellingFormat';
 
 export const PRODUCT_RELATIONSHIP_TYPES = ['similar', 'substitute', 'complementary'] as const;
 export type ProductRelationshipType = typeof PRODUCT_RELATIONSHIP_TYPES[number];
@@ -19,6 +21,7 @@ export interface RelationshipProduct {
   storageType: 'dry' | 'fresh' | 'frozen' | null;
   minOrderQuantity: number;
   orderQuantityStep: number;
+  sellingFormat: SellingFormatFields;
 }
 
 export interface ResolvedProductRelationship {
@@ -30,7 +33,7 @@ export interface ResolvedProductRelationship {
   product: RelationshipProduct;
 }
 
-interface CanonicalProductRow {
+interface CanonicalProductRow extends SellingFormatSource {
   id: string;
   tenant_id: string;
   category_id: string | null;
@@ -63,7 +66,7 @@ interface SemanticRow {
 }
 
 const PRODUCT_SELECT =
-  'id, tenant_id, category_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type, min_order_quantity, order_quantity_step';
+  `id, tenant_id, category_id, name, slug, image_url, price, compare_at_price, stock, active, weight_grams, storage_type, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`;
 
 export function isProductRelationshipType(value: unknown): value is ProductRelationshipType {
   return typeof value === 'string'
@@ -123,6 +126,7 @@ function toProduct(row: CanonicalProductRow): RelationshipProduct {
     storageType: row.storage_type,
     minOrderQuantity: Math.max(1, Math.trunc(row.min_order_quantity ?? 1) || 1),
     orderQuantityStep: Math.max(1, Math.trunc(row.order_quantity_step ?? 1) || 1),
+    sellingFormat: pickSellingFormatFields(row),
   };
 }
 

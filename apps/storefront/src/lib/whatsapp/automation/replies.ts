@@ -1,4 +1,5 @@
 import type { OrderPortalViewModel } from '@/lib/orders/portal/portalViewModel';
+import { CUSTOMER_STATUS_LABELS, type CustomerOrderStage } from '@/lib/orders/orderStatus';
 import type { WhatsAppHandoffReason } from '@/lib/whatsapp/types';
 
 /**
@@ -137,11 +138,33 @@ export function orderNotFoundReply(lang: ReplyLanguage): string {
   }, lang);
 }
 
+const STAGE_LABELS: Record<Exclude<ReplyLanguage, 'fr'>, Record<CustomerOrderStage, string> & { collected: string; needsAction: string }> = {
+  it: {
+    confirmed: 'Confermato', preparing: 'In preparazione', ready_for_pickup: 'Pronto per il ritiro', shipped: 'Spedito',
+    delivered: 'Consegnato', collected: 'Ritirato', cancelled: 'Annullato', needsAction: 'Da verificare',
+  },
+  en: {
+    confirmed: 'Confirmed', preparing: 'Being prepared', ready_for_pickup: 'Ready for pickup', shipped: 'Shipped',
+    delivered: 'Delivered', collected: 'Collected', cancelled: 'Cancelled', needsAction: 'Needs checking',
+  },
+};
+
+/** Libellé de l'étape dans la langue du client ; le français reste celui du portail. */
+export function orderStageLabel(lang: ReplyLanguage, order: Pick<OrderPortalViewModel, 'stage' | 'stageLabel' | 'fulfillment'>): string {
+  if (lang === 'fr') return order.stageLabel;
+  const labels = STAGE_LABELS[lang];
+  // Le portail range « Action requise » (conflit de stock) dans l'étape « cancelled ».
+  if (order.stage === 'cancelled' && order.stageLabel !== CUSTOMER_STATUS_LABELS.cancelled) return labels.needsAction;
+  if (order.stage === 'delivered' && order.fulfillment === 'pickup') return labels.collected;
+  return labels[order.stage];
+}
+
 export function orderStatusReply(lang: ReplyLanguage, order: OrderPortalViewModel, portalUrl: string | null): string {
+  const stage = orderStageLabel(lang, order);
   const head = pick({
-    fr: `Commande ${order.ref} du ${order.date} : *${order.stageLabel}*`,
-    it: `Ordine ${order.ref} del ${order.date}: *${order.stageLabel}*`,
-    en: `Order ${order.ref} (${order.date}): *${order.stageLabel}*`,
+    fr: `Commande ${order.ref} du ${order.date} : *${stage}*`,
+    it: `Ordine ${order.ref} del ${order.date}: *${stage}*`,
+    en: `Order ${order.ref} (${order.date}): *${stage}*`,
   }, lang);
   const lines = [head];
   if (lang === 'fr' && order.description) lines.push(order.description);
@@ -156,10 +179,11 @@ export function trackingReply(lang: ReplyLanguage, order: OrderPortalViewModel, 
   const trackCta = [order.primary, ...order.secondary].find((cta) => cta?.kind === 'track');
   const track = trackCta?.kind === 'track' ? trackCta.href : null;
   if (!order.shipment) {
+    const stage = orderStageLabel(lang, order);
     const pending = pick({
-      fr: `Commande ${order.ref} : *${order.stageLabel}*. Le suivi transporteur sera disponible dès l’expédition.`,
-      it: `Ordine ${order.ref}: *${order.stageLabel}*. Il tracciamento sarà disponibile dalla spedizione.`,
-      en: `Order ${order.ref}: *${order.stageLabel}*. Tracking will be available once shipped.`,
+      fr: `Commande ${order.ref} : *${stage}*. Le suivi transporteur sera disponible dès l’expédition.`,
+      it: `Ordine ${order.ref}: *${stage}*. Il tracciamento sarà disponibile dalla spedizione.`,
+      en: `Order ${order.ref}: *${stage}*. Tracking will be available once shipped.`,
     }, lang);
     return portalUrl ? `${pending}\n${portalUrl}` : pending;
   }

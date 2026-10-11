@@ -13,6 +13,8 @@ export const SUMMARY_COPY = {
   shippingAfterAddress: "après l'adresse",
   shippingFree: 'Gratuite',
   totalToPay: 'Total à payer',
+  totalPaid: 'Total payé',
+  ambassadorAdvantage: 'Avantage ambassadeur',
   taxIncluded: 'TVA incluse',
 } as const;
 

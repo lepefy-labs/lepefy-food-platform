@@ -51,10 +51,19 @@ export function buildTemplatePreviews(context: TenantNotificationContext, now = 
     previews.push({ id, group, label, audience, subject: email.subject, html: email.html });
 
   // Commandes
+  const rice = { name: 'Riz parfumé', unitPrice: 18.5, format: { sale_unit: 'sac', net_content_value: 5, net_content_unit: 'kg' } };
+  const oil = { name: 'Huile de palme rouge', unitPrice: 6.5, format: { sale_unit: 'bouteille', net_content_value: 1, net_content_unit: 'l' } };
+  const gari = { name: 'Gari', unitPrice: 4.5, format: { sale_unit: 'sachet', net_content_value: 1, net_content_unit: 'kg' } };
   add('order-confirmed-delivery', 'Commandes', 'Commande confirmée · livraison', 'Client',
-    orderConfirmedEmail(context, { ...order, fulfillmentType: 'delivery', total: 79.9, shippingTotal: 8.9, shippingAddress: address }));
+    orderConfirmedEmail(context, {
+      ...order, fulfillmentType: 'delivery', total: 79.9, shippingTotal: 8.9, shippingAddress: address,
+      items: [{ ...rice, quantity: 2 }, { ...oil, quantity: 2 }, { ...gari, quantity: 3 }, { name: 'Piment séché', unitPrice: 7.5, quantity: 1 }],
+    }));
   add('order-confirmed-pickup', 'Commandes', 'Commande confirmée · retrait', 'Client',
-    orderConfirmedEmail(context, { ...order, fulfillmentType: 'pickup', total: 42.5, shippingTotal: 0, shippingAddress: null }));
+    orderConfirmedEmail(context, {
+      ...order, fulfillmentType: 'pickup', total: 42.5, shippingTotal: 0, shippingAddress: null,
+      items: [{ ...rice, quantity: 1 }, { ...oil, quantity: 2 }, { ...gari, quantity: 2 }, { name: 'Cubes d’assaisonnement', unitPrice: 2, quantity: 1 }],
+    }));
   add('order-shipped', 'Commandes', 'Commande expédiée', 'Client',
     orderShippedEmail(context, {
       ...order, trackingCode: 'BRT0012345678', trackingCarrier: 'BRT', shippingEstimatedDeliveryAt: '2026-10-06T00:00:00.000Z',

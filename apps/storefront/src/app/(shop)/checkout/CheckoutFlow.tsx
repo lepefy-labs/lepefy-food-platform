@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
+  IconAlertTriangle,
   IconArrowLeft,
   IconBuildingStore,
   IconCheck,
@@ -37,6 +38,7 @@ import type { CustomerProfile } from '@/lib/customers/types';
 import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
+import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
 import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
 import { ACTION_COPY, ERROR_COPY, FORM_COPY, SUMMARY_COPY, productsPriceLabel, totalWithPendingShipping } from '@/lib/storefrontCopy/copy';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
@@ -128,6 +130,12 @@ export default function CheckoutFlow({
 }) {
   const router = useRouter();
   const { items, totalPrice, shippingPayload } = useCartStore();
+  // Pré-contrôle des minimums et du stock (même moteur que /cart et le
+  // serveur) : guide seulement, /api/checkout reste l'autorité.
+  const purchaseGate = useCartPurchaseGate(items);
+  const purchaseGateRef = useRef(purchaseGate);
+  purchaseGateRef.current = purchaseGate;
+  const cartIssuesRef = useRef<HTMLDivElement>(null);
   const initialDraftRef = useRef<CheckoutDraft | null>(null);
   if (initialDraftRef.current === null && typeof window !== 'undefined') initialDraftRef.current = readDraft();
   const initialDraft = initialDraftRef.current;
@@ -365,7 +373,16 @@ export default function CheckoutFlow({
     }
   }
 
+  function showCartIssues() {
+    cartIssuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    cartIssuesRef.current?.focus();
+  }
+
   const continueFromInformation = (data: ContactValues) => {
+    if (!purchaseGate.canProceed) {
+      showCartIssues();
+      return;
+    }
     if (!isPickup && !hasCompleteAddress) {
       focusAddressSection('Écrivez votre adresse complète (rue, numéro, code postal, ville) pour calculer la livraison.');
       return;
@@ -417,6 +434,8 @@ export default function CheckoutFlow({
   }
 
   async function createIntent() {
+    const gate = purchaseGateRef.current;
+    if (!gate.canProceed) return { error: gate.blockedMessage ?? ERROR_COPY.generic };
     try {
       const sharedPayload = buildSharedPayload();
       const snapshot = JSON.stringify({ ...sharedPayload, shippingTotal: effectiveShippingTotal });
@@ -457,6 +476,10 @@ export default function CheckoutFlow({
   }
 
   async function confirmPaymentChoice() {
+    if (!purchaseGate.canProceed) {
+      showCartIssues();
+      return;
+    }
     if (consentState.showTermsCheckbox && !termsAccepted) {
       setSubmitError(ERROR_COPY.termsRequired);
       return;
@@ -552,6 +575,26 @@ export default function CheckoutFlow({
     <div className="mx-auto w-full max-w-2xl px-4 py-4 pb-10 sm:px-6 sm:py-7">
       <CheckoutProgressIndicator currentStep={step} />
       <div className="mb-5">{compactSummary}</div>
+
+      {!purchaseGate.checking && (purchaseGate.error || purchaseGate.issues.length > 0) && (
+        <div ref={cartIssuesRef} tabIndex={-1} role="alert" className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
+          <p className="flex items-start gap-2 font-bold">
+            <IconAlertTriangle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+            {purchaseGate.error ? purchaseGate.error : "Votre panier n'est pas encore complet."}
+          </p>
+          {!purchaseGate.error && (
+            <ul className="mt-1.5 space-y-1 pl-6">
+              {purchaseGate.issues.map((issue, index) => <li key={`${index}-${issue}`}>{issue}</li>)}
+            </ul>
+          )}
+          <div className="mt-2 flex flex-wrap gap-x-4 pl-6">
+            {purchaseGate.error && (
+              <button type="button" onClick={purchaseGate.reloadGroups} className="min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
+            )}
+            <Link href="/cart" className="inline-flex min-h-11 items-center font-bold underline">Modifier mon panier</Link>
+          </div>
+        </div>
+      )}
 
       {step === 'shipping' && (
         <div className="space-y-5">
@@ -693,7 +736,7 @@ export default function CheckoutFlow({
 
           {fullSummary}
 
-          <button type="button" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
+          <button type="button" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading || !purchaseGate.canProceed} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
             {shippingLoading ? 'Calcul du prix de livraison…' : ACTION_COPY.choosePayment}
           </button>
         </div>
@@ -732,7 +775,7 @@ export default function CheckoutFlow({
           {fullSummary}
 
           {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">{submitError}</p>}
-          <button type="button" onClick={confirmPaymentChoice} disabled={isSubmitting || (consentState.showTermsCheckbox && !termsAccepted)} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: paymentCtaColor }}>
+          <button type="button" onClick={confirmPaymentChoice} disabled={isSubmitting || !purchaseGate.canProceed || (consentState.showTermsCheckbox && !termsAccepted)} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: paymentCtaColor }}>
             {isSubmitting ? ACTION_COPY.processing : `${paymentCtaLabel} · ${formatPrice(total, tenant.currency)}`}
           </button>
         </div>

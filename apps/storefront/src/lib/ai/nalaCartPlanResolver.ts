@@ -9,6 +9,7 @@ import {
 } from '@/lib/ai/nalaCartPlanContract';
 import type { NalaCanonicalProduct } from '@/lib/ai/nalaProductActionContract';
 import { getRelatedProducts } from '@/lib/catalog/productRelationships';
+import { pickSellingFormatFields } from '@/lib/storefrontCopy/sellingFormat';
 
 interface MatchProductsRow {
   id: string;
@@ -26,6 +27,11 @@ interface MatchProductsRow {
   min_order_quantity: number;
   order_quantity_step: number;
   similarity: number;
+  net_quantity_display?: string | null;
+  sale_unit?: string | null;
+  net_content_value?: number | string | null;
+  net_content_unit?: string | null;
+  pack_count?: number | null;
 }
 
 function toCanonical(row: MatchProductsRow, tenantId: string): NalaCanonicalProduct & { category_id: string | null } {
@@ -44,6 +50,7 @@ function toCanonical(row: MatchProductsRow, tenantId: string): NalaCanonicalProd
     storage_type: row.storage_type,
     min_order_quantity: row.min_order_quantity ?? 1,
     order_quantity_step: row.order_quantity_step ?? 1,
+    ...pickSellingFormatFields(row),
   };
 }
 

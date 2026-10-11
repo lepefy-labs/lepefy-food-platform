@@ -11,10 +11,7 @@ import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubt
 import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
-import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
-import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
-import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
-import { insufficientStockMessage } from '@/lib/storefrontCopy/availability';
+import { useCartPurchaseGate } from '@/lib/cart/useCartPurchaseGate';
 import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 import { useEffect, useState } from 'react';
@@ -34,22 +31,9 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
   const removeItem = useCartStore((state) => state.removeItem);
   const addItem = useCartStore((state) => state.addItem);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
-  const { groups: quantityGroups, loading: groupsLoading, error: groupsError, reload: reloadGroups } = useQuantityGroups();
-  const quantityViolations = computeCartQuantityViolations(items, quantityGroups);
-  const stockBlocked = items.find((item) =>
-    item.product.stock < item.quantity ||
-    getMaximumValidQuantity(item.product.stock, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1) === 0
-  );
-  const blockedMessage = groupsLoading
-    ? 'Vérification de votre panier…'
-    : groupsError
-      ? groupsError
-      : quantityViolations[0]
-        ? formatQuantityViolationMessage(quantityViolations[0])
-        : stockBlocked
-          ? insufficientStockMessage(stockBlocked.product.name, stockBlocked.product.stock)
-          : null;
-  const canProceed = !blockedMessage;
+  const {
+    groups: quantityGroups, error: groupsError, reloadGroups, blockedMessage, canProceed,
+  } = useCartPurchaseGate(items);
 
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
 

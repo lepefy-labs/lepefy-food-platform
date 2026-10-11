@@ -8,6 +8,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { embedText, logNalaEmbeddingUsage } from '@/lib/ai/embeddings';
 import { buildSystemPrompt, type MatchedProductContext, type KnowledgeSnippet } from '@/lib/ai/chatbox';
+import { buildMatchedProductContexts, type MatchProductsPromptRow } from '@/lib/ai/nalaPromptProducts';
 import { matchSmallTalk } from '@/lib/ai/smallTalk';
 import { canUseNala } from '@/lib/entitlements/tenantEntitlements';
 import {
@@ -47,17 +48,10 @@ export const maxDuration = 30;
 const ENDPOINT = 'chatbox';
 const MAX_MESSAGE_LENGTH = 300;
 
-interface MatchProductsRow {
-  id: string;
-  name: string;
+interface MatchProductsRow extends MatchProductsPromptRow {
   slug: string;
   image_url: string | null;
-  price: number;
   category_id: string | null;
-  stock: number | null;
-  weight_grams: number | null;
-  storage_type: string | null;
-  category_name: string | null;
   similarity: number;
 }
 
@@ -331,14 +325,9 @@ export async function POST(req: NextRequest) {
 
     const productRows = (matches ?? []) as MatchProductsRow[];
     matchedProductIds = productRows.length ? productRows.map((match) => match.id) : null;
-    const matchedProducts: MatchedProductContext[] = productRows.map((match) => ({
-      name: match.name.slice(0, 150),
-      price: match.price,
-      stock: match.stock,
-      weightGrams: match.weight_grams,
-      storageType: match.storage_type,
-      categoryName: match.category_name,
-    }));
+    const matchedProducts: MatchedProductContext[] = await buildMatchedProductContexts(
+      supabase, tenant.id, tenant.currency ?? 'EUR', productRows,
+    );
 
     const { data: knowledgeMatches } = vector ? await supabase.rpc('match_knowledge_base', {
       query_embedding: vector,

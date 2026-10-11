@@ -36,7 +36,7 @@ interface CartState {
   updateQuantity: (productId: string, quantity: number) => void;
   /**
    * +/- centralisés pour les contrôles de quantité du panier (CartDrawer,
-   * CartClient…) : contrairement à un +1/-1 littéral, respectent le pas de
+   * CartPurchaseClient…) : contrairement à un +1/-1 littéral, respectent le pas de
    * la règle de quantité du produit (ex. min=4/step=4 : 4 → 8, jamais 5).
    */
   incrementItem: (productId: string) => void;
