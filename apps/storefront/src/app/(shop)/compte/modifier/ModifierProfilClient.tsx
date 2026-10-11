@@ -117,7 +117,7 @@ export function ModifierProfilClient({ fullName, phone, defaultCountry }: Modifi
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={INPUT_CLS}
-                placeholder="Ton nom"
+                placeholder="Votre nom"
                 autoFocus
               />
             </div>

@@ -132,7 +132,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
           <Link href="/" className="absolute left-1/2 -translate-x-1/2" aria-label={tenant.name}>
             <TenantLogo variant="compact" priority className="h-11 w-[140px] max-w-[38vw]" />
           </Link>
-          <div className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold text-gray-500">
+          <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-gray-500">
             <IconLock size={14} />
             <span className="hidden sm:inline">Paiement sécurisé</span>
           </div>
@@ -165,7 +165,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
               <Link href="/avis" aria-label="Voir les avis clients" aria-current={pathname === '/avis' ? 'page' : undefined}
                 className="absolute right-16 flex h-11 w-11 flex-col items-center justify-center rounded-lg text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] md:hidden">
                 <IconStar size={23} stroke={2} aria-hidden="true" />
-                <span className="text-[10px] font-semibold leading-3 text-gray-700">Avis</span>
+                <span className="text-xs font-semibold leading-none text-gray-700">Avis</span>
               </Link>
             )}
             <Link

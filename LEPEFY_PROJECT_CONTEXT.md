@@ -2,7 +2,7 @@
 
 > Documento operativo di riferimento per Codex / Claude Code / sviluppatori.
 >
-> **Aggiornato:** 10 ottobre 2026 — **v7.22 Current-State Snapshot** (Journal d'activité: audit centralizzato multi-tenant append-only, trigger transazionali su ordini/pagamenti/catalogo/configurazione/RBAC, adapter di lettura sulle fonti di audit esistenti, `/admin/activite` solo platform owner finché il flag `activity_journal` non è attivato; migration 153 applicata e verificata il 10/10/2026; base `main` @ `fd1e392c`)
+> **Aggiornato:** 11 ottobre 2026 — **v7.23 Current-State Snapshot** (Storefront in francese semplice: formato di vendita, regole di quantità e disponibilità da un modulo condiviso `lib/storefrontCopy/`, nessun cambio di prezzi, regole o checkout; base `main` @ `d68a5f12`. Precedente v7.22: Journal d'activité, migration 153 applicata il 10/10/2026)
 >
 > **Source of truth:** codice del repository `lepefy-labs/lepefy-food-platform`. Per lo stato deployed prevalgono branch/commit effettivamente promossi e migration realmente applicate.
 
@@ -349,6 +349,16 @@ Organisation   /legal              legal_name, legal_address, legal_email
 - Le pagine di dettaglio usano `SettingsPageShell` (breadcrumb + sotto-navigazione verticale da `lg`, link "‹ Paramètres" sotto `lg`: su mobile il flusso è hub → dettaglio) e pannelli neutri `SettingsPanel`. I form tenant (`TenantFieldsForm`) inviano a `PATCH /api/admin/tenant` solo i campi della propria pagina.
 - La sidebar globale mostra una sola voce "Paramètres". Tutte le route ereditano `tenant_settings.view` dal prefisso; le API restano quelle esistenti (`tenant_settings.view/manage`).
 - Fuori da Paramètres, con lo stesso permesso `tenant_settings.view`: `/admin/contenu` (contenuto editoriale storefront: "Notre origine" `story_heading/story_text/story_image_url/countries_served`, upload `/api/admin/upload-story-photo`, link a Slides d'accueil se `catalog.manage`) e `/admin/outils` (QR boutique/carte SVG/PNG via `/api/shop/qr-code` e `/api/card/qr-code`, affiche PDF `/api/admin/card/poster`, link condivisibili). Entrambi sono voci "Commun" della sidebar e sono trovabili dalla ricerca dell'hub.
+
+### Storefront in francese semplice (`lib/storefrontCopy/`)
+
+Testi e formati visti dal cliente vengono da un solo modulo puro, condiviso da client, API e validazione (import relativi: è importato anche da `purchaseQuantityRules.ts`):
+- **`sellingFormat.ts`**: prezzo + formato («3,00 € les 500 g, soit 6,00 € le kilo»). Risoluzione a tre livelli: campi strutturati (`sale_unit`, `net_content_*`, `pack_count`: il formatter li accetta già, ma le colonne arrivano con la migration 154, non ancora presente), poi `net_quantity_display` solo se esattamente «numero + g/kg/ml/cl/L», poi «l'article». Mai da `weight_grams` (peso logistico, emballage incluso: non è più mostrato al cliente) né dal nome. Prezzo al kilo/litro solo visivo, arrotondato al centesimo. Registro unità in `saleUnits.ts` (una nuova unità = una voce, nessuna migration).
+- **`quantityRuleCopy.ts`**: minimo, incremento e gruppi da mescolare («Achetez 4 paquets minimum. Ensuite : 6, 8, 10…», «Boissons : encore 3 à ajouter»). `formatQuantityViolationMessage` delega qui: stesso testo nel carrello e nelle risposte di `/api/checkout`, stessi tipi e codici.
+- **`availability.ts`**: `sold_out` (stock 0) distinto da `below_minimum` (stock sotto il minimo), `at_limit`, problemi di riga del carrello con l'azione da fare. Icona + testo (`AvailabilityBadge`), mai solo colore.
+- **`copy.ts`**: riepiloghi («Prix des produits», «Prix de livraison», «Total à payer», «TVA incluse»: i prezzi sono TTC), CTA («Passer à la livraison», «Choisir le paiement», «Commander et payer») ed errori API in francese semplice. Gli errori cambiano solo nel testo: status HTTP e `code` invariati.
+
+`ProductPrice` (`components/catalog/`) è il rendering unico del prezzo su card, scheda e conferma. La proiezione card (`PRODUCT_CARD_BASE_COLUMNS` via `PRODUCT_SELLING_FORMAT_COLUMNS`) e il carrello server includono i campi di formato; nel tipo `CartItem.product` sono facoltativi (i carrelli salvati prima restano validi e mostrano il ripiego). Storefront: testo minimo 12 px nel percorso d'acquisto, «vous» ovunque (login e account inclusi); `tests/unit/storefrontCopy.spec.ts` blocca «/ unité», testo sotto 12 px e le vecchie etichette tecniche nei componenti del percorso. Paese preselezionato nel checkout = `tenant.country` se servito.
 
 ### Storefront routing, Catalogue, navigation e PWA
 

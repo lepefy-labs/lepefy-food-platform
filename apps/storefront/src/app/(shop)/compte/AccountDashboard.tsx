@@ -118,7 +118,7 @@ function AddressesSection({ addresses, error, retry }: { addresses: Address[]; e
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             <span className="break-words text-sm font-semibold text-gray-900">{address.full_name}</span>
-            {address.is_default && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">Par défaut</span>}
+            {address.is_default && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">Par défaut</span>}
           </span>
           <span className="mt-1 block break-words text-xs leading-5 text-gray-500">
             {address.line1}{address.line2 ? ', ' + address.line2 : ''}<br />
@@ -204,7 +204,7 @@ export function AccountDashboard({
             <IconUserCircle size={30} stroke={1.5} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Mon compte</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Mon compte</p>
             <h1 className="break-words font-display text-lg font-bold text-gray-900 sm:text-2xl">{fullName ? 'Bonjour ' + fullName : 'Bienvenue !'}</h1>
             <p className="break-all text-xs leading-5 text-gray-500 sm:text-sm">{email}</p>
           </div>

@@ -165,7 +165,7 @@ export function BrandNavigationDrawer({
               identity={{ name: tenant.name, logo_url: tenant.logo_url }}
               className="h-11 w-[150px] max-w-[55vw]"
             />
-            {eyebrow && <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[var(--color-primary)]">{eyebrow}</p>}
+            {eyebrow && <p className="mt-1 text-xs font-extrabold uppercase tracking-[0.18em] text-[var(--color-primary)]">{eyebrow}</p>}
             {tenant.tagline && <p className="mt-1 line-clamp-2 max-w-[30ch] text-xs leading-relaxed text-gray-500">{tenant.tagline}</p>}
           </div>
           <button
@@ -185,7 +185,7 @@ export function BrandNavigationDrawer({
               aria-labelledby={`${id}-${section.id}-title`}
               className={index > 0 ? 'mt-5 border-t border-gray-100 pt-4' : ''}
             >
-              <p id={`${id}-${section.id}-title`} className="px-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-gray-400">
+              <p id={`${id}-${section.id}-title`} className="px-3 pb-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-gray-400">
                 {section.label}
               </p>
 
@@ -239,7 +239,7 @@ export function BrandNavigationDrawer({
 
           {socialLinks.length > 0 && (
             <section aria-labelledby={`${id}-social-title`} className="mt-5 border-t border-gray-100 pt-4">
-              <p id={`${id}-social-title`} className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-[0.16em] text-gray-400">Suivez-nous</p>
+              <p id={`${id}-social-title`} className="px-3 pb-2 text-xs font-extrabold uppercase tracking-[0.16em] text-gray-400">Suivez-nous</p>
               <div className="flex flex-wrap gap-2 px-3" aria-label="Réseaux sociaux">
                 {socialLinks.map((link) => {
                   const meta = SOCIAL_PLATFORM_REGISTRY[link.platform];
@@ -265,7 +265,7 @@ export function BrandNavigationDrawer({
         </div>
 
         {showLegal && (
-          <div className="border-t border-gray-100 px-4 py-3 text-[11px] text-gray-400" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               <a href={joinUrl(legalBaseUrl, '/politique-confidentialite')} onClick={onClose} className="hover:text-gray-600">Confidentialité</a>
               <a href={joinUrl(legalBaseUrl, '/conditions-generales-vente')} onClick={onClose} className="hover:text-gray-600">CGV</a>

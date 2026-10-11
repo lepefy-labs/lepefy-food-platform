@@ -10,7 +10,7 @@ test('Livigno and Campione d\'Italia are recognised as extra-customs territories
 
 test('the unavailable message only offers store pickup when click & collect is enabled', () => {
   expect(extraCustomsUnavailableMessage('Livigno', true))
-    .toBe('Livraison indisponible vers Livigno (zone extra-douanière). Choisissez le retrait en magasin ou contactez-nous.');
+    .toBe('Livraison indisponible vers Livigno (zone extra-douanière). Choisissez le retrait en boutique ou contactez-nous.');
   expect(extraCustomsUnavailableMessage('Livigno', false))
     .toBe('Livraison indisponible vers Livigno (zone extra-douanière). Contactez-nous pour trouver une solution.');
 });

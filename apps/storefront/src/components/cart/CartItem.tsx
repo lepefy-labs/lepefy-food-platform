@@ -6,6 +6,8 @@ import { formatPrice } from '@/lib/utils/format';
 import { deriveCartItemState } from '@/lib/cart/cartItemState';
 import { CartQuantityControl } from './CartQuantityControl';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { describePrice, formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { cartLineIssue } from '@/lib/storefrontCopy/availability';
 
 interface CartItemProps {
   item: CartItemType;
@@ -18,15 +20,6 @@ interface CartItemProps {
   variant?: 'drawer' | 'page';
 }
 
-function formatWeightLabel(grams: number | null): string | null {
-  if (!grams) return null;
-  return grams >= 1000 ? `${+(grams / 1000).toFixed(2)}kg` : `${grams}g`;
-}
-
-const STATE_BADGE: Record<'unavailable' | 'out_of_stock', string> = {
-  unavailable: 'Indisponible',
-  out_of_stock: 'Épuisé',
-};
 
 export function CartItem({
   item,
@@ -48,7 +41,16 @@ export function CartItem({
   const maxPurchasable = getMaximumValidQuantity(product.stock, product.min_order_quantity ?? 1, product.order_quantity_step ?? 1);
   const insufficientForPack = maxPurchasable === 0;
   const blocked = state === 'unavailable' || state === 'out_of_stock' || insufficientForPack;
-  const weightLabel = formatWeightLabel(product.weight_grams);
+  const sellingFormat = resolveSellingFormat(product);
+  const price = describePrice(product.price, sellingFormat, currency);
+  const issue = cartLineIssue({
+    removed: state === 'unavailable',
+    stock: product.stock,
+    quantity,
+    minimum: product.min_order_quantity ?? 1,
+    step: product.order_quantity_step ?? 1,
+    countLabel: (count) => formatCount(sellingFormat, count),
+  });
   const lineTotal = product.price * quantity;
   const isPage = variant === 'page';
 
@@ -94,30 +96,14 @@ export function CartItem({
               <p className={`${isPage ? 'text-[15px] sm:text-base' : 'text-sm'} line-clamp-2 font-bold leading-snug text-gray-950`}>{product.name}</p>
               {isPage && <IconChevronRight size={16} className="mt-0.5 shrink-0 text-gray-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
-              {weightLabel && <span>{weightLabel}</span>}
-              <span className="font-medium">{formatPrice(product.price, currency)} / unité</span>
-              {(product.min_order_quantity ?? 1) > 1 && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800">
-                  Minimum {product.min_order_quantity}{(product.order_quantity_step ?? 1) > 1 ? ` · par ${product.order_quantity_step}` : ''}
-                </span>
-              )}
-              {insufficientForPack && (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
-                  Stock inférieur au minimum
-                </span>
-              )}
-              {!insufficientForPack && quantity > maxPurchasable && (
-                <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
-                  Ajustez à {maxPurchasable} unités
-                </span>
-              )}
-              {(state === 'unavailable' || state === 'out_of_stock') && (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700">
-                  {isPage ? 'Produit actuellement indisponible' : STATE_BADGE[state]}
-                </span>
-              )}
-            </div>
+            <p className="mt-1 text-xs text-gray-700">
+              <span className="font-semibold">{price.amount}</span> {price.unitPhrase}
+            </p>
+            {issue && (
+              <p className={`mt-1.5 rounded-lg px-2 py-1 text-xs font-semibold leading-snug ${issue.kind === 'over_stock' ? 'bg-amber-50 text-amber-900' : 'bg-red-50 text-red-800'}`} role="status">
+                {issue.message}
+              </p>
+            )}
           </div>
           {isPage && (
             <span className="hidden shrink-0 rounded-xl bg-white/85 px-2.5 py-1.5 text-base font-bold tabular-nums text-gray-950 ring-1 ring-black/5 shadow-sm sm:block" aria-live="polite">

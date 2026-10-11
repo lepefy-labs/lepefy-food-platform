@@ -99,7 +99,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     const firstAdd = panel.getByRole('button', { name: 'Ajouter Suggestion one', exact: true });
     expect((await firstAdd.boundingBox())!.height).toBeGreaterThanOrEqual(48);
     await firstAdd.click();
-    const capped = panel.getByRole('button', { name: 'Stock maximum pour Suggestion one', exact: true });
+    const capped = panel.getByRole('button', { name: 'Suggestion one : Vous avez déjà pris tout ce qui est disponible.', exact: true });
     await expect(capped).toHaveAttribute('aria-disabled', 'true');
     // Synthetic repeat represents rapid clicks arriving before a disabled render.
     await capped.evaluate(el => { (el as HTMLButtonElement).click(); (el as HTMLButtonElement).click(); });
@@ -119,7 +119,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     await page.keyboard.press('Escape');
     await expect(dialog(page)).toHaveCount(0);
     // The source stays keyboard-focusable even when its last unit was added.
-    expect(await page.evaluate(() => document.activeElement?.textContent?.includes('Ajouté') || document.activeElement?.textContent?.includes('Ajouter') || document.activeElement?.textContent?.includes('Stock maximum'))).toBe(true);
+    expect(await page.evaluate(() => document.activeElement?.textContent?.includes('Ajouté') || document.activeElement?.textContent?.includes('Ajouter') || document.activeElement?.textContent?.includes('Maximum atteint'))).toBe(true);
     expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
   });
 }

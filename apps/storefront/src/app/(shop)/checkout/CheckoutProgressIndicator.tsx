@@ -3,7 +3,7 @@ import { IconCheck } from '@tabler/icons-react';
 type CheckoutStep = 'shipping' | 'contact' | 'form' | 'select-payment' | 'payment';
 
 const STEPS = [
-  { key: 'shipping', label: 'Livraison / retrait' },
+  { key: 'shipping', label: 'Livraison ou retrait' },
   { key: 'payment', label: 'Paiement' },
 ] as const;
 
@@ -25,7 +25,7 @@ export function CheckoutProgressIndicator({ currentStep }: CheckoutProgressIndic
           <div key={step.key} className={`flex items-start ${last ? '' : 'flex-1'}`}>
             <div className="flex w-[110px] shrink-0 flex-col items-center">
               <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors"
                 style={{
                   backgroundColor: done || current ? 'var(--color-primary)' : '#E5E7EB',
                   color: done || current ? 'white' : '#9CA3AF',
@@ -33,7 +33,7 @@ export function CheckoutProgressIndicator({ currentStep }: CheckoutProgressIndic
               >
                 {done ? <IconCheck size={14} stroke={2.5} /> : index + 1}
               </div>
-              <span className="mt-1 text-center text-[10px] font-semibold leading-tight" style={{ color: current ? 'var(--color-primary)' : done ? '#15803d' : '#9CA3AF' }}>
+              <span className="mt-1 text-center text-xs font-semibold leading-tight" style={{ color: current ? 'var(--color-primary)' : done ? '#15803d' : '#4B5563' }}>
                 {step.label}
               </span>
             </div>

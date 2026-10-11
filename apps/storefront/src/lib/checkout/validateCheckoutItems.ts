@@ -1,3 +1,4 @@
+import { ERROR_COPY } from '@/lib/storefrontCopy/copy';
 import type { createServiceClient } from '@/lib/supabase/server';
 import {
   formatQuantityViolationMessage,
@@ -59,7 +60,7 @@ export async function validateCheckoutItems(
     !item || typeof item.productId !== 'string' || !item.productId
     || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > MAX_QUANTITY_PER_ITEM
   )) {
-    return { ok: false, status: 400, body: { error: 'Article invalide.', code: 'INVALID_ITEM' } };
+    return { ok: false, status: 400, body: { error: ERROR_COPY.invalidItem, code: 'INVALID_ITEM' } };
   }
 
   const quantityByProduct = new Map<string, number>();
@@ -67,7 +68,7 @@ export async function validateCheckoutItems(
     const productId = item.productId as string;
     const nextQuantity = (quantityByProduct.get(productId) ?? 0) + item.quantity;
     if (nextQuantity > MAX_QUANTITY_PER_ITEM) {
-      return { ok: false, status: 400, body: { error: 'Quantité maximale dépassée.', code: 'INVALID_ITEM' } };
+      return { ok: false, status: 400, body: { error: ERROR_COPY.tooManyItems, code: 'INVALID_ITEM' } };
     }
     quantityByProduct.set(productId, nextQuantity);
   }
@@ -85,13 +86,13 @@ export async function validateCheckoutItems(
 
   if (productsError || !dbProducts) {
     console.error('[checkout] Product quantity validation lookup failed:', productsError);
-    return { ok: false, status: 500, body: { error: 'Erreur serveur. Veuillez réessayer.', code: 'SERVER_ERROR' } };
+    return { ok: false, status: 500, body: { error: ERROR_COPY.server, code: 'SERVER_ERROR' } };
   }
 
   const productById = new Map(dbProducts.map((product) => [product.id, product]));
   if (productIds.some((id) => !productById.has(id))) {
     return { ok: false, status: 400, body: {
-      error: 'Certains articles de votre panier ne sont plus disponibles.', code: 'PRODUCT_UNAVAILABLE',
+      error: ERROR_COPY.productsUnavailable, code: 'PRODUCT_UNAVAILABLE',
     } };
   }
 
@@ -112,7 +113,7 @@ export async function validateCheckoutItems(
 
   if (groupsError || !groupRows) {
     console.error('[checkout] Group quantity validation lookup failed:', groupsError);
-    return { ok: false, status: 500, body: { error: 'Erreur serveur. Veuillez réessayer.', code: 'SERVER_ERROR' } };
+    return { ok: false, status: 500, body: { error: ERROR_COPY.server, code: 'SERVER_ERROR' } };
   }
 
   const quantityViolations = validatePurchaseQuantityRules(
@@ -139,7 +140,7 @@ export async function validateCheckoutItems(
     .map(([id]) => productById.get(id)!.name);
   if (insufficientStock.length) {
     return { ok: false, status: 400, body: {
-      error: `Stock insuffisant pour : ${insufficientStock.join(', ')}.`,
+      error: `Il n'en reste pas assez pour : ${insufficientStock.join(', ')}. Changez la quantité dans le panier.`,
       code: 'INSUFFICIENT_STOCK',
     } };
   }

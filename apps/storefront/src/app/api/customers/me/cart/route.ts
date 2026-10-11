@@ -1,3 +1,4 @@
+import { PRODUCT_SELLING_FORMAT_COLUMNS } from '@/lib/catalog/productCardSelect';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -66,10 +67,10 @@ async function rehydrateItems(
   const productIds = [...new Set(rawItems.map((i) => i.product_id))];
   const { data: dbProducts, error: productsError } = await supabase
     .from('products')
-    .select('id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step')
+    .select(`id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`)
     .eq('tenant_id', tenantId)
     .in('id', productIds) as {
-      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step'>> | null;
+      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'>> | null;
       error: unknown;
     };
 
@@ -93,6 +94,7 @@ async function rehydrateItems(
         storage_type:         p.storage_type,
         min_order_quantity:   p.min_order_quantity,
         order_quantity_step:  p.order_quantity_step,
+        net_quantity_display: p.net_quantity_display,
       },
       // Do not clamp to raw stock: 12 -> 10 would invent an off-step quantity
       // for min=4/step=4. Preserve the customer's stored intent, expose the

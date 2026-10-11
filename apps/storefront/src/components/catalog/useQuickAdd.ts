@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useCartStore } from '@/stores/cartStore';
 import type { ProductCardProduct } from './ProductCard';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { deriveAvailability } from '@/lib/storefrontCopy/availability';
 
 /** Shared quick-add behavior; merchandise retains its existing cart behavior. */
 export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = false) {
@@ -19,6 +20,13 @@ export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = fal
   );
   const outOfStock = maxPurchasable === 0;
   const atLimit = enforceStockLimit && quantity >= maxPurchasable;
+  const availability = deriveAvailability({
+    stock: Math.min(product.stock ?? 999, storedStock),
+    minimum: product.min_order_quantity,
+    step: product.order_quantity_step,
+    inCart: enforceStockLimit ? quantity : 0,
+    maxPurchasable,
+  });
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -43,6 +51,7 @@ export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = fal
       storage_type: product.storage_type ?? null,
       min_order_quantity: product.min_order_quantity,
       order_quantity_step: product.order_quantity_step,
+      net_quantity_display: product.net_quantity_display ?? null,
     });
     const updated = useCartStore.getState().items.find(item => item.product.id === product.id)?.quantity ?? 0;
     if (updated <= previous) return false;
@@ -51,5 +60,5 @@ export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = fal
     timer.current = setTimeout(() => setAdded(false), 1500);
     return true;
   }
-  return { addToCart, added, outOfStock, atLimit };
+  return { addToCart, added, outOfStock, atLimit, availability };
 }

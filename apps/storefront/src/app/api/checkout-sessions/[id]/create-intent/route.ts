@@ -1,3 +1,4 @@
+import { ERROR_COPY } from '@/lib/storefrontCopy/copy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -65,9 +66,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     if (error) {
       console.error('[checkout-sessions][create-intent] lookup error:', error);
-      return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
+      return NextResponse.json({ error: ERROR_COPY.server }, { status: 500 });
     }
-    if (!data) return NextResponse.json({ error: 'Session de paiement introuvable ou expirée.' }, { status: 404 });
+    if (!data) return NextResponse.json({ error: ERROR_COPY.sessionNotFound }, { status: 404 });
 
     const session = data as CheckoutSessionRow;
     const tokenValid = Boolean(
@@ -77,11 +78,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       session.customer_id && sessionCustomer && sessionCustomer.id === session.customer_id,
     );
     if (!customerMatches && !tokenValid) {
-      return NextResponse.json({ error: 'Accès non autorisé à cette session.' }, { status: 403 });
+      return NextResponse.json({ error: ERROR_COPY.sessionForbidden }, { status: 403 });
     }
 
     if (session.payment_method !== 'stripe') {
-      return NextResponse.json({ error: 'Cette session n\'est pas configurée pour un paiement par carte.' }, { status: 400 });
+      return NextResponse.json({ error: 'Ce paiement ne se fait pas par carte. Choisissez un autre moyen de paiement.' }, { status: 400 });
     }
 
     // Check current product and active-group rules before reusing, updating or
@@ -167,6 +168,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
     console.error('[checkout-sessions][create-intent] unhandled error:', err);
-    return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
+    return NextResponse.json({ error: ERROR_COPY.server }, { status: 500 });
   }
 }

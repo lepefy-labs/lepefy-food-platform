@@ -11,6 +11,8 @@
  * superfici calcolino la regola in modo divergente.
  */
 
+import { quantityViolationCopy } from './storefrontCopy/quantityRuleCopy';
+
 export interface QuantityRuleState {
   currentQuantity: number;
   minimumQuantity: number;
@@ -205,6 +207,8 @@ export function validatePurchaseQuantityRules(
  * "client" qui diverge de celle qui bloque réellement au serveur.
  */
 export function formatQuantityViolationMessage(violation: QuantityRuleViolation): string {
-  const label = violation.groupName ?? violation.productName ?? 'Un article';
-  return `${label} : quantité minimale ${violation.requiredMinimum}${violation.step > 1 ? ` par ${violation.step}` : ''}. Ajoutez encore ${violation.missingQuantity} unité(s).`;
+  return quantityViolationCopy({
+    ...violation,
+    label: violation.groupName ?? violation.productName ?? 'Un article',
+  });
 }

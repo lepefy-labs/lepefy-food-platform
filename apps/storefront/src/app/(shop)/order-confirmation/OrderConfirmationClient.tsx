@@ -163,7 +163,7 @@ export default function OrderConfirmationClient({
           <IconClock size={28} className="text-yellow-700" />
         </div>
         <h1 className="text-2xl font-bold mb-2">Paiement reçu — commande en cours</h1>
-        <p className="text-gray-500 text-sm">
+        <p className="text-gray-600 text-sm">
           Votre paiement a bien été effectué. Votre commande est en cours de création…
         </p>
       </div>
@@ -185,9 +185,9 @@ export default function OrderConfirmationClient({
         <h1 className="text-2xl font-bold mb-2">
           {isInStorePayment ? 'Commande enregistrée !' : 'Commande confirmée !'}
         </h1>
-        <p className="text-gray-500 text-sm">
+        <p className="text-gray-600 text-sm">
           {isInStorePayment
-            ? 'Votre commande est prête à être retirée. Présentez-vous en boutique pour régler.'
+            ? 'Nous préparons votre commande. Vous paierez en boutique au moment du retrait. Nous vous prévenons quand elle est prête.'
             : 'Merci pour votre achat. Votre paiement a bien été reçu.'
           }
         </p>
@@ -221,22 +221,22 @@ export default function OrderConfirmationClient({
           </div>
         ))}
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>Sous-total</span>
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Prix des produits</span>
             <span>{formatPrice(order.subtotal, tenant.currency)}</span>
           </div>
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>Livraison</span>
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Prix de livraison</span>
             <span>
               {order.shipping_cost === 0 ? (
-                <span className="text-green-600 font-medium">Gratuit</span>
+                <span className="text-green-700 font-medium">Gratuite</span>
               ) : (
                 formatPrice(order.shipping_cost, tenant.currency)
               )}
             </span>
           </div>
           <div className="flex justify-between font-bold text-base border-t border-gray-100 pt-2">
-            <span>Total</span>
+            <span>{isInStorePayment ? 'Total à payer au retrait' : 'Total payé'} <span className="block text-xs font-normal text-gray-600">TVA incluse</span></span>
             <span>{formatPrice(order.total, tenant.currency)}</span>
           </div>
         </div>

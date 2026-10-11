@@ -19,7 +19,7 @@ export function ReferralRope({ nodes }: ReferralRopeProps) {
   if (nodes.length === 0) {
     return (
       <p className="text-sm text-gray-400 text-center py-6">
-        Invite un ami pour commencer ta corde de filleuls.
+        Invitez un ami pour commencer votre corde de filleuls.
       </p>
     );
   }
@@ -42,7 +42,7 @@ export function ReferralRope({ nodes }: ReferralRopeProps) {
         const levelNodes = nodes.filter((n) => n.level === level);
         return (
           <div key={level} className="flex flex-col items-center gap-1.5 w-full">
-            <span className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
+            <span className="text-xs uppercase tracking-wide text-gray-400 font-medium">
               Niveau {level}
             </span>
             <div className="flex flex-row flex-wrap md:flex-row max-[420px]:flex-col items-center justify-center gap-3">

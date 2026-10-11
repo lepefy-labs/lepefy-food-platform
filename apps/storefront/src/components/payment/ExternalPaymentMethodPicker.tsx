@@ -50,7 +50,7 @@ function PaymentOptionCard({ option }: { option: PaymentOption }) {
       </span>
       <span className="flex-1">
         <span className="block text-gray-800">{option.label}</span>
-        <span className="block text-xs text-gray-400 font-normal">{option.sub}</span>
+        <span className="block text-xs text-gray-600 font-normal">{option.sub}</span>
       </span>
       <span className={`w-[18px] h-[18px] rounded-full border-2 flex-shrink-0 ${
         option.selected ? 'border-[var(--color-primary)] bg-[var(--color-primary)] bg-clip-padding' : 'border-gray-300'
@@ -84,7 +84,9 @@ export function buildExternalPaymentOptions(
       icon:     <Icon size={16} stroke={1.8} className="text-white" />,
       color:    methodColor(pm.method, 'var(--color-primary)'),
       label:    pm.label ?? meta.label,
-      sub:      pm.method === 'paypal' ? 'Lien direct · montant pré-rempli' : 'Lien direct · montant à saisir',
+      sub:      pm.method === 'paypal'
+        ? 'Vous payez sur PayPal. Nous vérifions, puis nous confirmons.'
+        : 'Vous payez sur leur page. Nous vérifions, puis nous confirmons.',
     };
   });
 }
@@ -100,19 +102,20 @@ export function ExternalPaymentNote({
   currency: string;
 }) {
   return (
-    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 mt-3 leading-relaxed">
+    <p className="text-sm text-amber-950 bg-amber-50 border border-amber-300 rounded-xl px-3.5 py-2.5 mt-3 leading-relaxed">
       {method.method === 'paypal'
-        ? <>Sélectionnez « Amis et famille » lors du paiement pour éviter les frais. Le montant ({formatPrice(total, currency)}) sera pré-rempli dans le lien.</>
-        : <>Le montant n&apos;est pas prérempli sur ce lien — saisissez-le manuellement : <strong>{formatPrice(total, currency)}</strong>.</>
+        ? <>Le montant <strong>{formatPrice(total, currency)}</strong> sera déjà écrit sur PayPal. Choisissez « Amis et famille » pour éviter les frais.</>
+        : <>Sur la page de paiement, écrivez ce montant : <strong>{formatPrice(total, currency)}</strong>.</>
       }
     </p>
   );
 }
 
 // `noun` distingue "la commande" (boutique) de "la réservation" (billetterie
-// événementiel) — même gabarit de texte, seul le nom change selon le module.
+// événementiel) — même gabarit de texte, seul le verbe change selon le module.
 export function externalPaymentCtaLabel(method: TenantPaymentMethod, noun: string = 'la commande'): string {
-  return `Créer ${noun} et ouvrir ${method.label ?? PAYMENT_METHOD_REGISTRY[method.method].label}`;
+  const verb = noun === 'la réservation' ? 'Réserver' : 'Commander';
+  return `${verb} et payer avec ${method.label ?? PAYMENT_METHOD_REGISTRY[method.method].label}`;
 }
 
 export function externalPaymentCtaColor(method: TenantPaymentMethod): string {

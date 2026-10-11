@@ -20,7 +20,7 @@ export function extraCustomsTerritory(country: string, postalCode: string): stri
 
 export function extraCustomsUnavailableMessage(territory: string, clickCollectEnabled: boolean): string {
   const alternative = clickCollectEnabled
-    ? 'Choisissez le retrait en magasin ou contactez-nous.'
+    ? 'Choisissez le retrait en boutique ou contactez-nous.'
     : 'Contactez-nous pour trouver une solution.';
   return `Livraison indisponible vers ${territory} (zone extra-douanière). ${alternative}`;
 }

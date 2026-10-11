@@ -89,25 +89,25 @@ export type TariffQuoteOutcome =
   | { kind: 'unavailable'; reason: TariffUnavailableCode; message: string };
 
 function alternative(clickCollectEnabled: boolean): string {
-  return clickCollectEnabled ? 'Choisissez le retrait en magasin ou contactez-nous.' : 'Contactez-nous pour trouver une solution.';
+  return clickCollectEnabled ? 'Choisissez le retrait en boutique ou contactez-nous.' : 'Contactez-nous pour trouver une solution.';
 }
 
 export function tariffUnavailableMessage(code: TariffUnavailableCode, clickCollectEnabled: boolean): string {
   const alt = alternative(clickCollectEnabled);
   switch (code) {
     case 'zone_not_deliverable': return `Livraison indisponible vers cette destination. ${alt}`;
-    case 'band_not_covered': return `Cette commande dépasse le poids livrable en ligne. ${alt}`;
-    case 'product_unavailable': return 'Certains articles de votre panier ne sont plus disponibles. Veuillez actualiser votre panier.';
+    case 'band_not_covered': return `Cette commande est trop lourde pour la livraison en ligne. ${alt}`;
+    case 'product_unavailable': return 'Certains articles ne sont plus disponibles. Retournez au panier pour les retirer.';
     case 'no_service':
     case 'no_eligible_service':
     case 'provider_rejected': return `Aucun service de livraison disponible pour cette destination. ${alt}`;
-    case 'provider_unavailable': return `Impossible de confirmer la livraison vers cette destination pour le moment. Réessayez dans quelques minutes. ${alt}`;
-    default: return `Livraison momentanément indisponible. ${alt}`;
+    case 'provider_unavailable': return `Nous ne pouvons pas confirmer la livraison pour le moment. Réessayez dans quelques minutes. ${alt}`;
+    default: return `La livraison n'est pas disponible pour le moment. ${alt}`;
   }
 }
 
 export const MISSING_WEIGHT_MESSAGE = (clickCollectEnabled: boolean) =>
-  `Les frais de livraison de certains articles ne peuvent pas encore être calculés. ${alternative(clickCollectEnabled)}`;
+  `Nous ne pouvons pas encore calculer la livraison de certains articles. ${alternative(clickCollectEnabled)}`;
 export const NO_TARIFF_MESSAGE = (clickCollectEnabled: boolean) =>
   `La livraison en ligne n'est pas disponible vers ce pays. ${alternative(clickCollectEnabled)}`;
 export const ZONE_NOT_COVERED_MESSAGE = (clickCollectEnabled: boolean) =>

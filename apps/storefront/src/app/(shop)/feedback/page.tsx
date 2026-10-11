@@ -69,7 +69,7 @@ export default async function FeedbackPage() {
           )}
         </div>
       </section>
-      <footer className="mt-6 text-center text-[11px] leading-5 text-gray-500">
+      <footer className="mt-6 text-center text-xs leading-5 text-gray-500">
         <strong className="font-semibold">Propulsé par Lepefy</strong><br />
         Solutions numériques sur mesure pour faire grandir votre activité
       </footer>

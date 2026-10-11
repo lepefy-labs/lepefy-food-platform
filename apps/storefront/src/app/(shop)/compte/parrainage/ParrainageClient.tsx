@@ -45,7 +45,7 @@ export function ParrainageClient({
     if (!shareUrl) return;
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Ton lien', url: shareUrl });
+        await navigator.share({ title: 'Votre lien de parrainage', url: shareUrl });
       } catch {
         // partage annulé par l'utilisateur — rien à faire
       }
@@ -57,7 +57,7 @@ export function ParrainageClient({
   if (!eligible) {
     return (
       <div className="max-w-sm mx-auto px-4 pt-10 pb-4 flex flex-col items-center gap-6">
-        <h1 className="text-xl font-bold text-gray-900 text-center">Invite un ami</h1>
+        <h1 className="text-xl font-bold text-gray-900 text-center">Invitez un ami</h1>
 
         {mode === 'SPENDING_THRESHOLD' && progress && progress.threshold != null ? (
           <LockedTagProgress
@@ -67,7 +67,7 @@ export function ParrainageClient({
           />
         ) : (
           <p className="text-sm text-gray-500 text-center max-w-[240px]">
-            Le parrainage arrive bientôt pour toi.
+            Le parrainage arrive bientôt pour vous.
           </p>
         )}
       </div>
@@ -78,7 +78,7 @@ export function ParrainageClient({
     <div className="max-w-sm mx-auto px-4 pt-8 pb-6 flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3 text-center">
         <ShopTag className="text-sm px-4 py-2">
-          Ton code : {code ?? '…'}
+          Votre code : {code ?? '…'}
         </ShopTag>
         <div className="flex gap-2">
           <button

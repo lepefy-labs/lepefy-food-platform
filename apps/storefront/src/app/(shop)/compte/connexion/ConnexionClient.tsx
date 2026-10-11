@@ -27,8 +27,8 @@ export function ConnexionClient({ initialCustomer }: { initialCustomer: SessionC
       <IconUserCircle size={56} stroke={1.2} color="var(--color-primary)" />
       <div className="text-center">
         <h1 className="text-xl font-bold text-gray-900">Mon compte</h1>
-        <p className="text-sm text-gray-400 mt-2">
-          Connecte-toi pour retrouver tes commandes et gagner des points
+        <p className="text-sm text-gray-600 mt-2">
+          Connectez-vous pour retrouver vos commandes et gagner des points.
         </p>
       </div>
       <div className="w-full">

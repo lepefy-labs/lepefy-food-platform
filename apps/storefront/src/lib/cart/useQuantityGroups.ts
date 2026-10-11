@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { PublicQuantityGroup } from '@/app/api/quantity-groups/route';
+import { ERROR_COPY } from '@/lib/storefrontCopy/copy';
 
 export interface QuantityGroupsLoadState {
   groups: PublicQuantityGroup[];
@@ -39,7 +40,7 @@ export function useQuantityGroups(): QuantityGroupsLoadState {
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setError('Impossible de vérifier les règles de quantité. Réessayez avant de continuer.');
+          setError(ERROR_COPY.quantityRulesUnavailable);
           setLoading(false);
         }
       });

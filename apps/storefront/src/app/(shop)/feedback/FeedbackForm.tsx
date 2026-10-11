@@ -108,7 +108,7 @@ export default function FeedbackForm({ campaign, accentColor, invitedTester }: P
                 style={reaction === value ? { borderColor: accentColor, backgroundColor: accentColor, color: 'white' } : undefined}
               >
                 <span className="block text-xl" aria-hidden="true">{REACTION_EMOJI[value]}</span>
-                <span className="mt-1 block text-[11px] font-medium">{REACTION_LABELS[value]}</span>
+                <span className="mt-1 block text-xs font-medium">{REACTION_LABELS[value]}</span>
               </button>
             ))}
           </div>

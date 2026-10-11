@@ -11,7 +11,10 @@
  */
 /** Colonnes scalaires communes, sans la relation `category` (jointure dont la
  *  forme — `left join` ou `!inner` — varie selon l'appelant, cf. gadgets). */
+/** Colonnes du format de vente affiché au client (lib/storefrontCopy/sellingFormat.ts). */
+export const PRODUCT_SELLING_FORMAT_COLUMNS = 'net_quantity_display';
+
 export const PRODUCT_CARD_BASE_COLUMNS =
-  'id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step';
+  `id, name, slug, price, compare_at_price, image_url, weight_grams, stock, storage_type, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`;
 
 export const PRODUCT_CARD_SELECT = `${PRODUCT_CARD_BASE_COLUMNS}, category:categories(name)`;

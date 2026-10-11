@@ -134,7 +134,7 @@ export function CartDrawer() {
           <div className="flex-1 overflow-y-auto px-5">
             {(groupsLoading || groupsError) && (
               <p className="mb-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-800" role="status">
-                {groupsLoading ? 'Vérification des règles du panier…' : groupsError}
+                {groupsLoading ? 'Vérification de votre panier…' : groupsError}
               </p>
             )}
             <QuantityGroupProgress groups={quantityGroups} items={items} />

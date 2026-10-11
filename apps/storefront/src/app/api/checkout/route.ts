@@ -1,3 +1,4 @@
+import { ERROR_COPY } from '@/lib/storefrontCopy/copy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!rawItems?.length || !email) {
-      return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 });
+      return NextResponse.json({ error: ERROR_COPY.missingData }, { status: 400 });
     }
 
     const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);
     if (consentState.showTermsCheckbox && termsAccepted !== true) {
       return NextResponse.json(
-        { error: 'Merci d\'accepter les Conditions Générales de Vente pour continuer.' },
+        { error: ERROR_COPY.termsRequired },
         { status: 400 },
       );
     }
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
       const { error: stockError } = await supabase.rpc('decrement_stock_for_order', { items: stockDecrementItems });
       if (stockError) {
         return NextResponse.json({
-          error: 'Un ou plusieurs articles ne sont plus disponibles dans la quantité demandée. Veuillez repasser par le panier.',
+          error: ERROR_COPY.productsUnavailable,
         }, { status: 409 });
       }
 
@@ -172,7 +173,7 @@ export async function POST(req: NextRequest) {
 
       if (orderError || !order) {
         console.error('[checkout] in_store order insert error:', orderError);
-        return NextResponse.json({ error: 'Erreur lors de la création de la commande.' }, { status: 500 });
+        return NextResponse.json({ error: ERROR_COPY.generic }, { status: 500 });
       }
 
       const orderItemsPayload = items.map((item) => ({
@@ -310,6 +311,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error('[checkout] unhandled error:', err);
-    return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
+    return NextResponse.json({ error: ERROR_COPY.server }, { status: 500 });
   }
 }

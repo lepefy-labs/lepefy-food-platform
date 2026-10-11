@@ -130,12 +130,13 @@ export function OtpLoginForm({ onAuthenticated }: OtpLoginFormProps) {
     <div className="rounded-2xl border border-gray-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
       {step === 'email' ? (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-gray-700">Connecte-toi pour gagner des points</p>
+          <p className="text-sm font-semibold text-gray-700">Connectez-vous pour gagner des points</p>
           <input
             type="email"
             inputMode="email"
             autoComplete="email"
-            placeholder="Ton email"
+            placeholder="Votre e-mail"
+            aria-label="Votre e-mail"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => {

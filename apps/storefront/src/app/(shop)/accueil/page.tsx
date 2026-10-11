@@ -35,6 +35,7 @@ export type HomeProduct = {
   compare_at_price?: number | null;
   min_order_quantity: number;
   order_quantity_step: number;
+  net_quantity_display?: string | null;
 };
 
 const HERO_LIMIT = 6;

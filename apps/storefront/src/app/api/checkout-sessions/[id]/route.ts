@@ -1,3 +1,4 @@
+import { ERROR_COPY } from '@/lib/storefrontCopy/copy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -97,11 +98,11 @@ async function loadAndAuthorizeSession(
 
   if (error) {
     console.error('[checkout-sessions] lookup error:', error);
-    return { ok: false, status: 500, error: 'Erreur serveur. Veuillez réessayer.' };
+    return { ok: false, status: 500, error: ERROR_COPY.server };
   }
 
   if (!data) {
-    return { ok: false, status: 404, error: 'Session de paiement introuvable ou indisponible.' };
+    return { ok: false, status: 404, error: ERROR_COPY.sessionNotFound };
   }
 
   const session = data as CheckoutSessionRow;
@@ -113,11 +114,11 @@ async function loadAndAuthorizeSession(
       .eq('tenant_id', tenantId)
       .eq('status', 'open')
       .lte('expires_at', nowIso);
-    return { ok: false, status: 404, error: 'Session de paiement introuvable ou expirée.' };
+    return { ok: false, status: 404, error: ERROR_COPY.sessionNotFound };
   }
 
   if (session.status === 'awaiting_verification' && session.payment_method !== 'external_link') {
-    return { ok: false, status: 409, error: 'État de paiement incohérent. Contactez le support.' };
+    return { ok: false, status: 409, error: ERROR_COPY.paymentNeedsCheck };
   }
 
   const tokenValid = Boolean(
@@ -128,7 +129,7 @@ async function loadAndAuthorizeSession(
   );
 
   if (!customerMatches && !tokenValid) {
-    return { ok: false, status: 403, error: 'Accès non autorisé à cette session.' };
+    return { ok: false, status: 403, error: ERROR_COPY.sessionForbidden };
   }
 
   return { ok: true, session };
@@ -156,7 +157,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .eq('tenant_id', tenant.id)
       .in('id', productIds);
     if (rulesError) {
-      return NextResponse.json({ error: 'Impossible de vérifier les règles de quantité.' }, { status: 503 });
+      return NextResponse.json({ error: ERROR_COPY.quantityRulesUnavailable }, { status: 503 });
     }
     const rulesById = new Map((productRules ?? []).map((product) => [product.id, product]));
     return NextResponse.json({
@@ -174,7 +175,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     });
   } catch (err) {
     console.error('[checkout-sessions][GET] unhandled error:', err);
-    return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
+    return NextResponse.json({ error: ERROR_COPY.server }, { status: 500 });
   }
 }
 
@@ -366,7 +367,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (needsLinkRebuild) {
         const methodId = body.externalPaymentMethodId;
         if (!methodId && session.payment_method !== 'external_link') {
-          return NextResponse.json({ error: 'Moyen de paiement manquant.' }, { status: 400 });
+          return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
         }
 
         if (methodId) {
@@ -379,7 +380,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             .maybeSingle();
           const method = methodRow as TenantPaymentMethod | null;
           if (!method || method.method === 'bank_transfer' || method.method === 'cash' || !method.extra?.link) {
-            return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
+            return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
           }
           const currency = (tenant.currency ?? 'EUR').toUpperCase();
           const finalLink = method.method === 'paypal'
@@ -468,6 +469,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     });
   } catch (err) {
     console.error('[checkout-sessions][PATCH] unhandled error:', err);
-    return NextResponse.json({ error: 'Erreur serveur. Veuillez réessayer.' }, { status: 500 });
+    return NextResponse.json({ error: ERROR_COPY.server }, { status: 500 });
   }
 }

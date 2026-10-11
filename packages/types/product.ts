@@ -63,8 +63,10 @@ export interface ProductWithCategory extends Product {
 }
 
 export interface CartItem {
+  // Les champs de format de vente sont facultatifs : un panier enregistré
+  // avant leur ajout reste valide et s'affiche avec le libellé de repli.
   product: Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'image_url' | 'weight_grams' | 'stock' | 'storage_type'>
-    & Partial<Pick<Product, 'min_order_quantity' | 'order_quantity_step'>>;
+    & Partial<Pick<Product, 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'>>;
   quantity: number;
 }
 

@@ -25,6 +25,7 @@
  *                            (shipping_tariff_fallback), mai implicito.
  */
 
+import { ERROR_COPY } from '@/lib/storefrontCopy/copy';
 import { resolvePacklinkApiKey } from '@/lib/shipping/packlinkApiKey';
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
@@ -153,7 +154,7 @@ async function quoteProviderCost(
     case 'flat_rate': {
       if (!tenant.flat_rate_amount) {
         console.error('[shipping/quote] flat_rate provider but flat_rate_amount is null — tenant:', tenant.id);
-        return { available: false, message: 'Tarif de livraison non configuré.', status: 500 };
+        return { available: false, message: ERROR_COPY.shippingUnavailableNow, status: 500 };
       }
 
       const applied = applyCountryRule(tenant.flat_rate_amount, cartSubtotal, rule);
@@ -172,7 +173,7 @@ async function quoteProviderCost(
       const packlinkApiKey = resolvePacklinkApiKey(tenant);
       if (!packlinkApiKey) {
         console.error('[shipping/quote] PACKLINK_API_KEY missing — tenant:', tenant.id);
-        return { available: false, message: 'Service de livraison non configuré.', status: 500 };
+        return { available: false, message: ERROR_COPY.shippingUnavailableNow, status: 500 };
       }
       console.info('[shipping/quote] packlink api key present — source:', tenant.packlink_api_key ? 'tenant DB' : 'env');
 
@@ -217,7 +218,7 @@ async function quoteProviderCost(
       console.info('[shipping/quote] surcharge row:', surcharge, '— vatRates count:', vatRates?.length ?? 0);
 
       if (!surcharge) {
-        return { available: false, message: 'Configuration de livraison manquante.', status: 500 };
+        return { available: false, message: ERROR_COPY.shippingUnavailableNow, status: 500 };
       }
 
       // ── Calculate ─────────────────────────────────────────────────────────
@@ -266,7 +267,7 @@ async function quoteTariff(
   const clickCollect = Boolean(tenant.click_collect_enabled);
   const quantityByProduct = quantitiesFromItems(items);
   if (!quantityByProduct) {
-    return NextResponse.json({ available: false, message: 'Articles invalides. Veuillez actualiser votre panier.' }, { status: 400 });
+    return NextResponse.json({ available: false, message: ERROR_COPY.invalidItem }, { status: 400 });
   }
 
   // Sous-total serveur (seuil de gratuité) : prix du catalogue, jamais ceux du navigateur.
@@ -379,7 +380,7 @@ export async function POST(request: Request) {
 
     if (!items?.length || !to?.country || !to?.zip_code) {
       return NextResponse.json(
-        { available: false, message: 'Paramètres manquants.' },
+        { available: false, message: 'Écrivez votre pays et votre code postal pour calculer la livraison.' },
         { status: 400 },
       );
     }
@@ -390,7 +391,7 @@ export async function POST(request: Request) {
     if (!quoteSecret) {
       console.error('[shipping/quote] TRACKING_SECRET manquant — impossible de signer le devis');
       return NextResponse.json(
-        { available: false, message: 'Service de livraison non configuré.' },
+        { available: false, message: ERROR_COPY.shippingUnavailableNow },
         { status: 500 },
       );
     }
@@ -403,7 +404,7 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error('[shipping/quote] getTenant failed — slug:', tenantSlug, err);
       return NextResponse.json(
-        { available: false, message: 'Tenant non trovato.' },
+        { available: false, message: ERROR_COPY.shippingUnavailableNow },
         { status: 500 },
       );
     }
@@ -415,7 +416,7 @@ export async function POST(request: Request) {
     if (tenant.shipping_provider === 'pickup_only') {
       return NextResponse.json({
         available: false,
-        message: 'Ce magasin ne propose pas de livraison. Veuillez choisir le retrait en magasin.',
+        message: "Cette boutique ne livre pas. Choisissez le retrait en boutique.",
       });
     }
 
@@ -438,7 +439,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('[shipping/quote] unhandled error:', err);
     return NextResponse.json(
-      { available: false, message: 'Erreur serveur. Veuillez réessayer.' },
+      { available: false, message: ERROR_COPY.server },
       { status: 500 },
     );
   }

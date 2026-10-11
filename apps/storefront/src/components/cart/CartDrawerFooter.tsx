@@ -27,8 +27,8 @@ function SyncBanner({ status }: { status: CartSyncStatus }) {
   }
   if (status === 'error') {
     return (
-      <p className="text-xs text-amber-600 text-center" role="status">
-        Impossible de synchroniser le panier. Nous réessaierons automatiquement.
+      <p className="text-xs text-amber-800 text-center" role="status">
+        Connexion instable : votre panier est gardé sur cet appareil.
       </p>
     );
   }
@@ -45,7 +45,7 @@ export function CartDrawerFooter({
   return (
     <div className="border-t border-gray-100 px-5 py-4 shrink-0 space-y-3">
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-500">Sous-total</span>
+        <span className="text-gray-700">Prix des produits</span>
         <span className="font-bold text-base">{formatPrice(subtotal, currency)}</span>
       </div>
 

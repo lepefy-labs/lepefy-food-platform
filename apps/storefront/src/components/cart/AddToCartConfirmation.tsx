@@ -15,6 +15,8 @@ import { useCartUiStore } from '@/stores/cartUiStore';
 import { useTenant } from '@/providers/TenantProvider';
 import { formatPrice } from '@/lib/utils/format';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { AVAILABILITY_COPY } from '@/lib/storefrontCopy/availability';
 
 const primary = { backgroundColor: 'var(--color-primary)' };
 const actionFocusClass = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors duration-150 motion-reduce:transition-none';
@@ -40,6 +42,7 @@ function RecommendationItem({ product, onAdded, onClose }: {
   const { addToCart, added, outOfStock, atLimit } = useQuickAdd(product, true);
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const hasMinRule = minOrderQuantity > 1;
+  const price = describePrice(product.price, resolveSellingFormat(product), currency);
   return (
     <li className="flex w-36 shrink-0 flex-col rounded-lg border border-gray-300 bg-white p-2 sm:w-auto sm:min-w-0">
       <Link href={`/products/${product.slug}`} onClick={onClose} className="block rounded-lg focus-visible:outline focus-visible:outline-2">
@@ -47,22 +50,22 @@ function RecommendationItem({ product, onAdded, onClose }: {
         <span className="mt-2 block min-h-10 text-sm font-medium leading-5 text-gray-900 line-clamp-2">{product.name}</span>
       </Link>
       <div className="my-2 mt-auto pt-2">
-        <span className="block text-sm font-bold text-gray-900">{formatPrice(product.price, currency)} <span className="text-xs font-medium text-gray-400">/ unité</span></span>
+        <span className="block text-sm text-gray-900"><span className="font-bold">{price.amount}</span> <span className="text-xs font-medium text-gray-700">{price.unitPhrase}</span></span>
         {product.compare_at_price != null && product.compare_at_price > product.price && (
-          <span className="block text-xs text-gray-400 line-through">{formatPrice(product.compare_at_price, currency)}</span>
+          <span className="block text-xs text-gray-500 line-through">{formatPrice(product.compare_at_price, currency)}</span>
         )}
         {hasMinRule && (
-          <span className="mt-1 inline-flex items-center rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-800">
-            Minimum {minOrderQuantity}
+          <span className="mt-1 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+            {minOrderQuantity} minimum
           </span>
         )}
       </div>
       <button type="button" disabled={outOfStock || atLimit} aria-disabled={atLimit || undefined}
-        aria-label={atLimit ? `Stock maximum pour ${product.name}` : hasMinRule ? `Ajouter ${minOrderQuantity} ${product.name}` : `Ajouter ${product.name}`}
-        className={`${recommendationActionClass} text-white hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 disabled:opacity-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-60`}
+        aria-label={atLimit ? `${product.name} : ${AVAILABILITY_COPY.atLimitHelp}` : hasMinRule ? `Ajouter ${minOrderQuantity} ${product.name}` : `Ajouter ${product.name}`}
+        className={`${recommendationActionClass} text-white hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:!bg-gray-200 disabled:text-gray-700 disabled:opacity-100 aria-disabled:cursor-not-allowed`}
         style={added ? { backgroundColor: '#16a34a' } : primary}
         onClick={() => { if (addToCart()) onAdded(product.id); }}>
-        {added ? 'Ajouté ✓' : atLimit ? 'Stock maximum' : outOfStock ? 'Épuisé' : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter'}
+        {added ? 'Ajouté ✓' : atLimit ? AVAILABILITY_COPY.atLimitCta : outOfStock ? AVAILABILITY_COPY.unavailableCta : hasMinRule ? `Ajouter ${minOrderQuantity}` : 'Ajouter'}
       </button>
     </li>
   );
@@ -139,9 +142,9 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
   }, [product.id]);
 
   const visible = recommendations.filter(p => addedHere.has(p.id) || !items.some(item => item.product.id === p.id));
-  const details = [product.category?.name, product.weight_grams ? `${product.weight_grams} g` : null].filter(Boolean).join(' · ');
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const hasMinRule = minOrderQuantity > 1;
+  const price = describePrice(product.price, resolveSellingFormat(product), currency);
 
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
@@ -165,11 +168,10 @@ function ConfirmationPanel({ product, onClose }: { product: ProductCardProduct; 
             <div className="min-w-0">
               <Link href={`/products/${product.slug}`} onClick={onClose}
                 className="line-clamp-2 rounded-sm text-sm font-semibold text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:text-base">{product.name}</Link>
-              {details && <p className="mt-0.5 truncate text-xs text-gray-500">{details}</p>}
-              <p className="mt-1 font-bold text-gray-900">{formatPrice(product.price, currency)} <span className="text-xs font-medium text-gray-400">/ unité</span></p>
+              <p className="mt-1 text-gray-900"><span className="font-bold">{price.amount}</span> <span className="text-sm font-medium text-gray-700">{price.unitPhrase}</span></p>
               {hasMinRule && (
-                <span className="mt-1 inline-flex items-center rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-800">
-                  Minimum {minOrderQuantity}
+                <span className="mt-1 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+                  {minOrderQuantity} minimum
                 </span>
               )}
               <div role="group" aria-label={`Quantité de ${product.name}`}

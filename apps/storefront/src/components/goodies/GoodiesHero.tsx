@@ -14,7 +14,7 @@ export function GoodiesHero({ product }: { product: ProductCardProduct & { descr
   return (
     <section aria-label="Produit phare" className="relative grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] overflow-hidden rounded-2xl bg-[var(--color-primary-light)] sm:rounded-3xl">
       <div className="relative z-10 flex min-w-0 flex-col items-start p-4 pr-0 sm:p-8 lg:p-10">
-        <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-primary)] sm:text-xs">Produit phare</span>
+        <span className="rounded-full bg-white/90 px-2 py-1 text-xs font-bold uppercase tracking-wide text-[var(--color-primary)] sm:text-xs">Produit phare</span>
         <h2 className="mt-3 break-words text-xl font-bold leading-tight text-[color:color-mix(in_srgb,var(--color-secondary)_35%,black)] sm:text-3xl">
           <Link href={`/products/${product.slug}?from=gadgets`} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]">{product.name}</Link>
         </h2>

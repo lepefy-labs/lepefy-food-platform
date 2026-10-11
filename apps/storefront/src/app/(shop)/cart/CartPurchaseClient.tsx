@@ -14,6 +14,8 @@ import { useCartStore } from '@/stores/cartStore';
 import { useQuantityGroups } from '@/lib/cart/useQuantityGroups';
 import { computeCartQuantityViolations } from '@/lib/cart/cartQuantityValidation';
 import { formatQuantityViolationMessage, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { insufficientStockMessage } from '@/lib/storefrontCopy/availability';
+import { ACTION_COPY, SUMMARY_COPY, productsPriceLabel } from '@/lib/storefrontCopy/copy';
 import type { CartItem as CartItemType, PublicTenant } from '@lepefy/types';
 import { useEffect, useState } from 'react';
 
@@ -39,13 +41,13 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
     getMaximumValidQuantity(item.product.stock, item.product.min_order_quantity ?? 1, item.product.order_quantity_step ?? 1) === 0
   );
   const blockedMessage = groupsLoading
-    ? 'Vérification des règles du panier…'
+    ? 'Vérification de votre panier…'
     : groupsError
       ? groupsError
       : quantityViolations[0]
         ? formatQuantityViolationMessage(quantityViolations[0])
         : stockBlocked
-          ? `Stock insuffisant pour : ${stockBlocked.product.name}. Ajustez sa quantité.`
+          ? insufficientStockMessage(stockBlocked.product.name, stockBlocked.product.stock)
           : null;
   const canProceed = !blockedMessage;
 
@@ -96,18 +98,19 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
           <section className="rounded-3xl border border-gray-200 bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] sm:p-5 lg:hidden" aria-label="Total du panier">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-gray-700">Total estimé</p>
+                <p className="text-sm font-semibold text-gray-700">{SUMMARY_COPY.productsPrice}</p>
                 <p className="mt-0.5 text-3xl font-black tracking-tight text-gray-950">{formatPrice(subtotal, tenant.currency)}</p>
               </div>
-              <p className="pb-1 text-sm font-medium text-gray-500">{formatProductCount(itemCount)}</p>
+              <p className="pb-1 text-sm font-medium text-gray-600">{formatProductCount(itemCount)}</p>
             </div>
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement 100 % sécurisé</p>
+            <p className="mt-2 text-sm text-gray-700">Livraison : {SUMMARY_COPY.shippingNextStep}</p>
+            <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
           </section>
 
           {groupsError && (
             <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               {groupsError}
-              <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">Réessayer</button>
+              <button type="button" onClick={reloadGroups} className="ml-2 min-h-11 font-bold underline">{ACTION_COPY.retry}</button>
             </div>
           )}
           <QuantityGroupProgress groups={quantityGroups} items={items} />
@@ -131,11 +134,11 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
             {undo && <div className="pt-3"><CartUndoToast productName={undo.item.product.name} onUndo={restore} /></div>}
           </section>
 
-          <div className="hidden flex-col gap-2 md:flex lg:max-w-xl">
-            {blockedMessage && <p className="text-xs font-semibold text-amber-700">{blockedMessage}</p>}
+          <div className="hidden flex-col gap-2 md:flex lg:hidden">
+            {blockedMessage && <p className="text-sm font-semibold text-amber-900" role="status">{blockedMessage}</p>}
             <div className="flex items-center gap-3">
               <button type="button" onClick={continueShopping} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 hover:bg-gray-50">
-                <IconArrowLeft size={16} /> Continuer mes achats
+                <IconArrowLeft size={16} aria-hidden="true" /> {ACTION_COPY.continueShopping}
               </button>
               <button
                 type="button"
@@ -145,20 +148,24 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
                 className="flex min-h-12 flex-[1.2] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ backgroundColor: 'var(--color-primary)' }}
               >
-                Continuer — Livraison <IconArrowRight size={16} />
+                {ACTION_COPY.goToShipping} <IconArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           </div>
         </div>
 
         <aside className="hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)] lg:sticky lg:top-24 lg:block">
-          <p className="text-sm font-semibold text-gray-700">Total estimé</p>
-          <div className="mt-1 flex items-end justify-between gap-3">
-            <p className="text-3xl font-black tracking-tight text-gray-950">{formatPrice(subtotal, tenant.currency)}</p>
-            <p className="pb-1 text-xs font-medium text-gray-500">{formatProductCount(itemCount)}</p>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-gray-500">Les frais de livraison seront calculés à l’étape suivante selon votre adresse.</p>
-          {blockedMessage && <p className="mt-3 text-xs font-semibold text-amber-700">{blockedMessage}</p>}
+          <dl className="text-sm">
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <dt className="text-gray-700">{productsPriceLabel(itemCount)}</dt>
+              <dd className="text-2xl font-black tracking-tight tabular-nums text-gray-950">{formatPrice(subtotal, tenant.currency)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1">
+              <dt className="text-gray-700">Livraison</dt>
+              <dd className="text-gray-800">{SUMMARY_COPY.shippingNextStep}</dd>
+            </div>
+          </dl>
+          {blockedMessage && <p className="mt-3 text-sm font-semibold text-amber-900" role="status">{blockedMessage}</p>}
           <button
             type="button"
             onClick={startCheckout}
@@ -167,18 +174,18 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
             className="mt-3 min-h-12 w-full rounded-2xl px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >
-            Continuer — Livraison
+            {ACTION_COPY.goToShipping}
           </button>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} /> Paiement sécurisé</p>
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-green-700"><IconLock size={13} aria-hidden="true" /> Paiement sécurisé</p>
         </aside>
       </div>
 
       <div className="fixed inset-x-0 bottom-16 z-40 border-t border-black/10 bg-white/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_30px_rgba(0,0,0,.08)] backdrop-blur md:hidden">
         <div className="mx-auto max-w-xl">
-          {blockedMessage && <p className="mb-1.5 text-center text-xs font-semibold text-amber-700">{blockedMessage}</p>}
+          {blockedMessage && <p className="mb-1.5 text-center text-sm font-semibold leading-snug text-amber-900" role="status">{blockedMessage}</p>}
           <div className="grid grid-cols-[0.9fr_1.25fr] gap-2.5">
             <button type="button" onClick={continueShopping} className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-gray-300 bg-white px-2 py-3 text-xs font-bold text-gray-800">
-              <IconArrowLeft size={15} /> Continuer mes achats
+              <IconArrowLeft size={15} aria-hidden="true" /> {ACTION_COPY.continueShopping}
             </button>
             <button
               type="button"
@@ -188,7 +195,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
               className="flex min-h-12 items-center justify-center gap-1.5 rounded-2xl px-3 py-3 text-sm font-bold text-white transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-primary)] motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-50"
               style={{ backgroundColor: 'var(--color-primary)' }}
             >
-              Livraison <IconArrowRight size={15} />
+              {ACTION_COPY.goToShipping} <IconArrowRight size={15} aria-hidden="true" />
             </button>
           </div>
         </div>

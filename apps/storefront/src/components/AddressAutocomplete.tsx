@@ -155,7 +155,7 @@ export default function AddressAutocomplete({
               {result.label}
             </button>
           ))}
-          <p className="text-[10px] text-gray-400 px-3 py-1.5 bg-gray-50">
+          <p className="text-xs text-gray-400 px-3 py-1.5 bg-gray-50">
             Recherche via OpenStreetMap
           </p>
         </div>

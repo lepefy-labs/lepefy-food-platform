@@ -38,6 +38,7 @@ import type { FreeShippingInfo } from '@/lib/shipping/freeShippingInfo';
 import { formatPrice } from '@/lib/utils/format';
 import { useCartStore } from '@/stores/cartStore';
 import type { PublicTenant, TenantPaymentMethod } from '@lepefy/types';
+import { ACTION_COPY, ERROR_COPY, FORM_COPY, SUMMARY_COPY, productsPriceLabel, totalWithPendingShipping } from '@/lib/storefrontCopy/copy';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
 
 const COUNTRIES = [
@@ -53,10 +54,10 @@ type FulfillmentType = 'delivery' | 'pickup';
 type PaymentMode = 'stripe' | 'in_store';
 
 const contactSchema = z.object({
-  firstName: z.string().trim().min(1, 'Prénom requis'),
-  lastName: z.string().trim().min(1, 'Nom requis'),
-  email: z.string().trim().email('Email invalide'),
-  phone: z.string().trim().min(6, 'Téléphone requis'),
+  firstName: z.string().trim().min(1, FORM_COPY.firstNameRequired),
+  lastName: z.string().trim().min(1, FORM_COPY.lastNameRequired),
+  email: z.string().trim().email(FORM_COPY.emailInvalid),
+  phone: z.string().trim().min(6, FORM_COPY.phoneRequired),
 });
 
 type ContactValues = z.infer<typeof contactSchema>;
@@ -91,7 +92,7 @@ function readDraft(): CheckoutDraft | null {
       shippingDetails: (parsed.shippingDetails as Record<string, unknown> | null) ?? null,
       freeShipping: (parsed.freeShipping as FreeShippingInfo) ?? null,
       quoteToken: typeof parsed.quoteToken === 'string' ? parsed.quoteToken : null,
-      country: typeof parsed.country === 'string' && parsed.country ? parsed.country : 'IT',
+      country: typeof parsed.country === 'string' ? parsed.country : '',
       postalCode: typeof parsed.postalCode === 'string' ? parsed.postalCode : '',
       street: typeof parsed.street === 'string' ? parsed.street : '',
       houseNumber: typeof parsed.houseNumber === 'string' ? parsed.houseNumber : '',
@@ -134,7 +135,9 @@ export default function CheckoutFlow({
   const { customer: sessionCustomer, refresh: refreshSessionCustomer } = useSessionCustomer();
   const [step, setStep] = useState<Step>('shipping');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(initialDraft?.fulfillmentType ?? 'delivery');
-  const [country, setCountry] = useState(initialDraft?.country ?? 'IT');
+  // Pays proposé par défaut : celui de la boutique s'il est livré, sinon le premier de la liste.
+  const defaultCountry = COUNTRIES.some((entry) => entry.value === tenant.country) ? tenant.country : COUNTRIES[0]!.value;
+  const [country, setCountry] = useState(initialDraft?.country || defaultCountry);
   const [postalCode, setPostalCode] = useState(initialDraft?.postalCode ?? '');
   const [street, setStreet] = useState(initialDraft?.street ?? '');
   const [houseNumber, setHouseNumber] = useState(initialDraft?.houseNumber ?? '');
@@ -213,7 +216,7 @@ export default function CheckoutFlow({
         if (!getValues('phone')) setValue('phone', profile.phone ?? '');
         if (profile.defaultAddress && !postalCode && !street) {
           const line = splitLine1(profile.defaultAddress.line1);
-          setCountry(profile.defaultAddress.country || 'IT');
+          setCountry(profile.defaultAddress.country || defaultCountry);
           setPostalCode(profile.defaultAddress.postalCode);
           setStreet(line.street);
           setHouseNumber(line.houseNumber);
@@ -225,12 +228,16 @@ export default function CheckoutFlow({
       }
     })();
     return () => { cancelled = true; };
-  }, [sessionCustomer, getValues, setValue, postalCode, street]);
+  }, [sessionCustomer, getValues, setValue, postalCode, street, defaultCountry]);
 
   const subtotal = totalPrice();
   const isPickup = fulfillmentType === 'pickup';
   const effectiveShippingTotal = isPickup ? 0 : shippingTotal;
   const total = subtotal + effectiveShippingTotal - ambassadorDiscount;
+  const shippingKnown = isPickup || Boolean(quoteToken);
+  const shippingValue = !shippingKnown
+    ? SUMMARY_COPY.shippingAfterAddress
+    : effectiveShippingTotal === 0 ? SUMMARY_COPY.shippingFree : formatPrice(effectiveShippingTotal, tenant.currency);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const hasCompleteAddress = Boolean(country.trim() && postalCode.trim() && street.trim() && houseNumber.trim() && city.trim());
   const recipientComplete = Boolean(firstName?.trim() && lastName?.trim());
@@ -290,7 +297,7 @@ export default function CheckoutFlow({
       const data = await response.json();
       if (!response.ok || !data.available) {
         setQuoteToken(null);
-        setShippingError(data.message ?? 'Livraison non disponible pour cette adresse.');
+        setShippingError(data.message ?? "La livraison n'est pas possible à cette adresse. Vérifiez le code postal.");
         return;
       }
       setShippingTotal(data.shippingTotal);
@@ -300,7 +307,7 @@ export default function CheckoutFlow({
       setQuotedFor({ country: destinationCountry, postalCode: zip.trim() });
     } catch {
       setQuoteToken(null);
-      setShippingError('Erreur lors du calcul des frais de livraison.');
+      setShippingError(ERROR_COPY.shippingQuoteFailed);
     } finally {
       setShippingLoading(false);
     }
@@ -330,7 +337,7 @@ export default function CheckoutFlow({
     stripeSessionIdRef.current = null;
     invalidateQuote();
     setStep('shipping');
-    setSubmitError(result.error ?? 'Les frais de livraison doivent être recalculés. Vérifiez le nouveau montant avant de payer.');
+    setSubmitError(result.error ?? 'Le prix de livraison a changé. Vérifiez le nouveau montant avant de payer.');
     if (!isPickup) void quoteShipping(country, postalCode);
     return true;
   }
@@ -360,11 +367,11 @@ export default function CheckoutFlow({
 
   const continueFromInformation = (data: ContactValues) => {
     if (!isPickup && !hasCompleteAddress) {
-      focusAddressSection('Indiquez une adresse complète pour calculer vos frais de livraison.');
+      focusAddressSection('Écrivez votre adresse complète (rue, numéro, code postal, ville) pour calculer la livraison.');
       return;
     }
     if (!isPickup && !quoteToken) {
-      focusAddressSection(shippingError ?? 'Le calcul de la livraison est en cours. Veuillez patienter un instant.');
+      focusAddressSection(shippingError ?? 'Nous calculons le prix de livraison. Patientez un instant.');
       return;
     }
     if (!data.firstName || !data.lastName || !data.email || !data.phone) return;
@@ -426,7 +433,7 @@ export default function CheckoutFlow({
         if (retryResponse.status !== 404) {
           const retryResult = await retryResponse.json().catch(() => ({}));
           handleShippingRequote(retryResult);
-          return { error: retryResult.error ?? 'Une erreur est survenue.' };
+          return { error: retryResult.error ?? ERROR_COPY.generic };
         }
         stripeSessionIdRef.current = null;
       }
@@ -439,19 +446,19 @@ export default function CheckoutFlow({
       const result = await response.json();
       if (!response.ok) {
         handleShippingRequote(result);
-        return { error: result.error ?? 'Une erreur est survenue.' };
+        return { error: result.error ?? ERROR_COPY.generic };
       }
       stripeSessionIdRef.current = result.sessionId ?? null;
       stripeSessionSnapshotRef.current = snapshot;
       return { clientSecret: result.clientSecret, reference_id: result.sessionId ?? null };
     } catch {
-      return { error: 'Une erreur est survenue.' };
+      return { error: ERROR_COPY.generic };
     }
   }
 
   async function confirmPaymentChoice() {
     if (consentState.showTermsCheckbox && !termsAccepted) {
-      setSubmitError('Merci d’accepter les Conditions Générales de Vente pour continuer.');
+      setSubmitError(ERROR_COPY.termsRequired);
       return;
     }
     setIsSubmitting(true);
@@ -465,7 +472,7 @@ export default function CheckoutFlow({
         });
         const result = await response.json();
         if (!response.ok) {
-          if (!handleShippingRequote(result)) setSubmitError(result.error ?? 'Une erreur est survenue.');
+          if (!handleShippingRequote(result)) setSubmitError(result.error ?? ERROR_COPY.generic);
           return;
         }
         sessionStorage.setItem('lepefy-pending-payment', JSON.stringify({
@@ -482,7 +489,7 @@ export default function CheckoutFlow({
           body: JSON.stringify({ ...sharedPayload, shippingTotal: 0, paymentMethod: 'in_store' as const }),
         });
         const result = await response.json();
-        if (!response.ok) { setSubmitError(result.error ?? 'Une erreur est survenue.'); return; }
+        if (!response.ok) { setSubmitError(result.error ?? ERROR_COPY.generic); return; }
         completeCheckout(`/order-confirmation?order_id=${result.orderId}`);
         return;
       }
@@ -490,7 +497,7 @@ export default function CheckoutFlow({
       saveDraft();
       setStep('payment');
     } catch {
-      setSubmitError('Une erreur est survenue. Veuillez réessayer.');
+      setSubmitError(ERROR_COPY.generic);
     } finally {
       setIsSubmitting(false);
     }
@@ -500,9 +507,9 @@ export default function CheckoutFlow({
     <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
       <button type="button" onClick={() => setShowOrderDetails((value) => !value)} className="flex min-h-12 w-full items-center justify-between gap-4 px-4 py-3 text-left">
         <span>
-          <span className="block text-xs font-medium text-gray-500">Total</span>
-          <span className="text-lg font-black text-gray-950">{formatPrice(total, tenant.currency)}</span>
-          <span className="ml-2 text-xs text-gray-500">· {itemCount} article{itemCount > 1 ? 's' : ''}</span>
+          <span className="block text-xs font-medium text-gray-600">{SUMMARY_COPY.totalToPay}</span>
+          <span className="text-lg font-black text-gray-950">{shippingKnown ? formatPrice(total, tenant.currency) : totalWithPendingShipping(subtotal - ambassadorDiscount, tenant.currency)}</span>
+          <span className="ml-2 text-xs text-gray-600">· {itemCount} article{itemCount > 1 ? 's' : ''}</span>
         </span>
         <IconChevronDown size={18} className={`text-gray-500 transition-transform ${showOrderDetails ? 'rotate-180' : ''}`} />
       </button>
@@ -511,7 +518,7 @@ export default function CheckoutFlow({
           {items.map((item) => (
             <div key={item.product.id} className="flex justify-between gap-4 py-1.5"><span className="min-w-0 truncate text-gray-600">{item.quantity}× {item.product.name}</span><span className="font-medium">{formatPrice(item.product.price * item.quantity, tenant.currency)}</span></div>
           ))}
-          <div className="mt-2 flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Livraison</span><span className="font-semibold">{isPickup ? 'Gratuit' : quoteToken ? formatPrice(shippingTotal, tenant.currency) : 'À calculer'}</span></div>
+          <div className="mt-2 flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-600">{SUMMARY_COPY.shippingPrice}</span><span className="font-semibold">{shippingValue}</span></div>
           {ambassadorDiscount > 0 && <div className="flex justify-between py-1.5 text-green-700"><span>Avantage ambassadeur</span><span>-{formatPrice(ambassadorDiscount, tenant.currency)}</span></div>}
         </div>
       )}
@@ -520,10 +527,25 @@ export default function CheckoutFlow({
 
   if (items.length === 0) return null;
 
+  const fullSummary = (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4" aria-label="Montant de la commande">
+      <div className="flex justify-between py-1.5 text-sm"><span className="text-gray-700">{productsPriceLabel(itemCount)}</span><span className="font-semibold">{formatPrice(subtotal, tenant.currency)}</span></div>
+      <div className="flex justify-between py-1.5 text-sm"><span className="text-gray-700">{SUMMARY_COPY.shippingPrice}</span><span className="font-semibold">{shippingValue}</span></div>
+      {ambassadorDiscount > 0 && <div className="flex justify-between py-1.5 text-sm text-green-700"><span>Avantage ambassadeur</span><span>-{formatPrice(ambassadorDiscount, tenant.currency)}</span></div>}
+      <div className="mt-2 flex items-end justify-between gap-3 border-t border-gray-200 pt-3">
+        <span>
+          <span className="block font-bold">{SUMMARY_COPY.totalToPay}</span>
+          <span className="block text-xs text-gray-600">{SUMMARY_COPY.taxIncluded}</span>
+        </span>
+        <span className="text-right text-2xl font-black tabular-nums" aria-live="polite">{shippingKnown ? formatPrice(total, tenant.currency) : totalWithPendingShipping(subtotal - ambassadorDiscount, tenant.currency)}</span>
+      </div>
+    </section>
+  );
+
   const selectedExternalMethod = externalPaymentMethods.find((method) => method.id === selectedExternalMethodId) ?? null;
   const paymentCtaLabel = selectedExternalMethod
     ? externalPaymentCtaLabel(selectedExternalMethod, 'la commande')
-    : paymentMode === 'in_store' ? 'Confirmer le retrait en boutique' : 'Continuer avec carte bancaire';
+    : paymentMode === 'in_store' ? ACTION_COPY.orderPayAtPickup : 'Payer par carte';
   const paymentCtaColor = selectedExternalMethod ? externalPaymentCtaColor(selectedExternalMethod) : paymentMode === 'in_store' ? '#8a8578' : 'var(--color-primary)';
 
   return (
@@ -534,22 +556,22 @@ export default function CheckoutFlow({
       {step === 'shipping' && (
         <div className="space-y-5">
           <section className="rounded-2xl bg-[color-mix(in_srgb,var(--color-primary)_6%,white)] px-4 py-3.5">
-            <p className="text-sm font-bold text-gray-950">{isPickup ? 'Préparez votre retrait' : 'Préparez votre livraison'}</p>
-            <p className="mt-1 text-xs leading-relaxed text-gray-600">
-              Renseignez la personne qui reçoit ou retire la commande, puis les informations nécessaires pour la livraison et le contact.
+            <p className="text-sm font-bold text-gray-950">{isPickup ? 'Retrait en boutique' : 'Livraison chez vous'}</p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-700">
+              {isPickup ? 'Écrivez votre nom, votre e-mail et votre téléphone.' : 'Écrivez votre nom, votre adresse, votre e-mail et votre téléphone.'}
             </p>
           </section>
 
           <section>
-            <h1 className="text-lg font-bold text-gray-950">Mode de récupération</h1>
+            <h1 className="text-lg font-bold text-gray-950">Comment recevoir votre commande ?</h1>
             <div className="mt-3 grid grid-cols-2 gap-3">
               {(['delivery', 'pickup'] as const).filter((type) => type === 'delivery' || tenant.click_collect_enabled).map((type) => {
                 const active = fulfillmentType === type;
                 return (
                   <button key={type} type="button" onClick={() => changeFulfillment(type)} className={`relative min-h-[92px] rounded-2xl border p-4 text-left transition-colors ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)]' : 'border-gray-200 bg-white'}`}>
                     <span className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl ${active ? 'bg-[var(--color-primary)] text-white' : 'bg-gray-100 text-gray-500'}`}>{type === 'delivery' ? <IconTruck size={18} /> : <IconBuildingStore size={18} />}</span>
-                    <span className="block text-sm font-bold text-gray-950">{type === 'delivery' ? 'Livraison' : 'Click & Collect'}</span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-gray-500">{type === 'delivery' ? 'Recevez votre commande à l’adresse indiquée' : 'Retirez votre commande en boutique'}</span>
+                    <span className="block text-sm font-bold text-gray-950">{type === 'delivery' ? 'Livraison' : 'Retrait en boutique'}</span>
+                    <span className="mt-0.5 block text-xs leading-snug text-gray-600">{type === 'delivery' ? 'Chez vous, à votre adresse' : 'Vous venez la chercher, sans prix de livraison'}</span>
                     {active && <IconCheck size={16} className="absolute right-3 top-3 text-[var(--color-primary)]" />}
                   </button>
                 );
@@ -561,13 +583,13 @@ export default function CheckoutFlow({
             <div className="flex items-start gap-3">
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${recipientComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{recipientComplete ? <IconCheck size={15} /> : '1'}</span>
               <div>
-                <h2 className="text-sm font-bold text-gray-950">{isPickup ? 'Personne qui retire' : 'Destinataire'}</h2>
-                <p className="mt-0.5 text-xs text-gray-500">Nom utilisé pour remettre ou livrer la commande.</p>
+                <h2 className="text-sm font-bold text-gray-950">{isPickup ? 'Qui vient chercher la commande ?' : 'À quel nom livrer ?'}</h2>
+                <p className="mt-0.5 text-xs text-gray-600">Prénom et nom de la personne qui reçoit la commande.</p>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div><input {...register('firstName')} autoComplete="given-name" placeholder="Prénom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.firstName && <p className="mt-1 text-xs font-medium text-red-600">{errors.firstName.message}</p>}</div>
-              <div><input {...register('lastName')} autoComplete="family-name" placeholder="Nom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.lastName && <p className="mt-1 text-xs font-medium text-red-600">{errors.lastName.message}</p>}</div>
+              <div><input {...register('firstName')} autoComplete="given-name" placeholder="Prénom" aria-label="Prénom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.firstName && <p className="mt-1 text-xs font-medium text-red-600">{errors.firstName.message}</p>}</div>
+              <div><input {...register('lastName')} autoComplete="family-name" placeholder="Nom" aria-label="Nom" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.lastName && <p className="mt-1 text-xs font-medium text-red-600">{errors.lastName.message}</p>}</div>
             </div>
           </section>
 
@@ -578,7 +600,7 @@ export default function CheckoutFlow({
                 <div>
                   <p className="flex items-center gap-2 text-sm font-bold text-blue-900"><IconMapPin size={17} /> Retrait chez {tenant.name}</p>
                   {tenant.click_collect_address && <p className="mt-2 text-sm text-blue-800">{tenant.click_collect_address}</p>}
-                  <p className="mt-2 text-xs font-semibold text-green-700">Aucun frais de livraison.</p>
+                  <p className="mt-2 text-xs font-semibold text-green-700">Pas de prix de livraison.</p>
                 </div>
               </div>
             </section>
@@ -588,7 +610,7 @@ export default function CheckoutFlow({
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${quoteToken && hasCompleteAddress ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{quoteToken && hasCompleteAddress ? <IconCheck size={15} /> : '2'}</span>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-sm font-bold text-gray-950">Adresse de livraison</h2>
-                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Elle sert à calculer les frais de livraison avant le paiement.</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-600">Elle sert à calculer le prix de livraison avant le paiement.</p>
                 </div>
               </div>
 
@@ -596,7 +618,7 @@ export default function CheckoutFlow({
                 <div className="mt-4 rounded-xl bg-green-50 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-xs font-bold text-green-800"><IconCheck size={15} /> Adresse validée</p>
+                      <p className="flex items-center gap-2 text-xs font-bold text-green-800"><IconCheck size={15} aria-hidden="true" /> Adresse trouvée</p>
                       <p className="mt-1 text-sm font-semibold text-gray-900">{street} {houseNumber}</p>
                       <p className="text-xs text-gray-600">{postalCode} {city} · {COUNTRIES.find((entry) => entry.value === country)?.label ?? country}</p>
                     </div>
@@ -605,7 +627,7 @@ export default function CheckoutFlow({
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">
-                  <select value={country} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
+                  <select aria-label="Pays de livraison" value={country} onChange={(event) => { setSubmitError(null); invalidateQuote(); setCountry(event.target.value); }} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]">
                     {COUNTRIES.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
                   </select>
                   {manualMode ? (
@@ -618,7 +640,7 @@ export default function CheckoutFlow({
                   ) : (
                     <AddressAutocomplete
                       country={country}
-                      placeholder="Saisissez votre adresse complète"
+                      placeholder="Votre adresse (rue, numéro, ville)"
                       onSelect={(result) => {
                         setSubmitError(null);
                         invalidateQuote();
@@ -636,9 +658,9 @@ export default function CheckoutFlow({
 
               <div className="mt-3 space-y-2">
                 {submitError && <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700" role="alert">{submitError}</p>}
-                {shippingLoading && <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600" role="status">Calcul de la livraison en cours…</p>}
+                {shippingLoading && <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700" role="status">Calcul du prix de livraison…</p>}
                 {!shippingLoading && shippingError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700" role="alert">{shippingError}</p>}
-                {!shippingLoading && quoteToken && <p className="rounded-xl border border-green-100 bg-green-50 px-3 py-2.5 text-xs font-semibold text-green-800">✓ Livraison disponible · {formatPrice(shippingTotal, tenant.currency)}</p>}
+                {!shippingLoading && quoteToken && <p className="rounded-xl border border-green-100 bg-green-50 px-3 py-2.5 text-xs font-semibold text-green-800">✓ Prix de livraison : {shippingTotal === 0 ? SUMMARY_COPY.shippingFree.toLowerCase() : formatPrice(shippingTotal, tenant.currency)}</p>}
               </div>
             </section>
           )}
@@ -648,12 +670,12 @@ export default function CheckoutFlow({
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${contactComplete ? 'bg-green-600 text-white' : 'bg-[var(--color-primary)] text-white'}`}>{contactComplete ? <IconCheck size={15} /> : '3'}</span>
               <div>
                 <h2 className="text-sm font-bold text-gray-950">Contact</h2>
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">Le téléphone est obligatoire : le transporteur ou la boutique peut vous contacter au sujet de la remise de la commande.</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-600">Le téléphone est obligatoire : le livreur ou la boutique peut vous appeler pour la remise.</p>
               </div>
             </div>
             <div className="mt-4 space-y-3">
-              <div><input {...register('email')} type="email" inputMode="email" autoComplete="email" placeholder="Email" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.email && <p className="mt-1 text-xs font-medium text-red-600">{errors.email.message}</p>}</div>
-              <div className="relative"><IconPhone size={16} className="pointer-events-none absolute left-3 top-3.5 text-gray-400" /><input {...register('phone')} type="tel" inputMode="tel" autoComplete="tel" placeholder="Téléphone" className="w-full rounded-xl border border-gray-200 py-3 pl-9 pr-3 text-sm" />{errors.phone && <p className="mt-1 text-xs font-medium text-red-600">{errors.phone.message}</p>}</div>
+              <div><input {...register('email')} type="email" inputMode="email" autoComplete="email" placeholder="E-mail" aria-label="E-mail" className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm" />{errors.email && <p className="mt-1 text-xs font-medium text-red-600">{errors.email.message}</p>}</div>
+              <div className="relative"><IconPhone size={16} className="pointer-events-none absolute left-3 top-3.5 text-gray-400" /><input {...register('phone')} type="tel" inputMode="tel" autoComplete="tel" placeholder="Téléphone" aria-label="Téléphone" className="w-full rounded-xl border border-gray-200 py-3 pl-9 pr-3 text-sm" />{errors.phone && <p className="mt-1 text-xs font-medium text-red-600">{errors.phone.message}</p>}</div>
             </div>
 
             <div className="mt-3">
@@ -669,35 +691,31 @@ export default function CheckoutFlow({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-4">
-            <div className="flex justify-between py-1.5 text-sm"><span className="text-gray-500">Sous-total ({itemCount} article{itemCount > 1 ? 's' : ''})</span><span className="font-semibold">{formatPrice(subtotal, tenant.currency)}</span></div>
-            <div className="flex justify-between py-1.5 text-sm"><span className="text-gray-500">Livraison</span><span className="font-semibold">{isPickup ? 'Gratuit' : quoteToken ? formatPrice(shippingTotal, tenant.currency) : 'À calculer'}</span></div>
-            <div className="mt-2 flex items-end justify-between border-t border-gray-200 pt-3"><span className="font-bold">{isPickup || quoteToken ? 'Total' : 'Total estimé'}</span><span className="text-2xl font-black">{formatPrice(total, tenant.currency)}</span></div>
-          </section>
+          {fullSummary}
 
           <button type="button" onClick={handleSubmit(continueFromInformation, focusFirstContactError)} disabled={shippingLoading} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: 'var(--color-primary)' }}>
-            {shippingLoading ? 'Calcul de la livraison…' : 'Continuer — Paiement'}
+            {shippingLoading ? 'Calcul du prix de livraison…' : ACTION_COPY.choosePayment}
           </button>
         </div>
       )}
 
       {step === 'select-payment' && (
         <div className="space-y-5">
-          <button type="button" onClick={() => setStep('shipping')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500"><IconArrowLeft size={14} /> Modifier la livraison et les coordonnées</button>
+          <button type="button" onClick={() => setStep('shipping')} className="flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gray-700"><IconArrowLeft size={14} aria-hidden="true" /> Modifier l&apos;adresse ou le contact</button>
           <section>
-            <h1 className="text-lg font-bold text-gray-950">Choisissez votre moyen de paiement</h1>
+            <h1 className="text-lg font-bold text-gray-950">Comment voulez-vous payer ?</h1>
             <div className="mt-3">
               <PaymentOptionList options={[
                 {
                   key: 'stripe', selected: paymentMode === 'stripe' && !selectedExternalMethodId,
                   onSelect: () => { setPaymentMode('stripe'); setSelectedExternalMethodId(null); },
-                  icon: <IconCreditCard size={16} className="text-white" />, color: 'var(--color-primary)', label: 'Carte bancaire', sub: 'Paiement sécurisé, confirmation immédiate',
+                  icon: <IconCreditCard size={16} className="text-white" />, color: 'var(--color-primary)', label: 'Carte bancaire', sub: 'Paiement sécurisé. Commande confirmée tout de suite.',
                 },
                 ...buildExternalPaymentOptions(externalPaymentMethods, selectedExternalMethodId, (id) => setSelectedExternalMethodId(id)),
                 ...(isPickup ? [{
                   key: 'in_store', selected: paymentMode === 'in_store' && !selectedExternalMethodId,
                   onSelect: () => { setPaymentMode('in_store'); setSelectedExternalMethodId(null); },
-                  icon: <IconBuildingStore size={16} className="text-white" />, color: '#8a8578', label: 'Paiement en boutique', sub: 'Paiement sur place lors du retrait',
+                  icon: <IconBuildingStore size={16} className="text-white" />, color: '#8a8578', label: 'Payer au retrait', sub: 'Vous payez en boutique en venant chercher la commande',
                 }] : []),
               ]} />
               {selectedExternalMethod && <ExternalPaymentNote method={selectedExternalMethod} total={total} currency={tenant.currency} />}
@@ -711,22 +729,24 @@ export default function CheckoutFlow({
             </section>
           )}
 
-          {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitError}</p>}
+          {fullSummary}
+
+          {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">{submitError}</p>}
           <button type="button" onClick={confirmPaymentChoice} disabled={isSubmitting || (consentState.showTermsCheckbox && !termsAccepted)} className="min-h-12 w-full rounded-2xl px-4 py-3.5 text-base font-bold text-white disabled:opacity-50" style={{ backgroundColor: paymentCtaColor }}>
-            {isSubmitting ? 'Traitement…' : paymentMode === 'stripe' && !selectedExternalMethod ? paymentCtaLabel : `${paymentCtaLabel} — ${formatPrice(total, tenant.currency)}`}
+            {isSubmitting ? ACTION_COPY.processing : `${paymentCtaLabel} · ${formatPrice(total, tenant.currency)}`}
           </button>
         </div>
       )}
 
       {step === 'payment' && (
         <div className="space-y-4">
-          <button type="button" onClick={() => setStep('select-payment')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500"><IconArrowLeft size={14} /> Modifier le mode de paiement</button>
+          <button type="button" onClick={() => setStep('select-payment')} className="flex min-h-11 items-center gap-1.5 text-sm font-semibold text-gray-700"><IconArrowLeft size={14} aria-hidden="true" /> Choisir un autre paiement</button>
           <div>
             <h1 className="text-lg font-bold text-gray-950">Paiement par carte bancaire</h1>
-            <p className="mt-1 text-xs text-gray-500">Transaction sécurisée par Stripe</p>
+            <p className="mt-1 text-xs text-gray-600">Paiement sécurisé par Stripe</p>
           </div>
-          {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitError}</p>}
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-900"><p className="flex items-start gap-2"><IconLock size={15} className="mt-0.5 shrink-0" /> Ne fermez pas cette fenêtre pendant le paiement. Vous serez redirigé(e) une fois le paiement terminé.</p></div>
+          {submitError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">{submitError}</p>}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900"><p className="flex items-start gap-2"><IconLock size={15} className="mt-0.5 shrink-0" aria-hidden="true" /> Restez sur cette page pendant le paiement.</p></div>
           <StripePaymentStep
             module="shop"
             isTest={isE2ETest}
@@ -735,9 +755,9 @@ export default function CheckoutFlow({
             color="var(--color-primary)"
             returnUrl={`${window.location.origin}/order-confirmation`}
             referenceId={null}
-            payLabel={`Payer ${formatPrice(total, tenant.currency)}`}
-            processingLabel="Traitement en cours…"
-            billingCountryHint="Si un pays est demandé ci-dessous, indiquez celui associé à votre carte bancaire (facturation), pas votre position actuelle."
+            payLabel={`${ACTION_COPY.orderAndPay} · ${formatPrice(total, tenant.currency)}`}
+            processingLabel="Paiement en cours…"
+            billingCountryHint="Pays : indiquez celui de votre carte bancaire."
             createIntent={createIntent}
             onError={(message) => setSubmitError(message)}
             onSucceeded={(paymentIntentId) => completeCheckout(`/order-confirmation?payment_intent=${paymentIntentId ?? ''}`)}

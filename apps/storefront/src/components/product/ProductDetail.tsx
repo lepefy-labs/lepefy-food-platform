@@ -15,7 +15,12 @@ import { ProductSpecs } from './ProductSpecs';
 import { ProductTabs } from './ProductTabs';
 import { TrustBadges } from './TrustBadges';
 import { formatPrice } from '@/lib/utils/format';
-import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { computeQuantityRuleState, getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
+import { contentLabel, formatCount, quantityNoun, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { groupHeadline, groupProgressCopy, minimumHeadline, nextQuantitiesList, stepLine } from '@/lib/storefrontCopy/quantityRuleCopy';
+import { AVAILABILITY_COPY, belowMinimumDetail, deriveAvailability } from '@/lib/storefrontCopy/availability';
+import { ProductPrice } from '@/components/catalog/ProductPrice';
+import { IconCircleOff, IconHourglassHigh } from '@tabler/icons-react';
 import type { ProductWithCategory } from '@lepefy/types';
 
 export function ProductDetail({ product }: { product: ProductWithCategory }) {
@@ -36,18 +41,24 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const [added, setAdded] = useState(false);
   const maxPurchasable = getMaximumValidQuantity(product.stock, minOrderQuantity, orderQuantityStep);
   const outOfStock = maxPurchasable === 0;
+  const availability = deriveAvailability({ stock: product.stock, minimum: minOrderQuantity, step: orderQuantityStep, maxPurchasable });
+  const sellingFormat = resolveSellingFormat(product);
   const totalPrice = product.price * quantity;
   const group = groups.find((entry) => entry.productIds.includes(product.id));
   const groupQuantity = group
     ? cartItems.filter((item) => group.productIds.includes(item.product.id))
         .reduce((sum, item) => sum + item.quantity, 0)
     : 0;
-  const groupTarget = group && groupQuantity > 0
-    ? group.min_quantity + Math.max(0, Math.ceil((groupQuantity - group.min_quantity) / group.quantity_step)) * group.quantity_step
-    : group?.min_quantity ?? 0;
-  const groupMissing = Math.max(0, groupTarget - groupQuantity);
+  const groupState = group && groupQuantity > 0
+    ? computeQuantityRuleState(groupQuantity, group.min_quantity, group.quantity_step)
+    : null;
+  const groupProgress = group && groupState
+    ? groupProgressCopy(group.name, groupQuantity, groupState.nextValidQuantity, group.min_quantity)
+    : null;
   const hasIndividualRule = minOrderQuantity > 1 || orderQuantityStep > 1;
-  const explicitQuantityLabel = `Ajouter ${quantity} au panier`;
+  const quantityLabel = formatCount(sellingFormat, quantity);
+  const explicitQuantityLabel = `Ajouter ${quantityLabel}`;
+  const ruleStepLine = stepLine(minOrderQuantity, orderQuantityStep);
 
   function continueShopping() {
     router.push(getShoppingReturn(catalogHref));
@@ -66,6 +77,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       storage_type: product.storage_type ?? null,
       min_order_quantity:  product.min_order_quantity,
       order_quantity_step: product.order_quantity_step,
+      net_quantity_display: product.net_quantity_display ?? null,
     }, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -107,53 +119,51 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
             </p>
           )}
           <ProductTitle product={product} />
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-3xl font-semibold" style={{ color: 'var(--color-primary)' }}>
-              {formatPrice(product.price, currency)}
-            </span>
-            <span className="text-sm font-medium text-gray-400">/ unité</span>
-            {product.compare_at_price && product.compare_at_price > product.price && (
-              <span className="text-lg text-gray-400 line-through">{formatPrice(product.compare_at_price, currency)}</span>
-            )}
+          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+            <ProductPrice price={product.price} currency={currency} product={product} compareAtPrice={product.compare_at_price} size="detail" />
           </div>
 
-          {hasIndividualRule && (
-            <section aria-label="Conditions de vente" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              <p className="font-semibold">Vendu à partir de {minOrderQuantity} unité{minOrderQuantity > 1 ? 's' : ''}</p>
-              <p className="mt-1 text-amber-900">
-                {orderQuantityStep > 1
-                  ? `Quantités possibles : ${minOrderQuantity}, ${minOrderQuantity + orderQuantityStep}, ${minOrderQuantity + orderQuantityStep * 2}…`
-                  : `Quantité minimale : ${minOrderQuantity} unité${minOrderQuantity > 1 ? 's' : ''}.`}
-              </p>
-              <p className="mt-2 flex items-center justify-between gap-3 border-t border-amber-200 pt-2">
-                <span>Montant minimum</span>
-                <strong className="tabular-nums">{formatPrice(product.price * minOrderQuantity, currency)}</strong>
+          {availability === 'sold_out' || availability === 'below_minimum' ? (
+            <section aria-label="Disponibilité" className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm ${availability === 'sold_out' ? 'border-gray-300 bg-gray-50 text-gray-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
+              {availability === 'sold_out'
+                ? <IconCircleOff size={20} aria-hidden="true" className="mt-0.5 shrink-0" />
+                : <IconHourglassHigh size={20} aria-hidden="true" className="mt-0.5 shrink-0" />}
+              <div>
+                <p className="font-bold">{availability === 'sold_out' ? AVAILABILITY_COPY.soldOutBadge : AVAILABILITY_COPY.belowMinimumBadge}</p>
+                <p className="mt-0.5">{availability === 'sold_out' ? AVAILABILITY_COPY.soldOutDetail : belowMinimumDetail(minOrderQuantity)}</p>
+              </div>
+            </section>
+          ) : hasIndividualRule && (
+            <section aria-label="Quantité à acheter" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <p className="text-base font-bold">{minimumHeadline(minOrderQuantity, quantityNoun(sellingFormat, minOrderQuantity))}</p>
+              {ruleStepLine && <p className="mt-1">{ruleStepLine}</p>}
+              <p className="mt-2 flex items-center justify-between gap-3 border-t border-amber-300 pt-2 font-semibold">
+                <span>{formatCount(sellingFormat, minOrderQuantity)} × {formatPrice(product.price, currency)}</span>
+                <span className="tabular-nums">{formatPrice(product.price * minOrderQuantity, currency)}</span>
               </p>
             </section>
           )}
           {group && (
-            <section aria-label="Quantité combinable" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-              <p className="font-semibold">Groupe « {group.name} » : minimum {group.min_quantity} unités combinables</p>
-              <p className="mt-1">Composez votre sélection avec les produits participants{group.quantity_step > 1 ? ` (paliers de ${group.quantity_step})` : ''}.</p>
-              {groupQuantity > 0 && (
+            <section aria-label="Produits à mélanger" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900">
+              <p className="font-bold">{groupHeadline(group.name, group.min_quantity)}</p>
+              {group.quantity_step > 1 && <p className="mt-1">Ensuite : {nextQuantitiesList(group.min_quantity, group.quantity_step)}</p>}
+              {groupProgress && (
                 <p className="mt-2 font-medium" aria-live="polite">
-                  Dans votre panier : {groupQuantity} / {groupTarget} unités
-                  {groupMissing > 0 ? ` · Encore ${groupMissing} à ajouter` : ' · Objectif atteint'}
+                  {groupProgress.done ? groupProgress.title : `${groupProgress.title}. ${groupProgress.detail}`}
                 </p>
               )}
-              <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir les produits combinables</Link>
+              <Link href={`/?quantityGroup=${encodeURIComponent(group.id)}`} className="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>Voir les produits à mélanger</Link>
             </section>
           )}
           {groupsError && (
-            <div className="text-xs text-gray-600" role="status">
-              Règles des groupes indisponibles. <button type="button" onClick={reloadGroups} className="font-semibold underline">Réessayer</button>
+            <div className="text-sm text-gray-700" role="status">
+              Nous n&apos;arrivons pas à vérifier les produits à mélanger. <button type="button" onClick={reloadGroups} className="min-h-11 font-semibold underline">Réessayer</button>
             </div>
           )}
-          {!group && groupsLoading && <p className="text-xs text-gray-500" role="status">Vérification des offres combinables…</p>}
+          {!group && groupsLoading && <p className="text-sm text-gray-600" role="status">Chargement…</p>}
 
           <ProductSpecs
-            netQuantityDisplay={product.net_quantity_display}
-            weightGrams={product.weight_grams}
+            content={contentLabel(sellingFormat) ?? product.net_quantity_display}
             countryOfOrigin={product.country_of_origin}
             storageType={product.storage_type}
             locale={activeLocale}
@@ -163,11 +173,11 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
 
           {outOfStock ? (
             <>
-              <div className="hidden py-3 px-4 bg-gray-100 rounded-lg text-gray-500 text-sm font-medium text-center md:block">Indisponible dans le format minimum</div>
+              <div className="hidden py-3 px-4 bg-gray-200 rounded-lg text-gray-800 text-sm font-semibold text-center md:block">{AVAILABILITY_COPY.unavailableCta}</div>
               <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] border-t border-gray-200 bg-white/95 shadow-[0_-8px_24px_rgba(15,23,42,0.10)] backdrop-blur md:hidden">
                 <div className="mx-auto max-w-7xl px-3 py-2.5">
-                  <div className="flex min-h-12 items-center justify-center rounded-xl bg-gray-100 px-4 text-sm font-semibold text-gray-500">
-                    Indisponible dans le format minimum
+                  <div className="flex min-h-12 items-center justify-center rounded-xl bg-gray-200 px-4 text-sm font-semibold text-gray-800">
+                    {AVAILABILITY_COPY.unavailableCta}
                   </div>
                 </div>
               </div>
@@ -185,7 +195,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                   className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
                   style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
                 >
-                  {added ? '✓ Ajouté au panier' : `${explicitQuantityLabel} · ${formatPrice(totalPrice, currency)}`}
+                  {added ? '✓ Ajouté au panier' : `${explicitQuantityLabel} au panier · ${formatPrice(totalPrice, currency)}`}
                 </button>
               </div>
 
@@ -202,7 +212,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
                     style={{ backgroundColor: added ? '#16a34a' : 'var(--color-primary)' }}
                   >
                     <span className="max-w-full truncate text-sm">{added ? '✓ Ajouté au panier' : explicitQuantityLabel}</span>
-                    {!added && <span className="text-xs font-medium opacity-90">{formatPrice(totalPrice, currency)}</span>}
+                    {!added && <span className="text-xs font-medium opacity-90">Total : {formatPrice(totalPrice, currency)}</span>}
                   </button>
                 </div>
                 {added && (
@@ -217,7 +227,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
 
           {added && (
             <div role="status" className="hidden rounded-xl border border-green-200 bg-green-50 p-3 md:block">
-              <p className="mb-2 text-sm font-semibold text-green-900">✓ {quantity} unité{quantity > 1 ? 's' : ''} ajoutée{quantity > 1 ? 's' : ''} au panier</p>
+              <p className="mb-2 text-sm font-semibold text-green-900">✓ {quantityLabel} dans le panier</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={continueShopping} className="min-h-11 flex-1 rounded-lg px-3 font-semibold text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Continuer mes achats</button>
                 <Link href="/cart" className="flex min-h-11 flex-1 items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-semibold">Voir mon panier</Link>
