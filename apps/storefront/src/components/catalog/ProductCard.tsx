@@ -238,7 +238,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
         ) : (
           <div className="px-2 pt-1 pb-6">
             <p className="text-xs font-medium line-clamp-2 text-gray-900">{product.name}</p>
-            <p className="mt-0.5 leading-tight" aria-label={shelfPrice.sentence}>
+            <p className="mt-0.5 leading-tight" aria-label={`${shelfPrice.amount} ${shelfPrice.unitPhrase}`}>
               <span aria-hidden="true" className="text-sm font-bold text-gray-950">{shelfPrice.amount}</span>{' '}
               <span aria-hidden="true" className="text-xs font-medium text-gray-700">{shelfPrice.unitPhrase}</span>
             </p>
