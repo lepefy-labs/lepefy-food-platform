@@ -8,6 +8,7 @@ import { selectCateringHeroMedia } from '@/lib/events/selectHeroMedia';
 import CateringLanding from './CateringLanding';
 import RentalCheckoutClient from './RentalCheckoutClient';
 import type { ServiceOffering, RentalItem } from '@lepefy/types';
+import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -62,7 +63,7 @@ export default async function ServiceDetailPage({ params }: PageProps) {
 
   const allPaymentMethods = await getTenantPaymentMethods(tenant.id);
   const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+    (m) => isLinkPaymentMethod(m)
       && m.enabled_modules.includes('rental'),
   );
 

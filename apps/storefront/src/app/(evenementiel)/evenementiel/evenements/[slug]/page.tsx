@@ -13,6 +13,7 @@ import EventBookingDeadlineGate from './EventBookingDeadlineGate';
 import EventCheckoutClient from './EventCheckoutClient';
 import EventOnSitePriceList from './EventOnSitePriceList';
 import type { EventGalleryPhoto, EventRow, EventTicketType } from '@lepefy/types';
+import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -120,7 +121,7 @@ export default async function EventDetailPage({ params }: PageProps) {
   const soldOut = eventRow.capacity_remaining <= 0;
 
   const externalPaymentMethods = allPaymentMethods.filter(
-    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+    (m) => isLinkPaymentMethod(m)
       && m.enabled_modules.includes('event'),
   );
 

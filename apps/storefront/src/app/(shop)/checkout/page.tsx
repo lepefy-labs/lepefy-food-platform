@@ -6,6 +6,7 @@ import { resolveCheckoutConsentState } from '@/lib/legal/resolveCheckoutConsentS
 import { isE2ERequest } from '@/lib/e2e/isE2ERequest';
 import CheckoutFlow from './CheckoutFlow';
 import styles from './checkoutSticky.module.css';
+import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export default async function CheckoutPage() {
     getSessionCustomer(tenant.id),
   ]);
   const externalPaymentMethods = allMethods.filter(
-    (method) => method.method !== 'bank_transfer' && method.method !== 'cash' && !!method.extra?.link
+    (method) => isLinkPaymentMethod(method)
       && method.enabled_modules.includes('shop'),
   );
   const consentState = await resolveCheckoutConsentState(tenant.id, sessionCustomer?.id ?? null);

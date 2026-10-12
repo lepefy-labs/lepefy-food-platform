@@ -31,6 +31,7 @@ import {
 import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
 import { missingFieldsTitle } from '@/lib/storefrontCopy/copy';
 import type { PublicTenant, TenantPaymentMethod, ShippingAddress } from '@lepefy/types';
+import { linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 
 interface SessionItem {
   productId:    string;
@@ -381,7 +382,9 @@ export function CheckoutSessionEditor({
     );
   }
 
-  const isPaypal = data.paymentMethod === 'external_link' && data.externalPaymentType === 'paypal';
+  // Même règle que le serveur : le montant n'est prérempli que sur un lien PayPal.me.
+  const isPaypal = data.paymentMethod === 'external_link' && data.externalPaymentType === 'paypal'
+    && linkIncludesAmount({ method: 'paypal', extra: { link: data.externalPaymentLink } });
 
   return (
     <>

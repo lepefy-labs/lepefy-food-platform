@@ -11,6 +11,7 @@ import { resolveCheckoutShippingDetails } from '@/lib/shipping/tariff/shadowTari
 import { revalidateSessionShipping, verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { notifyExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyExternalPaymentAwaitingVerification';
+import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 import type { ShippingAddress, TenantPaymentMethod } from '@lepefy/types';
 import { normalizeShippingAddress } from '@/lib/address/addressRules';
 import { guardModule } from '@/lib/billing/tenantServiceState';
@@ -395,13 +396,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             .eq('active', true)
             .maybeSingle();
           const method = methodRow as TenantPaymentMethod | null;
-          if (!method || method.method === 'bank_transfer' || method.method === 'cash' || !method.extra?.link) {
+          if (!method || !isLinkPaymentMethod(method)) {
             return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
           }
           const currency = (tenant.currency ?? 'EUR').toUpperCase();
-          const finalLink = method.method === 'paypal'
-            ? `${method.extra.link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency}`
-            : method.extra.link;
+          const finalLink = buildExternalPaymentLink(method, total, currency);
+          if (!finalLink) {
+            return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
+          }
           externalPaymentType = method.method;
           externalPaymentLabel = method.label ?? method.method;
           externalPaymentLink = finalLink;
@@ -409,13 +411,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             link: finalLink,
             amount: total,
             currency,
-            isPaypal: method.method === 'paypal',
+            isPaypal: linkIncludesAmount(method),
             label: method.label ?? method.method,
           };
-        } else if (externalPaymentType === 'paypal' && externalPaymentLink) {
+        } else if (externalPaymentType === 'paypal' && externalPaymentLink
+          && linkIncludesAmount({ method: 'paypal', extra: { link: externalPaymentLink } })) {
+          // Lien PayPal.me déjà enregistré : même règle, l'ancien montant est remplacé.
           const currency = (tenant.currency ?? 'EUR').toUpperCase();
-          const base = externalPaymentLink.replace(/\/[0-9.,]+[A-Z]{3}$/i, '');
-          externalPaymentLink = `${base}/${total.toFixed(2)}${currency}`;
+          externalPaymentLink = buildExternalPaymentLink({ method: 'paypal', extra: { link: externalPaymentLink } }, total, currency) ?? externalPaymentLink;
           externalLinkResponse = {
             link: externalPaymentLink,
             amount: total,

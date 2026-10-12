@@ -114,7 +114,7 @@ Conflitto di stock dopo un incasso: Stripe → rimborso automatico come prima; e
 
 - Fuori dal layout shop (nessun carrello/Nala), branding tenant, mobile-first, `noindex`, `no-referrer`.
 - Mostra: riferimento `P-XXXXXXXX`, articoli, consegna, totale, metodi. **Mai**: nota interna, ID cliente/admin, e-mail, telefono, storico, PaymentIntent.
-- Metodi: carta Stripe (Payment Element esistente, `StripePaymentStep`, PaymentIntent via `/api/pay/[token]/intent`) + metodi `tenant_payment_methods` attivi con modulo `shop` (link PayPal con importo come il checkout, Revolut/altro con link, **bonifico** con IBAN/BIC/beneficiario e riferimento `P-…`, istruzioni se senza link). Contanti, carta e Apple Pay esclusi dai metodi esterni.
+- Metodi: carta Stripe (Payment Element esistente, `StripePaymentStep`, PaymentIntent via `/api/pay/[token]/intent`) + metodi `tenant_payment_methods` attivi con modulo `shop` (link PayPal.me con importo come il checkout, regola unica `applyLinkAmount` di `lib/payments/externalPaymentLink.ts`, Revolut/altro con link, **bonifico** con IBAN/BIC/beneficiario e riferimento `P-…`, istruzioni se senza link). Contanti, carta e Apple Pay esclusi dai metodi esterni.
 - La scelta di un metodo esterno (`/api/pay/[token]/external`) porta la sessione a `awaiting_verification`, annulla l'intent carta, invia l'alert interno esistente (`notify_external_payment_pending`, claim idempotente). **Non è una conferma d'incasso.**
 - Stati dedicati: link invalido/revocato, scaduto, annullato, in verifica, pagato (con link di tracking).
 

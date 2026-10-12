@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { isCountryAllowedForDelivery, matchDeliveryZone } from '@/lib/rental/matchDeliveryZone';
 import { normalizeAddressParts, type NormalizedAddressParts } from '@/lib/address/addressRules';
+import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 import type { RentalCheckoutItemInput, RentalDeliveryZone, TenantPaymentMethod } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     const method = methodRow as TenantPaymentMethod | null;
 
-    if (!method || method.method === 'bank_transfer' || method.method === 'cash' || !method.extra?.link) {
+    if (!method || !isLinkPaymentMethod(method)) {
       return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
     }
 
@@ -162,10 +163,10 @@ export async function POST(req: NextRequest) {
 
     // ── Construction du lien (même règle que Phase 1/2 — Décision 4) ────────
     const currency = (tenant.currency ?? 'EUR').toUpperCase();
-    const finalLink =
-      method.method === 'paypal'
-        ? `${method.extra.link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency}`
-        : method.extra.link;
+    const finalLink = buildExternalPaymentLink(method, total, currency);
+    if (!finalLink) {
+      return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
+    }
 
     const { data: request, error: requestError } = await supabase
       .from('rental_reservation_requests')
@@ -210,7 +211,7 @@ export async function POST(req: NextRequest) {
       link:      finalLink,
       amount:    total,
       currency,
-      isPaypal:  method.method === 'paypal',
+      isPaypal:  linkIncludesAmount(method),
       label:     method.label ?? method.method,
     });
   } catch (err) {

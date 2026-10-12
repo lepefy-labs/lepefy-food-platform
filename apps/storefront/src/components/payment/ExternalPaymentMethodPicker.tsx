@@ -3,6 +3,7 @@ import { IconBuildingBank, IconCash, IconBrandPaypal, IconQrcode, IconWallet, Ic
 import { formatPrice } from '@/lib/utils/format';
 import { methodColor } from '@/lib/card/methodColor';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod } from '@lepefy/types';
+import { linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 
 // Composant partagé entre le checkout boutique ((shop)/checkout/CheckoutFlow.tsx)
 // et le checkout billetterie événementiel (EventCheckoutClient.tsx) — extrait
@@ -103,7 +104,7 @@ export function ExternalPaymentNote({
 }) {
   return (
     <p className="text-sm text-amber-950 bg-amber-50 border border-amber-300 rounded-xl px-3.5 py-2.5 mt-3 leading-relaxed">
-      {method.method === 'paypal'
+      {linkIncludesAmount(method)
         ? <>Le montant <strong>{formatPrice(total, currency)}</strong> sera déjà écrit sur PayPal. Choisissez « Amis et famille » pour éviter les frais.</>
         : <>Sur la page de paiement, écrivez ce montant : <strong>{formatPrice(total, currency)}</strong>.</>
       }

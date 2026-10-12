@@ -15,6 +15,7 @@ import { recordNalaCheckoutStarted } from '@/lib/ai/nalaConversionAttribution';
 import { validateCheckoutItems } from '@/lib/checkout/validateCheckoutItems';
 import { verifyCheckoutShipping } from '@/lib/shipping/tariff/checkoutShipping';
 import { normalizeShippingAddress, type NormalizedShippingAddress } from '@/lib/address/addressRules';
+import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 import type { TenantPaymentMethod } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     const method = methodRow as TenantPaymentMethod | null;
-    if (!method || method.method === 'bank_transfer' || method.method === 'cash' || !method.extra?.link) {
+    if (!method || !isLinkPaymentMethod(method)) {
       return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
     }
 
@@ -156,9 +157,10 @@ export async function POST(req: NextRequest) {
     });
     const total = parseFloat((subtotal + shippingTotal - ambassadorDiscount).toFixed(2));
     const currency = (tenant.currency ?? 'EUR').toUpperCase();
-    const finalLink = method.method === 'paypal'
-      ? `${method.extra.link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency}`
-      : method.extra.link;
+    const finalLink = buildExternalPaymentLink(method, total, currency);
+    if (!finalLink) {
+      return NextResponse.json({ error: ERROR_COPY.invalidPaymentMethod }, { status: 400 });
+    }
 
     const active = await upsertActiveCheckoutSession({
       supabase,
@@ -236,7 +238,7 @@ export async function POST(req: NextRequest) {
       link: finalLink,
       amount: total,
       currency,
-      isPaypal: method.method === 'paypal',
+      isPaypal: linkIncludesAmount(method),
       label: method.label ?? method.method,
       accessToken,
       reusedCheckout: active.reused,

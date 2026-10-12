@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { notifyEventExternalPaymentAwaitingVerification } from '@/lib/notifications/notifyEventExternalPaymentAwaitingVerification';
+import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
 import type { EventCheckoutItemInput, TenantPaymentMethod } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const method = methodRow as TenantPaymentMethod | null;
 
-    if (!method || method.method === 'bank_transfer' || method.method === 'cash' || !method.extra?.link) {
+    if (!method || !isLinkPaymentMethod(method)) {
       return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
     }
 
@@ -112,10 +113,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
 
     const currency = (tenant.currency ?? 'EUR').toUpperCase();
-    const finalLink =
-      method.method === 'paypal'
-        ? `${method.extra.link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency}`
-        : method.extra.link;
+    const finalLink = buildExternalPaymentLink(method, total, currency);
+    if (!finalLink) {
+      return NextResponse.json({ error: 'Moyen de paiement invalide.' }, { status: 400 });
+    }
 
     const { data: request, error: requestError } = await supabase
       .from('event_reservation_requests')
@@ -188,7 +189,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       link:      finalLink,
       amount:    total,
       currency,
-      isPaypal:  method.method === 'paypal',
+      isPaypal:  linkIncludesAmount(method),
       label:     method.label ?? method.method,
     });
   } catch (err) {

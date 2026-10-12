@@ -6,6 +6,7 @@ import { expireIfDue, type AssistedSessionRow } from './assistedOrderServer';
 import { hashPayLinkToken, isWellFormedPayLinkToken } from './payLinkToken';
 import { buildOrderTrackingLink } from '@/lib/orders/convertCheckoutSessionToOrder';
 import { shopBaseUrl } from './assistedOrderServer';
+import { applyLinkAmount } from '@/lib/payments/externalPaymentLink';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -75,11 +76,10 @@ export function publicExternalMethods(methods: TenantPaymentMethod[]): PublicPay
 
 /** Lien externe final (montant ajouté pour PayPal.me, comme le checkout storefront). */
 export function externalPaymentLink(method: TenantPaymentMethod, total: number, currency: string): string | null {
-  const link = method.extra?.link;
+  const link = method.extra?.link?.trim();
   if (!link) return null;
-  return method.method === 'paypal'
-    ? `${link.replace(/\/+$/, '')}/${total.toFixed(2)}${currency.toUpperCase()}`
-    : link;
+  // Même règle que les checkouts (montant seulement sur un lien PayPal.me).
+  return applyLinkAmount(method.method, link, total, currency);
 }
 
 export interface PublicPreorderView {

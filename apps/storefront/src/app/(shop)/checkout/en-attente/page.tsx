@@ -2,6 +2,7 @@ import { getTenant } from '@/lib/tenant/getTenant';
 import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import PendingPaymentClient from './PendingPaymentClient';
+import { isLinkPaymentMethod } from '@/lib/payments/externalPaymentLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function PendingPaymentPage({ searchParams }: PageProps) {
   // l'éditeur puisse proposer un changement de moyen de paiement identique
   // au checkout d'origine.
   const externalPaymentMethods = allMethods.filter(
-    (m) => m.method !== 'bank_transfer' && m.method !== 'cash' && !!m.extra?.link
+    (m) => isLinkPaymentMethod(m)
       && m.enabled_modules.includes('shop'),
   );
 
