@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import { isCountryAllowedForDelivery, matchDeliveryZone } from '@/lib/rental/matchDeliveryZone';
+import { normalizeAddressParts, type NormalizedAddressParts } from '@/lib/address/addressRules';
 import type { RentalCheckoutItemInput, RentalDeliveryZone, RentalPaymentIntentMetadata } from '@lepefy/types';
 import { guardModule } from '@/lib/billing/tenantServiceState';
 
@@ -50,10 +51,18 @@ export async function POST(req: NextRequest) {
     }
 
     const isDelivery = fulfillment_type === 'delivery';
-    if (isDelivery && (!street?.trim() || !house_number?.trim() || !city?.trim() || !postal_code?.trim() || !country?.trim())) {
-      return NextResponse.json({ error: 'Adresse de livraison incomplète.' }, { status: 400 });
+    // Adresse contrôlée avant tout calcul : texte nettoyé, pays ISO en
+    // majuscules, longueurs et code postal. Zone et montant restent calculés
+    // ci-dessous à partir de cette adresse normalisée.
+    let delivery: NormalizedAddressParts | null = null;
+    if (isDelivery) {
+      const normalized = normalizeAddressParts({ street, houseNumber: house_number, postalCode: postal_code, city, country });
+      if (!normalized.ok) {
+        return NextResponse.json({ error: normalized.error, code: 'ADDRESS_INVALID', field: normalized.field }, { status: 400 });
+      }
+      delivery = normalized.address;
     }
-    if (isDelivery && !isCountryAllowedForDelivery(tenant, country!)) {
+    if (delivery && !isCountryAllowedForDelivery(tenant, delivery.country)) {
       return NextResponse.json({ error: 'Livraison indisponible pour ce pays.' }, { status: 400 });
     }
 
@@ -126,7 +135,7 @@ export async function POST(req: NextRequest) {
         .select('*')
         .eq('tenant_id', tenant.id)
         .eq('active', true);
-      matchedZone = matchDeliveryZone((zones ?? []) as RentalDeliveryZone[], { country: country!, postal_code: postal_code!, city: city! });
+      matchedZone = matchDeliveryZone((zones ?? []) as RentalDeliveryZone[], { country: delivery!.country, postal_code: delivery!.postalCode, city: delivery!.city });
     }
     const deliveryFee = matchedZone ? matchedZone.fee_amount : 0;
     const total = parseFloat((itemsTotal + deliveryFee).toFixed(2));
@@ -141,11 +150,11 @@ export async function POST(req: NextRequest) {
       customer_email:       customer_email.trim(),
       customer_phone:       customer_phone?.trim() ?? '',
       fulfillment_type:     isDelivery ? 'delivery' : 'pickup',
-      delivery_street:      isDelivery ? street!.trim() : '',
-      delivery_house_number: isDelivery ? house_number!.trim() : '',
-      delivery_city:        isDelivery ? city!.trim() : '',
-      delivery_postal_code: isDelivery ? postal_code!.trim() : '',
-      delivery_country:     isDelivery ? country!.trim() : '',
+      delivery_street:      delivery ? delivery.street : '',
+      delivery_house_number: delivery ? delivery.houseNumber : '',
+      delivery_city:        delivery ? delivery.city : '',
+      delivery_postal_code: delivery ? delivery.postalCode : '',
+      delivery_country:     delivery ? delivery.country : '',
       delivery_zone_id:     matchedZone?.id ?? '',
       delivery_fee_amount:  isDelivery ? String(deliveryFee) : '',
     };

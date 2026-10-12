@@ -96,7 +96,11 @@ export default async function ServiceDetailPage({ params }: PageProps) {
         <RentalCheckoutClient
           service={{ id: serviceOffering.id, slug: serviceOffering.slug, title: serviceOffering.title }}
           rentalItems={rentalItems}
-          tenant={{ currency: tenant.currency }}
+          tenant={{
+            currency: tenant.currency,
+            deliveryEnabled: Boolean(tenant.rental_delivery_enabled),
+            deliveryCountries: tenant.rental_delivery_countries ?? [],
+          }}
           externalPaymentMethods={externalPaymentMethods}
         />
       </main>

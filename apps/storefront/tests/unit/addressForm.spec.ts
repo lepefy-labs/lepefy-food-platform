@@ -2,12 +2,14 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import {
   composeLine1,
+  countryOptions,
   defaultDeliveryCountry,
   draftToShippingAddress,
   emptyAddressDraft,
   firstErrorField,
   isValidPostalCode,
   normalizePostalCode,
+  normalizeAddressParts,
   normalizeShippingAddress,
   shippingAddressToDraft,
   splitLine1,
@@ -106,6 +108,41 @@ test.describe('contrôle serveur de l\'adresse (checkout, compte)', () => {
   test('code postal identique à celui du devis (jeton lié au CAP)', () => {
     const result = normalizeShippingAddress({ ...valid, postal_code: ' 42121 ' });
     expect(result.ok && result.address.postal_code).toBe('42121');
+  });
+});
+
+test.describe('location de matériel : pays du tenant et adresse découpée', () => {
+  test('pays proposés = pays de livraison du tenant, noms en français', () => {
+    expect(countryOptions(['it', 'IT', ' es ', 'Italie', ''])).toEqual([
+      { code: 'IT', label: 'Italie' },
+      { code: 'ES', label: 'Espagne' },
+    ]);
+    // Sans liste : pays de livraison de la boutique (checkout inchangé).
+    expect(countryOptions(undefined).map((option) => option.code)).toEqual(['IT', 'FR', 'BE', 'DE', 'CH']);
+  });
+
+  test('validation limitée aux pays du contexte', () => {
+    const spain = { country: 'ES', street: 'Calle Mayor', houseNumber: '3', postalCode: '28013', city: 'Madrid', line2: '' };
+    expect(validateAddressDraft(spain, { allowedCountries: ['ES'] })).toEqual({});
+    expect(validateAddressDraft(spain).country).toBe(ADDRESS_COPY.countryUnsupported);
+    expect(validateAddressDraft(filled, { allowedCountries: ['ES'] }).country).toBe(ADDRESS_COPY.countryUnsupported);
+  });
+
+  test('contrôle serveur : pays ISO, numéro, code postal', () => {
+    expect(normalizeAddressParts({ street: ' Via  Roma ', houseNumber: '25', postalCode: '42 121', city: 'Reggio Emilia', country: 'it' })).toEqual({
+      ok: true, address: { street: 'Via Roma', houseNumber: '25', postalCode: '42121', city: 'Reggio Emilia', country: 'IT' },
+    });
+    // « Italie » en toutes lettres n'est plus envoyé par le formulaire, et serait refusé clairement.
+    expect(normalizeAddressParts({ street: 'Via Roma', houseNumber: '25', postalCode: '42121', city: 'Reggio Emilia', country: 'Italie' }))
+      .toMatchObject({ ok: false, field: 'country' });
+    expect(normalizeAddressParts({ street: 'Via Roma', houseNumber: '', postalCode: '42121', city: 'Reggio Emilia', country: 'IT' }))
+      .toMatchObject({ ok: false, field: 'house_number', error: ADDRESS_COPY.houseNumberRequired });
+    expect(normalizeAddressParts({ street: 'Via Roma', houseNumber: '25', postalCode: '4212', city: 'Reggio Emilia', country: 'IT' }))
+      .toMatchObject({ ok: false, field: 'postal_code' });
+    expect(normalizeAddressParts({ street: 'Via Roma', houseNumber: 's.n.', postalCode: '42121', city: 'Reggio Emilia', country: 'IT' }))
+      .toMatchObject({ ok: true });
+    expect(normalizeAddressParts({ street: 42, houseNumber: '25', postalCode: '42121', city: 'X', country: 'IT' }))
+      .toMatchObject({ ok: false, field: 'street' });
   });
 });
 
@@ -236,6 +273,7 @@ test.describe('garde-fous des formulaires clients (Form Readability V2)', () => 
     'src/components/address/CustomerAddressForm.tsx',
     'src/components/address/AddressSearch.tsx',
     'src/components/address/SavedAddressPicker.tsx',
+    'src/app/(evenementiel)/evenementiel/services/[slug]/RentalCheckoutClient.tsx',
   ];
 
   for (const file of migrated) {
@@ -267,6 +305,15 @@ test.describe('garde-fous des formulaires clients (Form Readability V2)', () => 
     expect(css).not.toMatch(/min-h-12|rounded-2xl|\.mx-auto/);
     expect(css).toContain("[data-checkout-sticky='cta']");
     expect(css).toContain("[data-typing='true'] [data-checkout-sticky]");
+  });
+
+  test('location : pays choisi dans une liste, jamais en texte libre', () => {
+    const source = readFileSync('src/app/(evenementiel)/evenementiel/services/[slug]/RentalCheckoutClient.tsx', 'utf8');
+    expect(source).not.toContain('Ex. IT, FR');
+    expect(source).toContain('<CustomerAddressForm');
+    for (const file of ['src/app/api/rental/checkout/route.ts', 'src/app/api/rental/checkout-external-link/route.ts']) {
+      expect(readFileSync(file, 'utf8'), file).toContain('normalizeAddressParts(');
+    }
   });
 
   test('le checkout normalise l\'adresse côté serveur', () => {

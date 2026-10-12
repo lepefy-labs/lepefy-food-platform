@@ -14,14 +14,33 @@ import {
 } from '@/components/payment/ExternalPaymentMethodPicker';
 import { StripePaymentStep } from '@/components/payments/StripePaymentStep';
 import { usePaymentRedirectRecovery } from '@/lib/payments/usePaymentRedirectRecovery';
+import { CustomerAddressForm, addressFieldId } from '@/components/address/CustomerAddressForm';
+import { ErrorSummary, TextField } from '@/components/ui/form';
+import {
+  ADDRESS_FIELD_LABELS,
+  ADDRESS_FIELD_ORDER,
+  countryOptions,
+  emptyAddressDraft,
+  isValidPostalCode,
+  normalizePostalCode,
+  validateAddressDraft,
+  type AddressDraft,
+} from '@/lib/address/addressRules';
+import { ADDRESS_COPY } from '@/lib/storefrontCopy/addressCopy';
+import { FORM_COPY } from '@/lib/storefrontCopy/copy';
 import type { RentalItem, TenantPaymentMethod } from '@lepefy/types';
+
+const ADDRESS_ID_PREFIX = 'location-adresse';
 
 interface Props {
   service: { id: string; slug: string; title: string };
   rentalItems: RentalItem[];
-  tenant: { currency: string };
+  /** Projection explicite : devise et livraison du matériel (rental_delivery_*). */
+  tenant: { currency: string; deliveryEnabled: boolean; deliveryCountries: string[] };
   externalPaymentMethods?: TenantPaymentMethod[];
 }
+
+type ContactErrors = { pickupDate?: string; name?: string; email?: string };
 
 export default function RentalCheckoutClient({ service, rentalItems, tenant, externalPaymentMethods = [] }: Props) {
   const router = useRouter();
@@ -40,12 +59,16 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
+  // La livraison n'est proposée que si le tenant livre vers au moins un pays.
+  const deliveryCountries = useMemo(() => countryOptions(tenant.deliveryCountries).map((option) => option.code), [tenant.deliveryCountries]);
+  const canDeliver = tenant.deliveryEnabled && deliveryCountries.length > 0;
   const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
-  const [street, setStreet] = useState('');
-  const [houseNumber, setHouseNumber] = useState('');
-  const [city, setCity] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [country, setCountry] = useState('');
+  const [address, setAddress] = useState<AddressDraft>(() => emptyAddressDraft(deliveryCountries[0] ?? 'IT'));
+  const [addressSubmitted, setAddressSubmitted] = useState(false);
+  const [contactErrors, setContactErrors] = useState<ContactErrors>({});
+  const addressSummaryRef = useRef<HTMLDivElement>(null);
+  const quotePostalCode = normalizePostalCode(address.country, address.postalCode);
+  const quoteCity = address.city.trim();
   const [deliveryQuote, setDeliveryQuote] = useState<{
     status: 'idle' | 'loading' | 'quoted' | 'pending_quote' | 'unavailable';
     feeAmount: number | null;
@@ -94,7 +117,8 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
   // (voir matchDeliveryZone.ts) au moment du paiement, jamais fait confiance
   // à cette valeur.
   useEffect(() => {
-    if (fulfillmentType !== 'delivery' || !country.trim() || !postalCode.trim() || !city.trim()) {
+    // Aperçu seulement avec un code postal complet et une ville (zones par CP ou par ville).
+    if (fulfillmentType !== 'delivery' || !isValidPostalCode(address.country, quotePostalCode) || !quoteCity) {
       setDeliveryQuote({ status: 'idle', feeAmount: null });
       return;
     }
@@ -104,7 +128,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
         const res = await fetch('/api/rental/delivery-quote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ service_offering_id: service.id, country, postal_code: postalCode, city }),
+          body: JSON.stringify({ service_offering_id: service.id, country: address.country, postal_code: quotePostalCode, city: quoteCity }),
         });
         const result = await res.json();
         if (!result.available) {
@@ -119,7 +143,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [fulfillmentType, country, postalCode, city, service.id]);
+  }, [fulfillmentType, address.country, quotePostalCode, quoteCity, service.id]);
 
   const totalQuantity = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
   const itemsTotal = rentalItems.reduce((sum, item) => sum + (quantities[item.id] ?? 0) * item.price_per_unit, 0);
@@ -134,18 +158,39 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
     }));
   }
 
+  const addressErrors = validateAddressDraft(address, { allowedCountries: deliveryCountries });
+  const addressSummaryItems = addressSubmitted && fulfillmentType === 'delivery'
+    ? ADDRESS_FIELD_ORDER.filter((field) => addressErrors[field])
+      .map((field) => ({ fieldId: addressFieldId(ADDRESS_ID_PREFIX, field), label: ADDRESS_FIELD_LABELS[field] }))
+    : [];
+
+  function focusField(id: string) {
+    window.setTimeout(() => {
+      const target = id === 'address-summary' ? addressSummaryRef.current : document.getElementById(id);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target?.focus({ preventScroll: true });
+    }, 60);
+  }
+
   function handleContinueToPayment() {
     setError(null);
-    if (totalQuantity === 0) return setError('Sélectionnez au moins un article.');
-    if (!pickupDate) return setError('Indiquez une date de retrait.');
-    if (!name.trim() || !email.trim()) return setError('Nom et email sont obligatoires.');
-    if (fulfillmentType === 'delivery') {
-      if (!street.trim() || !houseNumber.trim() || !city.trim() || !postalCode.trim() || !country.trim()) {
-        return setError('Renseignez votre adresse de livraison complète.');
-      }
-      if (deliveryQuote.status === 'unavailable') {
-        return setError('Livraison indisponible pour cette adresse — choisissez le retrait en boutique.');
-      }
+    if (totalQuantity === 0) return setError('Choisissez au moins un article.');
+    const nextContact: ContactErrors = {};
+    if (!pickupDate) nextContact.pickupDate = fulfillmentType === 'delivery' ? 'Choisissez la date de livraison.' : 'Choisissez la date de retrait.';
+    if (!name.trim()) nextContact.name = ADDRESS_COPY.required;
+    if (!email.trim()) nextContact.email = ADDRESS_COPY.required;
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) nextContact.email = FORM_COPY.emailInvalid;
+    setContactErrors(nextContact);
+    if (fulfillmentType === 'delivery' && Object.keys(addressErrors).length > 0) {
+      setAddressSubmitted(true);
+      focusField('address-summary');
+      return;
+    }
+    if (nextContact.pickupDate) return focusField('location-date');
+    if (nextContact.name) return focusField('location-name');
+    if (nextContact.email) return focusField('location-email');
+    if (fulfillmentType === 'delivery' && deliveryQuote.status === 'unavailable') {
+      return setError('Nous ne livrons pas à cette adresse. Vérifiez le code postal, ou choisissez le retrait en boutique.');
     }
     setStep('choose-payment');
   }
@@ -154,11 +199,11 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
     if (fulfillmentType !== 'delivery') return { fulfillment_type: 'pickup' as const };
     return {
       fulfillment_type: 'delivery' as const,
-      street: street.trim(),
-      house_number: houseNumber.trim(),
-      city: city.trim(),
-      postal_code: postalCode.trim(),
-      country: country.trim(),
+      street: address.street.trim(),
+      house_number: address.houseNumber.trim(),
+      city: quoteCity,
+      postal_code: quotePostalCode,
+      country: address.country,
     };
   }
 
@@ -230,9 +275,6 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
       setIsSubmitting(false);
     }
   }
-
-  // Champs : apparence commune du storefront (globals.css, Form Readability V2).
-  const inputClass = 'sf-control sf-control--md';
 
   if (rentalItems.length === 0) {
     return <div className="rounded-3xl border border-black/[0.06] bg-white p-8 text-center text-sm text-gray-500">Aucun article disponible pour le moment.</div>;
@@ -379,7 +421,7 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
                     )}
                   </div>
                   <div className="p-4">
-                    {item.category && <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]">{item.category}</p>}
+                    {item.category && <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--color-primary-dark)]">{item.category}</p>}
                     <h2 className="mt-1 font-display text-xl font-semibold leading-tight">{item.name}</h2>
                     <p className="mt-2 text-sm font-bold text-gray-900">{formatPrice(item.price_per_unit, tenant.currency)} <span className="text-xs font-normal text-gray-500">/ unité</span></p>
                     <div className="mt-4 flex items-center justify-between gap-3">
@@ -398,63 +440,85 @@ export default function RentalCheckoutClient({ service, rentalItems, tenant, ext
           )}
 
           <section className="mt-7 rounded-3xl border border-black/[0.06] bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="font-display text-2xl font-semibold">Retrait et coordonnées</h2>
+            <h2 className="font-display text-2xl font-semibold">{canDeliver ? 'Retrait ou livraison' : 'Retrait et coordonnées'}</h2>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setFulfillmentType('pickup')}
-                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${fulfillmentType === 'pickup' ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]' : 'border-black/10 text-gray-600'}`}
-              >
-                <IconBuildingStore size={16} /> Retrait en boutique
-              </button>
-              <button
-                type="button"
-                onClick={() => setFulfillmentType('delivery')}
-                className={`flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${fulfillmentType === 'delivery' ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] text-[var(--color-primary)]' : 'border-black/10 text-gray-600'}`}
-              >
-                <IconTruckDelivery size={16} /> Livraison
-              </button>
+            {canDeliver ? (
+              <div className="mt-5 grid grid-cols-2 gap-2" role="group" aria-label="Retrait ou livraison">
+                {(['pickup', 'delivery'] as const).map((type) => {
+                  const active = fulfillmentType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setFulfillmentType(type)}
+                      className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border-[1.5px] px-3 text-sm font-semibold ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,white)] text-[color:var(--color-primary-dark)]' : 'border-[color:var(--field-border)] bg-white text-gray-800'}`}
+                    >
+                      {type === 'pickup' ? <IconBuildingStore size={17} aria-hidden="true" /> : <IconTruckDelivery size={17} aria-hidden="true" />}
+                      {type === 'pickup' ? 'Retrait en boutique' : 'Livraison'}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-gray-700">Retrait en boutique uniquement.</p>
+            )}
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <TextField
+                id="location-date"
+                className="sm:col-span-2"
+                label={fulfillmentType === 'delivery' ? 'Date de livraison souhaitée' : 'Date de retrait souhaitée'}
+                type="date"
+                value={pickupDate}
+                error={contactErrors.pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+              />
+              <TextField id="location-name" label="Nom et prénom" autoComplete="name" placeholder="Ex. : Marie Kamga" value={name} error={contactErrors.name} onChange={(e) => setName(e.target.value)} />
+              <TextField id="location-email" label="E-mail" type="email" inputMode="email" autoComplete="email" placeholder="Ex. : nom@gmail.com" value={email} error={contactErrors.email} onChange={(e) => setEmail(e.target.value)} />
+              <TextField id="location-phone" className="sm:col-span-2" label="Téléphone" optional type="tel" inputMode="tel" autoComplete="tel" placeholder="Ex. : +39 351 234 5678" hint="Avec l'indicatif du pays." value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-semibold text-gray-900 sm:col-span-2">Date de retrait souhaitée<input value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} type="date" className={`${inputClass} mt-1.5`} /></label>
-              <label className="block text-sm font-semibold text-gray-900">Nom complet<input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={`${inputClass} mt-1.5`} /></label>
-              <label className="block text-sm font-semibold text-gray-900">Email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" className={`${inputClass} mt-1.5`} /></label>
-              <label className="block text-sm font-semibold text-gray-900 sm:col-span-2">Téléphone<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" className={`${inputClass} mt-1.5`} /></label>
+            {canDeliver && fulfillmentType === 'delivery' && (
+              <div className="mt-6 flex flex-col gap-4 border-t border-black/[0.06] pt-5">
+                <h3 className="font-display text-lg font-semibold text-gray-950">Où doit-on livrer le matériel ?</h3>
+                <ErrorSummary ref={addressSummaryRef} items={addressSummaryItems} />
+                <CustomerAddressForm
+                  idPrefix={ADDRESS_ID_PREFIX}
+                  value={address}
+                  onChange={(next) => setAddress(next)}
+                  showAllErrors={addressSubmitted}
+                  countries={deliveryCountries}
+                  countryHint={`Livraison possible : ${countryOptions(deliveryCountries).map((option) => option.label).join(', ')}.`}
+                  showLine2={false}
+                  autofillSection="shipping"
+                />
 
-              {fulfillmentType === 'delivery' && (
-                <>
-                  <label className="block text-sm font-semibold text-gray-900">Rue<input value={street} onChange={(e) => setStreet(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="block text-sm font-semibold text-gray-900">Numéro<input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="block text-sm font-semibold text-gray-900">Code postal<input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="block text-sm font-semibold text-gray-900">Ville<input value={city} onChange={(e) => setCity(e.target.value)} className={`${inputClass} mt-1.5`} /></label>
-                  <label className="block text-sm font-semibold text-gray-900 sm:col-span-2">Pays<input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Ex. IT, FR" className={`${inputClass} mt-1.5`} /></label>
-
-                  <div className="sm:col-span-2">
-                    {deliveryQuote.status === 'loading' && <p className="text-xs text-gray-500">Vérification de la disponibilité…</p>}
-                    {deliveryQuote.status === 'quoted' && (
-                      <p className="rounded-xl bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)] px-3 py-2 text-xs font-semibold text-[var(--color-primary)]">
-                        Supplément de livraison : {formatPrice(deliveryQuote.feeAmount ?? 0, tenant.currency)} — inclus dans le total.
-                      </p>
-                    )}
-                    {deliveryQuote.status === 'pending_quote' && (
-                      <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        Aucun supplément n&apos;est facturé maintenant. Il sera confirmé par l&apos;établissement selon votre localisation et payé séparément.
-                      </p>
-                    )}
-                    {deliveryQuote.status === 'unavailable' && (
-                      <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
-                        Livraison indisponible pour cette adresse — choisissez le retrait en boutique.
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+                <div aria-live="polite">
+                  {deliveryQuote.status === 'loading' && (
+                    <p className="rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-sm font-semibold text-gray-800" role="status">Nous vérifions la livraison à cette adresse…</p>
+                  )}
+                  {deliveryQuote.status === 'quoted' && (
+                    <p className="rounded-xl border border-green-200 bg-green-50 px-3.5 py-2.5 text-sm text-green-900">
+                      <span className="font-bold">Supplément de livraison : {formatPrice(deliveryQuote.feeAmount ?? 0, tenant.currency)}</span>, inclus dans le total.
+                    </p>
+                  )}
+                  {deliveryQuote.status === 'pending_quote' && (
+                    <p className="rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-sm text-gray-800">
+                      Nous livrons dans ce pays. Le prix de livraison pour cette adresse sera confirmé par l&apos;établissement et payé à part.
+                    </p>
+                  )}
+                  {deliveryQuote.status === 'unavailable' && (
+                    <p className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">
+                      Nous ne livrons pas à cette adresse. Vérifiez le code postal, ou choisissez le retrait en boutique.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
-          {error && <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+          {error && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800" role="alert">{error}</p>}
           <button onClick={handleContinueToPayment} disabled={totalQuantity === 0} className="mt-5 hidden min-h-12 w-full rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-white disabled:opacity-50 lg:block">Continuer vers le paiement</button>
         </div>
 

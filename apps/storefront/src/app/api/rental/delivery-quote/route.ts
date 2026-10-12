@@ -14,16 +14,21 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { isCountryAllowedForDelivery, matchDeliveryZone } from '@/lib/rental/matchDeliveryZone';
+import { normalizePostalCode } from '@/lib/address/addressRules';
 import type { RentalDeliveryZone } from '@lepefy/types';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { country, postal_code, city } = body as { country?: string; postal_code?: string; city?: string };
-
-    if (!country?.trim() || !postal_code?.trim() || !city?.trim()) {
+    const raw = body as { country?: string; postal_code?: string; city?: string };
+    if (!raw.country?.trim() || !raw.postal_code?.trim() || !raw.city?.trim()) {
       return NextResponse.json({ available: false, feeAmount: null, zoneMatched: false }, { status: 400 });
     }
+    // Même normalisation que le paiement : l'aperçu montre le supplément que
+    // le checkout calculera réellement.
+    const country = raw.country.trim().toUpperCase();
+    const postal_code = normalizePostalCode(country, raw.postal_code);
+    const city = raw.city.trim().replace(/\s+/g, ' ');
 
     const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
     const tenant = await getTenant(slug);

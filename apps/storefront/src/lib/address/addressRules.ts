@@ -25,7 +25,22 @@ export function isDeliveryCountry(code: string | null | undefined): code is Deli
 }
 
 export function countryLabel(code: string): string {
-  return DELIVERY_COUNTRIES.find((entry) => entry.code === code)?.label ?? code;
+  const known = DELIVERY_COUNTRIES.find((entry) => entry.code === code)?.label;
+  if (known) return known;
+  // Autres pays (ex. zones de livraison Événementiel) : nom français standard.
+  try {
+    const name = new Intl.DisplayNames(['fr'], { type: 'region' }).of(code.toUpperCase());
+    return name && name !== code.toUpperCase() ? name : code;
+  } catch {
+    return code;
+  }
+}
+
+/** Options de liste déroulante pour des codes ISO2 (ordre conservé, doublons et codes invalides retirés). */
+export function countryOptions(codes?: ReadonlyArray<string> | null): Array<{ code: string; label: string }> {
+  if (!codes) return DELIVERY_COUNTRIES.map((entry) => ({ code: entry.code, label: entry.label }));
+  const unique = [...new Set(codes.map((code) => code.trim().toUpperCase()).filter((code) => /^[A-Z]{2}$/.test(code)))];
+  return unique.map((code) => ({ code, label: countryLabel(code) }));
 }
 
 /** Pays de la boutique s'il est livré, sinon le premier de la liste. */
@@ -137,14 +152,20 @@ export function emptyAddressDraft(country: string): AddressDraft {
 export type AddressErrors = Partial<Record<AddressField, string>>;
 
 /** Erreurs champ par champ ; objet vide = adresse complète (pas « livrable »). */
-export function validateAddressDraft(draft: AddressDraft, options: { requireFullName?: boolean } = {}): AddressErrors {
+export function validateAddressDraft(
+  draft: AddressDraft,
+  options: { requireFullName?: boolean; allowedCountries?: ReadonlyArray<string> } = {},
+): AddressErrors {
   const errors: AddressErrors = {};
   if (options.requireFullName) {
     const name = collapse(draft.fullName ?? '');
     if (!name) errors.fullName = ADDRESS_COPY.required;
     else if (name.length > ADDRESS_LIMITS.fullName) errors.fullName = ADDRESS_COPY.tooLong;
   }
-  if (!isDeliveryCountry(draft.country)) errors.country = ADDRESS_COPY.countryUnsupported;
+  const countryAllowed = options.allowedCountries
+    ? options.allowedCountries.includes(draft.country.toUpperCase())
+    : isDeliveryCountry(draft.country);
+  if (!countryAllowed) errors.country = ADDRESS_COPY.countryUnsupported;
   if (!collapse(draft.street)) errors.street = ADDRESS_COPY.required;
   if (!collapse(draft.houseNumber)) errors.houseNumber = ADDRESS_COPY.houseNumberRequired;
   if (!errors.street && !errors.houseNumber && composeLine1(draft.street, draft.houseNumber).length > ADDRESS_LIMITS.line1) {
@@ -240,6 +261,50 @@ export function normalizeShippingAddress(value: unknown): NormalizeShippingAddre
     ok: true,
     address: { full_name: fullName, line1, ...(line2 ? { line2 } : {}), city, postal_code: postalCode, country },
   };
+}
+
+/** Adresse découpée (rue et numéro séparés), forme des réservations de location. */
+export interface NormalizedAddressParts {
+  street: string;
+  houseNumber: string;
+  postalCode: string;
+  city: string;
+  country: string;
+}
+
+export type NormalizeAddressPartsResult =
+  | { ok: true; address: NormalizedAddressParts }
+  | { ok: false; field: string; error: string };
+
+/**
+ * Contrôle serveur d'une adresse envoyée champ par champ (location de
+ * matériel) : texte nettoyé, pays ISO en majuscules, longueurs bornées,
+ * format du code postal pour les pays connus. Ne dit rien de la livraison.
+ */
+export function normalizeAddressParts(raw: {
+  street?: unknown; houseNumber?: unknown; postalCode?: unknown; city?: unknown; country?: unknown;
+}): NormalizeAddressPartsResult {
+  const text = (value: unknown) => (typeof value === 'string' ? collapse(stripControl(value)) : '');
+  const street = text(raw.street);
+  const houseNumber = text(raw.houseNumber);
+  const city = text(raw.city);
+  const country = text(raw.country).toUpperCase();
+  const postalCode = normalizePostalCode(country, text(raw.postalCode));
+
+  const missing = (field: string, label: string) => ({ ok: false as const, field, error: `${label} : ${ADDRESS_COPY.required.toLowerCase()}` });
+  if (!street) return missing('street', ADDRESS_COPY.street);
+  if (!houseNumber) return { ok: false, field: 'house_number', error: ADDRESS_COPY.houseNumberRequired };
+  if (!postalCode) return missing('postal_code', ADDRESS_COPY.postalCode);
+  if (!city) return missing('city', ADDRESS_COPY.city);
+  if (!/^[A-Z]{2}$/.test(country)) return { ok: false, field: 'country', error: ADDRESS_COPY.countryUnsupported };
+
+  const tooLong = (field: string, label: string) => ({ ok: false as const, field, error: `${label} : ${ADDRESS_COPY.tooLong.toLowerCase()}` });
+  if (composeLine1(street, houseNumber).length > ADDRESS_LIMITS.line1) return tooLong('street', ADDRESS_COPY.street);
+  if (houseNumber.length > 12) return tooLong('house_number', ADDRESS_COPY.houseNumber);
+  if (city.length > ADDRESS_LIMITS.city) return tooLong('city', ADDRESS_COPY.city);
+  if (!isValidPostalCode(country, postalCode)) return { ok: false, field: 'postal_code', error: postalCodeError(country) };
+
+  return { ok: true, address: { street, houseNumber, postalCode, city, country } };
 }
 
 function collapse(value: string): string {

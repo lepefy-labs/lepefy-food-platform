@@ -8,9 +8,9 @@ import { fieldIds } from '@/components/ui/form/FieldShell';
 import {
   ADDRESS_LIMITS,
   COUNTRY_ADDRESS_RULES,
-  DELIVERY_COUNTRIES,
   NO_HOUSE_NUMBER,
   addressExample,
+  countryOptions,
   isDeliveryCountry,
   isNoHouseNumber,
   isValidPostalCode,
@@ -41,10 +41,16 @@ export interface CustomerAddressFormProps {
   showAllErrors?: boolean;
   /** Erreurs renvoyées par le serveur, prioritaires. */
   serverErrors?: AddressErrors;
-  /** 'open' : recherche visible ; 'collapsed' : lien pour l'ouvrir (modification d'une adresse). */
-  searchMode?: 'open' | 'collapsed';
+  /** 'open' : recherche visible ; 'collapsed' : lien pour l'ouvrir (modification d'une adresse) ; 'hidden' : jamais. */
+  searchMode?: 'open' | 'collapsed' | 'hidden';
+  /** Pays proposés (codes ISO2). Par défaut : pays de livraison de la boutique (DELIVERY_COUNTRIES). */
+  countries?: ReadonlyArray<string>;
+  /** Complément d'adresse (`line2`) ; masqué quand la donnée n'est pas enregistrée (location). */
+  showLine2?: boolean;
   /** Section d'autocomplétion HTML (« shipping » au checkout). */
   autofillSection?: 'shipping';
+  /** Aide sous le pays, ex. « Livraison possible en Italie. » */
+  countryHint?: string;
 }
 
 async function lookup(params: Record<string, string>, signal: AbortSignal): Promise<PostalLookupCity[]> {
@@ -74,6 +80,9 @@ export function CustomerAddressForm({
   serverErrors,
   searchMode = 'open',
   autofillSection,
+  countries,
+  showLine2 = true,
+  countryHint,
 }: CustomerAddressFormProps) {
   const [touched, setTouched] = useState<Set<AddressField>>(() => new Set());
   const [searchOpen, setSearchOpen] = useState(searchMode === 'open');
@@ -95,7 +104,11 @@ export function CustomerAddressForm({
   const postalDigits = isDeliveryCountry(value.country) ? COUNTRY_ADDRESS_RULES[value.country].postalDigits : ADDRESS_LIMITS.postalCode;
   const noNumber = isNoHouseNumber(value.houseNumber);
 
-  const computed = validateAddressDraft(value, { requireFullName: showFullName });
+  const options = countryOptions(countries);
+  const allowedCountries = countries ? options.map((option) => option.code) : undefined;
+  const computed = validateAddressDraft(value, { requireFullName: showFullName, allowedCountries });
+  // La recherche rapide et les suggestions ne couvrent que les pays connus (IT/FR/BE/DE/CH).
+  const searchAvailable = searchMode !== 'hidden' && isDeliveryCountry(value.country);
   const errorFor = (field: AddressField): string | undefined =>
     serverErrors?.[field] ?? (showAllErrors || touched.has(field) ? computed[field] : undefined);
 
@@ -215,7 +228,8 @@ export function CustomerAddressForm({
         label={ADDRESS_COPY.country}
         autoComplete={auto('country')}
         value={value.country}
-        options={DELIVERY_COUNTRIES.map((entry) => ({ value: entry.code, label: entry.label }))}
+        options={options.map((entry) => ({ value: entry.code, label: entry.label }))}
+        hint={countryHint}
         error={errorFor('country')}
         onChange={(event) => {
           // Changer de pays ne vide aucun champ : seul le code postal est à revérifier.
@@ -227,7 +241,7 @@ export function CustomerAddressForm({
         }}
       />
 
-      {searchOpen ? (
+      {!searchAvailable ? null : searchOpen ? (
         <>
           <AddressSearch id={`${idPrefix}-search`} country={value.country} onPick={pickSuggestion} />
           <p className="flex items-center gap-3 text-sm font-semibold text-gray-700" aria-hidden="true">
@@ -442,18 +456,20 @@ export function CustomerAddressForm({
         )}
       </div>
 
-      <TextField
-        id={id('line2')}
-        label={ADDRESS_COPY.line2}
-        optional
-        autoComplete={auto('address-line2')}
-        placeholder={ADDRESS_COPY.line2Example}
-        maxLength={ADDRESS_LIMITS.line2}
-        value={value.line2}
-        error={errorFor('line2')}
-        onChange={(event) => update({ line2: event.target.value })}
-        onBlur={() => touch('line2')}
-      />
+      {showLine2 && (
+        <TextField
+          id={id('line2')}
+          label={ADDRESS_COPY.line2}
+          optional
+          autoComplete={auto('address-line2')}
+          placeholder={ADDRESS_COPY.line2Example}
+          maxLength={ADDRESS_LIMITS.line2}
+          value={value.line2}
+          error={errorFor('line2')}
+          onChange={(event) => update({ line2: event.target.value })}
+          onBlur={() => touch('line2')}
+        />
+      )}
     </div>
   );
 }
