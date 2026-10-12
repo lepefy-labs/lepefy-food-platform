@@ -1,12 +1,12 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { IconShoppingBag, IconShoppingCart } from '@tabler/icons-react';
 import { useTenant } from '@/providers/TenantProvider';
 import { formatPrice } from '@/lib/utils/format';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
 import { useQuickAdd } from '@/components/catalog/useQuickAdd';
+import { LepefyImage } from '@/components/images/LepefyImage';
 
 export function GoodiesHero({ product }: { product: ProductCardProduct & { description?: string | null } }) {
   const { currency } = useTenant();
@@ -26,7 +26,7 @@ export function GoodiesHero({ product }: { product: ProductCardProduct & { descr
         </button>
       </div>
       <Link href={`/products/${product.slug}?from=gadgets`} aria-label={product.name} className="relative m-2 min-h-[250px] min-w-0 sm:m-4 sm:min-h-[320px]">
-        {product.image_url ? <Image src={product.image_url} alt={product.name} fill priority sizes="(max-width: 640px) 45vw, 50vw" className="object-contain p-1 sm:p-4" /> : <div className="flex h-full items-center justify-center text-[var(--color-primary)]/40"><IconShoppingBag size={80} stroke={1} aria-hidden="true" /></div>}
+        {product.image_url ? <LepefyImage src={product.image_url} variant="detail" alt={product.name} fill priority sizes="(max-width: 640px) 45vw, 50vw" className="object-contain p-1 sm:p-4" /> : <div className="flex h-full items-center justify-center text-[var(--color-primary)]/40"><IconShoppingBag size={80} stroke={1} aria-hidden="true" /></div>}
       </Link>
     </section>
   );

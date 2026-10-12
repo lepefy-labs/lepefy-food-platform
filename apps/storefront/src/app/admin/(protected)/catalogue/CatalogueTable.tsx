@@ -7,6 +7,9 @@ import { IconCopy, IconDotsVertical, IconPhoto, IconSparkles } from '@tabler/ico
 import { completenessIssues, stockTone } from '@/lib/catalog/catalogueFilters';
 import type { CatalogueListProduct as Product } from '@/lib/catalog/catalogueList';
 import { formatMoney } from '@/lib/admin/format';
+import { resolveProductImage } from '@/lib/images/productImageDelivery';
+import { useOptionalTenant } from '@/providers/TenantProvider';
+import { useProductImageDelivery } from '@/providers/ProductImageDeliveryProvider';
 import { cn } from '@/lib/utils/cn';
 import Badge from '../../_components/ui/Badge';
 import Button, { buttonClasses } from '../../_components/ui/Button';
@@ -40,6 +43,8 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
   const [stocks, setStocks] = useState<Record<string, number>>({});
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
   const rowIds = useMemo(() => products.map((product) => product.id), [products]);
+  const imageDeliveryEnabled = useProductImageDelivery();
+  const tenantId = useOptionalTenant()?.id;
 
   // Server data wins after every navigation / refresh.
   useEffect(() => {
@@ -160,7 +165,7 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
     return (
       <span className={cn('flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-a-surface-2', size === 'sm' ? 'h-11 w-11' : 'h-16 w-16')}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {product.image_url ? <img src={product.image_url} alt="" className="h-full w-full object-cover" /> : <IconPhoto size={20} aria-hidden="true" className="text-a-text-3" />}
+        {product.image_url ? <img src={resolveProductImage(product.image_url, 'thumbnail', imageDeliveryEnabled, process.env.NEXT_PUBLIC_SUPABASE_URL, tenantId).src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <IconPhoto size={20} aria-hidden="true" className="text-a-text-3" />}
       </span>
     );
   }
