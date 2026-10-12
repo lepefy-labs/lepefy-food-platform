@@ -5,7 +5,7 @@ import { IconMapPin, IconSearch, IconX } from '@tabler/icons-react';
 import type { ShippingZoneRow } from '@lepefy/types';
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
 
 const COUNTRIES = [
   { value: 'IT', label: 'Italie' },

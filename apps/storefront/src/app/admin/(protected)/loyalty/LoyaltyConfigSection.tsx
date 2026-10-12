@@ -15,10 +15,11 @@ import {
   referralTierIssues,
   type LoyaltyForm,
 } from '@/lib/loyalty/loyaltyAdmin';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
-const LABEL_CLS = 'text-a-text-3 text-xs font-medium mb-1 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
+const LABEL_CLS = labelClasses;
 const EXAMPLE_AMOUNT = 50;
 
 interface LoyaltyConfigSectionProps {

@@ -51,7 +51,7 @@ const NOTIFICATION_LABELS: Record<string, string> = {
   failed: 'échec d’envoi',
 };
 
-const inputClass = 'min-h-11 w-full rounded-xl border border-a-border bg-a-surface px-3 text-base text-a-text outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
+const inputClass = 'min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3 text-base text-a-text outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
 const cardClass = 'rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5';
 
 function dateTime(iso: string | null | undefined) {

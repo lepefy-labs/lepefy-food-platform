@@ -118,7 +118,7 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
                 onKeyDown={(event) => { if (event.key === 'Escape' && query) { event.stopPropagation(); setQuery(''); } }}
                 aria-label={search.label}
                 placeholder={search.placeholder}
-                className="h-9 w-full rounded-lg border border-a-border-strong bg-a-surface pl-9 pr-9 text-sm text-a-text placeholder:text-a-text-3 focus:border-a-brand focus:outline focus:outline-2 focus:outline-a-focus [&::-webkit-search-cancel-button]:hidden"
+                className="h-9 w-full rounded-lg border border-a-field bg-a-surface pl-9 pr-9 text-sm text-a-text placeholder:text-a-text-3 focus:border-a-brand focus:outline focus:outline-2 focus:outline-a-focus [&::-webkit-search-cancel-button]:hidden"
               />
               {query && (
                 <button type="button" onClick={() => setQuery('')} aria-label="Effacer la recherche"
@@ -140,7 +140,7 @@ export default function FilterBar({ views, viewsLabel = 'Vues', search, filters,
                 value={sort.value}
                 onChange={(event) => replace({ [sort.param ?? 'sort']: event.target.value })}
                 aria-label="Trier la liste"
-                className="h-9 max-w-[12rem] rounded-lg border border-a-border-strong bg-a-surface px-2 text-sm text-a-text focus:outline focus:outline-2 focus:outline-a-focus"
+                className="h-9 max-w-[12rem] rounded-lg border border-a-field bg-a-surface px-2 text-sm text-a-text focus:outline focus:outline-2 focus:outline-a-focus"
               >
                 {sort.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>

@@ -94,7 +94,7 @@ function CancelModal({ row, currency, onClose, onDone }: {
       <div className="space-y-3">
         <div>
           <label htmlFor="cancel-reason" className="mb-1.5 block text-sm font-semibold text-a-text">Motif (obligatoire)</label>
-          <textarea id="cancel-reason" rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. commande remboursée le 12/10" className="w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
+          <textarea id="cancel-reason" rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. commande remboursée le 12/10" className="w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
         </div>
         <ErrorText message={error} />
       </div>
@@ -142,7 +142,7 @@ export function CommissionsSection({ initialCommissions, currency, canManagePayo
           id="commission-filter"
           value={filter}
           onChange={(e) => void changeFilter(e.target.value as Filter)}
-          className="rounded-lg border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text-2"
+          className="rounded-lg border border-a-field bg-a-surface px-2 py-1 text-xs text-a-text-2"
         >
           <option value="CONFIRMED">À verser</option>
           <option value="PAID">Versées</option>

@@ -166,10 +166,10 @@ export default function EventReservationsTab({
         <label className="relative block w-full min-w-0 lg:w-[420px]">
           <span className="sr-only">Rechercher une réservation</span>
           <IconSearch size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
-          <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Client, email, référence ou formule" className="min-h-10 w-full rounded-lg border border-a-border bg-a-surface pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus" />
+          <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Client, email, référence ou formule" className="min-h-10 w-full rounded-lg border border-a-field bg-a-surface pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus" />
         </label>
         <div className="flex max-w-full flex-wrap items-center gap-2">
-          <select value={formulaFilter} onChange={(event) => setFormulaFilter(event.target.value)} className="min-h-10 rounded-lg border border-a-border bg-a-surface px-3 text-xs font-semibold text-a-text-2 focus:outline-none focus:ring-2 focus:ring-a-focus" aria-label="Filtrer par formule">
+          <select value={formulaFilter} onChange={(event) => setFormulaFilter(event.target.value)} className="min-h-10 rounded-lg border border-a-field bg-a-surface px-3 text-xs font-semibold text-a-text-2 focus:outline-none focus:ring-2 focus:ring-a-focus" aria-label="Filtrer par formule">
             <option value="all">Toutes les formules</option>
             {ticketTypes.map((ticket) => <option key={ticket.id} value={ticket.id}>{ticket.label}</option>)}
           </select>
@@ -205,7 +205,7 @@ export default function EventReservationsTab({
                       </div>
                       {editingEmailId === reservation.id ? (
                         <div className="mt-1 flex max-w-md items-center gap-1.5">
-                          <input type="email" value={emailDraft} onChange={(event) => onEmailDraftChange(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-a-border px-2 text-xs focus:outline-none focus:ring-2 focus:ring-a-focus" autoFocus />
+                          <input type="email" value={emailDraft} onChange={(event) => onEmailDraftChange(event.target.value)} className="min-h-10 min-w-0 flex-1 rounded-lg border border-a-field px-2 text-xs focus:outline-none focus:ring-2 focus:ring-a-focus" autoFocus />
                           <button type="button" onClick={() => onConfirmEmailEdit(reservation.id)} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-tone-success-fg hover:bg-tone-success-bg disabled:opacity-50" aria-label="Confirmer l’email"><IconCheck size={16} /></button>
                           <button type="button" onClick={onCancelEditEmail} disabled={resendingId === reservation.id} className="grid min-h-10 min-w-10 place-items-center rounded-lg text-a-text-3 hover:bg-a-surface-2 disabled:opacity-50" aria-label="Annuler la modification"><IconX size={16} /></button>
                         </div>

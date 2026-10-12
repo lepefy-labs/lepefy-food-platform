@@ -9,7 +9,7 @@ interface PolicyModel {
   timeout_ms: number; min_confidence: number | null;
 }
 interface Snapshot { providers: AiProvider[]; models: AiModel[]; policies: Policy[]; policyModels: PolicyModel[] }
-const field = 'min-h-11 w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text';
+const field = 'min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text';
 const button = 'min-h-11 rounded-lg bg-a-brand px-4 py-2 text-sm font-semibold text-a-on-brand hover:bg-a-brand disabled:opacity-50';
 const card = 'space-y-4 rounded-2xl border border-a-border bg-a-surface p-4';
 const text = (form: FormData, key: string) => String(form.get(key) ?? '').trim();

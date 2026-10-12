@@ -106,7 +106,7 @@ export default function PackingPanel({
                 setComplete(false);
               }}
               disabled={!pickingComplete || saving || readOnly}
-              className="h-11 w-full rounded-xl border border-a-border bg-a-surface px-3 text-sm font-semibold text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-50"
+              className="h-11 w-full rounded-xl border border-a-field bg-a-surface px-3 text-sm font-semibold text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-50"
             />
           </div>
           {estimatedParcels != null && (

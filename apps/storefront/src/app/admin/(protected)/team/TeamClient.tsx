@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconPlus, IconUserPlus } from '@tabler/icons-react';
 import Button from '../../_components/ui/Button';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 export interface AdminUserRow {
   id: string;
@@ -23,8 +24,8 @@ export interface TenantOption { id: string; name: string; }
 export interface RoleOption { id: string; code: string; name: string; scope: 'tenant' | 'platform'; isSystem: boolean; }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const INPUT_CLS = 'w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-a-focus';
-const LABEL_CLS = 'mb-0.5 block text-xs uppercase tracking-wide text-a-text-3';
+const INPUT_CLS = 'w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-a-focus';
+const LABEL_CLS = labelClasses;
 
 interface InviteForm { email: string; roleId: string; tenantId: string; }
 

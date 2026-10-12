@@ -16,10 +16,11 @@ import { formatPrice } from '@/lib/utils/format';
 import Button from '../../_components/ui/Button';
 import ConfirmDialog from '../../_components/ui/ConfirmDialog';
 import type { AmbassadorCommissionMode, AmbassadorDiscountType } from '@lepefy/types';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
-const LABEL_CLS = 'text-a-text-3 text-xs font-medium mb-1 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text disabled:bg-a-surface-2 disabled:text-a-text-3';
+const LABEL_CLS = labelClasses;
 const HINT_CLS = 'text-xs text-a-text-3 mt-1';
 
 function NumberField({ id, label, hint, value, onChange, disabled, step = '0.01', max }: {

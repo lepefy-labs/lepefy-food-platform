@@ -35,8 +35,8 @@ export default function EventsListClient({ initialEvents }: { initialEvents: Eve
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const inputClass = 'w-full min-h-11 border border-a-border bg-a-surface text-a-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
-  const flexInputClass = 'min-h-11 border border-a-border bg-a-surface text-a-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
+  const inputClass = 'w-full min-h-11 border border-a-field bg-a-surface text-a-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
+  const flexInputClass = 'min-h-11 border border-a-field bg-a-surface text-a-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
 
   const visibleEvents = useMemo(() => {
     const now = Date.now();

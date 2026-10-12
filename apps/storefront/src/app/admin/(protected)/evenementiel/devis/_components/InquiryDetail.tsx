@@ -91,7 +91,7 @@ export default function InquiryDetail({
 
         <section>
           <label htmlFor={`inquiry-status-${inquiry.id}`} className="text-sm font-semibold text-a-text">Statut</label>
-          <select id={`inquiry-status-${inquiry.id}`} value={inquiry.status} onChange={(e) => onStatusChange(e.target.value as ServiceInquiryStatus)} disabled={statusSaving} className="mt-2 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-60">
+          <select id={`inquiry-status-${inquiry.id}`} value={inquiry.status} onChange={(e) => onStatusChange(e.target.value as ServiceInquiryStatus)} disabled={statusSaving} className="mt-2 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-60">
             {INQUIRY_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
           </select>
           {statusError && <p className="mt-2 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{statusError}</p>}
@@ -100,7 +100,7 @@ export default function InquiryDetail({
         <section>
           <label htmlFor={`inquiry-note-${inquiry.id}`} className="text-sm font-semibold text-a-text">Note interne</label>
           <p className="mt-0.5 text-xs text-a-text-3">Visible uniquement par l’équipe admin.</p>
-          <textarea id={`inquiry-note-${inquiry.id}`} value={noteDraft} onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }} rows={5} placeholder="Ajouter une note pour l'équipe…" className="mt-2 w-full resize-y rounded-lg border border-a-border bg-a-surface px-3 py-2 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm" />
+          <textarea id={`inquiry-note-${inquiry.id}`} value={noteDraft} onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }} rows={5} placeholder="Ajouter une note pour l'équipe…" className="mt-2 w-full resize-y rounded-lg border border-a-field bg-a-surface px-3 py-2 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm" />
           {noteError && <p className="mt-2 rounded-lg bg-tone-danger-bg px-3 py-2 text-xs text-tone-danger-fg">{noteError}</p>}
           {noteSaved && !noteError && <p className="mt-2 text-xs font-medium text-tone-success-fg">Note enregistrée</p>}
           <Button type="button" onClick={saveNote} loading={noteSaving} disabled={!noteDirty || noteSaving} className="mt-3">{noteSaving ? 'Enregistrement…' : 'Enregistrer la note'}</Button>

@@ -162,7 +162,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
               Événement
-              <select value={event} onChange={e => setEvent(e.target.value as TestEvent)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3 text-sm">
+              <select value={event} onChange={e => setEvent(e.target.value as TestEvent)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3 text-sm">
                 {EVENTS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
               <span className="mt-1 block text-xs font-normal text-a-text-3">{eventDescription}</span>
@@ -170,27 +170,27 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
 
             <label className="text-sm font-medium text-a-text-2">
               {isTesterFeedbackInvite ? 'Destinataire testeur de test' : isTenantAlert ? 'Destinataire tenant de test' : 'Destinataire de test'}
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
             </label>
 
             {!isTesterFeedbackInvite && (
               <label className="text-sm font-medium text-a-text-2">
                 Nom client
-                <input value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                <input value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
               </label>
             )}
 
             {isTesterFeedbackInvite && (
               <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                 URL du test fermé Google Play
-                <input type="url" value={googlePlayTestUrl} onChange={e => setGooglePlayTestUrl(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                <input type="url" value={googlePlayTestUrl} onChange={e => setGooglePlayTestUrl(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
               </label>
             )}
 
             {isReviewInvite && (
               <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                 Type d’invitation
-                <select value={reviewInviteKind} onChange={e => setReviewInviteKind(e.target.value as ReviewInviteKind)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3">
+                <select value={reviewInviteKind} onChange={e => setReviewInviteKind(e.target.value as ReviewInviteKind)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3">
                   <option value="initial">Invitation initiale</option>
                   <option value="reminder">Rappel</option>
                 </select>
@@ -200,7 +200,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             {needsFulfillment && (
               <label className="text-sm font-medium text-a-text-2">
                 Remise
-                <select value={fulfillmentType} onChange={e => setFulfillmentType(e.target.value as FulfillmentType)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3">
+                <select value={fulfillmentType} onChange={e => setFulfillmentType(e.target.value as FulfillmentType)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3">
                   <option value="delivery">Livraison</option>
                   <option value="pickup">Click & Collect</option>
                 </select>
@@ -210,7 +210,7 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
             {(isConfirmed || isPaymentReminder || isShopExternalPaymentTenantAlert || isEventTest || event === 'order-stock-conflict') && (
               <label className="text-sm font-medium text-a-text-2">
                 Total
-                <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                <input inputMode="decimal" value={total} onChange={e => setTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
               </label>
             )}
 
@@ -218,23 +218,23 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               <>
                 <label className="text-sm font-medium text-a-text-2">
                   Frais de livraison
-                  <input inputMode="decimal" value={shippingTotal} onChange={e => setShippingTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input inputMode="decimal" value={shippingTotal} onChange={e => setShippingTotal(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                   Adresse
-                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Code postal
-                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Ville
-                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Pays
-                  <input value={country} onChange={e => setCountry(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={country} onChange={e => setCountry(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
               </>
             )}
@@ -243,15 +243,15 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               <>
                 <label className="sm:col-span-2 text-sm font-medium text-a-text-2">
                   Adresse client
-                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={line1} onChange={e => setLine1(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Code postal
-                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={postalCode} onChange={e => setPostalCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Ville
-                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
               </>
             )}
@@ -260,15 +260,15 @@ export default function NotificationTestConsole({ defaultEmail, tenantName, tena
               <>
                 <label className="text-sm font-medium text-a-text-2">
                   Transporteur
-                  <input value={trackingCarrier} onChange={e => setTrackingCarrier(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={trackingCarrier} onChange={e => setTrackingCarrier(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Tracking
-                  <input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input value={trackingCode} onChange={e => setTrackingCode(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                 </label>
                 <label className="text-sm font-medium text-a-text-2">
                   Livraison estimée
-                  <input type="date" value={estimatedDeliveryDate} onChange={e => setEstimatedDeliveryDate(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong px-3" />
+                  <input type="date" value={estimatedDeliveryDate} onChange={e => setEstimatedDeliveryDate(e.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-a-field px-3" />
                   <span className="mt-1 block text-xs font-normal text-a-text-3">Laisser vide pour tester l’e-mail sans date estimée.</span>
                 </label>
               </>

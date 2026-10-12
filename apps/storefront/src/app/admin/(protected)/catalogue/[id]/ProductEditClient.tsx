@@ -26,12 +26,13 @@ import { listSaleUnits } from '@/lib/storefrontCopy/saleUnits';
 import { CONTENT_UNITS, describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { FULFILLMENT_POLICIES, normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
+import { controlClasses, labelClasses } from '@/app/admin/_components/ui/Form';
 
-/** Aide de chaque mode de réception (ce que le client vivra). */
+/** Une ligne d'aide sous le choix : ce que vivra le client. */
 const FULFILLMENT_POLICY_HELP: Record<ProductFulfillmentPolicy, string> = {
-  delivery_or_pickup: 'Le client choisit : livraison à domicile ou retrait en boutique.',
-  pickup_only: 'Toute la commande qui contient ce produit sera retirée en boutique.',
-  delivery_only: 'Toute la commande qui contient ce produit sera livrée : pas de retrait en boutique.',
+  delivery_or_pickup: 'Le client choisit.',
+  pickup_only: 'Toute la commande sera retirée en boutique.',
+  delivery_only: 'Toute la commande sera livrée.',
 };
 
 interface ProductEditProps {
@@ -147,9 +148,8 @@ interface FormState {
   label_background_color: string;
 }
 
-const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
-const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+const INPUT_CLS = controlClasses;
+const LABEL_CLS = labelClasses;
 const SECTION_TITLE_CLS = 'text-sm font-semibold text-a-text-2 mb-4';
 
 const NUTRITION_FIELDS: { key: keyof NutritionInfo; label: string }[] = [
@@ -908,8 +908,7 @@ export default function ProductEditClient({
             </section>
 
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
-              <h2 className={SECTION_TITLE_CLS}>Mode de réception</h2>
-              <label htmlFor="product-fulfillment-policy" className={LABEL_CLS}>Comment le client reçoit ce produit</label>
+              <h2 className={SECTION_TITLE_CLS}><label htmlFor="product-fulfillment-policy">Mode de réception</label></h2>
               <select
                 id="product-fulfillment-policy"
                 value={formData.fulfillment_policy}
@@ -922,16 +921,7 @@ export default function ProductEditClient({
                   <option key={policy} value={policy}>{FULFILLMENT_POLICY_ADMIN_LABELS[policy]}</option>
                 ))}
               </select>
-              {/* Les trois modes expliqués d'un coup d'œil ; le mode choisi est mis en avant. */}
-              <ul id="product-fulfillment-help" className="mt-2 space-y-1 text-xs text-a-text-3">
-                {FULFILLMENT_POLICIES.map((policy) => (
-                  <li key={policy} className={formData.fulfillment_policy === policy ? 'text-a-text-2' : undefined}>
-                    <span className={formData.fulfillment_policy === policy ? 'font-semibold text-a-text' : 'font-medium'}>{FULFILLMENT_POLICY_ADMIN_LABELS[policy]}</span>
-                    {' : '}{FULFILLMENT_POLICY_HELP[policy]}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs text-a-text-3">Indépendant du type de stockage.</p>
+              <p id="product-fulfillment-help" className="mt-1.5 text-xs text-a-text-3">{FULFILLMENT_POLICY_HELP[formData.fulfillment_policy]}</p>
               {formData.fulfillment_policy === 'pickup_only' && !clickCollectEnabled && (
                 <p role="alert" className="mt-3 flex items-start gap-1.5 rounded-lg border border-tone-warning-border bg-tone-warning-bg px-3 py-2 text-xs font-semibold text-tone-warning-fg">
                   <IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />

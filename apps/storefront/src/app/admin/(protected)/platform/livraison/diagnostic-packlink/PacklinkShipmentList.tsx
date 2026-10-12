@@ -14,7 +14,7 @@ import type {
 type LinkFilter = 'all' | 'linked' | 'unlinked';
 
 const INPUT_CLS =
-  'w-full rounded-xl border border-a-border bg-a-surface px-3.5 py-2.5 text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
+  'w-full rounded-xl border border-a-field bg-a-surface px-3.5 py-2.5 text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
 
 const DASH = '—';
 
@@ -265,7 +265,7 @@ function Pager({
           inputMode="numeric"
           value={draft}
           onChange={(event) => setDraft(event.target.value.replace(/\D/g, '').slice(0, 5))}
-          className="w-20 rounded-xl border border-a-border bg-a-surface px-2.5 py-2 text-center text-sm text-a-text outline-none focus:ring-2 focus:ring-a-focus"
+          className="w-20 rounded-xl border border-a-field bg-a-surface px-2.5 py-2 text-center text-sm text-a-text outline-none focus:ring-2 focus:ring-a-focus"
         />
         <span>sur {totalPages.toLocaleString('fr-FR')}</span>
         <button type="submit" className={BTN} disabled={loading || !valid || target === page}>Aller</button>

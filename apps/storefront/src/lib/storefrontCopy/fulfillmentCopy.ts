@@ -20,7 +20,7 @@ export const FULFILLMENT_POLICY_LABELS: Record<ProductFulfillmentPolicy, string>
 /** Libellés de l'admin (choix du mode de réception). */
 export const FULFILLMENT_POLICY_ADMIN_LABELS: Record<ProductFulfillmentPolicy, string> = {
   delivery_or_pickup: 'Livraison et retrait',
-  pickup_only: 'Retrait en boutique uniquement',
+  pickup_only: 'Retrait uniquement',
   delivery_only: 'Livraison uniquement',
 };
 

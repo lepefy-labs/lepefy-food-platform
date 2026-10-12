@@ -142,14 +142,14 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
       </div>
       <div className="p-4">
         <label className="block text-xs font-semibold text-a-text-2">Fin des réservations
-          <input type="datetime-local" value={bookingClosesAt} max={toDateTimeLocal(event.date_start)} onChange={(e) => { setBookingClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" />
+          <input type="datetime-local" value={bookingClosesAt} max={toDateTimeLocal(event.date_start)} onChange={(e) => { setBookingClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" />
         </label>
         <p className="mt-2 text-xs leading-relaxed text-a-text-3">Ferme uniquement les nouvelles réservations publiques. Les billets déjà émis restent valides.</p>
 
         <div className="mt-4 rounded-xl border border-tone-info-border bg-tone-info-bg p-3">
           <div className="flex items-start gap-2"><IconTicket size={16} className="mt-0.5 shrink-0 text-tone-info-fg" /><div className="min-w-0 flex-1">
             <label className="block text-xs font-semibold text-a-text-2">Fin de validité des billets
-              <input type="datetime-local" value={checkinClosesAt} min={toDateTimeLocal(event.date_start)} onChange={(e) => { setCheckinClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus-visible:ring-tone-info-solid" />
+              <input type="datetime-local" value={checkinClosesAt} min={toDateTimeLocal(event.date_start)} onChange={(e) => { setCheckinClosesAt(e.target.value); setSaved(false); }} className="mt-1 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm text-a-text focus:outline-none focus:ring-2 focus-visible:ring-tone-info-solid" />
             </label>
             <p className="mt-2 text-xs leading-relaxed text-a-text-3">Après cette heure, le QR est expiré et le scanner refuse toute consommation restante.</p>
             {!savedCheckinClosesAt && effectiveCheckinClose && <p className="mt-1 text-xs font-medium text-tone-info-fg">Automatique si non défini : {formatDateTime(effectiveCheckinClose)} (début + 12 h).</p>}
@@ -161,7 +161,7 @@ export default function EventBookingDeadlineAdminCard({ event }: Props) {
             <p className="text-xs font-semibold text-a-text">Rapports de clôture automatiques</p>
             <p className="mt-1 text-xs leading-relaxed text-a-text-3">Rapport détaillé, liste imprimable et codes A5 sont envoyés ensemble aux destinataires configurés.</p>
             <label className="mt-2 block text-xs text-a-text-2">Si aucune fin des réservations n’est définie, envoyer les rapports
-              <span className="mt-1 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={fallbackHours} onChange={(e) => { setFallbackHours(e.target.value); setSaved(false); }} className="min-h-10 w-24 rounded-lg border border-a-border bg-a-surface px-3 text-sm" /><span>heure(s) avant l’événement</span></span>
+              <span className="mt-1 flex items-center gap-2"><input type="number" min={1} max={168} step={1} value={fallbackHours} onChange={(e) => { setFallbackHours(e.target.value); setSaved(false); }} className="min-h-10 w-24 rounded-lg border border-a-field bg-a-surface px-3 text-sm" /><span>heure(s) avant l’événement</span></span>
             </label>
             {computedReportTime && <p className="mt-2 text-xs font-medium text-a-brand-fg">Heure effective : {formatDateTime(computedReportTime)}</p>}
             <p className={`mt-1 text-xs ${reportState.status === 'error' ? 'text-tone-danger-fg' : reportState.sentAt ? 'font-semibold text-tone-success-fg' : 'text-a-text-3'}`}>{reportStatusLabel}</p>

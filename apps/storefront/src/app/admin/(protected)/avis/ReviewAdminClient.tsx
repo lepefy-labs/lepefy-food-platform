@@ -107,13 +107,13 @@ function ModerationModal({ review, action, onClose, onDone }: {
           )}
           {needsReason(action) && <>
             <label className="block text-sm font-semibold text-a-text">Motif (obligatoire)
-              <select value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-a-border-strong bg-a-surface px-3 text-sm font-normal text-a-text">
+              <select value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} className="mt-1.5 min-h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm font-normal text-a-text">
                 <option value="">Choisir…</option>
                 {REVIEW_REASON_CODES.map((code) => <option key={code} value={code}>{REASON_LABELS[code]}</option>)}
               </select>
             </label>
             <label className="block text-sm font-semibold text-a-text">Précision {reasonCode === 'other' ? '(obligatoire)' : '(facultative)'}
-              <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} maxLength={500} rows={2} className="mt-1.5 font-normal w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
+              <textarea value={reasonText} onChange={(e) => setReasonText(e.target.value)} maxLength={500} rows={2} className="mt-1.5 font-normal w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
             </label>
           </>}
           <ErrorText message={error} />
@@ -172,11 +172,11 @@ export default function ReviewAdminClient({
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <label className="flex items-center gap-3 rounded-xl bg-a-surface-2 p-4"><input type="checkbox" checked={settings.enabled} onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Envoyer les invitations</span></label>
         <label className="flex items-center gap-3 rounded-xl bg-a-surface-2 p-4"><input type="checkbox" checked={settings.publicDisplay} onChange={(e) => setSettings({ ...settings, publicDisplay: e.target.checked })} className="h-5 w-5" /><span className="text-sm font-medium">Afficher les avis sur la boutique</span></label>
-        <label className="rounded-xl bg-a-surface-2 p-4 text-sm"><span className="font-medium">Avis minimum avant d’afficher la note</span><input type="number" min={1} max={50} value={settings.minPublicCount} onChange={(e) => setSettings({ ...settings, minPublicCount: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })} className="mt-2 h-10 w-full rounded-lg border border-a-border bg-a-surface px-3" /></label>
+        <label className="rounded-xl bg-a-surface-2 p-4 text-sm"><span className="font-medium">Avis minimum avant d’afficher la note</span><input type="number" min={1} max={50} value={settings.minPublicCount} onChange={(e) => setSettings({ ...settings, minPublicCount: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })} className="mt-2 h-10 w-full rounded-lg border border-a-field bg-a-surface px-3" /></label>
       </div>
       <p className={`mt-3 rounded-xl px-3 py-2 text-xs ${rating.visible ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-a-surface-2 text-a-text-2'}`}>{rating.text}</p>
       <label className="mt-4 block text-sm"><span className="font-medium text-a-text">Liste de vigilance</span><span className="ml-2 text-xs text-a-text-3">un terme par ligne : l’avis est signalé pour vérification, jamais rejeté automatiquement</span>
-        <textarea value={settings.terms} onChange={(e) => setSettings({ ...settings, terms: e.target.value })} rows={4} className="mt-2 w-full rounded-xl border border-a-border px-3 py-2" placeholder={'numéro de téléphone\nnom d’un employé'} /></label>
+        <textarea value={settings.terms} onChange={(e) => setSettings({ ...settings, terms: e.target.value })} rows={4} className="mt-2 w-full rounded-xl border border-a-field px-3 py-2" placeholder={'numéro de téléphone\nnom d’un employé'} /></label>
       {settingsMessage && <p role={settingsMessage.tone === 'error' ? 'alert' : 'status'} className={`mt-3 rounded-xl px-3 py-2 text-sm ${settingsMessage.tone === 'ok' ? 'bg-tone-success-bg text-tone-success-fg' : 'bg-tone-danger-bg text-tone-danger-fg'}`}>{settingsMessage.text}</p>}
       {dirty && <div className="mt-4 flex flex-wrap items-center gap-2">
         <button onClick={() => void saveSettings()} disabled={saving} className="min-h-11 rounded-xl bg-a-brand px-4 text-sm font-semibold text-a-on-brand disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer'}</button>

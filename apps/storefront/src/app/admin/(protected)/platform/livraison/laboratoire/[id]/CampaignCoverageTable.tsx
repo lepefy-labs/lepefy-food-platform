@@ -130,7 +130,7 @@ export function CampaignCoverageTable({ rows, postalCodes }: { rows: CoverageRow
             onChange={(e) => setQuery(e.target.value)}
             placeholder="CAP, ville, zone…"
             aria-label="Rechercher un CAP"
-            className="w-full border border-a-border rounded-lg pl-8 pr-3 py-1.5 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
+            className="w-full border border-a-field rounded-lg pl-8 pr-3 py-1.5 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
           />
         </div>
       </div>

@@ -33,7 +33,7 @@ export default function AcceptInvitePage() {
     setTimeout(() => router.push('/admin/login'), 2000);
   }
 
-  const inputClass = 'w-full rounded-lg border border-a-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-border focus:border-a-brand';
+  const inputClass = 'w-full rounded-lg border border-a-field px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-border focus:border-a-brand';
   return (
     <div className="flex min-h-screen flex-col items-center justify-start bg-a-surface-2">
       <div className="mx-auto mt-16 w-full max-w-sm rounded-2xl border border-a-border bg-a-surface p-7 shadow-sm sm:mt-24 sm:p-8">

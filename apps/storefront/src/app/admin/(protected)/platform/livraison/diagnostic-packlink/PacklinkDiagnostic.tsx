@@ -45,7 +45,7 @@ const PROBE_LABELS: Record<ProbeName, string> = {
 };
 
 const INPUT_CLS =
-  'w-full rounded-xl border border-a-border bg-a-surface px-3.5 py-3 font-mono text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
+  'w-full rounded-xl border border-a-field bg-a-surface px-3.5 py-3 font-mono text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
 
 const INTERESTING_PATH =
   /(track|parcel|barcode|label|carrier|reference|shipment|awb|code|number|numero|collo)/i;

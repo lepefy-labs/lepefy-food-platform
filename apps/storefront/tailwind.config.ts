@@ -22,6 +22,7 @@ const config: Config = {
           'surface-2': 'var(--admin-surface-subtle)',
           border: 'var(--admin-border)',
           'border-strong': 'var(--admin-border-strong)',
+          field: 'var(--admin-field-border)',
           text: 'var(--admin-text)',
           'text-2': 'var(--admin-text-2)',
           'text-3': 'var(--admin-text-3)',

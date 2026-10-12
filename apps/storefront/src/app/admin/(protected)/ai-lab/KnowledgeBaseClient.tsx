@@ -9,10 +9,11 @@ import type {
   KnowledgeBaseSuggestion,
   KnowledgeSuggestionSignal,
 } from '@lepefy/types';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-a-focus';
-const LABEL_CLS = 'mb-1 block text-xs font-medium text-a-text-3';
+  'w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus:border-transparent focus:outline-none focus:ring-2 focus:ring-a-focus';
+const LABEL_CLS = labelClasses;
 const MAX_CONTENT = 2000;
 
 const CATEGORY_OPTIONS: { value: KnowledgeBaseCategory; label: string }[] = [
@@ -236,7 +237,7 @@ export function KnowledgeBaseClient({ initialEntries, initialSuggestions }: {
           <h2 className="text-sm font-semibold text-a-text-2">Connaissances ({entries.length})</h2>
           <div className="flex flex-wrap gap-2">
             <label htmlFor="kb-search" className="sr-only">Rechercher</label>
-            <input id="kb-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher…" className="min-h-10 rounded-lg border border-a-border px-3 text-sm" />
+            <input id="kb-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher…" className="min-h-10 rounded-lg border border-a-field px-3 text-sm" />
             {(['all', 'active', 'paused'] as const).map((value) => (
               <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)}
                 className={`min-h-10 rounded-lg px-3 text-xs font-medium ${filter === value ? 'bg-a-brand-soft text-a-brand-fg' : 'border border-a-border text-a-text-2'}`}>

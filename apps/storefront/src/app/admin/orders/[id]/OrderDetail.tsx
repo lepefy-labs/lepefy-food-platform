@@ -128,7 +128,7 @@ export default function OrderDetail({
       : needsTracking && !trackingCode.trim() ? 'Renseignez le code de suivi.' : null;
   const hasColdChain = coldChain.fresh > 0 || coldChain.frozen > 0;
   const terminal = order.status === 'delivered' || order.status === 'cancelled';
-  const inputClass = 'w-full rounded-lg border border-a-border bg-a-surface px-3 py-2.5 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus read-only:bg-a-surface-2';
+  const inputClass = 'w-full rounded-lg border border-a-field bg-a-surface px-3 py-2.5 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus read-only:bg-a-surface-2';
 
   async function patchOrder(body: Record<string, unknown>, successMessage: string) {
     setSaving(true);

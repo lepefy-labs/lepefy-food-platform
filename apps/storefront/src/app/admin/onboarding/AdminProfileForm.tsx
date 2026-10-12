@@ -86,7 +86,7 @@ export default function AdminProfileForm({ email, initial, nextPath, editing = f
     }
   }
 
-  const inputClass = 'mt-1.5 w-full rounded-xl border border-a-border bg-a-surface px-3 py-2.5 text-sm text-a-text outline-none transition placeholder:text-a-text-3 focus:border-a-brand focus:ring-2 focus:ring-a-border';
+  const inputClass = 'mt-1.5 w-full rounded-xl border border-a-field bg-a-surface px-3 py-2.5 text-sm text-a-text outline-none transition placeholder:text-a-text-3 focus:border-a-brand focus:ring-2 focus:ring-a-border';
   const labelClass = 'text-xs font-semibold text-a-text-2';
   const errorInputClass = 'border-tone-danger-border focus:border-tone-danger-solid focus:ring-tone-danger-border';
 

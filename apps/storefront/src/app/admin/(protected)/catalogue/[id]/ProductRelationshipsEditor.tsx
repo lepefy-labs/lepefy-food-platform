@@ -318,7 +318,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Nom, slug ou code-barres"
                     autoComplete="off"
-                    className="min-h-11 w-full rounded-lg border border-a-border bg-a-surface py-2 pl-10 pr-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
+                    className="min-h-11 w-full rounded-lg border border-a-field bg-a-surface py-2 pl-10 pr-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
                   />
                   {searching && (
                     <IconLoader2
@@ -404,7 +404,7 @@ export default function ProductRelationshipsEditor({ productId }: { productId: s
                           onBlur={(event) => void updateRelationship(relationship, {
                             priority: Math.max(0, Number.parseInt(event.target.value, 10) || 0),
                           })}
-                          className="mt-1 min-h-11 w-full rounded-lg border border-a-border px-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
+                          className="mt-1 min-h-11 w-full rounded-lg border border-a-field px-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
                         />
                       </label>
 

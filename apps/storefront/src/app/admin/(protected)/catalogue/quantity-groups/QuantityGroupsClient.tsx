@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import ConfirmDialog from '../../../_components/ui/ConfirmDialog';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 interface GroupProduct { id: string; name: string }
 interface Group {
@@ -16,8 +17,8 @@ interface Group {
 interface ProductOption { id: string; name: string; active: boolean }
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
-const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = labelClasses;
 
 function validQuantitiesPreview(min: number, step: number): string {
   return Array.from({ length: 5 }, (_, i) => min + i * step).join(' · ');

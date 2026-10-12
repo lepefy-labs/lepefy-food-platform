@@ -95,13 +95,13 @@ export function ZoneSentinelPicker({
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-xs text-a-text-3">
           Pays
-          <select value={country} onChange={(e) => setCountry(e.target.value)} className="mt-0.5 block border border-a-border rounded-lg px-2 py-1.5 text-sm bg-a-surface text-a-text">
+          <select value={country} onChange={(e) => setCountry(e.target.value)} className="mt-0.5 block border border-a-field rounded-lg px-2 py-1.5 text-sm bg-a-surface text-a-text">
             {countries.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
         <label className="text-xs text-a-text-3">
           CAP témoins par zone
-          <select value={perZone} onChange={(e) => setPerZone(Number(e.target.value))} className="mt-0.5 block border border-a-border rounded-lg px-2 py-1.5 text-sm bg-a-surface text-a-text">
+          <select value={perZone} onChange={(e) => setPerZone(Number(e.target.value))} className="mt-0.5 block border border-a-field rounded-lg px-2 py-1.5 text-sm bg-a-surface text-a-text">
             {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>

@@ -176,7 +176,7 @@ export default function ServiceDetailAdminClient({ offering: initialOffering, in
           onBlur={saveDescription}
           rows={4}
           disabled={savingDescription}
-          className="w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus"
+          className="w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus"
         />
       </section>
 

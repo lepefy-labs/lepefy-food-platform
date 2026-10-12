@@ -6,10 +6,11 @@ import Button from '../../_components/ui/Button';
 import { ApplePayDomainStatus } from './ApplePayDomainStatus';
 import { SettingsIconTile } from './_components/SettingsUi';
 import { PAYMENT_METHOD_REGISTRY, type TenantPaymentMethod, type PaymentMethodType, type PaymentModule } from '@lepefy/types';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full min-h-10 rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
-const LABEL_CLS = 'mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-a-text-3';
+  'w-full min-h-10 rounded-xl border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
+const LABEL_CLS = labelClasses;
 
 const METHOD_OPTIONS: PaymentMethodType[] = ['satispay', 'bank_transfer', 'cash', 'paypal', 'other', 'card', 'apple_pay'];
 

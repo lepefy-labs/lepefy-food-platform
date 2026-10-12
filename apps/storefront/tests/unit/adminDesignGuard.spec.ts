@@ -25,6 +25,8 @@ const GLOBAL_RULES: { name: string; pattern: RegExp; allow: string[] }[] = [
   // Overlays go through Dialog/Drawer (native <dialog>: focus trap, Escape,
   // top layer). The loyalty camera viewfinder is a full-screen camera view.
   { name: 'hand-made overlay (use Dialog / Drawer)', pattern: /\bfixed inset-0\b/, allow: ['loyalty/scan/CameraScanButton.tsx'] },
+  // Text controls are outlined by the field token (>= 3:1), never by the hairline border.
+  { name: 'text control class with border-a-border (use controlClasses / border-a-field)', pattern: /const \w*(?:INPUT|SELECT|FIELD|TEXTAREA|[Ii]nput|[Ff]ield|[Ss]elect)\w* =\s*['`][^'`]*\bborder-a-border(?:-strong)?(?![-\w])/, allow: [] },
 ];
 
 function filesUnder(path: string): string[] {

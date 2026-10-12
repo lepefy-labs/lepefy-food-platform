@@ -31,7 +31,7 @@ export default function InquiryToolbar({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Rechercher un client ou un email…"
-          className="min-h-11 w-full rounded-lg border border-a-border bg-a-surface pl-9 pr-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
+          className="min-h-11 w-full rounded-lg border border-a-field bg-a-surface pl-9 pr-3 text-base text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm"
         />
       </label>
       <div className="flex max-w-full gap-1 overflow-x-auto pb-0.5" aria-label="Filtrer les demandes">

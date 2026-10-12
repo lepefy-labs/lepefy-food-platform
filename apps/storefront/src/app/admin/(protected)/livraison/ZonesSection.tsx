@@ -11,10 +11,11 @@ import {
   findZonePrefixConflicts,
   groupZonesByCountry,
 } from '@/lib/shipping/shippingRuleConflicts';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
-const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = labelClasses;
 
 interface FormState {
   code: string;
@@ -203,10 +204,10 @@ export function ZonesSection({ initialZones, canManage, tariffMode }: {
         <div className="mb-4 rounded-lg bg-a-surface-2 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2 text-xs text-a-text-2">
             <label htmlFor="zone-lookup-postal" className="font-semibold">Quelle zone pour</label>
-            <select aria-label="Pays" value={lookupCountry} onChange={(e) => setLookupCountry(e.target.value)} className="rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text">
+            <select aria-label="Pays" value={lookupCountry} onChange={(e) => setLookupCountry(e.target.value)} className="rounded-md border border-a-field bg-a-surface px-2 py-1 text-xs text-a-text">
               {countryOptions.map((country) => <option key={country} value={country}>{countryName(country)}</option>)}
             </select>
-            <input id="zone-lookup-postal" type="text" inputMode="numeric" autoComplete="off" value={lookupPostal} onChange={(e) => setLookupPostal(e.target.value)} placeholder="Code postal" className="w-28 rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text" />
+            <input id="zone-lookup-postal" type="text" inputMode="numeric" autoComplete="off" value={lookupPostal} onChange={(e) => setLookupPostal(e.target.value)} placeholder="Code postal" className="w-28 rounded-md border border-a-field bg-a-surface px-2 py-1 text-xs text-a-text" />
             <span aria-live="polite">
               {lookup && (lookup.zoneCode ? (
                 <>

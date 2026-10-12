@@ -18,7 +18,7 @@ const STATUS: Record<AndroidAppStatus, { label: string; className: string }> = {
 };
 
 const card = 'rounded-2xl border border-a-border bg-a-surface p-5 shadow-sm';
-const input = 'mt-1.5 min-h-11 w-full rounded-xl border border-a-border-strong bg-a-surface px-3 text-sm';
+const input = 'mt-1.5 min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3 text-sm';
 const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-a-border-strong px-4 text-sm font-semibold text-a-text hover:bg-a-surface-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 export default function MobileAppClient({ initial, storefrontUrl }: { initial: AndroidAppSettings; storefrontUrl: string | null }) {

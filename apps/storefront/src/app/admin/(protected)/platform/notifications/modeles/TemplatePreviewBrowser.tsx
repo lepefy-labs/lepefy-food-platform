@@ -39,7 +39,7 @@ export default function TemplatePreviewBrowser({ previews, tenantName }: { previ
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="lg:hidden">
-          <select value={selected.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm" aria-label="Modèle">
+          <select value={selected.id} onChange={(e) => setSelectedId(e.target.value)} className="h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm" aria-label="Modèle">
             {groups.map(([group, items]) => (
               <optgroup key={group} label={group}>
                 {items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}

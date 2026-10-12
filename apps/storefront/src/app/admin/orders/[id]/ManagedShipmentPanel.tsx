@@ -79,7 +79,7 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
               <form onSubmit={event => { event.preventDefault(); if (!busy) void request('attach'); }} className="space-y-3">
                 <label htmlFor="provider-reference" className="block text-sm">Référence {provider.displayName}</label>
                 <input id="provider-reference" value={reference} onChange={event => setReference(event.target.value)} maxLength={100} required autoComplete="off"
-                  className="min-h-11 w-full rounded-lg border border-a-border bg-transparent px-3 text-sm focus:ring-2 focus:ring-a-focus" />
+                  className="min-h-11 w-full rounded-lg border border-a-field bg-transparent px-3 text-sm focus:ring-2 focus:ring-a-focus" />
                 <button disabled={busy || !reference.trim()} className={`${button} bg-a-brand text-a-on-brand`}>{busy ? 'Vérification…' : 'Vérifier et associer'}</button>
               </form>
             ) : showDraft ? null : <p className="text-sm text-a-text-3">Terminez la préparation, les contrôles froid et l’emballage avant d’associer une expédition.</p>}

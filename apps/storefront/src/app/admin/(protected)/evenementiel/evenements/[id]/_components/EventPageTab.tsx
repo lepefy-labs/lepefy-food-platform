@@ -39,7 +39,7 @@ export default function EventPageTab({
   onBannerChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   maxHighlights: number;
 }) {
-  const inputClass = 'min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
+  const inputClass = 'min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
   const priceListInputRef = useRef<HTMLInputElement>(null);
   const [priceListImageUrl, setPriceListImageUrl] = useState(event.on_site_price_list_image_url);
   const [uploadingPriceList, setUploadingPriceList] = useState(false);

@@ -92,7 +92,7 @@ export function ReferralAccessSection() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Nom ou e-mail…"
-          className="flex-1 border border-a-border rounded-lg px-3 py-2 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
+          className="flex-1 border border-a-field rounded-lg px-3 py-2 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
         />
         <Button type="submit" loading={isSearching}>Rechercher</Button>
       </form>

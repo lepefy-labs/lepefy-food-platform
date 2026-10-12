@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createBrowserClient } from '@supabase/ssr';
 
 const INPUT_CLS =
-  'w-full text-sm px-3 py-2 rounded-lg border border-a-border focus:outline-none focus:ring-2 focus:ring-a-focus';
+  'w-full text-sm px-3 py-2 rounded-lg border border-a-field focus:outline-none focus:ring-2 focus:ring-a-focus';
 
 type Status = 'idle' | 'saving' | 'done' | 'session-error';
 

@@ -16,9 +16,10 @@ import {
   type SubscriptionRow,
   type SubscriptionStateKind,
 } from '@/lib/billing/subscriptionRules';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
-const INPUT = 'w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus';
-const LABEL = 'mb-1 block text-xs font-medium text-a-text-3';
+const INPUT = 'w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus';
+const LABEL = labelClasses;
 const BUTTON = 'inline-flex min-h-10 items-center justify-center rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-50';
 const PRIMARY = `${BUTTON} bg-a-brand text-a-on-brand hover:opacity-90`;
 const SECONDARY = `${BUTTON} border border-a-border text-a-text-2 hover:bg-a-surface-2`;

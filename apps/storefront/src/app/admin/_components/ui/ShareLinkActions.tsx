@@ -40,7 +40,7 @@ export default function ShareLinkActions({
         value={url}
         onFocus={(event) => event.currentTarget.select()}
         aria-label="Lien"
-        className="h-11 w-full rounded-xl border border-a-border bg-a-surface-2 px-3 font-mono text-xs text-a-text-2"
+        className="h-11 w-full rounded-xl border border-a-field bg-a-surface-2 px-3 font-mono text-xs text-a-text-2"
       />
       <div className="grid gap-2 sm:grid-cols-2">
         <button

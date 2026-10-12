@@ -13,11 +13,12 @@ import { priceFromTariff, type TariffSnapshot } from '@/lib/shipping/tariff/pric
 import { buildVersionFromDraft, parseTariffVersion, TARIFF_ERROR_LABELS } from '@/lib/shipping/tariff/tariffVersion';
 import { buildActivationChecklist, describeCountryRule, perOrderSurchargeZones } from '@/lib/shipping/tariff/activationChecklist';
 import { resolveCountryRule } from '@/lib/shipping/resolveCountryRule';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const CARD = 'bg-a-surface rounded-xl border border-a-border p-5';
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
-const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = labelClasses;
 const BTN = 'min-h-11 px-4 py-2 text-xs font-semibold rounded-lg text-a-on-brand bg-a-brand disabled:opacity-50';
 const BTN_GHOST = 'min-h-11 px-4 py-2 text-xs font-semibold rounded-lg border border-a-border text-a-text-2 disabled:opacity-50';
 

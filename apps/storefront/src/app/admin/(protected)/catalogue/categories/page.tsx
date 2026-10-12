@@ -60,14 +60,14 @@ export default function CategoriesPage() {
           <input required maxLength={120} value={form.name} onChange={event => {
             const name = event.target.value;
             setForm(current => ({ ...current, name, ...(!current.id ? { slug: name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') } : {}) }));
-          }} className="mt-1 min-h-11 w-full rounded-xl border border-a-border px-3" />
+          }} className="mt-1 min-h-11 w-full rounded-xl border border-a-field px-3" />
         </label>
         <label className="text-sm font-medium">Adresse de la catégorie
-          <input required maxLength={120} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={form.slug} onChange={event => setForm(current => ({ ...current, slug: event.target.value }))} className="mt-1 min-h-11 w-full rounded-xl border border-a-border px-3" />
+          <input required maxLength={120} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={form.slug} onChange={event => setForm(current => ({ ...current, slug: event.target.value }))} className="mt-1 min-h-11 w-full rounded-xl border border-a-field px-3" />
         </label>
       </div>
       <label className="block text-sm font-medium">Destination
-        <select value={form.catalog_scope} onChange={event => setForm(current => ({ ...current, catalog_scope: event.target.value as CatalogScope }))} className="mt-1 min-h-11 w-full rounded-xl border border-a-border px-3">
+        <select value={form.catalog_scope} onChange={event => setForm(current => ({ ...current, catalog_scope: event.target.value as CatalogScope }))} className="mt-1 min-h-11 w-full rounded-xl border border-a-field px-3">
           <option value="shop">Catalogue</option><option value="gadgets">Goodies</option>
         </select>
       </label>

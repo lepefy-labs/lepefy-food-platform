@@ -51,7 +51,7 @@ const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
 /** Brevo transactional logs, searchable by message id or recipient. */
 const BREVO_LOGS_URL = 'https://app.brevo.com/transactional/email/logs';
 const dateFmt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-const INPUT_CLS = 'h-10 rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text shadow-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
+const INPUT_CLS = 'h-10 rounded-lg border border-a-field bg-a-surface px-3 text-sm text-a-text shadow-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus';
 
 function statusOf(d: Delivery) {
   // Logged-only deliveries (no retry payload) are retried by their own module.
@@ -146,7 +146,7 @@ export function NotificationDeliveriesSection() {
 
       <div className="mt-5 flex flex-col gap-2 lg:flex-row">
         <div className="flex flex-1 overflow-hidden rounded-lg border border-a-border shadow-sm">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="h-10 border-r border-a-border bg-a-surface-2 px-3 text-sm text-a-text outline-none" aria-label="Filtrer par statut">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="h-10 border-r border-a-field bg-a-surface-2 px-3 text-sm text-a-text outline-none" aria-label="Filtrer par statut">
             {STATUS_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <label className="flex flex-1 items-center gap-2 bg-a-surface px-3">

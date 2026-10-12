@@ -122,7 +122,7 @@ export default function AccessControlClient({ roles, permissions, users, tenants
     } finally { setBusy(false); }
   }
 
-  const input = 'w-full rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm outline-none focus:border-a-brand focus:ring-2 focus:ring-a-border';
+  const input = 'w-full rounded-xl border border-a-field bg-a-surface px-3 py-2 text-sm outline-none focus:border-a-brand focus:ring-2 focus:ring-a-border';
 
   return (
     <div className="space-y-6">

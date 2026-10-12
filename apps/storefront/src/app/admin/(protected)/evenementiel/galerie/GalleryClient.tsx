@@ -5,13 +5,14 @@ import { IconPencil, IconShare3, IconTrash, IconUpload } from '@tabler/icons-rea
 import { formatDate } from '@/lib/utils/format';
 import { GALLERY_CATEGORIES, HERO_PRIORITIES, heroPriorityOption } from '@/lib/events/galleryEditorial';
 import type { EventGalleryCategory, EventGalleryPhoto, EventRow } from '@lepefy/types';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 export type GalleryEventOption = Pick<EventRow, 'id' | 'title' | 'date_start'>;
 type EditorialDraft = Pick<EventGalleryPhoto, 'category' | 'event_id' | 'hero_eligible' | 'hero_priority' | 'caption'>;
 type GalleryFilter = 'all' | 'hero' | EventGalleryCategory;
 
-const SELECT_CLS = 'min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary,var(--admin-primary))]';
-const LABEL_CLS = 'mb-1 block text-xs font-medium text-a-text-2';
+const SELECT_CLS = 'min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary,var(--admin-primary))]';
+const LABEL_CLS = labelClasses;
 const BUTTON_CLS = 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-a-border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-brand disabled:cursor-not-allowed disabled:opacity-50';
 const DEFAULT_DRAFT: EditorialDraft = { category: 'general', event_id: null, hero_eligible: false, hero_priority: 50, caption: null };
 

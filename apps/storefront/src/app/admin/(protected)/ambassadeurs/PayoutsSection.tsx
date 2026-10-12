@@ -91,7 +91,7 @@ function PayoutModal({ candidate, currency, onClose, onDone }: {
         </div>
         <div>
           <label htmlFor="payout-note" className="mb-1.5 block text-sm font-semibold text-a-text">Référence du virement</label>
-          <input id="payout-note" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} className="w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
+          <input id="payout-note" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} className="w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3 focus:outline focus:outline-2 focus:outline-a-focus" />
         </div>
         <ErrorText message={error} />
       </div>

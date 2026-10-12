@@ -30,6 +30,13 @@ for (const mode of ['light', 'dark'] as const) {
     }
   });
 
+  test(`${mode}: text control outlines are visible (>= 3:1, WCAG 1.4.11) on every surface`, () => {
+    const s = ADMIN_SURFACE_VALUES[mode];
+    for (const bg of [s.surface, s.surfaceSubtle, s.pageBg]) {
+      expect(contrastRatio(s.fieldBorder, bg), `${mode} field border on ${bg}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   test(`${mode}: inverse surface text is AA`, () => {
     const s = ADMIN_SURFACE_VALUES[mode];
     expect(contrastRatio(s.inverseFg, s.inverseBg)).toBeGreaterThanOrEqual(AA);

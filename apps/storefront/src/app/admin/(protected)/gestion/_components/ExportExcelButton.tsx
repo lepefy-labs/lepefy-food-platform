@@ -67,8 +67,8 @@ export default function ExportExcelButton({ allowed }: { allowed: GestionExportT
           <legend className="text-sm font-medium">Période personnalisée</legend>
           <p className="mt-1 text-xs text-a-text-3">Les fournisseurs et le stock actuel restent des données du jour.</p>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="text-sm">Du<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-a-border-strong bg-a-surface p-2" /></label>
-            <label className="text-sm">Au<input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-a-border-strong bg-a-surface p-2" /></label>
+            <label className="text-sm">Du<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-a-field bg-a-surface p-2" /></label>
+            <label className="text-sm">Au<input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="mt-1 block w-full min-w-0 rounded-lg border border-a-field bg-a-surface p-2" /></label>
           </div>
         </fieldset>
         {error && <p role="alert" className="mt-3 text-sm text-tone-danger-fg">{error}</p>}

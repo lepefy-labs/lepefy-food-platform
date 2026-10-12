@@ -18,10 +18,11 @@ import {
 import { ZoneSentinelPicker } from './ZoneSentinelPicker';
 import { MAX_CAMPAIGN_SCENARIOS, splitDestinationsForLimit } from '@/lib/shipping/intelligence/scenarioMatrix';
 import { parseManualWeights, weightsForProfile } from '@/lib/shipping/intelligence/weightPresets';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
-const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = labelClasses;
 
 type UiSamplingMode = 'initial' | 'deep' | 'manual';
 

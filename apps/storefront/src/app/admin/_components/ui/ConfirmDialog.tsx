@@ -79,7 +79,7 @@ export default function ConfirmDialog({
                 placeholder={reason.placeholder}
                 maxLength={reason.maxLength ?? 500}
                 rows={3}
-                className={cn('w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3',
+                className={cn('w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text placeholder:text-a-text-3',
                   'focus:outline focus:outline-2 focus:outline-a-focus')}
               />
             </div>

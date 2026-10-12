@@ -82,7 +82,7 @@ export function PromoteAmbassadorSection() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Nom ou e-mail…"
-          className="flex-1 rounded-lg border border-a-border bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
+          className="flex-1 rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus"
         />
         <Button type="submit" loading={isSearching}>Rechercher</Button>
       </form>

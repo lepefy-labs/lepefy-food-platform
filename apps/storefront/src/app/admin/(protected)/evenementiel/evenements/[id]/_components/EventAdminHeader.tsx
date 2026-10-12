@@ -93,7 +93,7 @@ export function EventAdminHeader({
               disabled={savingStatus}
               aria-label="Changer le statut de l’événement"
               title="Changer le statut"
-              className="min-h-10 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-semibold text-a-text-2 focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-60"
+              className="min-h-10 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm font-semibold text-a-text-2 focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-60"
             >
               {(Object.keys(STATUS_LABELS) as EventStatus[]).map((status) => <option key={status} value={status}>{`Changer le statut · ${STATUS_LABELS[status]}`}</option>)}
             </select>

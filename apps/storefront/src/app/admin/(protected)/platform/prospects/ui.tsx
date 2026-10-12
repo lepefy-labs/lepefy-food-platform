@@ -1,6 +1,6 @@
 import { STATUS_LABELS } from '@/lib/platform/prospects/config';
 export const card = 'rounded-2xl border border-a-border bg-a-surface p-4';
-export const field = 'min-h-11 w-full rounded-lg border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text focus-visible:outline-a-brand';
+export const field = 'min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text focus-visible:outline-a-brand';
 export const button = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-a-brand px-4 py-2 text-sm font-semibold text-a-on-brand hover:bg-a-brand focus-visible:outline-a-brand disabled:opacity-50';
 export const secondary = 'inline-flex min-h-11 items-center justify-center rounded-lg border border-a-border-strong px-3 py-2 text-sm font-medium hover:bg-a-surface-2 focus-visible:outline-a-brand disabled:opacity-50';
 export function Badge({value}:{value:string}) {

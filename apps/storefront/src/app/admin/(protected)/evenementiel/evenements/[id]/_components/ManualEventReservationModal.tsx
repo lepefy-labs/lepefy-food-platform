@@ -125,10 +125,10 @@ export default function ManualEventReservationModal({
             <section>
               <h3 className="text-xs font-bold uppercase tracking-wide text-a-text-3">Client</h3>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                <label className="text-xs font-semibold text-a-text-2">Nom et prénom *<input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} autoComplete="name" className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
-                <label className="text-xs font-semibold text-a-text-2">E-mail *<input required type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} autoComplete="email" className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
+                <label className="text-xs font-semibold text-a-text-2">Nom et prénom *<input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} autoComplete="name" className="mt-1 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
+                <label className="text-xs font-semibold text-a-text-2">E-mail *<input required type="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} autoComplete="email" className="mt-1 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
               </div>
-              <label className="mt-3 block text-xs font-semibold text-a-text-2">Téléphone<input type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} autoComplete="tel" className="mt-1 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
+              <label className="mt-3 block text-xs font-semibold text-a-text-2">Téléphone<input type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} autoComplete="tel" className="mt-1 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm font-normal text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus" /></label>
             </section>
 
             <section>

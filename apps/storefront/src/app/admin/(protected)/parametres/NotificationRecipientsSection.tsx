@@ -27,7 +27,7 @@ import { useSettingsFeedback } from './_components/useSettingsFeedback';
 type Group = ReturnType<typeof groupNotificationTypes>[number];
 
 const CHECKBOX_CLS = 'h-5 w-5 cursor-pointer accent-[var(--admin-primary)] disabled:cursor-not-allowed';
-const SELECT_CLS = 'min-h-11 rounded-lg border border-a-border bg-a-surface px-3 text-sm text-a-text';
+const SELECT_CLS = 'min-h-11 rounded-lg border border-a-field bg-a-surface px-3 text-sm text-a-text';
 const GROUP_LEGEND_CLS = 'text-xs font-semibold uppercase tracking-[0.08em] text-a-text-3';
 
 /** Checkbox with a third, indeterminate state for partially subscribed groups. */

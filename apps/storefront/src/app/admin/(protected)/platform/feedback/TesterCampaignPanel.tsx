@@ -21,7 +21,7 @@ type Tester = {
   feedback_count: number;
 };
 
-const input = 'rounded-xl border border-a-border-strong bg-a-surface px-3 py-2 text-sm text-a-text';
+const input = 'rounded-xl border border-a-field bg-a-surface px-3 py-2 text-sm text-a-text';
 const button = 'rounded-xl bg-a-brand px-4 py-2.5 text-sm font-semibold text-a-on-brand hover:bg-a-brand disabled:cursor-not-allowed disabled:opacity-50';
 const secondary = 'rounded-xl border border-a-border-strong px-3 py-2 text-sm font-semibold hover:bg-a-surface-2 disabled:cursor-not-allowed disabled:opacity-50';
 

@@ -397,7 +397,7 @@ export function ScanClient({ eventsEnabled, events, initialEventId }: { eventsEn
         {events.length > 1 && (
           <details className="mt-2 border-t border-a-border pt-2">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between text-xs font-semibold text-a-text-3">Changer d&apos;événement <IconChevronDown size={15} /></summary>
-            <select value={selectedEventId} onChange={event => handleEventChange(event.target.value)} disabled={loading || voidLoading} className="mt-1 min-h-11 w-full rounded-xl border border-a-border bg-a-surface px-3 text-sm font-semibold text-a-text">
+            <select value={selectedEventId} onChange={event => handleEventChange(event.target.value)} disabled={loading || voidLoading} className="mt-1 min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3 text-sm font-semibold text-a-text">
               {events.map(event => <option key={event.id} value={event.id}>{formatEventLabel(event)}</option>)}
             </select>
           </details>
@@ -426,7 +426,7 @@ export function ScanClient({ eventsEnabled, events, initialEventId }: { eventsEn
           <details className="mt-5 border-t border-a-border pt-3">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-semibold text-a-text-3">Saisir un code manuellement <IconChevronDown size={16} /></summary>
             <form onSubmit={handleScanSubmit} className="mt-2 flex flex-col gap-3">
-              <input type="text" autoComplete="off" value={qrToken} onChange={event => setQrToken(event.target.value)} placeholder="Code QR ou code réservation" disabled={loading || !isOnline} className="w-full rounded-xl border-2 border-a-border px-4 py-4 text-center text-sm tracking-wide focus:outline-none focus:ring-2 focus:ring-a-focus disabled:bg-a-hover" />
+              <input type="text" autoComplete="off" value={qrToken} onChange={event => setQrToken(event.target.value)} placeholder="Code QR ou code réservation" disabled={loading || !isOnline} className="w-full rounded-xl border-2 border-a-field px-4 py-4 text-center text-sm tracking-wide focus:outline-none focus:ring-2 focus:ring-a-focus disabled:bg-a-hover" />
               <button type="submit" disabled={!qrToken.trim() || loading || !isOnline} className="min-h-12 w-full rounded-xl border border-a-border bg-a-surface-2 font-bold text-a-text-2 disabled:opacity-50">{loading ? 'Lecture…' : 'Rechercher la réservation'}</button>
             </form>
           </details>
@@ -436,7 +436,7 @@ export function ScanClient({ eventsEnabled, events, initialEventId }: { eventsEn
             <form onSubmit={handleReservationSearch} className="mt-2 space-y-3">
               <p className="text-xs text-a-text-3">Recherche par nom, e-mail, téléphone, QR ou référence complète.</p>
               <div className="flex gap-2">
-                <input value={reservationQuery} onChange={event => setReservationQuery(event.target.value)} disabled={!isOnline || searching} placeholder="Nom, e-mail ou référence" className="min-h-12 min-w-0 flex-1 rounded-xl border border-a-border px-3 text-sm disabled:bg-a-hover" />
+                <input value={reservationQuery} onChange={event => setReservationQuery(event.target.value)} disabled={!isOnline || searching} placeholder="Nom, e-mail ou référence" className="min-h-12 min-w-0 flex-1 rounded-xl border border-a-field px-3 text-sm disabled:bg-a-hover" />
                 <button type="submit" disabled={!isOnline || searching || reservationQuery.trim().length < 2} className="min-h-12 rounded-xl bg-a-inverse px-4 text-sm font-bold text-a-on-inverse disabled:opacity-40">{searching ? '…' : 'Chercher'}</button>
               </div>
               {searchError && <p className="text-xs font-semibold text-tone-danger-fg">{searchError}</p>}

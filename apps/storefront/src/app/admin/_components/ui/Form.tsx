@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils/cn';
 
 /** Shared look of every admin text control (input, select, textarea). */
 export const inputClasses = cn(
-  'w-full rounded-lg border border-a-border-strong bg-a-surface px-3 text-sm text-a-text placeholder:text-a-text-3',
+  'w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm text-a-text placeholder:text-a-text-3',
   'focus:border-a-brand focus:outline focus:outline-2 focus:outline-offset-0 focus:outline-a-focus',
   'disabled:cursor-not-allowed disabled:bg-a-disabled-bg disabled:text-a-disabled-fg',
   'aria-[invalid=true]:border-tone-danger-solid',

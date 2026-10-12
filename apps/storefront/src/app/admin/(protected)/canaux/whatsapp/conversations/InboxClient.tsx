@@ -259,7 +259,7 @@ export default function InboxClient({ initialItems, initialFilter, initialSelect
                       rows={2} maxLength={4096} value={draft} onChange={(event) => setDraft(event.target.value)}
                       onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) void sendMessage(); }}
                       placeholder="Écrire un message… (Ctrl+Entrée pour envoyer)"
-                      className="min-h-[44px] flex-1 resize-y rounded-xl border border-a-border bg-a-surface px-3 py-2 text-sm"
+                      className="min-h-[44px] flex-1 resize-y rounded-xl border border-a-field bg-a-surface px-3 py-2 text-sm"
                     />
                     <Button onClick={() => void sendMessage()} loading={busy === 'send'} disabled={!draft.trim()} aria-label="Envoyer"><IconSend size={16} /></Button>
                   </div>

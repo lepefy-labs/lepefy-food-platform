@@ -76,7 +76,7 @@ export default function ShipmentDraftBlock({ order, providerName, canManage }: {
           <form onSubmit={(event) => { event.preventDefault(); if (!busy && reference.trim()) void submit({ providerReference: reference.trim() }); }} className="space-y-2">
             <label htmlFor="draft-reference" className="block text-xs text-a-text-2">Référence trouvée dans {providerName} PRO</label>
             <input id="draft-reference" value={reference} onChange={(event) => setReference(event.target.value)} maxLength={100} autoComplete="off"
-              className="min-h-11 w-full rounded-lg border border-a-border bg-transparent px-3 text-sm focus:ring-2 focus:ring-a-focus" />
+              className="min-h-11 w-full rounded-lg border border-a-field bg-transparent px-3 text-sm focus:ring-2 focus:ring-a-focus" />
             <button disabled={busy || !reference.trim()} className={primary}>{busy ? 'Vérification…' : 'Associer la référence'}</button>
           </form>
           {confirmRecreate ? (

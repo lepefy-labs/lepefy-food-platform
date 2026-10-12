@@ -27,7 +27,7 @@ export default function RentalCatalogAdmin({ serviceId, initialItems, currency }
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = uploading || saving || removingId !== null;
-  const inputClass = 'mt-1.5 min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
+  const inputClass = 'mt-1.5 min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
 
   function resetForm() {
     setEditingId(null);

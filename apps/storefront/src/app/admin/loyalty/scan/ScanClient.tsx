@@ -275,7 +275,7 @@ export function ScanClient({ loyaltyEnabled, purchasePointsRate }: { loyaltyEnab
               onChange={(e) => setCardNumber(e.target.value)}
               placeholder="Scannez la carte"
               disabled={loading}
-              className="w-full text-lg tracking-wider text-center px-4 py-4 rounded-xl border-2 border-a-border focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent"
+              className="w-full text-lg tracking-wider text-center px-4 py-4 rounded-xl border-2 border-a-field focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent"
             />
             <button
               type="submit"
@@ -312,7 +312,7 @@ export function ScanClient({ loyaltyEnabled, purchasePointsRate }: { loyaltyEnab
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={`${SCAN_SEARCH_MIN_LENGTH} caractères minimum`}
-                  className="w-full px-3.5 py-3 rounded-xl border-2 border-a-border focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent"
+                  className="w-full px-3.5 py-3 rounded-xl border-2 border-a-field focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent"
                 />
                 <div aria-live="polite" className="flex flex-col gap-1.5">
                   {searching && <p className="text-xs text-a-text-3">Recherche…</p>}
@@ -387,7 +387,7 @@ export function ScanClient({ loyaltyEnabled, purchasePointsRate }: { loyaltyEnab
               placeholder="0,00"
               disabled={loading}
               aria-describedby="amount-preview"
-              className="w-full text-lg text-center px-4 py-4 rounded-xl border-2 border-a-border focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent"
+              className="w-full text-lg text-center px-4 py-4 rounded-xl border-2 border-a-field focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent"
             />
             <p id="amount-preview" aria-live="polite" className="text-center text-sm text-a-text-2 min-h-5">
               {parsedAmount !== null && (

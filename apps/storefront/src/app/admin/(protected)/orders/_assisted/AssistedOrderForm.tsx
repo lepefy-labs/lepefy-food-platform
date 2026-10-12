@@ -45,7 +45,7 @@ const MODE_OPTIONS: Array<{ key: Mode; title: string; helper: string; icon: Reac
   { key: 'paid', title: 'Déjà payé', helper: 'L’encaissement est déjà reçu : la commande est créée immédiatement.', icon: <IconCash size={18} /> },
 ];
 
-const inputClass = 'min-h-11 w-full rounded-xl border border-a-border bg-a-surface px-3 text-base text-a-text outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
+const inputClass = 'min-h-11 w-full rounded-xl border border-a-field bg-a-surface px-3 text-base text-a-text outline-none focus:ring-2 focus:ring-a-focus sm:text-sm';
 const sectionClass = 'rounded-2xl border border-a-border bg-a-surface p-4 shadow-sm sm:p-5';
 
 function nowLocalInput(): string {

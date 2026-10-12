@@ -66,7 +66,7 @@ export function PostalCodeIndexAdmin() {
         disabled={importing}
         value={selected}
         onChange={(e) => setSelected(Array.from(e.target.selectedOptions, (o) => o.value))}
-        className="w-full sm:w-64 h-32 border border-a-border rounded-lg px-2 py-1 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-50"
+        className="w-full sm:w-64 h-32 border border-a-field rounded-lg px-2 py-1 text-sm bg-a-surface text-a-text focus:outline-none focus:ring-2 focus:ring-a-focus disabled:opacity-50"
       >
         {COUNTRIES.map((c) => (
           <option key={c.value} value={c.value}>{c.label}</option>

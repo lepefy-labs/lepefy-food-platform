@@ -113,7 +113,7 @@ export function SettingsHub({ statuses }: { statuses: SettingsStatusMap }) {
             placeholder="Rechercher un paramètre…"
             autoComplete="off"
             aria-describedby={statusId}
-            className="min-h-12 w-full rounded-xl border border-a-border bg-a-surface pl-11 pr-12 text-sm text-a-text shadow-sm outline-none transition placeholder:text-a-text-3 focus:border-transparent focus:ring-2 focus:ring-a-focus [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-12 w-full rounded-xl border border-a-field bg-a-surface pl-11 pr-12 text-sm text-a-text shadow-sm outline-none transition placeholder:text-a-text-3 focus:border-transparent focus:ring-2 focus:ring-a-focus [&::-webkit-search-cancel-button]:hidden"
           />
           {searching && (
             <button type="button" onClick={() => { setQuery(''); inputRef.current?.focus(); }} aria-label="Effacer la recherche" className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-a-text-3 hover:text-a-text-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-a-focus">

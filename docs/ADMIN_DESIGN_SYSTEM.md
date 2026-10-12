@@ -18,7 +18,8 @@ Emessi da `app/admin/layout.tsx`: valori chiari su `:root`, scuri su `:root.dark
 |---|---|---|
 | `bg-a-bg` | `--admin-page-bg` | fondo pagina |
 | `bg-a-surface`, `bg-a-surface-2` | `--admin-surface`, `--admin-surface-subtle` | card, pannelli, intestazioni di tabella |
-| `border-a-border`, `border-a-border-strong` | `--admin-border*` | separatori; bordo di input e bottoni secondari |
+| `border-a-border`, `border-a-border-strong` | `--admin-border*` | separatori, card, bottoni secondari |
+| `border-a-field` | `--admin-field-border` | contorno dei campi di testo (input, select, textarea): ≥ 3:1 su ogni superficie in entrambi i temi (WCAG 1.4.11), verificato in `adminTokens.spec.ts` |
 | `text-a-text`, `text-a-text-2`, `text-a-text-3` | `--admin-text*` | testo, testo secondario, metadati (tutti ≥ 4,5:1) |
 | `bg-a-hover`, `bg-a-selected` | `--admin-hover`, `--admin-selected` | hover di riga/voce, riga o voce selezionata |
 | `bg-a-brand`, `text-a-on-brand`, `bg-a-brand-soft`, `text-a-brand-fg` | `--admin-primary*` | azione primaria, voce attiva, link d'azione |
@@ -65,7 +66,7 @@ Inter per l'interfaccia, Bricolage Grotesque (`font-display`) solo per il titolo
 - `AdminToaster` (montato nel layout protetto) + `useAdminToast()` — `success` / `error` / `info`, regione `aria-live`, errori più lunghi, azione opzionale con link.
 - `useAdminMutation()` — scrittura client: `run(url, { body | form, method, withKey, refresh, successMessage, errorToast })`, errore francese dall'API, chiave di richiesta stabile tra i retry (sostituisce `useGestionMutation`, ora alias).
 - `InlineAlert` (tono, titolo, azione; `role="alert"` per `danger`) ed `ErrorText`.
-- `Form`: `FormField` (label, hint, errore, `required`/`optional`, collega `aria-describedby`/`aria-invalid`), `Input`, `Select`, `Textarea`, `inputClasses`.
+- `Form`: `FormField` (label, hint, errore, `required`/`optional`, collega `aria-describedby`/`aria-invalid`), `Input`, `Select`, `Textarea`, `inputClasses` / `controlClasses` (bordo `border-a-field`), `labelClasses` (etichetta unica: minuscolo normale, `text-sm font-semibold text-a-text`, mai maiuscolo grigio), `hintClasses`. Le costanti locali `LABEL_CLS`/`LABEL` dei moduli puntano a `labelClasses`; un campo scritto a mano usa `controlClasses` o almeno `border-a-field`.
 - `BulkTrackingModal`, `BulkDocumentsDialog` (Commandes) già sul kit.
 
 ### Liste e dati (`src/lib/admin/listParams.ts`, `src/app/admin/_components/data/`)
@@ -104,6 +105,7 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 `tests/unit/adminDesignGuard.spec.ts` (eseguito da `pnpm test:unit`, perché `pnpm lint` non si usa):
 - su ogni file di `app/admin` rifiuta testo < 12 px, palette Tailwind diretta, varianti `dark:`, `var(--color-…)` e classi `bg-primary`/`text-secondary`… dello storefront, colori esadecimali in classi;
 - su tutto `app/admin` rifiuta già `confirm()` nativo e overlay `fixed inset-0` scritti a mano. Eccezione: il mirino fotocamera di `loyalty/scan/CameraScanButton.tsx` (vista a schermo intero, non un dialog).
+- su tutto `app/admin` rifiuta una costante di classi di campo (`*INPUT*`, `*SELECT*`, `*FIELD*`, `input`, `field`…) con `border-a-border(-strong)`: i campi usano `border-a-field`.
 - `tests/unit/adminNavigation.spec.ts`: id unici, coerenza registry ↔ `adminRoutePermissions`, visibilità per ruolo, stato attivo, barra mobile.
 
 ## 6. Stato di adozione
@@ -123,4 +125,5 @@ I moduli esistenti passano ai token con un codemod a regole fisse (una unità pe
 | U10 | Événementiel (back-office, prenotazioni, contenuti, noleggi, scan sul posto) sui token | ✅ |
 | U11 | Altri moduli (Paramètres, Paiements, Avis, Fidélité, Ambassadeurs, Canaux, Billing, IA, Contenu, Outils, dettaglio ordine, ordini assistiti, console Platform, Team, Sécurité, onboarding, login) sui token; Paiements carte convertito a Server Component + URL (`lib/card/cardPaymentsList.ts` condiviso con `GET /api/admin/card-payments`); guard esteso a tutto `app/admin` | ✅ `b0084cc2` |
 | U12 | Rete di sicurezza dark (`adminDarkTheme.ts`), rimappatura `--color-*` e alias token legacy rimossi; guard senza eccezioni | ✅ |
+| U13 | Campi visibili: token `--admin-field-border` / `border-a-field` (≥ 3:1), kit `Form` aggiornato, codemod su tutti gli `input`/`select`/`textarea` admin (78 file, risoluzione delle costanti via compilatore TypeScript), etichette locali su `labelClasses`, editor prodotto su `controlClasses`; regola del guard | ✅ 13/10/2026 |
 | — | Journal d'activité (`/admin/activite`, `AuditChanges`, `ResourceActivity`, `JournalLink`), nato sul kit | ✅ |

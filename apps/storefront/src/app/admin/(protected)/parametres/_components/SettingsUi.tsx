@@ -37,7 +37,7 @@ export function SettingsIconTile({ icon: TileIcon, accent, size = 'md' }: { icon
 }
 
 export const SETTINGS_INPUT_CLS =
-  'min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 py-2.5 text-sm text-a-text shadow-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus disabled:cursor-not-allowed disabled:opacity-60';
+  'min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 py-2.5 text-sm text-a-text shadow-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-a-focus disabled:cursor-not-allowed disabled:opacity-60';
 export const SETTINGS_LABEL_CLS = 'mb-1.5 block text-sm font-medium text-a-text-2';
 // Shared Button 'outline' uses the tenant dark colour, unreadable on the dark theme.
 export const SETTINGS_OUTLINE_DARK_CLS = '';

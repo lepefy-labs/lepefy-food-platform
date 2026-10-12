@@ -11,10 +11,11 @@ import {
   overlappingCountries,
   previewCountryRule,
 } from '@/lib/shipping/shippingRuleConflicts';
+import { labelClasses } from '@/app/admin/_components/ui/Form';
 
 const INPUT_CLS =
-  'w-full border border-a-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
-const LABEL_CLS = 'text-a-text-3 text-xs uppercase tracking-wide mb-0.5 block';
+  'w-full border border-a-field rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus focus:border-transparent bg-a-surface text-a-text';
+const LABEL_CLS = labelClasses;
 
 // Mêmes pays que le sélecteur d'adresse du checkout (CheckoutFlow.tsx) — seuls
 // pays pour lesquels un devis de livraison a un sens sur cette plateforme.
@@ -209,10 +210,10 @@ function RuleForm({ initial, allRules, currency, submitLabel, isSaving, onSubmit
         <p className="text-xs font-semibold text-a-text-2">Aperçu</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-a-text-3">
           <label htmlFor={`example-base-${idSuffix}`}>Prix de base</label>
-          <input id={`example-base-${idSuffix}`} type="text" inputMode="decimal" value={exampleBase} onChange={(e) => setExampleBase(e.target.value)} className="w-20 rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text" />
+          <input id={`example-base-${idSuffix}`} type="text" inputMode="decimal" value={exampleBase} onChange={(e) => setExampleBase(e.target.value)} className="w-20 rounded-md border border-a-field bg-a-surface px-2 py-1 text-xs text-a-text" />
           <span>{currency} ·</span>
           <label htmlFor={`example-cart-${idSuffix}`}>panier</label>
-          <input id={`example-cart-${idSuffix}`} type="text" inputMode="decimal" value={exampleCart} onChange={(e) => setExampleCart(e.target.value)} className="w-20 rounded-md border border-a-border bg-a-surface px-2 py-1 text-xs text-a-text" />
+          <input id={`example-cart-${idSuffix}`} type="text" inputMode="decimal" value={exampleCart} onChange={(e) => setExampleCart(e.target.value)} className="w-20 rounded-md border border-a-field bg-a-surface px-2 py-1 text-xs text-a-text" />
           <span>{currency}</span>
         </div>
         <p aria-live="polite" className="mt-1.5 text-xs text-a-text-2">

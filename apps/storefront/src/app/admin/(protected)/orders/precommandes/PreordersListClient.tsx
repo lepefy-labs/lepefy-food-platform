@@ -147,7 +147,7 @@ export default function PreordersListClient({ currency, canManage }: { currency:
           <div className="relative w-full lg:max-w-xs">
             <IconSearch size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-a-text-3" />
             <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Client, téléphone, e-mail ou P-…" aria-label="Rechercher une précommande"
-              className="h-10 w-full rounded-xl border border-a-border bg-a-surface pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-a-focus" />
+              className="h-10 w-full rounded-xl border border-a-field bg-a-surface pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-a-focus" />
           </div>
         </div>
 

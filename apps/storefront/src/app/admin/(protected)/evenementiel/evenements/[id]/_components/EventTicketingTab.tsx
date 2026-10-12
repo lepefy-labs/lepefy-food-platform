@@ -29,7 +29,7 @@ export default function EventTicketingTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState({ label: '', description: '', price: '', badge: '' });
 
-  const inputClass = 'min-h-11 w-full rounded-lg border border-a-border bg-a-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
+  const inputClass = 'min-h-11 w-full rounded-lg border border-a-field bg-a-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-a-focus';
 
   function startEdit(ticket: EventTicketType) {
     setEditingId(ticket.id);

@@ -28,6 +28,8 @@ export interface AdminSurfaceValues {
   surfaceSubtle: string;
   border: string;
   borderStrong: string;
+  /** Outline of text controls (input, select, textarea): >= 3:1 on every surface (WCAG 1.4.11). */
+  fieldBorder: string;
   text: string;
   text2: string;
   text3: string;
@@ -62,12 +64,12 @@ export const ADMIN_TONE_VALUES: Record<AdminThemeMode, Record<AdminTone, AdminTo
 
 export const ADMIN_SURFACE_VALUES: Record<AdminThemeMode, AdminSurfaceValues> = {
   light: {
-    pageBg: '#F7F8FA', surface: '#FFFFFF', surfaceSubtle: '#F8FAFC', border: '#E2E8F0', borderStrong: '#CBD5E1',
+    pageBg: '#F7F8FA', surface: '#FFFFFF', surfaceSubtle: '#F8FAFC', border: '#E2E8F0', borderStrong: '#CBD5E1', fieldBorder: '#7F8A9C',
     text: '#172033', text2: '#475569', text3: '#5B6779', hover: '#F1F5F9', disabledBg: '#F1F5F9', disabledFg: '#5B6779',
     inverseBg: '#172033', inverseFg: '#FFFFFF',
   },
   dark: {
-    pageBg: '#0B0F17', surface: '#111827', surfaceSubtle: '#161E2E', border: '#263042', borderStrong: '#334155',
+    pageBg: '#0B0F17', surface: '#111827', surfaceSubtle: '#161E2E', border: '#263042', borderStrong: '#334155', fieldBorder: '#5F6E84',
     text: '#E5E9F0', text2: '#B4BCC8', text3: '#8E98A8', hover: '#1A2333', disabledBg: '#1A2333', disabledFg: '#8E98A8',
     inverseBg: '#E5E9F0', inverseFg: '#0B0F17',
   },
@@ -95,6 +97,7 @@ function declarations(surface: AdminSurfaceValues, brand: AdminBrandValues, tone
     `--admin-surface-subtle: ${surface.surfaceSubtle}`,
     `--admin-border: ${surface.border}`,
     `--admin-border-strong: ${surface.borderStrong}`,
+    `--admin-field-border: ${surface.fieldBorder}`,
     `--admin-text: ${surface.text}`,
     `--admin-text-2: ${surface.text2}`,
     `--admin-text-3: ${surface.text3}`,
