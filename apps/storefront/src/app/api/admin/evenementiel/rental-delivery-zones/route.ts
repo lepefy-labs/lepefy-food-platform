@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { findDeliveryZoneConflict, normalizeDeliveryZone, type ExistingDeliveryZone } from '@/lib/rental/deliveryZoneRules';
 
 export async function GET() {
   const slug   = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
@@ -28,41 +29,28 @@ export async function POST(req: NextRequest) {
   const denied = await requireAdmin(tenant.id);
   if (denied) return denied;
 
-  const body = await req.json() as Record<string, unknown>;
-  const label     = String(body.label ?? '').trim();
-  const feeAmount = Number(body.fee_amount);
-  const prefixes  = Array.isArray(body.postal_code_prefixes)
-    ? (body.postal_code_prefixes as unknown[]).map((p) => String(p).trim()).filter(Boolean)
-    : null;
-
-  if (!label || !Number.isFinite(feeAmount) || feeAmount < 0) {
-    return NextResponse.json({ error: 'Label et montant valides requis.' }, { status: 400 });
+  const body = await req.json().catch(() => null) as Record<string, unknown> | null;
+  const normalized = normalizeDeliveryZone(body ?? {});
+  if (!normalized.ok) {
+    return NextResponse.json({ error: normalized.error, field: normalized.field }, { status: 400 });
   }
 
   const supabase = createServiceClient();
 
-  const { data: last } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('rental_delivery_zones')
-    .select('sort_order')
-    .eq('tenant_id', tenant.id)
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const nextSortOrder = (last?.sort_order ?? -1) + 1;
+    .select('id, label, country, city, postal_code_prefixes, active, sort_order')
+    .eq('tenant_id', tenant.id);
+  if (existingError) return NextResponse.json({ error: 'Erreur serveur.' }, { status: 500 });
+
+  const conflict = findDeliveryZoneConflict(normalized.zone, (existing ?? []) as ExistingDeliveryZone[]);
+  if (conflict) return NextResponse.json({ error: conflict.error, field: conflict.field }, { status: 409 });
+
+  const nextSortOrder = (existing ?? []).reduce((max, zone) => Math.max(max, (zone.sort_order as number | null) ?? -1), -1) + 1;
 
   const { data, error } = await supabase
     .from('rental_delivery_zones')
-    .insert({
-      tenant_id:            tenant.id,
-      label,
-      postal_code_prefixes: prefixes?.length ? prefixes : null,
-      city:                 body.city ? String(body.city).trim() : null,
-      country:              body.country ? String(body.country).trim().toUpperCase() : null,
-      fee_amount:           feeAmount,
-      note:                 body.note ? String(body.note).trim() : null,
-      active:               body.active === undefined ? true : Boolean(body.active),
-      sort_order:           nextSortOrder,
-    })
+    .insert({ tenant_id: tenant.id, ...normalized.zone, sort_order: nextSortOrder })
     .select('*')
     .single();
 

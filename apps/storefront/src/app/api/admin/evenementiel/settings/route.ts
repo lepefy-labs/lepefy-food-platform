@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
+import { normalizeDeliveryCountries } from '@/lib/rental/deliveryZoneRules';
 
 // Bascule les deux flags d'activation indépendants du module (052) —
 // events_enabled et services_enabled sur `tenants`, jamais de valeur par
@@ -23,8 +24,10 @@ async function handlePATCH(req: NextRequest) {
   if (typeof body.events_enabled === 'boolean') patch.events_enabled = body.events_enabled;
   if (typeof body.services_enabled === 'boolean') patch.services_enabled = body.services_enabled;
   if (typeof body.rental_delivery_enabled === 'boolean') patch.rental_delivery_enabled = body.rental_delivery_enabled;
-  if (Array.isArray(body.rental_delivery_countries)) {
-    patch.rental_delivery_countries = body.rental_delivery_countries.map((c) => c.trim().toUpperCase()).filter(Boolean);
+  if (body.rental_delivery_countries !== undefined) {
+    const countries = normalizeDeliveryCountries(body.rental_delivery_countries);
+    if (!countries.ok) return NextResponse.json({ error: countries.error, field: 'rental_delivery_countries' }, { status: 400 });
+    patch.rental_delivery_countries = countries.countries;
   }
 
   if (Object.keys(patch).length === 0) {

@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
+import AdminPageHeader from '../../../_components/ui/AdminPageHeader';
 import RentalDeliveryZonesClient from './RentalDeliveryZonesClient';
 import type { RentalDeliveryZone } from '@lepefy/types';
 
@@ -19,10 +20,10 @@ export default async function AdminRentalDeliveryZonesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-xl font-semibold text-a-text">Livraison matériel</h1>
-      <p className="mb-6 mt-1 text-sm text-a-text-3">
-        Configurez les pays où la livraison est proposée et les zones avec un supplément fixe calculé automatiquement au checkout.
-      </p>
+      <AdminPageHeader
+        title="Livraison matériel"
+        description="Pays de livraison, zones et supplément ajouté automatiquement à la réservation de matériel."
+      />
       <RentalDeliveryZonesClient
         initialZones={(zones ?? []) as RentalDeliveryZone[]}
         currency={tenant.currency}

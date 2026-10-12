@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
+import { countryOptions } from '@/lib/address/addressRules';
 import RentalReservationsClient from './RentalReservationsClient';
 import type { RentalReservationRequest, RentalFulfillmentType, RentalDeliveryFeeStatus } from '@lepefy/types';
 
@@ -86,6 +87,11 @@ export default async function AdminRentalReservationsPage() {
       && m.enabled_modules.includes('rental'),
   );
 
+  // Conversion retrait → livraison : pays de livraison du tenant, sinon les pays standard.
+  const deliveryCountries = countryOptions(
+    (tenant.rental_delivery_countries ?? []).length > 0 ? tenant.rental_delivery_countries : null,
+  ).map((option) => option.code);
+
   return (
     <div className="max-w-4xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -97,7 +103,7 @@ export default async function AdminRentalReservationsPage() {
       <p className="mb-6 mt-1 text-sm text-a-text-3">
         Retraits confirmés à venir en priorité, puis historique des réservations.
       </p>
-      <RentalReservationsClient initialReservations={result} initialPendingRequests={pendingRequests} rentalItemNameById={Object.fromEntries(rentalItemNameById)} currency={tenant.currency} externalPaymentMethods={externalPaymentMethods} />
+      <RentalReservationsClient initialReservations={result} initialPendingRequests={pendingRequests} rentalItemNameById={Object.fromEntries(rentalItemNameById)} currency={tenant.currency} externalPaymentMethods={externalPaymentMethods} deliveryCountries={deliveryCountries} />
     </div>
   );
 }

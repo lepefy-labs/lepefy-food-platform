@@ -1,12 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import { useRouter } from 'next/navigation';
 import { IconReceiptRefund, IconCalendar, IconClock, IconTruckDelivery, IconBuildingStore } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/admin/format';
+import { countryLabel, isDeliveryCountry, isValidPostalCode, normalizeAddressParts, normalizePostalCode } from '@/lib/address/addressRules';
+import type { PostalLookupCity } from '@/lib/address/postalLookup';
 import ConfirmPaymentButton from '../../../_components/ui/ConfirmPaymentButton';
 import Button from '../../../_components/ui/Button';
+import InlineAlert from '../../../_components/ui/InlineAlert';
+import { FormField, Input, Select } from '../../../_components/ui/Form';
+import { useAdminToast } from '../../../_components/ui/Toaster';
 import type { RentalReservationRequest, RentalFulfillmentType, RentalDeliveryFeeStatus, TenantPaymentMethod } from '@lepefy/types';
 
 interface RentalReservationWithDetails {
@@ -46,9 +53,11 @@ function elapsedLabel(createdAt: string): string {
 }
 
 export default function RentalReservationsClient({
-  initialReservations, initialPendingRequests = [], rentalItemNameById = {}, currency, externalPaymentMethods = [],
+  initialReservations, initialPendingRequests = [], rentalItemNameById = {}, currency, externalPaymentMethods = [], deliveryCountries,
 }: {
   initialReservations: RentalReservationWithDetails[];
+  /** Pays proposés pour une conversion en livraison (jamais vide). */
+  deliveryCountries: string[];
   initialPendingRequests?: RentalReservationRequest[];
   rentalItemNameById?: Record<string, string>;
   currency: string;
@@ -191,13 +200,13 @@ export default function RentalReservationsClient({
 
           {r.fulfillment_type === 'delivery' && (
             <div className="mt-2 text-xs text-a-text-2">
-              <p>{r.delivery_street} {r.delivery_house_number}, {r.delivery_postal_code} {r.delivery_city} ({r.delivery_country})</p>
+              <p>{r.delivery_street} {r.delivery_house_number}, {r.delivery_postal_code} {r.delivery_city}{r.delivery_country ? ` (${countryLabel(r.delivery_country)})` : ''}</p>
               <DeliveryFeeSection reservation={r} currency={currency} externalPaymentMethods={externalPaymentMethods} onUpdate={(patch) => updateReservation(r.id, patch)} />
             </div>
           )}
 
           {r.fulfillment_type === 'pickup' && r.status === 'confirmed' && (
-            <ConvertToDeliveryAction reservationId={r.id} onConverted={(patch) => updateReservation(r.id, { fulfillment_type: 'delivery', ...patch })} />
+            <ConvertToDeliveryAction reservationId={r.id} countries={deliveryCountries} currency={currency} onConverted={(patch) => updateReservation(r.id, { fulfillment_type: 'delivery', ...patch })} />
           )}
         </div>
       ))}
@@ -294,60 +303,170 @@ function DeliveryFeeSection({
   );
 }
 
+type ConvertField = 'street' | 'house_number' | 'postal_code' | 'city' | 'country';
+
+interface ConvertResponse {
+  error?: string;
+  field?: ConvertField;
+  deliveryFeeStatus?: RentalDeliveryFeeStatus;
+  suggestedFeeAmount?: number | null;
+  zoneLabel?: string | null;
+  address?: { street: string; house_number: string; postal_code: string; city: string; country: string };
+}
+
+// Passage retrait → livraison : mêmes contrôles d'adresse que le checkout
+// location (normalizeAddressParts), côté navigateur puis côté serveur.
 function ConvertToDeliveryAction({
-  reservationId, onConverted,
+  reservationId, countries, currency, onConverted,
 }: {
   reservationId: string;
+  countries: string[];
+  currency: string;
   onConverted: (patch: Partial<RentalReservationWithDetails>) => void;
 }) {
+  const toast = useAdminToast();
   const [open, setOpen] = useState(false);
+  const [country, setCountry] = useState(countries[0] ?? 'IT');
   const [street, setStreet] = useState('');
   const [houseNumber, setHouseNumber] = useState('');
-  const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
-  const [country, setCountry] = useState('');
+  const [city, setCity] = useState('');
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [cityFromPostal, setCityFromPostal] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<ConvertField, string>>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function submit() {
-    if (!street.trim() || !houseNumber.trim() || !city.trim() || !postalCode.trim() || !country.trim()) return;
-    setIsSubmitting(true);
+  function clearError(field: ConvertField) {
+    setErrors((previous) => {
+      if (!previous[field]) return previous;
+      const next = { ...previous };
+      delete next[field];
+      return next;
+    });
+    setFormError(null);
+  }
+
+  async function lookupCity(value: string) {
+    const postal = normalizePostalCode(country, value);
+    if (!isDeliveryCountry(country) || !isValidPostalCode(country, postal)) {
+      setCityOptions([]);
+      return;
+    }
     try {
+      const res = await fetch(`/api/address/postal-lookup?country=${country}&postalCode=${encodeURIComponent(postal)}`);
+      const result = await res.json().catch(() => ({ cities: [] })) as { cities?: PostalLookupCity[] };
+      const names = [...new Set((result.cities ?? []).map((entry) => entry.city))];
+      const [onlyCity] = names;
+      if (names.length === 1 && onlyCity && !city.trim()) {
+        setCity(onlyCity);
+        setCityFromPostal(true);
+        clearError('city');
+      }
+      setCityOptions(names.length > 1 ? names : []);
+    } catch {
+      // Suggestion facultative : la saisie reste possible.
+    }
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) return;
+    const check = normalizeAddressParts({ street, houseNumber, postalCode, city, country });
+    if (!check.ok) {
+      setErrors({ [check.field]: check.error });
+      return;
+    }
+    setIsSubmitting(true);
+    setFormError(null);
+    try {
+      const { address } = check;
       const res = await fetch(`/api/admin/evenementiel/reservations/${reservationId}/convert-to-delivery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ street, house_number: houseNumber, city, postal_code: postalCode, country }),
+        body: JSON.stringify({
+          street: address.street, house_number: address.houseNumber, postal_code: address.postalCode, city: address.city, country: address.country,
+        }),
       });
-      const result = await res.json();
-      if (res.ok) {
-        onConverted({
-          delivery_street: street, delivery_house_number: houseNumber, delivery_city: city,
-          delivery_postal_code: postalCode, delivery_country: country,
-          delivery_fee_status: result.deliveryFeeStatus, delivery_fee_amount: result.suggestedFeeAmount,
-        });
-        setOpen(false);
+      const result = await res.json().catch(() => ({})) as ConvertResponse;
+      if (!res.ok || !result.address || !result.deliveryFeeStatus) {
+        if (result.field) setErrors({ [result.field]: result.error ?? 'Valeur invalide.' });
+        else setFormError(result.error ?? 'Passage en livraison impossible. Réessayez.');
+        return;
       }
+      onConverted({
+        delivery_street: result.address.street,
+        delivery_house_number: result.address.house_number,
+        delivery_postal_code: result.address.postal_code,
+        delivery_city: result.address.city,
+        delivery_country: result.address.country,
+        delivery_fee_status: result.deliveryFeeStatus,
+        delivery_fee_amount: result.suggestedFeeAmount ?? null,
+      });
+      setOpen(false);
+      toast.success('Réservation passée en livraison.', {
+        description: result.zoneLabel
+          ? `Zone « ${result.zoneLabel} », supplément proposé ${formatMoney(result.suggestedFeeAmount ?? 0, currency)}.`
+          : 'Aucune zone : supplément à évaluer.',
+      });
+    } catch {
+      setFormError('Connexion impossible. Vérifiez le réseau puis réessayez.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
   if (!open) {
-    return <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs font-semibold text-a-brand-fg underline">Convertir en livraison</button>;
+    return (
+      <Button type="button" variant="ghost" size="sm" className="mt-2 -ml-2.5 text-a-brand-fg" onClick={() => setOpen(true)}>
+        <IconTruckDelivery size={16} aria-hidden="true" /> Convertir en livraison
+      </Button>
+    );
   }
 
   return (
-    <div className="mt-2 space-y-1.5 rounded-lg bg-a-surface-2 p-2">
-      <div className="grid grid-cols-2 gap-1.5">
-        <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rue" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs" />
-        <input value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)} placeholder="Numéro" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs" />
-        <input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="Code postal" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs" />
-        <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ville" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs" />
-        <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Pays (ex. IT)" className="min-h-9 rounded-lg border border-black/10 px-2 text-xs col-span-2" />
+    <form onSubmit={submit} noValidate className="mt-3 space-y-3 rounded-xl border border-a-border bg-a-surface-2 p-3">
+      <p className="text-sm font-semibold text-a-text">Adresse de livraison</p>
+      <FormField label="Pays" error={errors.country}>
+        <Select value={country} onChange={(event) => { setCountry(event.target.value); setCityOptions([]); clearError('country'); clearError('postal_code'); }}>
+          {countries.map((code) => <option key={code} value={code}>{countryLabel(code)}</option>)}
+        </Select>
+      </FormField>
+      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-3">
+        <FormField label="Rue" error={errors.street}>
+          <Input value={street} onChange={(event) => { setStreet(event.target.value); clearError('street'); }} autoComplete="off" placeholder="Ex. Via Roma" />
+        </FormField>
+        <FormField label="N°" error={errors.house_number}>
+          <Input value={houseNumber} onChange={(event) => { setHouseNumber(event.target.value); clearError('house_number'); }} autoComplete="off" placeholder="Ex. 25" />
+        </FormField>
       </div>
-      <div className="flex gap-2">
-        <Button type="button" size="sm" onClick={submit} loading={isSubmitting}>Convertir</Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="Code postal" error={errors.postal_code}>
+          <Input
+            value={postalCode}
+            onChange={(event) => { setPostalCode(event.target.value); clearError('postal_code'); }}
+            onBlur={(event) => lookupCity(event.target.value)}
+            inputMode="numeric"
+            autoComplete="off"
+          />
+        </FormField>
+        <FormField label="Ville" error={errors.city} hint={cityFromPostal && !errors.city ? 'Ville remplie à partir du code postal.' : undefined}>
+          <Input value={city} onChange={(event) => { setCity(event.target.value); setCityFromPostal(false); clearError('city'); }} autoComplete="off" />
+        </FormField>
       </div>
-    </div>
+      {cityOptions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Villes de ce code postal">
+          <span className="text-xs text-a-text-3">Villes de ce code postal :</span>
+          {cityOptions.map((name) => (
+            <Button key={name} type="button" variant="secondary" size="sm" onClick={() => { setCity(name); setCityOptions([]); clearError('city'); }}>{name}</Button>
+          ))}
+        </div>
+      )}
+      {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" loading={isSubmitting}>Passer en livraison</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={isSubmitting} onClick={() => setOpen(false)}>Annuler</Button>
+      </div>
+    </form>
   );
 }
