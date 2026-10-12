@@ -908,32 +908,30 @@ export default function ProductEditClient({
             </section>
 
             <section className="bg-a-surface rounded-xl border border-a-border p-5">
-              <h2 className={SECTION_TITLE_CLS} id="product-fulfillment-title">Mode de réception</h2>
-              <p className="-mt-2 mb-4 text-xs text-a-text-3">
-                Comment le client peut recevoir ce produit. Indépendant du type de stockage.
-              </p>
-              <div role="radiogroup" aria-labelledby="product-fulfillment-title" className="grid gap-2 sm:grid-cols-3">
-                {FULFILLMENT_POLICIES.map((policy) => {
-                  const selected = formData.fulfillment_policy === policy;
-                  return (
-                    <label key={policy} className={`flex min-h-11 cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm ${selected ? 'border-a-brand bg-a-brand-soft' : 'border-a-border bg-a-surface hover:bg-a-surface-2'}`}>
-                      <input
-                        type="radio"
-                        name="product-fulfillment-policy"
-                        value={policy}
-                        checked={selected}
-                        disabled={!canManage}
-                        onChange={() => setField('fulfillment_policy', policy)}
-                        className="mt-0.5"
-                      />
-                      <span>
-                        <span className="block font-semibold text-a-text">{FULFILLMENT_POLICY_ADMIN_LABELS[policy]}</span>
-                        <span className="mt-0.5 block text-xs text-a-text-3">{FULFILLMENT_POLICY_HELP[policy]}</span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
+              <h2 className={SECTION_TITLE_CLS}>Mode de réception</h2>
+              <label htmlFor="product-fulfillment-policy" className={LABEL_CLS}>Comment le client reçoit ce produit</label>
+              <select
+                id="product-fulfillment-policy"
+                value={formData.fulfillment_policy}
+                disabled={!canManage}
+                onChange={(e) => setField('fulfillment_policy', normalizeFulfillmentPolicy(e.target.value))}
+                aria-describedby="product-fulfillment-help"
+                className={INPUT_CLS}
+              >
+                {FULFILLMENT_POLICIES.map((policy) => (
+                  <option key={policy} value={policy}>{FULFILLMENT_POLICY_ADMIN_LABELS[policy]}</option>
+                ))}
+              </select>
+              {/* Les trois modes expliqués d'un coup d'œil ; le mode choisi est mis en avant. */}
+              <ul id="product-fulfillment-help" className="mt-2 space-y-1 text-xs text-a-text-3">
+                {FULFILLMENT_POLICIES.map((policy) => (
+                  <li key={policy} className={formData.fulfillment_policy === policy ? 'text-a-text-2' : undefined}>
+                    <span className={formData.fulfillment_policy === policy ? 'font-semibold text-a-text' : 'font-medium'}>{FULFILLMENT_POLICY_ADMIN_LABELS[policy]}</span>
+                    {' : '}{FULFILLMENT_POLICY_HELP[policy]}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-a-text-3">Indépendant du type de stockage.</p>
               {formData.fulfillment_policy === 'pickup_only' && !clickCollectEnabled && (
                 <p role="alert" className="mt-3 flex items-start gap-1.5 rounded-lg border border-tone-warning-border bg-tone-warning-bg px-3 py-2 text-xs font-semibold text-tone-warning-fg">
                   <IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />
