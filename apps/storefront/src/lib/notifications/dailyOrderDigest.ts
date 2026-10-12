@@ -49,6 +49,8 @@ export function classifyDigest(
       priority='urgent';reason='Conflit de stock';action='Vérifier le stock et la résolution du paiement.';
     }else if(['exception','returned','cancelled'].includes(order.shipping_normalized_status??'')){
       priority='urgent';reason='Incident de livraison';action='Contacter le transporteur et organiser la solution client.';
+    }else if(order.shipping_sync_error==='preparation_incomplete'){
+      priority='urgent';reason='Colis en transit, préparation non enregistrée';action='Valider le prélèvement, les contrôles froid et l’emballage.';
     }else if(order.shipping_sync_error){
       priority='urgent';reason='Suivi transporteur en erreur';action='Vérifier la référence et relancer la synchronisation.';
     }else if(order.payment_status!=='paid'){

@@ -3,7 +3,7 @@ import type { Order } from '@lepefy/types';
 import { packlinkAdapter, parsePacklinkShipment, normalizePacklinkStatus, resolveTrackingUrl } from '../../src/lib/shipping/providers/packlink';
 import { managedShippingProviderInfo } from '../../src/lib/shipping/providers/registry';
 import { applyShipmentSnapshot, syncOrderShipment } from '../../src/lib/shipping/syncOrderShipment';
-import { loadWorkflowOrder, updateWorkflowOrder, type OrderService } from '../../src/lib/orders/orderTransitionService';
+import { loadWorkflowOrder, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '../../src/lib/orders/orderTransitionService';
 import { runOrderTransitionSideEffects } from '../../src/lib/orders/adminOrderWorkflow';
 import type { TenantNotificationContext } from '../../src/lib/notifications/getTenantNotificationContext';
 import { shipmentEventLabel, shipmentEventsNewestFirst } from '../../src/lib/shipping/shipmentPresentation';
@@ -214,7 +214,7 @@ test('admin endpoints are POST-only orders.manage and internal auth fails closed
 });
 test('bounded scheduler excludes historical, terminal and unsupported shipments', async () => {
   const db = fakeService(initialOrder({ status: 'delivered', shipping_tracking_mode: 'managed', shipping_provider_reference: reference, shipping_provider_key: 'packlink' }));
-  expect(await runShippingSyncBatch(db.service)).toEqual({ processed: 0, succeeded: 0, failed: 0 });
+  expect(await runShippingSyncBatch(db.service)).toEqual({ processed: 0, succeeded: 0, failed: 0, blocked: 0 });
   expect(db.queries[0]).toBe('orders:id, tenant_id');
 });
 
@@ -228,7 +228,7 @@ test('batch isolates failures, resolves tenant per order and enforces limit', as
     if (orderId === 'order-0') throw new Error('test-failure');
     return initialOrder();
   });
-  expect(result).toEqual({ processed: 6, succeeded: 5, failed: 1 });
+  expect(result).toEqual({ processed: 6, succeeded: 5, failed: 1, blocked: 0 });
   expect(calls).toEqual(Array.from({ length: 6 }, (_, index) => `tenant-${index}:order-${index}`));
 });
 
@@ -247,4 +247,28 @@ test('provider HTTP not-found cannot associate; sync failure preserves last snap
     expect(attached.order().shipping_sync_error).toBe('shipment_not_found');
     expect(attached.order().shipping_provider_synced_at).toBeTruthy();
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('parcel in transit before preparation is recorded: snapshot kept, flagged, counted as blocked, ships once prepared', async () => {
+  // Real ChloeFood order (2026-10-12): Packlink IN_TRANSIT while picking/cold-chain/packing were never recorded.
+  const managed = { shipping_tracking_mode: 'managed', shipping_provider_key: 'packlink', shipping_provider_reference: reference } as const;
+  const db = fakeService(initialOrder({ ...managed, packing_completed_at: null, packing_parcel_count: null, shipping_provider_status: 'READY_TO_PRINT' }));
+  db.rows.order_items = [{ order_id: 'order-a', tenant_id: 'tenant-a', storage_type: 'frozen', picked_at: null, cold_chain_checked_at: null }];
+  const adapter = () => ({ ...packlinkAdapter, async resolveShipment() { return snapshot('IN_TRANSIT'); } });
+  await expect(syncOrderShipment(db.service, 'tenant-a', 'order-a', undefined, adapter)).rejects.toBeInstanceOf(PreparationIncompleteError);
+  expect(db.order().status).toBe('preparing');
+  expect(db.order().shipped_at).toBeNull();
+  expect(db.order().shipping_provider_status).toBe('IN_TRANSIT');
+  expect(db.order().tracking_code).toBe('179196133702310');
+  expect(db.order().shipping_sync_error).toBe('preparation_incomplete');
+  expect(db.order().shipping_provider_synced_at).toBeTruthy();
+  expect(await runShippingSyncBatch(db.service, (service, tenantId, orderId) => syncOrderShipment(service, tenantId, orderId, undefined, adapter)))
+    .toEqual({ processed: 1, succeeded: 0, failed: 0, blocked: 1 });
+  // Preparation recorded by the operator: the next tick ships the order and clears the flag.
+  db.rows.order_items = [{ order_id: 'order-a', tenant_id: 'tenant-a', storage_type: 'frozen', picked_at: 'yes', cold_chain_checked_at: 'yes' }];
+  Object.assign(db.rows.orders![0]!, { packing_completed_at: '2026-10-12T19:00:00Z', packing_parcel_count: 1 });
+  const spy = effects();
+  await applyShipmentSnapshot(db.service, db.order(), snapshot('IN_TRANSIT'), spy.run);
+  expect(db.order().status).toBe('shipped');
+  expect(db.order().shipping_sync_error).toBeNull();
 });

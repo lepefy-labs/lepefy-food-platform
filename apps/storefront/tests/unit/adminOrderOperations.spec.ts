@@ -210,6 +210,7 @@ test.describe('order detail alignment', () => {
     expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_normalized_status: 'exception' }))).toEqual({ label: 'Incident', tone: 'danger' });
     expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_normalized_status: 'delivered' }))).toEqual({ label: 'Livré', tone: 'success' });
     expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_sync_error: 'timeout' }))).toEqual({ label: 'Synchro en erreur', tone: 'danger' });
+    expect(transportState(make({ shipping_provider_reference: 'PK1', shipping_sync_error: 'preparation_incomplete' }))).toEqual({ label: 'En transit · préparation à valider', tone: 'danger' });
   });
 
   test('tracking timeline is newest first, drops malformed events and keeps carrier wording readable', () => {

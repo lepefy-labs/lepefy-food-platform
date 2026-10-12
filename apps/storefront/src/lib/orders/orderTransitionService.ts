@@ -7,6 +7,8 @@ export type OrderService = ReturnType<typeof createServiceClient>;
 export class OrderWorkflowError extends Error {
   constructor(message: string, public readonly httpStatus = 409) { super(message); }
 }
+/** Picking/cold-chain/packing not recorded: an operator action, not a technical failure. */
+export class PreparationIncompleteError extends OrderWorkflowError {}
 
 export interface PickingItemRow {
   storage_type: 'dry' | 'fresh' | 'frozen' | null;
@@ -40,10 +42,10 @@ export async function assertPreparationComplete(service: OrderService, order: Or
   if (error) throw new OrderWorkflowError('Impossible de vérifier la préparation.', 503);
   const items = (data ?? []) as PickingItemRow[];
   const message = pickingError(items);
-  if (message) throw new OrderWorkflowError(message);
+  if (message) throw new PreparationIncompleteError(message);
   if (packing && (!order.packing_completed_at || !order.packing_parcel_count || order.packing_parcel_count < 1
     || (items.some(item => item.storage_type === 'fresh' || item.storage_type === 'frozen') && !order.cold_chain_packing_checked_at))) {
-    throw new OrderWorkflowError('Emballage incomplet : validez les colis et les contrôles froid avant l’expédition.');
+    throw new PreparationIncompleteError('Emballage incomplet : validez les colis et les contrôles froid avant l’expédition.');
   }
 }
 

@@ -8,6 +8,8 @@ const LABELS: Record<NormalizedShipmentStatus, string> = {
 export function shipmentStatusLabel(status: NormalizedShipmentStatus | null | undefined): string {
   return status && status in LABELS ? LABELS[status] : LABELS.unknown;
 }
+/** `shipping_sync_error` when the carrier moved the parcel but picking/packing is not recorded in Lepefy. */
+export const SHIPPING_SYNC_PREPARATION_INCOMPLETE = 'preparation_incomplete';
 export function shipmentEventLabel(event: ShipmentTrackingEvent): string {
   const known: Record<string, string> = {
     RITIRATA: 'Pris en charge', 'DATI SPEDIZ. TRASMESSI A BRT': 'Données transmises au transporteur',

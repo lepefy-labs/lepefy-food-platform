@@ -1,6 +1,7 @@
 import type { Order, OrderStatus } from '@lepefy/types';
-import { assertPreparationComplete, loadWorkflowOrder, OrderWorkflowError, updateWorkflowOrder, type OrderService } from '@/lib/orders/orderTransitionService';
+import { assertPreparationComplete, loadWorkflowOrder, OrderWorkflowError, PreparationIncompleteError, updateWorkflowOrder, type OrderService } from '@/lib/orders/orderTransitionService';
 import { getShippingProvider } from './providers/registry';
+import { SHIPPING_SYNC_PREPARATION_INCOMPLETE } from './shipmentPresentation';
 import { ShippingProviderError, type ProviderShipmentSnapshot, type ShippingProviderAdapter } from './providers/types';
 
 export function shipmentOrderTarget(current: OrderStatus, snapshot: ProviderShipmentSnapshot): OrderStatus {
@@ -57,8 +58,9 @@ export async function syncOrderShipment(service: OrderService, tenantId: string,
   if (attaching) {
     await assertPreparationComplete(service, order, true);
   }
+  let snapshot: ProviderShipmentSnapshot | undefined;
   try {
-    const snapshot = await adapter.resolveShipment({ tenantId: order.tenant_id, tenant },
+    snapshot = await adapter.resolveShipment({ tenantId: order.tenant_id, tenant },
       attaching ? attachReference : order.shipping_provider_reference!);
     if (snapshot.provider !== adapter.key) throw new ShippingProviderError('shipment_provider_mismatch');
     return await applyShipmentSnapshot(service, order, snapshot);
@@ -68,6 +70,14 @@ export async function syncOrderShipment(service: OrderService, tenantId: string,
       await service.from('orders').update({ shipping_provider_synced_at: new Date().toISOString(), shipping_sync_error: failure.code })
         .eq('id', order.id).eq('tenant_id', order.tenant_id).eq('updated_at', order.updated_at)
         .eq('shipping_tracking_mode', 'managed').eq('shipping_provider_reference', order.shipping_provider_reference);
+    }
+    // Parcel already moving but picking/packing not recorded: keep the carrier snapshot without any
+    // status transition and flag it, so the order surfaces in « Action requise » and leaves the head
+    // of the sync queue. The next tick after the preparation is recorded ships it (and clears the flag).
+    if (!attaching && snapshot && failure instanceof PreparationIncompleteError) {
+      await updateWorkflowOrder({ service, order, source: 'provider',
+        patch: { ...shipmentSnapshotPatch(snapshot), shipping_sync_error: SHIPPING_SYNC_PREPARATION_INCOMPLETE } })
+        .catch(() => undefined);
     }
     throw failure;
   }

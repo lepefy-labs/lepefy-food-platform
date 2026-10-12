@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconCircleCheck } from '@tabler/icons-react';
 import type { Order } from '@lepefy/types';
-import { shipmentDate, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { SHIPPING_SYNC_PREPARATION_INCOMPLETE, shipmentDate, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 import CopyableValue from '../../_components/ui/CopyableValue';
 import ShipmentDraftBlock from './ShipmentDraftBlock';
 
@@ -57,7 +57,9 @@ export default function ManagedShipmentPanel({ order, provider, ready, canManage
             <p className="text-a-text-3">Statut transporteur : <span className="font-medium text-a-text">{shipmentStatusLabel(order.shipping_normalized_status)}</span></p>
             <p className="text-a-text-3">Dernière synchro : {shipmentDate(order.shipping_provider_synced_at)}</p>
           </div>
-          {order.shipping_sync_error && <p role="status" className="text-xs text-tone-warning-fg">La dernière synchronisation a échoué. Les dernières données connues sont conservées.</p>}
+          {order.shipping_sync_error && <p role="status" className="text-xs text-tone-warning-fg">{order.shipping_sync_error === SHIPPING_SYNC_PREPARATION_INCOMPLETE
+            ? 'Le colis a été pris en charge par le transporteur, mais la préparation n’est pas enregistrée. Validez le prélèvement, les contrôles froid et l’emballage : la commande passera en « Expédiée » à la prochaine synchronisation.'
+            : 'La dernière synchronisation a échoué. Les dernières données connues sont conservées.'}</p>}
           <p className="text-xs text-a-text-3">{autoSync ? 'Synchronisation automatique active' : 'Suivi terminé'}</p>
           {active && canManage && <button disabled={busy} onClick={() => void request('sync')} className={button}>{busy ? 'Synchronisation…' : 'Synchroniser maintenant'}</button>}
           {releasable && (releaseConfirm ? (

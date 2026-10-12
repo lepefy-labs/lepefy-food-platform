@@ -1,5 +1,5 @@
 import type { NormalizedShipmentStatus, OrderStatus, ShipmentTrackingEvent } from '@lepefy/types';
-import { shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
+import { SHIPPING_SYNC_PREPARATION_INCOMPLETE, shipmentEventsNewestFirst, shipmentStatusLabel } from '@/lib/shipping/shipmentPresentation';
 
 // Single operational classifier of the Admin → Commandes work queue. KPIs,
 // views, the "Priorité opérationnelle" sort and every row read it: no queue
@@ -315,6 +315,7 @@ export function compareOrders(sort: OrderSortKey, a: PrioritizedOrder, b: Priori
 export function transportState(order: Pick<OperationalOrder, 'fulfillment_type' | 'shipping_sync_error' | 'shipping_provider_reference' | 'shipping_normalized_status' | 'shipping_tracking_mode' | 'tracking_code'>):
   { label: string; tone: 'danger' | 'success' | 'neutral' } | null {
   if (order.fulfillment_type === 'pickup') return null;
+  if (order.shipping_sync_error === SHIPPING_SYNC_PREPARATION_INCOMPLETE) return { label: 'En transit · préparation à valider', tone: 'danger' };
   if (order.shipping_sync_error) return { label: 'Synchro en erreur', tone: 'danger' };
   if (order.shipping_provider_reference) {
     const status = order.shipping_normalized_status;

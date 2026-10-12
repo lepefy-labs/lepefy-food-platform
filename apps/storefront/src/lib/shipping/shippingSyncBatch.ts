@@ -1,6 +1,6 @@
 import { managedShippingProviderKeys } from './providers/registry';
 import { syncOrderShipment } from './syncOrderShipment';
-import type { OrderService } from '@/lib/orders/orderTransitionService';
+import { PreparationIncompleteError, type OrderService } from '@/lib/orders/orderTransitionService';
 
 export async function runShippingSyncBatch(service: OrderService, sync = syncOrderShipment) {
   const { data, error } = await service.from('orders').select('id, tenant_id')
@@ -12,6 +12,8 @@ export async function runShippingSyncBatch(service: OrderService, sync = syncOrd
   const orders = (data ?? []) as { id: string; tenant_id: string }[];
   let succeeded = 0;
   let failed = 0;
+  // Waiting on an operator (preparation not recorded, flagged on the order): not a scheduler failure.
+  let blocked = 0;
   // Two bounded workers; at most three 10s resolves each leave room for canonical side effects.
   let index = 0;
   async function worker() {
@@ -19,9 +21,12 @@ export async function runShippingSyncBatch(service: OrderService, sync = syncOrd
       const order = orders[index++];
       if (!order) break;
       try { await sync(service, order.tenant_id, order.id); succeeded++; }
-      catch { failed++; console.error('[shipping-sync] order sync failed — order_id:', order.id); }
+      catch (failure) {
+        if (failure instanceof PreparationIncompleteError) { blocked++; console.warn('[shipping-sync] order awaiting preparation — order_id:', order.id); }
+        else { failed++; console.error('[shipping-sync] order sync failed — order_id:', order.id); }
+      }
     }
   }
   await Promise.all([worker(), worker()]);
-  return { processed: orders.length, succeeded, failed };
+  return { processed: orders.length, succeeded, failed, blocked };
 }
