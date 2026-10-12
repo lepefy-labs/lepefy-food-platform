@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -165,8 +165,9 @@ export function NalaCartPlanCard({
 
               <span className="relative flex h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-[#F1EFFF]">
                 {item.product?.imageUrl ? (
-                  <Image
+                  <LepefyImage
                     src={item.product.imageUrl}
+                    variant="thumbnail"
                     alt=""
                     fill
                     sizes="36px"

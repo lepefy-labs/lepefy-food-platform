@@ -1,6 +1,4 @@
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
@@ -11,6 +9,7 @@ import {
 } from '@/lib/catalog/productImages';
 import type { ProductImage } from '@lepefy/types';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
+import { uploadProductImageSet } from '@/lib/images/productImagePipeline';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -22,20 +21,6 @@ function getFileFormat(file: File): { extension: string; contentType: string } |
   if (file.type === 'image/webp') return { extension: 'webp', contentType: 'image/webp' };
   if (file.type === 'image/jpeg') return { extension: 'jpg', contentType: 'image/jpeg' };
   return null;
-}
-
-function managedStoragePath(imageUrl: string, tenantId: string, productId: string): string | null {
-  try {
-    const marker = '/storage/v1/object/public/assets/';
-    const pathname = new URL(imageUrl).pathname;
-    const markerIndex = pathname.indexOf(marker);
-    if (markerIndex < 0) return null;
-    const path = decodeURIComponent(pathname.slice(markerIndex + marker.length));
-    const expectedPrefix = 'tenants/' + tenantId + '/products/' + productId + '/';
-    return path.startsWith(expectedPrefix) ? path : null;
-  } catch {
-    return null;
-  }
 }
 
 async function handlePOST(req: NextRequest) {
@@ -107,41 +92,26 @@ async function handlePOST(req: NextRequest) {
       if (!format) continue;
 
       let buffer: Buffer = Buffer.from(await file.arrayBuffer());
-      let extension = format.extension;
       let contentType = format.contentType;
 
       if (shouldRemoveBg) {
         buffer = await removeBackground(buffer, file.name);
-        extension = 'png';
         contentType = 'image/png';
       }
-
-      const resized = await sharp(buffer)
-        .rotate()
-        .resize({
-          width: 1600,
-          height: 1600,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .toBuffer();
-
-      const path =
-        'tenants/' + tenant.id + '/products/' + productId + '/' + randomUUID() + '.' + extension;
-      const { error: uploadError } = await supabase.storage
-        .from('assets')
-        .upload(path, resized, { contentType, upsert: false });
-
-      if (uploadError) throw new Error(uploadError.message);
-      uploadedPaths.push(path);
-
-      const url =
-        process.env.NEXT_PUBLIC_SUPABASE_URL +
-        '/storage/v1/object/public/assets/' +
-        path +
-        '?v=' +
-        Date.now();
-      uploadedImages.push({ url, alt: product.name });
+      const set = await uploadProductImageSet({
+        supabase,
+        bytes: buffer,
+        mime: contentType,
+        tenantId: tenant.id,
+        productId,
+        baseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      });
+      uploadedPaths.push(...set.paths);
+      uploadedImages.push({ url: set.url, alt: product.name });
+      console.info('[product-images] Set uploaded', {
+        tenantId: tenant.id, productId, variants: set.paths.length - 1,
+        sourceBytes: set.sourceBytes, storedBytes: set.storedBytes,
+      });
     }
 
     const nextImages = additive
@@ -228,13 +198,8 @@ async function handleDELETE(req: NextRequest) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  const path = managedStoragePath(body.imageUrl, tenant.id, body.productId);
-  if (path) {
-    const { error: storageError } = await supabase.storage.from('assets').remove([path]);
-    if (storageError) {
-      console.error('[product-images] Suppression storage échouée:', storageError.message);
-    }
-  }
+  // Detach only. A URL may be reused by another surface; cleanup is a separate
+  // reference-aware operation after its retention window.
 
   return NextResponse.json({
     images: nextImages,

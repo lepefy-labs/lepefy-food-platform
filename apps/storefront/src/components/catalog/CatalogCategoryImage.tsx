@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import { useEffect, useRef, useState } from 'react';
 
 interface CatalogCategoryImageProps {
@@ -32,10 +32,11 @@ export function CatalogCategoryImage({ images, categoryIndex, animate }: Catalog
   if (!currentImage) return null;
 
   return (
-    <Image
+    <LepefyImage
       ref={imageRef}
       key={currentImage}
       src={currentImage}
+      variant="thumbnail"
       alt=""
       fill
       className="object-cover"

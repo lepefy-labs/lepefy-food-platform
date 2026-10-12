@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/utils/format';
 import type { HomeProduct } from '@/app/(shop)/accueil/page';
@@ -58,7 +58,7 @@ export function SuggestionsRow({ id, label, products, currency }: SuggestionsRow
               )}
               <div className="aspect-square bg-primary-light rounded-md overflow-hidden relative mb-2">
                 {product.image_url && (
-                  <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="140px" />
+                  <LepefyImage src={product.image_url} variant="thumbnail" alt={product.name} fill className="object-cover" sizes="140px" />
                 )}
               </div>
               <p className="text-xs font-medium line-clamp-2 text-gray-900">{product.name}</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { IconLoader2, IconPhoto, IconShoppingCart } from '@tabler/icons-react';
@@ -73,8 +73,9 @@ export function NalaProductActionCard({
           className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#F1EFFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D5AF6]"
         >
           {action.product.imageUrl ? (
-            <Image
+            <LepefyImage
               src={action.product.imageUrl}
+              variant="thumbnail"
               alt=""
               fill
               sizes="56px"

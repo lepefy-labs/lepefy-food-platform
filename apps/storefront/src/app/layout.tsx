@@ -3,6 +3,8 @@ import { Inter, Bricolage_Grotesque } from 'next/font/google';
 import { getTenant } from '@/lib/tenant/getTenant';
 import { toPublicTenant } from '@/lib/tenant/publicTenant';
 import { TenantProvider } from '@/providers/TenantProvider';
+import { ProductImageDeliveryProvider } from '@/providers/ProductImageDeliveryProvider';
+import { productImageDeliveryEnabled } from '@/lib/images/productImageRollout';
 import { PWARegister } from '@/components/PWARegister';
 import { buildPwaIconPath, getAppIconRevision } from '@/lib/tenant/appIcon';
 import './globals.css';
@@ -80,7 +82,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content={tenant.primary_color ?? '#1D9E75'} />
       </head>
       <body>
-        <TenantProvider tenant={clientTenant}>{children}</TenantProvider>
+        <TenantProvider tenant={clientTenant}>
+          <ProductImageDeliveryProvider enabled={productImageDeliveryEnabled(tenant)}>{children}</ProductImageDeliveryProvider>
+        </TenantProvider>
         <PWARegister />
       </body>
     </html>

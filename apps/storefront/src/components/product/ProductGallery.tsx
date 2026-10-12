@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -114,8 +114,9 @@ export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGa
               className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border-2 bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 md:h-auto md:w-full md:aspect-square"
               style={{ borderColor: index === activeIndex ? 'var(--color-primary)' : 'transparent' }}
             >
-              <Image
+              <LepefyImage
                 src={image.url}
+                variant="thumbnail"
                 alt=""
                 fill
                 className="object-cover"
@@ -137,8 +138,9 @@ export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGa
                 className="group absolute inset-0 z-[1] cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--color-primary)]"
                 aria-label="Agrandir l’image du produit"
               >
-                <Image
+                <LepefyImage
                   src={active.url}
+                  variant="detail"
                   alt={active.alt || name}
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
@@ -202,8 +204,9 @@ export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGa
           )}
 
           <div className="relative h-[82vh] w-[86vw] max-w-6xl">
-            <Image
+            <LepefyImage
               src={active.url}
+              variant="full"
               alt={active.alt || name}
               fill
               className="select-none object-contain"

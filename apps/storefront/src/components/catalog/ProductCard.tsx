@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import { IconInfoCircle, IconSnowflake, IconShoppingCart } from '@tabler/icons-react';
 import type { CatalogScope } from '@lepefy/types';
 import { useAddToCartUiStore } from '@/stores/addToCartUiStore';
@@ -168,8 +168,9 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
           )}
 
           {product.image_url ? (
-            <Image
+            <LepefyImage
               src={product.image_url}
+              variant="catalog"
               alt={product.name}
               fill
               className={`${merchandise ? 'object-contain p-2 bg-gray-50' : 'object-cover'} group-hover:scale-105 transition-transform duration-300 ${unavailable ? 'opacity-70' : ''}`}

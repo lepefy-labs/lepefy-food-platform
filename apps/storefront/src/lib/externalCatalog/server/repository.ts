@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import sharp from 'sharp';
+import { uploadProductImageSet } from '@/lib/images/productImagePipeline';
 import { createServiceClient } from '@/lib/supabase/server';
 import { isFeatureEnabled } from '@/lib/featureFlags/featureFlags';
 import { revalidateCatalogCache } from '@/lib/cache/storefrontCache';
@@ -364,10 +364,6 @@ export interface ApplyOutcome {
   images: { attached: number; failed: Array<{ url: string; reason: string }> };
 }
 
-function publicAssetUrl(path: string): string {
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}`;
-}
-
 async function copyImages(tenantId: string, productId: string, normalized: NormalizedExternalProduct, productName: string) {
   const captured = new Map<string, Uint8Array>();
   const allowed = process.env.WHATSAPP_CATALOG_IMAGE_HOSTS?.split(',').map((s) => s.trim()).filter(Boolean) ?? DEFAULT_IMAGE_HOST_SUFFIXES;
@@ -385,15 +381,22 @@ async function copyImages(tenantId: string, productId: string, normalized: Norma
       if (staged.status !== 'duplicate') failed.push({ url: image.url, reason: staged.detail ?? staged.status });
       continue;
     }
-    const resized = await sharp(bytes).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).toBuffer();
-    const ext = staged.file.split('.').pop() ?? 'jpg';
-    const path = `tenants/${tenantId}/products/${productId}/wa-${staged.sha256.slice(0, 32)}.${ext}`;
-    const { error } = await createServiceClient().storage.from('assets').upload(path, resized, { contentType: staged.mime ?? 'image/jpeg', upsert: false });
-    if (error && !/exists|duplicate/i.test(error.message)) {
+    try {
+      const set = await uploadProductImageSet({
+        supabase: createServiceClient(),
+        bytes: Buffer.from(bytes),
+        mime: staged.mime ?? 'image/jpeg',
+        tenantId,
+        productId,
+        baseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        imageId: staged.sha256.slice(0, 32),
+        allowExisting: true,
+      });
+      uploaded.push({ url: set.url, alt: productName });
+    } catch {
       failed.push({ url: image.url, reason: 'Échec du téléversement vers le stockage.' });
       continue;
     }
-    uploaded.push({ url: publicAssetUrl(path), alt: productName });
   }
   return { uploaded, failed };
 }

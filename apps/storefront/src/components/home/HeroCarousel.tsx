@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -72,7 +73,7 @@ function ProductVisual({ products }: { products: HeroSlideProduct[] }) {
           className={`group overflow-hidden rounded-xl border border-white/35 bg-white/95 p-1.5 shadow-xl backdrop-blur-sm transition-transform hover:-translate-y-1 md:p-2 ${index === 1 ? '-translate-y-3' : ''} ${index === 2 ? 'hidden sm:block' : ''}`}
         >
           <div className="relative aspect-square overflow-hidden rounded-lg bg-white">
-            <Image src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 28vw, 180px" className="object-contain" />
+            <LepefyImage src={product.image_url} variant="catalog" alt={product.name} fill sizes="(max-width: 768px) 28vw, 180px" className="object-contain" />
           </div>
           <p className="mt-1.5 line-clamp-1 text-[10px] font-bold text-gray-900 md:text-xs">{product.name}</p>
           <div className="flex flex-wrap items-baseline gap-1">

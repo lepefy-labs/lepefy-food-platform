@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -8,6 +7,7 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { checkRateLimit, logAiUsage } from '@/lib/ai/usageTracking';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
 import { withStorefrontInvalidation } from '@/lib/cache/withStorefrontInvalidation';
+import { uploadProductImageSet } from '@/lib/images/productImagePipeline';
 
 const ENDPOINT = 'generate-product-image';
 
@@ -141,27 +141,6 @@ async function generateImage(photoPrompt: string): Promise<ImageGenerationResult
 
 // ─── Upload su Supabase Storage ───────────────────────────────────────────────
 
-async function uploadToStorage(
-  base64Data: string,
-  tenantId: string,
-  productId: string,
-): Promise<string> {
-  const supabase = createServiceClient();
-  const buffer   = Buffer.from(base64Data, 'base64');
-  const path     = `tenants/${tenantId}/products/${productId}/ai-${randomUUID()}.jpg`;
-
-  const { error } = await supabase.storage
-    .from('assets')
-    .upload(path, buffer, {
-      contentType: 'image/jpeg',
-      upsert:      false,
-    });
-
-  if (error) throw new Error(`Storage upload: ${error.message}`);
-
-  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/assets/${path}?v=${Date.now()}`;
-}
-
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 async function handlePOST(req: NextRequest) {
@@ -208,6 +187,15 @@ async function handlePOST(req: NextRequest) {
     );
   }
 
+  const supabase = createServiceClient();
+  const { data: product } = await supabase
+    .from('products')
+    .select('name, image_url, images')
+    .eq('id', productId)
+    .eq('tenant_id', tenant.id)
+    .single();
+  if (!product) return NextResponse.json({ error: 'Produit introuvable' }, { status: 404 });
+
   const allowed = await checkRateLimit(tenant.id, ENDPOINT, false);
   if (!allowed) {
     await logAiUsage({
@@ -236,28 +224,40 @@ async function handlePOST(req: NextRequest) {
     const { base64Data, model, inputTokens, outputTokens } = await generateImage(photoPrompt);
 
     console.log('[generate-image] Step 3: upload su Supabase Storage');
-    const imageUrl = await uploadToStorage(base64Data, tenant.id, productId);
-
-    const supabase = createServiceClient();
-    const { data: product } = await supabase
+    const set = await uploadProductImageSet({
+      supabase,
+      bytes: Buffer.from(base64Data, 'base64'),
+      mime: 'image/jpeg',
+      tenantId: tenant.id,
+      productId,
+      baseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    });
+    const imageUrl = set.url;
+    const { data: currentProduct } = await supabase
       .from('products')
       .select('name, image_url, images')
       .eq('id', productId)
       .eq('tenant_id', tenant.id)
       .single();
-    if (!product) throw new Error('Produit introuvable');
+    if (!currentProduct) {
+      await supabase.storage.from('assets').remove(set.paths);
+      throw new Error('Produit introuvable');
+    }
 
     const images = normalizeProductImages(
-      [{ url: imageUrl, alt: product.name }, ...normalizeProductImages(product.images, product.image_url, product.name)],
+      [{ url: imageUrl, alt: currentProduct.name }, ...normalizeProductImages(currentProduct.images, currentProduct.image_url, currentProduct.name)],
     );
     const { error: updateError } = await supabase
       .from('products')
       .update({ image_url: imageUrl, images })
       .eq('id', productId)
       .eq('tenant_id', tenant.id);
-    if (updateError) throw new Error(updateError.message);
+    if (updateError) {
+      await supabase.storage.from('assets').remove(set.paths);
+      throw new Error(updateError.message);
+    }
 
-    console.log(`[generate-image] Completato: ${imageUrl}`);
+    console.info('[generate-image] Completed', { tenantId: tenant.id, productId, variants: 4, sourceBytes: set.sourceBytes, storedBytes: set.storedBytes });
 
     // Coût dominant = l'étape image (step 1 avec gemini-2.5-flash n'est pas
     // tracké séparément — coût marginal comparé à la génération d'image).

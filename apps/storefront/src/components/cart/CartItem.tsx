@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { IconChevronRight } from '@tabler/icons-react';
 import type { CartItem as CartItemType } from '@lepefy/types';
@@ -73,8 +73,9 @@ export function CartItem({
 
       <div className={`${isPage ? 'h-[88px] w-[88px] sm:h-24 sm:w-24' : 'h-16 w-16'} relative z-10 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-black/5 shadow-sm transition-transform duration-200 group-hover:scale-[1.015] motion-reduce:transition-none motion-reduce:transform-none pointer-events-none`}>
         {product.image_url ? (
-          <Image
+          <LepefyImage
             src={product.image_url}
+            variant="thumbnail"
             alt={product.name}
             fill
             sizes={isPage ? '(min-width: 640px) 96px, 88px' : '64px'}

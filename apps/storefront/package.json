@@ -13,7 +13,8 @@
     "test:e2e:report": "playwright show-report ../../playwright-report",
     "catalog:whatsapp:test": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/catalog-whatsapp-test.ts",
     "catalog:whatsapp:review": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/catalog-whatsapp-review.ts",
-    "catalog:selling-format:report": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/selling-format-report.ts"
+    "catalog:selling-format:report": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/selling-format-report.ts",
+    "images:backfill": "node --env-file-if-exists=.env.local --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/ts-resolve-hooks.mjs scripts/product-image-backfill.ts"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

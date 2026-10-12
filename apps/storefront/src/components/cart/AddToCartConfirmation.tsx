@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { IconCheck, IconPhoto, IconX } from '@tabler/icons-react';
@@ -27,7 +27,7 @@ function ProductImage({ product, small = false }: { product: ProductCardProduct;
   return (
     <div className={`relative shrink-0 overflow-hidden rounded-lg bg-gray-50 ${small ? 'aspect-square w-full' : 'h-20 w-20'}`}>
       {product.image_url
-        ? <Image src={product.image_url} alt="" fill sizes={small ? '160px' : '80px'} className="object-contain" />
+        ? <LepefyImage src={product.image_url} variant="thumbnail" alt="" fill sizes={small ? '160px' : '80px'} className="object-contain" />
         : <IconPhoto aria-hidden="true" className="absolute inset-0 m-auto text-gray-300" size={32} />}
     </div>
   );

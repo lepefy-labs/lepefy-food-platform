@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -271,8 +271,9 @@ export default function ProductMediaManager({
                 key={image.url}
                 className="group relative aspect-square overflow-hidden rounded-lg border border-a-border bg-a-hover"
               >
-                <Image
+                <LepefyImage
                   src={image.url}
+                  variant="catalog"
                   alt={image.alt || productName}
                   fill
                   className="object-cover"

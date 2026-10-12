@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { CatalogCategoryImage } from '@/components/catalog/CatalogCategoryImage';
 import { contrastRatio, mixWithBlack } from '@/lib/utils/color';
@@ -69,7 +70,7 @@ export function CategoryBlock({
         ) : previewImages.length > 0 ? (
           <CatalogCategoryImage images={previewImages} categoryIndex={index} animate={animatePreviewImages} />
         ) : previewImage ? (
-          <Image src={previewImage} alt="" fill className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" sizes="(max-width: 640px) 31vw, (max-width: 768px) 23vw, 168px" />
+          <LepefyImage src={previewImage} variant="thumbnail" alt="" fill className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" sizes="(max-width: 640px) 31vw, (max-width: 768px) 23vw, 168px" />
         ) : (
           <div aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(145deg, var(--color-primary), var(--color-primary-dark))' }} />
         )}
@@ -127,8 +128,9 @@ export function CategoryBlock({
             return (
               <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-white/15">
                 {product?.image_url && (
-                  <Image
+                  <LepefyImage
                     src={product.image_url}
+                    variant="thumbnail"
                     alt={product.name}
                     fill
                     className="object-cover"

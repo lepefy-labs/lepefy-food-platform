@@ -16,7 +16,7 @@ test('normalise la couverture legacy et supprime les doublons', async () => {
     'https://cdn.test/main.jpg',
     'Produit',
   )).toEqual([
-    { url: 'https://cdn.test/main.jpg', alt: 'Produit' },
+    { url: 'https://cdn.test/main.jpg', alt: 'Doublon' },
     { url: 'https://cdn.test/second.jpg', alt: 'Deuxième vue' },
   ]);
 });

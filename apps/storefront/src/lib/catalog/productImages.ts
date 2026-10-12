@@ -8,7 +8,15 @@ export function normalizeProductImages(
   fallbackAlt?: string,
 ): ProductImage[] {
   const candidates: unknown[] = [];
-  if (primaryUrl) candidates.push({ url: primaryUrl, alt: fallbackAlt });
+  if (primaryUrl) {
+    const matching = Array.isArray(raw)
+      ? raw.find((item) => item && typeof item === 'object' && (item as Record<string, unknown>).url === primaryUrl)
+      : null;
+    const savedAlt = matching && typeof (matching as Record<string, unknown>).alt === 'string'
+      ? (matching as Record<string, string>).alt
+      : fallbackAlt;
+    candidates.push({ url: primaryUrl, alt: savedAlt });
+  }
   if (Array.isArray(raw)) candidates.push(...raw);
 
   const seen = new Set<string>();
