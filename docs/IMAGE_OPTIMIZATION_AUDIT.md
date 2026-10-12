@@ -88,6 +88,29 @@ Anche il catalogo admin (`CatalogueTable`) caricava i master interi (in media ci
 
 Le trasformazioni Vercel per le immagini prodotto passano a zero e i 402 spariscono. In cambio, ogni card pesa circa 3–5 volte di più a DPR 1: una card da circa 170–270 px CSS sceglie la variante da 480 px, perché la scala salta da 160 a 480, e WebP q82 pesa più di AVIF q75. Il traffico passa sulla banda Supabase; quota e piano Supabase non sono ancora stati verificati. Su telefoni a DPR 2–3 il confronto cambia, perché `next/image` avrebbe servito larghezze maggiori: va misurato su dispositivo reale. Interventi possibili, da approvare: una variante intermedia da 320 px e una qualità o un formato più compatti. Entrambi richiedono un nuovo backfill delle varianti.
 
+## Aggiornamento ChloeFood a set v3 (12 ottobre 2026)
+
+Motivazione: dopo il backfill v2, a DPR 3 ogni card scaricava `detail.webp` (960 px, ~71 KB) e la home mobile pesava ~2 MB di immagini. Il traffico immagini ora pesa sull'egress Supabase. L'org è sul piano Free (ciclo 2 ott – 2 nov, dopo 10 giorni: egress 0,96 GB, egress in cache 0,81 GB, Storage 0,17 GB, DB 111 MB). Il dashboard avvisa che a quota esaurita il progetto smette di servire richieste.
+
+Prerequisito verificato: il deploy di `0cd833d` (resolver v3) era `Ready` in produzione prima di qualunque scrittura. Il push era arrivato in ritardo a Vercel per un 403 *secondary rate limit* di GitHub, e Vercel ha distribuito appena il limite si è azzerato. Prova su `la-raie-cover-pot` (4 set), poi `--tenant chloefood --apply --upgrade-v3` con backup: 253 set in 9 min, 0 errori.
+
+Verifiche:
+- classificazione: 257 v3, 0 v2, 0 legacy;
+- 180/180 prodotti coerenti con il backup (stesso `imageId`, ordine, `alt`, cover);
+- 257 set da 7 oggetti controllati in sequenza;
+- nessuna richiesta `/_next/image` per prodotti, nessun 402, nessuna immagine rotta.
+
+I set v2 restano in Storage (~60 MB recuperabili con approvazione).
+
+| Home, stesso protocollo | v2 | v3 |
+|---|---|---|
+| Mobile 390 px, DPR 1 | 1.196 KB | 531 KB (−56 %) |
+| Mobile, DPR 2 | 1.596 KB | 1.263 KB (−21 %) |
+| Mobile, DPR 3 | 2.006 KB | 1.563 KB (−22 %) |
+| Desktop 1440 px | 2.075 KB | 1.683 KB (−19 %) |
+
+Le card prodotto `grid` misurano circa 44vw fino a 640 px, circa 30vw fino a 767 px, 234 px fino a 1279 px e 266 px oltre (home, `/accueil`, `/gadgets`, ricerca). Il `sizes` precedente (`50vw / 33vw / 25vw`) le sovrastimava fino a 2,4 volte sugli schermi larghi: per esempio `w480` a 1440 px e `w640` a 2560 px. Nello stesso commit di questo documento il `sizes` diventa `45vw / 31vw / 236px / 268px`.
+
 **Residui osservati.** Il master PNG di `mutzig` è passato da 1,6 a 2,4 MB perché Sharp ricodifica il PNG con i parametri di default. Il browser non lo scarica (riceve le varianti WebP, 5–86 KB), ma occupa Storage. Una compressione PNG più forte va introdotta solo dopo il backfill completo: il riuso idempotente confronta i byte e un retry con encoder diverso fallirebbe. Chat e admin non verificati, perché richiedono autenticazione. Le miniature della gallery hanno `alt=""` già prima del pilota (sono decorative dentro un bottone etichettato). Il CLS di circa 0,11–0,12 della pagina carrello non dipende dalle immagini prodotto: va analizzato a parte.
 
 **Stima residua, da calcolare dopo il pilota:** trasformazioni Vercel = richieste uniche di larghezza/qualità delle immagini Supabase legacy e delle altre categorie ancora su `next/image`; per i set prodotto v2 su tenant abilitato il percorso di rendering non genera `/_next/image`. Storage aggiuntivo per immagine = somma dei cinque file del set, mantenendo l'originale legacy; banda Supabase = numero di visualizzazioni × byte della variante effettivamente scelta dal browser. Le tariffe e i volumi reali vanno letti dalle dashboard dei provider prima di tradurre questi numeri in euro.

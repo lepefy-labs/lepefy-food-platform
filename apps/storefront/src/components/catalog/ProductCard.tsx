@@ -124,8 +124,9 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
     }
   }
 
+  // Measured grid card widths: ~44vw up to 640px, ~30vw to 767px, 234px to 1279px, 266px above.
   const imageSizes = variant === 'grid'
-    ? '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'
+    ? '(max-width: 640px) 45vw, (max-width: 767px) 31vw, (max-width: 1279px) 236px, 268px'
     : '(max-width: 768px) 144px, 200px';
 
   return (
