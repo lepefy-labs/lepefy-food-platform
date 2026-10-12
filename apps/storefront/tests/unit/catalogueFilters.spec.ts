@@ -31,7 +31,7 @@ test('list state round-trips through the URL, defaults omitted, junk rejected', 
   const params = (query: string) => new URLSearchParams(query);
   expect(catalogueQueryString(parseCatalogueState(params('')))).toBe('');
   const state = parseCatalogueState(params('q=garri&status=no_weight&category=farines&sort=stock_asc&page=3'));
-  expect(state).toEqual({ q: 'garri', status: 'no_weight', category: 'farines', sort: 'stock_asc', page: 3 });
+  expect(state).toEqual({ q: 'garri', status: 'no_weight', category: 'farines', sort: 'stock_asc', page: 3, reception: '' });
   expect(parseCatalogueState(params(catalogueQueryString(state)))).toEqual(state);
   expect(parseCatalogueState(params('status=drop&sort=evil&page=-1'))).toMatchObject({ status: 'all', sort: 'position_asc', page: 1 });
 });
@@ -40,4 +40,13 @@ test('stock tone and completeness badges only flag real gaps', () => {
   expect([0, 1, 9, 10].map(stockTone)).toEqual(['out', 'low', 'low', 'ok']);
   expect(completenessIssues({ weight_grams: 500, image_url: 'x.jpg', category_id: 'c' })).toEqual([]);
   expect(completenessIssues({ weight_grams: 0, image_url: null, category_id: null })).toEqual(['Sans poids', 'Sans photo', 'Sans catégorie']);
+});
+
+test('reception filter: known fulfillment policies only, round-trips through the URL', () => {
+  const params = (query: string) => new URLSearchParams(query);
+  const state = parseCatalogueState(params('reception=pickup_only&status=active'));
+  expect(state.reception).toBe('pickup_only');
+  expect(catalogueQueryString(state)).toBe('status=active&reception=pickup_only');
+  expect(parseCatalogueState(params(catalogueQueryString(state)))).toEqual(state);
+  expect(parseCatalogueState(params('reception=teleport')).reception).toBe('');
 });

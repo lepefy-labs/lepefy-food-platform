@@ -78,6 +78,7 @@ export default async function AdminNouveauProduitPage() {
     net_content_value:            null,
     net_content_unit:             null,
     pack_count:                   null,
+    fulfillment_policy:           'delivery_or_pickup' as const,
     packaging_material:           null,
     recycling_note:               null,
     nutrition_basis:              '100g' as const,
@@ -115,6 +116,7 @@ export default async function AdminNouveauProduitPage() {
           tenantLocales={tenant.locales ?? ['fr']}
           aiDescriptionsEnabled={ai.descriptionGeneration}
           isNew={true}
+          clickCollectEnabled={Boolean(tenant.click_collect_enabled)}
         />
       </ProductEditWorkspace>
     </div>

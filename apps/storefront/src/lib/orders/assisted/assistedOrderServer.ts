@@ -245,7 +245,9 @@ export async function prepareAssistedCart(
         quantity: Number(item?.quantity),
       }))
     : [];
-  const validated = await validateCheckoutItems(supabase, tenant.id, rawItems);
+  // Retrait convenu par l'équipe : toujours possible, mais les produits
+  // « retrait uniquement » / « livraison uniquement » imposent leur mode.
+  const validated = await validateCheckoutItems(supabase, tenant.id, rawItems, { mode: fulfillmentType, pickupAvailable: true });
   if (validated.ok === false) return { ok: false, status: validated.status, body: validated.body };
 
   const items = validated.items as AssistedCartLine[];
@@ -334,7 +336,10 @@ export async function revalidateAssistedSession(
   if (session.shipping_details?.quotePending === true) {
     return { ok: false, status: 409, body: { error: 'Les frais de livraison doivent être calculés.', code: 'SHIPPING_QUOTE_REQUIRED' } };
   }
-  const validated = await validateCheckoutItems(supabase, tenant.id, session.items);
+  const validated = await validateCheckoutItems(supabase, tenant.id, session.items, {
+    mode: session.fulfillment_type === 'pickup' ? 'pickup' : 'delivery',
+    pickupAvailable: true,
+  });
   if (validated.ok === false) return { ok: false, status: validated.status === 400 ? 409 : validated.status, body: validated.body };
   const subtotal = computePreorderTotals(session.items, 0, 0).subtotal;
   const shipping = await revalidateSessionShipping({

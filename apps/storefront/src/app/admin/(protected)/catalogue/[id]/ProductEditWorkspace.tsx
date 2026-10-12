@@ -2,6 +2,8 @@
 
 import { type ReactNode, useRef } from 'react';
 import styles from './ProductEditWorkspace.module.css';
+import type { ProductFulfillmentPolicy } from '@lepefy/types';
+import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
 
 interface ProductEditWorkspaceProps {
   children: ReactNode;
@@ -14,6 +16,10 @@ interface ProductEditWorkspaceProps {
   /** Missing or zero weight: shipping quote and carton suggestion cannot use it. */
   missingWeight?: boolean;
   descriptionSource: 'ai' | 'human' | null;
+  /** Mode de réception (migration 155) : seul un mode imposé est rappelé ici. */
+  fulfillmentPolicy?: ProductFulfillmentPolicy;
+  /** Retrait en boutique désactivé pour la boutique (Paramètres → Retrait). */
+  pickupDisabled?: boolean;
 }
 
 const WORKFLOW_SECTIONS = [
@@ -36,6 +42,8 @@ export default function ProductEditWorkspace({
   hasImage,
   missingWeight = false,
   descriptionSource,
+  fulfillmentPolicy = 'delivery_or_pickup',
+  pickupDisabled = false,
 }: ProductEditWorkspaceProps) {
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +98,11 @@ export default function ProductEditWorkspace({
             {!isNew && missingWeight && (
               <span className="rounded-full bg-tone-warning-bg px-2.5 py-1 font-medium text-tone-warning-fg">
                 Poids à compléter
+              </span>
+            )}
+            {fulfillmentPolicy !== 'delivery_or_pickup' && (
+              <span className={`rounded-full px-2.5 py-1 font-medium ${fulfillmentPolicy === 'pickup_only' && pickupDisabled ? 'bg-tone-warning-bg text-tone-warning-fg' : 'bg-a-hover text-a-text-2'}`}>
+                {FULFILLMENT_POLICY_ADMIN_LABELS[fulfillmentPolicy]}
               </span>
             )}
             {descriptionSource === 'ai' && (

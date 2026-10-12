@@ -1,4 +1,5 @@
 import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
+import { DEFAULT_FULFILLMENT_POLICY, FULFILLMENT_POLICY_INVALID, isFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -71,6 +72,9 @@ async function handlePOST(req: NextRequest) {
 
   const sellingFormat = parseSellingFormatInput(body);
   if (!sellingFormat.ok) return NextResponse.json({ error: sellingFormat.error }, { status: 400 });
+  // Mode de réception (migration 155) : absent = défaut, inconnu = refusé.
+  const fulfillmentPolicy = body.fulfillment_policy ?? DEFAULT_FULFILLMENT_POLICY;
+  if (!isFulfillmentPolicy(fulfillmentPolicy)) return NextResponse.json({ error: FULFILLMENT_POLICY_INVALID }, { status: 400 });
 
   const slugProd = (body.name as string)
     .toLowerCase()
@@ -123,6 +127,7 @@ async function handlePOST(req: NextRequest) {
       alcohol_pct: body.alcohol_pct !== '' && body.alcohol_pct != null ? parseFloat(body.alcohol_pct) : null,
       net_quantity_display: body.net_quantity_display ? String(body.net_quantity_display).trim() : null,
       ...sellingFormat.values,
+      fulfillment_policy: fulfillmentPolicy,
       packaging_material: body.packaging_material ? String(body.packaging_material).trim() : null,
       recycling_note: body.recycling_note ? String(body.recycling_note).trim() : null,
       nutrition_basis: body.nutrition_basis === '100ml' ? '100ml' : '100g',

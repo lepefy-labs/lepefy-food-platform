@@ -73,6 +73,15 @@ Cart (Zustand, localStorage)
 - **Nala** (`src/lib/ai/nalaProductActionContract.ts`, `nalaCartPlanContract.ts`/`nalaCartPlanResolver.ts`) proposes/adds the real minimum quantity, never a literal `1`, and drops a candidate whose stock can't cover its minimum instead of proposing an unpurchasable quantity.
 - **Admin**: product editor "Règles de vente" section (min/step) and `/admin/catalogue/quantity-groups` (+ `api/admin/catalogue/quantity-groups/**`) for group CRUD and membership.
 
+### Product fulfillment policy (delivery / pickup per product)
+
+`products.fulfillment_policy` (migration `155_product_fulfillment_policy.sql`): `delivery_or_pickup` (default) | `pickup_only` | `delivery_only`. Separate from `storage_type`, never derived from it.
+
+- **Single pure engine**: `src/lib/fulfillment/fulfillmentPolicy.ts` (`computeCartFulfillment`, `checkFulfillmentMode`) used by server and client. One `pickup_only` forces the whole order to pickup, one `delivery_only` forces delivery, both = incompatible cart; without `tenants.click_collect_enabled` a `pickup_only` product fails closed.
+- **Authoritative enforcement**: `validateCheckoutItems(supabase, tenantId, items, { mode, pickupAvailable })` — the 4th argument is required, so every payment path states its mode. Storefront paths pass `tenant.click_collect_enabled`; assisted orders pass `true` (staff-arranged pickup). Errors: `FULFILLMENT_CONFLICT`, `FULFILLMENT_MODE_NOT_ALLOWED`, `PICKUP_NOT_ENABLED` (400, French message, `fulfillment` detail).
+- **Client guidance**: `useCartPurchaseGate().fulfillment` (fresh policies from `GET /api/products/fulfillment?ids=`, fail-closed while loading), `CartFulfillmentNotice` on `/cart` and `/checkout`; `CheckoutFlow` only offers allowed modes and forces the single one (invalidating the delivery quote).
+- `fulfillment_policy` is part of `PRODUCT_CARD_SELECT` and required on `ProductCardProduct`; `match_products` returns it. Unavailable product images use the shared `UnavailableRibbon` ("pas disponible").
+
 ### Shipping Calculation (`src/lib/shipping/calculateShipping.ts`)
 
 The shipping logic is the most complex part of the codebase:

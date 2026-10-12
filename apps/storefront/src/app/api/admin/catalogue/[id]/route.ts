@@ -1,4 +1,5 @@
 import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
+import { FULFILLMENT_POLICY_INVALID, isFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTenant } from '@/lib/tenant/getTenant';
@@ -66,6 +67,12 @@ async function handlePATCH(
   const sellingFormat = parseSellingFormatInput(body);
   if (!sellingFormat.ok) return NextResponse.json({ error: sellingFormat.error }, { status: 400 });
   Object.assign(updatePayload, sellingFormat.values);
+
+  // Mode de réception (migration 155) : valeur connue uniquement, jamais déduite.
+  if ('fulfillment_policy' in body) {
+    if (!isFulfillmentPolicy(body.fulfillment_policy)) return NextResponse.json({ error: FULFILLMENT_POLICY_INVALID }, { status: 400 });
+    updatePayload.fulfillment_policy = body.fulfillment_policy;
+  }
 
   if ('name'               in body) updatePayload.name               = String(body.name).trim();
   if ('name_alt'           in body) updatePayload.name_alt           = body.name_alt ? String(body.name_alt).trim() : null;

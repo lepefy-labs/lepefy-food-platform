@@ -87,7 +87,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Check current product and active-group rules before reusing, updating or
     // creating any PaymentIntent. A saved checkout snapshot is not authority.
-    const validated = await validateCheckoutItems(supabase, tenant.id, session.items);
+    const validated = await validateCheckoutItems(supabase, tenant.id, session.items, {
+      mode: session.fulfillment_type === 'pickup' ? 'pickup' : 'delivery',
+      pickupAvailable: Boolean(tenant.click_collect_enabled),
+    });
     if (validated.ok === false) {
       return NextResponse.json(validated.body, { status: validated.status });
     }

@@ -20,7 +20,7 @@ Non è implementata l'acquisizione automatica delle conversazioni WhatsApp né W
 | Tema | Stato trovato |
 | --- | --- |
 | Stati `checkout_sessions` | `open`, `awaiting_verification`, `completed`, `cancelled`, `expired` (074/075). Tutti usati. Nessuno stato bozza. |
-| Importi | Server-side: `validateCheckoutItems` (prezzi catalogo, regole min/step/gruppi, stock) + `verifyCheckoutShipping` (token preventivo firmato) + sconto ambassador. Il browser non è mai autorità. |
+| Importi | Server-side: `validateCheckoutItems` (prezzi catalogo, regole min/step/gruppi, stock, mode de réception dei prodotti — migration 155: ritiro concordato dall'équipe sempre possibile, ma `pickup_only`/`delivery_only` impongono il modo e un mix dei due è rifiutato) + `verifyCheckoutShipping` (token preventivo firmato) + sconto ambassador. Il browser non è mai autorità. |
 | Magazzino | Nessuna riserva: `decrement_stock_for_order` atomico (tutto o niente) **alla creazione dell'ordine**; se fallisce dopo un pagamento → ordine `stock_conflict` + rimborso Stripe o rimborso manuale. |
 | Pagamenti esterni | `external_link` → `awaiting_verification` (trigger 075); conferma admin `shop_payments.confirm` via `createOrderFromCheckoutSession`. |
 | Duplicati | Solo Stripe era protetto a livello DB (indice unico `orders.stripe_payment_intent_id` + 23505). La conferma manuale **non aveva lock**: due conferme simultanee potevano creare due ordini. |
@@ -78,7 +78,7 @@ Azioni per stato: `lib/orders/assisted/assistedOrderPolicy.ts` (`allowedPreorder
 
 - **Durata**: link valido **72 h** (`ASSISTED_PAY_LINK_TTL_HOURS`); scadenza pigra (nessun cron) al primo accesso admin/pubblico.
 - **Prezzi**: ogni emissione di link rivalida disponibilità, regole e spedizione e applica i **prezzi catalogo correnti**; da lì importi **garantiti fino alla scadenza** del link.
-- **Disponibilità**: nessuna riserva di stock (coerente con il sistema esistente). Prima di ogni PaymentIntent, dichiarazione esterna o incasso admin: `validateCheckoutItems` (attivo, regole, stock) + `revalidateSessionShipping` (forfait attivo). Se non più valido → pagamento bloccato («à mettre à jour par le magasin»).
+- **Disponibilità**: nessuna riserva di stock (coerente con il sistema esistente). Prima di ogni PaymentIntent, dichiarazione esterna o incasso admin: `validateCheckoutItems` (attivo, regole, stock, mode de réception) + `revalidateSessionShipping` (forfait attivo). Se non più valido → pagamento bloccato («à mettre à jour par le magasin»).
 - **Modifica dopo condivisione**: la modifica annulla il PaymentIntent aperto (rifiutata se il pagamento carta è in corso/riuscito), **revoca il link** (hash azzerato) e riporta la precommande in `draft`. Il cliente vede «Ce lien n'est plus valide»; un nuovo link va emesso esplicitamente. Nessun importo obsoleto è pagabile.
 - **Rigenerazione**: nuovo nonce ⇒ il vecchio link smette immediatamente di funzionare.
 - **Pagamento esterno dichiarato** (`awaiting_verification`): nessuna scadenza, come i link esterni storici (075).

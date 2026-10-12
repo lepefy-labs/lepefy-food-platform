@@ -247,7 +247,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     // Recovery and session edits must revalidate even when items are unchanged:
     // the tenant may have edited a SKU rule or activated a group meanwhile.
-    const validated = await validateCheckoutItems(supabase, tenant.id, body.items ?? session.items);
+    const fulfillmentType = body.fulfillmentType ?? session.fulfillment_type;
+    const validated = await validateCheckoutItems(supabase, tenant.id, body.items ?? session.items, {
+      mode: fulfillmentType === 'pickup' ? 'pickup' : 'delivery',
+      pickupAvailable: Boolean(tenant.click_collect_enabled),
+    });
     if (validated.ok === false) {
       return NextResponse.json(validated.body, { status: validated.status });
     }
@@ -255,7 +259,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // explicitly edits items; quantity rules always come from today's DB.
     const items: CartItemPayload[] = body.items ? validated.items : session.items;
 
-    const fulfillmentType = body.fulfillmentType ?? session.fulfillment_type;
     let shippingAddress: ShippingAddress | null = session.shipping_address;
     if (body.shippingAddress !== undefined) {
       // Nouvelle adresse envoyée : même contrôle que /api/checkout.

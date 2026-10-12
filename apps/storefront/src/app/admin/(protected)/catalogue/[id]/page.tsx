@@ -11,6 +11,7 @@ import { ProductCostPanel } from '../../gestion/_components/ProductCostPanel';
 import { canAdmin, getCurrentAdminAccessContext } from '@/lib/auth/adminRbac';
 import { catalogueQueryString, parseCatalogueState } from '@/lib/catalog/catalogueFilters';
 import { readFromParam } from '@/lib/catalog/productFormDiff';
+import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -41,7 +42,7 @@ export default async function AdminProductEditPage({
       gluten_free_certified, usage_instructions, conservation_instructions,
       conservation_after_opening, country_of_origin, durability_type,
       quid_ingredient, quid_percentage, alcohol_pct, net_quantity_display,
-      sale_unit, net_content_value, net_content_unit, pack_count,
+      sale_unit, net_content_value, net_content_unit, pack_count, fulfillment_policy,
       packaging_material, recycling_note, nutrition_basis, nutrition,
       label_background_image_url, label_background_color, barcode_value
     `)
@@ -95,6 +96,8 @@ export default async function AdminProductEditPage({
         hasImage={Boolean(product.image_url)}
         missingWeight={!(Number(product.weight_grams) > 0)}
         descriptionSource={product.description_source}
+        fulfillmentPolicy={normalizeFulfillmentPolicy(product.fulfillment_policy)}
+        pickupDisabled={!tenant.click_collect_enabled}
       >
         <ProductEditClient
           product={product}
@@ -108,6 +111,7 @@ export default async function AdminProductEditPage({
           aiDescriptionsEnabled={ai.descriptionGeneration}
           fromCategory={searchParams.from_category}
           canManage={canManage}
+          clickCollectEnabled={Boolean(tenant.click_collect_enabled)}
         />
       </ProductEditWorkspace>
       {/* Gestion (flag business_management) : coût d'achat en lecture seule, rendu serveur uniquement. */}

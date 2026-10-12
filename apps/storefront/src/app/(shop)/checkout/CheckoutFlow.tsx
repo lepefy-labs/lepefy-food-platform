@@ -59,6 +59,10 @@ import {
   type AddressField,
 } from '@/lib/address/addressRules';
 import { CheckoutProgressIndicator } from './CheckoutProgressIndicator';
+import { CartFulfillmentNotice } from '@/components/cart/CartFulfillmentNotice';
+
+/** Codes serveur du mode de réception (lib/fulfillment/fulfillmentPolicy.ts). */
+const FULFILLMENT_ERROR_CODES = new Set(['FULFILLMENT_CONFLICT', 'FULFILLMENT_MODE_NOT_ALLOWED', 'PICKUP_NOT_ENABLED']);
 
 const ADDRESS_ID_PREFIX = 'checkout-adresse';
 
@@ -152,6 +156,10 @@ export default function CheckoutFlow({
   const purchaseGateRef = useRef(purchaseGate);
   purchaseGateRef.current = purchaseGate;
   const cartIssuesRef = useRef<HTMLDivElement>(null);
+  const fulfillmentNoticeRef = useRef<HTMLDivElement>(null);
+  // Modes possibles pour ce panier (produits « retrait / livraison uniquement »
+  // et retrait de la boutique) : même moteur que le serveur.
+  const fulfillmentRules = purchaseGate.fulfillment;
   const initialDraftRef = useRef<CheckoutDraft | null>(null);
   if (initialDraftRef.current === null && typeof window !== 'undefined') initialDraftRef.current = readDraft();
   const initialDraft = initialDraftRef.current;
@@ -192,6 +200,7 @@ export default function CheckoutFlow({
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fulfillmentError, setFulfillmentError] = useState<string | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [ambassadorDiscount, setAmbassadorDiscount] = useState(0);
   const recalcDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -437,6 +446,7 @@ export default function CheckoutFlow({
   function changeFulfillment(next: FulfillmentType) {
     setFulfillmentType(next);
     setSubmitError(null);
+    setFulfillmentError(null);
     if (next === 'pickup') {
       setQuoteToken(null);
       setShippingError(null);
@@ -445,14 +455,42 @@ export default function CheckoutFlow({
     }
   }
 
+  // Un seul mode possible (produit « retrait uniquement » ou « livraison
+  // uniquement », boutique sans retrait) : il est imposé, y compris sur un
+  // brouillon restauré ou après un changement du panier. Le devis de livraison
+  // devenu inutile ou périmé est invalidé, le paiement revient à l'étape 1.
+  const forcedMode = purchaseGate.checking ? null : fulfillmentRules.forcedMode;
+  useEffect(() => {
+    if (!forcedMode || forcedMode === fulfillmentType) return;
+    changeFulfillment(forcedMode);
+    stripeSessionIdRef.current = null;
+    setStep('shipping');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forcedMode, fulfillmentType]);
+
+  /** Le serveur a refusé le mode de réception : on relit les règles et on revient au choix du mode. */
+  function handleFulfillmentRejection(result: { code?: string; error?: string }): boolean {
+    if (!result.code || !FULFILLMENT_ERROR_CODES.has(result.code)) return false;
+    stripeSessionIdRef.current = null;
+    setStep('shipping');
+    setFulfillmentError(result.error ?? ERROR_COPY.generic);
+    purchaseGate.reloadGroups();
+    return true;
+  }
+
   function showCartIssues() {
-    cartIssuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    cartIssuesRef.current?.focus();
+    const target = cartIssuesRef.current ?? fulfillmentNoticeRef.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target?.focus();
   }
 
   const continueFromInformation = (data: ContactValues) => {
     if (!purchaseGate.canProceed) {
       showCartIssues();
+      return;
+    }
+    if (!fulfillmentRules.allowedModes.includes(fulfillmentType)) {
+      fulfillmentNoticeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
     if (!isPickup && !hasCompleteAddress) {
@@ -525,7 +563,7 @@ export default function CheckoutFlow({
         }
         if (retryResponse.status !== 404) {
           const retryResult = await retryResponse.json().catch(() => ({}));
-          handleShippingRequote(retryResult);
+          if (!handleFulfillmentRejection(retryResult)) handleShippingRequote(retryResult);
           return { error: retryResult.error ?? ERROR_COPY.generic };
         }
         stripeSessionIdRef.current = null;
@@ -538,7 +576,7 @@ export default function CheckoutFlow({
       });
       const result = await response.json();
       if (!response.ok) {
-        handleShippingRequote(result);
+        if (!handleFulfillmentRejection(result)) handleShippingRequote(result);
         return { error: result.error ?? ERROR_COPY.generic };
       }
       stripeSessionIdRef.current = result.sessionId ?? null;
@@ -569,7 +607,7 @@ export default function CheckoutFlow({
         });
         const result = await response.json();
         if (!response.ok) {
-          if (!handleShippingRequote(result)) setSubmitError(result.error ?? ERROR_COPY.generic);
+          if (!handleFulfillmentRejection(result) && !handleShippingRequote(result)) setSubmitError(result.error ?? ERROR_COPY.generic);
           return;
         }
         sessionStorage.setItem('lepefy-pending-payment', JSON.stringify({
@@ -586,7 +624,7 @@ export default function CheckoutFlow({
           body: JSON.stringify({ ...sharedPayload, shippingTotal: 0, paymentMethod: 'in_store' as const }),
         });
         const result = await response.json();
-        if (!response.ok) { setSubmitError(result.error ?? ERROR_COPY.generic); return; }
+        if (!response.ok) { if (!handleFulfillmentRejection(result)) setSubmitError(result.error ?? ERROR_COPY.generic); return; }
         completeCheckout(`/order-confirmation?order_id=${result.orderId}`);
         return;
       }
@@ -694,8 +732,12 @@ export default function CheckoutFlow({
 
           <section>
             <h1 className="text-lg font-bold text-gray-950">Comment recevoir votre commande ?</h1>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {(['delivery', 'pickup'] as const).filter((type) => type === 'delivery' || tenant.click_collect_enabled).map((type) => {
+            {!purchaseGate.checking && (
+              <CartFulfillmentNotice ref={fulfillmentNoticeRef} eligibility={fulfillmentRules} pickupAvailable={Boolean(tenant.click_collect_enabled)} className="mt-3" />
+            )}
+            {fulfillmentError && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-800" role="alert">{fulfillmentError}</p>}
+            <div className={`mt-3 grid gap-3 ${fulfillmentRules.allowedModes.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {(['delivery', 'pickup'] as const).filter((type) => fulfillmentRules.allowedModes.includes(type)).map((type) => {
                 const active = fulfillmentType === type;
                 return (
                   <button key={type} type="button" aria-pressed={active} onClick={() => changeFulfillment(type)} className={`relative min-h-[92px] rounded-2xl border-[1.5px] p-4 text-left transition-colors ${active ? 'border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_5%,white)]' : 'border-[color:var(--field-border)] bg-white'}`}>

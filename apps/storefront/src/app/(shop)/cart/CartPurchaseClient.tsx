@@ -7,6 +7,8 @@ import { CartEmpty } from '@/components/cart/CartEmpty';
 import { CartItem } from '@/components/cart/CartItem';
 import { CartUndoToast } from '@/components/cart/CartUndoToast';
 import { QuantityGroupProgress } from '@/components/cart/QuantityGroupProgress';
+import { CartFulfillmentNotice } from '@/components/cart/CartFulfillmentNotice';
+import { cartProductPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import { selectCartIsEmpty, selectCartItemCount, selectCartItems, selectCartSubtotal, selectPendingProductIds } from '@/lib/cart/cartSelectors';
 import { formatProductCount } from '@/lib/cart/formatProductCount';
 import { formatPrice } from '@/lib/utils/format';
@@ -32,7 +34,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
   const addItem = useCartStore((state) => state.addItem);
   const [undo, setUndo] = useState<{ item: CartItemType; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
   const {
-    groups: quantityGroups, error: groupsError, reloadGroups, blockedMessage, canProceed,
+    groups: quantityGroups, error: groupsError, reloadGroups, blockedMessage, canProceed, checking, fulfillment,
   } = useCartPurchaseGate(items);
 
   useEffect(() => () => { if (undo) clearTimeout(undo.timeoutId); }, [undo]);
@@ -98,6 +100,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
             </div>
           )}
           <QuantityGroupProgress groups={quantityGroups} items={items} />
+          {!checking && <CartFulfillmentNotice eligibility={fulfillment} pickupAvailable={Boolean(tenant.click_collect_enabled)} />}
 
           <section aria-label="Articles du panier">
             <ul className="space-y-3">
@@ -109,6 +112,7 @@ export default function CartPurchaseClient({ tenant }: { tenant: PublicTenant })
                   currency={tenant.currency}
                   unavailableProductIds={unavailableProductIds}
                   pendingProductIds={pendingProductIds}
+                  fulfillmentPolicy={checking ? undefined : cartProductPolicy(fulfillment, item.product.id)}
                   onIncrement={increment}
                   onDecrement={decrement}
                   onRemove={remove}

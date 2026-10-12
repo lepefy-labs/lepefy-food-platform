@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconCopy, IconDotsVertical, IconPhoto, IconSparkles } from '@tabler/icons-react';
 import { completenessIssues, stockTone } from '@/lib/catalog/catalogueFilters';
+import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
+import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
 import type { CatalogueListProduct as Product } from '@/lib/catalog/catalogueList';
 import { formatMoney } from '@/lib/admin/format';
 import { resolveProductImage } from '@/lib/images/productImageDelivery';
@@ -28,6 +30,8 @@ interface Props {
   listQuery: string;
   hasFilters: boolean;
   resetHref: string;
+  /** Retrait désactivé pour la boutique : un produit « retrait uniquement » ne peut pas être commandé. */
+  pickupDisabled?: boolean;
 }
 
 const STOCK_INPUT_TONE = {
@@ -36,7 +40,7 @@ const STOCK_INPUT_TONE = {
   ok: 'border-a-border-strong bg-a-surface text-a-text',
 } as const;
 
-export default function CatalogueTable({ products, tenantCurrency, canManage, listQuery, hasFilters, resetHref }: Props) {
+export default function CatalogueTable({ products, tenantCurrency, canManage, listQuery, hasFilters, resetHref, pickupDisabled = false }: Props) {
   const router = useRouter();
   const toast = useAdminToast();
   const [stockValues, setStockValues] = useState<Record<string, string>>({});
@@ -172,9 +176,17 @@ export default function CatalogueTable({ products, tenantCurrency, canManage, li
 
   function issues(product: Product) {
     const list = completenessIssues(product);
-    if (product.description_source !== 'ai' && list.length === 0) return null;
+    // Seul un mode de réception imposé est signalé ; « retrait uniquement » sans retrait activé est une incohérence.
+    const policy = normalizeFulfillmentPolicy(product.fulfillment_policy);
+    const showPolicy = policy !== 'delivery_or_pickup';
+    if (product.description_source !== 'ai' && list.length === 0 && !showPolicy) return null;
     return (
       <span className="mt-1 flex flex-wrap gap-1">
+        {showPolicy && (
+          <Badge tone={policy === 'pickup_only' && pickupDisabled ? 'warning' : 'neutral'}>
+            {FULFILLMENT_POLICY_ADMIN_LABELS[policy]}{policy === 'pickup_only' && pickupDisabled ? ' · retrait désactivé' : ''}
+          </Badge>
+        )}
         {product.description_source === 'ai' && <Badge tone="warning" icon={<IconSparkles size={12} aria-hidden="true" />}>IA à revoir</Badge>}
         {list.map((issue) => <Badge key={issue} tone="warning">{issue}</Badge>)}
       </span>

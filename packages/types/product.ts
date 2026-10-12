@@ -1,5 +1,11 @@
 export type CatalogScope = 'shop' | 'gadgets';
 
+/**
+ * Mode de réception d'un produit (migration 155) — comment le client peut le
+ * recevoir. Indépendant de `storage_type`. Règles panier : lib/fulfillment/fulfillmentPolicy.ts.
+ */
+export type ProductFulfillmentPolicy = 'delivery_or_pickup' | 'pickup_only' | 'delivery_only';
+
 export type CatalogCategoryOption = Pick<Category, 'id' | 'name' | 'slug' | 'catalog_scope'>;
 
 export interface Category {
@@ -55,6 +61,8 @@ export interface Product {
   net_content_value: number | null;
   net_content_unit: string | null; // g | kg | ml | cl | l (CHECK en base)
   pack_count: number | null;
+  // Mode de réception (migration 155). Défaut `delivery_or_pickup`.
+  fulfillment_policy: ProductFulfillmentPolicy;
   created_at: string;
   updated_at: string;
 }
@@ -73,7 +81,7 @@ export interface CartItem {
   // avant leur ajout reste valide et s'affiche avec le libellé de repli.
   product: Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'image_url' | 'weight_grams' | 'stock' | 'storage_type'>
     & Partial<Pick<Product, 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display'
-      | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count'>>;
+      | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count' | 'fulfillment_policy'>>;
   quantity: number;
 }
 

@@ -10,6 +10,7 @@ import {
   IconZoomIn,
 } from '@tabler/icons-react';
 import { ShopTag } from '@/components/ui/ShopTag';
+import { UnavailableRibbon } from '@/components/catalog/UnavailableRibbon';
 import { normalizeProductImages } from '@/lib/catalog/productImages';
 import type { ProductImage } from '@lepefy/types';
 
@@ -18,9 +19,11 @@ interface ProductGalleryProps {
   imageUrl: string | null;
   images: ProductImage[];
   isHomemade: boolean;
+  /** Produit épuisé / sous le minimum : bandeau « pas disponible » sur l'image principale. */
+  unavailable?: boolean;
 }
 
-export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGalleryProps) {
+export function ProductGallery({ name, imageUrl, images, isHomemade, unavailable = false }: ProductGalleryProps) {
   const gallery = useMemo(
     () => normalizeProductImages(images, imageUrl, name),
     [imageUrl, images, name],
@@ -163,6 +166,7 @@ export function ProductGallery({ name, imageUrl, images, isHomemade }: ProductGa
               </svg>
             </div>
           )}
+          {unavailable && <UnavailableRibbon size="detail" />}
         </div>
       </div>
 

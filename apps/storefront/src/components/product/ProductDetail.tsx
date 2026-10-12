@@ -20,7 +20,9 @@ import { contentLabel, formatCount, pickSellingFormatFields, quantityNoun, resol
 import { groupHeadline, groupProgressCopy, minimumHeadline, nextQuantitiesList, stepLine } from '@/lib/storefrontCopy/quantityRuleCopy';
 import { AVAILABILITY_COPY, belowMinimumDetail, deriveAvailability } from '@/lib/storefrontCopy/availability';
 import { ProductPrice } from '@/components/catalog/ProductPrice';
-import { IconCircleOff, IconHourglassHigh } from '@tabler/icons-react';
+import { IconBuildingStore, IconCircleOff, IconHourglassHigh, IconTruck, IconTruckDelivery } from '@tabler/icons-react';
+import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
+import { productFulfillmentHint } from '@/lib/storefrontCopy/fulfillmentCopy';
 import type { ProductWithCategory } from '@lepefy/types';
 
 export function ProductDetail({ product }: { product: ProductWithCategory }) {
@@ -59,6 +61,9 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
   const quantityLabel = formatCount(sellingFormat, quantity);
   const explicitQuantityLabel = `Ajouter ${quantityLabel}`;
   const ruleStepLine = stepLine(minOrderQuantity, orderQuantityStep);
+  const fulfillmentPolicy = normalizeFulfillmentPolicy(product.fulfillment_policy);
+  const fulfillmentHint = productFulfillmentHint(fulfillmentPolicy, Boolean(tenant.click_collect_enabled));
+  const FulfillmentIcon = fulfillmentPolicy === 'pickup_only' ? IconBuildingStore : fulfillmentPolicy === 'delivery_only' ? IconTruck : IconTruckDelivery;
 
   function continueShopping() {
     router.push(getShoppingReturn(catalogHref));
@@ -77,6 +82,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
       storage_type: product.storage_type ?? null,
       min_order_quantity:  product.min_order_quantity,
       order_quantity_step: product.order_quantity_step,
+      fulfillment_policy: normalizeFulfillmentPolicy(product.fulfillment_policy),
       ...pickSellingFormatFields(product),
     }, quantity);
     setAdded(true);
@@ -110,6 +116,7 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           imageUrl={product.image_url}
           images={product.images ?? []}
           isHomemade={product.is_homemade}
+          unavailable={availability === 'sold_out' || availability === 'below_minimum'}
         />
 
         <div className="flex flex-col gap-4">
@@ -170,6 +177,17 @@ export function ProductDetail({ product }: { product: ProductWithCategory }) {
           />
 
           <ProductDescription product={product} />
+
+          {fulfillmentHint && (
+            <section aria-label="Mode de réception" data-fulfillment-policy={fulfillmentPolicy}
+              className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm ${fulfillmentHint.blocked ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-gray-200 bg-white text-gray-900'}`}>
+              <FulfillmentIcon size={20} aria-hidden="true" className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold">{fulfillmentHint.label}</p>
+                <p className="mt-0.5 text-gray-700">{fulfillmentHint.detail}</p>
+              </div>
+            </section>
+          )}
 
           {outOfStock ? (
             <>

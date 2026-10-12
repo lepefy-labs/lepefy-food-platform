@@ -67,10 +67,10 @@ async function rehydrateItems(
   const productIds = [...new Set(rawItems.map((i) => i.product_id))];
   const { data: dbProducts, error: productsError } = await supabase
     .from('products')
-    .select(`id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step, ${PRODUCT_SELLING_FORMAT_COLUMNS}`)
+    .select(`id, name, slug, price, storage_type, stock, image_url, weight_grams, active, min_order_quantity, order_quantity_step, fulfillment_policy, ${PRODUCT_SELLING_FORMAT_COLUMNS}`)
     .eq('tenant_id', tenantId)
     .in('id', productIds) as {
-      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display' | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count'>> | null;
+      data: Array<Pick<Product, 'id' | 'name' | 'slug' | 'price' | 'storage_type' | 'stock' | 'image_url' | 'weight_grams' | 'active' | 'min_order_quantity' | 'order_quantity_step' | 'net_quantity_display' | 'sale_unit' | 'net_content_value' | 'net_content_unit' | 'pack_count' | 'fulfillment_policy'>> | null;
       error: unknown;
     };
 
@@ -99,6 +99,7 @@ async function rehydrateItems(
         net_content_value:    p.net_content_value,
         net_content_unit:     p.net_content_unit,
         pack_count:           p.pack_count,
+        fulfillment_policy:   p.fulfillment_policy,
       },
       // Do not clamp to raw stock: 12 -> 10 would invent an off-step quantity
       // for min=4/step=4. Preserve the customer's stored intent, expose the

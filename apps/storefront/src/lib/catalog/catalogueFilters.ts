@@ -1,6 +1,9 @@
 // Admin → Catalogue list: status filters, URL state and completeness badges.
 // Pure (the query helper only chains a PostgREST builder it receives).
 
+import type { ProductFulfillmentPolicy } from '@lepefy/types';
+import { isFulfillmentPolicy } from '../fulfillment/fulfillmentPolicy';
+
 export type CatalogueStatus =
   | 'all' | 'active' | 'inactive' | 'out' | 'low' | 'ai'
   | 'no_weight' | 'no_image' | 'no_category';
@@ -31,27 +34,32 @@ export interface CatalogueListState {
   category: string;
   sort: CatalogueSort;
   page: number;
+  /** Mode de réception (migration 155) ; '' = tous. URL `?reception=`. */
+  reception: ProductFulfillmentPolicy | '';
 }
 
 export function parseCatalogueState(params: { get(name: string): string | null }): CatalogueListState {
   const status = params.get('status') ?? 'all';
   const sort = params.get('sort') ?? 'position_asc';
   const page = Number.parseInt(params.get('page') ?? '1', 10);
+  const reception = params.get('reception');
   return {
     q: (params.get('q') ?? '').slice(0, 80),
     status: STATUS_KEYS.has(status) ? status as CatalogueStatus : 'all',
     category: (params.get('category') ?? '').slice(0, 120),
     sort: (CATALOGUE_SORTS as readonly string[]).includes(sort) ? sort as CatalogueSort : 'position_asc',
     page: Number.isFinite(page) && page > 0 ? Math.min(page, 1000) : 1,
+    reception: isFulfillmentPolicy(reception) ? reception : '',
   };
 }
 
-/** Defaults (all, position, page 1, no search/category) are omitted. */
+/** Defaults (all, position, page 1, no search/category/reception) are omitted. */
 export function catalogueQueryString(state: CatalogueListState): string {
   const params = new URLSearchParams();
   if (state.q.trim()) params.set('q', state.q.trim());
   if (state.status !== 'all') params.set('status', state.status);
   if (state.category) params.set('category', state.category);
+  if (state.reception) params.set('reception', state.reception);
   if (state.sort !== 'position_asc') params.set('sort', state.sort);
   if (state.page > 1) params.set('page', String(state.page));
   return params.toString();

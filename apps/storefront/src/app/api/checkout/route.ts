@@ -96,7 +96,11 @@ export async function POST(req: NextRequest) {
     }
 
     // All payment entry points, including recovery, share this DB-backed gate.
-    const validated = await validateCheckoutItems(supabase, tenant.id, rawItems);
+    // Mode de réception (migration 155) : vérifié ici, avant commande ou PaymentIntent.
+    const validated = await validateCheckoutItems(supabase, tenant.id, rawItems, {
+      mode: fulfillmentType === 'pickup' ? 'pickup' : 'delivery',
+      pickupAvailable: Boolean(tenant.click_collect_enabled),
+    });
     if (validated.ok === false) {
       return NextResponse.json(validated.body, { status: validated.status });
     }

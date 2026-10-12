@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { LepefyImage } from '@/components/images/LepefyImage';
 import { IconInfoCircle, IconSnowflake, IconShoppingCart } from '@tabler/icons-react';
-import type { CatalogScope } from '@lepefy/types';
+import type { CatalogScope, ProductFulfillmentPolicy } from '@lepefy/types';
 import { useAddToCartUiStore } from '@/stores/addToCartUiStore';
 import { useQuickAdd } from './useQuickAdd';
 import { formatPrice } from '@/lib/utils/format';
@@ -14,6 +14,9 @@ import { minimumChip } from '@/lib/storefrontCopy/quantityRuleCopy';
 import { AVAILABILITY_COPY, belowMinimumDetail } from '@/lib/storefrontCopy/availability';
 import { AvailabilityBadge } from './AvailabilityBadge';
 import { ProductPrice } from './ProductPrice';
+import { FulfillmentPolicyChip } from './FulfillmentPolicyChip';
+import { UnavailableRibbon } from './UnavailableRibbon';
+import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 
 /**
  * Forme minimale requise par la card — satisfaite à la fois par
@@ -41,6 +44,12 @@ export interface ProductCardProduct extends SellingFormatSource {
    */
   min_order_quantity: number;
   order_quantity_step: number;
+  /**
+   * Mode de réception (migration 155). Obligatoire pour la même raison que la
+   * règle de quantité : un produit « retrait uniquement » se voit avant l'ajout.
+   * Une source sans la colonne passe `'delivery_or_pickup'`.
+   */
+  fulfillment_policy: ProductFulfillmentPolicy;
 }
 
 interface ProductCardProps {
@@ -101,6 +110,10 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
   const minOrderQuantity = product.min_order_quantity ?? 1;
   const hasMinRule = !merchandise && minOrderQuantity > 1;
   const unavailable = availability === 'sold_out' || availability === 'below_minimum';
+  // Seuls les modes imposés sont mentionnés sur la card : le cas standard
+  // (« Livraison ou retrait ») est dit sur la fiche produit, sans charger la grille.
+  const fulfillmentPolicy = normalizeFulfillmentPolicy(product.fulfillment_policy);
+  const showFulfillment = !merchandise && fulfillmentPolicy !== 'delivery_or_pickup';
   const shelfPrice = describePrice(product.price, sellingFormat, currency);
   const ctaLabel = added
     ? 'Ajouté ✓'
@@ -186,15 +199,14 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
               <span className="text-3xl">🛒</span>
             </div>
           )}
-          {unavailable && (
-            <AvailabilityBadge state={availability} className="absolute bottom-2 left-2 right-2 z-10 justify-center text-center" />
-          )}
+          {unavailable && <UnavailableRibbon />}
         </div>
 
         {variant === 'grid' ? (
           <div className={compactGrid ? 'p-2.5 sm:p-3' : 'p-3'}>
             <p className={`font-medium text-gray-900 line-clamp-2 mb-1 ${compactGrid ? 'min-h-[2.05rem] text-[13px] leading-[1.25] sm:min-h-0 sm:text-sm sm:leading-normal' : 'text-sm'}`}>{displayName}</p>
             {cartonDetail && <p className="mb-1.5 text-xs font-semibold leading-snug text-gray-700">{cartonDetail}</p>}
+            {showFulfillment && <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mb-1.5" />}
             {merchandise && product.category?.name && <p className="mb-2 truncate text-xs text-gray-500">{product.category.name}</p>}
             <div className={`flex items-end justify-between gap-2 ${merchandise ? 'flex-wrap' : ''}`}>
               <div className="min-w-0">
@@ -249,6 +261,7 @@ export function ProductCard({ product, variant = 'grid', compactMobile = false, 
                 {minOrderQuantity} minimum
               </span>
             )}
+            {showFulfillment && <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1" />}
             {unavailable && <AvailabilityBadge state={availability} className="mt-1" />}
           </div>
         )}

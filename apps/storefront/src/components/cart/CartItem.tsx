@@ -1,13 +1,14 @@
 import { LepefyImage } from '@/components/images/LepefyImage';
 import Link from 'next/link';
 import { IconChevronRight } from '@tabler/icons-react';
-import type { CartItem as CartItemType } from '@lepefy/types';
+import type { CartItem as CartItemType, ProductFulfillmentPolicy } from '@lepefy/types';
 import { formatPrice } from '@/lib/utils/format';
 import { deriveCartItemState } from '@/lib/cart/cartItemState';
 import { CartQuantityControl } from './CartQuantityControl';
 import { getMaximumValidQuantity } from '@/lib/purchaseQuantityRules';
 import { describePrice, formatCount, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
 import { cartLineIssue } from '@/lib/storefrontCopy/availability';
+import { FulfillmentPolicyChip } from '@/components/catalog/FulfillmentPolicyChip';
 
 interface CartItemProps {
   item: CartItemType;
@@ -18,6 +19,8 @@ interface CartItemProps {
   onDecrement: (productId: string) => void;
   onRemove: (productId: string) => void;
   variant?: 'drawer' | 'page';
+  /** Mode de réception lu frais (panier) : seul un mode imposé est affiché. */
+  fulfillmentPolicy?: ProductFulfillmentPolicy;
 }
 
 
@@ -30,6 +33,7 @@ export function CartItem({
   onDecrement,
   onRemove,
   variant = 'drawer',
+  fulfillmentPolicy,
 }: CartItemProps) {
   const { product, quantity } = item;
   const state = deriveCartItemState({
@@ -100,6 +104,9 @@ export function CartItem({
             <p className="mt-1 text-xs text-gray-700">
               <span className="font-semibold">{price.amount}</span> {price.unitPhrase}
             </p>
+            {fulfillmentPolicy && fulfillmentPolicy !== 'delivery_or_pickup' && (
+              <FulfillmentPolicyChip policy={fulfillmentPolicy} className="mt-1.5" />
+            )}
             {issue && (
               <p className={`mt-1.5 rounded-lg px-2 py-1 text-xs font-semibold leading-snug ${issue.kind === 'over_stock' ? 'bg-amber-50 text-amber-900' : 'bg-red-50 text-red-800'}`} role="status">
                 {issue.message}

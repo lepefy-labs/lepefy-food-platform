@@ -52,6 +52,7 @@ export function useQuickAdd(product: ProductCardProduct, enforceStockLimit = fal
       storage_type: product.storage_type ?? null,
       min_order_quantity: product.min_order_quantity,
       order_quantity_step: product.order_quantity_step,
+      fulfillment_policy: product.fulfillment_policy,
       ...pickSellingFormatFields(product),
     });
     const updated = useCartStore.getState().items.find(item => item.product.id === product.id)?.quantity ?? 0;

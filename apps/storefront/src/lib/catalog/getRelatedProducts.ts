@@ -1,3 +1,4 @@
+import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 import type { createPublicClient } from '@/lib/supabase/public';
 import type { SemanticMatch } from '@lepefy/types';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
@@ -90,6 +91,7 @@ export async function getRelatedProducts(
             net_content_value:   p.net_content_value ?? null,
             net_content_unit:    p.net_content_unit ?? null,
             pack_count:          p.pack_count ?? null,
+            fulfillment_policy:  normalizeFulfillmentPolicy(p.fulfillment_policy),
           }));
       }
     }

@@ -1,3 +1,5 @@
+import type { ProductFulfillmentPolicy } from './product';
+
 export interface AiPricing {
   id: string;
   provider: string;
@@ -81,5 +83,7 @@ export interface SemanticMatch {
   net_content_value?: number | null;
   net_content_unit?: string | null;
   pack_count?: number | null;
+  // Mode de réception (migration 155) ; absent tant que la 155 n'est pas appliquée.
+  fulfillment_policy?: ProductFulfillmentPolicy | null;
   similarity: number;
 }

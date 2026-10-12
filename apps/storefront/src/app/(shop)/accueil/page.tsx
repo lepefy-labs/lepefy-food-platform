@@ -11,7 +11,7 @@ import { CategoryBlocksRow } from '@/components/home/CategoryBlocksRow';
 import { CategoryBlocksGrid } from '@/components/home/CategoryBlocksGrid';
 import { SuggestionsRow, type SuggestionProduct } from '@/components/home/SuggestionsRow';
 import { formatDate, formatPrice } from '@/lib/utils/format';
-import type { EventRow, ServiceOffering } from '@lepefy/types';
+import type { EventRow, ProductFulfillmentPolicy, ServiceOffering } from '@lepefy/types';
 
 export const metadata: Metadata = {
   title: 'Découvrir',
@@ -36,6 +36,7 @@ export type HomeProduct = {
   min_order_quantity: number;
   order_quantity_step: number;
   net_quantity_display?: string | null;
+  fulfillment_policy: ProductFulfillmentPolicy;
 };
 
 const HERO_LIMIT = 6;

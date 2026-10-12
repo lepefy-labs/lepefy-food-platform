@@ -1,5 +1,6 @@
 import type { SemanticMatch } from '@lepefy/types';
 import type { ProductCardProduct } from '@/components/catalog/ProductCard';
+import { normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
 
 /**
  * Adapte une ligne `match_products` (ricerca semantica) vers la forme
@@ -27,5 +28,6 @@ export function semanticMatchToProductCardProduct(match: SemanticMatch): Product
     net_content_value: match.net_content_value ?? null,
     net_content_unit: match.net_content_unit ?? null,
     pack_count: match.pack_count ?? null,
+    fulfillment_policy: normalizeFulfillmentPolicy(match.fulfillment_policy),
   };
 }

@@ -17,7 +17,7 @@ export const PRODUCT_FIELD_LABELS: Record<string, string> = {
   conservation_instructions: 'Conservation', conservation_after_opening: 'Conservation après ouverture',
   country_of_origin: 'Origine', durability_type: 'Durabilité', quid_ingredient: 'QUID', quid_percentage: 'QUID %',
   alcohol_pct: 'Alcool', net_quantity_display: 'Quantité nette', packaging_material: 'Emballage',
-  sale_unit: 'Unité de vente', net_content_value: 'Contenu net', net_content_unit: 'Unité du contenu', pack_count: 'Éléments par lot',
+  fulfillment_policy: 'Mode de réception', sale_unit: 'Unité de vente', net_content_value: 'Contenu net', net_content_unit: 'Unité du contenu', pack_count: 'Éléments par lot',
   recycling_note: 'Tri sélectif', nutrition_basis: 'Base nutritionnelle', nutrition: 'Valeurs nutritionnelles',
   label_background_image_url: 'Fond d’étiquette', label_background_color: 'Couleur d’étiquette',
 };

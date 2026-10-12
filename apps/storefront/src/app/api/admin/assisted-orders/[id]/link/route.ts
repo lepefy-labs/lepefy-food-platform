@@ -45,7 +45,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (intent === 'blocked') return NextResponse.json({ error: PAYMENT_IN_PROGRESS_MESSAGE }, { status: 409 });
   if (intent === 'unverifiable') return NextResponse.json({ error: PAYMENT_UNVERIFIABLE_MESSAGE }, { status: 503 });
 
-  const validated = await validateCheckoutItems(supabase, tenant.id, session.items);
+  // Retrait convenu par l'équipe : toujours possible pour une précommande assistée.
+  const validated = await validateCheckoutItems(supabase, tenant.id, session.items, {
+    mode: session.fulfillment_type === 'pickup' ? 'pickup' : 'delivery',
+    pickupAvailable: true,
+  });
   if (validated.ok === false) return NextResponse.json(validated.body, { status: 409 });
 
   const items = validated.items;

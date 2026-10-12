@@ -13,7 +13,7 @@ import {
   IconTrash,
   IconTag,
 } from '@tabler/icons-react';
-import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption, ProductImage } from '@lepefy/types';
+import type { Producer, Importer, NutritionInfo, DurabilityType, CatalogCategoryOption, ProductFulfillmentPolicy, ProductImage } from '@lepefy/types';
 import { formatBarcodeDisplay } from '@/lib/barcodeFormat';
 import Button from '../../../_components/ui/Button';
 import ConfirmDialog, { useUnsavedChangesGuard } from '../../../_components/ui/ConfirmDialog';
@@ -24,6 +24,15 @@ import { changedFieldLabels, changedProductKeys, productPatchPayload, type Produ
 import { parseSellingFormatInput } from '@/lib/catalog/sellingFormatInput';
 import { listSaleUnits } from '@/lib/storefrontCopy/saleUnits';
 import { CONTENT_UNITS, describePrice, resolveSellingFormat } from '@/lib/storefrontCopy/sellingFormat';
+import { FULFILLMENT_POLICIES, normalizeFulfillmentPolicy } from '@/lib/fulfillment/fulfillmentPolicy';
+import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
+
+/** Aide de chaque mode de réception (ce que le client vivra). */
+const FULFILLMENT_POLICY_HELP: Record<ProductFulfillmentPolicy, string> = {
+  delivery_or_pickup: 'Le client choisit : livraison à domicile ou retrait en boutique.',
+  pickup_only: 'Toute la commande qui contient ce produit sera retirée en boutique.',
+  delivery_only: 'Toute la commande qui contient ce produit sera livrée : pas de retrait en boutique.',
+};
 
 interface ProductEditProps {
   product: {
@@ -66,6 +75,7 @@ interface ProductEditProps {
     net_content_value: number | null;
     net_content_unit: string | null;
     pack_count: number | null;
+    fulfillment_policy: ProductFulfillmentPolicy | string | null;
     packaging_material: string | null;
     recycling_note: string | null;
     nutrition_basis: '100g' | '100ml';
@@ -86,6 +96,8 @@ interface ProductEditProps {
   fromCategory?: string;
   /** catalog.manage; without it the editor is read-only (the API re-checks it). */
   canManage?: boolean;
+  /** Retrait en boutique activé pour la boutique (Paramètres → Retrait). */
+  clickCollectEnabled?: boolean;
 }
 
 interface FormState {
@@ -126,6 +138,7 @@ interface FormState {
   net_content_value: string;
   net_content_unit: string;
   pack_count: string;
+  fulfillment_policy: ProductFulfillmentPolicy;
   packaging_material: string;
   recycling_note: string;
   nutrition_basis: '100g' | '100ml';
@@ -198,6 +211,7 @@ function buildBody(formData: FormState): ProductBody {
     net_content_value:           formData.net_content_value,
     net_content_unit:            formData.net_content_unit,
     pack_count:                  formData.pack_count,
+    fulfillment_policy:          formData.fulfillment_policy,
     packaging_material:          formData.packaging_material,
     recycling_note:              formData.recycling_note,
     nutrition_basis:             formData.nutrition_basis,
@@ -255,6 +269,7 @@ function initFormState(product: ProductEditProps['product'], tenantLocales: stri
     net_content_value:           product.net_content_value != null ? String(product.net_content_value) : '',
     net_content_unit:            product.net_content_unit ?? '',
     pack_count:                  product.pack_count != null ? String(product.pack_count) : '',
+    fulfillment_policy:          normalizeFulfillmentPolicy(product.fulfillment_policy),
     packaging_material:          product.packaging_material ?? '',
     recycling_note:              product.recycling_note ?? '',
     nutrition_basis:             product.nutrition_basis ?? '100g',
@@ -277,6 +292,7 @@ export default function ProductEditClient({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fromCategory,
   canManage = true,
+  clickCollectEnabled = true,
 }: ProductEditProps) {
   const router = useRouter();
   const [activeTab, setActiveTab]       = useState<'generale' | 'etichetta' | 'associations'>('generale');
@@ -889,6 +905,43 @@ export default function ProductEditClient({
                 }
                 return null;
               })()}
+            </section>
+
+            <section className="bg-a-surface rounded-xl border border-a-border p-5">
+              <h2 className={SECTION_TITLE_CLS} id="product-fulfillment-title">Mode de réception</h2>
+              <p className="-mt-2 mb-4 text-xs text-a-text-3">
+                Comment le client peut recevoir ce produit. Indépendant du type de stockage.
+              </p>
+              <div role="radiogroup" aria-labelledby="product-fulfillment-title" className="grid gap-2 sm:grid-cols-3">
+                {FULFILLMENT_POLICIES.map((policy) => {
+                  const selected = formData.fulfillment_policy === policy;
+                  return (
+                    <label key={policy} className={`flex min-h-11 cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm ${selected ? 'border-a-brand bg-a-brand-soft' : 'border-a-border bg-a-surface hover:bg-a-surface-2'}`}>
+                      <input
+                        type="radio"
+                        name="product-fulfillment-policy"
+                        value={policy}
+                        checked={selected}
+                        disabled={!canManage}
+                        onChange={() => setField('fulfillment_policy', policy)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="block font-semibold text-a-text">{FULFILLMENT_POLICY_ADMIN_LABELS[policy]}</span>
+                        <span className="mt-0.5 block text-xs text-a-text-3">{FULFILLMENT_POLICY_HELP[policy]}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {formData.fulfillment_policy === 'pickup_only' && !clickCollectEnabled && (
+                <p role="alert" className="mt-3 flex items-start gap-1.5 rounded-lg border border-tone-warning-border bg-tone-warning-bg px-3 py-2 text-xs font-semibold text-tone-warning-fg">
+                  <IconAlertTriangle size={14} aria-hidden="true" className="mt-px shrink-0" />
+                  <span>
+                    Le retrait en boutique est désactivé pour votre boutique : ce produit ne pourra pas être commandé tant que le retrait n’est pas activé (Paramètres → Retrait en boutique).
+                  </span>
+                </p>
+              )}
             </section>
 
             <section className="bg-a-surface rounded-xl border border-a-border p-5">

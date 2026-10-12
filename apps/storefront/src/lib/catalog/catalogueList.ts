@@ -24,6 +24,7 @@ export interface CatalogueListProduct {
   category_id: string | null;
   image_url: string | null;
   storage_type: string | null;
+  fulfillment_policy: string | null;
   warehouse_location: string | null;
   description_source: 'ai' | 'human' | null;
   barcode_value: string | null;
@@ -41,13 +42,13 @@ export interface CatalogueListResult {
 
 /**
  * Admin catalogue page: one page of products for the list state plus the
- * per-status counters of the whole catalogue (search and category do not
- * narrow the counters). Shared by the Server Component and GET /api/admin/catalogue.
+ * per-status counters of the whole catalogue (search, category and reception
+ * mode do not narrow the counters). Shared by the Server Component and GET /api/admin/catalogue.
  */
 export async function loadCatalogueList(
   db: SupabaseClient,
   tenantId: string,
-  state: Pick<CatalogueListState, 'q' | 'status' | 'category' | 'sort' | 'page'>,
+  state: Pick<CatalogueListState, 'q' | 'status' | 'category' | 'sort' | 'page'> & Partial<Pick<CatalogueListState, 'reception'>>,
   limit = CATALOGUE_PAGE_SIZE,
 ): Promise<CatalogueListResult> {
   const page = Math.max(1, state.page);
@@ -63,12 +64,13 @@ export async function loadCatalogueList(
     .from('products')
     .select(`
       id, name, slug, price, stock, active, weight_grams, category_id,
-      image_url, storage_type, warehouse_location, description_source,
+      image_url, storage_type, fulfillment_policy, warehouse_location, description_source,
       barcode_value, categories(name, slug)
     `, { count: 'exact' })
     .eq('tenant_id', tenantId);
 
   if (categoryId) query = query.eq('category_id', categoryId);
+  if (state.reception) query = query.eq('fulfillment_policy', state.reception);
   const q = state.q.trim();
   if (q) {
     const safe = q.replace(/[%_,()]/g, ' ').trim();

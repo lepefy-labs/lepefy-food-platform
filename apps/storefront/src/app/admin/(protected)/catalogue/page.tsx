@@ -17,6 +17,8 @@ import { ErrorState } from '../../_components/ui/States';
 import FilterBar, { type ActiveFilterChip } from '../../_components/data/FilterBar';
 import Pagination from '../../_components/data/Pagination';
 import CatalogueTable from './CatalogueTable';
+import { FULFILLMENT_POLICIES } from '@/lib/fulfillment/fulfillmentPolicy';
+import { FULFILLMENT_POLICY_ADMIN_LABELS } from '@/lib/storefrontCopy/fulfillmentCopy';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -53,10 +55,11 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
   const window = pageWindow(total, list?.page ?? state.page, CATALOGUE_PAGE_SIZE);
   const categoryList = (categories ?? []) as { id: string; name: string; slug: string; catalog_scope: string | null }[];
   const categoryName = categoryList.find((category) => category.slug === state.category)?.name;
-  const hasFilters = Boolean(state.q || state.status !== 'all' || state.category);
-  const resetHref = href({ q: '', status: 'all', category: '' });
+  const hasFilters = Boolean(state.q || state.status !== 'all' || state.category || state.reception);
+  const resetHref = href({ q: '', status: 'all', category: '', reception: '' });
   const chips: ActiveFilterChip[] = [
     ...(state.category ? [{ key: 'category', label: `Catégorie : ${categoryName ?? state.category}`, href: href({ category: '' }) }] : []),
+    ...(state.reception ? [{ key: 'reception', label: `Réception : ${FULFILLMENT_POLICY_ADMIN_LABELS[state.reception]}`, href: href({ reception: '' }) }] : []),
     ...(CATALOGUE_STATUS_OPTIONS.find((option) => option.key === state.status && option.group === 'quality')
       ? [{ key: 'status', label: CATALOGUE_STATUS_OPTIONS.find((option) => option.key === state.status)!.label, href: href({ status: 'all' }) }]
       : []),
@@ -99,7 +102,10 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
               count: option.key === 'all' ? undefined : counts[option.key] ?? undefined, countTone: warn(option.key) ? 'warning' : 'neutral',
             }))}
             search={{ label: 'Rechercher un produit', placeholder: 'Nom, slug ou code-barres' }}
-            filters={[{ type: 'select', key: 'category', label: 'Catégorie', allLabel: 'Toutes les catégories', options: categoryList.map((category) => ({ value: category.slug, label: `${category.name} — ${category.catalog_scope === 'gadgets' ? 'Goodies' : 'Catalogue'}` })) }]}
+            filters={[
+              { type: 'select', key: 'category', label: 'Catégorie', allLabel: 'Toutes les catégories', options: categoryList.map((category) => ({ value: category.slug, label: `${category.name} — ${category.catalog_scope === 'gadgets' ? 'Goodies' : 'Catalogue'}` })) },
+              { type: 'select', key: 'reception', label: 'Mode de réception', allLabel: 'Tous les modes de réception', options: FULFILLMENT_POLICIES.map((policy) => ({ value: policy, label: FULFILLMENT_POLICY_ADMIN_LABELS[policy] })) },
+            ]}
             activeChips={chips}
             resetHref={resetHref}
             sort={{ value: state.sort, options: SORT_OPTIONS }}
@@ -108,7 +114,7 @@ export default async function AdminCataloguePage({ searchParams }: { searchParam
         </Suspense>
         {!list
           ? <ErrorState title="Impossible de charger le catalogue." action={<ButtonLink href={href({ page: state.page })}>Réessayer</ButtonLink>} />
-          : <CatalogueTable products={list.products} tenantCurrency={tenant.currency} canManage={canManage} listQuery={catalogueQueryString(state)} hasFilters={hasFilters} resetHref={resetHref} />}
+          : <CatalogueTable products={list.products} tenantCurrency={tenant.currency} canManage={canManage} pickupDisabled={!tenant.click_collect_enabled} listQuery={catalogueQueryString(state)} hasFilters={hasFilters} resetHref={resetHref} />}
         {list && total > 0 && <Pagination window={window} noun="produits" hrefForPage={(page) => href({ page })} />}
       </Card>
     </div>

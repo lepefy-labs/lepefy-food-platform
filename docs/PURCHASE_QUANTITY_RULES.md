@@ -16,7 +16,7 @@ An *active* combinable group with minimum `gm`, step `gs` applies to the sum of 
 
 ## Authoritative enforcement
 
-`apps/storefront/src/lib/purchaseQuantityRules.ts` contains the pure rules engine; `apps/storefront/src/lib/checkout/validateCheckoutItems.ts` is the only server-side loading/enforcement entry point and must be called in **every route that creates or changes payment state**:
+`apps/storefront/src/lib/purchaseQuantityRules.ts` contains the pure rules engine; `apps/storefront/src/lib/checkout/validateCheckoutItems.ts` (which also enforces the product fulfillment policy, migration 155, via `lib/fulfillment/fulfillmentPolicy.ts`) is the only server-side loading/enforcement entry point and must be called in **every route that creates or changes payment state**:
 
 - `/api/checkout`
 - `/api/checkout/external-link`
