@@ -3,6 +3,7 @@
  * pnpm --filter @lepefy/storefront images:backfill --tenant chloefood --limit 20
  * Add --apply only after an approved production window; --apply requires --backup <path>.
  * --include-unscoped also converts same-project legacy URLs outside tenants/{tenantId}/products/{productId}/.
+ * --upgrade-v3 rebuilds v2 sets ({imageId}/master + 4 variants) as v3 sets ({imageId}/v3/), reusing the v2 master bytes.
  */
 import { writeFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
@@ -34,6 +35,7 @@ const productFilter = option('product');
 const reportPath = option('report');
 const backupPath = option('backup');
 const includeUnscoped = args.includes('--include-unscoped');
+const upgradeV3 = args.includes('--upgrade-v3');
 if (apply && !backupPath) throw new Error('--apply requires --backup <path> for the original image_url/images rows');
 const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -68,6 +70,7 @@ let cursor = 0;
 async function processProduct(product: ProductRow) {
   const images = normalizeProductImages(product.images, product.image_url, product.name);
   let migrated = 0;
+  let v2 = 0;
   let legacy = 0;
   let external = 0;
   let unscoped = 0;
@@ -77,12 +80,40 @@ async function processProduct(product: ProductRow) {
   const replacements = new Map<string, string>();
   const imageResults: Array<{ index: number; status: string; sourceBytes?: number; storedBytes?: number; width?: number; height?: number; format?: string }> = [];
   for (const [index, image] of images.entries()) {
-    if (parseManagedProductImage(image.url, baseUrl, tenantId)) {
+    const managed = parseManagedProductImage(image.url, baseUrl, tenantId);
+    if (managed?.layout === 2) v2++;
+    if (managed && (managed.layout === 3 || !upgradeV3)) {
       migrated++;
-      imageResults.push({ index, status: 'migrated' });
+      imageResults.push({ index, status: managed.layout === 3 ? 'migrated' : 'migrated-v2' });
       continue;
     }
     let path: string;
+    if (managed) {
+      // v2 → v3: same tenant and product as the row, master reused byte for byte.
+      if (managed.productId.toLowerCase() !== product.id.toLowerCase()) { external++; imageResults.push({ index, status: 'unrecognized' }); continue; }
+      path = new URL(managed.masterUrl).pathname.slice('/storage/v1/object/public/assets/'.length);
+      if (!apply && !validate) { imageResults.push({ index, status: 'v2' }); continue; }
+      const { data: blob, error: downloadError } = await db.storage.from('assets').download(path);
+      if (downloadError || !blob) throw new Error('Download failed for a v2 master');
+      const bytes = Buffer.from(await blob.arrayBuffer());
+      if (validate && !apply) {
+        const metadata = await sharp(bytes, { failOn: 'error', limitInputPixels: 40_000_000 }).metadata();
+        validated++;
+        sourceBytes += bytes.length;
+        imageResults.push({ index, status: 'validated-v2', sourceBytes: bytes.length, width: metadata.width, height: metadata.height, format: metadata.format });
+        continue;
+      }
+      const set = await uploadProductImageSet({
+        supabase: db, bytes, mime: managed.masterMime, tenantId, productId: product.id,
+        baseUrl: baseUrl!, imageId: managed.imageId, allowExisting: true, reuseMaster: true,
+      });
+      replacements.set(image.url, set.url);
+      sourceBytes += set.sourceBytes;
+      storedBytes += set.storedBytes;
+      imageResults.push({ index, status: 'upgraded', sourceBytes: set.sourceBytes, storedBytes: set.storedBytes });
+      await new Promise((resolve) => setTimeout(resolve, rateMs));
+      continue;
+    }
     try {
       const url = new URL(image.url);
       const source = new URL(baseUrl!);
@@ -148,7 +179,7 @@ async function processProduct(product: ProductRow) {
       .select('id');
     if (updateError || !written?.length) throw new Error(updateError?.message ?? 'Concurrent product update');
   }
-  return { productId: product.id, imageCount: images.length, imageResults, migrated, legacy, unscoped, external, validated, converted: replacements.size, sourceBytes, storedBytes, status: 'ok' };
+  return { productId: product.id, imageCount: images.length, imageResults, migrated, v2, legacy, unscoped, external, validated, converted: replacements.size, sourceBytes, storedBytes, status: 'ok' };
 }
 
 async function worker() {
@@ -172,6 +203,7 @@ const summary = {
   products: rows.length,
   errors: results.filter((item) => item.status === 'error').length,
   migrated: results.reduce((sum, item) => sum + Number(item.migrated ?? 0), 0),
+  v2: results.reduce((sum, item) => sum + Number(item.v2 ?? 0), 0),
   legacy: results.reduce((sum, item) => sum + Number(item.legacy ?? 0), 0),
   unscoped: results.reduce((sum, item) => sum + Number(item.unscoped ?? 0), 0),
   external: results.reduce((sum, item) => sum + Number(item.external ?? 0), 0),

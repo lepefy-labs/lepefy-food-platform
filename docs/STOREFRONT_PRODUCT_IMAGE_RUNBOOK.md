@@ -243,7 +243,7 @@ clous-de-girofle-usage.webp
 
 The client may resize images to a maximum 1600 px edge and convert them to high-quality WebP when that reduces file size. Multiple selections are uploaded sequentially to stay below the production request-body limit.
 
-The server also creates an immutable five-file set in Supabase Storage: a master plus 160/480/960/1600 px WebP variants. It preserves aspect ratio, transparency and gallery order. For a tenant enabled through the server-side `PRODUCT_IMAGE_VARIANTS_TENANTS` configuration, the browser reads the prepared variants directly from Storage/CDN. Historical images remain visible through the legacy path until backfilled. See `docs/IMAGE_DELIVERY_ARCHITECTURE.md` for backfill, verification and rollback; never run a mass production backfill without explicit approval.
+The server also creates an immutable seven-file set in Supabase Storage: a master plus 160/320/480/640/960/1600 px WebP variants (quality 75). It preserves aspect ratio, transparency and gallery order. For a tenant enabled through the server-side `PRODUCT_IMAGE_VARIANTS_TENANTS` configuration, the browser reads the prepared variants directly from Storage/CDN. Historical images remain visible through the legacy path until backfilled. See `docs/IMAGE_DELIVERY_ARCHITECTURE.md` for backfill, verification and rollback; never run a mass production backfill without explicit approval.
 
 ## Delivery report
 

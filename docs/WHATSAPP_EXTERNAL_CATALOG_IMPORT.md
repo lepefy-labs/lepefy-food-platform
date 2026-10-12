@@ -1,6 +1,6 @@
 # Import di cataloghi WhatsApp esterni
 
-> Revisione immagini su `main@5731d352eafb10d5c234d14631bb4c1c92f44ec8` (12/10/2026): `copyImages` continua a usare solo staging host-allowlisted e applicazione prodotto per prodotto via RPC, ma ora salva un set master + quattro varianti WebP immutabili tramite la pipeline condivisa delle immagini prodotto. Il prefisso resta tenant/prodotto; il contenuto già presente è verificato prima del riuso idempotente. Nessuna modifica a consenso del venditore, policy o campo di prezzo. Diagnosi di immagini mancanti: consultare `docs/IMAGE_DELIVERY_ARCHITECTURE.md`.
+> Revisione immagini su `main@5731d352eafb10d5c234d14631bb4c1c92f44ec8` (12/10/2026): `copyImages` continua a usare solo staging host-allowlisted e applicazione prodotto per prodotto via RPC, ma ora salva un set immutabile (master + varianti WebP; layout v3 con sei larghezze dal 12/10/2026) tramite la pipeline condivisa delle immagini prodotto. Il prefisso resta tenant/prodotto; il contenuto già presente è verificato prima del riuso idempotente. Nessuna modifica a consenso del venditore, policy o campo di prezzo. Diagnosi di immagini mancanti: consultare `docs/IMAGE_DELIVERY_ARCHITECTURE.md`.
 
 Stato (8/10/2026, ramo `feat/whatsapp-external-catalog-import`, base `main@ae81c8a7`):
 - **CLI sperimentale locale**: operativa, testata su un catalogo reale (§1, §7).

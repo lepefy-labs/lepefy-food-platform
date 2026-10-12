@@ -10,6 +10,7 @@ const product = '33333333-3333-3333-3333-333333333333';
 const image = '44444444-4444-4444-4444-444444444444';
 const base = 'https://storage.example.supabase.co';
 const master = `${base}/storage/v1/object/public/assets/tenants/${tenant}/products/${product}/${image}/master.png`;
+const masterV3 = master.replace('/master.png', '/v3/master.png');
 
 test('resolves only an immutable set owned by the active tenant', () => {
   expect(parseManagedProductImage(master, base, tenant)?.variants.catalog).toBe(master.replace('master.png', 'catalog.webp'));
@@ -25,7 +26,23 @@ test('resolves only an immutable set owned by the active tenant', () => {
   expect(resolveProductImage(null, 'catalog', true, base, tenant).direct).toBe(false);
 });
 
-test('uploads a transparent master and four bounded WebP variants', async () => {
+test('keeps v2 sets readable and exposes the denser v3 ladder', () => {
+  const v2 = parseManagedProductImage(master, base, tenant);
+  expect(v2?.layout).toBe(2);
+  expect(v2?.srcSet.map((entry) => entry.width)).toEqual([160, 480, 960, 1600]);
+  const v3 = parseManagedProductImage(masterV3, base, tenant);
+  expect(v3?.layout).toBe(3);
+  expect(v3?.variants.catalog).toBe(masterV3.replace('master.png', 'w480.webp'));
+  expect(v3?.srcSet.map((entry) => entry.width)).toEqual([160, 320, 480, 640, 960, 1600]);
+  const resolved = resolveProductImage(masterV3, 'catalog', true, base, tenant);
+  expect(resolved.srcSet).toContain(masterV3.replace('master.png', 'w320.webp') + ' 320w');
+  expect(resolveProductImage(masterV3, 'catalog', false, base, tenant).srcSet).toBeNull();
+  expect(parseManagedProductImage(masterV3, base, otherTenant)).toBeNull();
+  expect(parseManagedProductImage(master.replace('/master.png', '/v4/master.png'), base, tenant)).toBeNull();
+  expect(parseManagedProductImage(master.replace('/master.png', '/v3/v3/master.png'), base, tenant)).toBeNull();
+});
+
+test('uploads a transparent master and six bounded WebP variants', async () => {
   const uploaded = new Map<string, { bytes: Buffer; contentType: string; cacheControl: string }>();
   const bucket = {
     upload: async (path: string, bytes: Buffer, options: { contentType: string; cacheControl: string }) => {
@@ -37,10 +54,10 @@ test('uploads a transparent master and four bounded WebP variants', async () => 
   const supabase = { storage: { from: () => bucket } } as unknown as SupabaseClient;
   const bytes = await sharp({ create: { width: 1200, height: 600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer();
   const set = await uploadProductImageSet({ supabase, bytes, mime: 'image/png', tenantId: tenant, productId: product, baseUrl: base, imageId: image });
-  expect(set.paths).toHaveLength(5);
-  expect(set.url).toBe(master);
-  for (const [name, maxWidth] of Object.entries({ thumbnail: 160, catalog: 480, detail: 960, full: 1600 })) {
-    const object = uploaded.get(`tenants/${tenant}/products/${product}/${image}/${name}.webp`);
+  expect(set.paths).toHaveLength(7);
+  expect(set.url).toBe(masterV3);
+  for (const maxWidth of [160, 320, 480, 640, 960, 1600]) {
+    const object = uploaded.get(`tenants/${tenant}/products/${product}/${image}/v3/w${maxWidth}.webp`);
     expect(object?.contentType).toBe('image/webp');
     expect(object?.cacheControl).toBe('31536000');
     const metadata = await sharp(object!.bytes).metadata();
@@ -83,7 +100,23 @@ test('reuses a complete deterministic set and rejects different bytes', async ()
   const first = await uploadProductImageSet(input);
   const retry = await uploadProductImageSet({ ...input, allowExisting: true });
   expect(retry.url).toBe(first.url);
-  expect(stored.size).toBe(5);
+  expect(stored.size).toBe(7);
   const changed = await sharp({ create: { width: 300, height: 300, channels: 3, background: '#000000' } }).jpeg().toBuffer();
   await expect(uploadProductImageSet({ ...input, bytes: changed, allowExisting: true })).rejects.toThrow('differs');
+});
+
+test('reuses an upright master byte for byte and rejects oversized ones', async () => {
+  const uploaded = new Map<string, Buffer>();
+  const bucket = {
+    upload: async (path: string, bytes: Buffer) => { uploaded.set(path, bytes); return { error: null }; },
+    remove: async () => ({ error: null }),
+  };
+  const supabase = { storage: { from: () => bucket } } as unknown as SupabaseClient;
+  const bytes = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#ff8800' } }).jpeg({ quality: 90 }).toBuffer();
+  const input = { supabase, bytes, mime: 'image/jpeg', tenantId: tenant, productId: product, baseUrl: base, imageId: image, reuseMaster: true };
+  const set = await uploadProductImageSet(input);
+  expect(set.url).toBe(masterV3.replace('master.png', 'master.jpg'));
+  expect(Buffer.compare(uploaded.get(`tenants/${tenant}/products/${product}/${image}/v3/master.jpg`)!, bytes)).toBe(0);
+  const large = await sharp({ create: { width: 2000, height: 600, channels: 3, background: '#ff8800' } }).jpeg().toBuffer();
+  await expect(uploadProductImageSet({ ...input, bytes: large })).rejects.toThrow('at most 1600');
 });

@@ -35,9 +35,7 @@ export const LepefyImage = forwardRef<HTMLImageElement, Props>(function LepefyIm
   const currentSrc = failedSrc === resolved.src ? resolved.masterUrl : resolved.src;
   const fallbackFailed = failedSrc === resolved.masterUrl;
   if (fallbackFailed) return unavailable;
-  const sourceSet = failedSrc
-    ? undefined
-    : `${resolved.variants.thumbnail} 160w, ${resolved.variants.catalog} 480w, ${resolved.variants.detail} 960w, ${resolved.variants.full} 1600w`;
+  const sourceSet = failedSrc ? undefined : resolved.srcSet;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- immutable Supabase variants bypass Vercel transforms
     <img

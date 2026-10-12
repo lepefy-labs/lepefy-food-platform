@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
 import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { PRODUCT_IMAGE_VARIANTS } from './productImageDelivery';
+import { PRODUCT_IMAGE_WEBP_QUALITY_V3, PRODUCT_IMAGE_WIDTHS_V3 } from './productImageDelivery';
 
 const MIME_EXTENSION: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -32,6 +32,8 @@ export async function uploadProductImageSet(input: {
   baseUrl: string;
   imageId?: string;
   allowExisting?: boolean;
+  /** Bytes are already a pipeline master (rotated, at most 1600 px): store them unchanged. */
+  reuseMaster?: boolean;
 }): Promise<ProductImageSet> {
   const { supabase, bytes, mime, tenantId, productId, baseUrl } = input;
   if (!MIME_EXTENSION[mime]) throw new Error('Unsupported product image format');
@@ -43,14 +45,19 @@ export async function uploadProductImageSet(input: {
   const actualMime = metadata.format === 'jpeg' ? 'image/jpeg' : `image/${metadata.format}`;
   const extension = MIME_EXTENSION[actualMime];
   if (!extension) throw new Error('Unsupported product image content');
-  const prefix = `tenants/${tenantId}/products/${productId}/${imageId}/`;
+  const prefix = `tenants/${tenantId}/products/${productId}/${imageId}/v3/`;
   const masterFormat = (extension === 'jpg' ? 'jpeg' : extension) as 'jpeg' | 'png' | 'webp';
-  const master = await sharp(bytes).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).toFormat(masterFormat).toBuffer();
+  if (input.reuseMaster && (metadata.width > 1600 || metadata.height > 1600 || (metadata.orientation ?? 1) !== 1)) {
+    throw new Error('Reused master must be upright and at most 1600 px');
+  }
+  const master = input.reuseMaster
+    ? bytes
+    : await sharp(bytes).rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).toFormat(masterFormat).toBuffer();
   const masterMeta = await sharp(master).metadata();
   const variants = await Promise.all(
-    Object.entries(PRODUCT_IMAGE_VARIANTS).map(async ([name, size]) => ({
-      path: prefix + name + '.webp',
-      bytes: await sharp(bytes).rotate().resize(size, size, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 82, effort: 4 }).toBuffer(),
+    PRODUCT_IMAGE_WIDTHS_V3.map(async (size) => ({
+      path: prefix + 'w' + size + '.webp',
+      bytes: await sharp(bytes).rotate().resize(size, size, { fit: 'inside', withoutEnlargement: true }).webp({ quality: PRODUCT_IMAGE_WEBP_QUALITY_V3, effort: 4 }).toBuffer(),
       contentType: 'image/webp',
     })),
   );
