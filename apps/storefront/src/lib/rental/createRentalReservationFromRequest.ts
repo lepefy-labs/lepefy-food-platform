@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStripeClient } from '@/lib/payments/stripeServerConfig';
 import type { RentalCheckoutItemInput } from '@lepefy/types';
+import { initialDeliveryFee } from '@/lib/rental/deliveryFee';
 import { sendTenantEmail } from '@/lib/notifications/sendEmail';
 import {
   rentalDeliveryQuotePendingEmail, rentalReservationAdminEmail, rentalReservationCustomerEmail, rentalStockConflictEmail,
@@ -121,10 +122,11 @@ export async function createRentalReservationFromRequest(
     return { error: 'stock_conflict' };
   }
 
-  const deliveryFeeStatus =
-    input.fulfillmentType !== 'delivery' ? 'not_applicable'
-    : input.deliveryFeeAmount != null ? 'quoted'
-    : 'pending_quote';
+  // Zone trouvée au checkout : supplément déjà inclus dans le montant payé.
+  // Sans zone : à chiffrer par l'équipe (jamais « 0 € » par défaut).
+  const deliveryFee = initialDeliveryFee(input);
+  const deliveryFeeStatus = deliveryFee.status;
+  const deliveryFeeAt = deliveryFeeStatus === 'paid' ? new Date().toISOString() : null;
 
   const { data: reservation, error: reservationError } = await supabase
     .from('rental_reservations')
@@ -146,8 +148,9 @@ export async function createRentalReservationFromRequest(
       delivery_country:          input.deliveryCountry ?? null,
       delivery_zone_id:          input.deliveryZoneId ?? null,
       delivery_fee_status:       deliveryFeeStatus,
-      delivery_fee_amount:       input.deliveryFeeAmount ?? null,
-      delivery_fee_quoted_at:    deliveryFeeStatus === 'quoted' ? new Date().toISOString() : null,
+      delivery_fee_amount:       deliveryFee.amount,
+      delivery_fee_quoted_at:    deliveryFeeAt,
+      delivery_fee_paid_at:      deliveryFeeAt,
     })
     .select('id')
     .single();

@@ -4,13 +4,19 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useConfirm } from '@/app/admin/_components/ui/ConfirmDialog';
 import { useRouter } from 'next/navigation';
-import { IconReceiptRefund, IconCalendar, IconClock, IconTruckDelivery, IconBuildingStore } from '@tabler/icons-react';
+import { IconReceiptRefund, IconCalendar, IconClock, IconTruckDelivery, IconBuildingStore, IconPencil, IconCopy, IconCheck, IconBrandWhatsapp } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
-import { formatMoney } from '@/lib/admin/format';
+import { formatDate, formatMoney } from '@/lib/admin/format';
+import { RENTAL_DELIVERY_FEE_STATUS_META, statusMeta } from '@/lib/admin/statusRegistry';
+import { buildExternalPaymentLink, isLinkPaymentMethod, linkIncludesAmount } from '@/lib/payments/externalPaymentLink';
+import { deliveryFeeMessage, normalizeDeliveryFeeAmount } from '@/lib/rental/deliveryFee';
+import { buildWhatsAppShareUrl } from '@/lib/orders/assisted/assistedOrderPolicy';
 import { countryLabel, isDeliveryCountry, isValidPostalCode, normalizeAddressParts, normalizePostalCode } from '@/lib/address/addressRules';
 import type { PostalLookupCity } from '@/lib/address/postalLookup';
 import ConfirmPaymentButton from '../../../_components/ui/ConfirmPaymentButton';
-import Button from '../../../_components/ui/Button';
+import Button, { buttonClasses } from '../../../_components/ui/Button';
+import Badge from '../../../_components/ui/Badge';
+import ShareLinkActions from '../../../_components/ui/ShareLinkActions';
 import InlineAlert from '../../../_components/ui/InlineAlert';
 import { FormField, Input, Select } from '../../../_components/ui/Form';
 import { useAdminToast } from '../../../_components/ui/Toaster';
@@ -20,6 +26,7 @@ interface RentalReservationWithDetails {
   id: string;
   customer_name: string;
   customer_email: string;
+  customer_phone: string | null;
   pickup_date: string;
   amount_paid: number;
   status: 'confirmed' | 'cancelled' | 'refunded';
@@ -34,6 +41,7 @@ interface RentalReservationWithDetails {
   delivery_country: string | null;
   delivery_fee_status: RentalDeliveryFeeStatus;
   delivery_fee_amount: number | null;
+  delivery_fee_quoted_at: string | null;
   delivery_fee_paid_at: string | null;
 }
 
@@ -216,6 +224,9 @@ export default function RentalReservationsClient({
   );
 }
 
+// Supplément de livraison après la réservation : à évaluer → proposé (lien et
+// message envoyés à la main par l'équipe) → payé. Un supplément payé n'est
+// plus modifiable (contrôlé aussi par l'API).
 function DeliveryFeeSection({
   reservation, currency, externalPaymentMethods, onUpdate,
 }: {
@@ -224,82 +235,207 @@ function DeliveryFeeSection({
   externalPaymentMethods: TenantPaymentMethod[];
   onUpdate: (patch: Partial<RentalReservationWithDetails>) => void;
 }) {
+  const toast = useAdminToast();
+  const [ask, confirmDialog] = useConfirm();
+  const status = reservation.delivery_fee_status;
+  const meta = statusMeta(RENTAL_DELIVERY_FEE_STATUS_META, status);
+  const fee = reservation.delivery_fee_amount ?? 0;
+  const editable = reservation.status === 'confirmed' && (status === 'pending_quote' || status === 'quoted');
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState(reservation.delivery_fee_amount != null ? String(reservation.delivery_fee_amount) : '');
-  const [methodId, setMethodId] = useState('');
-  const [link, setLink] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
+  const linkMethods = externalPaymentMethods.filter(isLinkPaymentMethod);
+  const [methodId, setMethodId] = useState(linkMethods[0]?.id ?? '');
+  const method = linkMethods.find((entry) => entry.id === methodId) ?? null;
+  const link = method ? buildExternalPaymentLink(method, fee, currency) : null;
+  const message = deliveryFeeMessage({
+    customerName: reservation.customer_name,
+    dateLabel: formatDate(reservation.pickup_date),
+    amountLabel: formatMoney(fee, currency),
+    link,
+  });
+  const [messageCopied, setMessageCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
 
-  async function submitFee() {
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) return;
-    setIsSubmitting(true);
+  function startEditing() {
+    setAmount(reservation.delivery_fee_amount != null ? String(reservation.delivery_fee_amount) : '');
+    setAmountError(null);
+    setFormError(null);
+    setEditing(true);
+  }
+
+  async function submitFee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const check = normalizeDeliveryFeeAmount(amount);
+    if (!check.ok) {
+      setAmountError(check.error);
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
     try {
       const res = await fetch(`/api/admin/evenementiel/reservations/${reservation.id}/delivery-fee`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ delivery_fee_amount: parsedAmount, external_payment_method_id: methodId || undefined }),
+        body: JSON.stringify({ delivery_fee_amount: check.amount }),
       });
-      const result = await res.json();
-      if (res.ok) {
-        onUpdate({ delivery_fee_status: 'quoted', delivery_fee_amount: parsedAmount });
-        setLink(result.link ?? null);
-        setEditing(false);
+      const result = await res.json().catch(() => ({})) as {
+        error?: string; field?: string; delivery_fee_amount?: number; delivery_fee_quoted_at?: string;
+      };
+      if (!res.ok) {
+        if (result.field === 'delivery_fee_amount') setAmountError(result.error ?? 'Montant invalide.');
+        else setFormError(result.error ?? 'Enregistrement impossible. Réessayez.');
+        return;
       }
+      onUpdate({
+        delivery_fee_status: 'quoted',
+        delivery_fee_amount: result.delivery_fee_amount ?? check.amount,
+        delivery_fee_quoted_at: result.delivery_fee_quoted_at ?? new Date().toISOString(),
+      });
+      setEditing(false);
+      toast.success('Supplément enregistré.', { description: 'Envoyez le lien ou le message au client.' });
+    } catch {
+      setFormError('Connexion impossible. Vérifiez le réseau puis réessayez.');
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   }
 
   async function markPaid() {
-    setIsMarkingPaid(true);
+    if (markingPaid) return;
+    const confirmed = await ask({
+      title: 'Confirmer le paiement du supplément ?',
+      description: `Vous confirmez avoir reçu ${formatMoney(fee, currency)} de ${reservation.customer_name} pour la livraison. Le montant ne pourra plus être modifié.`,
+      confirmLabel: 'Confirmer le paiement',
+    });
+    if (!confirmed) return;
+    setMarkingPaid(true);
     try {
       const res = await fetch(`/api/admin/evenementiel/reservations/${reservation.id}/delivery-fee/mark-paid`, { method: 'POST' });
-      if (res.ok) onUpdate({ delivery_fee_status: 'paid' });
+      const result = await res.json().catch(() => ({})) as { error?: string; delivery_fee_paid_at?: string | null };
+      if (!res.ok) {
+        toast.error(result.error ?? 'Confirmation impossible. Réessayez.');
+        return;
+      }
+      onUpdate({ delivery_fee_status: 'paid', delivery_fee_paid_at: result.delivery_fee_paid_at ?? new Date().toISOString() });
+      toast.success('Supplément marqué comme payé.');
+    } catch {
+      toast.error('Connexion impossible. Vérifiez le réseau puis réessayez.');
     } finally {
-      setIsMarkingPaid(false);
+      setMarkingPaid(false);
     }
   }
 
-  if (reservation.delivery_fee_status === 'paid') {
-    return <p className="mt-1 rounded-lg bg-tone-success-bg px-2 py-1.5 text-tone-success-fg font-semibold">Supplément payé — {formatPrice(reservation.delivery_fee_amount ?? 0, currency)}</p>;
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message);
+      setMessageCopied('copied');
+    } catch {
+      setMessageCopied('failed');
+    }
+    window.setTimeout(() => setMessageCopied('idle'), 2500);
   }
 
-  if (editing) {
-    return (
-      <div className="mt-1.5 space-y-1.5 rounded-lg bg-tone-warning-bg p-2">
-        <div className="flex gap-2">
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="Montant" className="min-h-9 w-24 rounded-lg border border-black/10 px-2 text-xs" />
-          <select value={methodId} onChange={(e) => setMethodId(e.target.value)} className="min-h-9 flex-1 rounded-lg border border-black/10 px-2 text-xs">
-            <option value="">Sans lien de paiement</option>
-            {externalPaymentMethods.map((m) => <option key={m.id} value={m.id}>{m.label ?? m.method}</option>)}
-          </select>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" size="sm" onClick={submitFee} loading={isSubmitting}>Valider</Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>Annuler</Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (reservation.delivery_fee_status === 'quoted') {
-    return (
-      <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-tone-warning-bg px-2 py-1.5">
-        <span className="font-semibold text-tone-warning-fg">Supplément : {formatPrice(reservation.delivery_fee_amount ?? 0, currency)}</span>
-        {link && <button type="button" onClick={() => navigator.clipboard.writeText(link)} className="text-tone-warning-fg underline">Copier le lien</button>}
-        <button type="button" onClick={() => setEditing(true)} className="text-tone-warning-fg underline">Modifier</button>
-        <Button type="button" size="sm" onClick={markPaid} loading={isMarkingPaid}>Marquer comme payé</Button>
-      </div>
-    );
-  }
+  // Même horodatage pour la proposition et le paiement : supplément de zone
+  // payé avec la réservation au checkout.
+  const paidWithReservation = status === 'paid' && Boolean(reservation.delivery_fee_paid_at)
+    && reservation.delivery_fee_paid_at === reservation.delivery_fee_quoted_at;
 
   return (
-    <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-tone-warning-bg px-2 py-1.5 text-tone-warning-fg">
-      <span>Supplément à évaluer</span>
-      <button type="button" onClick={() => setEditing(true)} className="font-semibold underline">Évaluer le supplément</button>
-    </div>
+    <section aria-label="Supplément de livraison" className="mt-2 space-y-3 rounded-xl border border-a-border bg-a-surface-2 p-3">
+      {confirmDialog}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-a-text">Supplément de livraison</h3>
+        <Badge tone={meta.tone}>{meta.label}</Badge>
+      </div>
+
+      {status === 'paid' && (
+        <div>
+          <p className="text-base font-semibold tabular-nums text-a-text">{formatMoney(fee, currency)}</p>
+          <p className="text-xs text-a-text-3">
+            {paidWithReservation
+              ? 'Inclus dans le paiement de la réservation.'
+              : reservation.delivery_fee_paid_at ? `Payé le ${formatDate(reservation.delivery_fee_paid_at)}.` : 'Payé.'}
+          </p>
+        </div>
+      )}
+
+      {editing && (
+        <form onSubmit={submitFee} noValidate className="space-y-3">
+          <FormField label={`Montant (${currency.toUpperCase()})`} required error={amountError} hint={status === 'pending_quote' ? 'Aucune zone ne correspond à cette adresse.' : undefined}>
+            <Input
+              value={amount}
+              onChange={(event) => { setAmount(event.target.value); setAmountError(null); setFormError(null); }}
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="Ex. 15"
+              className="sm:max-w-40"
+            />
+          </FormField>
+          {formError && <InlineAlert tone="danger">{formError}</InlineAlert>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" loading={saving}>Enregistrer le supplément</Button>
+            <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => setEditing(false)}>Annuler</Button>
+          </div>
+        </form>
+      )}
+
+      {!editing && status === 'pending_quote' && (
+        <div className="space-y-2">
+          <p className="text-xs leading-5 text-a-text-3">Aucune zone ne correspond à cette adresse : fixez le montant, puis envoyez-le au client.</p>
+          {editable
+            ? <Button type="button" size="sm" onClick={startEditing}>Fixer le supplément</Button>
+            : <p className="text-xs text-a-text-3">Réservation annulée ou remboursée.</p>}
+        </div>
+      )}
+
+      {!editing && status === 'quoted' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-base font-semibold tabular-nums text-a-text">{formatMoney(fee, currency)}</p>
+              {reservation.delivery_fee_quoted_at && <p className="text-xs text-a-text-3">Proposé le {formatDate(reservation.delivery_fee_quoted_at)}.</p>}
+            </div>
+            {editable && <Button type="button" size="sm" variant="ghost" onClick={startEditing}><IconPencil size={16} aria-hidden="true" /> Modifier</Button>}
+          </div>
+          {editable && (
+            <>
+              {linkMethods.length > 0 ? (
+                <FormField label="Lien de paiement" hint={method && !linkIncludesAmount(method) ? 'Ce lien ne contient pas le montant : il est indiqué dans le message.' : undefined}>
+                  <Select value={methodId} onChange={(event) => setMethodId(event.target.value)}>
+                    {linkMethods.map((entry) => <option key={entry.id} value={entry.id}>{entry.label ?? entry.method}</option>)}
+                  </Select>
+                </FormField>
+              ) : (
+                <p className="text-xs leading-5 text-a-text-3">Aucun moyen de paiement par lien n’est activé pour la location : le message ne contient pas de lien.</p>
+              )}
+              {link && <ShareLinkActions url={link} message={message} phone={reservation.customer_phone} />}
+              <div className="space-y-2">
+                <p className="whitespace-pre-line rounded-lg border border-dashed border-a-border-strong bg-a-surface px-3 py-2 text-xs leading-5 text-a-text-2">{message}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant="secondary" onClick={copyMessage}>
+                    {messageCopied === 'copied' ? <IconCheck size={16} aria-hidden="true" /> : <IconCopy size={16} aria-hidden="true" />}
+                    {messageCopied === 'copied' ? 'Message copié' : 'Copier le message'}
+                  </Button>
+                  {!link && (
+                    <a href={buildWhatsAppShareUrl(reservation.customer_phone, message)} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+                      <IconBrandWhatsapp size={16} aria-hidden="true" /> Partager sur WhatsApp
+                    </a>
+                  )}
+                </div>
+                <span role="status" className="sr-only">{messageCopied === 'copied' ? 'Message copié' : ''}</span>
+                {messageCopied === 'failed' && <p className="text-xs text-tone-warning-fg">Copie impossible : sélectionnez le message et copiez-le manuellement.</p>}
+              </div>
+              <Button type="button" onClick={markPaid} loading={markingPaid} className="w-full sm:w-auto">Marquer comme payé</Button>
+            </>
+          )}
+          {!editable && <p className="text-xs text-a-text-3">Réservation annulée ou remboursée.</p>}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -402,6 +538,8 @@ function ConvertToDeliveryAction({
         delivery_country: result.address.country,
         delivery_fee_status: result.deliveryFeeStatus,
         delivery_fee_amount: result.suggestedFeeAmount ?? null,
+        delivery_fee_quoted_at: result.deliveryFeeStatus === 'quoted' ? new Date().toISOString() : null,
+        delivery_fee_paid_at: null,
       });
       setOpen(false);
       toast.success('Réservation passée en livraison.', {

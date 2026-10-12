@@ -13,6 +13,7 @@ interface RentalReservationWithDetails {
   id: string;
   customer_name: string;
   customer_email: string;
+  customer_phone: string | null;
   pickup_date: string;
   amount_paid: number;
   status: 'confirmed' | 'cancelled' | 'refunded';
@@ -27,6 +28,7 @@ interface RentalReservationWithDetails {
   delivery_country: string | null;
   delivery_fee_status: RentalDeliveryFeeStatus;
   delivery_fee_amount: number | null;
+  delivery_fee_quoted_at: string | null;
   delivery_fee_paid_at: string | null;
 }
 

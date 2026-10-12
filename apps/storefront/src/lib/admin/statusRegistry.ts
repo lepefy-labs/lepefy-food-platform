@@ -52,6 +52,14 @@ export const AUDIT_SEVERITY_META: Record<string, AdminStatusMeta> = {
   critical: { label: 'Critique', tone: 'urgent' },
 };
 
+/** Supplément de livraison d'une location de matériel (rental_reservations.delivery_fee_status). */
+export const RENTAL_DELIVERY_FEE_STATUS_META: Record<string, AdminStatusMeta> = {
+  not_applicable: { label: 'Sans livraison', tone: 'neutral' },
+  pending_quote: { label: 'À évaluer', tone: 'warning' },
+  quoted: { label: 'En attente du paiement', tone: 'info' },
+  paid: { label: 'Payé', tone: 'success' },
+};
+
 export function statusMeta(registry: Record<string, AdminStatusMeta>, status: string | null | undefined): AdminStatusMeta {
   if (!status) return { label: '—', tone: 'neutral' };
   return registry[status] ?? { label: status, tone: 'neutral' };
