@@ -1,7 +1,8 @@
 /**
  * Dry run by default. Example:
  * pnpm --filter @lepefy/storefront images:backfill --tenant chloefood --limit 20
- * Add --apply only after an approved production window.
+ * Add --apply only after an approved production window; --apply requires --backup <path>.
+ * --include-unscoped also converts same-project legacy URLs outside tenants/{tenantId}/products/{productId}/.
  */
 import { writeFile } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
@@ -31,6 +32,9 @@ const concurrency = numberOption('concurrency', 2, 8);
 const rateMs = numberOption('rate-ms', 250, 60_000);
 const productFilter = option('product');
 const reportPath = option('report');
+const backupPath = option('backup');
+const includeUnscoped = args.includes('--include-unscoped');
+if (apply && !backupPath) throw new Error('--apply requires --backup <path> for the original image_url/images rows');
 const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!baseUrl || !serviceKey) throw new Error('Supabase URL and service role env are required');
@@ -54,6 +58,11 @@ for (let offset = 0; rows.length < limit; offset += 200) {
   if (!data || data.length < Math.min(200, limit - rows.length + data.length)) break;
 }
 
+// Written before any Storage or DB write, so every applied product can be restored.
+if (apply && backupPath) {
+  await writeFile(backupPath, JSON.stringify({ tenantId, createdAt: new Date().toISOString(), products: rows }, null, 2) + '\n', { flag: 'wx' });
+}
+
 const results: Array<Record<string, unknown>> = [];
 let cursor = 0;
 async function processProduct(product: ProductRow) {
@@ -61,11 +70,12 @@ async function processProduct(product: ProductRow) {
   let migrated = 0;
   let legacy = 0;
   let external = 0;
+  let unscoped = 0;
   let validated = 0;
   let sourceBytes = 0;
   let storedBytes = 0;
   const replacements = new Map<string, string>();
-  const imageResults: Array<{ index: number; status: string; sourceBytes?: number; storedBytes?: number }> = [];
+  const imageResults: Array<{ index: number; status: string; sourceBytes?: number; storedBytes?: number; width?: number; height?: number; format?: string }> = [];
   for (const [index, image] of images.entries()) {
     if (parseManagedProductImage(image.url, baseUrl, tenantId)) {
       migrated++;
@@ -76,13 +86,19 @@ async function processProduct(product: ProductRow) {
     try {
       const url = new URL(image.url);
       const source = new URL(baseUrl!);
-      const prefix = `/storage/v1/object/public/assets/tenants/${tenantId}/products/${product.id}/`;
-      if (url.origin !== source.origin || url.username || url.password || !url.pathname.startsWith(prefix)) {
+      const bucketPrefix = '/storage/v1/object/public/assets/';
+      const prefix = `${bucketPrefix}tenants/${tenantId}/products/${product.id}/`;
+      if (url.origin !== source.origin || url.username || url.password || !url.pathname.startsWith(bucketPrefix)) {
         external++; imageResults.push({ index, status: 'external' }); continue;
       }
-      path = decodeURIComponent(url.pathname.slice('/storage/v1/object/public/assets/'.length));
-      if (path.includes('..') || path.includes('\\') || path.includes('%') || !/^tenants\/[0-9a-f-]{36}\/products\/[0-9a-f-]{36}\/[a-zA-Z0-9._/-]+$/.test(path)) {
+      path = decodeURIComponent(url.pathname.slice(bucketPrefix.length));
+      if (path.includes('..') || path.includes('\\') || path.includes('%') || !/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(path)) {
         external++; imageResults.push({ index, status: 'unrecognized' }); continue;
+      }
+      // Older uploads live outside the tenant/product prefix: same project, but not tenant-scoped by path.
+      if (!url.pathname.startsWith(prefix)) {
+        unscoped++;
+        if (!includeUnscoped) { imageResults.push({ index, status: 'legacy-unscoped' }); continue; }
       }
     } catch { external++; imageResults.push({ index, status: 'unrecognized' }); continue; }
     legacy++;
@@ -97,7 +113,7 @@ async function processProduct(product: ProductRow) {
       }
       validated++;
       sourceBytes += bytes.length;
-      imageResults.push({ index, status: 'validated', sourceBytes: bytes.length });
+      imageResults.push({ index, status: 'validated', sourceBytes: bytes.length, width: metadata.width, height: metadata.height, format: metadata.format });
       continue;
     }
     const extension = path.toLowerCase().split('.').pop();
@@ -132,7 +148,7 @@ async function processProduct(product: ProductRow) {
       .select('id');
     if (updateError || !written?.length) throw new Error(updateError?.message ?? 'Concurrent product update');
   }
-  return { productId: product.id, imageCount: images.length, imageResults, migrated, legacy, external, validated, converted: replacements.size, sourceBytes, storedBytes, status: 'ok' };
+  return { productId: product.id, imageCount: images.length, imageResults, migrated, legacy, unscoped, external, validated, converted: replacements.size, sourceBytes, storedBytes, status: 'ok' };
 }
 
 async function worker() {
@@ -155,7 +171,10 @@ const summary = {
   mode: apply ? 'apply' : 'dry-run',
   products: rows.length,
   errors: results.filter((item) => item.status === 'error').length,
+  migrated: results.reduce((sum, item) => sum + Number(item.migrated ?? 0), 0),
   legacy: results.reduce((sum, item) => sum + Number(item.legacy ?? 0), 0),
+  unscoped: results.reduce((sum, item) => sum + Number(item.unscoped ?? 0), 0),
+  external: results.reduce((sum, item) => sum + Number(item.external ?? 0), 0),
   converted: results.reduce((sum, item) => sum + Number(item.converted ?? 0), 0),
   validated: results.reduce((sum, item) => sum + Number(item.validated ?? 0), 0),
   sourceBytes: results.reduce((sum, item) => sum + Number(item.sourceBytes ?? 0), 0),
