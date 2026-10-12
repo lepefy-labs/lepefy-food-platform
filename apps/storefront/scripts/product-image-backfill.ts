@@ -41,11 +41,12 @@ const { data: tenant, error: tenantError } = await (
   /^[0-9a-f-]{36}$/i.test(tenantKey) ? tenantQuery.eq('id', tenantKey) : tenantQuery.eq('slug', tenantKey)
 ).single();
 if (tenantError || !tenant) throw new Error('Tenant not found');
+const tenantId = tenant.id;
 
 type ProductRow = { id: string; name: string; image_url: string | null; images: unknown; updated_at: string };
 const rows: ProductRow[] = [];
 for (let offset = 0; rows.length < limit; offset += 200) {
-  let query = db.from('products').select('id, name, image_url, images, updated_at').eq('tenant_id', tenant.id).order('id').range(offset, offset + Math.min(199, limit - rows.length - 1));
+  let query = db.from('products').select('id, name, image_url, images, updated_at').eq('tenant_id', tenantId).order('id').range(offset, offset + Math.min(199, limit - rows.length - 1));
   if (productFilter) query = query.eq('id', productFilter);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -66,7 +67,7 @@ async function processProduct(product: ProductRow) {
   const replacements = new Map<string, string>();
   const imageResults: Array<{ index: number; status: string; sourceBytes?: number; storedBytes?: number }> = [];
   for (const [index, image] of images.entries()) {
-    if (parseManagedProductImage(image.url, baseUrl, tenant.id)) {
+    if (parseManagedProductImage(image.url, baseUrl, tenantId)) {
       migrated++;
       imageResults.push({ index, status: 'migrated' });
       continue;
@@ -75,7 +76,7 @@ async function processProduct(product: ProductRow) {
     try {
       const url = new URL(image.url);
       const source = new URL(baseUrl!);
-      const prefix = `/storage/v1/object/public/assets/tenants/${tenant.id}/products/${product.id}/`;
+      const prefix = `/storage/v1/object/public/assets/tenants/${tenantId}/products/${product.id}/`;
       if (url.origin !== source.origin || url.username || url.password || !url.pathname.startsWith(prefix)) {
         external++; imageResults.push({ index, status: 'external' }); continue;
       }
@@ -102,7 +103,7 @@ async function processProduct(product: ProductRow) {
     const extension = path.toLowerCase().split('.').pop();
     const mime = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
     const set = await uploadProductImageSet({
-      supabase: db, bytes, mime, tenantId: tenant.id, productId: product.id,
+      supabase: db, bytes, mime, tenantId, productId: product.id,
       baseUrl: baseUrl!, imageId: productImageIdForLegacyUrl(image.url), allowExisting: true,
     });
     replacements.set(image.url, set.url);
@@ -112,7 +113,7 @@ async function processProduct(product: ProductRow) {
     await new Promise((resolve) => setTimeout(resolve, rateMs));
   }
   if (replacements.size) {
-    const { data: current, error: readError } = await db.from('products').select('image_url, images, updated_at').eq('tenant_id', tenant.id).eq('id', product.id).single();
+    const { data: current, error: readError } = await db.from('products').select('image_url, images, updated_at').eq('tenant_id', tenantId).eq('id', product.id).single();
     if (readError || !current || JSON.stringify(current.images) !== JSON.stringify(product.images) || current.image_url !== product.image_url || current.updated_at !== product.updated_at) {
       throw new Error('Gallery changed during backfill; retry after review');
     }
@@ -127,7 +128,7 @@ async function processProduct(product: ProductRow) {
       : product.images;
     const { data: written, error: updateError } = await db.from('products')
       .update({ image_url: product.image_url ? replacements.get(product.image_url) ?? product.image_url : null, images: updatedImages })
-      .eq('tenant_id', tenant.id).eq('id', product.id).eq('updated_at', product.updated_at)
+      .eq('tenant_id', tenantId).eq('id', product.id).eq('updated_at', product.updated_at)
       .select('id');
     if (updateError || !written?.length) throw new Error(updateError?.message ?? 'Concurrent product update');
   }
@@ -150,7 +151,7 @@ async function worker() {
 }
 await Promise.all(Array.from({ length: concurrency }, () => worker()));
 const summary = {
-  tenantId: tenant.id,
+  tenantId,
   mode: apply ? 'apply' : 'dry-run',
   products: rows.length,
   errors: results.filter((item) => item.status === 'error').length,
