@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { IconShare } from '@tabler/icons-react';
+import { IconShare, IconX } from '@tabler/icons-react';
 
 type Lang = 'fr' | 'it';
 
@@ -45,6 +45,11 @@ const SEVEN_DAYS  = 7 * 24 * 60 * 60 * 1000;
 // reste toujours une option visible pour l'utilisateur.
 const PROMPT_TIMEOUT_MS = 2500;
 
+// /card est d'abord une page de paiement : le bandeau n'apparaît qu'après ce
+// délai, en surimpression (jamais dans le flux, donc aucun décalage de la
+// hero ni des boutons « Payer maintenant » / « Commander »).
+const BANNER_DELAY_MS = 8000;
+
 interface AddToHomeScreenProps {
   lang: Lang;
   tenant: {
@@ -87,8 +92,8 @@ export function AddToHomeScreen({ lang, tenant }: AddToHomeScreenProps) {
     // iOS n'a pas d'API beforeinstallprompt : on affiche directement le
     // bandeau instructif, sans attendre un événement qui ne viendra jamais.
     if (ios) {
-      setShow(true);
-      return;
+      const iosTimer = window.setTimeout(() => setShow(true), BANNER_DELAY_MS);
+      return () => window.clearTimeout(iosTimer);
     }
 
     let promptReceived = false;
@@ -100,7 +105,6 @@ export function AddToHomeScreen({ lang, tenant }: AddToHomeScreenProps) {
       console.log('[a2hs] beforeinstallprompt fired: true');
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShow(true);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -116,13 +120,14 @@ export function AddToHomeScreen({ lang, tenant }: AddToHomeScreenProps) {
         // DEBUG TEMPORAIRE
         console.log('[a2hs] beforeinstallprompt fired: false (timeout, fallback manuel affiché)');
         setShowManualFallback(true);
-        setShow(true);
       }
     }, PROMPT_TIMEOUT_MS);
+    const showTimer = window.setTimeout(() => setShow(true), BANNER_DELAY_MS);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
       window.clearTimeout(fallbackTimer);
+      window.clearTimeout(showTimer);
     };
   }, []);
 
@@ -146,99 +151,47 @@ export function AddToHomeScreen({ lang, tenant }: AddToHomeScreenProps) {
   return (
     <>
       <style>{`
-        @keyframes pwa-slide-down {
-          from { transform: translateY(-100%); opacity: 0; }
+        @keyframes card-a2hs-in {
+          from { transform: translateY(-120%); opacity: 0; }
           to   { transform: translateY(0);     opacity: 1; }
         }
-        @keyframes pwa-pulse {
-          0%, 100% { box-shadow: 0 0 0 0   color-mix(in srgb, ${tenant.primary_color} 40%, transparent); }
-          50%       { box-shadow: 0 0 0 6px transparent; }
-        }
         @media (prefers-reduced-motion: reduce) {
-          [data-pwa-banner], [data-pwa-banner] * { animation: none !important; }
+          [data-pwa-banner] { animation: none !important; }
         }
       `}</style>
 
       <div
-        role="banner"
+        role="dialog"
+        aria-label={t.addToHome(tenant.name)}
         data-pwa-banner
-        style={{
-          background:   tenant.primary_color,
-          borderBottom: `2px solid color-mix(in srgb, ${tenant.primary_color} 80%, black)`,
-          padding:      '10px 14px',
-          display:      'flex',
-          alignItems:   'center',
-          gap:          10,
-          position:     'relative',
-          zIndex:       50,
-          animation:    'pwa-slide-down 0.4s cubic-bezier(0.4,0,0.2,1) both',
-        }}
+        className="fixed inset-x-2 top-[max(.5rem,env(safe-area-inset-top))] z-[60] mx-auto flex max-w-md items-center gap-2.5 rounded-2xl bg-white py-2 pl-3 pr-1 shadow-[0_10px_30px_rgba(17,24,39,0.22)] ring-1 ring-black/5"
+        style={{ animation: 'card-a2hs-in 0.35s cubic-bezier(0.4,0,0.2,1) both' }}
       >
-        {/* Icon — pulse quand une action directe est possible (deferredPrompt), statique sinon (iOS ou fallback manuel) */}
-        <div
-          aria-hidden
-          style={{
-            width:          36,
-            height:         36,
-            borderRadius:   8,
-            background:     'white',
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            flexShrink:     0,
-            animation:      deferredPrompt ? 'pwa-pulse 2s ease-in-out infinite' : undefined,
-          }}
-        >
-          <IconShare size={18} stroke={1.5} style={{ color: tenant.primary_color }} />
-        </div>
-
-        {/* Text */}
-        <div style={{ flex: 1 }}>
-          <div className="text-sm" style={{ color: '#fff', fontWeight: 700, lineHeight: '1.3' }}>
-            {t.addToHome(tenant.name)}
-          </div>
-          {showSubtext && (
-            <div className="text-2xs" style={{ color: 'rgba(255,255,255,0.85)', lineHeight: '1.3' }}>
-              {isIos ? t.addToHomeIos : t.addToHomeAndroidFallback}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-          {deferredPrompt && (
-            <button
-              onClick={handleInstall}
-              className="text-2xs"
-              style={{
-                background:   'white',
-                color:        tenant.primary_color,
-                border:       'none',
-                borderRadius: 6,
-                padding:      '5px 11px',
-                fontWeight:   700,
-                cursor:       'pointer',
-                whiteSpace:   'nowrap',
-              }}
-            >
-              {t.install}
-            </button>
-          )}
+        <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: tenant.primary_color }}>
+          <IconShare size={18} stroke={1.8} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-bold leading-tight text-gray-900">{t.addToHome(tenant.name)}</span>
+          {showSubtext && <span className="mt-0.5 block text-xs leading-snug text-gray-700">{isIos ? t.addToHomeIos : t.addToHomeAndroidFallback}</span>}
+        </span>
+        {deferredPrompt && (
           <button
-            onClick={handleDismiss}
-            className="text-2xs"
-            style={{
-              background:     'transparent',
-              color:          'rgba(255,255,255,0.75)',
-              border:         'none',
-              textDecoration: 'underline',
-              cursor:         'pointer',
-              padding:        0,
-            }}
+            type="button"
+            onClick={handleInstall}
+            className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            style={{ backgroundColor: tenant.primary_color, '--tw-ring-color': tenant.primary_color } as React.CSSProperties}
           >
-            {t.later}
+            {t.install}
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label={t.later}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+        >
+          <IconX size={20} aria-hidden="true" />
+        </button>
       </div>
     </>
   );

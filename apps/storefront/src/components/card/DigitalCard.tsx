@@ -76,7 +76,6 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: CARD_PAGE_BACKGROUND, fontFamily: 'var(--font-card-body)' }}>
-      <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
       {paymentView ? (
         <main className="mx-auto w-full max-w-xl px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-8">
           {paymentReturn.result ? (
@@ -105,6 +104,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
         </main>
       ) : (
         <>
+          {/* Invitation PWA : landing uniquement, jamais par-dessus un écran de paiement. */}
+          <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
           <main className="mx-auto w-full max-w-6xl pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:px-6 lg:pt-6">
             <CardHero
               lang={lang}
