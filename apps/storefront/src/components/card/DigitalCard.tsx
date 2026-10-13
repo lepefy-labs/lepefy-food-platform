@@ -6,7 +6,7 @@ import type { TenantSocialLink, TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
 import { CardHero } from './CardHero';
 import { CardPaymentBrands } from './CardPaymentBrands';
-import { CardShowcase } from './CardShowcase';
+import { CardShowcase, CardShowcaseProvider } from './CardShowcase';
 import { CardStoreInfo } from './CardStoreInfo';
 import { PaymentMethodsAccordion } from './PaymentMethodsAccordion';
 import { CardPaymentResult } from './CardPaymentResult';
@@ -79,6 +79,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
   }
 
   return (
+    <CardShowcaseProvider value={{ products: showcaseProducts, currency: tenant.currency, primaryColor: tenant.primary_color }}>
     <div className="min-h-screen" style={{ backgroundColor: CARD_PAGE_BACKGROUND, fontFamily: 'var(--font-card-body)' }}>
       {paymentView ? (
         <main className="mx-auto w-full max-w-xl px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-8">
@@ -151,5 +152,6 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
         </>
       )}
     </div>
+    </CardShowcaseProvider>
   );
 }

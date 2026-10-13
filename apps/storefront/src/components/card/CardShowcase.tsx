@@ -1,5 +1,6 @@
 'use client';
 
+import { createContext, useContext } from 'react';
 import Link from 'next/link';
 import { IconChevronRight, IconShoppingBag } from '@tabler/icons-react';
 import { LepefyImage } from '@/components/images/LepefyImage';
@@ -78,6 +79,15 @@ export function CardShowcase({ lang, products, storefrontReady, tagline, currenc
         </div>
         {tagline && <p className="mt-1 text-sm leading-snug text-gray-700">{tagline}</p>}
       </div>
+      <CardShowcaseGrid lang={lang} products={products} currency={currency} primaryColor={primaryColor} />
+    </section>
+  );
+}
+
+/** Grille des 1–2 produits vitrine : landing et écran « Paiement confirmé ». */
+export function CardShowcaseGrid({ lang, products, currency, primaryColor }: { lang: Lang; products: CardShowcaseProduct[]; currency: string; primaryColor: string }) {
+  const t = COPY[lang];
+  return (
       <ul className={`grid gap-3 ${products.length > 1 ? 'grid-cols-2' : 'grid-cols-1 min-[420px]:grid-cols-2'}`}>
         {products.map((product) => {
           const promo = product.reason === 'promo';
@@ -123,6 +133,16 @@ export function CardShowcase({ lang, products, storefrontReady, tagline, currenc
           );
         })}
       </ul>
-    </section>
   );
+}
+
+interface CardShowcaseData { products: CardShowcaseProduct[]; currency: string; primaryColor: string }
+
+const CardShowcaseContext = createContext<CardShowcaseData | null>(null);
+
+/** Fourni par DigitalCard : les mêmes produits vitrine (lus une fois côté serveur) servent à l'écran d'issue. */
+export const CardShowcaseProvider = CardShowcaseContext.Provider;
+
+export function useCardShowcaseData(): CardShowcaseData | null {
+  return useContext(CardShowcaseContext);
 }

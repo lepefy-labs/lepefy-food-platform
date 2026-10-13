@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { IconArrowRight, IconCheck, IconCircleCheck, IconClock, IconX } from '@tabler/icons-react';
+import { IconArrowRight, IconCheck, IconCircleCheck, IconClock, IconShoppingBag, IconX } from '@tabler/icons-react';
 import { formatPrice } from '@/lib/utils/format';
+import { CardShowcaseGrid, useCardShowcaseData } from './CardShowcase';
 import { maskEmail, type CardPaymentOutcome, type CardPaymentReceipt } from '@/lib/card/cardPaymentOutcome';
 
 type Lang = 'fr' | 'it';
@@ -15,7 +16,7 @@ const COPY = {
     noEmail: 'Faites une capture de cet écran : elle vous sert de justificatif.',
     processingNote: 'Ne payez pas une seconde fois. Votre banque finalise l’opération ; le montant sera confirmé automatiquement.',
     failedNote: 'Aucun montant n’a été débité. Vous pouvez réessayer ou choisir un autre moyen de paiement.',
-    shopTitle: 'Envie d’autres produits ?', shopText: 'Commandez en ligne, depuis votre téléphone.',
+    shopTitle: 'Nos produits en vedette', shopText: 'Envie d’autres produits ? Commandez en ligne, depuis votre téléphone.',
     shopCta: 'Découvrir notre boutique', retry: 'Réessayer le paiement', returnCard: 'Retour à l’accueil',
   },
   it: {
@@ -25,7 +26,7 @@ const COPY = {
     noEmail: 'Fai uno screenshot di questa schermata: ti serve come ricevuta.',
     processingNote: 'Non pagare una seconda volta. La tua banca sta completando l’operazione; l’importo verrà confermato automaticamente.',
     failedNote: 'Nessun importo è stato addebitato. Puoi riprovare o scegliere un altro metodo di pagamento.',
-    shopTitle: 'Ti servono altri prodotti?', shopText: 'Ordina online, dal telefono.',
+    shopTitle: 'I nostri prodotti in evidenza', shopText: 'Ti servono altri prodotti? Ordina online, dal telefono.',
     shopCta: 'Scopri il nostro negozio', retry: 'Riprova il pagamento', returnCard: 'Torna alla pagina iniziale',
   },
 } as const;
@@ -57,6 +58,8 @@ export function CardPaymentResult({
   const tone = TONE[outcome];
   const Icon = tone.icon;
   const email = maskEmail(receipt.email);
+  // Mêmes produits vitrine que la landing (DigitalCard), sans nouvelle lecture.
+  const showcase = useCardShowcaseData();
   const secondary = 'min-h-[52px] w-full rounded-2xl bg-white px-4 text-base font-bold text-gray-900 ring-1 ring-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2';
 
   return (
@@ -72,7 +75,7 @@ export function CardPaymentResult({
         {outcome === 'succeeded' && (receipt.reference || email) && (
           <dl className="mt-5 divide-y divide-gray-200 rounded-2xl bg-gray-50 px-4 text-left text-sm">
             {receipt.reference && <div className="flex items-center justify-between gap-3 py-3"><dt className="text-gray-700">{t.reference}</dt><dd className="font-mono font-bold text-gray-900">{receipt.reference}</dd></div>}
-            {email && <div className="flex items-center justify-between gap-3 py-3"><dt className="text-gray-700">{t.confirmation}</dt><dd className="min-w-0 truncate font-medium text-gray-900">{email}</dd></div>}
+            {email && <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 py-3"><dt className="text-gray-700">{t.confirmation}</dt><dd className="min-w-0 break-all font-medium text-gray-900">{email}</dd></div>}
           </dl>
         )}
         {outcome === 'succeeded' && !email && <p className="mt-4 text-sm text-gray-700">{t.noEmail}</p>}
@@ -81,13 +84,24 @@ export function CardPaymentResult({
       </div>
 
       {outcome === 'succeeded' && shop && (
-        <div className="rounded-3xl p-5" style={{ backgroundColor: shop.color, color: shop.foreground }}>
-          <p className="text-lg font-extrabold" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.shopTitle}</p>
-          <p className="mb-4 mt-1 text-sm opacity-95">{t.shopText}</p>
-          <Link href="/" className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-base font-extrabold text-gray-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/60">
-            {t.shopCta} <IconArrowRight size={18} aria-hidden="true" />
+        <section aria-labelledby="card-result-shop-title" className={`${SURFACE} p-4 sm:p-5`}>
+          <h2 id="card-result-shop-title" className="text-xl font-extrabold leading-tight text-gray-900" style={{ fontFamily: 'var(--font-card-heading)' }}>{t.shopTitle}</h2>
+          <p className="mb-3.5 mt-1 text-sm leading-snug text-gray-700">{t.shopText}</p>
+          {showcase && showcase.products.length > 0 && (
+            <div className="mb-4">
+              <CardShowcaseGrid lang={lang} products={showcase.products} currency={showcase.currency} primaryColor={showcase.primaryColor} />
+            </div>
+          )}
+          <Link
+            href="/"
+            className="flex min-h-14 w-full items-center gap-2.5 rounded-2xl px-4 text-base font-extrabold shadow-[0_8px_20px_rgba(17,24,39,0.18)] min-[400px]:text-lg sm:gap-3 sm:px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            style={{ backgroundColor: shop.color, color: shop.foreground, '--tw-ring-color': shop.color, fontFamily: 'var(--font-card-heading)' } as React.CSSProperties}
+          >
+            <IconShoppingBag size={24} aria-hidden="true" className="shrink-0" />
+            <span className="flex-1">{t.shopCta}</span>
+            <IconArrowRight size={20} aria-hidden="true" className="shrink-0" />
           </Link>
-        </div>
+        </section>
       )}
       {outcome === 'failed' && onRetry && (
         <button type="button" onClick={onRetry} className="min-h-[52px] w-full rounded-2xl bg-gray-900 px-4 text-base font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2">{t.retry}</button>
