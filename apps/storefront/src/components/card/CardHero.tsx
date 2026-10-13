@@ -65,7 +65,7 @@ export function CardHero({ lang, onLangChange, tenant, image: configuredImage, o
     >
       <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-4 pt-[max(.75rem,env(safe-area-inset-top))] lg:px-7 lg:pt-6">
         <span className="inline-flex min-h-11 items-center rounded-2xl bg-white/95 px-2.5 py-1 shadow-sm">
-          <TenantLogo variant="compact" priority identity={{ name: tenant.name, logo_url: tenant.logo_url }} className="max-w-[40vw]" fallbackClassName="text-gray-900" />
+          <TenantLogo variant="compact" unoptimized priority identity={{ name: tenant.name, logo_url: tenant.logo_url }} className="max-w-[40vw]" fallbackClassName="text-gray-900" />
         </span>
         <div role="group" aria-label={t.language} className="inline-flex rounded-xl bg-black/45 p-1 backdrop-blur-sm">
           {(['fr', 'it'] as const).map((code) => (

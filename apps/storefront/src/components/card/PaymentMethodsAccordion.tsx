@@ -185,7 +185,7 @@ export function PaymentMethodsAccordion({ paymentMethods, primaryColor, currency
       {!focus && (
         <div className="flex items-center justify-between gap-3">
           {backButton(onClose)}
-          <TenantLogo variant="compact" identity={{ name: tenantName, logo_url: tenantLogoUrl }} className="max-w-[40vw]" fallbackClassName="text-gray-900" />
+          <TenantLogo variant="compact" unoptimized identity={{ name: tenantName, logo_url: tenantLogoUrl }} className="max-w-[40vw]" fallbackClassName="text-gray-900" />
         </div>
       )}
       {!focus && (

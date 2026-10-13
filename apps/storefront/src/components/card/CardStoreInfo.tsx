@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {
   IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBrandYoutube,
-  IconBrandLinkedin, IconBrandX, IconChevronRight, IconClock, IconStar,
+  IconBrandLinkedin, IconBrandX, IconChevronRight, IconClock, IconStar, IconUserPlus,
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink } from '@lepefy/types';
 import { CardLocation } from './CardLocation';
@@ -14,12 +14,12 @@ const ICONS = { IconBrandInstagram, IconBrandFacebook, IconBrandTiktok, IconBran
 
 const COPY = {
   fr: {
-    title: 'La boutique', whatsapp: 'WhatsApp', whatsappText: 'Une question ? Écrivez-nous', hours: 'Horaires',
+    title: 'La boutique', addContact: 'Ajouter aux contacts', addContactText: 'Enregistrez nos coordonnées', whatsapp: 'WhatsApp', whatsappText: 'Une question ? Écrivez-nous', hours: 'Horaires',
     reviewsTitle: 'Votre avis compte', reviewsText: 'Avis de nos clients vérifiés', reviewsCta: 'Voir les avis',
     googleReviewText: 'Acheté en boutique ?', googleReviewCta: 'Laissez un avis Google', followUs: 'Suivez-nous',
   },
   it: {
-    title: 'Il negozio', whatsapp: 'WhatsApp', whatsappText: 'Una domanda? Scrivici', hours: 'Orari',
+    title: 'Il negozio', addContact: 'Aggiungi ai contatti', addContactText: 'Salva i nostri recapiti', whatsapp: 'WhatsApp', whatsappText: 'Una domanda? Scrivici', hours: 'Orari',
     reviewsTitle: 'La tua opinione conta', reviewsText: 'Recensioni dei nostri clienti verificati', reviewsCta: 'Vedi le recensioni',
     googleReviewText: 'Hai acquistato in negozio?', googleReviewCta: 'Lascia una recensione Google', followUs: 'Seguici',
   },
@@ -49,10 +49,24 @@ export function CardStoreInfo({ lang, tenant, socialLinks, reviewsEnabled }: Car
 
   return (
     <>
-      {hasStore && (
-        <section aria-labelledby="card-store-title">
+      {/* Toujours rendue : sur desktop elle porte « Ajouter aux contacts » (la barre fixe est mobile uniquement). */}
+      {(
+        <section aria-labelledby="card-store-title" className={hasStore ? undefined : 'hidden lg:block'}>
           <h2 id="card-store-title" className={HEADING} style={{ fontFamily: 'var(--font-card-heading)' }}>{t.title}</h2>
           <div className={`${PANEL} [&>*+*]:border-t [&>*+*]:border-gray-100`}>
+            <a
+              href="/api/card/vcard"
+              download
+              className="hidden min-h-[72px] items-center gap-3 px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset lg:flex"
+              style={ring}
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white" style={{ backgroundColor: tenant.primary_color }}><IconUserPlus size={22} aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-gray-900">{t.addContact}</span>
+                <span className="block text-sm text-gray-700">{t.addContactText}</span>
+              </span>
+              <IconChevronRight size={20} aria-hidden="true" className="shrink-0 text-gray-500" />
+            </a>
             {tenant.whatsapp_number && (
               <a
                 href={`https://wa.me/${tenant.whatsapp_number}`}

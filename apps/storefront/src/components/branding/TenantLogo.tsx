@@ -17,6 +17,11 @@ interface TenantLogoProps {
   showNameFallback?: boolean;
   identity?: TenantLogoIdentity;
   fallbackClassName?: string;
+  /**
+   * Sert le fichier tel quel, sans `/_next/image` : à utiliser là où une
+   * transformation Vercel (quota épuisée → 402) casserait le logo, ex. /card.
+   */
+  unoptimized?: boolean;
 }
 
 const VARIANTS: Record<TenantLogoVariant, { wrapper: string; sizes: string; name: string }> = {
@@ -44,6 +49,7 @@ export function TenantLogo({
   showNameFallback = true,
   identity,
   fallbackClassName = '',
+  unoptimized = false,
 }: TenantLogoProps) {
   const contextTenant = useOptionalTenant();
   const tenant = identity ?? contextTenant;
@@ -74,6 +80,7 @@ export function TenantLogo({
         sizes={styles.sizes}
         className="object-contain"
         priority={priority}
+        unoptimized={unoptimized}
       />
     </span>
   );

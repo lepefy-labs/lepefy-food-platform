@@ -135,3 +135,20 @@ test.describe('photo hero /card', () => {
     }
   });
 });
+
+test.describe('montant /card', () => {
+  test('virgule ou point, un seul séparateur, deux décimales', async () => {
+    const { sanitizeAmountInput, parseCardAmount } = await import('../../src/lib/card/cardAmount');
+    expect(sanitizeAmountInput('12,50')).toBe('12,50');
+    expect(sanitizeAmountInput('12.505')).toBe('12.50');
+    expect(sanitizeAmountInput('1 200,5 €')).toBe('1200,5');
+    expect(sanitizeAmountInput('12,5,3')).toBe('12,53');
+    expect(sanitizeAmountInput(',5')).toBe('0,5');
+    expect(sanitizeAmountInput('abc')).toBe('');
+    expect(parseCardAmount('12,50')).toBe(12.5);
+    expect(parseCardAmount('89')).toBe(89);
+    expect(parseCardAmount('0,99')).toBe(0.99);
+    expect(parseCardAmount('')).toBeNull();
+    expect(parseCardAmount(',')).toBeNull();
+  });
+});

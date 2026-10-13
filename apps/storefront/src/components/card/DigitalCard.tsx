@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { IconUserPlus } from '@tabler/icons-react';
 import type { TenantSocialLink, TenantPaymentMethod } from '@lepefy/types';
 import { AddToHomeScreen } from './AddToHomeScreen';
@@ -66,6 +66,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
   // Retour système depuis le paiement (ou son issue) : revient à la landing au lieu de quitter /card.
   useCardHistoryStep(paymentView, () => { paymentReturn.clear(); setInPayment(false); });
   const t = COPY[lang];
+  // Langue réelle de la page pour les lecteurs d'écran (le <html> est rendu en fr).
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   const contactForeground = readableForeground(tenant.primary_color);
 
   function changeLang(next: Lang) {
@@ -112,7 +114,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
         <>
           {/* Invitation PWA : landing uniquement, jamais par-dessus un écran de paiement. */}
           <AddToHomeScreen lang={lang} tenant={{ name: tenant.name, primary_color: tenant.primary_color }} />
-          <main className="mx-auto w-full max-w-6xl pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:px-6 lg:pt-6">
+          <main className="mx-auto w-full max-w-6xl pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:px-6 lg:pb-12 lg:pt-6">
             <CardHero
               lang={lang}
               onLangChange={changeLang}
@@ -138,8 +140,8 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
               </div>
             </div>
           </main>
-          {/* Toujours présent sur la landing (pas sur les écrans de paiement) : enregistre la vCard. */}
-          <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/5 bg-white/90 px-4 pt-2 backdrop-blur-md" style={{ paddingBottom: 'calc(.5rem + env(safe-area-inset-bottom))' }}>
+          {/* Mobile/tablette : barre fixe sur la landing (jamais sur les écrans de paiement). Desktop : bouton dans « La boutique » (CardStoreInfo). */}
+          <div className="fixed inset-x-0 bottom-0 z-50 border-t border-black/5 bg-white/90 px-4 pt-2 backdrop-blur-md lg:hidden" style={{ paddingBottom: 'calc(.5rem + env(safe-area-inset-bottom))' }}>
             <a
               href="/api/card/vcard"
               download
