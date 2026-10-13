@@ -6,7 +6,7 @@ import { getTenantPaymentMethods } from '@/lib/tenant/getTenantPaymentMethods';
 import { canUseReviews } from '@/lib/entitlements/tenantEntitlements';
 import { DigitalCard } from '@/components/card/DigitalCard';
 import { isApplePayEnabledForCard } from '@/lib/payments/applePay';
-import { getCardHeroImage } from '@/lib/card/getCardHeroImage';
+import { getCardPublicSettings } from '@/lib/card/digitalCardSettings';
 import { getCardShowcaseProducts } from '@/lib/card/getCardShowcaseProducts';
 
 const manrope = Manrope({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-card-heading', display: 'swap' });
@@ -21,11 +21,11 @@ export const metadata: Metadata = {
 export default async function CardPage() {
   const slug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? 'chloefood';
   const tenant = await getTenant(slug);
-  const [socialLinks, allPaymentMethods, reviewsEnabled, heroImage, showcaseProducts] = await Promise.all([
+  const [socialLinks, allPaymentMethods, reviewsEnabled, cardSettings, showcaseProducts] = await Promise.all([
     getTenantSocialLinks(tenant.id),
     getTenantPaymentMethods(tenant.id),
     canUseReviews(tenant.id),
-    getCardHeroImage(tenant),
+    getCardPublicSettings(tenant),
     // Vitrine seulement si la boutique est ouverte (même règle que le CTA boutique).
     tenant.storefront_ready ? getCardShowcaseProducts(tenant.id) : Promise.resolve([]),
   ]);
@@ -58,7 +58,8 @@ export default async function CardPage() {
         paymentMethods={paymentMethods}
         applePayEnabled={applePayEnabled}
         reviewsEnabled={reviewsEnabled}
-        heroImage={heroImage}
+        heroImage={cardSettings.heroImage}
+        openingHours={cardSettings.openingHours}
         showcaseProducts={showcaseProducts}
       />
     </div>

@@ -1,11 +1,18 @@
 import { z } from 'zod';
+import { openingHoursSchema } from './openingHours';
 
 /**
- * Photo de la hero /card, personnalisable par tenant sans migration :
- *   1. `tenant_feature_settings('digital_card').config.hero_image_url` (+
- *      `hero_image_position`, CSS object-position), lu par getCardHeroImage ;
- *   2. sinon l'asset du tenant livré avec le code (CARD_HERO_ASSETS) ;
- *   3. sinon aucune photo : la hero garde un dégradé aux couleurs du tenant.
+ * Réglages de la carte digitale, une ligne `tenant_feature_settings
+ * ('digital_card')` (aucune migration ; son `enabled` n'est lu par rien) :
+ * photo de la hero et horaires structurés (`opening_hours`, lib/card/openingHours.ts).
+ *
+ * Photo de la hero /card, par ordre de priorité :
+ *   1. photo téléversée depuis l'admin (Contenu public) : variantes
+ *      `${hero_image_base}-${largeur}.avif|webp` dans le stockage Supabase ;
+ *   2. `hero_image_url` (URL unique, réglage technique antérieur) ;
+ *   3. l'asset du tenant livré avec le code (CARD_HERO_ASSETS) ;
+ *   4. aucune photo : la hero garde un dégradé aux couleurs du tenant.
+ * `hero_image_position` (CSS object-position) s'applique à chacune.
  * Seules deux origines sont acceptées : un fichier du dossier public
  * `/images/…` ou le stockage public Supabase du projet, jamais une URL tierce
  * arbitraire. La photo n'utilise jamais `/_next/image` : la quota Vercel Image
@@ -17,14 +24,21 @@ import { z } from 'zod';
  */
 export const DIGITAL_CARD_FEATURE_KEY = 'digital_card';
 
+export const HERO_UPLOAD_WIDTHS = [480, 800, 1200] as const;
+
 export const digitalCardConfigSchema = z.object({
   hero_image_url: z.string().trim().max(500).nullable(),
   hero_image_position: z.string().trim().max(40).nullable(),
+  hero_image_base: z.string().trim().max(500).nullable(),
+  hero_image_widths: z.array(z.number().int().min(160).max(2400)).min(1).max(6).nullable(),
+  opening_hours: openingHoursSchema.nullable(),
 });
 
 export type DigitalCardConfig = z.infer<typeof digitalCardConfigSchema>;
 
-export const DIGITAL_CARD_DEFAULTS: DigitalCardConfig = { hero_image_url: null, hero_image_position: null };
+export const DIGITAL_CARD_DEFAULTS: DigitalCardConfig = {
+  hero_image_url: null, hero_image_position: null, hero_image_base: null, hero_image_widths: null, opening_hours: null,
+};
 
 export interface CardHeroImageSource {
   type: 'image/avif' | 'image/webp';
@@ -85,6 +99,11 @@ export function resolveCardHeroImage(input: {
 }): CardHeroImage | null {
   const configured = input.config?.hero_image_url;
   const configuredPosition = normalizeHeroPosition(input.config?.hero_image_position);
+  const base = input.config?.hero_image_base;
+  const widths = input.config?.hero_image_widths;
+  if (base && widths?.length && isAllowedHeroImageUrl(base, input.supabaseUrl) && !/[?#]/.test(base)) {
+    return staticHeroAsset(base, [...widths].sort((a, b) => a - b), configuredPosition ?? DEFAULT_POSITION);
+  }
   if (configured && isAllowedHeroImageUrl(configured, input.supabaseUrl)) {
     return { src: configured.trim(), position: configuredPosition ?? DEFAULT_POSITION };
   }

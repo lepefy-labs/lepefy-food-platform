@@ -51,6 +51,9 @@ export function permissionForAdminApi(pathname: string, method: string): AdminAp
   if (path.startsWith('/api/admin/clients/')) return read ? 'customers.view' : 'customers.manage';
   if (path.startsWith('/api/admin/hero-slides') || path.startsWith('/api/admin/social-links') || path.startsWith('/api/admin/labels') || path === '/api/admin/upload-label-asset' || path === '/api/admin/upload-product-image' || path === '/api/admin/generate-product-image' || path === '/api/admin/generate-product-description') return 'catalog.manage';
   if (path === '/api/admin/card/poster' || path === '/api/admin/upload-story-photo' || path === '/api/admin/app-icon') return 'tenant_settings.manage';
+  // Carte digitale : photo de la hero (téléversement) et réglages (cadrage, horaires structurés).
+  if (path === '/api/admin/card/hero-image') return 'tenant_settings.manage';
+  if (path === '/api/admin/card/settings') return read ? 'tenant_settings.view' : 'tenant_settings.manage';
   if (path.startsWith('/api/admin/knowledge-base')) return 'ai_knowledge.manage';
   if (path.startsWith('/api/admin/loyalty/scan')) return 'loyalty.scan';
   // Program settings keep the permission of their former route (/api/admin/tenant).

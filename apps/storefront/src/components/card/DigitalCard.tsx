@@ -17,6 +17,7 @@ import { useApplePaySupport } from '@/lib/payments/useApplePaySupport';
 import { cardPaymentBrandStrip } from '@/lib/card/cardPaymentBrands';
 import { CARD_PAGE_BACKGROUND, readableForeground } from '@/lib/card/cardTheme';
 import type { CardHeroImage } from '@/lib/card/cardHero';
+import type { OpeningHours } from '@/lib/card/openingHours';
 import type { CardShowcaseProduct } from '@/lib/card/getCardShowcaseProducts';
 
 type Lang = 'fr' | 'it';
@@ -40,6 +41,7 @@ interface Props {
   reviewsEnabled: boolean;
   heroImage: CardHeroImage | null;
   showcaseProducts: CardShowcaseProduct[];
+  openingHours: OpeningHours | null;
 }
 
 /**
@@ -48,7 +50,7 @@ interface Props {
  * PaymentMethodsAccordion → CardQuickPay → Stripe, retour après redirection
  * via useCardPaymentReturn.
  */
-export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethods, applePayEnabled, reviewsEnabled, heroImage, showcaseProducts }: Props) {
+export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethods, applePayEnabled, reviewsEnabled, heroImage, showcaseProducts, openingHours }: Props) {
   // Filtre unique pour le bouton « Payer maintenant », la fascia des marques et
   // la liste : si seule la ligne apple_pay existe et que l'appareil ne supporte
   // pas Apple Pay, rien n'est proposé (jamais de page de paiement vide).
@@ -136,7 +138,7 @@ export function DigitalCard({ tenant, socialLinks, paymentMethods: allCardMethod
                 />
               </div>
               <div className="flex flex-col gap-4 sm:gap-5 lg:col-span-5 lg:col-start-1 lg:row-start-2">
-                <CardStoreInfo lang={lang} tenant={tenant} socialLinks={socialLinks} reviewsEnabled={reviewsEnabled} />
+                <CardStoreInfo lang={lang} tenant={tenant} socialLinks={socialLinks} reviewsEnabled={reviewsEnabled} openingHours={openingHours} />
               </div>
             </div>
           </main>

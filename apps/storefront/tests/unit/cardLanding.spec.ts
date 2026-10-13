@@ -6,6 +6,8 @@ import { cardPaymentBrandStrip, isOnlineCardMethod } from '../../src/lib/card/ca
 import { CARD_HERO_ASSETS, isAllowedHeroImageUrl, normalizeHeroPosition, resolveCardHeroImage } from '../../src/lib/card/cardHero';
 import { darkenHex, readableForeground } from '../../src/lib/card/cardTheme';
 import { parseCardAmount, sanitizeAmountInput } from '../../src/lib/card/cardAmount';
+import { defaultTimezone, emptyWeek, openingHoursSchema, openingStatus, statusLabel, weekRows, type OpeningHours } from '../../src/lib/card/openingHours';
+import { permissionForAdminApi } from '../../src/lib/auth/adminApiPermissions';
 
 function product(id: string, overrides: Partial<CardShowcaseCandidate> = {}): CardShowcaseCandidate {
   return {
@@ -150,5 +152,63 @@ test.describe('montant /card', () => {
     expect(parseCardAmount('0,99')).toBe(0.99);
     expect(parseCardAmount('')).toBeNull();
     expect(parseCardAmount(',')).toBeNull();
+  });
+});
+
+test.describe('horaires structurés /card', () => {
+  const week = (): OpeningHours => {
+    const days = emptyWeek();
+    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri'] as const) days[day] = [{ open: '09:00', close: '13:00' }, { open: '15:00', close: '19:00' }];
+    days.sat = [{ open: '09:00', close: '19:00' }];
+    return { timezone: 'Europe/Rome', days };
+  };
+  // 13 octobre 2026 = mardi. 10:00 UTC = 12:00 à Rome (UTC+2).
+  const at = (iso: string) => new Date(iso);
+
+  test('ouvert / fermé dans le fuseau du commerce, pause déjeuner comprise', () => {
+    expect(openingStatus(week(), at('2026-10-13T10:00:00Z'))).toEqual({ state: 'open', closesAt: '13:00' });
+    expect(openingStatus(week(), at('2026-10-13T11:30:00Z'))).toEqual({ state: 'closed', next: { dayOffset: 0, day: 'tue', time: '15:00' } });
+    expect(openingStatus(week(), at('2026-10-13T18:00:00Z'))).toEqual({ state: 'closed', next: { dayOffset: 1, day: 'wed', time: '09:00' } });
+    // Samedi 17/10 20:00 Rome → dimanche fermé → lundi.
+    expect(openingStatus(week(), at('2026-10-17T18:30:00Z'))).toEqual({ state: 'closed', next: { dayOffset: 2, day: 'mon', time: '09:00' } });
+    // Même instant, fuseau de Douala (UTC+1) : 11:00, ouvert.
+    expect(openingStatus({ ...week(), timezone: 'Africa/Douala' }, at('2026-10-13T10:00:00Z')).state).toBe('open');
+  });
+
+  test('libellés FR / IT', () => {
+    expect(statusLabel({ state: 'open', closesAt: '19:00' }, 'fr')).toEqual({ title: 'Ouvert maintenant', detail: 'jusqu’à 19h00' });
+    expect(statusLabel({ state: 'closed', next: { dayOffset: 1, day: 'wed', time: '09:00' } }, 'fr').detail).toBe('ouvre demain à 9h00');
+    expect(statusLabel({ state: 'closed', next: { dayOffset: 3, day: 'mon', time: '09:30' } }, 'it').detail).toBe('apre lunedì alle 9:30');
+  });
+
+  test('tableau regroupé et validation', () => {
+    expect(weekRows(week()).map((row) => [row.from, row.to, row.ranges.length])).toEqual([['mon', 'fri', 2], ['sat', 'sat', 1], ['sun', 'sun', 0]]);
+    expect(openingHoursSchema.safeParse(week()).success).toBe(true);
+    const bad = week(); bad.days.mon = [{ open: '12:00', close: '10:00' }];
+    expect(openingHoursSchema.safeParse(bad).success).toBe(false);
+    const overlap = week(); overlap.days.tue = [{ open: '09:00', close: '14:00' }, { open: '13:00', close: '19:00' }];
+    expect(openingHoursSchema.safeParse(overlap).success).toBe(false);
+    expect(openingHoursSchema.safeParse({ ...week(), timezone: 'Mars/Olympus' }).success).toBe(false);
+    expect(defaultTimezone('FR')).toBe('Europe/Paris');
+    expect(defaultTimezone('IT')).toBe('Europe/Rome');
+  });
+});
+
+test.describe('photo téléversée et permissions admin /card', () => {
+  const supabaseUrl = 'https://abc.supabase.co';
+
+  test('variantes téléversées prioritaires, jamais d’URL tierce', () => {
+    const base = `${supabaseUrl}/storage/v1/object/public/assets/card-hero/t1/v123`;
+    const image = resolveCardHeroImage({ slug: 'chloefood', supabaseUrl, config: { hero_image_base: base, hero_image_widths: [1200, 480, 800], hero_image_position: null, hero_image_url: null } });
+    expect(image?.src).toBe(`${base}-800.webp`);
+    expect(image?.sources?.[0]).toEqual({ type: 'image/avif', srcSet: `${base}-480.avif 480w, ${base}-800.avif 800w, ${base}-1200.avif 1200w` });
+    expect(resolveCardHeroImage({ slug: 'chloefood', supabaseUrl, config: { hero_image_base: 'https://evil.example/x', hero_image_widths: [800], hero_image_position: null, hero_image_url: null } }))
+      .toEqual(CARD_HERO_ASSETS.chloefood);
+  });
+
+  test('routes admin mappées sur les réglages du tenant', () => {
+    expect(permissionForAdminApi('/api/admin/card/hero-image', 'POST')).toBe('tenant_settings.manage');
+    expect(permissionForAdminApi('/api/admin/card/settings', 'GET')).toBe('tenant_settings.view');
+    expect(permissionForAdminApi('/api/admin/card/settings', 'PATCH')).toBe('tenant_settings.manage');
   });
 });

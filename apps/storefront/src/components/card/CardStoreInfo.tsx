@@ -7,6 +7,8 @@ import {
 } from '@tabler/icons-react';
 import { SOCIAL_PLATFORM_REGISTRY, type TenantSocialLink } from '@lepefy/types';
 import { CardLocation } from './CardLocation';
+import { CardOpeningHours } from './CardOpeningHours';
+import type { OpeningHours } from '@/lib/card/openingHours';
 
 type Lang = 'fr' | 'it';
 
@@ -37,14 +39,16 @@ interface CardStoreInfoProps {
   };
   socialLinks: TenantSocialLink[];
   reviewsEnabled: boolean;
+  /** Horaires structurés (statut « Ouvert / Fermé ») ; sinon les horaires texte du tenant. */
+  openingHours: OpeningHours | null;
 }
 
 /** Contacts, adresse, horaires, avis et réseaux : regroupés en deux surfaces au lieu d'une pile de cartes grises. */
-export function CardStoreInfo({ lang, tenant, socialLinks, reviewsEnabled }: CardStoreInfoProps) {
+export function CardStoreInfo({ lang, tenant, socialLinks, reviewsEnabled, openingHours }: CardStoreInfoProps) {
   const t = COPY[lang];
   const hours = lang === 'it' ? (tenant.click_collect_hours_it || tenant.click_collect_hours) : tenant.click_collect_hours;
   const ring = { '--tw-ring-color': tenant.primary_color } as React.CSSProperties;
-  const hasStore = Boolean(tenant.whatsapp_number || tenant.click_collect_address || tenant.google_maps_url || hours);
+  const hasStore = Boolean(tenant.whatsapp_number || tenant.click_collect_address || tenant.google_maps_url || hours || openingHours);
   const hasReviews = reviewsEnabled || Boolean(tenant.google_review_url);
 
   return (
@@ -84,7 +88,8 @@ export function CardStoreInfo({ lang, tenant, socialLinks, reviewsEnabled }: Car
               </a>
             )}
             <CardLocation address={tenant.click_collect_address} googleMapsUrl={tenant.google_maps_url} lang={lang} primaryColor={tenant.primary_color} secondaryColor={tenant.secondary_color} />
-            {hours && (
+            {openingHours && <CardOpeningHours hours={openingHours} lang={lang} primaryColor={tenant.primary_color} />}
+            {!openingHours && hours && (
               <div className="flex items-start gap-3 px-4 py-3.5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gray-50" style={{ color: tenant.primary_color }} aria-hidden><IconClock size={19} /></span>
                 <span className="min-w-0 flex-1">
