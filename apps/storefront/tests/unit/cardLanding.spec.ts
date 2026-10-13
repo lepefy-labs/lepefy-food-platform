@@ -5,6 +5,7 @@ import { hasValidPromotion, isShowcaseEligible, selectCardShowcase, type CardSho
 import { cardPaymentBrandStrip, isOnlineCardMethod } from '../../src/lib/card/cardPaymentBrands';
 import { CARD_HERO_ASSETS, isAllowedHeroImageUrl, normalizeHeroPosition, resolveCardHeroImage } from '../../src/lib/card/cardHero';
 import { darkenHex, readableForeground } from '../../src/lib/card/cardTheme';
+import { parseCardAmount, sanitizeAmountInput } from '../../src/lib/card/cardAmount';
 
 function product(id: string, overrides: Partial<CardShowcaseCandidate> = {}): CardShowcaseCandidate {
   return {
@@ -137,8 +138,7 @@ test.describe('photo hero /card', () => {
 });
 
 test.describe('montant /card', () => {
-  test('virgule ou point, un seul séparateur, deux décimales', async () => {
-    const { sanitizeAmountInput, parseCardAmount } = await import('../../src/lib/card/cardAmount');
+  test('virgule ou point, un seul séparateur, deux décimales', () => {
     expect(sanitizeAmountInput('12,50')).toBe('12,50');
     expect(sanitizeAmountInput('12.505')).toBe('12.50');
     expect(sanitizeAmountInput('1 200,5 €')).toBe('1200,5');
