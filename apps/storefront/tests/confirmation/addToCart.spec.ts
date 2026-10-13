@@ -4,7 +4,7 @@ const suggestion = (id: string, stock = 3) => ({
   id, name: 'Suggestion ' + id, slug: 'suggestion-' + id, price: 5,
   compare_at_price: id === 'one' ? 7 : null, image_url: null, weight_grams: null, stock,
 });
-const dialog = (page: Page) => page.getByRole('dialog', { name: 'Ajouté au panier', exact: true });
+const dialog = (page: Page) => page.getByRole('dialog', { name: 'Produit ajouté au panier !', exact: true });
 const trigger = (page: Page) => page.getByRole('button', { name: 'Ajouter au panier', exact: true }).filter({ hasText: 'Ajouter au panier' }).first();
 const readItems = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('lepefy-cart') ?? '{"state":{"items":[]}}').state.items as { product: { id: string; stock: number }; quantity: number }[]);
 
