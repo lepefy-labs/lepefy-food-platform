@@ -1,12 +1,19 @@
 name: Storefront confirmation smoke
 
 on:
+  # Manual run from Actions (branch main): re-checks the current production deploy.
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - 'apps/storefront/src/components/catalog/**'
-      - 'apps/storefront/src/components/cart/AddToCartConfirmation.tsx'
+      - 'apps/storefront/src/components/cart/**'
+      # Shop chrome (header, BottomNav, search bar) drives the responsive overflow checks.
+      - 'apps/storefront/src/components/layout/**'
+      - 'apps/storefront/src/components/search/**'
       - 'apps/storefront/src/stores/addToCartUiStore.ts'
+      - 'apps/storefront/src/stores/cartUiStore.ts'
+      - 'apps/storefront/tailwind.config.ts'
       - 'apps/storefront/src/lib/catalog/getRelatedProducts.ts'
       - 'apps/storefront/src/app/api/products/**'
       - 'apps/storefront/src/app/(shop)/**'
