@@ -107,8 +107,16 @@ test.describe('photo hero /card', () => {
     expect(resolveCardHeroImage({ slug: 'unknown-tenant', config: null, supabaseUrl })).toBeNull();
   });
 
-  test('l’asset Chloe Food existe dans public/', () => {
-    expect(() => readFileSync(`public${CARD_HERO_ASSETS.chloefood!.src}`)).not.toThrow();
+  test('assets du code : chaque variante AVIF/WebP existe dans public/, jamais via /_next/image', () => {
+    for (const [slug, asset] of Object.entries(CARD_HERO_ASSETS)) {
+      const files = [asset.src, ...(asset.sources ?? []).flatMap((source) => source.srcSet.split(',').map((entry) => entry.trim().split(' ')[0]!))];
+      expect(asset.sources?.map((source) => source.type), slug).toEqual(['image/avif', 'image/webp']);
+      for (const file of files) {
+        expect(file.startsWith('/images/'), file).toBe(true);
+        expect(() => readFileSync(`public${file}`), file).not.toThrow();
+      }
+    }
+    expect(readFileSync('src/components/card/CardHero.tsx', 'utf8')).not.toContain("from 'next/image'");
   });
 
   test('object-position limité à des mots-clés ou pourcentages', () => {

@@ -6,10 +6,14 @@ import { z } from 'zod';
  *      `hero_image_position`, CSS object-position), lu par getCardHeroImage ;
  *   2. sinon l'asset du tenant livré avec le code (CARD_HERO_ASSETS) ;
  *   3. sinon aucune photo : la hero garde un dégradé aux couleurs du tenant.
- * Seules deux origines sont acceptées, toutes deux servies par next/image
- * (AVIF/WebP, tailles responsives, cache) : un fichier du dossier public
- * `/images/…` ou le stockage public Supabase du projet. Jamais une URL tierce
- * arbitraire. Pur, testé dans tests/unit/cardHero.spec.ts.
+ * Seules deux origines sont acceptées : un fichier du dossier public
+ * `/images/…` ou le stockage public Supabase du projet, jamais une URL tierce
+ * arbitraire. La photo n'utilise jamais `/_next/image` : la quota Vercel Image
+ * Optimization est épuisée (docs/IMAGE_OPTIMIZATION_AUDIT.md) et toute
+ * transformation non encore en cache répond 402. Les assets du code sont donc
+ * livrés pré-déclinés en AVIF/WebP à plusieurs largeurs (`<picture>` +
+ * `srcset`), une URL configurée est servie telle quelle. Pur, testé dans
+ * tests/unit/cardLanding.spec.ts.
  */
 export const DIGITAL_CARD_FEATURE_KEY = 'digital_card';
 
@@ -22,17 +26,36 @@ export type DigitalCardConfig = z.infer<typeof digitalCardConfigSchema>;
 
 export const DIGITAL_CARD_DEFAULTS: DigitalCardConfig = { hero_image_url: null, hero_image_position: null };
 
+export interface CardHeroImageSource {
+  type: 'image/avif' | 'image/webp';
+  srcSet: string;
+}
+
 export interface CardHeroImage {
+  /** Image de repli du `<img>` (navigateur sans `<picture>`/AVIF). */
   src: string;
   /** Valeur CSS `object-position` : garde le sujet visible sur mobile comme sur desktop. */
   position: string;
+  /** Variantes statiques pré-générées, de la plus compacte à la plus compatible. */
+  sources?: CardHeroImageSource[];
+}
+
+/** Asset public décliné en `<base>-<largeur>.avif|webp` (jamais agrandi au-delà de l'original). */
+export function staticHeroAsset(base: string, widths: readonly number[], position: string): CardHeroImage {
+  const srcSet = (ext: string) => widths.map((w) => `${base}-${w}.${ext} ${w}w`).join(', ');
+  const fallback = widths[Math.min(1, widths.length - 1)];
+  return {
+    src: `${base}-${fallback}.webp`,
+    position,
+    sources: [{ type: 'image/avif', srcSet: srcSet('avif') }, { type: 'image/webp', srcSet: srcSet('webp') }],
+  };
 }
 
 const DEFAULT_POSITION = 'center';
 
 /** Assets livrés avec le code, par slug : photo réelle d'un client qui paie, sujet à droite. */
 export const CARD_HERO_ASSETS: Record<string, CardHeroImage> = {
-  chloefood: { src: '/images/card/chloefood-hero-payment.webp', position: '72% 28%' },
+  chloefood: staticHeroAsset('/images/card/chloefood-hero-payment', [480, 800, 1122], '72% 28%'),
 };
 
 const POSITION_TOKEN = /^(?:left|center|right|top|bottom|\d{1,3}%)$/;
@@ -63,5 +86,5 @@ export function resolveCardHeroImage(input: {
   }
   const asset = CARD_HERO_ASSETS[input.slug];
   if (!asset) return null;
-  return { src: asset.src, position: normalizeHeroPosition(input.config?.hero_image_position) ?? asset.position };
+  return { ...asset, position: normalizeHeroPosition(input.config?.hero_image_position) ?? asset.position };
 }

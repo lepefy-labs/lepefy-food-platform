@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { IconChevronRight, IconCreditCard, IconShoppingBag } from '@tabler/icons-react';
 import { TenantLogo } from '@/components/branding/TenantLogo';
@@ -9,6 +9,8 @@ import { CARD_PAY_COLOR, darkenHex } from '@/lib/card/cardTheme';
 import { hexToRgba } from '@/lib/card/methodColor';
 
 type Lang = 'fr' | 'it';
+
+const HERO_SIZES = '(min-width: 1024px) 600px, 100vw';
 
 const COPY = {
   fr: { title: 'Payez ici, simplement.', subtitle: 'Réglez votre achat en quelques instants.', pay: 'Payer maintenant', shop: 'Commander sur la boutique', language: 'Langue' },
@@ -34,8 +36,17 @@ interface CardHeroProps {
  * dimensions ne dépendent jamais d'elle (pas de CLS) et les boutons sont
  * utilisables avant son chargement.
  */
-export function CardHero({ lang, onLangChange, tenant, image, onPay, showShop }: CardHeroProps) {
+export function CardHero({ lang, onLangChange, tenant, image: configuredImage, onPay, showShop }: CardHeroProps) {
   const t = COPY[lang];
+  // Photo introuvable ou refusée : la hero se replie sur le dégradé compact, jamais une icône d'image cassée.
+  const [imageFailed, setImageFailed] = useState(false);
+  const image = imageFailed ? null : configuredImage;
+  const imageRef = useRef<HTMLImageElement>(null);
+  // Une erreur survenue avant l'hydratation ne déclenche pas onError côté React.
+  useEffect(() => {
+    const element = imageRef.current;
+    if (element?.complete && element.naturalWidth === 0) setImageFailed(true);
+  }, []);
   const background = darkenHex(tenant.primary_color, 0.8);
   const fade = (alpha: number) => hexToRgba(background, alpha);
 
@@ -69,15 +80,23 @@ export function CardHero({ lang, onLangChange, tenant, image, onPay, showShop }:
         style={image ? undefined : { background: `radial-gradient(120% 90% at 80% 10%, ${hexToRgba(tenant.primary_color, 0.55)} 0%, transparent 70%)` }}
       >
         {image && (
-          <Image
-            src={image.src}
-            alt=""
-            fill
-            priority
-            sizes="(min-width: 1024px) 600px, 100vw"
-            className="object-cover"
-            style={{ objectPosition: image.position }}
-          />
+          // <picture> statique, jamais /_next/image (quota Vercel épuisée → 402, cf. lib/card/cardHero.ts).
+          <picture>
+            {image.sources?.map((source) => <source key={source.type} type={source.type} srcSet={source.srcSet} sizes={HERO_SIZES} />)}
+            {/* eslint-disable-next-line @next/next/no-img-element -- variantes AVIF/WebP pré-générées, servies sans transformation */}
+            <img
+              ref={imageRef}
+              src={image.src}
+              alt=""
+              sizes={image.sources ? HERO_SIZES : undefined}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              onError={() => setImageFailed(true)}
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition: image.position }}
+            />
+          </picture>
         )}
         {/* Haut : lisibilité du logo et du sélecteur ; bas (mobile) / gauche (desktop) : fondu vers le fond du texte. */}
         <div aria-hidden className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/45 to-transparent" />
