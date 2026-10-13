@@ -203,7 +203,7 @@ export function Header({ socialLinks = [], storyEnabled = false, reviewsAvailabl
                 onClick={handleCartClick}
                 aria-haspopup="dialog"
                 aria-label={cartAriaLabel(totalItems, 'Ouvrir le panier')}
-                className={`inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-bold shadow-sm transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:animate-none ${cartPulse ? 'animate-cart-pop' : ''}`}
+                className={`hidden min-h-11 items-center gap-2 whitespace-nowrap rounded-full px-4 lg:inline-flex text-sm font-bold shadow-sm transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:animate-none ${cartPulse ? 'animate-cart-pop' : ''}`}
                 style={{ backgroundColor: 'var(--color-primary)', color: onPrimary, outlineColor: 'var(--color-primary)' }}
               >
                 <IconShoppingCart size={20} stroke={2} aria-hidden="true" />

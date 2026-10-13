@@ -64,7 +64,10 @@ test.describe('éléments du layout boutique', () => {
 
   test('le panier latéral reste accessible à côté de la recherche mobile', () => {
     const bar = readFileSync('src/components/search/ShopSearchBar.tsx', 'utf8');
-    expect(bar).toContain('<CartShortcutButton className="md:hidden" />');
+    expect(bar).toContain('<CartShortcutButton />');
+    // À 768 px l'header (logo 320 px + liens) n'a pas la place du bouton « Mon panier ».
+    const header = readFileSync('src/components/layout/Header.tsx', 'utf8');
+    expect(header).toMatch(/hidden min-h-11[^`]*lg:inline-flex/);
     const button = readFileSync('src/components/cart/CartShortcutButton.tsx', 'utf8');
     expect(button).toContain('openDrawer()');
     expect(button).toContain('href="/cart"');

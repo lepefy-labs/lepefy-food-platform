@@ -21,9 +21,9 @@ export function SearchFieldPlaceholder({ variant }: { variant: 'bar' | 'header' 
 /**
  * Barre de recherche mobile/tablette, juste sous l'header : seul élément du
  * haut qui reste fixé au défilement sur mobile (l'header défile, la BottomNav
- * garde les destinations), avec l'accès au panier latéral à droite du champ.
- * Sur tablette l'header (fixe) porte déjà « Panier » ; sur desktop le champ
- * vit dans l'header.
+ * garde les destinations), avec l'accès au panier latéral à droite du champ
+ * (mobile et tablette). Sur desktop le champ et « Mon panier » vivent dans
+ * l'header ; sur tablette l'header n'a pas la place pour ce bouton.
  */
 export function ShopSearchBar() {
   const pathname = usePathname();
@@ -38,7 +38,7 @@ export function ShopSearchBar() {
               <GlobalProductSearch variant="bar" />
             </Suspense>
           </div>
-          <CartShortcutButton className="md:hidden" />
+          <CartShortcutButton />
         </div>
       </div>
     </div>
