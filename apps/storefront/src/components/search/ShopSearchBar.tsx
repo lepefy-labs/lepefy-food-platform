@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { IconSearch } from '@tabler/icons-react';
 import { shouldShowGlobalSearch } from '@/lib/storefront/shopChrome';
+import { CartShortcutButton } from '@/components/cart/CartShortcutButton';
 import { GlobalProductSearch } from './GlobalProductSearch';
 
 /** Même gabarit que le champ réel : le rendu statique (ISR) ne décale rien à l'hydratation. */
@@ -20,7 +21,9 @@ export function SearchFieldPlaceholder({ variant }: { variant: 'bar' | 'header' 
 /**
  * Barre de recherche mobile/tablette, juste sous l'header : seul élément du
  * haut qui reste fixé au défilement sur mobile (l'header défile, la BottomNav
- * garde les destinations). Sur desktop le champ vit dans l'header.
+ * garde les destinations), avec l'accès au panier latéral à droite du champ.
+ * Sur tablette l'header (fixe) porte déjà « Panier » ; sur desktop le champ
+ * vit dans l'header.
  */
 export function ShopSearchBar() {
   const pathname = usePathname();
@@ -29,10 +32,13 @@ export function ShopSearchBar() {
   return (
     <div className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur motion-reduce:backdrop-blur-none md:top-24 lg:hidden">
       <div className="mx-auto max-w-6xl px-4 py-2">
-        <div className="max-w-2xl">
-          <Suspense fallback={<SearchFieldPlaceholder variant="bar" />}>
-            <GlobalProductSearch variant="bar" />
-          </Suspense>
+        <div className="flex max-w-2xl items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <Suspense fallback={<SearchFieldPlaceholder variant="bar" />}>
+              <GlobalProductSearch variant="bar" />
+            </Suspense>
+          </div>
+          <CartShortcutButton className="md:hidden" />
         </div>
       </div>
     </div>

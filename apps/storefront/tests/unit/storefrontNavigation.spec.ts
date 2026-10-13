@@ -62,6 +62,14 @@ test.describe('éléments du layout boutique', () => {
     expect(layout.indexOf('<PromoTickerGate />')).toBeGreaterThan(layout.indexOf('<ShopSearchBar />'));
   });
 
+  test('le panier latéral reste accessible à côté de la recherche mobile', () => {
+    const bar = readFileSync('src/components/search/ShopSearchBar.tsx', 'utf8');
+    expect(bar).toContain('<CartShortcutButton className="md:hidden" />');
+    const button = readFileSync('src/components/cart/CartShortcutButton.tsx', 'utf8');
+    expect(button).toContain('openDrawer()');
+    expect(button).toContain('href="/cart"');
+  });
+
   test('un seul champ de recherche : CatalogClient n’en possède plus', () => {
     const catalog = readFileSync('src/components/catalog/CatalogClient.tsx', 'utf8');
     expect(catalog).not.toContain('type="search"');
